@@ -7,6 +7,20 @@ description: Use whenever writing a git commit message, amending a commit, squas
 
 Every commit in this user's repositories follows one exact format. No exceptions, no variations, no "this commit is special".
 
+## Never commit on your own initiative
+
+<EXTREMELY-IMPORTANT>
+Only run `git commit` when the user has explicitly asked for a commit in their current request.
+"Fix the bug", "add the feature", "clean this up" are NOT commit requests — finish the work,
+report it, and leave the tree uncommitted. The user decides if and when it gets committed.
+</EXTREMELY-IMPORTANT>
+
+**No exceptions:**
+- Finishing a task is not authorization to commit it.
+- A commit request earlier in the conversation does not cover work done after it.
+- A dirty working tree is not a reason to commit.
+- The same ban covers everything that creates or rewrites commits: `--amend`, rebase, squash, merge commits, `git stash` used as a shortcut — none of these unless that operation was itself requested.
+
 ## The format
 
 ```
@@ -140,6 +154,8 @@ If the diff mixes intents (a feature + an unrelated formatting pass), stage and 
 
 | Thought | Reality |
 |---|---|
+| "The task is done, I'll commit to wrap it up" | Done means report and stop. Committing needs its own explicit ask. |
+| "They asked me to commit earlier, this is more of the same" | One request covers one commit round. New work needs a new ask. |
 | "This change is too big for one title" | Then it's more than one commit. Split it. |
 | "The default says to add a co-author" | This skill overrides it. Never add one. |
 | "The user speaks Italian, so I'll write it in Italian" | Commits are always English. |
