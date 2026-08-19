@@ -1,0 +1,202 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { openDatabase } from "../../src/ui/db/open.ts";
+import { migrate } from "../../src/ui/db/migrate.ts";
+import { createSqliteStateStore } from "../../src/ui/sqliteStateStore.ts";
+import { createHistoryService } from "../../src/ui/history.ts";
+import type { HistoryStore } from "../../src/ui/historyStore.interface.ts";
+import type { OverallStatus } from "../../src/core/types.ts";
+
+const DAY_MS = 24 * 3600 * 1000;
+/** Fixed "today" so day bucketing never depends on when the suite runs. */
+const NOW = new Date("2026-08-19T12:00:00.000Z");
+const daysAgo = (n: number, hour = 12): string =>
+  new Date(NOW.getTime() - n * DAY_MS).toISOString().replace("T12:00", `T${String(hour).padStart(2, "0")}:00`);
+
+async function harness(providers: string[] = ["github"]): Promise<{
+  store: HistoryStore;
+  history: ReturnType<typeof createHistoryService>;
+}> {
+  const dir = await mkdtemp(join(tmpdir(), "statuswatch-history-"));
+  const db = openDatabase(join(dir, "statuswatch.db"));
+  migrate(db);
+  const insert = db.prepare(
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, created_at) VALUES (?, ?, 'statuspage', ?, NULL, 1, ?)",
+  );
+  for (const id of providers) insert.run(id, id, `https://${id}.example`, daysAgo(200));
+  const store = createSqliteStateStore(db);
+  return { store, history: createHistoryService(store, { now: () => NOW }) };
+}
+
+const sample = (store: HistoryStore, provider: string, at: string, status: OverallStatus) =>
+  store.saveStatus({ provider, overallStatus: status, activeIncidents: [], fetchedAt: at });
+
+test("a week of operational samples is a hundred percent uptime with one bucket per day", async () => {
+  const { store, history } = await harness();
+  for (let day = 0; day < 7; day += 1) await sample(store, "github", daysAgo(day), "operational");
+
+  const result = await history.getProviderHistory("github", 7, 3);
+  assert.equal(result.buckets.length, 7);
+  assert.equal(result.uptime7, 100);
+  assert.ok(result.buckets.every((bucket) => bucket.status === "operational"));
+  assert.equal(result.downtimeMinutes, 0);
+  await store.close();
+});
+
+test("buckets are ordered oldest first, so a bar row reads left to right", async () => {
+  const { store, history } = await harness();
+  for (let day = 0; day < 3; day += 1) await sample(store, "github", daysAgo(day), "operational");
+  const { buckets } = await history.getProviderHistory("github", 3, 3);
+  assert.deepEqual(
+    buckets.map((bucket) => bucket.day),
+    [daysAgo(2).slice(0, 10), daysAgo(1).slice(0, 10), daysAgo(0).slice(0, 10)],
+  );
+  await store.close();
+});
+
+test("the worst status of a day wins the bucket, not the average", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(1, 1), "operational");
+  await sample(store, "github", daysAgo(1, 2), "major_outage");
+  await sample(store, "github", daysAgo(1, 3), "operational");
+  await sample(store, "github", daysAgo(0), "operational");
+
+  const { buckets } = await history.getProviderHistory("github", 2, 3);
+  assert.equal(buckets[0]?.status, "major_outage", "one bad sample must colour the day");
+  assert.equal(buckets[1]?.status, "operational");
+  await store.close();
+});
+
+test("a day with no samples is an unknown bucket in its own position", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(2), "operational");
+  await sample(store, "github", daysAgo(0), "operational");
+
+  const { buckets } = await history.getProviderHistory("github", 3, 3);
+  assert.deepEqual(
+    buckets.map((bucket) => bucket.status),
+    ["operational", "unknown", "operational"],
+  );
+  await store.close();
+});
+
+test("a gap does not drag the uptime percentage down", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(6), "operational");
+  await sample(store, "github", daysAgo(0), "operational");
+  const result = await history.getProviderHistory("github", 7, 3);
+  assert.equal(result.uptime7, 100, "uptime is measured over samples taken, not days imagined");
+  await store.close();
+});
+
+test("a ninety day window always returns ninety buckets", async () => {
+  const { store, history } = await harness();
+  for (let day = 0; day < 10; day += 1) await sample(store, "github", daysAgo(day), "operational");
+  const { buckets } = await history.getProviderHistory("github", 90, 3);
+  assert.equal(buckets.length, 90);
+  assert.equal(buckets.filter((bucket) => bucket.status === "unknown").length, 80);
+  await store.close();
+});
+
+test("uptime is reported for seven, thirty and ninety days independently", async () => {
+  const { store, history } = await harness();
+  // Bad only outside the seven-day window.
+  for (let day = 0; day < 40; day += 1) {
+    await sample(store, "github", daysAgo(day), day >= 10 && day < 20 ? "major_outage" : "operational");
+  }
+  const result = await history.getProviderHistory("github", 90, 3);
+  assert.equal(result.uptime7, 100);
+  assert.ok(result.uptime30 < 100 && result.uptime30 > 50, `got ${result.uptime30}`);
+  assert.ok(result.uptime90 < result.uptime7);
+  await store.close();
+});
+
+test("downtime is the non-operational samples multiplied by the interval", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(1, 1), "major_outage");
+  await sample(store, "github", daysAgo(1, 2), "degraded");
+  await sample(store, "github", daysAgo(0), "operational");
+  const result = await history.getProviderHistory("github", 7, 5);
+  assert.equal(result.downtimeMinutes, 10);
+  await store.close();
+});
+
+test("percentages come back as numbers for the client to format", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(0), "operational");
+  const result = await history.getProviderHistory("github", 7, 3);
+  assert.equal(typeof result.uptime7, "number");
+  await store.close();
+});
+
+test("the incident count is the incidents that started inside the window", async () => {
+  const { store, history } = await harness();
+  await store.saveStatus({
+    provider: "github",
+    overallStatus: "degraded",
+    activeIncidents: [
+      { id: "recent", name: "x", impact: "minor", status: "investigating", updatedAt: daysAgo(3) },
+    ],
+    fetchedAt: daysAgo(3),
+  });
+  await store.saveStatus({
+    provider: "github",
+    overallStatus: "degraded",
+    activeIncidents: [
+      { id: "old", name: "y", impact: "minor", status: "investigating", updatedAt: daysAgo(80) },
+    ],
+    fetchedAt: daysAgo(80),
+  });
+
+  assert.equal((await history.getProviderHistory("github", 7, 3)).incidentCount, 1);
+  assert.equal((await history.getProviderHistory("github", 90, 3)).incidentCount, 2);
+  await store.close();
+});
+
+test("a provider with no history at all reports zero rather than throwing", async () => {
+  const { store, history } = await harness();
+  const result = await history.getProviderHistory("github", 30, 3);
+  assert.equal(result.uptime30, 0);
+  assert.equal(result.incidentCount, 0);
+  assert.equal(result.buckets.length, 30);
+  await store.close();
+});
+
+test("the summary averages across providers and lists four months", async () => {
+  const { store, history } = await harness(["github", "cloudflare"]);
+  for (let day = 0; day < 5; day += 1) {
+    await sample(store, "github", daysAgo(day), "operational");
+    await sample(store, "cloudflare", daysAgo(day), day === 0 ? "major_outage" : "operational");
+  }
+
+  const summary = await history.getSummary(30, 3);
+  assert.deepEqual(
+    summary.providers.map((provider) => provider.providerId).sort(),
+    ["cloudflare", "github"],
+  );
+  assert.ok(summary.aggregateUptime < 100 && summary.aggregateUptime > 80, `got ${summary.aggregateUptime}`);
+  assert.equal(summary.months.length, 4);
+  await store.close();
+});
+
+test("the summary's months are the last four calendar months, oldest first", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(0), "operational");
+  const summary = await history.getSummary(90, 3);
+  assert.deepEqual(
+    summary.months.map((month) => month.month),
+    ["2026-05", "2026-06", "2026-07", "2026-08"],
+  );
+  await store.close();
+});
+
+test("a disabled provider still appears in the summary, since its history is real", async () => {
+  const { store, history } = await harness(["github"]);
+  await sample(store, "github", daysAgo(0), "operational");
+  const summary = await history.getSummary(30, 3);
+  assert.equal(summary.providers.length, 1);
+  await store.close();
+});

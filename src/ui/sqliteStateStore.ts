@@ -2,9 +2,10 @@ import type { DatabaseSync } from "node:sqlite";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { ProviderRuntimeState } from "../core/stateStore.interface.ts";
 import { incidentSchema } from "../core/status.schema.ts";
-import type { Incident, NormalizedStatus } from "../core/types.ts";
+import type { Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { z } from "zod";
 import type {
+  DailyBucket,
   HistoryStore,
   IncidentFilter,
   IncidentRow,
@@ -61,6 +62,13 @@ const notificationRowSchema = z.object({
   error: z.string().nullable(),
 });
 
+const bucketRowSchema = z.object({
+  day: z.string(),
+  worst: z.number(),
+  ok_samples: z.number(),
+  total_samples: z.number(),
+});
+
 const sampleRowSchema = z.object({
   observed_at: z.string(),
   overall_status: overallStatusSchema,
@@ -68,6 +76,27 @@ const sampleRowSchema = z.object({
 });
 
 type IncidentDbRow = z.infer<typeof incidentRowSchema>;
+
+/**
+ * Severity rank used to pick a day's bucket. `unknown` ranks lowest on purpose:
+ * a day holding one unclassifiable sample among good ones reads as operational,
+ * and only a day with nothing but unknowns reads as unknown.
+ */
+const SEVERITY_RANK: Record<OverallStatus, number> = {
+  unknown: 0,
+  operational: 1,
+  degraded: 2,
+  partial_outage: 3,
+  major_outage: 4,
+};
+
+const RANK_TO_STATUS = Object.fromEntries(
+  Object.entries(SEVERITY_RANK).map(([status, rank]) => [rank, status as OverallStatus]),
+) as Record<number, OverallStatus>;
+
+const RANK_CASE = `CASE overall_status ${Object.entries(SEVERITY_RANK)
+  .map(([status, rank]) => `WHEN '${status}' THEN ${rank}`)
+  .join(" ")} ELSE ${SEVERITY_RANK.major_outage} END`;
 
 const baseline = (): ProviderRuntimeState => ({
   last: null,
@@ -282,6 +311,37 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
         )
         .get(providerId, incidentId);
       return row === undefined ? null : toIncidentRow(incidentRowSchema.parse(row));
+    },
+
+    async getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]> {
+      const from = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+      const rows = db
+        .prepare(
+          `SELECT date(observed_at) AS day,
+                  MAX(${RANK_CASE}) AS worst,
+                  SUM(ok) AS ok_samples,
+                  COUNT(*) AS total_samples
+           FROM status_samples
+           WHERE provider_id = ? AND observed_at >= ?
+           GROUP BY day
+           ORDER BY day ASC`,
+        )
+        .all(providerId, from)
+        .map((raw) => bucketRowSchema.parse(raw));
+
+      return rows.map((row) => ({
+        day: row.day,
+        worstStatus: RANK_TO_STATUS[row.worst] ?? "unknown",
+        okSamples: row.ok_samples,
+        totalSamples: row.total_samples,
+      }));
+    },
+
+    async listProviderIds(): Promise<string[]> {
+      return db
+        .prepare("SELECT id FROM services ORDER BY id")
+        .all()
+        .map((raw) => z.object({ id: z.string() }).parse(raw).id);
     },
 
     async getRecentSamples(providerId: string, limit: number): Promise<SampleRow[]> {
