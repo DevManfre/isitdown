@@ -12,12 +12,14 @@ import { applyTranslations, loadCatalog, t, formatTime } from "./i18n.js";
 import { currentTheme, initTheme, nextTheme, setTheme } from "./theme.js";
 import { element } from "./charts.js";
 import { renderOverview } from "./views/overview.js";
+import { openAddServiceDialog, renderProviders } from "./views/providers.js";
 
 const REFRESH_MS = 30_000;
 
 /** Route table. A view is linkable only once it is registered here. */
 const ROUTES = [
   { path: "overview", nav: "nav.overview", render: renderOverview },
+  { path: "providers", nav: "nav.providers", render: renderProviders },
 ];
 
 const state = {
@@ -152,7 +154,7 @@ function wireHeader() {
   });
 
   dom.addService.addEventListener("click", () => {
-    window.dispatchEvent(new CustomEvent("statuswatch:add-service"));
+    openAddServiceDialog();
   });
 }
 
