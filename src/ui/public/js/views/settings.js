@@ -93,7 +93,7 @@ function leftColumn(config, state) {
     meta.style.fontSize = "10.5px";
     left.append(meta);
 
-    const actions = element("div", "header-actions");
+    const actions = element("div", "row-actions");
     actions.append(editButton(known.get(service.id) ?? service), removeButton(service));
     row.append(left, actions);
     services.append(row);

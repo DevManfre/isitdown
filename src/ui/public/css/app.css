@@ -418,24 +418,77 @@
   background: color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
 
+/* — row actions — */
+/* An action inside a row wears the same outline as the buttons in the header,
+   sized down for the row and coloured by what it does: accent to edit, the
+   outage hue to remove, so a destructive click never looks like the safe one. */
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.btn-row {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+.btn-danger {
+  color: var(--status-major-outage);
+  border-color: var(--status-outage-border);
+}
+.btn-danger:hover {
+  background: var(--status-outage-tint);
+  border-color: var(--status-major-outage);
+}
+.btn-danger:active {
+  background: color-mix(in srgb, var(--status-major-outage) 22%, transparent);
+}
+
 /* — providers table — */
-/* The prototype tints a hovered provider row with the accent rather than with
-   the design system's neutral wash; the row rule keeps painting underneath. */
+/* Eight columns on the design system's 5.6px cell padding read as one crowded
+   block, so the table sets its own gutter and lets the rows breathe. The last
+   column drops it: its buttons already end at the table's edge. */
+.table th,
+.table td {
+  padding-right: 18px;
+}
+.table th:last-child,
+.table td:last-child {
+  padding-right: 0;
+}
+.table td {
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+
+/* A figure column is right-aligned in its header and in its cells from the same
+   class, so the two can't drift apart. */
+.table .num {
+  text-align: right;
+}
+.table .col-range {
+  width: 210px;
+}
+/* Sized by its buttons, never wrapped: "Edit / Remove" is wider than the
+   prototype's "Edit / ✕" and two lines of it stretches every row. */
+.table .col-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* Hover marks the row it is on without repainting it: the row's own rule lights
+   up in the accent and the text steps to full contrast. No slab of colour. */
 .table tbody tr:hover {
-  background:
-    linear-gradient(
-        color-mix(in srgb, var(--color-accent) 7%, transparent),
-        color-mix(in srgb, var(--color-accent) 7%, transparent)
-      )
-      no-repeat 0 0 / 100% 100%,
-    linear-gradient(
-        to right,
-        transparent,
-        color-mix(in srgb, var(--color-text) 8%, transparent) 48px,
-        color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 48px),
-        transparent
-      )
-      no-repeat bottom / 100% 1px;
+  background: linear-gradient(
+      to right,
+      transparent,
+      color-mix(in srgb, var(--color-accent) 55%, transparent) 48px,
+      color-mix(in srgb, var(--color-accent) 55%, transparent) calc(100% - 48px),
+      transparent
+    )
+    no-repeat bottom / 100% 1px;
+}
+.table tbody tr:hover td {
+  color: var(--color-text);
 }
 
 /* — charts — */
