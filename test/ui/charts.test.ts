@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // The mapping helpers are pure, so they are exercised without a browser.
-import { barSpec, stagger, statusColor, trimToLatest } from "../../src/ui/public/js/charts.js";
+import { barSpec, faviconCandidates, stagger, statusColor, trimToLatest } from "../../src/ui/public/js/charts.js";
 
 test("every status maps to its own colour and height token", () => {
   const specs = ["operational", "degraded", "partial_outage", "major_outage", "unknown"].map(barSpec);
@@ -86,6 +86,19 @@ test("stagger spaces items by a fixed step after an optional lead-in", () => {
   assert.equal(stagger(3, 70), "210ms");
   assert.equal(stagger(0, 80, 120), "120ms");
   assert.equal(stagger(2, 80, 120), "280ms");
+});
+
+test("faviconCandidates tries the page's own favicon first, then the icon service", () => {
+  assert.deepEqual(faviconCandidates("https://www.cloudflarestatus.com/api/v2/summary.json"), [
+    "https://www.cloudflarestatus.com/favicon.ico",
+    "https://icons.duckduckgo.com/ip3/www.cloudflarestatus.com.ico",
+  ]);
+});
+
+test("faviconCandidates offers nothing for anything it cannot parse as a URL", () => {
+  assert.deepEqual(faviconCandidates("not a url"), []);
+  assert.deepEqual(faviconCandidates(""), []);
+  assert.deepEqual(faviconCandidates(undefined), []);
 });
 
 test("trimToLatest keeps the newest entries of a newest-first list", () => {

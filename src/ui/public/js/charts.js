@@ -74,6 +74,22 @@ export function animate(node, className, delay) {
 
 export const statusColor = (status) => barSpec(status).color;
 
+/**
+ * Where a provider's icon may live, in the order worth trying. The page's own
+ * /favicon.ico comes first, but Statuspage-hosted pages keep theirs on a CDN
+ * behind a <link rel="icon"> we cannot read cross-origin, so the DuckDuckGo
+ * icon service is the second try. Empty when the base URL does not parse —
+ * the ring then keeps its three-letter label instead.
+ */
+export function faviconCandidates(baseUrl) {
+  try {
+    const url = new URL(baseUrl);
+    return [`${url.origin}/favicon.ico`, `https://icons.duckduckgo.com/ip3/${url.host}.ico`];
+  } catch {
+    return [];
+  }
+}
+
 /** Keeps only the newest `size` entries of a newest-first list. */
 export function trimToLatest(list, size) {
   return list.slice(0, size);
@@ -138,6 +154,20 @@ export function uptimeRing(provider, delay) {
   const short = element("span", "ring-label", provider.name.slice(0, 3).toUpperCase());
   short.style.color = color;
   inner.append(short);
+  const candidates = faviconCandidates(provider.baseUrl);
+  if (candidates.length > 0) {
+    // The label is the fallback: the icon only takes its place once one of the
+    // candidates has actually loaded, so a page without a favicon costs nothing.
+    const img = element("img", "ring-icon");
+    img.alt = "";
+    let attempt = 0;
+    img.addEventListener("load", () => short.replaceWith(img));
+    img.addEventListener("error", () => {
+      attempt += 1;
+      if (attempt < candidates.length) img.src = candidates[attempt];
+    });
+    img.src = candidates[0];
+  }
   ring.append(inner);
 
   const text = element("div", "stack-tight");

@@ -556,6 +556,19 @@
   font-family: var(--font-mono);
   font-size: 9.5px;
 }
+/* A favicon sits on its own light chip: dark marks (GitHub's octocat) would
+   otherwise vanish into the ring's dark centre, and the chip's margin keeps
+   the icon clear of the gauge. */
+.ring-icon {
+  box-sizing: border-box;
+  width: 31px;
+  height: 31px;
+  padding: 5px;
+  border-radius: 50%;
+  background: var(--ring-icon-bg);
+  object-fit: contain;
+  display: block;
+}
 .month-cols {
   display: flex;
   align-items: flex-end;
