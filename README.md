@@ -430,5 +430,63 @@ statuswatch/
 ├── docker-compose.yml
 ├── package.json
 ├── tsconfig.json
+├── .mergeexclude                  (paths that must never reach `main` — see section 12)
+├── .githooks/                     (versioned hooks, enabled by scripts/setup-hooks.sh)
+├── scripts/
+│   ├── git-merge-clean            (branch-aware merge wrapper)
+│   └── setup-hooks.sh             (one-time setup after cloning)
 └── README.md
 ```
+
+---
+
+## 12. Branch Layout & Merge Policy
+
+The Claude Code tooling (`.claude/` and `CLAUDE.md`) is tracked on **`dev` only**.
+On `main` those paths must not exist — neither in the commit nor in the working
+tree. Everything else (source, docs, config) flows normally from `dev` to `main`.
+
+### After cloning
+
+Run this once per clone. Git never runs hooks straight from a clone, so it
+cannot be automatic:
+
+```bash
+scripts/setup-hooks.sh
+```
+
+It sets `core.hooksPath` to `.githooks/`, points the purge reference at `dev`,
+and installs the `git mergeclean` alias.
+
+### Merging into `main`
+
+```bash
+git switch main
+git mergeclean dev        # not `git merge dev`
+```
+
+`git mergeclean` merges the branch, drops the paths listed in `.mergeexclude`
+from the merge, commits with the repo's `🔀` subject format, and removes those
+paths from the working tree. It refuses to run on a dirty tree. Genuine
+conflicts outside the excluded paths stop the run so you can resolve them and
+`git commit` as usual.
+
+### What enforces it
+
+| Piece | Role |
+|---|---|
+| `.mergeexclude` | the path list |
+| `scripts/git-merge-clean` | the merge wrapper (`--sync` purges, `--guard` checks) |
+| `.githooks/post-checkout` | purges the excluded paths after a branch switch |
+| `.githooks/pre-merge-commit`, `.githooks/pre-commit` | abort any commit that would add an excluded path to a branch that does not track it |
+
+A plain `git merge dev` on `main` is refused by the guard hooks — run
+`git merge --abort` and use `git mergeclean` instead. `git commit --no-verify`
+bypasses the guard if you ever genuinely need to.
+
+### Rules of thumb
+
+- Edit `.claude/` and `CLAUDE.md` only while on `dev` — on `main` they do not exist.
+- The purge only deletes files that `dev` also has and that are byte-identical to
+  it, so machine-local files (`.claude/settings.local.json`) and local edits are
+  never touched.
