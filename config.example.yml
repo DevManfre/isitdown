@@ -26,7 +26,8 @@ services:
   - name: Anthropic
     id: anthropic
     adapter: statuspage
-    baseUrl: https://status.anthropic.com
+    # status.anthropic.com 301-redirects here; the canonical host avoids the hop
+    baseUrl: https://status.claude.com
 
 notifications:
   telegram:
