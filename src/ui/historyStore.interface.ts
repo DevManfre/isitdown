@@ -32,7 +32,20 @@ export interface IncidentFilter {
   limit?: number | undefined;
 }
 
+export interface DailyBucket {
+  /** UTC calendar day, `YYYY-MM-DD`. */
+  day: string;
+  /** Worst status seen that day. `unknown` only when nothing better was seen. */
+  worstStatus: OverallStatus;
+  okSamples: number;
+  totalSamples: number;
+}
+
 export interface HistoryStore extends StateStore {
+  /** One row per day that has samples, oldest first. Days with none are absent. */
+  getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]>;
+  /** Every configured provider, enabled or not: its history is real either way. */
+  listProviderIds(): Promise<string[]>;
   recordNotification(record: SentRecord): Promise<void>;
   listNotifications(limit: number): Promise<SentRecord[]>;
   listIncidents(filter: IncidentFilter): Promise<IncidentRow[]>;
