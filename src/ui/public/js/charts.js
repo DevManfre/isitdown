@@ -15,16 +15,61 @@ import { formatPercent } from "./i18n.js";
  * that keeps every colour in the token file would have nothing to look at.
  */
 const TOKENS = {
-  operational: { color: "var(--status-operational)", height: "var(--bar-operational)" },
-  degraded: { color: "var(--status-degraded)", height: "var(--bar-degraded)" },
-  partial_outage: { color: "var(--status-partial-outage)", height: "var(--bar-partial-outage)" },
-  major_outage: { color: "var(--status-major-outage)", height: "var(--bar-major-outage)" },
-  unknown: { color: "var(--status-unknown)", height: "var(--bar-unknown)" },
+  operational: {
+    color: "var(--status-operational)",
+    height: "var(--bar-operational)",
+    compact: "var(--bar-compact-operational)",
+    poll: "var(--bar-poll-operational)",
+  },
+  degraded: {
+    color: "var(--status-degraded)",
+    height: "var(--bar-degraded)",
+    compact: "var(--bar-compact-degraded)",
+    poll: "var(--bar-poll-degraded)",
+  },
+  partial_outage: {
+    color: "var(--status-partial-outage)",
+    height: "var(--bar-partial-outage)",
+    compact: "var(--bar-compact-partial-outage)",
+    poll: "var(--bar-poll-partial-outage)",
+  },
+  major_outage: {
+    color: "var(--status-major-outage)",
+    height: "var(--bar-major-outage)",
+    compact: "var(--bar-compact-major-outage)",
+    poll: "var(--bar-poll-major-outage)",
+  },
+  unknown: {
+    color: "var(--status-unknown)",
+    height: "var(--bar-unknown)",
+    compact: "var(--bar-compact-unknown)",
+    poll: "var(--bar-poll-unknown)",
+  },
 };
 
-export function barSpec(status) {
+/**
+ * @param {string} status
+ * @param {"row" | "compact" | "poll"} [scale] which of the prototype's three bar
+ *   rows this bar belongs to; each one has its own set of heights.
+ */
+export function barSpec(status, scale = "row") {
   const known = Object.hasOwn(TOKENS, status) ? status : "unknown";
-  return { status: known, ...TOKENS[known], muted: known === "unknown" };
+  const token = TOKENS[known];
+  const height = scale === "compact" ? token.compact : scale === "poll" ? token.poll : token.height;
+  return { status: known, color: token.color, height, muted: known === "unknown" };
+}
+
+/**
+ * The entry delay of the item at `index`, as the prototype writes it: a fixed
+ * step per item, optionally after a lead-in for the block as a whole.
+ */
+export const stagger = (index, step, offset = 0) => `${offset + index * step}ms`;
+
+/** Marks a node as an entry animation; #view[data-animate] decides if it plays. */
+export function animate(node, className, delay) {
+  node.classList.add(...className.split(" "));
+  if (delay !== undefined) node.style.animationDelay = delay;
+  return node;
 }
 
 export const statusColor = (status) => barSpec(status).color;
@@ -42,43 +87,52 @@ export function element(tag, className, text) {
 }
 
 /**
- * One bar per day, oldest first: the status-page uptime row.
+ * One bar per day, oldest first: the status-page uptime row. Each bar grows out
+ * of its baseline 5ms after the one to its left, so the row reads as a sweep.
  * @param {{day: string, status: string}[]} buckets
  * @param {(bucket: {day: string, status: string}) => string} [title]
+ * @param {"row" | "compact"} [scale] the overview draws the same data shorter.
  */
-export function uptimeBarRow(buckets, title) {
-  const row = element("div", "bar-row");
-  for (const bucket of buckets) {
-    const spec = barSpec(bucket.status);
+export function uptimeBarRow(buckets, title, scale = "row") {
+  const row = element("div", scale === "compact" ? "bar-row bar-row-compact" : "bar-row");
+  buckets.forEach((bucket, index) => {
+    const spec = barSpec(bucket.status, scale);
     const bar = element("span", "bar");
     bar.style.height = spec.height;
     bar.style.background = spec.color;
     if (spec.muted) bar.style.opacity = "0.45";
     bar.title = title === undefined ? "" : title(bucket);
-    row.append(bar);
-  }
+    row.append(animate(bar, "anim-bar", stagger(index, 5)));
+  });
   return row;
 }
 
 /** The compact inline variant used inside the providers table. */
 export function uptimeStrip(buckets) {
   const row = element("div", "bar-strip");
-  for (const bucket of buckets) {
+  buckets.forEach((bucket, index) => {
     const spec = barSpec(bucket.status);
     const bar = element("span", "bar");
     bar.style.background = spec.color;
     if (spec.muted) bar.style.opacity = "0.45";
-    row.append(bar);
-  }
+    row.append(animate(bar, "anim-bar anim-bar-strip", stagger(index, 5)));
+  });
   return row;
 }
 
-/** A provider tile: a ring in its status colour around its short code. */
-export function uptimeRing(provider) {
-  const tile = element("div", "ring-tile");
-  const ring = element("div", "ring");
+/**
+ * A provider tile: a ring in its status colour around its short code.
+ *
+ * The ring is a gauge of the last percent, not of the whole scale — the
+ * prototype's own geometry. At 99% or below it stays at a 6° stub, because a
+ * ring that reads as empty says less than one that reads as barely started.
+ */
+export function uptimeRing(provider, delay) {
+  const tile = animate(element("div", "ring-tile"), "anim-rise", delay);
+  const ring = animate(element("div", "ring"), "anim-ring", delay);
   const color = statusColor(provider.overallStatus);
-  ring.style.background = `conic-gradient(${color} ${Math.max(provider.uptime90, 2)}%, var(--color-neutral-800) 0)`;
+  const degrees = Math.max(6, (provider.uptime90 - 99) * 360);
+  ring.style.background = `conic-gradient(${color} 0 ${degrees}deg, var(--status-unknown) ${degrees}deg 360deg)`;
 
   const inner = element("div", "ring-inner");
   const short = element("span", "ring-label", provider.name.slice(0, 3).toUpperCase());
@@ -105,40 +159,62 @@ export function uptimeRing(provider) {
  */
 export function monthColumns(months, labelFor, noDataLabel) {
   const wrap = element("div", "month-cols");
-  for (const month of months) {
+  months.forEach((month, index) => {
     const column = element("div", "month-col");
     const measured = month.uptime !== null;
+    const delay = stagger(index, 90);
     column.append(
-      element("span", "mono muted", measured ? formatPercent(month.uptime) : noDataLabel),
+      animate(
+        element("span", "mono muted", measured ? formatPercent(month.uptime) : noDataLabel),
+        "anim-fade",
+        delay,
+      ),
     );
     const bar = element("div", "month-bar");
     // Floor keeps a bad month visible instead of collapsing it to nothing.
     bar.style.height = measured ? `${Math.max(Math.round(month.uptime * 0.6), 8)}px` : "8px";
     if (!measured) bar.style.opacity = "0.35";
-    column.append(bar);
+    column.append(animate(bar, "anim-bar anim-bar-month", delay));
     column.append(element("span", "mono muted", labelFor(month.month)));
     wrap.append(column);
-  }
+  });
   return wrap;
 }
 
 /** The incident view's strip of the most recent polls, oldest on the left. */
 export function pollStrip(samples, size = 24) {
   const strip = element("div", "poll-strip");
-  for (const sample of trimToLatest(samples, size).slice().reverse()) {
-    const spec = barSpec(sample.overallStatus);
-    const bar = element("span", "bar");
-    bar.style.height = spec.height;
-    bar.style.background = spec.color;
-    if (spec.muted) bar.style.opacity = "0.45";
-    strip.append(bar);
-  }
+  trimToLatest(samples, size)
+    .slice()
+    .reverse()
+    .forEach((sample, index) => {
+      const spec = barSpec(sample.overallStatus, "poll");
+      const bar = element("span", "bar");
+      bar.style.height = spec.height;
+      bar.style.background = spec.color;
+      if (spec.muted) bar.style.opacity = "0.45";
+      strip.append(animate(bar, "anim-bar", stagger(index, 22)));
+    });
   return strip;
 }
 
-export function statusDot(status, glow = false) {
+/**
+ * @param {string} status
+ * @param {number} [glow] halo radius in px — 12 on the overview, 8 in the
+ *   providers table, none in the lists. The halo is the status colour at 55%,
+ *   as the prototype draws it, not the solid colour.
+ * @param {boolean} [pulse] the slow ring of a state that is still unfolding.
+ */
+export function statusDot(status, glow = 0, pulse = false) {
   const dot = element("span", "dot");
   dot.style.background = statusColor(status);
-  if (glow) dot.style.boxShadow = `0 0 12px ${statusColor(status)}`;
+  if (glow > 0) {
+    dot.style.boxShadow = `0 0 ${glow}px color-mix(in srgb, ${statusColor(status)} 55%, transparent)`;
+  }
+  if (pulse) {
+    // The pulse expands in currentColor, so the dot carries its colour twice.
+    dot.style.color = statusColor(status);
+    dot.classList.add("dot-pulse");
+  }
   return dot;
 }

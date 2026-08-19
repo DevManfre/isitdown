@@ -8,7 +8,7 @@
  */
 
 import * as api from "../api.js";
-import { element, monthColumns, statusColor, uptimeBarRow } from "../charts.js";
+import { animate, element, monthColumns, stagger, statusColor, uptimeBarRow } from "../charts.js";
 import { formatDay, formatPercent, t, tPlural } from "../i18n.js";
 
 const RANGES = [7, 30, 90];
@@ -27,17 +27,18 @@ export async function renderHistory(container, state) {
   const summary = await api.getHistory(days);
   const names = new Map((state.status?.providers ?? []).map((provider) => [provider.id, provider.name]));
 
-  container.append(summaryRow(summary), element("div", "fade-rule"));
+  container.append(summaryRow(summary), animate(element("div", "fade-rule"), "anim-sweep", "200ms"));
 
   if (summary.providers.length === 0) {
     container.append(element("p", "empty", t("empty.no-data")));
     return;
   }
 
-  const rows = element("div", "stack");
-  for (const provider of summary.providers) {
-    rows.append(providerBlock(provider, names.get(provider.providerId) ?? provider.providerId));
-  }
+  const rows = element("div", "history-list");
+  summary.providers.forEach((provider, index) => {
+    const block = providerBlock(provider, names.get(provider.providerId) ?? provider.providerId);
+    rows.append(animate(block, "anim-rise", stagger(index, 80)));
+  });
   container.append(rows, exportRow());
 }
 
@@ -45,7 +46,7 @@ function summaryRow(summary) {
   const row = element("div", "row-between");
   row.style.alignItems = "flex-end";
 
-  const left = element("div", "stack-tight");
+  const left = animate(element("div", "stack-tight"), "anim-rise anim-rise-column");
   left.append(element("span", "kicker kicker-accent", t("history.kicker")));
   left.append(element("span", "big-figure", formatPercent(summary.aggregateUptime)));
   left.append(
@@ -61,7 +62,7 @@ function summaryRow(summary) {
 }
 
 function rangeSwitch() {
-  const seg = element("div", "seg");
+  const seg = element("div", "seg seg-pills");
   for (const range of RANGES) {
     const option = element("button", "seg-opt mono", `${range}d`);
     option.type = "button";

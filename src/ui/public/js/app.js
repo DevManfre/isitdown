@@ -29,6 +29,14 @@ const ROUTES = [
   { path: "settings", nav: "nav.settings", render: renderSettings },
 ];
 
+/**
+ * The prototype restarts a view's entry animations whenever the view, the
+ * language or the theme changes, and never otherwise — which is what keeps the
+ * 30-second refresh from re-playing the page under the operator's cursor. That
+ * remount key lives here; `data-animate` on the container is how CSS sees it.
+ */
+let animatedKey;
+
 const state = {
   status: undefined,
   config: undefined,
@@ -129,22 +137,51 @@ function renderHeader() {
   applyTranslations(document);
 }
 
+/** "incident" for the detail route, otherwise the route's own path. */
+function viewName() {
+  const route = ROUTES.find((entry) => entry.path === state.route.path) ?? ROUTES[0];
+  return state.route.params.length > 0 && route.detail !== undefined ? "incident" : route.path;
+}
+
+const animationKey = () =>
+  [viewName(), state.route.params.join("/"), state.preferences.uiLocale, currentTheme()].join("|");
+
+/** Stamps the container so every entry animation inside it plays from the start. */
+function playEntryAnimations() {
+  dom.view.removeAttribute("data-animate");
+  // Reading a layout property between the two writes is what makes the
+  // container's own animation restart rather than continue where it was.
+  void dom.view.offsetWidth;
+  dom.view.setAttribute("data-animate", viewName());
+}
+
 async function renderView() {
   const route = ROUTES.find((entry) => entry.path === state.route.path) ?? ROUTES[0];
   const render =
     state.route.params.length > 0 && route.detail !== undefined ? route.detail : route.render;
+  const key = animationKey();
+  const replay = key !== animatedKey;
+  animatedKey = key;
+
+  dom.view.className = `view view-${viewName()}`;
+  dom.view.removeAttribute("data-animate");
   dom.view.replaceChildren();
   try {
     await render(dom.view, state);
   } catch (error) {
     dom.view.replaceChildren(element("p", "empty", t("error.load-failed", { error: error.message })));
   }
+  // After the content is in place, so the whole view animates as one.
+  if (replay) playEntryAnimations();
 }
 
 function wireHeader() {
   dom.themeToggle.addEventListener("click", async () => {
     const chosen = setTheme(nextTheme());
     renderHeader();
+    // A theme flip re-plays the view, exactly as the prototype's remount does.
+    animatedKey = animationKey();
+    playEntryAnimations();
     try {
       await api.patchPreferences({ theme: chosen });
     } catch {

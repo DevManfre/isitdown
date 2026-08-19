@@ -7,7 +7,7 @@
  */
 
 import * as api from "../api.js";
-import { element, statusColor, statusDot, uptimeStrip } from "../charts.js";
+import { animate, element, stagger, statusColor, statusDot, uptimeStrip } from "../charts.js";
 import { formatPercent, t } from "../i18n.js";
 import { confirmModal, openModal } from "../components/modal.js";
 import { refresh } from "../app.js";
@@ -42,7 +42,7 @@ function headerRow() {
   const row = element("div", "row-between");
   row.append(element("span", "muted", t("providers.intro")));
 
-  const seg = element("div", "seg");
+  const seg = element("div", "seg seg-pills");
   for (const [label, issuesOnly] of [
     [t("filter.all"), false],
     [t("filter.issues"), true],
@@ -80,9 +80,9 @@ function table(providers, byId, state) {
   table.append(head);
 
   const body = element("tbody");
-  for (const provider of providers) {
+  providers.forEach((provider, index) => {
     const history = byId.get(provider.id);
-    const row = element("tr");
+    const row = animate(element("tr"), "anim-rise anim-rise-table-row", stagger(index, 60));
 
     const nameCell = element("td");
     const nameWrap = element("div", "row-between");
@@ -93,7 +93,7 @@ function table(providers, byId, state) {
     const host = element("span", "mono muted", hostOf(provider.baseUrl));
     host.style.fontSize = "10px";
     names.append(host);
-    nameWrap.append(statusDot(provider.overallStatus, true), names);
+    nameWrap.append(statusDot(provider.overallStatus, 8), names);
     nameCell.append(nameWrap);
 
     const statusCell = element("td");
@@ -141,7 +141,7 @@ function table(providers, byId, state) {
       actionsCell,
     );
     body.append(row);
-  }
+  });
   table.append(body);
   return table;
 }
@@ -185,7 +185,8 @@ export function removeButton(provider) {
 }
 
 function addHint() {
-  const hint = element("div", "add-hint");
+  // Last in, after the table has finished settling.
+  const hint = animate(element("div", "add-hint"), "anim-rise", "340ms");
   hint.append(element("span", "muted", t("providers.add-hint", { adapter: "statuspage" })));
   const button = element("button", "btn btn-primary", t("action.add-service"));
   button.type = "button";

@@ -7,7 +7,7 @@
  */
 
 import * as api from "../api.js";
-import { element, statusColor, statusDot } from "../charts.js";
+import { animate, element, stagger, statusColor, statusDot } from "../charts.js";
 import { formatDateTime, formatRelative, t } from "../i18n.js";
 import { navigate } from "../app.js";
 
@@ -25,7 +25,7 @@ export async function renderIncidents(container, state) {
 
   container.append(filterRow());
 
-  const grid = element("div", "grid-two");
+  const grid = element("div", "grid-incidents");
   grid.append(activePanel(incidents.active, providerName), feedPanel(feed.notifications, providerName));
   container.append(grid);
 
@@ -52,7 +52,7 @@ function filterRow() {
 }
 
 function activePanel(active, providerName) {
-  const panel = element("div", "panel panel-accent");
+  const panel = animate(element("div", "panel panel-accent"), "anim-rise", "60ms");
   panel.append(
     (() => {
       const head = element("div", "row-between");
@@ -110,7 +110,7 @@ function activePanel(active, providerName) {
 }
 
 function feedPanel(notifications, providerName) {
-  const panel = element("div", "panel");
+  const panel = animate(element("div", "panel"), "anim-rise", "140ms");
   panel.append(element("span", "kicker", t("incidents.notifications-sent")));
 
   if (notifications.length === 0) {
@@ -118,8 +118,8 @@ function feedPanel(notifications, providerName) {
     return panel;
   }
 
-  for (const record of notifications) {
-    const row = element("div");
+  notifications.forEach((record, index) => {
+    const row = animate(element("div"), "anim-fade", stagger(index, 65));
     row.style.display = "flex";
     row.style.alignItems = "baseline";
     row.style.gap = "9px";
@@ -140,12 +140,12 @@ function feedPanel(notifications, providerName) {
 
     row.append(dot, text);
     panel.append(row);
-  }
+  });
   return panel;
 }
 
 function closedList(closed, providerName) {
-  const section = element("div", "stack-tight");
+  const section = element("div", "incident-list");
   section.append(element("span", "kicker", t("incidents.closed")));
 
   if (closed.length === 0) {
@@ -153,8 +153,8 @@ function closedList(closed, providerName) {
     return section;
   }
 
-  for (const incident of closed) {
-    const row = element("div", "incident-row");
+  closed.forEach((incident, index) => {
+    const row = animate(element("div", "incident-row"), "anim-rise anim-rise-row", stagger(index, 70));
     row.append(element("span", "mono muted", formatDateTime(incident.startedAt)));
 
     const middle = element("div", "stack-tight");
@@ -193,7 +193,7 @@ function closedList(closed, providerName) {
     right.append(state, open);
     row.append(middle, right);
     section.append(row);
-  }
+  });
   return section;
 }
 

@@ -82,12 +82,29 @@
   --radius-md: 8px;
   --radius-lg: 14px;
 
-  /* Uptime bar heights per severity — the prototype's own proportions. */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* Uptime bar heights per severity — the prototype's own proportions. It draws
+     three scales, not one: the 26px daily row of the history view, the 22px
+     compact row of the overview signal wall, and the 22px poll strip of the
+     incident detail. Each keeps its own steps, exactly as drawn. */
   --bar-operational: 26px;
   --bar-degraded: 19px;
   --bar-partial-outage: 16px;
   --bar-major-outage: 13px;
   --bar-unknown: 26px;
+
+  --bar-compact-operational: 16px;
+  --bar-compact-degraded: 12px;
+  --bar-compact-partial-outage: 10px;
+  --bar-compact-major-outage: 8px;
+  --bar-compact-unknown: 16px;
+
+  --bar-poll-operational: 20px;
+  --bar-poll-degraded: 13px;
+  --bar-poll-partial-outage: 11px;
+  --bar-poll-major-outage: 9px;
+  --bar-poll-unknown: 20px;
 
   --rail-width: 196px;
 }
@@ -158,11 +175,24 @@
   --radius-md: 8px;
   --radius-lg: 14px;
 
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
   --bar-operational: 26px;
   --bar-degraded: 19px;
   --bar-partial-outage: 16px;
   --bar-major-outage: 13px;
   --bar-unknown: 26px;
+  --bar-compact-operational: 16px;
+  --bar-compact-degraded: 12px;
+  --bar-compact-partial-outage: 10px;
+  --bar-compact-major-outage: 8px;
+  --bar-compact-unknown: 16px;
+
+  --bar-poll-operational: 20px;
+  --bar-poll-degraded: 13px;
+  --bar-poll-partial-outage: 11px;
+  --bar-poll-major-outage: 9px;
+  --bar-poll-unknown: 20px;
 
   --rail-width: 196px;
 }
@@ -236,11 +266,24 @@
     --radius-md: 8px;
     --radius-lg: 14px;
 
+    --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
     --bar-operational: 26px;
     --bar-degraded: 19px;
     --bar-partial-outage: 16px;
     --bar-major-outage: 13px;
     --bar-unknown: 26px;
+    --bar-compact-operational: 16px;
+    --bar-compact-degraded: 12px;
+    --bar-compact-partial-outage: 10px;
+    --bar-compact-major-outage: 8px;
+    --bar-compact-unknown: 16px;
+
+    --bar-poll-operational: 20px;
+    --bar-poll-degraded: 13px;
+    --bar-poll-partial-outage: 11px;
+    --bar-poll-major-outage: 9px;
+    --bar-poll-unknown: 20px;
 
     --rail-width: 196px;
   }

@@ -7,7 +7,15 @@
  */
 
 import * as api from "../api.js";
-import { element, statusColor, statusDot, uptimeBarRow, uptimeRing } from "../charts.js";
+import {
+  animate,
+  element,
+  stagger,
+  statusColor,
+  statusDot,
+  uptimeBarRow,
+  uptimeRing,
+} from "../charts.js";
 import { formatPercent, formatRelative, t, tPlural } from "../i18n.js";
 import { navigate } from "../app.js";
 
@@ -25,10 +33,11 @@ function hero(providers) {
   const grid = element("div", "grid-two");
 
   const down = providers.filter((provider) => provider.overallStatus !== "operational");
-  const text = element("div", "stack");
-  text.append(element("span", "kicker kicker-accent", t("overview.kicker")));
+  const text = element("div", "hero-copy");
+  // The hero enters line by line, 60–70ms apart, headline first.
+  text.append(animate(element("span", "kicker kicker-accent kicker-hero", t("overview.kicker")), "anim-rise"));
 
-  const title = element("h2", "hero-title");
+  const title = animate(element("h2", "hero-title"), "anim-rise anim-rise-hero", "60ms");
   title.textContent =
     down.length === 0
       ? t("overview.title.all-operational")
@@ -40,7 +49,7 @@ function hero(providers) {
     .filter((value) => value !== null)
     .sort()
     .at(-1);
-  const body = element("p", "hero-body");
+  const body = animate(element("p", "hero-body"), "anim-rise anim-rise-hero", "130ms");
   body.textContent =
     down.length === 0
       ? t("overview.body.all-operational", {
@@ -52,7 +61,7 @@ function hero(providers) {
         });
   text.append(body);
 
-  const actions = element("div", "header-actions");
+  const actions = animate(element("div", "header-actions"), "anim-rise anim-rise-hero", "200ms");
   const firstIncident = providers.find((provider) => provider.activeIncidents.length > 0);
   if (firstIncident !== undefined) {
     const details = element("button", "btn btn-primary", t("action.incident-details"));
@@ -69,7 +78,8 @@ function hero(providers) {
   text.append(actions);
 
   const rings = element("div", "ring-grid");
-  for (const provider of providers) rings.append(uptimeRing(provider));
+  // The rings follow the hero, 80ms apart, after a 120ms lead-in.
+  providers.forEach((provider, index) => rings.append(uptimeRing(provider, stagger(index, 80, 120))));
 
   grid.append(text, rings);
   wrap.append(grid);
@@ -77,25 +87,30 @@ function hero(providers) {
 }
 
 function providerRows(providers, bucketsById) {
-  const section = element("div", "view");
-  section.append(element("div", "fade-rule"));
+  const section = element("div", "overview-rows");
+  // The rule draws itself outwards under the hero before the rows arrive.
+  section.append(animate(element("div", "fade-rule"), "anim-sweep", "220ms"));
 
   if (providers.length === 0) {
     section.append(element("p", "empty", t("providers.empty")));
     return section;
   }
 
-  const rows = element("div", "stack");
-  for (const provider of providers) {
-    const row = element("div", "overview-row");
+  const rows = element("div", "overview-list");
+  providers.forEach((provider, index) => {
+    const row = animate(element("div", "overview-row"), "anim-rise", stagger(index, 70));
 
     const name = element("div", "row-between");
     name.style.justifyContent = "flex-start";
     name.style.gap = "9px";
-    name.append(statusDot(provider.overallStatus, true), element("span", "provider-name", provider.name));
+    name.append(statusDot(provider.overallStatus, 12), element("span", "provider-name", provider.name));
 
     const buckets = bucketsById.get(provider.id) ?? [];
-    const bars = uptimeBarRow(buckets, (bucket) => `${bucket.day} · ${t(statusKey(bucket.status))}`);
+    const bars = uptimeBarRow(
+      buckets,
+      (bucket) => `${bucket.day} · ${t(statusKey(bucket.status))}`,
+      "compact",
+    );
 
     const label = element("span", "mono", t(statusKey(provider.overallStatus)).toUpperCase());
     label.style.fontSize = "11.5px";
@@ -104,10 +119,14 @@ function providerRows(providers, bucketsById) {
 
     row.append(name, bars, label);
     rows.append(row);
-  }
+  });
   section.append(rows);
 
-  const footer = element("div", "row-between");
+  const footer = animate(
+    element("div", "row-between"),
+    "anim-fade",
+    stagger(providers.length, 70),
+  );
   footer.append(
     element("span", "muted", t("overview.uptime-window", { uptime: formatPercent(average(providers)) })),
   );

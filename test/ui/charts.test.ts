@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // The mapping helpers are pure, so they are exercised without a browser.
-import { barSpec, statusColor, trimToLatest } from "../../src/ui/public/js/charts.js";
+import { barSpec, stagger, statusColor, trimToLatest } from "../../src/ui/public/js/charts.js";
 
 test("every status maps to its own colour and height token", () => {
   const specs = ["operational", "degraded", "partial_outage", "major_outage", "unknown"].map(barSpec);
@@ -58,6 +58,34 @@ test("an unrecognised status degrades to unknown instead of rendering nothing", 
 
 test("statusColor is the token a dot or a ring paints with", () => {
   assert.equal(statusColor("degraded"), "var(--status-degraded)");
+});
+
+test("each bar row scale reads its own height token for the same status", () => {
+  assert.equal(barSpec("degraded").height, "var(--bar-degraded)");
+  assert.equal(barSpec("degraded", "row").height, "var(--bar-degraded)");
+  assert.equal(barSpec("degraded", "compact").height, "var(--bar-compact-degraded)");
+  assert.equal(barSpec("degraded", "poll").height, "var(--bar-poll-degraded)");
+});
+
+test("a scale changes the height and nothing else", () => {
+  const row = barSpec("major_outage", "row");
+  const compact = barSpec("major_outage", "compact");
+  assert.equal(compact.color, row.color);
+  assert.equal(compact.status, row.status);
+  assert.equal(compact.muted, row.muted);
+  assert.notEqual(compact.height, row.height);
+});
+
+test("an unrecognised status degrades to unknown in every scale", () => {
+  assert.equal(barSpec("gremlins", "compact").height, "var(--bar-compact-unknown)");
+  assert.equal(barSpec("gremlins", "poll").height, "var(--bar-poll-unknown)");
+});
+
+test("stagger spaces items by a fixed step after an optional lead-in", () => {
+  assert.equal(stagger(0, 70), "0ms");
+  assert.equal(stagger(3, 70), "210ms");
+  assert.equal(stagger(0, 80, 120), "120ms");
+  assert.equal(stagger(2, 80, 120), "280ms");
 });
 
 test("trimToLatest keeps the newest entries of a newest-first list", () => {
