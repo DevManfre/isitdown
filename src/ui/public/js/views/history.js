@@ -54,7 +54,7 @@ function summaryRow(summary) {
 
   const right = element("div", "header-actions");
   right.style.alignItems = "flex-end";
-  right.append(rangeSwitch(), monthColumns(summary.months, monthLabel));
+  right.append(rangeSwitch(), monthColumns(summary.months, monthLabel, t("history.month-no-data")));
 
   row.append(left, right);
   return row;

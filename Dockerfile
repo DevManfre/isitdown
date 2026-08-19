@@ -38,3 +38,19 @@ VOLUME ["/app/config", "/app/data"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD ["node", "dist/light/healthcheck.js"]
 CMD ["node", "dist/light/index.js"]
+
+# --- UI edition: the light image plus the server layer ----------------------------
+# Starting FROM light means every layer below this point — base image, production
+# dependencies, core engine — is shared with statuswatch:light on disk and in a
+# registry. The UI image is that image plus one thin layer.
+FROM light AS ui
+ENV DB_PATH=/app/data/statuswatch.db
+ENV PORT=3000
+USER root
+COPY --from=builder /app/dist/ui ./dist/ui
+RUN chown -R node:node /app/dist/ui
+USER node
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["node", "dist/ui/healthcheck.js"]
+CMD ["node", "dist/ui/server.js"]
