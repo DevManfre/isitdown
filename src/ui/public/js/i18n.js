@@ -118,23 +118,17 @@ export function formatRelative(iso) {
   return formatter.format(0, "second");
 }
 
-/** A duration in minutes rendered with the locale's own unit words. */
+/**
+ * A duration in minutes rendered with the locale's own unit words, stepping up to
+ * hours and days so "1440 min" never reaches an operator.
+ */
 export function formatDuration(minutes) {
-  const formatter = new Intl.NumberFormat(active, { style: "unit", unitDisplay: "short" });
-  if (minutes < 60) {
-    return new Intl.NumberFormat(active, { style: "unit", unit: "minute", unitDisplay: "short" }).format(
-      Math.round(minutes),
-    );
-  }
+  /** @param {Intl.NumberFormatOptions["unit"]} unit */
+  const inUnit = (unit, value) =>
+    new Intl.NumberFormat(active, { style: "unit", unit, unitDisplay: "short" }).format(value);
+
+  if (minutes < 60) return inUnit("minute", Math.round(minutes));
   const hours = minutes / 60;
-  if (hours < 24) {
-    return new Intl.NumberFormat(active, { style: "unit", unit: "hour", unitDisplay: "short" }).format(
-      Math.round(hours * 10) / 10,
-    );
-  }
-  return formatter
-    ? new Intl.NumberFormat(active, { style: "unit", unit: "day", unitDisplay: "short" }).format(
-        Math.round((hours / 24) * 10) / 10,
-      )
-    : String(minutes);
+  if (hours < 24) return inUnit("hour", Math.round(hours * 10) / 10);
+  return inUnit("day", Math.round((hours / 24) * 10) / 10);
 }
