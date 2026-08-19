@@ -7,6 +7,8 @@
   "nav.history": "History",
   "nav.settings": "Settings",
   "nav.notifier": "Notifier",
+  "nav.rail-collapse": "Collapse the sidebar",
+  "nav.rail-expand": "Expand the sidebar",
 
   "action.add-service": "Add service",
   "action.poll-now": "Poll now",

@@ -7,6 +7,8 @@
   "nav.history": "Cronologia",
   "nav.settings": "Impostazioni",
   "nav.notifier": "Notifiche",
+  "nav.rail-collapse": "Comprimi la barra laterale",
+  "nav.rail-expand": "Espandi la barra laterale",
 
   "action.add-service": "Aggiungi servizio",
   "action.poll-now": "Aggiorna ora",

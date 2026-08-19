@@ -18,6 +18,9 @@
           }
           var lang = localStorage.getItem("isitdown.uiLocale");
           if (lang) document.documentElement.setAttribute("lang", lang);
+          if (localStorage.getItem("isitdown.railCollapsed") === "true") {
+            document.documentElement.setAttribute("data-rail", "collapsed");
+          }
         } catch (error) {
           /* a blocked localStorage just means the system theme is used */
         }
@@ -40,6 +43,9 @@
         <div class="rail-brand">
           <span class="rail-dot"></span>
           <span class="rail-name" data-i18n="app.name"></span>
+          <button class="rail-toggle" id="rail-toggle" type="button">
+            <span class="rail-toggle-chevron"></span>
+          </button>
         </div>
         <div class="rail-links" id="rail-links"></div>
         <div class="rail-foot">
