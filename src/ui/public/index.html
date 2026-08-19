@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StatusWatch</title>
+    <title>IsItDown</title>
     <!--
       Runs before the stylesheets paint anything: without it the page would show
       the light palette for one frame on a dark desktop. "system" stamps nothing
@@ -12,11 +12,11 @@
     <script>
       (function () {
         try {
-          var stored = localStorage.getItem("statuswatch.theme");
+          var stored = localStorage.getItem("isitdown.theme");
           if (stored === "light" || stored === "dark") {
             document.documentElement.setAttribute("data-theme", stored);
           }
-          var lang = localStorage.getItem("statuswatch.uiLocale");
+          var lang = localStorage.getItem("isitdown.uiLocale");
           if (lang) document.documentElement.setAttribute("lang", lang);
         } catch (error) {
           /* a blocked localStorage just means the system theme is used */

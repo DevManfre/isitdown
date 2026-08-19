@@ -15,7 +15,7 @@ import type { StateStore } from "../../src/core/stateStore.interface.ts";
 const silent = createLogger("error", () => {});
 
 async function freshStore(): Promise<StateStore> {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-poller-"));
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-poller-"));
   return createFileStateStore(join(dir, "state.json"));
 }
 

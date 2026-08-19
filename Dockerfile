@@ -1,7 +1,7 @@
-# StatusWatch ships two editions from one source tree and one Dockerfile.
+# IsItDown ships two editions from one source tree and one Dockerfile.
 #
-#   docker build --target light -t statuswatch:light .
-#   docker build --target ui    -t statuswatch:ui    .
+#   docker build --target light -t isitdown:light .
+#   docker build --target ui    -t isitdown:ui    .
 #
 # The `ui` stage starts FROM `light`, so the UI image is the Light image plus a
 # single thin layer: everything below it — base image, production dependencies,
@@ -41,10 +41,10 @@ CMD ["node", "dist/light/index.js"]
 
 # --- UI edition: the light image plus the server layer ----------------------------
 # Starting FROM light means every layer below this point — base image, production
-# dependencies, core engine — is shared with statuswatch:light on disk and in a
+# dependencies, core engine — is shared with isitdown:light on disk and in a
 # registry. The UI image is that image plus one thin layer.
 FROM light AS ui
-ENV DB_PATH=/app/data/statuswatch.db
+ENV DB_PATH=/app/data/isitdown.db
 ENV PORT=3000
 USER root
 COPY --from=builder /app/dist/ui ./dist/ui

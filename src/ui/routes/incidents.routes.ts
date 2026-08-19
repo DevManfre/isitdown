@@ -15,7 +15,7 @@ interface TimelineEntry {
 /**
  * The incident list and one incident's detail.
  *
- * The timeline is built from what StatusWatch actually observed — when the
+ * The timeline is built from what IsItDown actually observed — when the
  * incident first appeared, the status transitions its polls recorded, and when it
  * disappeared — rather than from the provider's own update feed, which the
  * adapter does not normalise. Showing our own observations is honest and needs no

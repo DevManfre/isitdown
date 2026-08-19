@@ -5,7 +5,7 @@ description: Use when writing, fixing, or reviewing tests, when adding behaviour
 
 # Testing Discipline
 
-General testing discipline for this repo. For StatusWatch-specific requirements — the diff-engine
+General testing discipline for this repo. For IsItDown-specific requirements — the diff-engine
 transition table, adapter fixtures, `StateStore` interchangeability, restart safety — use the
 `core-engine-testing` skill as well; it wins where the two overlap.
 

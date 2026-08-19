@@ -6,7 +6,7 @@
  * against the same instance starts where the operator left off.
  */
 
-const KEY = "statuswatch.theme";
+const KEY = "isitdown.theme";
 const MODES = ["light", "dark", "system"];
 
 let mode = "system";

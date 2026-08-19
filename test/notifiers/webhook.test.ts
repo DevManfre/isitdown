@@ -4,7 +4,7 @@ import { createWebhookNotifier } from "../../src/notifiers/webhook.notifier.ts";
 import { stubFetch, jsonResponse } from "../helpers/fetchStub.ts";
 import type { NotificationPayload } from "../../src/core/types.ts";
 
-const settings = { url: "https://hooks.example/statuswatch" };
+const settings = { url: "https://hooks.example/isitdown" };
 
 const payload: NotificationPayload = {
   change: {

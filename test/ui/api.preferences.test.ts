@@ -19,7 +19,7 @@ interface Api {
 }
 
 async function api(dbPath?: string): Promise<Api> {
-  const path = dbPath ?? join(await mkdtemp(join(tmpdir(), "statuswatch-pref-")), "statuswatch.db");
+  const path = dbPath ?? join(await mkdtemp(join(tmpdir(), "isitdown-pref-")), "isitdown.db");
   const runtime = await buildUiRuntime({ dbPath: path, env: {}, logger: silent });
   const server: Server = runtime.app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", () => resolve()));
@@ -148,7 +148,7 @@ test("the locale route cannot be walked out of its directory", async () => {
       const response = await app.raw(attempt);
       assert.ok(response.status === 404 || response.status === 400, `${attempt} -> ${response.status}`);
       const text = await response.text();
-      assert.ok(!text.includes("statuswatch\","), "no file outside the locales directory may be served");
+      assert.ok(!text.includes("isitdown\","), "no file outside the locales directory may be served");
       assert.ok(!text.includes("root:"), "no system file may be served");
     }
   } finally {

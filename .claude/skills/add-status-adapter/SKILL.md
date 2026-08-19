@@ -1,11 +1,11 @@
 ---
 name: add-status-adapter
-description: Scaffold a new provider adapter for StatusWatch — turns a status page's raw response into a NormalizedStatus. Use whenever the user wants to add monitoring for a new third-party service/provider, mentions a status page URL, or asks "how do I add X to StatusWatch". Covers both Statuspage.io-based providers (majority of cases) and custom/non-standard status pages requiring a bespoke parser.
+description: Scaffold a new provider adapter for IsItDown — turns a status page's raw response into a NormalizedStatus. Use whenever the user wants to add monitoring for a new third-party service/provider, mentions a status page URL, or asks "how do I add X to IsItDown". Covers both Statuspage.io-based providers (majority of cases) and custom/non-standard status pages requiring a bespoke parser.
 ---
 
 # Add Status Adapter
 
-Scaffolds a new adapter under `src/adapters/` for a provider StatusWatch should monitor. Always check "is this a Statuspage.io provider?" first — most are, and it means zero new code.
+Scaffolds a new adapter under `src/adapters/` for a provider IsItDown should monitor. Always check "is this a Statuspage.io provider?" first — most are, and it means zero new code.
 
 ## Step 1 — Determine if a custom adapter is even needed
 

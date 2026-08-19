@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createFileConfigSource, loadConfig } from "../../src/light/config/loadConfig.ts";
 
 async function configFile(body: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-config-"));
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-config-"));
   const path = join(dir, "config.yml");
   await writeFile(path, body, "utf8");
   return path;
@@ -107,7 +107,7 @@ test("omitted optional keys fall back to the documented defaults", async () => {
 });
 
 test("a missing file is fatal and names the path it looked for", async () => {
-  const path = join(tmpdir(), "statuswatch-does-not-exist", "config.yml");
+  const path = join(tmpdir(), "isitdown-does-not-exist", "config.yml");
   await assert.rejects(loadConfig(path, {}), new RegExp(path.replace(/[/\\]/g, ".")));
 });
 

@@ -64,7 +64,7 @@ export function createPoller(deps: PollerDeps): Poller {
     for (let attempt = 0; attempt < config.polling.maxRetries; attempt += 1) {
       if (attempt > 0) {
         // Exponential backoff with jitter, so a provider recovering from an
-        // outage is not hit by every StatusWatch instance in lockstep.
+        // outage is not hit by every IsItDown instance in lockstep.
         const delay = BACKOFF_BASE_MS * 2 ** (attempt - 1) + Math.random() * BACKOFF_JITTER_MS;
         await sleep(Math.round(delay));
       }

@@ -23,8 +23,8 @@ async function harness(extraIds: readonly string[] = []): Promise<{
   store: HistoryStore;
   path: string;
 }> {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-sqlite-"));
-  const path = join(dir, "statuswatch.db");
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-sqlite-"));
+  const path = join(dir, "isitdown.db");
   const db = openDatabase(path);
   migrate(db);
   seedServices(db, [...CONTRACT_PROVIDER_IDS, ...extraIds]);

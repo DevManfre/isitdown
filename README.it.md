@@ -1,4 +1,4 @@
-# StatusWatch
+# IsItDown
 
 [![Versione](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)](package.json)
 [![Licenza](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
@@ -78,7 +78,7 @@ server) e **UI** (lo stesso motore più una dashboard locale, configurabile a ru
 
 ## 1. Cosa fa
 
-Ogni pochi minuti StatusWatch recupera la status page di ogni provider, normalizza
+Ogni pochi minuti IsItDown recupera la status page di ogni provider, normalizza
 la risposta, la confronta con quella precedente e invia un messaggio solo se è
 cambiato qualcosa davvero.
 
@@ -105,7 +105,7 @@ Anthropic       operational    ████████████████�
 
 |  | Light | UI |
 |---|---|---|
-| Immagine | `statuswatch:light` | `statuswatch:ui` (costruita `FROM` light) |
+| Immagine | `isitdown:light` | `isitdown:ui` (costruita `FROM` light) |
 | Poller · Adapter · Diff Engine · Notifier | condivisi | condivisi |
 | Configurazione | `config.yml`, riletto a ogni ciclo | SQLite, modificata dalla dashboard |
 | State store | file JSON, scritture atomiche | SQLite (contiene anche la cronologia) |
@@ -134,7 +134,7 @@ cp .env.example .env                # compila solo i canali che abiliterai
 ```bash
 cp config.example.yml config.yml    # modifica: provider, intervallo, canali
 docker compose --profile light up -d --build
-docker logs -f statuswatch-light
+docker logs -f isitdown-light
 ```
 
 **Edizione UI** — la dashboard sulla :3000, nessun `config.yml` necessario:
@@ -229,7 +229,7 @@ l'unico modo di fallire su cui vale la pena essere rumorosi.
 ### 3.2 Edizione UI — impostazioni a runtime
 
 L'edizione UI **non** monta alcun `config.yml`; uno presente su disco verrebbe
-ignorato. Tutto vive in SQLite in `/app/data/statuswatch.db` e si modifica da
+ignorato. Tutto vive in SQLite in `/app/data/isitdown.db` e si modifica da
 **Settings** nella dashboard (o tramite [`/config`](#6-api-http)):
 
 - intervallo di polling, timeout delle richieste, numero di tentativi
@@ -253,7 +253,7 @@ tua lista non viene più sovrascritta in seguito.
 | `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Dove leggere `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Dove tenere il file di stato. |
-| `DB_PATH` | UI | `/app/data/statuswatch.db` | Database SQLite. |
+| `DB_PATH` | UI | `/app/data/isitdown.db` | Database SQLite. |
 | `PORT` | UI | `3000` | Porta HTTP. |
 
 I segreti arrivano tramite `env_file` a runtime; nulla viene incorporato in
@@ -308,7 +308,7 @@ i redirect, quindi funzionano entrambi; l'host canonico evita il salto in più.
 
 Lo `status.indicator` del provider viene mappato sul modello di severità interno:
 
-| Indicator Statuspage | Stato StatusWatch |
+| Indicator Statuspage | Stato IsItDown |
 |---|---|
 | `none` | `operational` |
 | `minor` | `degraded` |
@@ -372,8 +372,8 @@ ui       FROM light       + dist/ui (dashboard e cataloghi) · EXPOSE 3000
 ```
 
 ```bash
-docker build --target light -t statuswatch:light .
-docker build --target ui    -t statuswatch:ui    .
+docker build --target light -t isitdown:light .
+docker build --target ui    -t isitdown:ui    .
 ```
 
 Misurato: 12 dei 14 layer dell'immagine UI sono identici byte per byte a quelli
@@ -383,8 +383,8 @@ Tagga le release per edizione invece di usare un `latest` nudo, che non direbbe 
 quale edizione si tratta:
 
 ```
-statuswatch:light-v1.0.0   statuswatch:light-latest
-statuswatch:ui-v1.0.0      statuswatch:ui-latest
+isitdown:light-v1.0.0   isitdown:light-latest
+isitdown:ui-v1.0.0      isitdown:ui-latest
 ```
 
 ### 4.2 Profili compose
@@ -434,14 +434,14 @@ curl -s localhost:3000/status | node -e 'process.stdin.toArray().then(c => {
 
 ```bash
 docker ps --format "{{.Names}} {{.Status}}"
-#   statuswatch-light  Up 2 minutes (healthy)
-#   statuswatch-ui     Up 2 minutes (healthy)
+#   isitdown-light  Up 2 minutes (healthy)
+#   isitdown-ui     Up 2 minutes (healthy)
 
-docker exec statuswatch-light node dist/light/healthcheck.js; echo "exit=$?"   # exit=0
-docker exec statuswatch-ui    node dist/ui/healthcheck.js;    echo "exit=$?"   # exit=0
+docker exec isitdown-light node dist/light/healthcheck.js; echo "exit=$?"   # exit=0
+docker exec isitdown-ui    node dist/ui/healthcheck.js;    echo "exit=$?"   # exit=0
 
-docker logs -f statuswatch-light
-#   {"level":"info","msg":"statuswatch light started",...}
+docker logs -f isitdown-light
+#   {"level":"info","msg":"isitdown light started",...}
 #   {"level":"info","msg":"poll cycle finished","providers":3,"failed":0,"changes":0}
 ```
 
@@ -452,13 +452,13 @@ Conferma che l'edizione Light non esponga davvero alcun server:
 
 ```bash
 docker ps --format "{{.Names}} ports={{.Ports}}" | grep light   # ports= è vuoto
-docker exec statuswatch-light sh -c "ps -o pid,args"            # solo node dist/light/index.js
+docker exec isitdown-light sh -c "ps -o pid,args"            # solo node dist/light/index.js
 ```
 
 Conferma che nessun segreto sia finito in un'immagine:
 
 ```bash
-docker history statuswatch:ui --no-trunc --format "{{.CreatedBy}}" | grep -iE "TOKEN=|SECRET="
+docker history isitdown:ui --no-trunc --format "{{.CreatedBy}}" | grep -iE "TOKEN=|SECRET="
 # nessun output
 ```
 
@@ -500,7 +500,7 @@ nessun incidente, nessuna notifica. È diagnostica, non cronologia.
 all'inizio di ogni ciclo. Aggiungi un provider e abbassa l'intervallo:
 
 ```bash
-docker logs -f statuswatch-light
+docker logs -f isitdown-light
 #   ..."poll cycle finished","providers":3      ← prima
 #   ..."poll cycle finished","providers":4      ← dopo, senza restart
 ```
@@ -521,12 +521,12 @@ Conferma che una configurazione non valida venga rifiutata a voce alta invece di
 essere applicata a metà:
 
 ```bash
-docker run --rm statuswatch:light
-#   ..."statuswatch light failed to start","error":"config file /app/config/config.yml
+docker run --rm isitdown:light
+#   ..."isitdown light failed to start","error":"config file /app/config/config.yml
 #      was not found — mount it or set CONFIG_PATH"   → exit 1
 
 printf 'services: []\n' > /tmp/bad.yml
-docker run --rm -v /tmp/bad.yml:/app/config/config.yml:ro statuswatch:light
+docker run --rm -v /tmp/bad.yml:/app/config/config.yml:ro isitdown:light
 #   ..."error":"config file ... is invalid: services: at least one service is required"
 ```
 
@@ -853,7 +853,7 @@ Updated: 2026-08-19 22:04 UTC
 
 Emoji per severità: 🟢 operational · 🟡 degraded · 🟠 partial outage · 🔴 major
 outage · ⚪ unknown. Un avviso di monitoraggio è sempre ⚪: riguarda il recupero dati
-di StatusWatch, non lo stato del provider, quindi non ne prende mai il colore. I
+di IsItDown, non lo stato del provider, quindi non ne prende mai il colore. I
 timestamp restano UTC con suffisso esplicito in ogni lingua.
 
 ### 7.5 Resilienza
@@ -950,7 +950,7 @@ poi `en`.
 ### 9.1 Struttura del repository
 
 ```
-statuswatch/
+isitdown/
 ├── src/
 │   ├── core/                          (condiviso dalle due edizioni)
 │   │   ├── types.ts                   NormalizedStatus, Incident, StatusChange, NotificationPayload
@@ -1112,14 +1112,14 @@ Consegnato:
 
 - **v1 — edizione Light**: polling, diff engine, notifiche Telegram e webhook
   generico, `config.yml` con segreti referenziati dall'ambiente, state store JSON con
-  scritture atomiche, `statuswatch:light`.
+  scritture atomiche, `isitdown:light`.
 - **v1.1 — prototipazione UI**: la dashboard esplorata in Claude Design e conservata in
   `design/claude-design-prototypes/`. L'opzione `3a`, la console navigabile, è il
   riferimento per l'implementazione; la palette scura e le etichette italiane più
   lunghe sono state validate lì invece di essere scoperte dopo.
 - **v1.2 — edizione UI**: quel design come dashboard Express + moduli ES vanilla su
   SQLite, con la configurazione gestita a runtime e applicata al ciclo successivo senza
-  restart. `statuswatch:ui`, costruita `FROM` l'immagine Light.
+  restart. `isitdown:ui`, costruita `FROM` l'immagine Light.
 - **v1.3 — cronologia**: uptime e cronologia incidenti per provider con le barre
   giornaliere in stile status page e le viste 7/30/90 giorni, aggregate lato server e
   servite da `/history`.

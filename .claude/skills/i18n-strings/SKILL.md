@@ -5,7 +5,7 @@ description: Use when writing or changing any string a human will read — dashb
 
 # i18n Strings
 
-Every user-facing string in StatusWatch is a **key** resolved through the i18n layer. The source text is **always English**, stored in a catalog file, and translated in the other catalogs.
+Every user-facing string in IsItDown is a **key** resolved through the i18n layer. The source text is **always English**, stored in a catalog file, and translated in the other catalogs.
 
 Two rules, no exceptions:
 

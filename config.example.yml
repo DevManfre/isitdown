@@ -1,4 +1,4 @@
-# StatusWatch — Light edition configuration.
+# IsItDown — Light edition configuration.
 #
 # Copy this file to config.yml and edit it. In the container it is mounted at
 # /app/config/config.yml, so it can be changed without rebuilding the image.

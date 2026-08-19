@@ -51,7 +51,7 @@ async function harness(): Promise<Harness> {
   const providerPort = (provider.address() as AddressInfo).port;
   const receiverPort = (receiver.address() as AddressInfo).port;
 
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-e2e-"));
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-e2e-"));
   const configPath = join(dir, "config.yml");
   const dataPath = join(dir, "state.json");
   await writeFile(

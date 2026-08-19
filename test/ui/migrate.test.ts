@@ -9,8 +9,8 @@ import { migrate, SCHEMA_VERSION } from "../../src/ui/db/migrate.ts";
 import { seedDefaults } from "../../src/ui/db/seed.ts";
 
 async function freshDb(): Promise<DatabaseSync> {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-db-"));
-  return openDatabase(join(dir, "statuswatch.db"));
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-db-"));
+  return openDatabase(join(dir, "isitdown.db"));
 }
 
 const names = (db: DatabaseSync, type: "table" | "index"): string[] =>

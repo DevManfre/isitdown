@@ -1,11 +1,11 @@
 ---
 name: core-engine-testing
-description: Write correct unit and integration tests for StatusWatch's core engine — poller, diff engine, adapters, and state store. Use whenever adding a test for a new adapter, diff-engine transition case, or the polling loop, or when asked to increase coverage or verify notification-triggering logic.
+description: Write correct unit and integration tests for IsItDown's core engine — poller, diff engine, adapters, and state store. Use whenever adding a test for a new adapter, diff-engine transition case, or the polling loop, or when asked to increase coverage or verify notification-triggering logic.
 ---
 
 # Core Engine Testing
 
-Testing conventions specific to StatusWatch's core engine. General testing philosophy aside, this project has a few non-obvious correctness requirements that tests must actually verify, not just exercise.
+Testing conventions specific to IsItDown's core engine. General testing philosophy aside, this project has a few non-obvious correctness requirements that tests must actually verify, not just exercise.
 
 ## What must be tested for every change
 

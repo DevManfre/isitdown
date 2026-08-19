@@ -18,9 +18,9 @@ interface Api {
 }
 
 async function api(): Promise<Api> {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-api-"));
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-api-"));
   const runtime = await buildUiRuntime({
-    dbPath: join(dir, "statuswatch.db"),
+    dbPath: join(dir, "isitdown.db"),
     env: {},
     logger: silent,
   });
@@ -175,8 +175,8 @@ test("a bad method on a known path is refused rather than falling through", asyn
 });
 
 test("samples older than the retention window are pruned at boot", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-prune-"));
-  const dbPath = join(dir, "statuswatch.db");
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-prune-"));
+  const dbPath = join(dir, "isitdown.db");
 
   const first = await buildUiRuntime({ dbPath, env: {}, logger: silent });
   const ancient = new Date(Date.now() - 200 * 24 * 3600 * 1000).toISOString();

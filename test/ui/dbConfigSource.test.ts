@@ -24,8 +24,8 @@ import { createLogger } from "../../src/core/logger.ts";
 const silent = createLogger("error", () => {});
 
 async function freshDb(): Promise<DatabaseSync> {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-cfg-"));
-  const db = openDatabase(join(dir, "statuswatch.db"));
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-cfg-"));
+  const db = openDatabase(join(dir, "isitdown.db"));
   migrate(db);
   seedDefaults(db);
   return db;

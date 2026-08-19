@@ -1,6 +1,6 @@
 ---
 name: ui-dashboard-charts
-description: Implement or modify the UI edition's dashboard — status grid, status-page-style uptime charts (daily uptime bars, 7/30/90-day views), and incident timeline. Use whenever working on the StatusWatch UI edition's frontend/dashboard, adding a new chart or view, or wiring dashboard data to the SQLite-backed history API. Always check the Claude Design prototypes in design/ before implementing new UI.
+description: Implement or modify the UI edition's dashboard — status grid, status-page-style uptime charts (daily uptime bars, 7/30/90-day views), and incident timeline. Use whenever working on the IsItDown UI edition's frontend/dashboard, adding a new chart or view, or wiring dashboard data to the SQLite-backed history API. Always check the Claude Design prototypes in design/ before implementing new UI.
 ---
 
 # UI Dashboard & Charts
@@ -8,7 +8,7 @@ description: Implement or modify the UI edition's dashboard — status grid, sta
 > `design/` is currently listed in `.gitignore`, so the prototypes live on disk
 > but are not committed. Read them there; do not assume a fresh clone has them.
 
-Covers the StatusWatch **UI edition** dashboard only — status grid, uptime charts, incident timeline, settings panel. Not applicable to the Light edition, which has no UI.
+Covers the IsItDown **UI edition** dashboard only — status grid, uptime charts, incident timeline, settings panel. Not applicable to the Light edition, which has no UI.
 
 ## Before writing any dashboard code
 
