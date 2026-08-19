@@ -13,6 +13,8 @@ import { currentTheme, initTheme, nextTheme, setTheme } from "./theme.js";
 import { element } from "./charts.js";
 import { renderOverview } from "./views/overview.js";
 import { openAddServiceDialog, renderProviders } from "./views/providers.js";
+import { renderIncidents } from "./views/incidents.js";
+import { renderIncident } from "./views/incident.js";
 
 const REFRESH_MS = 30_000;
 
@@ -20,6 +22,7 @@ const REFRESH_MS = 30_000;
 const ROUTES = [
   { path: "overview", nav: "nav.overview", render: renderOverview },
   { path: "providers", nav: "nav.providers", render: renderProviders },
+  { path: "incidents", nav: "nav.incidents", render: renderIncidents, detail: renderIncident },
 ];
 
 const state = {
@@ -124,9 +127,11 @@ function renderHeader() {
 
 async function renderView() {
   const route = ROUTES.find((entry) => entry.path === state.route.path) ?? ROUTES[0];
+  const render =
+    state.route.params.length > 0 && route.detail !== undefined ? route.detail : route.render;
   dom.view.replaceChildren();
   try {
-    await route.render(dom.view, state);
+    await render(dom.view, state);
   } catch (error) {
     dom.view.replaceChildren(element("p", "empty", t("error.load-failed", { error: error.message })));
   }
