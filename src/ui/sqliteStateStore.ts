@@ -98,6 +98,20 @@ const RANK_CASE = `CASE overall_status ${Object.entries(SEVERITY_RANK)
   .map(([status, rank]) => `WHEN '${status}' THEN ${rank}`)
   .join(" ")} ELSE ${SEVERITY_RANK.major_outage} END`;
 
+/**
+ * A provider's own timestamp is untrusted input like the rest of its payload.
+ * One ahead of our clock would make the incident resolve "before" it started and
+ * every duration derived from it negative, so the start time is pinned to when we
+ * first observed the incident. The provider's own claim is still kept as
+ * `updated_at`.
+ */
+function startedAt(providerUpdatedAt: string, observedAt: string): string {
+  const claimed = Date.parse(providerUpdatedAt);
+  const observed = Date.parse(observedAt);
+  if (Number.isNaN(claimed) || claimed > observed) return observedAt;
+  return providerUpdatedAt;
+}
+
 const baseline = (): ProviderRuntimeState => ({
   last: null,
   failureCount: 0,
@@ -221,7 +235,7 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
             incident.name,
             incident.impact,
             incident.status,
-            incident.updatedAt,
+            startedAt(incident.updatedAt, status.fetchedAt),
             incident.updatedAt,
           );
         }
