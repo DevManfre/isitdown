@@ -1,0 +1,9 @@
+# Paths that must never be merged into a branch that does not already track
+# them. One path per line, relative to the repository root.
+#
+# Enforced by scripts/git-merge-clean and the hooks in .githooks/.
+# After cloning, run: scripts/setup-hooks.sh
+#
+# The Claude Code tooling lives on `dev` only and must stay off `main`.
+.claude
+CLAUDE.md

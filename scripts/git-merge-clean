@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+#
+# git-merge-clean — keep branch-local paths out of the branches that must not
+# carry them.
+#
+# The paths are listed one per line in `.mergeexclude` at the repository root
+# (falling back to `$GIT_DIR/merge-exclude`). In this repository that is the
+# Claude Code tooling: it is tracked on `dev` and must never reach `main`.
+#
+# Modes
+#   git-merge-clean <branch> [<git merge args>...]
+#       Merge <branch>, drop the excluded paths from the merge, then commit.
+#   git-merge-clean --sync
+#       Remove the excluded paths from the working tree on a branch that does
+#       not track them. Run from the post-checkout hook.
+#   git-merge-clean --guard
+#       Fail if the index would add an excluded path on a branch that does not
+#       track it. Run from the pre-commit and pre-merge-commit hooks.
+#
+# For every excluded path a merge handles:
+#   - tracked on the current branch     -> the current branch's version is kept
+#   - not tracked on the current branch -> the incoming version is dropped from
+#     the index and removed from the working tree
+#
+# The working-tree removal only touches files that the reference named by
+# `git config mergeclean.purgeFrom` (default: dev) also has, and only when the
+# copy on disk is byte-identical to that reference. Local-only files and locally
+# modified files are always left alone.
+#
+set -uo pipefail
+
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "not a git repository" >&2; exit 1; }
+
+git_dir=$(git rev-parse --git-dir)
+top=$(git rev-parse --show-toplevel)
+
+mode=merge
+case "${1:-}" in
+  --sync|--restore-only) mode=sync;  shift ;;
+  --guard)               mode=guard; shift ;;
+esac
+
+if [ "$mode" = merge ] && [ "$#" -eq 0 ]; then
+  echo "usage: git-merge-clean [--sync|--guard] <branch> [<git merge args>...]" >&2
+  exit 2
+fi
+
+# --- read the exclude list -------------------------------------------------
+list=""
+if [ -f "$top/.mergeexclude" ]; then
+  list="$top/.mergeexclude"
+elif [ -f "$git_dir/merge-exclude" ]; then
+  list="$git_dir/merge-exclude"
+fi
+
+exclude=()
+if [ -n "$list" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    case "$line" in ''|'#'*) continue ;; esac
+    exclude+=("$line")
+  done < "$list"
+fi
+
+tracked_here() {
+  [ -n "$(git ls-tree -r --name-only HEAD -- "$1" 2>/dev/null)" ]
+}
+
+purge_from() {
+  local src
+  src=$(git config --get mergeclean.purgeFrom || true)
+  [ -n "$src" ] || src=dev
+  # a fresh clone has no local branch yet, fall back to its remote-tracking ref
+  if ! git rev-parse --verify --quiet "$src" >/dev/null 2>&1 \
+     && git rev-parse --verify --quiet "origin/$src" >/dev/null 2>&1; then
+    src="origin/$src"
+  fi
+  printf '%s' "$src"
+}
+
+# Remove the excluded paths from the working tree on branches that do not track
+# them. Only files the reference also has, and only when unmodified, are removed.
+purge_excluded() {
+  local src path file disk ref removed=0
+  src=$(purge_from)
+  git rev-parse --verify --quiet "$src" >/dev/null 2>&1 || return 0
+
+  for path in "${exclude[@]}"; do
+    tracked_here "$path" && continue
+    while IFS= read -r file; do
+      [ -n "$file" ] || continue
+      [ -f "$top/$file" ] || continue
+      ref=$(git rev-parse --verify --quiet "$src:$file" 2>/dev/null) || continue
+      disk=$(git hash-object -- "$top/$file" 2>/dev/null) || continue
+      if [ "$disk" = "$ref" ]; then
+        rm -f -- "$top/$file" && removed=$((removed + 1))
+      else
+        echo "git-merge-clean: kept $file (differs from $src)" >&2
+      fi
+    done < <(git ls-tree -r --name-only "$src" -- "$path" 2>/dev/null)
+    [ -d "$top/$path" ] && find "$top/$path" -type d -empty -delete 2>/dev/null
+  done
+
+  [ "$removed" -gt 0 ] && echo "git-merge-clean: removed $removed excluded file(s) from the working tree"
+  return 0
+}
+
+# Refuse a commit that would add an excluded path to a branch that does not
+# track it.
+guard_excluded() {
+  local path staged bad=0
+  for path in "${exclude[@]}"; do
+    tracked_here "$path" && continue
+    staged=$(git diff --cached --name-only --diff-filter=AM -- "$path")
+    if [ -n "$staged" ]; then
+      if [ "$bad" -eq 0 ]; then
+        echo "git-merge-clean: refusing to add excluded paths to $(git rev-parse --abbrev-ref HEAD)" >&2
+      fi
+      printf '  %s\n' $staged >&2
+      bad=1
+    fi
+  done
+  if [ "$bad" -eq 1 ]; then
+    echo >&2
+    echo "These paths are listed in .mergeexclude and must not live on this branch." >&2
+    echo "Merge with 'git mergeclean <branch>' instead of 'git merge <branch>'." >&2
+    echo "To override once: git commit --no-verify" >&2
+    return 1
+  fi
+  return 0
+}
+
+if [ "${#exclude[@]}" -eq 0 ]; then
+  case "$mode" in
+    sync|guard) exit 0 ;;
+  esac
+  echo "git-merge-clean: no exclude list found, running a plain merge" >&2
+  exec git merge "$@"
+fi
+
+case "$mode" in
+  sync)  purge_excluded; exit 0 ;;
+  guard) guard_excluded;  exit $? ;;
+esac
+
+# --- refuse to run on a dirty tree ----------------------------------------
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "git-merge-clean: working tree is not clean, commit or stash first" >&2
+  exit 1
+fi
+
+# --- merge, but stop before committing; hide noise about excluded paths ----
+filter=()
+for path in "${exclude[@]}"; do filter+=(-e "$path"); done
+merge_out=$(git merge --no-ff --no-commit "$@" 2>&1)
+printf '%s\n' "$merge_out" \
+  | grep -vF "${filter[@]}" \
+  | grep -v '^Automatic merge failed' \
+  | grep -v '^$' || true
+
+# --- neutralise the excluded paths ----------------------------------------
+for path in "${exclude[@]}"; do
+  if tracked_here "$path"; then
+    git checkout HEAD -- "$path" 2>/dev/null \
+      || echo "git-merge-clean: could not restore $path" >&2
+  else
+    git rm -r --cached --force --quiet --ignore-unmatch -- "$path" 2>/dev/null
+  fi
+done
+echo "git-merge-clean: excluded ${exclude[*]}"
+
+# --- anything still conflicted? -------------------------------------------
+unmerged=$(git diff --name-only --diff-filter=U)
+if [ -n "$unmerged" ]; then
+  purge_excluded
+  echo "git-merge-clean: conflicts left for you to resolve:" >&2
+  printf '  %s\n' $unmerged >&2
+  echo "resolve them, then run: git commit" >&2
+  exit 1
+fi
+
+if git diff --cached --quiet HEAD; then
+  echo "git-merge-clean: nothing to merge outside the excluded paths, merge aborted"
+  git merge --abort 2>/dev/null || git reset --merge
+  purge_excluded
+  exit 0
+fi
+
+if [ -n "${MERGECLEAN_MESSAGE:-}" ]; then
+  git commit -m "$MERGECLEAN_MESSAGE"
+else
+  git commit --no-edit
+fi
+status=$?
+purge_excluded
+exit "$status"
