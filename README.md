@@ -430,11 +430,11 @@ statuswatch/
 ├── docker-compose.yml
 ├── package.json
 ├── tsconfig.json
-├── .mergeexclude                  (paths that must never reach `main` — see section 12)
-├── .githooks/                     (versioned hooks, enabled by scripts/setup-hooks.sh)
+├── .mergeexclude                  (`dev` only — paths that must never reach `main`, see section 12)
+├── .githooks/                     (`dev` only — hook templates installed into .git/hooks)
 ├── scripts/
-│   ├── git-merge-clean            (branch-aware merge wrapper)
-│   └── setup-hooks.sh             (one-time setup after cloning)
+│   ├── git-merge-clean            (`dev` only — branch-aware merge wrapper)
+│   └── setup-hooks.sh             (`dev` only — installs the filter into this clone)
 └── README.md
 ```
 
@@ -442,21 +442,31 @@ statuswatch/
 
 ## 12. Branch Layout & Merge Policy
 
-The Claude Code tooling (`.claude/` and `CLAUDE.md`) is tracked on **`dev` only**.
-On `main` those paths must not exist — neither in the commit nor in the working
-tree. Everything else (source, docs, config) flows normally from `dev` to `main`.
+The Claude Code tooling (`.claude/`, `CLAUDE.md`) and the merge filter itself
+(`.mergeexclude`, `.githooks/`, `scripts/`) are tracked on **`dev` only**. On
+`main` none of those paths exist — neither in the commit nor in the working tree.
+Everything else (source, docs, config) flows normally from `dev` to `main`.
 
-### After cloning
+Because the filter is not readable from `main`, it is installed into this clone's
+`.git` directory, which every branch shares.
 
-Run this once per clone. Git never runs hooks straight from a clone, so it
-cannot be automatic:
+### Setup, once per clone
 
 ```bash
+git switch dev
 scripts/setup-hooks.sh
 ```
 
-It sets `core.hooksPath` to `.githooks/`, points the purge reference at `dev`,
-and installs the `git mergeclean` alias.
+It copies:
+
+| From (`dev`) | To (shared by every branch) |
+|---|---|
+| `scripts/git-merge-clean` | `$GIT_DIR/merge-clean` |
+| `.githooks/*` | `$GIT_DIR/hooks/*` |
+| `.mergeexclude` | `$GIT_DIR/merge-exclude` |
+
+and installs the `git mergeclean` alias. Re-run it after changing
+`.mergeexclude` or `scripts/git-merge-clean`.
 
 ### Merging into `main`
 
@@ -465,28 +475,38 @@ git switch main
 git mergeclean dev        # not `git merge dev`
 ```
 
-`git mergeclean` merges the branch, drops the paths listed in `.mergeexclude`
-from the merge, commits with the repo's `🔀` subject format, and removes those
-paths from the working tree. It refuses to run on a dirty tree. Genuine
-conflicts outside the excluded paths stop the run so you can resolve them and
-`git commit` as usual.
+`git mergeclean` merges the branch, drops the paths listed in the exclude list,
+commits with the repo's `🔀` subject format, and removes those paths from the
+working tree. It refuses to run on a dirty tree. Genuine conflicts outside the
+excluded paths stop the run so you can resolve them and `git commit` as usual.
 
 ### What enforces it
 
 | Piece | Role |
 |---|---|
-| `.mergeexclude` | the path list |
-| `scripts/git-merge-clean` | the merge wrapper (`--sync` purges, `--guard` checks) |
-| `.githooks/post-checkout` | purges the excluded paths after a branch switch |
-| `.githooks/pre-merge-commit`, `.githooks/pre-commit` | abort any commit that would add an excluded path to a branch that does not track it |
+| `$GIT_DIR/merge-exclude` | the path list |
+| `$GIT_DIR/merge-clean` | the merge wrapper (`--sync` purges, `--guard` checks) |
+| `$GIT_DIR/hooks/post-checkout` | purges the excluded paths after a branch switch |
+| `$GIT_DIR/hooks/pre-merge-commit`, `pre-commit` | abort any commit that would add an excluded path to a branch that does not track it |
 
 A plain `git merge dev` on `main` is refused by the guard hooks — run
 `git merge --abort` and use `git mergeclean` instead. `git commit --no-verify`
 bypasses the guard if you ever genuinely need to.
 
+### Consequences of keeping the filter off `main`
+
+- **The setup is per clone and cannot be automatic.** Git never runs hooks taken
+  from a clone, and a clone that only ever checks out `main` has nothing to
+  install from. On a new machine, check out `dev` and run the setup before
+  merging anything into `main`.
+- **Until the setup is run, nothing is enforced.** A plain `git merge dev` on a
+  fresh clone will pull `.claude/` and `CLAUDE.md` into `main` as soon as you
+  resolve the conflicts it raises.
+
 ### Rules of thumb
 
-- Edit `.claude/` and `CLAUDE.md` only while on `dev` — on `main` they do not exist.
+- Edit `.claude/`, `CLAUDE.md`, `.mergeexclude`, `.githooks/` and `scripts/` only
+  while on `dev` — on `main` they do not exist.
 - The purge only deletes files that `dev` also has and that are byte-identical to
   it, so machine-local files (`.claude/settings.local.json`) and local edits are
   never touched.
