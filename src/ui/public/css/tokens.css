@@ -107,6 +107,8 @@
   --bar-poll-unknown: 20px;
 
   --rail-width: 196px;
+
+  --ring-icon-bg: #ffffff;
 }
 
 :root[data-theme="dark"] {
@@ -195,6 +197,8 @@
   --bar-poll-unknown: 20px;
 
   --rail-width: 196px;
+
+  --ring-icon-bg: #ffffff;
 }
 
 /* "System" is the default: no data-theme attribute is set, so the OS decides.
@@ -286,5 +290,7 @@
     --bar-poll-unknown: 20px;
 
     --rail-width: 196px;
+
+    --ring-icon-bg: #ffffff;
   }
 }
