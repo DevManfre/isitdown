@@ -250,6 +250,20 @@
 .btn-primary:active {
   transform: scale(0.96);
 }
+/* Same handling for the destructive outline, in its own hue. */
+.btn-danger {
+  transition:
+    background 0.22s ease,
+    border-color 0.22s ease,
+    transform 0.18s var(--ease-out),
+    box-shadow 0.24s ease;
+}
+.btn-danger:hover {
+  box-shadow: 0 0 18px var(--status-outage-tint);
+}
+.btn-danger:active {
+  transform: scale(0.96);
+}
 .btn-ghost {
   transition:
     color 0.2s ease,
@@ -296,7 +310,9 @@
 .incident-row {
   transition: background 0.2s ease;
 }
-
+.table tbody td {
+  transition: color 0.2s ease;
+}
 .ring-tile {
   transition:
     border-color 0.24s ease,

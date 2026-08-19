@@ -14,6 +14,20 @@ import { refresh } from "../app.js";
 
 const RANGE_DAYS = 90;
 
+/**
+ * The table's columns in order. `num` is the alignment the cell uses too, so a
+ * header can never drift away from the figures under it.
+ */
+const COLUMNS = [
+  { key: "column.provider" },
+  { key: "column.status" },
+  { key: "column.range", className: "col-range" },
+  { key: "column.uptime", className: "num" },
+  { key: "column.incidents", className: "num" },
+  { key: "column.poll", className: "num" },
+  { key: "column.adapter", className: "num" },
+];
+
 const STATUS_KEYS = {
   operational: "status.operational",
   degraded: "status.degraded",
@@ -64,18 +78,11 @@ function table(providers, byId, state) {
   const table = element("table", "table");
   const head = element("thead");
   const headRow = element("tr");
-  for (const key of [
-    "column.provider",
-    "column.status",
-    "column.range",
-    "column.uptime",
-    "column.incidents",
-    "column.poll",
-    "column.adapter",
-  ]) {
-    headRow.append(element("th", undefined, key === "column.range" ? t(key, { days: RANGE_DAYS }) : t(key)));
+  for (const column of COLUMNS) {
+    const label = column.key === "column.range" ? t(column.key, { days: RANGE_DAYS }) : t(column.key);
+    headRow.append(element("th", column.className, label));
   }
-  headRow.append(element("th"));
+  headRow.append(element("th", "col-actions"));
   head.append(headRow);
   table.append(head);
 
@@ -103,30 +110,16 @@ function table(providers, byId, state) {
     statusLabel.style.color = statusColor(provider.overallStatus);
     statusCell.append(statusLabel);
 
-    const barsCell = element("td");
-    barsCell.style.width = "210px";
+    const barsCell = element("td", "col-range");
     barsCell.append(uptimeStrip(history?.buckets ?? []));
 
-    const uptimeCell = element("td", "mono");
-    uptimeCell.style.textAlign = "right";
-    uptimeCell.textContent = formatPercent(provider.uptime90);
+    const uptimeCell = element("td", "mono num", formatPercent(provider.uptime90));
+    const incidentsCell = element("td", "mono muted num", String(history?.incidentCount ?? 0));
+    const pollCell = element("td", "mono muted num", `${state.status?.pollIntervalMinutes ?? "-"}m`);
+    const adapterCell = element("td", "mono muted num", provider.adapter);
 
-    const incidentsCell = element("td", "mono muted");
-    incidentsCell.style.textAlign = "right";
-    incidentsCell.textContent = String(history?.incidentCount ?? 0);
-
-    const pollCell = element("td", "mono muted");
-    pollCell.style.textAlign = "right";
-    pollCell.textContent = `${state.status?.pollIntervalMinutes ?? "-"}m`;
-
-    const adapterCell = element("td", "mono muted");
-    adapterCell.style.textAlign = "right";
-    adapterCell.textContent = provider.adapter;
-
-    const actionsCell = element("td");
-    actionsCell.style.textAlign = "right";
-    const actions = element("div", "header-actions");
-    actions.style.justifyContent = "flex-end";
+    const actionsCell = element("td", "num");
+    const actions = element("div", "row-actions");
     actions.append(editButton(provider), removeButton(provider));
     actionsCell.append(actions);
 
@@ -147,7 +140,7 @@ function table(providers, byId, state) {
 }
 
 export function editButton(provider) {
-  const button = element("button", "btn btn-ghost", t("action.edit"));
+  const button = element("button", "btn btn-primary btn-row", t("action.edit"));
   button.type = "button";
   button.addEventListener("click", () => {
     openModal({
@@ -167,9 +160,8 @@ export function editButton(provider) {
 }
 
 export function removeButton(provider) {
-  const button = element("button", "btn btn-ghost", t("action.remove"));
+  const button = element("button", "btn btn-danger btn-row", t("action.remove"));
   button.type = "button";
-  button.style.color = "var(--color-neutral-600)";
   button.addEventListener("click", () => {
     confirmModal({
       title: t("action.remove"),
