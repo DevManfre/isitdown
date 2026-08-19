@@ -200,3 +200,15 @@ test("a disabled provider still appears in the summary, since its history is rea
   assert.equal(summary.providers.length, 1);
   await store.close();
 });
+
+test("a day mixing an unclassifiable sample with good ones still reads as operational", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(1, 1), "unknown");
+  await sample(store, "github", daysAgo(1, 2), "operational");
+  await sample(store, "github", daysAgo(0, 1), "unknown");
+
+  const { buckets } = await history.getProviderHistory("github", 2, 3);
+  assert.equal(buckets[0]?.status, "operational", "one unknown sample must not mute a good day");
+  assert.equal(buckets[1]?.status, "unknown", "a day with nothing but unknowns stays unknown");
+  await store.close();
+});
