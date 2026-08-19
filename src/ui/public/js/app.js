@@ -37,7 +37,7 @@ const dom = {
   themeToggle: document.getElementById("theme-toggle"),
   themeLabel: document.getElementById("theme-label"),
   addService: document.getElementById("add-service"),
-  pollNow: document.getElementById("poll-now"),
+  pollNow: /** @type {HTMLButtonElement} */ (document.getElementById("poll-now")),
 };
 
 export const appState = state;

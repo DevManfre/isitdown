@@ -58,15 +58,22 @@ export function tPlural(baseKey, count, params = {}) {
   });
 }
 
-/** Fills every [data-i18n] node and [data-i18n-*] attribute under `root`. */
+/**
+ * Fills every [data-i18n] node and [data-i18n-*] attribute under `root`.
+ * @param {ParentNode} root
+ */
 export function applyTranslations(root = document) {
-  for (const node of root.querySelectorAll("[data-i18n]")) {
+  for (const node of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll("[data-i18n]"))) {
     node.textContent = t(node.dataset.i18n);
   }
-  for (const node of root.querySelectorAll("[data-i18n-placeholder]")) {
+  for (const node of /** @type {NodeListOf<HTMLInputElement>} */ (
+    root.querySelectorAll("[data-i18n-placeholder]")
+  )) {
     node.placeholder = t(node.dataset.i18nPlaceholder);
   }
-  for (const node of root.querySelectorAll("[data-i18n-title]")) {
+  for (const node of /** @type {NodeListOf<HTMLElement>} */ (
+    root.querySelectorAll("[data-i18n-title]")
+  )) {
     node.title = t(node.dataset.i18nTitle);
   }
 }
@@ -96,15 +103,16 @@ export const formatDay = (day) =>
 export function formatRelative(iso) {
   const formatter = new Intl.RelativeTimeFormat(active, { numeric: "auto" });
   const deltaSeconds = (Date.parse(iso) - Date.now()) / 1000;
+  /** @type {{unit: Intl.RelativeTimeFormatUnit, seconds: number}[]} */
   const units = [
-    ["day", 86400],
-    ["hour", 3600],
-    ["minute", 60],
-    ["second", 1],
+    { unit: "day", seconds: 86400 },
+    { unit: "hour", seconds: 3600 },
+    { unit: "minute", seconds: 60 },
+    { unit: "second", seconds: 1 },
   ];
-  for (const [unit, size] of units) {
-    if (Math.abs(deltaSeconds) >= size || unit === "second") {
-      return formatter.format(Math.round(deltaSeconds / size), unit);
+  for (const { unit, seconds } of units) {
+    if (Math.abs(deltaSeconds) >= seconds || unit === "second") {
+      return formatter.format(Math.round(deltaSeconds / seconds), unit);
     }
   }
   return formatter.format(0, "second");

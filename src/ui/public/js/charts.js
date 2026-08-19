@@ -41,8 +41,12 @@ export function element(tag, className, text) {
   return node;
 }
 
-/** One bar per day, oldest first: the status-page uptime row. */
-export function uptimeBarRow(buckets, title = () => "") {
+/**
+ * One bar per day, oldest first: the status-page uptime row.
+ * @param {{day: string, status: string}[]} buckets
+ * @param {(bucket: {day: string, status: string}) => string} [title]
+ */
+export function uptimeBarRow(buckets, title) {
   const row = element("div", "bar-row");
   for (const bucket of buckets) {
     const spec = barSpec(bucket.status);
@@ -50,7 +54,7 @@ export function uptimeBarRow(buckets, title = () => "") {
     bar.style.height = spec.height;
     bar.style.background = spec.color;
     if (spec.muted) bar.style.opacity = "0.45";
-    bar.title = title(bucket);
+    bar.title = title === undefined ? "" : title(bucket);
     row.append(bar);
   }
   return row;
