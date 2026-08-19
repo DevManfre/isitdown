@@ -195,6 +195,34 @@
 }
 
 /* — rail — */
+/* The strip widens on hover and the pin chevron flips; content fades with it. */
+.rail {
+  transition: width 0.28s var(--ease-out);
+}
+.console {
+  transition: grid-template-columns 0.28s var(--ease-out);
+}
+.rail-toggle {
+  transition: color 0.2s ease;
+}
+.rail-toggle-chevron {
+  transition: transform 0.4s var(--ease-out);
+}
+:root[data-rail="collapsed"] .rail-toggle-chevron {
+  transform: rotate(225deg);
+  margin-left: -2px;
+}
+.rail-links,
+.rail-foot {
+  transition: opacity 0.22s ease;
+}
+.rail-brand {
+  transition: padding 0.28s var(--ease-out);
+}
+.rail-dot,
+.rail-name {
+  transition: opacity 0.22s ease;
+}
 /* Hovering nudges the label 4px further in, pressing settles at 2px. */
 .rail-link {
   transition:

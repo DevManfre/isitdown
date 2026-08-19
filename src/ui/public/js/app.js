@@ -55,6 +55,8 @@ const dom = {
   themeLabel: document.getElementById("theme-label"),
   addService: document.getElementById("add-service"),
   pollNow: /** @type {HTMLButtonElement} */ (document.getElementById("poll-now")),
+  railToggle: document.getElementById("rail-toggle"),
+  rail: document.querySelector(".rail"),
 };
 
 export const appState = state;
@@ -109,6 +111,29 @@ function renderRail() {
   }
 }
 
+const railCollapsed = () => document.documentElement.getAttribute("data-rail") === "collapsed";
+
+/**
+ * Pinned open or collapsed to the hover strip. The attribute lives on <html>
+ * so the pre-paint script in index.html can restore it before the first frame;
+ * hover-expanding a collapsed rail is CSS alone.
+ */
+function setRailCollapsed(collapsed) {
+  if (collapsed) document.documentElement.setAttribute("data-rail", "collapsed");
+  else document.documentElement.removeAttribute("data-rail");
+  labelRailToggle();
+  try {
+    localStorage.setItem("isitdown.railCollapsed", String(collapsed));
+  } catch {
+    /* only costs the choice surviving a reload */
+  }
+}
+
+function labelRailToggle() {
+  dom.railToggle.setAttribute("aria-expanded", String(!railCollapsed()));
+  dom.railToggle.setAttribute("aria-label", t(railCollapsed() ? "nav.rail-expand" : "nav.rail-collapse"));
+}
+
 function badgeFor(path) {
   if (state.status === undefined) return undefined;
   if (path === "providers") return String(state.status.providers.length);
@@ -139,6 +164,7 @@ function renderHeader() {
         ].join(" · ");
 
   dom.themeLabel.textContent = t("theme.mode", { mode: t(`theme.${currentTheme()}`) });
+  labelRailToggle();
   applyTranslations(document);
 }
 
@@ -181,6 +207,23 @@ async function renderView() {
 }
 
 function wireHeader() {
+  dom.railToggle.addEventListener("click", () => {
+    const collapsing = !railCollapsed();
+    setRailCollapsed(collapsing);
+    if (collapsing) {
+      // The pointer and the focus are both still on the rail, and either one
+      // would hold it open: blur drops the focus, .rail-hold blinds :hover
+      // until the pointer has actually left once.
+      dom.railToggle.blur();
+      dom.rail.classList.add("rail-hold");
+      dom.rail.addEventListener("mouseleave", () => dom.rail.classList.remove("rail-hold"), {
+        once: true,
+      });
+    } else {
+      dom.rail.classList.remove("rail-hold");
+    }
+  });
+
   dom.themeToggle.addEventListener("click", async () => {
     const chosen = setTheme(nextTheme());
     renderHeader();

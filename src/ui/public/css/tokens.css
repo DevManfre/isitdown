@@ -109,6 +109,7 @@
   --rail-width: 196px;
 
   --ring-icon-bg: #ffffff;
+  --rail-width-collapsed: 30px;
 }
 
 :root[data-theme="dark"] {
@@ -199,6 +200,7 @@
   --rail-width: 196px;
 
   --ring-icon-bg: #ffffff;
+  --rail-width-collapsed: 30px;
 }
 
 /* "System" is the default: no data-theme attribute is set, so the OS decides.
@@ -292,5 +294,6 @@
     --rail-width: 196px;
 
     --ring-icon-bg: #ffffff;
+    --rail-width-collapsed: 30px;
   }
 }

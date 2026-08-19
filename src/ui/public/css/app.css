@@ -12,13 +12,83 @@
 }
 
 /* — rail — */
+/* The rail is always an overlay above its own grid column: pinning only moves
+   the column edge, so the rail never re-enters the flow and never slides over
+   the content mid-transition. The column and the rail width share one motion. */
 .rail {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--rail-width);
+  overflow: hidden;
+  z-index: 6;
   border-right: 1px solid var(--color-divider);
   padding: var(--space-6) 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: linear-gradient(180deg, var(--color-neutral-900), transparent 40%);
+  background-color: var(--color-bg);
+  background-image: linear-gradient(180deg, var(--color-neutral-900), transparent 40%);
+}
+/* A flex sibling of the brand name, so the two centre on the same line. */
+.rail-toggle {
+  all: unset;
+  cursor: pointer;
+  margin-left: auto;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-neutral-500);
+}
+.rail-toggle:hover {
+  color: var(--color-text);
+}
+.rail-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+/* A chevron drawn from two borders, like the theme dot: the markup guard test
+   allows no text node, so the glyph cannot be a character. Rotated 45° it
+   points left (collapse); the flip to 225° lives with the other motion. */
+.rail-toggle-chevron {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 2px;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+/* Collapsed, the column shrinks to a strip; only the chevron stays visible
+   until the pointer (or keyboard focus) arrives. Hover-opening widens the
+   column with the rail, so the page gives way instead of being covered. */
+:root[data-rail="collapsed"] .console {
+  grid-template-columns: var(--rail-width-collapsed) 1fr;
+}
+:root[data-rail="collapsed"] .console:has(.rail:hover:not(.rail-hold)),
+:root[data-rail="collapsed"] .console:has(.rail:focus-within) {
+  grid-template-columns: var(--rail-width) 1fr;
+}
+:root[data-rail="collapsed"] .rail {
+  width: var(--rail-width-collapsed);
+}
+/* .rail-hold marks the strip the pointer is still standing on right after the
+   collapse click: without it, :hover would reopen the rail in the same instant.
+   app.js lifts it on the first mouseleave. */
+:root[data-rail="collapsed"] .rail:hover:not(.rail-hold),
+:root[data-rail="collapsed"] .rail:focus-within {
+  width: var(--rail-width);
+}
+:root[data-rail="collapsed"] .rail:not(:hover):not(:focus-within) :is(.rail-dot, .rail-name, .rail-links, .rail-foot),
+:root[data-rail="collapsed"] .rail.rail-hold :is(.rail-dot, .rail-name, .rail-links, .rail-foot) {
+  opacity: 0;
+}
+:root[data-rail="collapsed"] .rail:not(:hover):not(:focus-within) .rail-brand,
+:root[data-rail="collapsed"] .rail.rail-hold .rail-brand {
+  padding-left: 6px;
+  padding-right: 6px;
 }
 .rail-brand {
   display: flex;
@@ -129,6 +199,8 @@
 
 /* — main column — */
 .main {
+  /* The rail overlays column 1, so the main column claims its cell explicitly. */
+  grid-column: 2;
   display: flex;
   flex-direction: column;
   min-width: 0;
