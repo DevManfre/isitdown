@@ -1,8 +1,10 @@
 #!/bin/sh
-# Keep the paths listed in .mergeexclude out of the working tree on branches
-# that do not track them. Only fires on a branch checkout.
+# Keep the excluded paths out of the working tree on branches that do not track
+# them. Only fires on a branch checkout.
+#
+# Template: installed into .git/hooks/ by scripts/setup-hooks.sh.
 [ "$3" = "1" ] || exit 0
-script="$(git rev-parse --show-toplevel)/scripts/git-merge-clean"
+script="$(git rev-parse --absolute-git-dir)/merge-clean"
 [ -x "$script" ] || exit 0
 "$script" --sync >/dev/null 2>&1 || true
 exit 0
