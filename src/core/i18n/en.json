@@ -5,11 +5,6 @@
   "status.major-outage": "Major outage",
   "status.unknown": "Unknown",
 
-  "impact.none": "None",
-  "impact.minor": "Minor",
-  "impact.major": "Major",
-  "impact.critical": "Critical",
-
   "incident.status.investigating": "Investigating",
   "incident.status.identified": "Identified",
   "incident.status.monitoring": "Monitoring",
