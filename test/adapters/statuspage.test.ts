@@ -1,0 +1,205 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
+import { parseSummary, statuspageAdapter } from "../../src/adapters/statuspage.adapter.ts";
+import { getAdapter } from "../../src/adapters/index.ts";
+import type { ServiceRef } from "../../src/core/adapter.interface.ts";
+
+const service: ServiceRef = {
+  id: "github",
+  name: "GitHub",
+  baseUrl: "https://www.githubstatus.com",
+};
+
+const fixture = (name: string): unknown =>
+  JSON.parse(readFileSync(new URL(`../fixtures/statuspage/${name}.json`, import.meta.url), "utf8"));
+
+/** Local stand-in for a provider. Never a live endpoint. */
+async function withServer(
+  handler: (req: IncomingMessage, res: ServerResponse) => void,
+  run: (baseUrl: string, server: Server) => Promise<void>,
+): Promise<void> {
+  const server = createServer(handler);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    await run(`http://127.0.0.1:${port}`, server);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}
+
+test("an operational summary maps to operational with no incidents", () => {
+  const status = parseSummary(fixture("operational"), service);
+  assert.equal(status.provider, "github");
+  assert.equal(status.overallStatus, "operational");
+  assert.deepEqual(status.activeIncidents, []);
+  assert.ok(!Number.isNaN(Date.parse(status.fetchedAt)));
+});
+
+test("indicator minor maps to degraded and surfaces the incident as recorded", () => {
+  const status = parseSummary(fixture("incident-minor"), service);
+  assert.equal(status.overallStatus, "degraded");
+  assert.equal(status.activeIncidents.length, 1);
+  assert.deepEqual(status.activeIncidents[0], {
+    id: "46j9vvprj159",
+    name: "Workers AI GLM 5.2 is unavailable",
+    impact: "minor",
+    status: "monitoring",
+    updatedAt: "2026-08-19T16:16:18.869Z",
+  });
+});
+
+test("indicator major maps to partial_outage", () => {
+  const status = parseSummary(fixture("incident-major"), service);
+  assert.equal(status.overallStatus, "partial_outage");
+  assert.equal(status.activeIncidents[0]?.impact, "major");
+  assert.equal(status.activeIncidents[0]?.status, "investigating");
+});
+
+test("a resolved incident is not an active incident", () => {
+  const status = parseSummary(fixture("resolved"), service);
+  assert.equal(status.overallStatus, "operational");
+  assert.deepEqual(status.activeIncidents, []);
+});
+
+test("a postmortem incident is not an active incident either", () => {
+  const status = parseSummary(
+    { status: { indicator: "none" }, incidents: [{ id: "p1", status: "postmortem" }] },
+    service,
+  );
+  assert.deepEqual(status.activeIncidents, []);
+});
+
+test("an unrecognised indicator maps to the more severe bucket, never operational", () => {
+  const status = parseSummary(fixture("unknown-indicator"), service);
+  assert.equal(status.overallStatus, "major_outage");
+});
+
+test("each documented indicator maps to its bucket", () => {
+  const expected = {
+    none: "operational",
+    minor: "degraded",
+    major: "partial_outage",
+    critical: "major_outage",
+  } as const;
+  for (const [indicator, bucket] of Object.entries(expected)) {
+    const status = parseSummary({ status: { indicator }, incidents: [] }, service);
+    assert.equal(status.overallStatus, bucket, `indicator ${indicator}`);
+  }
+});
+
+test("a summary with incidents but no status object is unknown, not operational", () => {
+  const status = parseSummary({ incidents: [] }, service);
+  assert.equal(status.overallStatus, "unknown");
+});
+
+test("a malformed incident degrades field by field instead of throwing", () => {
+  const status = parseSummary(fixture("malformed"), service);
+  assert.equal(status.overallStatus, "degraded");
+  assert.equal(status.activeIncidents.length, 1);
+  assert.equal(status.activeIncidents[0]?.name, "");
+  assert.equal(status.activeIncidents[0]?.impact, "");
+  assert.ok(!Number.isNaN(Date.parse(status.activeIncidents[0]?.updatedAt ?? "")));
+});
+
+test("an incident with no usable id is dropped rather than keyed on undefined", () => {
+  const status = parseSummary(
+    { status: { indicator: "minor" }, incidents: [{ status: "investigating" }, { id: "ok", status: "identified" }] },
+    service,
+  );
+  assert.deepEqual(
+    status.activeIncidents.map((incident) => incident.id),
+    ["ok"],
+  );
+});
+
+test("a fundamentally broken body throws so the poller can retry", () => {
+  for (const body of ["not json at all", 42, null, [], { nothing: true }]) {
+    assert.throws(() => parseSummary(body, service), `expected ${JSON.stringify(body)} to throw`);
+  }
+});
+
+test("the provider id comes from the service, not from the payload", () => {
+  const status = parseSummary(fixture("operational"), { ...service, id: "renamed" });
+  assert.equal(status.provider, "renamed");
+});
+
+test("fetchStatus requests the summary endpoint under the service base url", async () => {
+  const seen: string[] = [];
+  await withServer(
+    (req, res) => {
+      seen.push(req.url ?? "");
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ status: { indicator: "none" }, incidents: [] }));
+    },
+    async (baseUrl) => {
+      const status = await statuspageAdapter.fetchStatus({ ...service, baseUrl }, { timeoutMs: 2000 });
+      assert.equal(status.overallStatus, "operational");
+      assert.deepEqual(seen, ["/api/v2/summary.json"]);
+    },
+  );
+});
+
+test("fetchStatus follows a redirect, as status.anthropic.com issues one", async () => {
+  await withServer(
+    (req, res) => {
+      if (req.url === "/api/v2/summary.json") {
+        res.writeHead(301, { location: "/moved/summary.json" });
+        res.end();
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ status: { indicator: "minor" }, incidents: [] }));
+    },
+    async (baseUrl) => {
+      const status = await statuspageAdapter.fetchStatus({ ...service, baseUrl }, { timeoutMs: 2000 });
+      assert.equal(status.overallStatus, "degraded");
+    },
+  );
+});
+
+test("fetchStatus throws on a non-2xx response with the status code in the message", async () => {
+  await withServer(
+    (_req, res) => {
+      res.writeHead(503);
+      res.end("nope");
+    },
+    async (baseUrl) => {
+      await assert.rejects(
+        statuspageAdapter.fetchStatus({ ...service, baseUrl }, { timeoutMs: 2000 }),
+        /503/,
+      );
+    },
+  );
+});
+
+test("fetchStatus throws when the body is not JSON", async () => {
+  await withServer(
+    (_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("<html>not json</html>");
+    },
+    async (baseUrl) => {
+      await assert.rejects(statuspageAdapter.fetchStatus({ ...service, baseUrl }, { timeoutMs: 2000 }));
+    },
+  );
+});
+
+test("fetchStatus gives up once the timeout passes", async () => {
+  await withServer(
+    () => {
+      /* never responds */
+    },
+    async (baseUrl) => {
+      await assert.rejects(statuspageAdapter.fetchStatus({ ...service, baseUrl }, { timeoutMs: 150 }));
+    },
+  );
+});
+
+test("the registry resolves statuspage and rejects an unknown adapter by name", () => {
+  assert.equal(getAdapter("statuspage").id, "statuspage");
+  assert.throws(() => getAdapter("nope"), /nope/);
+});
