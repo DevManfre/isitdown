@@ -18,6 +18,11 @@ export interface SentRecord {
 export interface DispatchContext {
   services: ServiceDefinition[];
   locale: string;
+  /**
+   * Built fresh by the caller from the configuration of this cycle, so enabling
+   * or disabling a channel takes effect without a restart.
+   */
+  notifiers: Notifier[];
 }
 
 export interface Dispatcher {
@@ -25,7 +30,6 @@ export interface Dispatcher {
 }
 
 export interface DispatcherDeps {
-  notifiers: Notifier[];
   logger: Logger;
   /** Called once per attempt, success or failure. The UI edition persists these. */
   onSent?: ((record: SentRecord) => void | Promise<void>) | undefined;
@@ -37,7 +41,7 @@ export interface DispatcherDeps {
  * place: no route handler and no poller shortcut may send a message.
  */
 export function createDispatcher(deps: DispatcherDeps): Dispatcher {
-  const { notifiers, logger, onSent } = deps;
+  const { logger, onSent } = deps;
 
   async function deliver(
     notifier: Notifier,
@@ -88,7 +92,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
 
   return {
     async dispatch(changes: StatusChange[], ctx: DispatchContext): Promise<SentRecord[]> {
-      if (changes.length === 0 || notifiers.length === 0) return [];
+      if (changes.length === 0 || ctx.notifiers.length === 0) return [];
 
       const byId = new Map(ctx.services.map((service) => [service.id, service]));
       const attempts: Promise<SentRecord>[] = [];
@@ -112,7 +116,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         };
         const text = renderMessage(payload);
 
-        for (const notifier of notifiers) {
+        for (const notifier of ctx.notifiers) {
           attempts.push(deliver(notifier, payload, text));
         }
       }
