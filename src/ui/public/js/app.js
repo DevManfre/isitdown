@@ -15,6 +15,7 @@ import { renderOverview } from "./views/overview.js";
 import { openAddServiceDialog, renderProviders } from "./views/providers.js";
 import { renderIncidents } from "./views/incidents.js";
 import { renderIncident } from "./views/incident.js";
+import { renderHistory } from "./views/history.js";
 
 const REFRESH_MS = 30_000;
 
@@ -23,6 +24,7 @@ const ROUTES = [
   { path: "overview", nav: "nav.overview", render: renderOverview },
   { path: "providers", nav: "nav.providers", render: renderProviders },
   { path: "incidents", nav: "nav.incidents", render: renderIncidents, detail: renderIncident },
+  { path: "history", nav: "nav.history", render: renderHistory },
 ];
 
 const state = {
