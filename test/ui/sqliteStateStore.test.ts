@@ -289,3 +289,46 @@ test("state for one provider is untouched by another provider's save", async () 
   assert.equal((await store.getState("cloudflare")).last?.overallStatus, "operational");
   await store.close();
 });
+
+test("a provider timestamp ahead of our clock cannot start an incident in the future", async () => {
+  const { store } = await harness();
+  // Nothing stops a provider reporting updated_at in the future; if that became
+  // started_at, the incident would later resolve "before" it opened and every
+  // duration derived from it would be negative.
+  await store.saveStatus({
+    provider: "github",
+    overallStatus: "major_outage",
+    activeIncidents: [inc({ updatedAt: "2099-01-01T00:00:00.000Z" })],
+    fetchedAt: "2026-08-19T14:05:00.000Z",
+  });
+
+  const [row] = await store.listIncidents({ providerId: "github" });
+  assert.equal(row?.startedAt, "2026-08-19T14:05:00.000Z", "pinned to when we first saw it");
+  assert.equal(row?.updatedAt, "2099-01-01T00:00:00.000Z", "the provider's own claim is still recorded");
+
+  await store.saveStatus({
+    provider: "github",
+    overallStatus: "operational",
+    activeIncidents: [],
+    fetchedAt: "2026-08-19T15:00:00.000Z",
+  });
+  const [resolved] = await store.listIncidents({ providerId: "github" });
+  assert.ok(
+    Date.parse(resolved?.resolvedAt ?? "") >= Date.parse(resolved?.startedAt ?? ""),
+    "an incident must never resolve before it started",
+  );
+  await store.close();
+});
+
+test("a normal past provider timestamp is kept as the start time", async () => {
+  const { store } = await harness();
+  await store.saveStatus({
+    provider: "github",
+    overallStatus: "degraded",
+    activeIncidents: [inc({ updatedAt: "2026-08-19T13:30:00.000Z" })],
+    fetchedAt: "2026-08-19T14:05:00.000Z",
+  });
+  const [row] = await store.listIncidents({ providerId: "github" });
+  assert.equal(row?.startedAt, "2026-08-19T13:30:00.000Z", "the provider knows when it began");
+  await store.close();
+});
