@@ -3,6 +3,7 @@ import { configRoutes } from "./routes/config.routes.ts";
 import { historyRoutes } from "./routes/history.routes.ts";
 import { incidentsRoutes } from "./routes/incidents.routes.ts";
 import { notificationsRoutes } from "./routes/notifications.routes.ts";
+import { preferencesRoutes } from "./routes/preferences.routes.ts";
 import { statusRoutes } from "./routes/status.routes.ts";
 import type { UiRuntimeCore } from "./runtime.ts";
 
@@ -23,6 +24,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(incidentsRoutes(runtime));
   app.use(notificationsRoutes(runtime));
   app.use(configRoutes(runtime));
+  app.use(preferencesRoutes(runtime));
 
   app.use(express.static(PUBLIC_DIR.pathname, { extensions: ["html"] }));
 
