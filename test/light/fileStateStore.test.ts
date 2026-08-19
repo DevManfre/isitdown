@@ -75,3 +75,31 @@ test("unparseable JSON is fatal and names the file", async () => {
   await writeFile(path, "{not json");
   await assert.rejects(createFileStateStore(path), new RegExp(path.replace(/[/\\]/g, "."))); 
 });
+
+test("concurrent mutations from a whole poll cycle all land and leave no temp file", async () => {
+  const path = await tempPath();
+  const store = await createFileStateStore(path);
+  const providers = ["github", "cloudflare", "anthropic", "npm", "aws"];
+
+  await Promise.all(
+    providers.map((provider, index) =>
+      index % 2 === 0
+        ? store.saveStatus({
+            provider,
+            overallStatus: "degraded",
+            activeIncidents: [],
+            fetchedAt: "2026-08-19T14:05:00.000Z",
+          })
+        : store.recordFailure(provider),
+    ),
+  );
+  await store.close();
+
+  const parsed = JSON.parse(await readFile(path, "utf8")) as {
+    providers: Record<string, { last: unknown; failureCount: number }>;
+  };
+  assert.deepEqual(Object.keys(parsed.providers).sort(), [...providers].sort());
+  assert.ok(parsed.providers["github"]?.last, "an even provider kept its saved status");
+  assert.equal(parsed.providers["cloudflare"]?.failureCount, 1);
+  assert.deepEqual(await readdir(join(path, "..")), ["state.json"]);
+});
