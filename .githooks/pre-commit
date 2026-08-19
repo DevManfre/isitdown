@@ -1,6 +1,8 @@
 #!/bin/sh
 # Same guard as pre-merge-commit, for the commit that finishes a conflicted
 # merge and for hand-made commits.
-script="$(git rev-parse --show-toplevel)/scripts/git-merge-clean"
+#
+# Template: installed into .git/hooks/ by scripts/setup-hooks.sh.
+script="$(git rev-parse --absolute-git-dir)/merge-clean"
 [ -x "$script" ] || exit 0
 exec "$script" --guard
