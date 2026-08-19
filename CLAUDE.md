@@ -50,6 +50,7 @@ npm run test:integration
 - One adapter = one file under `src/adapters/`, implementing the shared `Adapter` interface and returning a `NormalizedStatus`.
 - One notifier = one file under `src/notifiers/`, implementing `send(payload): Promise<void>`. Keep formatting logic (emoji, message layout) inside the notifier, not in the diff engine.
 - Never add notification-sending logic outside the Diff Engine → Notifier path. If a change "should" trigger a message, it must go through `diffEngine`, not be fired ad hoc from a route handler or the poller.
+- Any string a human reads (dashboard label, notification text, status name) is a key in an i18n catalog, written in English first — never a literal in code, never typed in Italian. See the `i18n-strings` skill.
 - Secrets (bot tokens, webhook URLs) come from environment variables only — never hardcoded, never committed, not even in `config.example.yml`.
 - UI edition: any new dashboard screen or chart should be prototyped in `design/` (Claude Design) first; only implement in `src/ui/public` once the direction is agreed. Don't skip straight to code for new UI surfaces.
 
@@ -71,6 +72,7 @@ This repo ships with Claude Code skills under `.claude/skills/` tailored to recu
 - `docker-edition-build` — build/tag/run the Light and UI Docker images correctly.
 - `core-engine-testing` — write correct unit/integration tests for poller, diff engine, and adapters.
 - `ui-dashboard-charts` — implement status-page-style uptime charts/timeline in the UI edition dashboard, consistent with the Claude Design prototypes.
+- `i18n-strings` — every user-facing string goes in an English source catalog and gets translated; no literals in code.
 - `git-commit-style` — write commit messages in the required `<emoji> <TITLE> - <description>` format.
 - `writing-code` — write or modify production code (read neighbours first, exact scope, match conventions).
 - `testing-discipline` — general testing discipline: red-green, behaviour over internals, never weaken a failing test.
