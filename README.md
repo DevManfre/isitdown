@@ -14,6 +14,37 @@ The goal is to give a single developer or small team early visibility into upstr
 
 ---
 
+## Quick start
+
+Light edition, locally (needs Node 24):
+
+```bash
+npm install
+cp config.example.yml config.yml    # edit it: add or remove providers
+cp .env.example .env                # fill in only the channels you enable
+npm run build:light && node dist/light/index.js
+```
+
+Light edition, in Docker:
+
+```bash
+docker compose --profile light up -d --build
+docker logs -f statuswatch-light
+```
+
+Tests:
+
+```bash
+npm test                 # unit
+npm run test:integration # end to end, with a fake provider
+npm run typecheck
+```
+
+The UI edition (`docker compose --profile ui up -d`) is the next milestone — see
+section 10.
+
+---
+
 ## 2. Product Editions
 
 StatusWatch ships as **two distinct editions**, sharing the same core engine (Poller, Adapters, State Store, Diff Engine, Notifier) but differing in how they're configured and consumed.
@@ -124,7 +155,7 @@ Rules:
 ### Components
 
 1. **Scheduler**
-   Triggers a polling cycle at a configurable interval (default: every 2–5 minutes). Implemented with `node-cron` or a simple `setInterval` loop with jitter to avoid thundering-herd requests.
+   Triggers a polling cycle at a configurable interval (default: every 3 minutes). A `setTimeout` re-armed after each cycle, with up to 10% jitter either way, so a slow cycle delays the next one instead of overlapping it and a fleet of instances does not hit a provider in lockstep. The configuration is re-read on every cycle, which is what lets the UI edition change providers, intervals and channels without a restart.
 
 2. **Poller**
    For each configured service, performs an HTTP GET against its status endpoint. Handles timeouts, retries (exponential backoff, max 3 attempts), and per-request error isolation (one failing provider must never block the others — use `Promise.allSettled`).
@@ -149,7 +180,9 @@ Rules:
    - **CustomAdapter**: fallback for providers with a non-standard API, implemented as needed (e.g. scraping an HTML page with a CSS selector, defined in config).
 
 4. **State Store**
-   Persists the last known `NormalizedStatus` per provider. SQLite (via `better-sqlite3`) is recommended for durability across restarts; a flat JSON file is acceptable for v1 and easier to inspect/debug.
+   Persists the last known `NormalizedStatus` per provider, plus a consecutive-failure count and whether the "monitoring degraded" warning has already been sent. The Light edition uses a JSON file, rewritten through a temporary file and a rename so a crash mid-write cannot truncate it; the UI edition uses SQLite through the built-in `node:sqlite`, which also carries the history the charts need. Both implementations pass the same contract suite, so they are interchangeable.
+
+   A failed fetch never overwrites the stored status: keeping the last known state is what stops the next successful poll from being reported as a recovery that never happened.
 
 5. **Diff Engine**
    Compares the freshly fetched status against the stored one. Triggers a notification only when:
@@ -177,11 +210,18 @@ Rules:
 
 ## 4. Configuration
 
-All service definitions live in a single `config.yml`, mounted as a volume so it can be edited without rebuilding the image:
+Light edition only. All service definitions live in a single `config.yml`,
+mounted as a volume so it can be edited without rebuilding the image; the loader
+re-reads it every cycle, so an edit applies on the next poll. `config.example.yml`
+in the repo is the tracked template — `config.yml` itself is git-ignored, since it
+carries an operator's own provider list.
 
 ```yaml
-pollIntervalMinutes: 3
-locale: en          # language for notification messages: en | it (falls back to en)
+pollIntervalMinutes: 3      # how often to poll every provider
+requestTimeoutSeconds: 8    # per-request timeout
+maxRetries: 3               # attempts per provider per cycle, with backoff
+failureThreshold: 5         # consecutive failures before a "monitoring degraded" warning
+locale: en                  # language for notification messages: en | it (falls back to en)
 
 services:
   - name: GitHub
@@ -197,130 +237,125 @@ services:
   - name: Anthropic
     id: anthropic
     adapter: statuspage
-    baseUrl: https://status.anthropic.com
+    baseUrl: https://status.claude.com
 
 notifications:
   telegram:
     enabled: true
     botToken: "${TELEGRAM_BOT_TOKEN}"
     chatId: "${TELEGRAM_CHAT_ID}"
-  discordWebhook:
+  webhook:
     enabled: false
-    url: "${DISCORD_WEBHOOK_URL}"
-  genericWebhook:
-    enabled: false
-    url: ""
+    url: "${WEBHOOK_URL}"
 ```
 
-Secrets (`TELEGRAM_BOT_TOKEN`, etc.) are injected via environment variables / `.env` file — never committed to the repo.
+Every field except `services` is optional and falls back to the value shown above.
 
----
+**Secrets never appear in this file.** `${VAR}` references are resolved from the
+environment (see `.env.example`); an enabled channel whose variable is unset is a
+fatal startup error naming the variable, and a resolved secret is never written to
+the state file or to a log line.
+
+Anything invalid — a missing file, malformed YAML, a bad base URL, a duplicate
+service id, an empty service list — stops the container at boot with the reason
+and the offending path. A container that starts with a half-understood
+configuration would look healthy while silently not alerting.
+
+### Supported providers
+
+Any provider running Atlassian Statuspage works with the generic `statuspage`
+adapter and no code: if `<domain>/api/v2/summary.json` returns JSON with `status`
+and `incidents`, just add an entry. Verified:
+
+| Provider | `baseUrl` | Adapter |
+|---|---|---|
+| GitHub | `https://www.githubstatus.com` | `statuspage` (generic) |
+| Cloudflare | `https://www.cloudflarestatus.com` | `statuspage` (generic) |
+| Anthropic / Claude | `https://status.claude.com` | `statuspage` (generic) |
+
+`status.anthropic.com` issues a 301 to `status.claude.com`. The adapter follows
+redirects, so either host works; the canonical one avoids the extra hop.
+
+The provider's own `status.indicator` maps onto the internal severity model as
+`none → operational`, `minor → degraded`, `major → partial_outage`,
+`critical → major_outage`. An indicator we have never seen maps to
+`major_outage`, and a summary with no `status` object at all maps to `unknown` —
+severity is never silently downgraded.
+
+For a provider with a non-standard status page, add an adapter under
+`src/adapters/` (see the `add-status-adapter` skill).
+
+### Notification channels
+
+| Channel | Config key | Required environment variables |
+|---|---|---|
+| Telegram Bot API | `telegram` | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
+| Generic webhook (POST JSON) | `webhook` | `WEBHOOK_URL` |
+
+The webhook posts `{ change, service, message }`, so a consumer can either
+display the rendered text or route on the structured fields. Discord and Slack
+are webhook-shaped and are the natural next channels (see the
+`add-notifier-channel` skill).
 
 ## 5. Tech Stack
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Runtime | Node.js 20 (LTS) | matches your existing stack |
-| Language | TypeScript | type safety for adapters/config |
-| HTTP client | `undici` or `axios` | undici is faster, native to Node |
-| Scheduling | `node-cron` | simple cron syntax support |
-| Storage | SQLite (`better-sqlite3`) or JSON file | start with JSON, migrate if needed |
-| Config parsing | `yaml` + `zod` | zod for runtime schema validation |
-| Notifications | native `fetch` calls to provider APIs | no heavy SDKs needed |
-| Container | Docker, multi-stage build | small final image (`node:20-alpine`) |
-| Optional dashboard | Express + plain HTML/CSS | no need for a frontend framework |
-| Theming | CSS custom properties + `data-theme` attribute | no CSS framework, no runtime style lib |
-| i18n | flat JSON catalogs + native `Intl.*` | no i18n framework (i18next etc.) needed at this size |
+| Runtime | Node.js 24 (LTS) | required: the built-in SQLite driver and native TypeScript type stripping both need it |
+| Language | TypeScript, strict | `erasableSyntaxOnly` + `rewriteRelativeImportExtensions`, so `tsc` emits real `.js` while `node --test` runs the `.ts` sources directly |
+| HTTP client | global `fetch` | already in the runtime; no dependency needed |
+| Scheduling | `setTimeout` re-armed after each cycle, with jitter | a slow cycle delays the next instead of overlapping it; no `node-cron` dependency |
+| Storage | JSON file (Light) · built-in `node:sqlite` (UI) | no native module, so no compiler in any build stage |
+| Config parsing | `yaml` + `zod` | zod validates every external input, including provider JSON |
+| Notifications | native `fetch` to each channel's API | no SDKs |
+| Test runner | built-in `node:test` | no test framework dependency |
+| Container | Docker, one multi-stage Dockerfile | `--target light` / `--target ui`; `node:24-alpine` |
+| Dashboard | Express + vanilla ES modules and plain CSS | no framework, no bundler, no chart library |
+| Theming | CSS custom properties + `data-theme` attribute | one token file is the only place a hex colour appears |
+| i18n | flat JSON catalogs + native `Intl.*` | no i18n framework needed at this size |
 
----
+Runtime dependencies, exhaustively: `zod`, `yaml` (both editions) and `express`
+(UI edition). Dev dependencies: `typescript`, `@types/node`.
 
 ## 6. Docker Setup
 
-Both editions are built from the same source tree via multi-stage Dockerfiles, differing mainly in the final runtime stage (whether the HTTP/dashboard layer is included) and in the entrypoint.
+Both editions come from one source tree and **one** `Dockerfile` with named
+stages. The `ui` stage begins `FROM light`, so the UI image is the Light image
+plus a single thin layer — base image, production dependencies and the whole core
+engine are shared on disk and in a registry.
 
-### Dockerfile — Light edition (`Dockerfile.light`)
-```dockerfile
-# --- Build stage ---
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build:light
-
-# --- Runtime stage ---
-FROM node:20-alpine
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/dist/light ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY package*.json ./
-VOLUME ["/app/config", "/app/data"]
-HEALTHCHECK --interval=30s --timeout=5s CMD node dist/healthcheck.js
-CMD ["node", "dist/index.js"]
 ```
-No `EXPOSE`, no HTTP server dependency — this build only runs the polling/notification loop.
-
-### Dockerfile — UI edition (`Dockerfile.ui`)
-```dockerfile
-# --- Build stage ---
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build:ui
-
-# --- Runtime stage ---
-FROM node:20-alpine
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/dist/ui ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY package*.json ./
-VOLUME ["/app/data"]
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s CMD node dist/healthcheck.js
-CMD ["node", "dist/server.js"]
+builder  node:24-alpine   npm ci, tsc, copy non-TS assets into dist
+light    node:24-alpine   production deps + dist/{core,adapters,notifiers,light}
+                          VOLUME /app/config /app/data, no EXPOSE, no server
+ui       FROM light       + dist/ui (dashboard and locales included), EXPOSE 3000
 ```
-Note there's no `config.yml` volume here: in the UI edition, configuration lives in the SQLite database (managed entirely through the dashboard), not in a mounted file.
 
-### docker-compose.yml (both services defined, run whichever you need)
-```yaml
-version: "3.9"
-services:
-  statuswatch-light:
-    build:
-      context: .
-      dockerfile: Dockerfile.light
-    container_name: statuswatch-light
-    restart: unless-stopped
-    env_file: .env
-    volumes:
-      - ./config.yml:/app/config/config.yml:ro
-      - statuswatch-light-data:/app/data
-    profiles: ["light"]
+### Building
 
-  statuswatch-ui:
-    build:
-      context: .
-      dockerfile: Dockerfile.ui
-    container_name: statuswatch-ui
-    restart: unless-stopped
-    env_file: .env
-    ports:
-      - "3000:3000"
-    volumes:
-      - statuswatch-ui-data:/app/data
-    profiles: ["ui"]
-
-volumes:
-  statuswatch-light-data:
-  statuswatch-ui-data:
+```bash
+docker build --target light -t statuswatch:light .
+docker build --target ui    -t statuswatch:ui    .
 ```
-Run with `docker compose --profile light up -d` or `docker compose --profile ui up -d`, depending on which edition you want.
 
----
+### Running
+
+```bash
+docker compose --profile light up -d --build   # needs ./config.yml and .env; no port
+docker compose --profile ui    up -d --build   # exposes :3000; config lives in SQLite
+```
+
+`docker-compose.yml` defines both services, each building this one `Dockerfile`
+with its own `target`. The Light service mounts `config.yml` read-only and a
+named volume for its state file. The UI service mounts only a data volume: its
+configuration lives in SQLite, managed from the dashboard.
+
+Both images run as the unprivileged `node` user, carry a `HEALTHCHECK` with a
+start period, and bake in no secret — those arrive at runtime through `env_file`.
+
+The Light edition has no server to probe, so its healthcheck uses the state
+file's age: every cycle rewrites it, and three intervals without a write is
+unhealthy.
 
 ## 7. Notification Message Format (example)
 
@@ -354,91 +389,118 @@ Previous incident "API requests failing intermittently" has been resolved.
 
 ## 9. Testing Strategy
 
-- **Unit tests** for each adapter, using recorded/fixture JSON responses (no live network calls in CI).
-- **Unit tests** for the Diff Engine with table-driven cases (no change / status change / new incident / incident resolved).
-- **Integration test**: spin up the container, mock the config with a fake local HTTP server standing in for a provider, assert a notification is sent on a simulated status change.
-- **Locale catalog parity test**: every non-`en` catalog (notifications and dashboard) must have exactly the key set of `en` — the test fails on a missing or orphaned key, so a new string can't ship half-translated unnoticed.
-- **Notifier localization test**: same status transition rendered in each locale, asserting the message differs, the timestamp stays UTC, and an unknown locale falls back to `en`.
-- **Theme test**: the token block defines every `--color-*` variable in both light and dark, and no stylesheet outside it contains a raw hex color.
+`npm test` runs the unit suite (`test/**/*.test.ts`); `npm run test:integration`
+runs the end-to-end suite (`test/**/*.itest.ts`). Both use the built-in
+`node:test` runner. **No test ever touches a live provider.**
 
----
+- **Diff engine** — one table covering every transition, including the ones that
+  must *not* notify: a first poll, a reordered incident list, a timestamp bump,
+  and `unknown` on either side. New edge cases are added as rows.
+- **Adapters** — tested against payloads recorded from the live status pages and
+  kept under `test/fixtures/<provider>/`, plus a malformed one and an unrecognised
+  indicator. The HTTP behaviour (redirects, non-2xx, timeout, non-JSON body) runs
+  against a local server.
+- **State store** — `test/core/stateStore.contract.ts` is one suite that every
+  implementation must pass, so the Light and UI stores are provably
+  interchangeable. It includes the restart case: reload the store and assert the
+  diff engine fires nothing.
+- **Poller** — against a local stand-in provider: retry count and growing backoff,
+  per-provider isolation, a hanging provider not blocking a healthy one, and the
+  "monitoring degraded" warning firing once at the threshold and not repeating.
+- **Scheduler** — with mocked timers and injected jitter: cadence, config re-read
+  per cycle, a manual poll joining an in-flight cycle, and a failed cycle not
+  killing the loop.
+- **Notifiers** — outbound request shape per transition with `fetch` stubbed, plus
+  the assertion that a failed Telegram send never puts the bot token in its error.
+- **Locale parity** — every non-`en` catalog must have exactly `en`'s key set and
+  the same placeholders in every value, so a string cannot ship half-translated.
+- **End to end** — a fake provider and a webhook receiver: a transition delivers
+  exactly one notification, an unchanged cycle delivers none, a restart delivers
+  none, an unreachable provider keeps its last known state, and the entrypoint
+  stays alive between cycles and exits 0 on `SIGTERM`.
 
 ## 10. Roadmap / Future Enhancements
 
-- **v1 — Light edition**: polling + Telegram notifications + file-based config + JSON/YAML state store + Docker image (`statuswatch:light`). This is the first thing to ship — it validates the core engine before any UI work starts.
-- **v1.1 — UI prototyping**: design exploration in Claude Design for the dashboard — status grid, uptime charts, incident timeline, settings panel. No real backend yet, purely visual/interaction validation.
-- **v1.2 — UI edition, first pass**: implement the validated design as a real Express + HTML/CSS dashboard, backed by SQLite; move configuration fully into the UI (add/edit/remove services and notification channels at runtime, no file editing). Ship as `statuswatch:ui`.
-- **v1.3**: historical incident log + uptime percentage per provider with the status-page-style charts (daily uptime bars, 7/30/90-day views), served from `/history`.
-- **v1.4 — dark mode + i18n**: CSS-token theming with the light/dark/system toggle and persisted preference; localized dashboard (`en`, `it`) plus localized notification messages shared by both editions (`locale` in `config.yml` for Light, DB setting for UI). Dark palette and translated label lengths validated in Claude Design before implementation.
-- **v2**: pluggable adapter marketplace (community-contributed adapters for niche providers), Discord/Slack rich embeds, multi-recipient notification routing (different channels per provider severity) — available in both editions where applicable.
+- **v1 — Light edition** ✅ delivered: polling, the diff engine, Telegram and
+  generic-webhook notifications, `config.yml` with environment-referenced secrets,
+  a JSON state store with atomic writes, and the `statuswatch:light` image.
+- **v1.1 — UI prototyping** ✅ delivered: the dashboard explored in Claude Design
+  (status grid, uptime charts, incident timeline, settings panel) and kept in
+  `design/`. The navigable console is the reference for implementation.
+- **v1.2 — UI edition, first pass**: the validated design as an Express + vanilla
+  dashboard over SQLite, with configuration managed at runtime from the UI and no
+  restart needed. Ships as `statuswatch:ui`.
+- **v1.3**: historical incident log and uptime percentages per provider, with the
+  status-page-style daily bars and 7/30/90-day views served from `/history`.
+- **v1.4 — dark mode + i18n**: token-based theming with the light/dark/system
+  toggle and a localised dashboard (`en`, `it`) on top of the localised
+  notification messages both editions already share.
+- **v2**: more adapters for niche providers, Discord and Slack rich embeds, and
+  multi-recipient routing (different channels per provider severity).
 
----
+## 11. Repo Structure
 
-## 11. Suggested Repo Structure
-
-The core engine is shared; each edition has its own thin entrypoint and edition-specific config/storage layer.
+The core engine is shared; each edition has its own thin entrypoint and
+edition-specific configuration and storage layer.
 
 ```
 statuswatch/
 ├── src/
-│   ├── core/                      (shared by both editions)
-│   │   ├── poller.ts
-│   │   ├── diffEngine.ts
-│   │   ├── stateStore.interface.ts
-│   │   └── i18n/                  (notification strings, edition-agnostic)
-│   │       ├── index.ts           (lookup + `en` fallback + Intl formatting)
-│   │       ├── en.json
+│   ├── core/                          (shared by both editions)
+│   │   ├── types.ts                   NormalizedStatus, Incident, StatusChange, NotificationPayload
+│   │   ├── adapter.interface.ts        ServiceRef, FetchContext, Adapter
+│   │   ├── notifier.interface.ts       Notifier
+│   │   ├── stateStore.interface.ts     ProviderRuntimeState, StateStore
+│   │   ├── configSource.interface.ts   RuntimeConfig, ServiceDefinition, ChannelConfig, ConfigSource
+│   │   ├── config.schema.ts            zod schemas shared by the file loader and the UI's settings writes
+│   │   ├── status.schema.ts            validation for a persisted NormalizedStatus
+│   │   ├── poller.ts                   one cycle: stagger, retry, isolation, failure accounting
+│   │   ├── diffEngine.ts               the sole authority on whether a notification fires
+│   │   ├── notificationDispatcher.ts   the only caller of Notifier.send
+│   │   ├── scheduler.ts                the loop; re-reads config every cycle
+│   │   ├── logger.ts
+│   │   └── i18n/                       notification strings, edition-agnostic
+│   │       ├── index.ts                lookup + en fallback + UTC formatting
+│   │       ├── en.json                 source locale
 │   │       └── it.json
-│   ├── adapters/                  (shared)
-│   │   ├── statuspage.adapter.ts
-│   │   └── index.ts
-│   ├── notifiers/                 (shared)
+│   ├── adapters/                      (shared)
+│   │   ├── statuspage.adapter.ts       generic Atlassian Statuspage adapter
+│   │   └── index.ts                    registry keyed by adapter id
+│   ├── notifiers/                     (shared)
+│   │   ├── formatting.ts               emoji, severity labels, message assembly
 │   │   ├── telegram.notifier.ts
 │   │   ├── webhook.notifier.ts
-│   │   └── index.ts
-│   ├── light/                     (Light edition only)
-│   │   ├── config/
-│   │   │   ├── schema.ts          (zod schema)
-│   │   │   └── loadConfig.ts
-│   │   ├── fileStateStore.ts      (JSON/YAML implementation)
-│   │   ├── healthcheck.ts
-│   │   └── index.ts
-│   └── ui/                        (UI edition only)
-│       ├── server.ts              (Express API)
-│       ├── sqliteStateStore.ts    (SQLite implementation)
-│       ├── routes/
-│       │   ├── status.routes.ts
-│       │   ├── config.routes.ts
-│       │   ├── history.routes.ts
-│       │   └── preferences.routes.ts  (theme + locale)
-│       ├── public/                (dashboard: HTML/CSS/JS, or built frontend)
-│       │   ├── css/
-│       │   │   └── tokens.css     (light + dark color tokens, single source)
-│       │   ├── js/
-│       │   │   ├── theme.js       (toggle, persistence, pre-paint init)
-│       │   │   └── i18n.js        (catalog loading, data-i18n application)
-│       │   └── locales/
-│       │       ├── en.json
-│       │       └── it.json
-│       └── healthcheck.ts
-├── design/
-│   └── claude-design-prototypes/  (exported mockups/prototypes from Claude Design)
-├── config.example.yml             (Light edition only)
-├── .env.example
-├── Dockerfile.light
-├── Dockerfile.ui
-├── docker-compose.yml
-├── package.json
-├── tsconfig.json
-├── .mergeexclude                  (`dev` only — paths that must never reach `main`, see section 12)
-├── .githooks/                     (`dev` only — hook templates installed into .git/hooks)
-├── scripts/
-│   ├── git-merge-clean            (`dev` only — branch-aware merge wrapper)
-│   └── setup-hooks.sh             (`dev` only — installs the filter into this clone)
-└── README.md
+│   │   └── index.ts                    registry keyed by channel id
+│   ├── light/                         (Light edition only)
+│   │   ├── index.ts                    entrypoint
+│   │   ├── runtime.ts                  wiring, shared with the end-to-end test
+│   │   ├── healthcheck.ts              state-file freshness
+│   │   ├── fileStateStore.ts           JSON file, atomic writes
+│   │   └── config/
+│   │       ├── schema.ts               config.yml shape
+│   │       └── loadConfig.ts           YAML + ${ENV} substitution + validation
+│   └── ui/                            (UI edition only)
+├── tools/
+│   └── copy-assets.mjs                copies i18n catalogs and the dashboard into dist
+├── test/
+│   ├── core/                          diff engine, poller, scheduler, dispatcher, i18n, schemas
+│   │   └── stateStore.contract.ts     one suite every StateStore implementation must pass
+│   ├── adapters/
+│   ├── notifiers/
+│   ├── light/
+│   ├── fixtures/statuspage/           payloads recorded from the live pages, never fetched in a test
+│   ├── helpers/
+│   └── integration/                   *.itest.ts — fake provider and webhook receiver end to end
+├── design/                            Claude Design prototypes for the UI dashboard
+├── Dockerfile                         builder → light → ui (ui is FROM light)
+├── docker-compose.yml                 both editions as profiles
+├── config.example.yml                 tracked template; config.yml is git-ignored
+└── .env.example                       secret variable names, never values
 ```
 
----
+**Golden rule:** `src/core`, `src/adapters` and `src/notifiers` never import from
+`src/light` or `src/ui`. Edition-specific behaviour is injected through the shared
+interfaces instead.
 
 ## 12. Branch Layout & Merge Policy
 
