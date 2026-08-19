@@ -10,6 +10,7 @@ const KEY = "statuswatch.theme";
 const MODES = ["light", "dark", "system"];
 
 let mode = "system";
+/** @type {(mode: string) => void} */
 let onChange = () => {};
 
 export function initTheme(stored, notify) {
