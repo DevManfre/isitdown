@@ -1,0 +1,38 @@
+# StatusWatch — Light edition configuration.
+#
+# Copy this file to config.yml and edit it. In the container it is mounted at
+# /app/config/config.yml, so it can be changed without rebuilding the image.
+#
+# Secrets are NEVER written here. Use ${ENV_VAR} references; the values come
+# from the environment (see .env.example).
+
+pollIntervalMinutes: 3      # how often to poll every provider
+requestTimeoutSeconds: 8    # per-request timeout
+maxRetries: 3               # attempts per provider per cycle, with backoff
+failureThreshold: 5         # consecutive failures before a "monitoring degraded" warning
+locale: en                  # language for notification messages: en | it (falls back to en)
+
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+
+  - name: Cloudflare
+    id: cloudflare
+    adapter: statuspage
+    baseUrl: https://www.cloudflarestatus.com
+
+  - name: Anthropic
+    id: anthropic
+    adapter: statuspage
+    baseUrl: https://status.anthropic.com
+
+notifications:
+  telegram:
+    enabled: true
+    botToken: "${TELEGRAM_BOT_TOKEN}"
+    chatId: "${TELEGRAM_CHAT_ID}"
+  webhook:
+    enabled: false
+    url: "${WEBHOOK_URL}"

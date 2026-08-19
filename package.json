@@ -1,0 +1,27 @@
+{
+  "name": "statuswatch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Polls the public status pages of third-party providers and notifies on state transitions",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node tools/copy-assets.mjs",
+    "build:light": "tsc -p tsconfig.light.json && node tools/copy-assets.mjs",
+    "build:ui": "tsc -p tsconfig.json && node tools/copy-assets.mjs",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "test:integration": "node --test \"test/**/*.itest.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "yaml": "^2.5.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
