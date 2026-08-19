@@ -146,7 +146,7 @@ function table(providers, byId, state) {
   return table;
 }
 
-function editButton(provider) {
+export function editButton(provider) {
   const button = element("button", "btn btn-ghost", t("action.edit"));
   button.type = "button";
   button.addEventListener("click", () => {
@@ -166,7 +166,7 @@ function editButton(provider) {
   return button;
 }
 
-function removeButton(provider) {
+export function removeButton(provider) {
   const button = element("button", "btn btn-ghost", t("action.remove"));
   button.type = "button";
   button.style.color = "var(--color-neutral-600)";
