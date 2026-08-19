@@ -1,0 +1,40 @@
+# Run whichever edition you need:
+#   docker compose --profile light up -d --build
+#   docker compose --profile ui    up -d --build
+#
+# Both build the same Dockerfile, each selecting its own target.
+
+services:
+  statuswatch-light:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: light
+    image: statuswatch:light
+    container_name: statuswatch-light
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./config.yml:/app/config/config.yml:ro
+      - statuswatch-light-data:/app/data
+    profiles: ["light"]
+
+  statuswatch-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ui
+    image: statuswatch:ui
+    container_name: statuswatch-ui
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "3000:3000"
+    # No config.yml: the UI edition keeps its configuration in SQLite.
+    volumes:
+      - statuswatch-ui-data:/app/data
+    profiles: ["ui"]
+
+volumes:
+  statuswatch-light-data:
+  statuswatch-ui-data:
