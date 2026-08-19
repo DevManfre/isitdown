@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createScheduler } from "../../src/core/scheduler.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import type { CycleResult, Poller } from "../../src/core/poller.ts";
-import type { ConfigSource, RuntimeConfig } from "../../src/core/configSource.interface.ts";
+import type { ChannelConfig, ConfigSource, RuntimeConfig } from "../../src/core/configSource.interface.ts";
 import type { Dispatcher, SentRecord } from "../../src/core/notificationDispatcher.ts";
 import type { StatusChange } from "../../src/core/types.ts";
 
@@ -78,6 +78,7 @@ test("start runs one cycle immediately", async (t) => {
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
     logger: silent,
     random: noJitter,
   });
@@ -94,6 +95,7 @@ test("the next cycle fires one interval later", async (t) => {
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
     logger: silent,
     random: noJitter,
   });
@@ -117,6 +119,7 @@ test("the configuration is re-read on every cycle, so a changed interval applies
     configSource: source,
     poller,
     dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
     logger: silent,
     random: noJitter,
   });
@@ -152,6 +155,7 @@ test("the cycle's changes are handed to the dispatcher with the active locale", 
     configSource: fakeConfigSource(baseConfig({ locale: "it" })),
     poller: fakePoller(async () => cycleResult([change])),
     dispatcher,
+    buildNotifiers: () => [],
     logger: silent,
     random: noJitter,
   });
@@ -169,6 +173,7 @@ test("a cycle with no changes still runs but dispatches nothing", async (t) => {
     configSource: fakeConfigSource(),
     poller: fakePoller(),
     dispatcher,
+    buildNotifiers: () => [],
     logger: silent,
     random: noJitter,
   });
@@ -192,6 +197,7 @@ test("triggerNow joins an in-flight cycle instead of starting a second one", asy
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
     logger: silent,
     random: noJitter,
   });
@@ -214,6 +220,7 @@ test("triggerNow outside a cycle runs one on demand", async (t) => {
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
     logger: silent,
     random: noJitter,
   });
@@ -237,6 +244,7 @@ test("a cycle that throws is logged and the loop keeps running", async (t) => {
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
     logger: createLogger("error", (line) => errors.push(line)),
     random: noJitter,
   });
@@ -265,6 +273,7 @@ test("a config source that throws does not kill the loop either", async (t) => {
     },
     poller: fakePoller(),
     dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
     logger: createLogger("error", (line) => errors.push(line)),
     random: noJitter,
   });
@@ -284,6 +293,7 @@ test("stop prevents any further cycle", async (t) => {
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
     logger: silent,
     random: noJitter,
   });
@@ -307,6 +317,7 @@ test("jitter keeps the arming delay within ten percent of the interval", async (
       configSource: fakeConfigSource(),
       poller,
       dispatcher: fakeDispatcher(),
+      buildNotifiers: () => [],
       logger: silent,
       random,
     });
@@ -328,6 +339,7 @@ test("onCycle receives every cycle result", async (t) => {
     configSource: fakeConfigSource(),
     poller: fakePoller(),
     dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
     logger: silent,
     random: noJitter,
     onCycle: (result) => {
@@ -339,5 +351,38 @@ test("onCycle receives every cycle result", async (t) => {
   t.mock.timers.tick(3 * 60_000);
   await scheduler.settled();
   assert.equal(seen.length, 2);
+  scheduler.stop();
+});
+
+test("notifiers are rebuilt from the channels of each cycle, so enabling one needs no restart", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const source = fakeConfigSource();
+  const seen: ChannelConfig[][] = [];
+  const dispatcher = fakeDispatcher();
+  const scheduler = createScheduler({
+    configSource: source,
+    poller: fakePoller(),
+    dispatcher,
+    buildNotifiers: (channels) => {
+      seen.push(channels);
+      return [];
+    },
+    logger: silent,
+    random: noJitter,
+  });
+
+  await scheduler.start();
+  assert.deepEqual(seen, [[]]);
+
+  source.current = baseConfig({
+    channels: [{ id: "webhook", enabled: true, settings: { url: "https://hooks.example/x" } }],
+  });
+  t.mock.timers.tick(3 * 60_000);
+  await scheduler.settled();
+
+  assert.equal(seen.length, 2);
+  assert.deepEqual(seen[1], [
+    { id: "webhook", enabled: true, settings: { url: "https://hooks.example/x" } },
+  ]);
   scheduler.stop();
 });

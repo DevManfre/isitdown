@@ -54,9 +54,9 @@ function recorder(id: string, behaviour: "ok" | "throw" = "ok"): {
 
 test("each change becomes one payload carrying the change, service and locale", async () => {
   const channel = recorder("telegram");
-  const dispatcher = createDispatcher({ notifiers: [channel.notifier], logger: silent });
+  const dispatcher = createDispatcher({ logger: silent });
 
-  await dispatcher.dispatch([change()], { services, locale: "it" });
+  await dispatcher.dispatch([change()], { services, locale: "it", notifiers: [channel.notifier] });
 
   assert.equal(channel.seen.length, 1);
   const [payload] = channel.seen;
@@ -72,7 +72,7 @@ test("each change becomes one payload carrying the change, service and locale", 
 
 test("every change kind is dispatched with its own structured payload", async () => {
   const channel = recorder("webhook");
-  const dispatcher = createDispatcher({ notifiers: [channel.notifier], logger: silent });
+  const dispatcher = createDispatcher({ logger: silent });
 
   const changes: StatusChange[] = [
     change({ kind: "status_change" }),
@@ -81,7 +81,7 @@ test("every change kind is dispatched with its own structured payload", async ()
     change({ kind: "incident_resolved", incident, currentStatus: "operational" }),
     change({ kind: "monitoring_degraded", failureCount: 5 }),
   ];
-  await dispatcher.dispatch(changes, { services, locale: "en" });
+  await dispatcher.dispatch(changes, { services, locale: "en", notifiers: [channel.notifier] });
 
   assert.deepEqual(
     channel.seen.map((payload) => payload.change.kind),
@@ -94,9 +94,13 @@ test("every change kind is dispatched with its own structured payload", async ()
 test("a change goes to every enabled channel", async () => {
   const a = recorder("telegram");
   const b = recorder("webhook");
-  const dispatcher = createDispatcher({ notifiers: [a.notifier, b.notifier], logger: silent });
+  const dispatcher = createDispatcher({ logger: silent });
 
-  const records = await dispatcher.dispatch([change()], { services, locale: "en" });
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [a.notifier, b.notifier],
+  });
 
   assert.equal(a.seen.length, 1);
   assert.equal(b.seen.length, 1);
@@ -107,9 +111,13 @@ test("a change goes to every enabled channel", async () => {
 test("one failing channel never blocks another and never rejects the dispatch", async () => {
   const broken = recorder("telegram", "throw");
   const healthy = recorder("webhook");
-  const dispatcher = createDispatcher({ notifiers: [broken.notifier, healthy.notifier], logger: silent });
+  const dispatcher = createDispatcher({ logger: silent });
 
-  const records = await dispatcher.dispatch([change()], { services, locale: "en" });
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [broken.notifier, healthy.notifier],
+  });
 
   assert.equal(healthy.seen.length, 1, "the healthy channel must still be delivered to");
   const failed = records.find((record) => record.channel === "telegram");
@@ -125,7 +133,6 @@ test("onSent is called once per change and channel, with the outcome", async () 
   const healthy = recorder("webhook");
   const seen: SentRecord[] = [];
   const dispatcher = createDispatcher({
-    notifiers: [broken.notifier, healthy.notifier],
     logger: silent,
     onSent: (record) => {
       seen.push(record);
@@ -135,6 +142,7 @@ test("onSent is called once per change and channel, with the outcome", async () 
   await dispatcher.dispatch([change(), change({ kind: "incident_opened", incident })], {
     services,
     locale: "en",
+    notifiers: [broken.notifier, healthy.notifier],
   });
 
   assert.equal(seen.length, 4);
@@ -149,27 +157,30 @@ test("onSent is called once per change and channel, with the outcome", async () 
 
 test("no changes means no delivery and no records", async () => {
   const channel = recorder("telegram");
-  const dispatcher = createDispatcher({ notifiers: [channel.notifier], logger: silent });
-  assert.deepEqual(await dispatcher.dispatch([], { services, locale: "en" }), []);
+  const dispatcher = createDispatcher({ logger: silent });
+  assert.deepEqual(
+    await dispatcher.dispatch([], { services, locale: "en", notifiers: [channel.notifier] }),
+    [],
+  );
   assert.equal(channel.seen.length, 0);
 });
 
 test("no channels means no delivery, not a crash", async () => {
-  const dispatcher = createDispatcher({ notifiers: [], logger: silent });
-  assert.deepEqual(await dispatcher.dispatch([change()], { services, locale: "en" }), []);
+  const dispatcher = createDispatcher({ logger: silent });
+  assert.deepEqual(await dispatcher.dispatch([change()], { services, locale: "en", notifiers: [] }), []);
 });
 
 test("a change for a provider that is no longer configured is skipped, not thrown", async () => {
   const channel = recorder("telegram");
   const warnings: string[] = [];
   const dispatcher = createDispatcher({
-    notifiers: [channel.notifier],
     logger: createLogger("warn", (line) => warnings.push(line)),
   });
 
   const records = await dispatcher.dispatch([change({ providerId: "deleted" })], {
     services,
     locale: "en",
+    notifiers: [channel.notifier],
   });
 
   assert.deepEqual(records, []);
@@ -181,14 +192,17 @@ test("a change for a provider that is no longer configured is skipped, not throw
 test("a throwing onSent hook does not lose the dispatch result", async () => {
   const channel = recorder("telegram");
   const dispatcher = createDispatcher({
-    notifiers: [channel.notifier],
     logger: silent,
     onSent: () => {
       throw new Error("the store is on fire");
     },
   });
 
-  const records = await dispatcher.dispatch([change()], { services, locale: "en" });
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+  });
   assert.equal(records.length, 1);
   assert.equal(records[0]?.ok, true);
 });

@@ -1,6 +1,7 @@
-import type { ConfigSource } from "./configSource.interface.ts";
+import type { ChannelConfig, ConfigSource } from "./configSource.interface.ts";
 import type { Logger } from "./logger.ts";
 import type { Dispatcher } from "./notificationDispatcher.ts";
+import type { Notifier } from "./notifier.interface.ts";
 import type { CycleResult, Poller } from "./poller.ts";
 
 /** Fraction of the interval the arming delay may vary by, either way. */
@@ -20,6 +21,11 @@ export interface SchedulerDeps {
   configSource: ConfigSource;
   poller: Poller;
   dispatcher: Dispatcher;
+  /**
+   * Called with the channels of the freshly loaded configuration on every cycle,
+   * so enabling a channel takes effect without a restart.
+   */
+  buildNotifiers: (channels: ChannelConfig[]) => Notifier[];
   logger: Logger;
   onCycle?: ((result: CycleResult) => void | Promise<void>) | undefined;
   /** Injected so tests get an exact arming delay. */
@@ -35,7 +41,7 @@ export interface SchedulerDeps {
  * slow cycle delays the next one instead of overlapping with it.
  */
 export function createScheduler(deps: SchedulerDeps): Scheduler {
-  const { configSource, poller, dispatcher, logger, onCycle } = deps;
+  const { configSource, poller, dispatcher, buildNotifiers, logger, onCycle } = deps;
   const random = deps.random ?? Math.random;
 
   let timer: NodeJS.Timeout | undefined;
@@ -51,6 +57,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     await dispatcher.dispatch(result.changes, {
       services: config.services,
       locale: config.locale,
+      notifiers: buildNotifiers(config.channels),
     });
     if (onCycle !== undefined) await onCycle(result);
     return result;
