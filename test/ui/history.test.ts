@@ -212,3 +212,47 @@ test("a day mixing an unclassifiable sample with good ones still reads as operat
   assert.equal(buckets[1]?.status, "unknown", "a day with nothing but unknowns stays unknown");
   await store.close();
 });
+
+test("a provider measured at zero percent drags the aggregate down instead of vanishing from it", async () => {
+  const { store, history } = await harness(["github", "cloudflare"]);
+  await sample(store, "github", daysAgo(0), "operational");
+  await sample(store, "cloudflare", daysAgo(0), "major_outage");
+
+  const summary = await history.getSummary(30, 3);
+  assert.equal(
+    summary.aggregateUptime,
+    50,
+    "a provider that is fully down was measured, so it belongs in the average",
+  );
+});
+
+test("a provider with no samples at all is excluded from the aggregate rather than counted as zero", async () => {
+  const { store, history } = await harness(["github", "cloudflare"]);
+  await sample(store, "github", daysAgo(0), "operational");
+  // cloudflare has never been polled.
+
+  const summary = await history.getSummary(30, 3);
+  assert.equal(summary.aggregateUptime, 100, "an unmeasured provider must not invent downtime");
+  assert.equal(summary.providers.find((p) => p.providerId === "cloudflare")?.sampleCount, 0);
+});
+
+test("a provider history reports how many samples backed its percentages", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(0, 1), "operational");
+  await sample(store, "github", daysAgo(0, 2), "major_outage");
+  const result = await history.getProviderHistory("github", 30, 3);
+  assert.equal(result.sampleCount, 2);
+  assert.equal(result.uptime30, 50);
+});
+
+test("a month with no samples reports no uptime rather than zero percent", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(0), "operational");
+  const summary = await history.getSummary(90, 3);
+
+  const thisMonth = summary.months.at(-1);
+  assert.equal(thisMonth?.uptime, 100);
+  for (const month of summary.months.slice(0, -1)) {
+    assert.equal(month.uptime, null, `${month.month} had no samples, so 0% would be a lie`);
+  }
+});

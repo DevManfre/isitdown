@@ -96,15 +96,25 @@ export function uptimeRing(provider) {
   return tile;
 }
 
-/** The four gradient columns of the history view. */
-export function monthColumns(months, labelFor) {
+/**
+ * The four gradient columns of the history view.
+ *
+ * A month with a null uptime was never sampled. It renders as a placeholder at
+ * minimum height: printing 0.00% would claim a month-long outage that never
+ * happened.
+ */
+export function monthColumns(months, labelFor, noDataLabel) {
   const wrap = element("div", "month-cols");
   for (const month of months) {
     const column = element("div", "month-col");
-    column.append(element("span", "mono muted", formatPercent(month.uptime)));
+    const measured = month.uptime !== null;
+    column.append(
+      element("span", "mono muted", measured ? formatPercent(month.uptime) : noDataLabel),
+    );
     const bar = element("div", "month-bar");
     // Floor keeps a bad month visible instead of collapsing it to nothing.
-    bar.style.height = `${Math.max(Math.round(month.uptime * 0.6), 8)}px`;
+    bar.style.height = measured ? `${Math.max(Math.round(month.uptime * 0.6), 8)}px` : "8px";
+    if (!measured) bar.style.opacity = "0.35";
     column.append(bar);
     column.append(element("span", "mono muted", labelFor(month.month)));
     wrap.append(column);

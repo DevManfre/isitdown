@@ -18,13 +18,19 @@ export interface ProviderHistory {
   uptime7: number;
   uptime30: number;
   uptime90: number;
+  /**
+   * Samples backing the percentages in this window. Zero means never measured,
+   * which is a different statement from 0% uptime and must not be averaged in.
+   */
+  sampleCount: number;
   incidentCount: number;
   downtimeMinutes: number;
 }
 
 export interface HistorySummary {
   aggregateUptime: number;
-  months: { month: string; uptime: number }[];
+  /** `uptime` is null for a month with no samples: 0% would read as an outage. */
+  months: { month: string; uptime: number | null }[];
   providers: ProviderHistory[];
 }
 
@@ -83,10 +89,12 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     const incidents = await store.listIncidents({ providerId, days });
 
     let notOk = 0;
+    let sampleCount = 0;
     const from = dayKey(new Date(today.getTime() - (days - 1) * DAY_MS));
     for (const bucket of buckets) {
       if (bucket.day < from) continue;
       notOk += bucket.totalSamples - bucket.okSamples;
+      sampleCount += bucket.totalSamples;
     }
 
     return {
@@ -95,6 +103,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
       uptime7: uptimeOver(buckets, 7, today),
       uptime30: uptimeOver(buckets, 30, today),
       uptime90: uptimeOver(buckets, 90, today),
+      sampleCount,
       incidentCount: incidents.length,
       downtimeMinutes: notOk * intervalMinutes,
     };
@@ -121,7 +130,10 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
       }
     }
 
-    const measured = providers.filter((provider) => uptimeKey(provider, days) > 0);
+    // Measured means "has samples", not "has uptime above zero". A provider that
+    // was fully down was measured, and averaging it out would let the headline
+    // claim 100% while a month below it reports real downtime.
+    const measured = providers.filter((provider) => provider.sampleCount > 0);
     return {
       aggregateUptime:
         measured.length === 0
@@ -131,7 +143,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
             ),
       months: [...monthTotals.entries()].map(([month, totals]) => ({
         month,
-        uptime: totals.total === 0 ? 0 : round2((totals.ok / totals.total) * 100),
+        uptime: totals.total === 0 ? null : round2((totals.ok / totals.total) * 100),
       })),
       providers,
     };

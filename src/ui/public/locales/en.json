@@ -105,6 +105,7 @@
   "history.incidents.one": "{count} incident",
   "history.incidents.other": "{count} incidents",
   "history.downtime": "{minutes} min down",
+  "history.month-no-data": "—",
   "history.export": "Served by",
 
   "settings.polling": "Polling",
