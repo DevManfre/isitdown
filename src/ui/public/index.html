@@ -61,22 +61,28 @@
             <span class="header-meta" id="view-meta"></span>
           </div>
           <div class="header-actions">
-            <div class="lang-switch" id="lang-switch"></div>
-            <button class="btn theme-btn" id="theme-toggle" type="button">
-              <span class="theme-dot"></span><span id="theme-label"></span>
-            </button>
-            <button
-              class="btn btn-ghost"
-              id="add-service"
-              type="button"
-              data-i18n="action.add-service"
-            ></button>
-            <button
-              class="btn btn-primary"
-              id="poll-now"
-              type="button"
-              data-i18n="action.poll-now"
-            ></button>
+            <div class="header-controls">
+              <div class="lang-switch" id="lang-switch"></div>
+              <button class="theme-btn" id="theme-toggle" type="button">
+                <span class="theme-dot"></span>
+              </button>
+            </div>
+            <span class="header-sep"></span>
+            <div class="header-poll">
+              <div class="poll-next">
+                <span class="poll-next-label" data-i18n="meta.next-poll-label"></span>
+                <span class="poll-next-value">
+                  <span class="poll-next-dot" id="poll-next-dot"></span>
+                  <span class="poll-next-time" id="poll-next-time"></span>
+                </span>
+              </div>
+              <button
+                class="btn btn-primary"
+                id="poll-now"
+                type="button"
+                data-i18n="action.poll-now"
+              ></button>
+            </div>
           </div>
         </header>
         <main class="view" id="view"></main>

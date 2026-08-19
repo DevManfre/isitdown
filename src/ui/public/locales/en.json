@@ -65,7 +65,9 @@
 
   "meta.watched": "{count} monitored",
   "meta.interval": "polling every {minutes}m",
-  "meta.next-poll": "next at {time}",
+  "meta.next-poll-label": "Next poll",
+  "meta.countdown": "{minutes}m {seconds}s",
+  "meta.countdown-seconds": "{seconds}s",
   "meta.never-polled": "not polled yet",
 
   "overview.kicker": "Upstream status",
