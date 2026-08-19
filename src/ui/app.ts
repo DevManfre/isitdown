@@ -1,4 +1,5 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
+import { configRoutes } from "./routes/config.routes.ts";
 import { historyRoutes } from "./routes/history.routes.ts";
 import { incidentsRoutes } from "./routes/incidents.routes.ts";
 import { notificationsRoutes } from "./routes/notifications.routes.ts";
@@ -21,6 +22,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(historyRoutes(runtime));
   app.use(incidentsRoutes(runtime));
   app.use(notificationsRoutes(runtime));
+  app.use(configRoutes(runtime));
 
   app.use(express.static(PUBLIC_DIR.pathname, { extensions: ["html"] }));
 

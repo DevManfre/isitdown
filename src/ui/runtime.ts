@@ -3,7 +3,7 @@ import type { Express } from "express";
 import { getAdapter } from "../adapters/index.ts";
 import type { ConfigSource, ServiceDefinition } from "../core/configSource.interface.ts";
 import { createLogger, parseLogLevel, type Logger } from "../core/logger.ts";
-import { createDispatcher } from "../core/notificationDispatcher.ts";
+import { createDispatcher, type Dispatcher } from "../core/notificationDispatcher.ts";
 import { createPoller, type CycleResult } from "../core/poller.ts";
 import { createScheduler, type Scheduler } from "../core/scheduler.ts";
 import { buildNotifiers } from "../notifiers/index.ts";
@@ -33,6 +33,9 @@ export interface UiRuntimeOptions {
  */
 export interface UiRuntimeCore {
   db: DatabaseSync;
+  /** The process environment secrets are resolved from; never serialised. */
+  env: NodeJS.ProcessEnv;
+  dispatcher: Dispatcher;
   store: HistoryStore;
   history: ReturnType<typeof createHistoryService>;
   configSource: ConfigSource;
@@ -100,6 +103,8 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
 
   const core: UiRuntimeCore = {
     db,
+    env: options.env,
+    dispatcher,
     store,
     history,
     configSource,

@@ -27,6 +27,14 @@ export interface DispatchContext {
 
 export interface Dispatcher {
   dispatch(changes: StatusChange[], ctx: DispatchContext): Promise<SentRecord[]>;
+  /**
+   * Delivers one operator-requested test message. It lives here, rather than in a
+   * route, so that the dispatcher stays the single gate every outbound
+   * notification passes through — the diff engine remains the only thing that
+   * decides whether a *status change* notifies, and diagnostics cannot drift into
+   * a second sending path.
+   */
+  sendTest(notifier: Notifier, service: DispatchContext["services"][number], locale: string): Promise<SentRecord>;
 }
 
 export interface DispatcherDeps {
@@ -91,6 +99,21 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
   }
 
   return {
+    async sendTest(notifier, service, locale): Promise<SentRecord> {
+      const payload: NotificationPayload = {
+        change: {
+          kind: "monitoring_degraded",
+          providerId: service.id,
+          currentStatus: "unknown",
+          failureCount: 0,
+          at: new Date().toISOString(),
+        },
+        service: { id: service.id, name: service.name, statusUrl: service.baseUrl },
+        locale,
+      };
+      return deliver(notifier, payload, renderMessage(payload));
+    },
+
     async dispatch(changes: StatusChange[], ctx: DispatchContext): Promise<SentRecord[]> {
       if (changes.length === 0 || ctx.notifiers.length === 0) return [];
 
