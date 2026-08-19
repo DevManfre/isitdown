@@ -30,16 +30,32 @@ const baseline = (): ProviderRuntimeState => ({
 export async function createFileStateStore(path: string): Promise<StateStore> {
   const providers = new Map<string, ProviderRuntimeState>(Object.entries(await readState(path)));
 
-  async function persist(): Promise<void> {
+  // A cycle polls every provider concurrently, so several mutations land at once.
+  // Writes are serialised and each uses its own temporary file: sharing one
+  // temporary name let two concurrent renames race, and the loser failed with
+  // ENOENT after the winner had already moved the file into place.
+  let writes = 0;
+  let tail: Promise<unknown> = Promise.resolve();
+
+  async function writeOnce(): Promise<void> {
     await mkdir(dirname(path), { recursive: true });
     const payload = JSON.stringify(
       { version: FORMAT_VERSION, providers: Object.fromEntries(providers) },
       null,
       2,
     );
-    const temporary = join(dirname(path), `.${FORMAT_VERSION}.state.tmp`);
+    writes += 1;
+    const temporary = join(dirname(path), `.state.${process.pid}.${writes}.tmp`);
     await writeFile(temporary, `${payload}\n`, "utf8");
     await rename(temporary, path);
+  }
+
+  function persist(): Promise<void> {
+    const run = tail.then(writeOnce, writeOnce);
+    // Keep the chain alive after a failed write while still surfacing the error
+    // to the caller that triggered it.
+    tail = run.catch(() => undefined);
+    return run;
   }
 
   function stateOf(providerId: string): ProviderRuntimeState {
