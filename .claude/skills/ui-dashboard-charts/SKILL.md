@@ -5,6 +5,9 @@ description: Implement or modify the UI edition's dashboard — status grid, sta
 
 # UI Dashboard & Charts
 
+> `design/` is currently listed in `.gitignore`, so the prototypes live on disk
+> but are not committed. Read them there; do not assume a fresh clone has them.
+
 Covers the StatusWatch **UI edition** dashboard only — status grid, uptime charts, incident timeline, settings panel. Not applicable to the Light edition, which has no UI.
 
 ## Before writing any dashboard code
