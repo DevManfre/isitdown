@@ -1,5 +1,18 @@
 # StatusWatch
 
+[![Version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)](package.json)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A5%2024-5FA04E?style=flat-square&logo=node.js&logoColor=white)](.nvmrc)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](tsconfig.json)
+[![Dashboard](https://img.shields.io/badge/dashboard-vanilla%20JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](#92-tech-stack)
+
+[![Tests](https://img.shields.io/badge/tests-301%20passing-brightgreen?style=flat-square)](#93-tests-and-checks)
+[![Runtime dependencies](https://img.shields.io/badge/runtime%20deps-3-lightgrey?style=flat-square)](#92-tech-stack)
+[![Docker](https://img.shields.io/badge/docker-light%20%7C%20ui-2496ED?style=flat-square&logo=docker&logoColor=white)](#4-docker)
+[![i18n](https://img.shields.io/badge/i18n-en%20%7C%20it-orange?style=flat-square)](#82-localisation)
+
+**English** · [Italiano](README.it.md)
+
 Self-hosted, containerized monitoring for **other people's** status pages. It polls
 the public status pages of the providers you depend on — GitHub, Cloudflare,
 Anthropic, npm, anything running Atlassian Statuspage — and messages you when one
