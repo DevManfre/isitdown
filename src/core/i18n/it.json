@@ -5,11 +5,6 @@
   "status.major-outage": "Interruzione grave",
   "status.unknown": "Sconosciuto",
 
-  "impact.none": "Nessuno",
-  "impact.minor": "Minore",
-  "impact.major": "Grave",
-  "impact.critical": "Critico",
-
   "incident.status.investigating": "In analisi",
   "incident.status.identified": "Identificato",
   "incident.status.monitoring": "In monitoraggio",
