@@ -1,0 +1,32 @@
+import express, { type Express, type NextFunction, type Request, type Response } from "express";
+import { statusRoutes } from "./routes/status.routes.ts";
+import type { UiRuntimeCore } from "./runtime.ts";
+
+const PUBLIC_DIR = new URL("./public/", import.meta.url);
+
+/**
+ * The dashboard's HTTP surface. Every response is JSON except the static
+ * dashboard itself, including errors: a browser fetch that gets an HTML error
+ * page back reports a parse failure instead of the real problem.
+ */
+export function createApp(runtime: UiRuntimeCore): Express {
+  const app = express();
+  app.disable("x-powered-by");
+  app.use(express.json({ limit: "64kb" }));
+
+  app.use(statusRoutes(runtime));
+
+  app.use(express.static(PUBLIC_DIR.pathname, { extensions: ["html"] }));
+
+  app.use((_req: Request, res: Response) => {
+    res.status(404).json({ error: { message: "not found" } });
+  });
+
+  app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    const message = error instanceof Error ? error.message : String(error);
+    runtime.logger.error("request failed", { error: message });
+    res.status(500).json({ error: { message } });
+  });
+
+  return app;
+}
