@@ -19,7 +19,7 @@ src/adapters/   per-provider status parsers (statuspage.io generic adapter + cus
 src/notifiers/  per-channel notification senders (telegram, webhook, ...)
 src/light/      Light edition entrypoint, file-based config loader, file state store
 src/ui/         UI edition entrypoint, Express server, SQLite state store, dashboard routes/assets
-design/         Claude Design exports/prototypes for the UI dashboard (source of truth for visual direction before implementation)
+design/         Claude Design exports/prototypes for the UI dashboard (source of truth for visual direction before implementation) — git-ignored, so present on disk only
 ```
 
 **Golden rule**: `src/core`, `src/adapters`, and `src/notifiers` must stay edition-agnostic. If you're tempted to `import` something from `src/light` or `src/ui` into one of those folders, stop — that logic belongs in the edition layer instead, wired in through the shared interfaces (`StateStore`, `Notifier`, `Adapter`).
@@ -37,9 +37,12 @@ docker compose --profile ui up -d --build           # UI edition, container
 ## Testing
 
 ```bash
-npm test                # unit tests: adapters (fixture-based, no live network) + diff engine
-npm run test:integration
+npm test                 # unit tests: *.test.ts — adapters, diff engine, poller, scheduler, stores, API
+npm run test:integration # end to end: *.itest.ts — fake provider and webhook receiver
+npm run typecheck        # server TypeScript, plus the dashboard JavaScript via checkJs
 ```
+
+Requires Node 24 (`.nvmrc`); `npm install` refuses an older one.
 
 - New adapters need fixture JSON files under `test/fixtures/<provider>/` — never hit a live provider endpoint in tests.
 - New diff-engine behavior needs a table-driven test case added to the existing suite (no change / status change / new incident / incident resolved).

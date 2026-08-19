@@ -16,7 +16,9 @@ The goal is to give a single developer or small team early visibility into upstr
 
 ## Quick start
 
-Light edition, locally (needs Node 24):
+Requires **Node 24** (`.nvmrc` pins it; `npm install` refuses an older one).
+
+Light edition — polling and notifications, no server:
 
 ```bash
 npm install
@@ -25,23 +27,27 @@ cp .env.example .env                # fill in only the channels you enable
 npm run build:light && node dist/light/index.js
 ```
 
-Light edition, in Docker:
+UI edition — the same engine plus the dashboard on :3000:
 
 ```bash
-docker compose --profile light up -d --build
-docker logs -f statuswatch-light
+npm run build:ui && node dist/ui/server.js
+# then open http://localhost:3000
 ```
 
-Tests:
+In Docker:
 
 ```bash
-npm test                 # unit
-npm run test:integration # end to end, with a fake provider
-npm run typecheck
+docker compose --profile light up -d --build   # needs ./config.yml and .env
+docker compose --profile ui    up -d --build   # no config.yml; open :3000
 ```
 
-The UI edition (`docker compose --profile ui up -d`) is the next milestone — see
-section 10.
+Tests and checks:
+
+```bash
+npm test                 # unit suite
+npm run test:integration # end to end, against a fake provider
+npm run typecheck        # server TypeScript and the dashboard JavaScript
+```
 
 ---
 
@@ -59,14 +65,32 @@ StatusWatch ships as **two distinct editions**, sharing the same core engine (Po
 
 ### 2.2 UI Edition
 - **Target user**: users who want visibility and control without touching config files — everything through a local web page.
-- **Configuration**: fully manageable through the UI — add/remove monitored services, set polling interval, configure notification channels, all persisted to the State Store (SQLite) instead of a static file. No restart required to apply changes.
-- **Dashboard**: local web page showing:
-  - A status grid (green/yellow/red cards) for each monitored service, refreshed in near real time.
-  - **Status-page-style charts** per service: uptime percentage over time (7/30/90-day view), an incident timeline/history, and current active incidents with details — visually similar to the status pages being monitored (e.g. Statuspage.io-style bar/heatmap of daily uptime).
-  - A settings panel to manage services and notification integrations.
-  - A **theme toggle** (light / dark / follow system) in the header, applied instantly with no page reload.
-  - A **language selector** in the header, switching every dashboard string at runtime.
-- **Docker image tag**: `statuswatch:ui`
+- **Configuration**: fully manageable through the UI — add/remove monitored services, set the polling interval, timeout and retries, enable notification channels. Everything is persisted to SQLite instead of a static file, and the scheduler re-reads it every cycle, so **no restart is needed** and no `config.yml` is mounted at all.
+- **Dashboard** (design `3a` in `design/claude-design-prototypes/`), five views plus an incident detail:
+  - **Overview** — the headline state, a ring per provider with its 90-day uptime, and a daily uptime bar row per provider.
+  - **Providers** — a table with status, an inline uptime strip, uptime, 90-day incident count, poll interval and adapter, with edit/remove and an add-service dialog.
+  - **Incidents** — active incidents, the feed of notifications actually sent, and the closed list.
+  - **Incident detail** — the status stepper, the timeline of what StatusWatch observed, the log of what it sent, the provider's other open incidents, and the last 24 polls.
+  - **History** — aggregate uptime, four month columns, and per-provider 7/30/90-day figures with daily bars.
+  - **Settings** — polling, the service list, and the notification channels.
+  - A **theme toggle** (light / dark / system) and a **language switch** (EN / IT) in the header, both applied instantly with no page reload.
+- **Docker image tag**: `statuswatch:ui`, built `FROM` the Light image so it is that image plus one thin layer.
+- **Environment**: `PORT` (default 3000), `DB_PATH` (default `/app/data/statuswatch.db`), `LOG_LEVEL`, plus whichever channel secrets are in use.
+
+#### Secrets in the dashboard
+
+The design prototype draws editable credential fields. The implementation
+deliberately does not, because secrets come from the environment only:
+
+- The `channels` table stores the **name** of the environment variable carrying each credential (`botTokenEnv: "TELEGRAM_BOT_TOKEN"`), never a value.
+- Settings shows that name, and whether it currently resolves — the name is editable, the value is not.
+- `PATCH /config/channels/:id` **refuses** a request carrying a literal secret, so the database is never given the chance to hold one.
+- No API response, DOM node, log line or thrown error contains a resolved secret. Tests assert this.
+
+A channel enabled in the database whose variable is unset is skipped for that
+cycle with a warning rather than crashing the dashboard — the Light edition
+treats the same situation as a fatal startup error, because it has no UI in which
+an operator could see and fix it.
 
 ### 2.3 Shared vs. edition-specific components
 
@@ -198,13 +222,30 @@ Rules:
    - Generic Webhook (POST JSON to any URL, for custom integrations)
    - Email (SMTP) — optional, lower priority
 
-7. **HTTP API / Dashboard (optional, v2)**
-   A minimal Express server exposing:
-   - `GET /health` — container liveness check
-   - `GET /status` — current normalized status of all providers (JSON)
-   - `GET /` — simple static HTML dashboard (no framework needed, just fetch `/status` and render)
-   - `GET /api/preferences` / `PATCH /api/preferences` — theme (`light`/`dark`/`system`), UI locale, notification locale
-   - `GET /locales/:lang.json` — dashboard string catalog for the requested language (404 → client falls back to `en`)
+7. **HTTP API / Dashboard** (UI edition)
+   An Express server in the same process as the scheduler:
+
+   | Method | Path | Purpose |
+   |---|---|---|
+   | GET | `/health` | container liveness |
+   | GET | `/status` | current status of every provider, last/next poll — a pure database read, safe to poll every 30s |
+   | GET | `/history?provider=&days=` | pre-aggregated daily buckets, 7/30/90-day uptime, month columns (`days` accepts 7, 30 or 90) |
+   | GET | `/incidents?provider=` | active and closed incidents |
+   | GET | `/incidents/:providerId/:incidentId` | detail: timeline, action log, other open incidents, last 24 polls |
+   | GET | `/notifications?limit=` | what was actually sent, newest first |
+   | GET | `/config` | services, polling settings, channels (variable names only) |
+   | POST | `/config/services` · PATCH/DELETE `/config/services/:id` | service CRUD, validated with the shared zod schema |
+   | PATCH | `/config/settings` | polling settings |
+   | PATCH | `/config/channels/:id` | channel enable/disable and variable names |
+   | POST | `/config/services/:id/test` | one live fetch; records nothing |
+   | POST | `/config/channels/:id/test` | one test notification, through the dispatcher |
+   | GET, PATCH | `/api/preferences` | theme, UI locale, notification locale |
+   | GET | `/locales/:lang.json` | dashboard catalog; 404 → the client falls back to `en` |
+   | POST | `/poll` | run a cycle now, through the scheduler |
+   | GET | `/` | the dashboard |
+
+   Deleting a service cascades to its samples, incidents and stored state, so a
+   removed provider leaves no orphaned history behind.
 
 ---
 
@@ -421,22 +462,21 @@ runs the end-to-end suite (`test/**/*.itest.ts`). Both use the built-in
 
 ## 10. Roadmap / Future Enhancements
 
-- **v1 — Light edition** ✅ delivered: polling, the diff engine, Telegram and
-  generic-webhook notifications, `config.yml` with environment-referenced secrets,
-  a JSON state store with atomic writes, and the `statuswatch:light` image.
-- **v1.1 — UI prototyping** ✅ delivered: the dashboard explored in Claude Design
-  (status grid, uptime charts, incident timeline, settings panel) and kept in
-  `design/`. The navigable console is the reference for implementation.
-- **v1.2 — UI edition, first pass**: the validated design as an Express + vanilla
-  dashboard over SQLite, with configuration managed at runtime from the UI and no
-  restart needed. Ships as `statuswatch:ui`.
-- **v1.3**: historical incident log and uptime percentages per provider, with the
-  status-page-style daily bars and 7/30/90-day views served from `/history`.
-- **v1.4 — dark mode + i18n**: token-based theming with the light/dark/system
-  toggle and a localised dashboard (`en`, `it`) on top of the localised
-  notification messages both editions already share.
-- **v2**: more adapters for niche providers, Discord and Slack rich embeds, and
-  multi-recipient routing (different channels per provider severity).
+Delivered:
+
+- **v1 — Light edition**: polling, the diff engine, Telegram and generic-webhook notifications, `config.yml` with environment-referenced secrets, a JSON state store with atomic writes, `statuswatch:light`.
+- **v1.1 — UI prototyping**: the dashboard explored in Claude Design and kept in `design/claude-design-prototypes/`; option `3a`, the navigable console, is the implementation reference.
+- **v1.2 — UI edition**: the validated design as an Express + vanilla-ES-module dashboard over SQLite, with configuration managed at runtime and applied on the next cycle without a restart. `statuswatch:ui`, built `FROM` the Light image.
+- **v1.3 — history**: per-provider uptime and incident history with the status-page daily bars and 7/30/90-day views, aggregated server-side and served from `/history`.
+- **v1.4 — dark mode + i18n**: token-based light/dark/system theming with a persisted preference, and a localised dashboard (`en`, `it`) on top of the localised notification messages both editions already share.
+
+Still open:
+
+- More adapters for providers that are not on Atlassian Statuspage (the `statuspage` adapter already covers any that are).
+- Discord and Slack channels with rich embeds — both are webhook-shaped, so they slot in behind the existing `Notifier` interface.
+- Multi-recipient routing: different channels per provider or per severity.
+- Scheduled-maintenance awareness. The adapter currently ignores Statuspage's `scheduled_maintenances`, and the severity model has no maintenance state.
+- Component-level detail. The adapter normalises a provider's overall status and its incidents, not its individual components, so the incident view shows the provider's other open incidents where the prototype drew a components panel.
 
 ## 11. Repo Structure
 
@@ -480,6 +520,23 @@ statuswatch/
 │   │       ├── schema.ts               config.yml shape
 │   │       └── loadConfig.ts           YAML + ${ENV} substitution + validation
 │   └── ui/                            (UI edition only)
+│       ├── server.ts                   entrypoint
+│       ├── runtime.ts                  wiring, shared with the API tests
+│       ├── app.ts                      Express app: routes, static dashboard, JSON errors
+│       ├── healthcheck.ts              probes /health
+│       ├── sqliteStateStore.ts         StateStore + history, one transaction per save
+│       ├── historyStore.interface.ts   the history contract (UI is its only consumer)
+│       ├── history.ts                  uptime and incident aggregation
+│       ├── dbConfigSource.ts           config from SQLite; resolves secrets by variable name
+│       ├── db/                         open.ts, migrate.ts, seed.ts
+│       ├── routes/                     status, history, incidents, notifications, config, preferences
+│       └── public/                     the dashboard: no framework, no bundler
+│           ├── index.html              pre-paint theme script, rail, header, view container
+│           ├── css/tokens.css          the only file with a colour literal
+│           ├── css/nocturne.css        design-system component layer
+│           ├── css/app.css             console layout
+│           ├── js/                     app (router), api, i18n, theme, charts, components/, views/
+│           └── locales/                en.json (source) + it.json
 ├── tools/
 │   └── copy-assets.mjs                copies i18n catalogs and the dashboard into dist
 ├── test/
@@ -488,6 +545,7 @@ statuswatch/
 │   ├── adapters/
 │   ├── notifiers/
 │   ├── light/
+│   ├── ui/                            store contract, aggregation, every API route, theme and locale guards
 │   ├── fixtures/statuspage/           payloads recorded from the live pages, never fetched in a test
 │   ├── helpers/
 │   └── integration/                   *.itest.ts — fake provider and webhook receiver end to end
