@@ -4,6 +4,13 @@ import { diff } from "../../src/core/diffEngine.ts";
 import type { StateStore } from "../../src/core/stateStore.interface.ts";
 import type { NormalizedStatus, OverallStatus } from "../../src/core/types.ts";
 
+/**
+ * Provider ids the contract exercises. A store whose schema requires the provider
+ * to exist first (the UI edition's, where state hangs off a service row) seeds
+ * these in its harness.
+ */
+export const CONTRACT_PROVIDER_IDS = ["github", "cloudflare", "nobody"] as const;
+
 export interface StoreHarness {
   store: StateStore;
   /** Closes nothing; opens a second store over the same backing storage. */
