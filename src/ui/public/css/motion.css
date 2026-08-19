@@ -242,21 +242,18 @@
 .lang-opt {
   transition:
     color 0.2s ease,
-    border-color 0.24s ease,
-    background 0.24s ease;
+    background 0.24s var(--ease-out);
 }
 .lang-opt:hover {
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 .theme-btn {
-  transition:
-    color 0.2s ease,
-    border-color 0.24s ease;
+  transition: background 0.24s ease;
 }
 .theme-dot {
   transition:
     background 0.35s var(--ease-out),
-    transform 0.45s var(--ease-out);
+    transform 0.5s var(--ease-out);
 }
 :root[data-theme="light"] .theme-dot {
   transform: rotate(180deg);

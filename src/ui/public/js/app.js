@@ -8,11 +8,11 @@
  */
 
 import * as api from "./api.js";
-import { applyTranslations, loadCatalog, t, formatTime } from "./i18n.js";
+import { applyTranslations, loadCatalog, t } from "./i18n.js";
 import { currentTheme, initTheme, nextTheme, setTheme } from "./theme.js";
 import { element } from "./charts.js";
 import { renderOverview } from "./views/overview.js";
-import { openAddServiceDialog, renderProviders } from "./views/providers.js";
+import { renderProviders } from "./views/providers.js";
 import { renderIncidents } from "./views/incidents.js";
 import { renderIncident } from "./views/incident.js";
 import { renderHistory } from "./views/history.js";
@@ -52,8 +52,8 @@ const dom = {
   railChannels: document.getElementById("rail-channels"),
   langSwitch: document.getElementById("lang-switch"),
   themeToggle: document.getElementById("theme-toggle"),
-  themeLabel: document.getElementById("theme-label"),
-  addService: document.getElementById("add-service"),
+  pollDot: document.getElementById("poll-next-dot"),
+  pollTime: document.getElementById("poll-next-time"),
   pollNow: /** @type {HTMLButtonElement} */ (document.getElementById("poll-now")),
   railToggle: document.getElementById("rail-toggle"),
   rail: document.querySelector(".rail"),
@@ -152,27 +152,41 @@ function renderHeader() {
   dom.title.textContent = t(route.nav);
 
   const status = state.status;
-  if (status === undefined) {
-    dom.meta.replaceChildren();
-  } else {
-    const scheduled = status.nextPollAt !== null;
-    const live = element("span", scheduled ? "meta-live-dot dot-pulse" : "meta-live-dot meta-live-dot-idle");
-    const nextChip = element(
-      "span",
-      "meta-chip",
-      scheduled ? t("meta.next-poll", { time: formatTime(status.nextPollAt) }) : t("meta.never-polled"),
-    );
-    nextChip.prepend(live);
-    dom.meta.replaceChildren(
-      element("span", "meta-chip", t("meta.watched", { count: status.providers.length })),
-      element("span", "meta-chip", t("meta.interval", { minutes: status.pollIntervalMinutes })),
-      nextChip,
-    );
-  }
+  dom.meta.textContent =
+    status === undefined
+      ? ""
+      : [
+          t("meta.watched", { count: status.providers.length }),
+          t("meta.interval", { minutes: status.pollIntervalMinutes }),
+        ].join(" · ");
 
-  dom.themeLabel.textContent = t("theme.mode", { mode: t(`theme.${currentTheme()}`) });
+  const themeTitle = t("theme.mode", { mode: t(`theme.${currentTheme()}`) });
+  dom.themeToggle.title = themeTitle;
+  dom.themeToggle.setAttribute("aria-label", themeTitle);
+  renderCountdown();
   labelRailToggle();
   applyTranslations(document);
+}
+
+/**
+ * The next-poll readout counts down live: a 1s tick recomputes the remainder
+ * from nextPollAt, so it needs no extra requests between status refreshes.
+ */
+function renderCountdown() {
+  const nextPollAt = state.status?.nextPollAt ?? null;
+  if (nextPollAt === null) {
+    dom.pollTime.textContent = state.status === undefined ? "" : t("meta.never-polled");
+    dom.pollDot.className = "poll-next-dot";
+    return;
+  }
+  const remaining = Math.max(0, new Date(nextPollAt).getTime() - Date.now());
+  const minutes = Math.floor(remaining / 60_000);
+  const seconds = Math.floor((remaining % 60_000) / 1000);
+  dom.pollTime.textContent =
+    minutes > 0
+      ? t("meta.countdown", { minutes, seconds })
+      : t("meta.countdown-seconds", { seconds });
+  dom.pollDot.className = "poll-next-dot dot-pulse";
 }
 
 /** "incident" for the detail route, otherwise the route's own path. */
@@ -254,9 +268,6 @@ function wireHeader() {
     }
   });
 
-  dom.addService.addEventListener("click", () => {
-    openAddServiceDialog();
-  });
 }
 
 async function renderLangSwitch() {
@@ -320,6 +331,7 @@ async function start() {
       /* a failed refresh keeps the last view rather than blanking it */
     });
   }, REFRESH_MS);
+  setInterval(renderCountdown, 1000);
 }
 
 void start();
