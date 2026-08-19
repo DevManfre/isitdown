@@ -83,7 +83,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
   function arm(): void {
     if (stopped) return;
     const interval = lastIntervalMinutes * 60_000;
-    // Spread instances out so a fleet of StatusWatch containers does not hit
+    // Spread instances out so a fleet of IsItDown containers does not hit
     // every provider on the same second.
     const delay = Math.round(interval * (1 - JITTER + random() * 2 * JITTER));
     // Deliberately referenced: this timer is the only thing keeping the Light

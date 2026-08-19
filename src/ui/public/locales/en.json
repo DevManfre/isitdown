@@ -1,5 +1,5 @@
 {
-  "app.name": "StatusWatch",
+  "app.name": "IsItDown",
 
   "nav.overview": "Overview",
   "nav.providers": "Providers",
@@ -91,7 +91,7 @@
   "incident.elapsed": "open for {duration}",
   "incident.closed-after": "resolved after {duration}",
   "incident.timeline": "Timeline",
-  "incident.what-we-did": "What StatusWatch did",
+  "incident.what-we-did": "What IsItDown did",
   "incident.last-polls": "Last {count} polls",
   "incident.other-active": "Other open incidents",
   "incident.no-other-active": "None.",

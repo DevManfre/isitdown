@@ -185,7 +185,7 @@ async function switchLanguage(language) {
   state.preferences.uiLocale = await loadCatalog(language);
   document.documentElement.setAttribute("lang", state.preferences.uiLocale);
   try {
-    localStorage.setItem("statuswatch.uiLocale", state.preferences.uiLocale);
+    localStorage.setItem("isitdown.uiLocale", state.preferences.uiLocale);
   } catch {
     /* only costs the pre-paint hint */
   }

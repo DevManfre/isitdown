@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   StatusWatch — colour, type, spacing and elevation tokens.
+   IsItDown — colour, type, spacing and elevation tokens.
 
    This is the ONLY file in the dashboard allowed to contain a colour literal;
    a test enforces that. Everything else references var(--…).

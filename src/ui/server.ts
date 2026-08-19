@@ -1,7 +1,7 @@
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { buildUiRuntime } from "./runtime.ts";
 
-const DB_PATH = process.env["DB_PATH"] ?? "/app/data/statuswatch.db";
+const DB_PATH = process.env["DB_PATH"] ?? "/app/data/isitdown.db";
 const PORT = Number(process.env["PORT"] ?? 3000);
 
 const logger = createLogger(parseLogLevel(process.env["LOG_LEVEL"]));
@@ -10,7 +10,7 @@ let runtime: Awaited<ReturnType<typeof buildUiRuntime>> | undefined;
 try {
   runtime = await buildUiRuntime({ dbPath: DB_PATH, env: process.env, logger });
 } catch (error) {
-  logger.error("statuswatch ui failed to start", {
+  logger.error("isitdown ui failed to start", {
     error: error instanceof Error ? error.message : String(error),
     dbPath: DB_PATH,
   });
@@ -19,7 +19,7 @@ try {
 
 const started = runtime;
 const server = started.app.listen(PORT, () => {
-  logger.info("statuswatch ui started", { port: PORT, dbPath: DB_PATH });
+  logger.info("isitdown ui started", { port: PORT, dbPath: DB_PATH });
 });
 
 for (const signal of ["SIGTERM", "SIGINT"] as const) {

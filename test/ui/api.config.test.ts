@@ -21,8 +21,8 @@ interface Api {
 }
 
 async function api(env: NodeJS.ProcessEnv = {}): Promise<Api> {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-cfg-api-"));
-  const runtime = await buildUiRuntime({ dbPath: join(dir, "statuswatch.db"), env, logger: silent });
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-cfg-api-"));
+  const runtime = await buildUiRuntime({ dbPath: join(dir, "isitdown.db"), env, logger: silent });
   const server: Server = runtime.app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", () => resolve()));
   const { port } = server.address() as AddressInfo;

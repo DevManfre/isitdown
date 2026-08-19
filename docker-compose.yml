@@ -5,36 +5,36 @@
 # Both build the same Dockerfile, each selecting its own target.
 
 services:
-  statuswatch-light:
+  isitdown-light:
     build:
       context: .
       dockerfile: Dockerfile
       target: light
-    image: statuswatch:light
-    container_name: statuswatch-light
+    image: isitdown:light
+    container_name: isitdown-light
     restart: unless-stopped
     env_file: .env
     volumes:
       - ./config.yml:/app/config/config.yml:ro
-      - statuswatch-light-data:/app/data
+      - isitdown-light-data:/app/data
     profiles: ["light"]
 
-  statuswatch-ui:
+  isitdown-ui:
     build:
       context: .
       dockerfile: Dockerfile
       target: ui
-    image: statuswatch:ui
-    container_name: statuswatch-ui
+    image: isitdown:ui
+    container_name: isitdown-ui
     restart: unless-stopped
     env_file: .env
     ports:
       - "3000:3000"
     # No config.yml: the UI edition keeps its configuration in SQLite.
     volumes:
-      - statuswatch-ui-data:/app/data
+      - isitdown-ui-data:/app/data
     profiles: ["ui"]
 
 volumes:
-  statuswatch-light-data:
-  statuswatch-ui-data:
+  isitdown-light-data:
+  isitdown-ui-data:

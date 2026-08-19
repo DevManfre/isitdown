@@ -20,8 +20,8 @@ async function harness(providers: string[] = ["github"]): Promise<{
   store: HistoryStore;
   history: ReturnType<typeof createHistoryService>;
 }> {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-history-"));
-  const db = openDatabase(join(dir, "statuswatch.db"));
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-history-"));
+  const db = openDatabase(join(dir, "isitdown.db"));
   migrate(db);
   const insert = db.prepare(
     "INSERT INTO services (id, name, adapter, base_url, options, enabled, created_at) VALUES (?, ?, 'statuspage', ?, NULL, 1, ?)",

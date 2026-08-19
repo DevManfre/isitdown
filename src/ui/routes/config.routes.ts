@@ -185,8 +185,8 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     }
 
     const service = listServices(db)[0] ?? {
-      id: "statuswatch",
-      name: "StatusWatch",
+      id: "isitdown",
+      name: "IsItDown",
       adapter: "statuspage",
       baseUrl: "https://example.com",
       enabled: true,

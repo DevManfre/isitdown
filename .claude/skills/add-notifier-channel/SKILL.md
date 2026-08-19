@@ -1,6 +1,6 @@
 ---
 name: add-notifier-channel
-description: Scaffold a new notification channel (e.g. Slack, Discord, email, SMS, PagerDuty) for StatusWatch. Use whenever the user wants to add a way to be alerted about status changes beyond the existing Telegram/webhook channels, or asks "how do I get notified via X".
+description: Scaffold a new notification channel (e.g. Slack, Discord, email, SMS, PagerDuty) for IsItDown. Use whenever the user wants to add a way to be alerted about status changes beyond the existing Telegram/webhook channels, or asks "how do I get notified via X".
 ---
 
 # Add Notifier Channel

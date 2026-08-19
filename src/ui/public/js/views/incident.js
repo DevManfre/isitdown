@@ -1,6 +1,6 @@
 /**
  * Design 3a's incident detail: the status stepper, the timeline of what
- * StatusWatch observed, the action log of what it actually sent, the provider's
+ * IsItDown observed, the action log of what it actually sent, the provider's
  * other open incidents, and the strip of recent polls.
  *
  * The timeline is our own observations rather than the provider's update feed —

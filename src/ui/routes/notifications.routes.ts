@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { UiRuntimeCore } from "../runtime.ts";
 
 /**
- * What StatusWatch actually sent. This is the audit trail behind the dashboard's
+ * What IsItDown actually sent. This is the audit trail behind the dashboard's
  * "notifications sent" panel: every dispatch attempt, delivered or failed.
  */
 export function notificationsRoutes(runtime: UiRuntimeCore): Router {

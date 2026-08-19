@@ -7,7 +7,7 @@ import { createFileStateStore } from "../../src/light/fileStateStore.ts";
 import { runStateStoreContract } from "../core/stateStore.contract.ts";
 
 async function tempPath(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-file-"));
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-file-"));
   return join(dir, "state.json");
 }
 
@@ -26,7 +26,7 @@ test("a missing file is an empty store rather than an error", async () => {
 });
 
 test("the parent directory is created when it does not exist", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "statuswatch-file-"));
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-file-"));
   const path = join(dir, "nested", "deeper", "state.json");
   const store = await createFileStateStore(path);
   await store.recordFailure("github");

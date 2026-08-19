@@ -18,7 +18,7 @@ try {
 } catch (error) {
   // Refusing to start with a message is worth more than starting silently and
   // never notifying: this is the first thing an operator reads in docker logs.
-  logger.error("statuswatch light failed to start", {
+  logger.error("isitdown light failed to start", {
     error: error instanceof Error ? error.message : String(error),
     configPath: CONFIG_PATH,
     dataPath: DATA_PATH,
@@ -44,5 +44,5 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
   });
 }
 
-logger.info("statuswatch light started", { configPath: CONFIG_PATH, dataPath: DATA_PATH });
+logger.info("isitdown light started", { configPath: CONFIG_PATH, dataPath: DATA_PATH });
 await started.scheduler.start();

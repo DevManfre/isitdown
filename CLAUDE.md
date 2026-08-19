@@ -4,10 +4,10 @@ Guidance for Claude (and Claude Code) when working in this repository. See `READ
 
 ## Project summary
 
-StatusWatch is a Dockerized service that polls the public status pages of third-party providers (GitHub, Anthropic, Cloudflare, etc.) and sends a notification when their status changes. It ships as two editions from the same codebase:
+IsItDown is a Dockerized service that polls the public status pages of third-party providers (GitHub, Anthropic, Cloudflare, etc.) and sends a notification when their status changes. It ships as two editions from the same codebase:
 
-- **Light**: polling + notifications only, config via `config.yml`, no HTTP server. Image: `statuswatch:light`.
-- **UI**: adds a local web dashboard (status grid, uptime charts, incident timeline) and runtime configuration via SQLite instead of a static file. Image: `statuswatch:ui`.
+- **Light**: polling + notifications only, config via `config.yml`, no HTTP server. Image: `isitdown:light`.
+- **UI**: adds a local web dashboard (status grid, uptime charts, incident timeline) and runtime configuration via SQLite instead of a static file. Image: `isitdown:ui`.
 
 Full architecture, data flow, and rationale live in `README.md` — read it before making structural changes.
 
@@ -68,7 +68,7 @@ Use the `add-notifier-channel` skill (see `.claude/skills/`) — it captures the
 
 ## Skills available in this repo
 
-This repo ships with Claude Code skills under `.claude/skills/` tailored to recurring StatusWatch workflows:
+This repo ships with Claude Code skills under `.claude/skills/` tailored to recurring IsItDown workflows:
 
 - `add-status-adapter` — scaffold a new provider adapter (Statuspage-based or custom).
 - `add-notifier-channel` — scaffold a new notification channel.

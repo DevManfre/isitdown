@@ -1,20 +1,20 @@
 ---
 name: docker-edition-build
-description: Build, tag, run, and troubleshoot the StatusWatch Light and UI Docker editions (one multi-stage Dockerfile with light/ui targets, docker-compose profiles). Use whenever the user wants to build or run either edition's container, debug a Docker build failure, change image tags, or asks about differences between the two editions' container setup.
+description: Build, tag, run, and troubleshoot the IsItDown Light and UI Docker editions (one multi-stage Dockerfile with light/ui targets, docker-compose profiles). Use whenever the user wants to build or run either edition's container, debug a Docker build failure, change image tags, or asks about differences between the two editions' container setup.
 ---
 
 # Docker Edition Build
 
-StatusWatch builds two separate images from one source tree: `statuswatch:light` (polling + notifications only, no server) and `statuswatch:ui` (adds the Express dashboard + SQLite). Never conflate the two — a build change for one must not silently affect the other.
+IsItDown builds two separate images from one source tree: `isitdown:light` (polling + notifications only, no server) and `isitdown:ui` (adds the Express dashboard + SQLite). Never conflate the two — a build change for one must not silently affect the other.
 
 ## Building
 
 ```bash
 # Light edition
-docker build --target light -t statuswatch:light .
+docker build --target light -t isitdown:light .
 
 # UI edition — its stage is FROM light, so this reuses every light layer
-docker build --target ui -t statuswatch:ui .
+docker build --target ui -t isitdown:ui .
 
 # Both, via compose (profile-gated; each service selects its own target)
 docker compose --profile light build
@@ -52,10 +52,10 @@ Sanity checklist before declaring a build "done":
 Use semantic, edition-qualified tags — never a bare `latest` that doesn't indicate edition:
 
 ```
-statuswatch:light-v1.0.0
-statuswatch:ui-v1.0.0
-statuswatch:light-latest
-statuswatch:ui-latest
+isitdown:light-v1.0.0
+isitdown:ui-v1.0.0
+isitdown:light-latest
+isitdown:ui-latest
 ```
 
 When publishing to a registry, push both edition tags for every release — don't ship a Light release without also cutting the corresponding UI tag (or explicitly note in the changelog that the UI edition is unchanged).
