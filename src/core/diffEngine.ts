@@ -1,4 +1,4 @@
-import type { Incident, NormalizedStatus, StatusChange } from "./types.ts";
+import type { NormalizedStatus, StatusChange } from "./types.ts";
 
 /**
  * The single authority on whether a notification fires. Pure and synchronous:
