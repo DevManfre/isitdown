@@ -65,11 +65,18 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 
   function cycle(): Promise<CycleResult> {
     if (inFlight !== undefined) return inFlight;
-    const run = runCycle();
+    // The marker is cleared inside the run's own body rather than in a chained
+    // callback: a chained .finally settles a microtask later than the promise
+    // itself, so a caller awaiting one cycle and immediately asking for another
+    // was handed back the finished one and no new cycle ran at all.
+    const run = (async () => {
+      try {
+        return await runCycle();
+      } finally {
+        inFlight = undefined;
+      }
+    })();
     inFlight = run;
-    void run.catch(() => undefined).finally(() => {
-      inFlight = undefined;
-    });
     return run;
   }
 
@@ -79,10 +86,12 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     // Spread instances out so a fleet of StatusWatch containers does not hit
     // every provider on the same second.
     const delay = Math.round(interval * (1 - JITTER + random() * 2 * JITTER));
+    // Deliberately referenced: this timer is the only thing keeping the Light
+    // edition's event loop alive between cycles, and unref'ing it made the
+    // container exit after its first poll.
     timer = setTimeout(() => {
       void tick();
     }, delay);
-    timer.unref?.();
   }
 
   async function tick(): Promise<void> {
