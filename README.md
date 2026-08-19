@@ -23,6 +23,7 @@ StatusWatch ships as **two distinct editions**, sharing the same core engine (Po
 - **Configuration**: code/file-only — a single `config.yml` (or `config.ts`), edited by hand and loaded at container startup. No runtime UI to change settings; any change requires editing the file and restarting/reloading the container.
 - **Output**: notifications only (Telegram/Discord/Slack/webhook). No web server, no dashboard, no persistent history beyond what's needed for the Diff Engine to detect state changes.
 - **Footprint**: smallest possible image, no HTTP server dependency at all, minimal memory/CPU usage — ideal for a small VPS or a Raspberry Pi.
+- **Language**: notification messages are localized via a top-level `locale` key in `config.yml` (see section 2.5). No theme setting — there is no UI to theme.
 - **Docker image tag**: `statuswatch:light`
 
 ### 2.2 UI Edition
@@ -32,6 +33,8 @@ StatusWatch ships as **two distinct editions**, sharing the same core engine (Po
   - A status grid (green/yellow/red cards) for each monitored service, refreshed in near real time.
   - **Status-page-style charts** per service: uptime percentage over time (7/30/90-day view), an incident timeline/history, and current active incidents with details — visually similar to the status pages being monitored (e.g. Statuspage.io-style bar/heatmap of daily uptime).
   - A settings panel to manage services and notification integrations.
+  - A **theme toggle** (light / dark / follow system) in the header, applied instantly with no page reload.
+  - A **language selector** in the header, switching every dashboard string at runtime.
 - **Docker image tag**: `statuswatch:ui`
 
 ### 2.3 Shared vs. edition-specific components
@@ -44,10 +47,40 @@ StatusWatch ships as **two distinct editions**, sharing the same core engine (Po
 | Configuration | static file, code-level | dynamic, via UI, persisted to DB |
 | HTTP server | ❌ not included | ✅ required (API + dashboard) |
 | Charts/history | ❌ not available | ✅ core feature |
+| Dark mode | ❌ n/a (no UI) | ✅ toggle: light / dark / system |
+| Localization (i18n) | ✅ notifications only, `locale` in `config.yml` | ✅ notifications + full dashboard, switchable at runtime |
 
 ### 2.4 UI prototyping approach
 
-Before building the real dashboard in code, the plan is to **prototype the interface with Claude Design first** — exploring layout, status-grid styling, and chart types (uptime bars, incident timeline) as static mockups/interactive prototypes. Only once the UI direction is validated there does it get implemented as the actual Express/HTML (or lightweight frontend) dashboard described in section 2.2. This avoids committing to a dashboard implementation before the visual design and information hierarchy are settled.
+Before building the real dashboard in code, the plan is to **prototype the interface with Claude Design first** — exploring layout, status-grid styling, and chart types (uptime bars, incident timeline) as static mockups/interactive prototypes. Only once the UI direction is validated there does it get implemented as the actual Express/HTML (or lightweight frontend) dashboard described in section 2.2. This avoids committing to a dashboard implementation before the visual design and information hierarchy are settled. Both the dark palette and the localized string lengths (German/Italian labels are longer than English ones and break tight layouts) are part of what gets validated in the prototype, not an afterthought.
+
+### 2.5 Dark mode toggle
+
+UI edition only. The dashboard ships light and dark themes with an explicit three-state control: **light / dark / system**.
+
+- **Tokens, not per-component colors**: every color is a CSS custom property defined once on `:root` (light) and overridden in a `:root[data-theme="dark"]` block. Components reference `var(--...)` only — no hardcoded hex outside the token block. The charts (uptime bars, timeline) read their colors from the same tokens, so they never need a separate dark palette.
+- **System default**: with no explicit choice stored, the theme follows `prefers-color-scheme` and reacts live to OS changes.
+- **Persistence**: the choice is stored client-side (`localStorage`) *and* in the SQLite settings table, so it survives both a browser reload and a fresh browser on the same instance.
+- **No flash of wrong theme**: a tiny inline script in `<head>` sets `data-theme` on the root element before first paint — after the stylesheet, before the body renders.
+- **Status colors stay legible**: green/yellow/red status cards get dark-mode variants that keep at least WCAG AA contrast against the dark surface, rather than reusing the light-mode hues at lower luminance.
+- **API**: `GET /api/preferences` / `PATCH /api/preferences` (`{ theme: "light" | "dark" | "system" }`), served by `preferences.routes.ts`.
+
+### 2.6 Multi-language support (i18n)
+
+Localization spans **both editions**, split in two layers:
+
+- **Notification messages (shared, both editions)**: message text lives in `src/core/i18n/`, edition-agnostic like the rest of core. Notifiers ask the i18n module for a translated, formatted string; the Diff Engine stays language-unaware and keeps passing structured payloads. Formatting (emoji, layout) still lives in the notifier — only the strings move.
+- **Dashboard UI (UI edition only)**: flat JSON catalogs under `src/ui/public/locales/<lang>.json`, loaded on demand and applied client-side to `data-i18n` marked nodes. Switching language does not reload the page.
+
+Rules:
+
+- **`en` is the source locale** and the fallback for any missing key: a missing translation renders the English string, never an empty node or a raw key.
+- **Catalogs are flat key/value JSON** (`"status.operational": "Operational"`) validated with `zod` at load time, like every other external input.
+- **Locale resolution order**: stored user preference → `Accept-Language` / `navigator.language` → `en`.
+- **Dates, numbers, percentages, and relative times** go through `Intl.DateTimeFormat` / `Intl.NumberFormat` / `Intl.RelativeTimeFormat` with the active locale — never hand-built format strings. Timestamps in notifications stay UTC with an explicit `UTC` suffix regardless of locale, to avoid ambiguity.
+- **Initial locales**: `en` (source) and `it`. Adding a language means adding one JSON file per layer plus an entry in the locale registry — no code changes.
+- **Light edition config**: top-level `locale: en` in `config.yml` (see section 4). **UI edition**: a setting in the DB, changeable from the dashboard; the notification locale and the dashboard locale are separate fields, so an operator can read an English UI and receive Italian alerts.
+- **API**: the same `preferences` endpoint carries `{ uiLocale, notificationLocale }`.
 
 ---
 
@@ -137,6 +170,8 @@ Before building the real dashboard in code, the plan is to **prototype the inter
    - `GET /health` — container liveness check
    - `GET /status` — current normalized status of all providers (JSON)
    - `GET /` — simple static HTML dashboard (no framework needed, just fetch `/status` and render)
+   - `GET /api/preferences` / `PATCH /api/preferences` — theme (`light`/`dark`/`system`), UI locale, notification locale
+   - `GET /locales/:lang.json` — dashboard string catalog for the requested language (404 → client falls back to `en`)
 
 ---
 
@@ -146,6 +181,7 @@ All service definitions live in a single `config.yml`, mounted as a volume so it
 
 ```yaml
 pollIntervalMinutes: 3
+locale: en          # language for notification messages: en | it (falls back to en)
 
 services:
   - name: GitHub
@@ -193,6 +229,8 @@ Secrets (`TELEGRAM_BOT_TOKEN`, etc.) are injected via environment variables / `.
 | Notifications | native `fetch` calls to provider APIs | no heavy SDKs needed |
 | Container | Docker, multi-stage build | small final image (`node:20-alpine`) |
 | Optional dashboard | Express + plain HTML/CSS | no need for a frontend framework |
+| Theming | CSS custom properties + `data-theme` attribute | no CSS framework, no runtime style lib |
+| i18n | flat JSON catalogs + native `Intl.*` | no i18n framework (i18next etc.) needed at this size |
 
 ---
 
@@ -319,6 +357,9 @@ Previous incident "API requests failing intermittently" has been resolved.
 - **Unit tests** for each adapter, using recorded/fixture JSON responses (no live network calls in CI).
 - **Unit tests** for the Diff Engine with table-driven cases (no change / status change / new incident / incident resolved).
 - **Integration test**: spin up the container, mock the config with a fake local HTTP server standing in for a provider, assert a notification is sent on a simulated status change.
+- **Locale catalog parity test**: every non-`en` catalog (notifications and dashboard) must have exactly the key set of `en` — the test fails on a missing or orphaned key, so a new string can't ship half-translated unnoticed.
+- **Notifier localization test**: same status transition rendered in each locale, asserting the message differs, the timestamp stays UTC, and an unknown locale falls back to `en`.
+- **Theme test**: the token block defines every `--color-*` variable in both light and dark, and no stylesheet outside it contains a raw hex color.
 
 ---
 
@@ -328,6 +369,7 @@ Previous incident "API requests failing intermittently" has been resolved.
 - **v1.1 — UI prototyping**: design exploration in Claude Design for the dashboard — status grid, uptime charts, incident timeline, settings panel. No real backend yet, purely visual/interaction validation.
 - **v1.2 — UI edition, first pass**: implement the validated design as a real Express + HTML/CSS dashboard, backed by SQLite; move configuration fully into the UI (add/edit/remove services and notification channels at runtime, no file editing). Ship as `statuswatch:ui`.
 - **v1.3**: historical incident log + uptime percentage per provider with the status-page-style charts (daily uptime bars, 7/30/90-day views), served from `/history`.
+- **v1.4 — dark mode + i18n**: CSS-token theming with the light/dark/system toggle and persisted preference; localized dashboard (`en`, `it`) plus localized notification messages shared by both editions (`locale` in `config.yml` for Light, DB setting for UI). Dark palette and translated label lengths validated in Claude Design before implementation.
 - **v2**: pluggable adapter marketplace (community-contributed adapters for niche providers), Discord/Slack rich embeds, multi-recipient notification routing (different channels per provider severity) — available in both editions where applicable.
 
 ---
@@ -342,7 +384,11 @@ statuswatch/
 │   ├── core/                      (shared by both editions)
 │   │   ├── poller.ts
 │   │   ├── diffEngine.ts
-│   │   └── stateStore.interface.ts
+│   │   ├── stateStore.interface.ts
+│   │   └── i18n/                  (notification strings, edition-agnostic)
+│   │       ├── index.ts           (lookup + `en` fallback + Intl formatting)
+│   │       ├── en.json
+│   │       └── it.json
 │   ├── adapters/                  (shared)
 │   │   ├── statuspage.adapter.ts
 │   │   └── index.ts
@@ -363,8 +409,17 @@ statuswatch/
 │       ├── routes/
 │       │   ├── status.routes.ts
 │       │   ├── config.routes.ts
-│       │   └── history.routes.ts
+│       │   ├── history.routes.ts
+│       │   └── preferences.routes.ts  (theme + locale)
 │       ├── public/                (dashboard: HTML/CSS/JS, or built frontend)
+│       │   ├── css/
+│       │   │   └── tokens.css     (light + dark color tokens, single source)
+│       │   ├── js/
+│       │   │   ├── theme.js       (toggle, persistence, pre-paint init)
+│       │   │   └── i18n.js        (catalog loading, data-i18n application)
+│       │   └── locales/
+│       │       ├── en.json
+│       │       └── it.json
 │       └── healthcheck.ts
 ├── design/
 │   └── claude-design-prototypes/  (exported mockups/prototypes from Claude Design)
