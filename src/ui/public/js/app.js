@@ -152,16 +152,23 @@ function renderHeader() {
   dom.title.textContent = t(route.nav);
 
   const status = state.status;
-  dom.meta.textContent =
-    status === undefined
-      ? ""
-      : [
-          t("meta.watched", { count: status.providers.length }),
-          t("meta.interval", { minutes: status.pollIntervalMinutes }),
-          status.nextPollAt === null
-            ? t("meta.never-polled")
-            : t("meta.next-poll", { time: formatTime(status.nextPollAt) }),
-        ].join(" · ");
+  if (status === undefined) {
+    dom.meta.replaceChildren();
+  } else {
+    const scheduled = status.nextPollAt !== null;
+    const live = element("span", scheduled ? "meta-live-dot dot-pulse" : "meta-live-dot meta-live-dot-idle");
+    const nextChip = element(
+      "span",
+      "meta-chip",
+      scheduled ? t("meta.next-poll", { time: formatTime(status.nextPollAt) }) : t("meta.never-polled"),
+    );
+    nextChip.prepend(live);
+    dom.meta.replaceChildren(
+      element("span", "meta-chip", t("meta.watched", { count: status.providers.length })),
+      element("span", "meta-chip", t("meta.interval", { minutes: status.pollIntervalMinutes })),
+      nextChip,
+    );
+  }
 
   dom.themeLabel.textContent = t("theme.mode", { mode: t(`theme.${currentTheme()}`) });
   labelRailToggle();

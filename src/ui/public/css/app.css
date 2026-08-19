@@ -224,11 +224,39 @@
   margin: 0;
   font-size: 16px;
 }
+/* The meta line reads as three facts, so each fact gets its own quiet pill —
+   the same register as the language switch sitting across the bar. */
 .header-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--color-neutral-600);
+  line-height: 1.6;
+  padding: 1px 10px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 999px;
+  color: var(--color-neutral-500);
   white-space: nowrap;
+}
+/* The scheduler's heartbeat: green and pulsing while a next poll is booked. */
+.meta-live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--status-operational);
+  color: var(--status-operational);
+}
+.meta-live-dot-idle {
+  background: var(--color-neutral-600);
+  color: var(--color-neutral-600);
 }
 .header-actions {
   display: flex;
