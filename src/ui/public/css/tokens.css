@@ -1,0 +1,247 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   StatusWatch — colour, type, spacing and elevation tokens.
+
+   This is the ONLY file in the dashboard allowed to contain a colour literal;
+   a test enforces that. Everything else references var(--…).
+
+   Palette: Nocturne (design/claude-design-prototypes). Nocturne is a dark
+   system, and the prototype's own light mode reads the same tonal ramps from the
+   other end — no colour here was invented.
+
+   Structure follows the spec: the light palette on bare :root, overridden in
+   :root[data-theme="dark"] for an explicit choice, and mirrored under
+   prefers-color-scheme for "system". The three blocks declare identical token
+   sets, so no component can end up with a token that exists in one theme only.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --color-bg: #f3f5fe;
+  --color-surface: #e4e7f5;
+  --color-text: #292b31;
+  --color-divider: color-mix(in srgb, #292b31 18%, transparent);
+
+  --color-neutral-100: #161826;
+  --color-neutral-200: #292b31;
+  --color-neutral-300: #3f424d;
+  --color-neutral-400: #292b31;
+  --color-neutral-500: #3f424d;
+  --color-neutral-600: #595d6c;
+  --color-neutral-700: #b2b6ca;
+  --color-neutral-800: #cfd3e5;
+  --color-neutral-900: #f3f5fe;
+
+  --color-accent: #5d5294;
+  --color-accent-100: #2b2741;
+  --color-accent-200: #423a6a;
+  --color-accent-300: #5d5294;
+  --color-accent-400: #5d5294;
+  --color-accent-500: #796cbf;
+  --color-accent-600: #968ae0;
+  --color-accent-700: #b5abfc;
+  --color-accent-800: #d2cefd;
+  --color-accent-900: #e7e5fe;
+
+  /* Severity. Partial and major share a hue and are told apart by bar height
+     and label, exactly as the prototype draws them. */
+  --status-operational: #2f6b4f;
+  --status-degraded: #8a6420;
+  --status-partial-outage: #9c3f2a;
+  --status-major-outage: #9c3f2a;
+  --status-unknown: #cfd3e5;
+  --status-accent: #4a3f86;
+
+  --status-operational-tint: rgba(47, 107, 79, 0.1);
+  --status-degraded-tint: rgba(138, 100, 32, 0.12);
+  --status-outage-tint: rgba(156, 63, 42, 0.12);
+  --status-accent-tint: rgba(74, 63, 134, 0.12);
+
+  --status-operational-border: rgba(47, 107, 79, 0.35);
+  --status-degraded-border: rgba(138, 100, 32, 0.4);
+  --status-outage-border: rgba(156, 63, 42, 0.4);
+  --status-accent-border: rgba(74, 63, 134, 0.4);
+
+  --scrim: rgba(41, 43, 49, 0.55);
+
+  --shadow-sm: 0 0 0 1px #cfd3e5;
+  --shadow-md: 0 0 0 1px #cfd3e5, 0 6px 18px rgba(41, 43, 49, 0.12);
+  --shadow-lg: 0 0 0 1px #b2b6ca, 0 16px 40px rgba(41, 43, 49, 0.18);
+
+  --font-heading: "Inter", system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --space-1: 2.8px;
+  --space-2: 5.6px;
+  --space-3: 8.4px;
+  --space-4: 11.2px;
+  --space-6: 16.8px;
+  --space-8: 22.4px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  /* Uptime bar heights per severity — the prototype's own proportions. */
+  --bar-operational: 26px;
+  --bar-degraded: 19px;
+  --bar-partial-outage: 16px;
+  --bar-major-outage: 13px;
+  --bar-unknown: 26px;
+
+  --rail-width: 196px;
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #161826;
+  --color-surface: #232532;
+  --color-text: #e9e9ed;
+  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+
+  --color-neutral-100: #f3f5fe;
+  --color-neutral-200: #e4e7f5;
+  --color-neutral-300: #cfd3e5;
+  --color-neutral-400: #b2b6ca;
+  --color-neutral-500: #9397ab;
+  --color-neutral-600: #75798c;
+  --color-neutral-700: #595d6c;
+  --color-neutral-800: #3f424d;
+  --color-neutral-900: #292b31;
+
+  --color-accent: #9184d9;
+  --color-accent-100: #f5f4ff;
+  --color-accent-200: #e7e5fe;
+  --color-accent-300: #d2cefd;
+  --color-accent-400: #b5abfc;
+  --color-accent-500: #968ae0;
+  --color-accent-600: #796cbf;
+  --color-accent-700: #5d5294;
+  --color-accent-800: #423a6a;
+  --color-accent-900: #2b2741;
+
+  --status-operational: #56a37f;
+  --status-degraded: #d8a34a;
+  --status-partial-outage: #d2694f;
+  --status-major-outage: #d2694f;
+  --status-unknown: #2a2d3c;
+  --status-accent: #9184d9;
+
+  --status-operational-tint: rgba(86, 163, 122, 0.1);
+  --status-degraded-tint: rgba(216, 163, 74, 0.12);
+  --status-outage-tint: rgba(210, 105, 79, 0.12);
+  --status-accent-tint: rgba(145, 132, 217, 0.12);
+
+  --status-operational-border: rgba(86, 163, 122, 0.35);
+  --status-degraded-border: rgba(216, 163, 74, 0.4);
+  --status-outage-border: rgba(210, 105, 79, 0.4);
+  --status-accent-border: rgba(145, 132, 217, 0.4);
+
+  --scrim: rgba(10, 11, 18, 0.72);
+
+  --shadow-sm: 0 0 0 1px #3f424d;
+  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+
+  --font-heading: "Inter", system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --space-1: 2.8px;
+  --space-2: 5.6px;
+  --space-3: 8.4px;
+  --space-4: 11.2px;
+  --space-6: 16.8px;
+  --space-8: 22.4px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --bar-operational: 26px;
+  --bar-degraded: 19px;
+  --bar-partial-outage: 16px;
+  --bar-major-outage: 13px;
+  --bar-unknown: 26px;
+
+  --rail-width: 196px;
+}
+
+/* "System" is the default: no data-theme attribute is set, so the OS decides.
+   Guarded so an explicit light choice still wins on a dark desktop. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #161826;
+    --color-surface: #232532;
+    --color-text: #e9e9ed;
+    --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+
+    --color-neutral-100: #f3f5fe;
+    --color-neutral-200: #e4e7f5;
+    --color-neutral-300: #cfd3e5;
+    --color-neutral-400: #b2b6ca;
+    --color-neutral-500: #9397ab;
+    --color-neutral-600: #75798c;
+    --color-neutral-700: #595d6c;
+    --color-neutral-800: #3f424d;
+    --color-neutral-900: #292b31;
+
+    --color-accent: #9184d9;
+    --color-accent-100: #f5f4ff;
+    --color-accent-200: #e7e5fe;
+    --color-accent-300: #d2cefd;
+    --color-accent-400: #b5abfc;
+    --color-accent-500: #968ae0;
+    --color-accent-600: #796cbf;
+    --color-accent-700: #5d5294;
+    --color-accent-800: #423a6a;
+    --color-accent-900: #2b2741;
+
+    --status-operational: #56a37f;
+    --status-degraded: #d8a34a;
+    --status-partial-outage: #d2694f;
+    --status-major-outage: #d2694f;
+    --status-unknown: #2a2d3c;
+    --status-accent: #9184d9;
+
+    --status-operational-tint: rgba(86, 163, 122, 0.1);
+    --status-degraded-tint: rgba(216, 163, 74, 0.12);
+    --status-outage-tint: rgba(210, 105, 79, 0.12);
+    --status-accent-tint: rgba(145, 132, 217, 0.12);
+
+    --status-operational-border: rgba(86, 163, 122, 0.35);
+    --status-degraded-border: rgba(216, 163, 74, 0.4);
+    --status-outage-border: rgba(210, 105, 79, 0.4);
+    --status-accent-border: rgba(145, 132, 217, 0.4);
+
+    --scrim: rgba(10, 11, 18, 0.72);
+
+    --shadow-sm: 0 0 0 1px #3f424d;
+    --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+
+    --font-heading: "Inter", system-ui, sans-serif;
+    --font-heading-weight: 500;
+    --font-body: "Inter", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+    --space-1: 2.8px;
+    --space-2: 5.6px;
+    --space-3: 8.4px;
+    --space-4: 11.2px;
+    --space-6: 16.8px;
+    --space-8: 22.4px;
+
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 14px;
+
+    --bar-operational: 26px;
+    --bar-degraded: 19px;
+    --bar-partial-outage: 16px;
+    --bar-major-outage: 13px;
+    --bar-unknown: 26px;
+
+    --rail-width: 196px;
+  }
+}

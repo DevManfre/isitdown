@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StatusWatch</title>
+    <!--
+      Runs before the stylesheets paint anything: without it the page would show
+      the light palette for one frame on a dark desktop. "system" stamps nothing
+      and lets the media query decide.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("statuswatch.theme");
+          if (stored === "light" || stored === "dark") {
+            document.documentElement.setAttribute("data-theme", stored);
+          }
+          var lang = localStorage.getItem("statuswatch.uiLocale");
+          if (lang) document.documentElement.setAttribute("lang", lang);
+        } catch (error) {
+          /* a blocked localStorage just means the system theme is used */
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="./css/tokens.css" />
+    <link rel="stylesheet" href="./css/nocturne.css" />
+    <link rel="stylesheet" href="./css/app.css" />
+  </head>
+  <body>
+    <div class="console">
+      <nav class="rail" aria-label="Views">
+        <div class="rail-brand">
+          <span class="rail-dot"></span>
+          <span class="rail-name" data-i18n="app.name"></span>
+        </div>
+        <div id="rail-links"></div>
+        <div class="rail-foot">
+          <span class="rail-foot-title" data-i18n="nav.notifier"></span>
+          <div id="rail-channels"></div>
+        </div>
+      </nav>
+
+      <div class="main">
+        <header class="header">
+          <div class="header-title">
+            <h1 id="view-title"></h1>
+            <span class="header-meta" id="view-meta"></span>
+          </div>
+          <div class="header-actions">
+            <div class="lang-switch" id="lang-switch"></div>
+            <button class="btn theme-btn" id="theme-toggle" type="button">
+              <span class="theme-dot"></span><span id="theme-label"></span>
+            </button>
+            <button
+              class="btn btn-ghost"
+              id="add-service"
+              type="button"
+              data-i18n="action.add-service"
+            ></button>
+            <button
+              class="btn btn-primary"
+              id="poll-now"
+              type="button"
+              data-i18n="action.poll-now"
+            ></button>
+          </div>
+        </header>
+        <main class="view" id="view"></main>
+      </div>
+    </div>
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>
