@@ -1,6 +1,6 @@
 ---
 name: docker-edition-build
-description: Build, tag, run, and troubleshoot the StatusWatch Light and UI Docker editions (Dockerfile.light / Dockerfile.ui, docker-compose profiles). Use whenever the user wants to build or run either edition's container, debug a Docker build failure, change image tags, or asks about differences between the two editions' container setup.
+description: Build, tag, run, and troubleshoot the StatusWatch Light and UI Docker editions (one multi-stage Dockerfile with light/ui targets, docker-compose profiles). Use whenever the user wants to build or run either edition's container, debug a Docker build failure, change image tags, or asks about differences between the two editions' container setup.
 ---
 
 # Docker Edition Build
@@ -11,15 +11,20 @@ StatusWatch builds two separate images from one source tree: `statuswatch:light`
 
 ```bash
 # Light edition
-docker build -f Dockerfile.light -t statuswatch:light .
+docker build --target light -t statuswatch:light .
 
-# UI edition
-docker build -f Dockerfile.ui -t statuswatch:ui .
+# UI edition — its stage is FROM light, so this reuses every light layer
+docker build --target ui -t statuswatch:ui .
 
-# Both, via compose (profile-gated)
+# Both, via compose (profile-gated; each service selects its own target)
 docker compose --profile light build
 docker compose --profile ui build
 ```
+
+There is **one** `Dockerfile` with named stages (`builder`, `light`, `ui`), not a
+`Dockerfile.light` and a `Dockerfile.ui`. The `ui` stage starts `FROM light`, so
+the UI image is the Light image plus one thin layer — if a change to the light
+stage breaks, it breaks both editions, so rebuild and check both.
 
 ## Running
 
