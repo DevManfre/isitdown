@@ -13,8 +13,17 @@ import { applyTranslations, t } from "../i18n.js";
  * @param {{
  *   title: string,
  *   subtitle?: string,
- *   fields?: {name: string, label: string, value?: string, placeholder?: string, mono?: boolean, readOnly?: boolean}[],
- *   extra?: (dialog: HTMLElement) => void,
+ *   fields?: {
+ *     name?: string,
+ *     label: string,
+ *     value?: string,
+ *     placeholder?: string,
+ *     mono?: boolean,
+ *     readOnly?: boolean,
+ *     half?: boolean,
+ *     hint?: string,
+ *     render?: (field: HTMLElement) => void,
+ *   }[],
  *   confirmLabel: string,
  *   onConfirm: (values: Record<string, string>) => Promise<void> | void,
  * }} options
@@ -34,19 +43,32 @@ export function openModal(options) {
 
   /** @type {Record<string, HTMLInputElement>} */
   const inputs = {};
-  for (const field of options.fields ?? []) {
-    const wrap = element("div", "field");
-    wrap.append(element("label", undefined, field.label));
-    const input = /** @type {HTMLInputElement} */ (element("input", field.mono ? "input mono" : "input"));
-    input.value = field.value ?? "";
-    if (field.placeholder !== undefined) input.placeholder = field.placeholder;
-    if (field.readOnly === true) input.readOnly = true;
-    inputs[field.name] = input;
-    wrap.append(input);
-    dialog.append(wrap);
+  const fields = options.fields ?? [];
+  if (fields.length > 0) {
+    // Two columns, and a field takes the whole row unless it asks for a half.
+    const grid = element("div", "dialog-fields");
+    for (const field of fields) {
+      const wrap = element("div", field.half === true ? "field" : "field field-full");
+      wrap.append(element("label", undefined, field.label));
+      if (field.render !== undefined) {
+        // A field that draws its own control — a picker rather than an input —
+        // so it can sit in reading order with the rest instead of after them.
+        field.render(wrap);
+      } else {
+        const input = /** @type {HTMLInputElement} */ (element("input", field.mono ? "input mono" : "input"));
+        input.value = field.value ?? "";
+        if (field.placeholder !== undefined) input.placeholder = field.placeholder;
+        if (field.readOnly === true) input.readOnly = true;
+        inputs[field.name ?? ""] = input;
+        wrap.append(input);
+      }
+      if (field.hint !== undefined) {
+        wrap.append(element("span", "mono field-hint", field.hint));
+      }
+      grid.append(wrap);
+    }
+    dialog.append(grid);
   }
-
-  if (options.extra !== undefined) options.extra(dialog);
 
   const message = element("p", "muted");
   message.hidden = true;
@@ -77,7 +99,23 @@ export function openModal(options) {
     if (settled) return;
     settled = true;
     document.removeEventListener("keydown", onKeydown);
-    backdrop.remove();
+    // The node leaves when its closing animation ends, so the dialog is seen
+    // going. The timeout is the fallback for a tab that never animates.
+    backdrop.classList.add("is-closing");
+    const drop = () => {
+      backdrop.removeEventListener("animationend", onAnimationEnd);
+      backdrop.remove();
+    };
+    /**
+     * The dialog's own animation bubbles up here too, so the scrim's is picked
+     * out by target rather than by taking the first event that arrives.
+     * @param {AnimationEvent} event
+     */
+    function onAnimationEnd(event) {
+      if (event.target === backdrop) drop();
+    }
+    backdrop.addEventListener("animationend", onAnimationEnd);
+    setTimeout(drop, 400);
     previousFocus?.focus();
   };
 
