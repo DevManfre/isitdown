@@ -86,7 +86,12 @@ function renderRail() {
     link.type = "button";
     link.append(element("span", undefined, t(route.nav)));
     const badge = badgeFor(route.path);
-    if (badge !== undefined) link.append(element("span", "rail-badge", badge));
+    if (badge !== undefined) {
+      // The incidents count only appears when something is open, so it is the
+      // one badge that carries the alert tint.
+      const alert = route.path === "incidents" ? " rail-badge-alert" : "";
+      link.append(element("span", `rail-badge${alert}`, badge));
+    }
     if (route.path === state.route.path) link.setAttribute("aria-current", "page");
     link.addEventListener("click", () => navigate(`#/${route.path}`));
     dom.railLinks.append(link);
