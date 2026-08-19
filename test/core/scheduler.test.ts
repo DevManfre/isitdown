@@ -386,3 +386,22 @@ test("notifiers are rebuilt from the channels of each cycle, so enabling one nee
   ]);
   scheduler.stop();
 });
+
+test("two sequential manual polls each run a cycle", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const poller = fakePoller();
+  const scheduler = createScheduler({
+    configSource: fakeConfigSource(),
+    poller,
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    random: noJitter,
+  });
+
+  await scheduler.triggerNow();
+  await scheduler.triggerNow();
+  await scheduler.triggerNow();
+  assert.equal(poller.calls, 3, "a finished cycle must not be handed back to the next caller");
+  scheduler.stop();
+});
