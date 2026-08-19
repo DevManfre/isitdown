@@ -43,16 +43,32 @@ export async function renderProviders(container, state) {
   const summary = await api.getHistory(RANGE_DAYS);
   const byId = new Map(summary.providers.map((entry) => [entry.providerId, entry]));
   const all = state.status?.providers ?? [];
-  const providers = showIssuesOnly
-    ? all.filter((provider) => provider.overallStatus !== "operational")
-    : all;
 
-  container.append(headerRow());
-  container.append(providers.length === 0 ? element("p", "empty", t("providers.empty")) : table(providers, byId, state));
+  // The filter is client-side, so a toggle swaps only the list below it: the
+  // pills stay mounted and their accent outline transitions instead of
+  // snapping through a full re-render.
+  let list = listFor(all, byId, state);
+  container.append(
+    headerRow(() => {
+      const next = listFor(all, byId, state);
+      list.replaceWith(next);
+      list = next;
+    }),
+  );
+  container.append(list);
   container.append(addHint());
 }
 
-function headerRow() {
+function listFor(all, byId, state) {
+  const providers = showIssuesOnly
+    ? all.filter((provider) => provider.overallStatus !== "operational")
+    : all;
+  return providers.length === 0
+    ? element("p", "empty", t("providers.empty"))
+    : table(providers, byId, state);
+}
+
+function headerRow(onToggle) {
   const row = element("div", "row-between");
   row.append(element("span", "muted", t("providers.intro")));
 
@@ -65,8 +81,12 @@ function headerRow() {
     option.type = "button";
     option.setAttribute("aria-pressed", String(showIssuesOnly === issuesOnly));
     option.addEventListener("click", () => {
+      if (showIssuesOnly === issuesOnly) return;
       showIssuesOnly = issuesOnly;
-      void refresh();
+      for (const sibling of seg.children) {
+        sibling.setAttribute("aria-pressed", String(sibling === option));
+      }
+      onToggle();
     });
     seg.append(option);
   }
