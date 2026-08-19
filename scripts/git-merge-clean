@@ -122,7 +122,7 @@ guard_excluded() {
   done
   if [ "$bad" -eq 1 ]; then
     echo >&2
-    echo "These paths are listed in .mergeexclude and must not live on this branch." >&2
+    echo "These paths are listed in $(basename "$list") and must not live on this branch." >&2
     echo "Merge with 'git mergeclean <branch>' instead of 'git merge <branch>'." >&2
     echo "To override once: git commit --no-verify" >&2
     return 1
