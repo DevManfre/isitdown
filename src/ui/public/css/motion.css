@@ -83,6 +83,24 @@
     transform: none;
   }
 }
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes modal-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
 /* The ring expands in the dot's own colour: currentColor, set beside background. */
 @keyframes pulse {
   0% {
@@ -166,6 +184,16 @@
 .dialog {
   animation: modal-in 0.42s var(--ease-out) 40ms both;
 }
+/* Closing runs the entry in reverse and faster: leaving should not be a wait.
+   modal.js adds the class, then drops the node when this animation ends. */
+.dialog-backdrop.is-closing {
+  animation: fade-out 0.22s ease both;
+  pointer-events: none;
+}
+.dialog-backdrop.is-closing .dialog {
+  animation: modal-out 0.22s ease both;
+}
+
 /* — rail — */
 /* Hovering nudges the label 4px further in, pressing settles at 2px. */
 .rail-link {

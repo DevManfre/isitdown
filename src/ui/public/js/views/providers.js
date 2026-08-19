@@ -203,30 +203,35 @@ export function openAddServiceDialog() {
     subtitle: t("add.subtitle"),
     confirmLabel: t("action.add"),
     fields: [
-      { name: "name", label: t("field.name"), placeholder: "Vercel" },
-      { name: "id", label: t("field.id"), placeholder: "vercel", mono: true },
-      { name: "baseUrl", label: t("field.base-url"), placeholder: "https://www.vercel-status.com", mono: true },
-    ],
-    extra: (dialog) => {
-      const wrap = element("div", "field");
-      wrap.append(element("label", undefined, t("field.adapter")));
-      const seg = element("div", "seg");
-      for (const option of ["statuspage", "custom"]) {
-        const choice = element("button", "seg-opt mono", option);
-        choice.type = "button";
-        choice.setAttribute("aria-pressed", String(option === adapter));
-        choice.addEventListener("click", () => {
-          adapter = option;
-          for (const sibling of seg.children) {
-            sibling.setAttribute("aria-pressed", String(sibling.textContent === adapter));
+      { name: "name", label: t("field.name"), placeholder: "Vercel", half: true },
+      { name: "id", label: t("field.id"), placeholder: "vercel", mono: true, half: true },
+      {
+        label: t("field.adapter"),
+        render: (wrap) => {
+          const seg = element("div", "seg seg-pills");
+          for (const option of ["statuspage", "custom"]) {
+            const choice = element("button", "seg-opt mono", option);
+            choice.type = "button";
+            choice.setAttribute("aria-pressed", String(option === adapter));
+            choice.addEventListener("click", () => {
+              adapter = option;
+              for (const sibling of seg.children) {
+                sibling.setAttribute("aria-pressed", String(sibling.textContent === adapter));
+              }
+            });
+            seg.append(choice);
           }
-        });
-        seg.append(choice);
-      }
-      wrap.append(seg);
-      wrap.append(element("span", "mono muted", t("add.note")));
-      dialog.append(wrap);
-    },
+          wrap.append(seg);
+        },
+      },
+      {
+        name: "baseUrl",
+        label: t("field.base-url"),
+        placeholder: "https://www.vercel-status.com",
+        mono: true,
+        hint: t("add.note"),
+      },
+    ],
     onConfirm: async (values) => {
       await api.addService({ ...values, adapter, enabled: true });
       const result = await api.testService(values.id);
