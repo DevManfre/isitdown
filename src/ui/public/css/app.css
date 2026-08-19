@@ -100,7 +100,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-6);
-  padding: var(--space-4) 28px;
+  padding: 14px 28px;
   border-bottom: 1px solid var(--color-divider);
   flex-wrap: wrap;
 }
@@ -175,16 +175,39 @@
   display: inline-block;
 }
 
+/* Each view sets its own rhythm in the prototype, so the gap is per route. */
 .view {
-  padding: var(--space-8) 28px 28px;
+  padding: 22px 28px 28px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: 18px;
   min-width: 0;
+}
+.view-incidents {
+  gap: 20px;
+}
+.view-history {
+  gap: 22px;
+}
+.view-incident {
+  padding-top: 20px;
+  gap: 22px;
 }
 .view-hero {
   background: radial-gradient(110% 70% at 8% 0%, var(--color-accent-900), transparent 60%);
   padding: 32px 28px 26px;
+}
+/* The overview drops the view padding: its hero bleeds to the edges. */
+.overview-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 28px 30px;
+}
+.overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
 }
 
 /* — shared pieces — */
@@ -197,6 +220,11 @@
 }
 .kicker-accent {
   color: var(--color-accent-400);
+}
+/* The overview's own kicker is set wider and one step larger than the rest. */
+.kicker-hero {
+  font-size: 11px;
+  letter-spacing: 0.2em;
 }
 .fade-rule {
   height: 1px;
@@ -234,6 +262,42 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+/* Column rhythms the prototype sets by hand, view by view. */
+.hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.settings-column {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.settings-channels {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.settings-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.detail-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.detail-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
 .muted {
   color: var(--color-neutral-500);
   font-size: 12.5px;
@@ -258,6 +322,12 @@
   gap: 22px;
   align-items: start;
 }
+.grid-incidents {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
 .panel {
   border: 1px solid var(--color-neutral-800);
   border-radius: var(--radius-md);
@@ -271,6 +341,64 @@
   border-color: var(--color-accent-800);
   background: var(--color-accent-900);
 }
+/* A notification channel card sits tighter than a content panel. */
+.panel-channel {
+  padding: 13px 15px;
+  gap: 10px;
+}
+
+/* — segmented controls — */
+/* The prototype never draws the design system's boxed segment: its filters and
+   pickers are loose pills, the chosen one outlined in the accent. */
+.seg-pills {
+  border: 0;
+  gap: 4px;
+  overflow: visible;
+}
+.seg-pills .seg-opt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-neutral-500);
+}
+.seg-pills .seg-opt + .seg-opt {
+  border-left: 1px solid transparent;
+}
+/* Specific enough to beat the design system's own neutral hover wash. */
+.seg-pills .seg-opt:not([aria-pressed="true"]):hover {
+  background: transparent;
+  color: var(--color-text);
+}
+.seg-pills .seg-opt[aria-pressed="true"] {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: none;
+}
+.seg-pills .seg-opt[aria-pressed="true"]:hover {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+/* — providers table — */
+/* The prototype tints a hovered provider row with the accent rather than with
+   the design system's neutral wash; the row rule keeps painting underneath. */
+.table tbody tr:hover {
+  background:
+    linear-gradient(
+        color-mix(in srgb, var(--color-accent) 7%, transparent),
+        color-mix(in srgb, var(--color-accent) 7%, transparent)
+      )
+      no-repeat 0 0 / 100% 100%,
+    linear-gradient(
+        to right,
+        transparent,
+        color-mix(in srgb, var(--color-text) 8%, transparent) 48px,
+        color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 48px),
+        transparent
+      )
+      no-repeat bottom / 100% 1px;
+}
 
 /* — charts — */
 .bar-row {
@@ -283,6 +411,15 @@
   flex: 1;
   min-width: 1px;
   border-radius: 1.5px;
+}
+/* The overview's signal wall: shorter bars, centred in a lower row. */
+.bar-row-compact {
+  height: 22px;
+  align-items: center;
+}
+.bar-row-compact .bar {
+  border-radius: 1px;
+  opacity: 0.92;
 }
 .bar-strip {
   display: flex;
@@ -357,13 +494,13 @@
   font-size: 44px;
   line-height: 1.03;
   letter-spacing: -0.03em;
-  max-width: 14ch;
+  max-width: 12ch;
 }
 .hero-body {
   margin: 0;
   font-size: 13.5px;
   color: var(--color-neutral-400);
-  max-width: 46ch;
+  max-width: 44ch;
   text-wrap: pretty;
 }
 
@@ -403,7 +540,7 @@
 }
 .timeline-entry {
   display: grid;
-  grid-template-columns: 68px 1fr;
+  grid-template-columns: 62px 1fr;
   gap: 14px;
   align-items: baseline;
   border-top: 1px solid var(--color-divider);
@@ -415,6 +552,15 @@
   gap: 20px;
   align-items: center;
 }
+/* The closed list is a stack of rules, so the rows carry no gap of their own. */
+.incident-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.incident-list > .kicker {
+  padding-bottom: 6px;
+}
 .incident-row {
   display: grid;
   grid-template-columns: 132px 1fr auto;
@@ -422,6 +568,9 @@
   align-items: baseline;
   padding: 11px 2px;
   border-top: 1px solid var(--color-divider);
+}
+.incident-row:hover {
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
 }
 .settings-grid {
   display: grid;
@@ -484,6 +633,7 @@
   }
   .grid-two,
   .grid-detail,
+  .grid-incidents,
   .settings-grid {
     grid-template-columns: 1fr;
     gap: var(--space-6);

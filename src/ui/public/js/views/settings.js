@@ -10,7 +10,7 @@
  */
 
 import * as api from "../api.js";
-import { element } from "../charts.js";
+import { animate, element, stagger } from "../charts.js";
 import { t } from "../i18n.js";
 import { refresh } from "../app.js";
 import { editButton, removeButton, openAddServiceDialog } from "./providers.js";
@@ -23,9 +23,9 @@ export async function renderSettings(container, state) {
 }
 
 function leftColumn(config, state) {
-  const column = element("div", "stack");
+  const column = element("div", "settings-column");
 
-  const polling = element("div", "stack-tight");
+  const polling = element("div", "settings-block");
   polling.append(element("span", "kicker", t("settings.polling")));
 
   const fields = element("div", "settings-fields");
@@ -71,7 +71,7 @@ function leftColumn(config, state) {
   polling.append(saveRow);
   column.append(polling);
 
-  const services = element("div", "stack-tight");
+  const services = element("div", "settings-block");
   const head = element("div", "row-between");
   head.append(element("span", "kicker", t("settings.services")));
   const add = element("button", "btn btn-ghost", t("action.add-service"));
@@ -81,8 +81,8 @@ function leftColumn(config, state) {
   services.append(head);
 
   const known = new Map((state.status?.providers ?? []).map((provider) => [provider.id, provider]));
-  for (const service of config.services) {
-    const row = element("div", "service-row");
+  config.services.forEach((service, index) => {
+    const row = animate(element("div", "service-row"), "anim-rise anim-rise-row", stagger(index, 60));
     const left = element("div", "row-between");
     left.style.justifyContent = "flex-start";
     left.style.gap = "10px";
@@ -97,24 +97,24 @@ function leftColumn(config, state) {
     actions.append(editButton(known.get(service.id) ?? service), removeButton(service));
     row.append(left, actions);
     services.append(row);
-  }
+  });
   column.append(services);
   return column;
 }
 
 function rightColumn(config) {
-  const column = element("div", "stack");
+  const column = element("div", "settings-channels");
   column.append(element("span", "kicker", t("settings.channels")));
   column.append(element("span", "muted", t("settings.secret-note")));
 
-  for (const channel of config.channels) {
-    column.append(channelCard(channel));
-  }
+  config.channels.forEach((channel, index) => {
+    column.append(channelCard(channel, stagger(index, 90, 40)));
+  });
   return column;
 }
 
-function channelCard(channel) {
-  const card = element("div", "panel");
+function channelCard(channel, delay) {
+  const card = animate(element("div", "panel panel-channel"), "anim-rise", delay);
 
   const head = element("div", "row-between");
   const left = element("div", "row-between");

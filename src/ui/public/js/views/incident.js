@@ -9,7 +9,7 @@
  */
 
 import * as api from "../api.js";
-import { element, pollStrip, statusDot } from "../charts.js";
+import { animate, element, pollStrip, stagger, statusDot } from "../charts.js";
 import { formatDateTime, formatDuration, formatTime, t } from "../i18n.js";
 import { navigate } from "../app.js";
 import { impactKey, incidentStatusKey, impactColor, nameLookup } from "./incidents.js";
@@ -34,7 +34,7 @@ export async function renderIncident(container, state) {
 }
 
 function backLink() {
-  const link = element("button", "btn btn-ghost mono", `← ${t("action.back")}`);
+  const link = element("button", "btn btn-ghost mono back-link", `← ${t("action.back")}`);
   link.type = "button";
   link.style.width = "fit-content";
   link.style.padding = "2px 0";
@@ -46,7 +46,8 @@ function heading(detail, providerName) {
   const wrap = element("div", "row-between");
   const left = element("div", "stack-tight");
 
-  const kickerRow = element("div", "header-actions");
+  // The header enters top down: severity chip, headline, elapsed line, actions.
+  const kickerRow = animate(element("div", "header-actions"), "anim-rise", "40ms");
   const kicker = element("span", "kicker", t("incident.kicker"));
   kicker.style.color = impactColor(detail.incident.impact);
   const severity = element("span", "mono", t(impactKey(detail.incident.impact)));
@@ -59,7 +60,7 @@ function heading(detail, providerName) {
   kickerRow.append(kicker, severity, element("span", "mono muted", detail.incident.incidentId));
   left.append(kickerRow);
 
-  const title = element("h2");
+  const title = animate(element("h2"), "anim-rise anim-rise-hero", "100ms");
   title.style.margin = "0";
   title.style.fontSize = "32px";
   title.style.letterSpacing = "-0.025em";
@@ -74,10 +75,14 @@ function heading(detail, providerName) {
           duration: durationBetween(detail.incident.startedAt, detail.incident.resolvedAt),
         });
   left.append(
-    element("span", "mono muted", `${providerName(detail.incident.providerId)} · ${elapsed}`),
+    animate(
+      element("span", "mono muted", `${providerName(detail.incident.providerId)} · ${elapsed}`),
+      "anim-rise anim-rise-hero",
+      "160ms",
+    ),
   );
 
-  const actions = element("div", "header-actions");
+  const actions = animate(element("div", "header-actions"), "anim-rise anim-rise-column", "200ms");
   const copy = element("button", "btn btn-ghost mono", t("action.copy-payload"));
   copy.type = "button";
   copy.addEventListener("click", async () => {
@@ -95,30 +100,36 @@ function stepper(incident) {
   const reached = incident.resolvedAt === null ? STEPS.indexOf(incident.status) : STEPS.length - 1;
 
   STEPS.forEach((step, index) => {
-    const entry = element("div", "step");
+    const delay = stagger(index, 90);
+    const entry = animate(element("div", "step"), "anim-fade", delay);
     const dot = element("span", "dot");
     dot.style.width = "9px";
     dot.style.height = "9px";
     const active = index <= reached;
     dot.style.background = active ? impactColor(incident.impact) : "var(--color-neutral-800)";
+    // The step the incident is sitting on keeps pulsing while it is open.
+    if (index === reached && incident.resolvedAt === null) {
+      dot.style.color = impactColor(incident.impact);
+      dot.classList.add("dot-pulse");
+    }
 
     const label = element("span", "mono", t(incidentStatusKey(step)));
     label.style.fontSize = "11px";
     label.style.color = active ? impactColor(incident.impact) : "var(--color-neutral-600)";
     label.style.fontWeight = index === reached ? "500" : "400";
 
-    entry.append(dot, label, element("span", "step-line"));
+    entry.append(dot, label, animate(element("span", "step-line"), "anim-sweep anim-sweep-step", delay));
     wrap.append(entry);
   });
   return wrap;
 }
 
 function leftColumn(detail) {
-  const column = element("div", "stack");
+  const column = element("div", "detail-column");
   column.append(element("span", "kicker", t("incident.timeline")));
 
-  for (const entry of detail.timeline) {
-    const row = element("div", "timeline-entry");
+  detail.timeline.forEach((entry, index) => {
+    const row = animate(element("div", "timeline-entry"), "anim-rise", stagger(index, 90, 80));
     row.append(element("span", "mono muted", formatTime(entry.at)));
     const body = element("div", "stack-tight");
     body.append(element("span", "kicker", t(`incident.timeline.${entry.label}`)));
@@ -127,7 +138,7 @@ function leftColumn(detail) {
     }
     row.append(body);
     column.append(row);
-  }
+  });
 
   const log = element("div", "stack-tight");
   log.append(element("span", "kicker kicker-accent", t("incident.what-we-did")));
@@ -135,8 +146,8 @@ function leftColumn(detail) {
   if (detail.actionLog.length === 0) {
     panel.append(element("p", "empty", t("incidents.empty-notifications")));
   } else {
-    for (const record of detail.actionLog) {
-      const row = element("div");
+    detail.actionLog.forEach((record, index) => {
+      const row = animate(element("div"), "anim-fade", stagger(index, 80, 120));
       row.style.display = "grid";
       row.style.gridTemplateColumns = "70px 1fr";
       row.style.gap = "12px";
@@ -147,7 +158,7 @@ function leftColumn(detail) {
       line.textContent = `${record.channel}: ${record.text.split("\n")[0]}${record.ok ? "" : ` — ${record.error}`}`;
       row.append(line);
       panel.append(row);
-    }
+    });
   }
   log.append(panel);
   column.append(log);
@@ -155,15 +166,19 @@ function leftColumn(detail) {
 }
 
 function rightColumn(detail, providerName) {
-  const column = element("div", "stack");
+  const column = element("div", "detail-side");
 
   const others = element("div", "stack-tight");
   others.append(element("span", "kicker", t("incident.other-active")));
   if (detail.otherActiveIncidents.length === 0) {
     others.append(element("p", "empty", t("incident.no-other-active")));
   } else {
-    for (const other of detail.otherActiveIncidents) {
-      const row = element("div", "service-row");
+    detail.otherActiveIncidents.forEach((other, index) => {
+      const row = animate(
+        element("div", "service-row"),
+        "anim-rise anim-rise-row",
+        stagger(index, 70, 60),
+      );
       const left = element("div", "row-between");
       left.style.justifyContent = "flex-start";
       left.style.gap = "9px";
@@ -177,7 +192,7 @@ function rightColumn(detail, providerName) {
         navigate(`#/incidents/${other.providerId}/${other.incidentId}`),
       );
       others.append(row);
-    }
+    });
   }
   column.append(others);
 
@@ -199,7 +214,7 @@ function rightColumn(detail, providerName) {
 
   const meta = element("div", "stack-tight");
   meta.append(element("span", "kicker", t("column.status")));
-  const row = element("div", "service-row");
+  const row = animate(element("div", "service-row"), "anim-rise anim-rise-row", "200ms");
   row.append(
     element("span", undefined, t(incidentStatusKey(detail.incident.status))),
     element("span", "mono muted", formatDateTime(detail.incident.updatedAt)),
