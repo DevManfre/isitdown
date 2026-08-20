@@ -1,5 +1,9 @@
+import type { Adapter } from "../core/adapter.interface.ts";
+import type { ConfigSource, PollingConfig, ServiceDefinition } from "../core/configSource.interface.ts";
 import type { HistoricalIncident, OverallStatus } from "../core/types.ts";
+import type { Logger } from "../core/logger.ts";
 import type { SampleRow } from "./historyStore.interface.ts";
+import type { HistoryStore } from "./historyStore.interface.ts";
 
 /** How far back the bars can possibly reach; the 90-day view is the widest. */
 export const BACKFILL_DAYS = 90;
@@ -65,4 +69,85 @@ export function deriveSamples(
     });
   }
   return samples;
+}
+
+const DAY_MS = 24 * 3600 * 1000;
+
+export interface BackfillService {
+  backfillAll(): Promise<void>;
+  backfillOne(serviceId: string): Promise<void>;
+}
+
+export interface BackfillDeps {
+  getAdapter: (id: string) => Adapter;
+  store: Pick<HistoryStore, "getEarliestSampleTime" | "applyBackfill">;
+  configSource: ConfigSource;
+  logger: Logger;
+  /** Injected so the window does not depend on when a test runs. */
+  now?: (() => Date) | undefined;
+}
+
+/**
+ * Reconstructs history from each provider's public incident feed. It writes
+ * only through `applyBackfill` — never `saveStatus` — so `provider_state` stays
+ * null and the first real poll remains a baseline: no notification can come out
+ * of reconstructed history. A failure here costs nothing but an emptier chart,
+ * so every error is a warning, never a crash.
+ */
+export function createBackfillService(deps: BackfillDeps): BackfillService {
+  const now = deps.now ?? (() => new Date());
+
+  async function backfillProvider(service: ServiceDefinition, polling: PollingConfig): Promise<void> {
+    const adapter = deps.getAdapter(service.adapter);
+    if (adapter.fetchIncidentHistory === undefined) return;
+
+    const from = new Date(now().getTime() - BACKFILL_DAYS * DAY_MS).toISOString();
+    const to = (await deps.store.getEarliestSampleTime(service.id)) ?? now().toISOString();
+    if (to <= from) return; // already backfilled, or 90 days of real samples exist
+
+    const history = await adapter.fetchIncidentHistory(
+      { id: service.id, name: service.name, baseUrl: service.baseUrl, options: service.options },
+      { timeoutMs: polling.requestTimeoutSeconds * 1000 },
+    );
+    const samples = deriveSamples(
+      history.incidents,
+      history.coverageStart,
+      from,
+      to,
+      polling.intervalMinutes,
+    );
+    await deps.store.applyBackfill(service.id, { samples, incidents: history.incidents });
+    deps.logger.info("history backfilled", {
+      providerId: service.id,
+      samples: samples.length,
+      incidents: history.incidents.length,
+      coverageStart: history.coverageStart ?? from,
+    });
+  }
+
+  async function attempt(service: ServiceDefinition, polling: PollingConfig): Promise<void> {
+    try {
+      await backfillProvider(service, polling);
+    } catch (error) {
+      deps.logger.warn("history backfill failed", {
+        providerId: service.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return {
+    async backfillAll(): Promise<void> {
+      const config = await deps.configSource.load();
+      // Sequential on purpose: this is a boot-time nicety, not a poll cycle.
+      for (const service of config.services) await attempt(service, config.polling);
+    },
+
+    async backfillOne(serviceId: string): Promise<void> {
+      const config = await deps.configSource.load();
+      const service = config.services.find((entry) => entry.id === serviceId);
+      if (service === undefined) return; // unknown or disabled: nothing to do
+      await attempt(service, config.polling);
+    },
+  };
 }
