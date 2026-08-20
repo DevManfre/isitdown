@@ -27,6 +27,12 @@ import { applyTranslations, t } from "../i18n.js";
  *   confirmLabel: string,
  *   onConfirm: (values: Record<string, string>) => Promise<void> | void,
  * }} options
+ * @returns {{
+ *   close: () => void,
+ *   dialog: HTMLElement,
+ *   message: HTMLElement,
+ *   inputs: Record<string, HTMLInputElement>,
+ * }}
  */
 export function openModal(options) {
   const previousFocus = /** @type {HTMLElement | null} */ (document.activeElement);
@@ -88,9 +94,15 @@ export function openModal(options) {
   document.body.append(backdrop);
   applyTranslations(dialog);
 
+  // `offsetParent === null` catches anything not laid out — a `hidden`
+  // attribute on the node itself (the component picker's search filter hides
+  // rows this way) or on an ancestor, and a `display: none` rule reaching in
+  // from CSS — without needing a jsdom-free environment to special-case
+  // `hidden` by name. A `position: fixed` element would also read as having
+  // no offset parent, but nothing in this dialog is positioned that way.
   const focusable = () =>
     /** @type {HTMLElement[]} */ ([...dialog.querySelectorAll("input, button")]).filter(
-      (node) => !(/** @type {HTMLInputElement} */ (node).disabled),
+      (node) => !(/** @type {HTMLInputElement} */ (node).disabled) && node.offsetParent !== null,
     );
   focusable()[0]?.focus();
 
@@ -162,7 +174,7 @@ export function openModal(options) {
     }
   });
 
-  return { close, dialog, message };
+  return { close, dialog, message, inputs };
 }
 
 /** A yes/no dialog for an action that destroys data. */

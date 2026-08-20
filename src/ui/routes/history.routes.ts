@@ -24,6 +24,29 @@ function parseDays(raw: unknown): number | null {
 export function historyRoutes(runtime: UiRuntimeCore): Router {
   const router = Router();
 
+  router.get("/history/components", async (req, res) => {
+    const days = parseDays(req.query["days"] ?? undefined);
+    if (days === null) {
+      res.status(400).json({ error: { message: `days must be one of ${ALLOWED_DAYS.join(", ")}` } });
+      return;
+    }
+    const provider = req.query["provider"];
+    if (typeof provider !== "string" || provider === "") {
+      res.status(400).json({ error: { message: "provider is required" } });
+      return;
+    }
+    const service = runtime.listAllServices().find((entry) => entry.id === provider);
+    if (service === undefined) {
+      res.status(404).json({ error: { message: `unknown provider: ${provider}` } });
+      return;
+    }
+    res.json({
+      provider,
+      days,
+      components: await runtime.history.getComponentHistories(provider, service.components, days),
+    });
+  });
+
   router.get("/history", async (req, res) => {
     const days = parseDays(req.query["days"] ?? undefined);
     if (days === null) {

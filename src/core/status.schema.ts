@@ -14,10 +14,17 @@ export const incidentSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const componentStatusSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: z.enum(["operational", "degraded", "partial_outage", "major_outage", "unknown"]),
+});
+
 export const normalizedStatusSchema = z.object({
   provider: z.string(),
   overallStatus: z.enum(["operational", "degraded", "partial_outage", "major_outage", "unknown"]),
   activeIncidents: z.array(incidentSchema),
+  components: z.array(componentStatusSchema).default([]),
   fetchedAt: z.string(),
 });
 

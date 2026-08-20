@@ -27,6 +27,17 @@ export interface ProviderHistory {
   downtimeMinutes: number;
 }
 
+export interface ComponentHistory {
+  componentId: string;
+  name: string;
+  /** Exactly `days` entries, oldest first, gap-filled `unknown`. */
+  buckets: HistoryBucket[];
+  uptime7: number;
+  uptime30: number;
+  uptime90: number;
+  sampleCount: number;
+}
+
 export interface HistorySummary {
   aggregateUptime: number;
   /** `uptime` is null for a month with no samples: 0% would read as an outage. */
@@ -109,6 +120,34 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     };
   }
 
+  async function getComponentHistories(
+    providerId: string,
+    selection: { id: string; name: string }[],
+    days: number,
+  ): Promise<ComponentHistory[]> {
+    const today = now();
+    const from = dayKey(new Date(today.getTime() - (days - 1) * DAY_MS));
+    return Promise.all(
+      selection.map(async ({ id, name }) => {
+        const buckets = await store.getComponentDailyBuckets(providerId, id, WINDOW_DAYS);
+        let sampleCount = 0;
+        for (const bucket of buckets) {
+          if (bucket.day < from) continue;
+          sampleCount += bucket.totalSamples;
+        }
+        return {
+          componentId: id,
+          name,
+          buckets: fill(buckets, days, today),
+          uptime7: uptimeOver(buckets, 7, today),
+          uptime30: uptimeOver(buckets, 30, today),
+          uptime90: uptimeOver(buckets, 90, today),
+          sampleCount,
+        };
+      }),
+    );
+  }
+
   async function getSummary(days: number, intervalMinutes: number): Promise<HistorySummary> {
     const today = now();
     const providerIds = await store.listProviderIds();
@@ -149,7 +188,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     };
   }
 
-  return { getProviderHistory, getSummary };
+  return { getProviderHistory, getComponentHistories, getSummary };
 }
 
 const uptimeKey = (provider: ProviderHistory, days: number): number =>

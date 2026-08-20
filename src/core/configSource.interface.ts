@@ -14,6 +14,7 @@ export interface ServiceDefinition {
   baseUrl: string;
   enabled: boolean;
   options?: Record<string, string> | undefined;
+  components: { id: string; name: string }[];
 }
 
 export interface ChannelConfig {

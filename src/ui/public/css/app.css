@@ -757,6 +757,38 @@
   font: 500 32px var(--font-mono);
 }
 
+/* Selected components under a provider's own strip: dot + name held to a
+   fixed column so the strip and the figure line up row over row, whatever
+   the component name's length. */
+.component-rows {
+  gap: 10px;
+}
+.component-row {
+  gap: 12px;
+}
+.component-row-name {
+  width: 168px;
+  flex: none;
+  min-width: 0;
+}
+.component-row-name-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.component-row .bar-strip {
+  flex: 1;
+}
+.component-row-figure {
+  width: 96px;
+  flex: none;
+  text-align: right;
+  font-size: 12.5px;
+}
+
 /* — timeline / stepper — */
 .stepper {
   display: flex;
@@ -872,6 +904,112 @@
   border-radius: var(--radius-md);
   padding: 14px 18px;
 }
+
+/* — component picker (add/edit service dialog) — */
+.component-picker-search {
+  position: relative;
+}
+.component-picker-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 11px;
+  color: var(--color-neutral-600);
+  pointer-events: none;
+}
+.component-picker-search-input {
+  padding-left: 30px;
+  font-size: 13px;
+}
+.component-picker-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  max-height: 216px;
+  overflow-y: auto;
+}
+.component-picker-group-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  cursor: pointer;
+  list-style: none;
+}
+.component-picker-group-summary::-webkit-details-marker {
+  display: none;
+}
+.component-picker-chevron {
+  flex: none;
+  transform: rotate(-90deg);
+  transition: transform 0.18s ease;
+}
+.component-picker-group[open] > .component-picker-group-summary .component-picker-chevron {
+  transform: rotate(0deg);
+}
+.component-picker-group-name {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.component-picker-group-count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+}
+.component-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px 7px 28px;
+  cursor: pointer;
+}
+.component-picker-row-name {
+  font-size: 13.5px;
+}
+.component-picker-check {
+  position: relative;
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.component-picker-checkbox {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  width: 15px;
+  height: 15px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--color-text) 30%, transparent);
+  background: transparent;
+  cursor: pointer;
+}
+.component-picker-checkbox:checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.component-picker-check-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  color: var(--color-bg);
+  opacity: 0;
+  pointer-events: none;
+}
+.component-picker-checkbox:checked + .component-picker-check-icon {
+  opacity: 1;
+}
+/* Author `display` rules above win over the user-agent's `[hidden] { display:
+   none }` regardless of specificity — cascade origin beats it. Restore it
+   explicitly for the two elements here that get toggled via `.hidden`. */
+.component-picker-list[hidden],
+.component-picker-row[hidden] {
+  display: none;
+}
+
 .toast {
   position: fixed;
   right: 20px;

@@ -4,6 +4,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer, type Server } from "node:http";
+import { readFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { buildUiRuntime, type UiRuntime } from "../../src/ui/runtime.ts";
 import { createLogger } from "../../src/core/logger.ts";
@@ -54,6 +55,25 @@ async function fakeProvider(indicator = "none"): Promise<{ baseUrl: string; clos
     } else if (req.url === "/api/v2/incidents.json") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ incidents: [] }));
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  return {
+    baseUrl: `http://127.0.0.1:${port}`,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
+
+async function fakeComponentsProvider(): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  const fixture = readFileSync(new URL("../fixtures/statuspage/components-mixed.json", import.meta.url), "utf8");
+  const server = createServer((req, res) => {
+    if (req.url === "/api/v2/summary.json") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(fixture);
     } else {
       res.writeHead(404);
       res.end();
@@ -179,6 +199,7 @@ test("deleting a service removes it and its history", async () => {
       provider: "github",
       overallStatus: "operational",
       activeIncidents: [],
+      components: [],
       fetchedAt: new Date().toISOString(),
     });
     assert.equal((await app.runtime.store.getRecentSamples("github", 5)).length, 1);
@@ -368,6 +389,56 @@ test("testing a channel whose variable is unset reports why", async () => {
     const result = body as { ok: boolean; error: string };
     assert.equal(result.ok, false);
     assert.match(result.error, /WEBHOOK_URL/);
+  } finally {
+    await app.close();
+  }
+});
+
+test("preview-components lists a statuspage provider's components", async () => {
+  const provider = await fakeComponentsProvider();
+  const app = await api();
+  try {
+    const { status, body } = await app.request("POST", "/config/services/preview-components", {
+      adapter: "statuspage",
+      baseUrl: provider.baseUrl,
+    });
+    assert.equal(status, 200);
+    const result = body as { supported: boolean; components: unknown[] };
+    assert.equal(result.supported, true);
+    assert.equal(result.components.length, 5);
+    assert.deepEqual(result.components[0], {
+      id: "cmp1",
+      name: "API",
+      group: "Core Services",
+      showcase: true,
+    });
+  } finally {
+    await app.close();
+    await provider.close();
+  }
+});
+
+test("preview-components rejects an unknown adapter", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.request("POST", "/config/services/preview-components", {
+      adapter: "nope",
+      baseUrl: "https://status.example.com",
+    });
+    assert.equal(status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
+test("preview-components reports an unreachable provider as 502", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.request("POST", "/config/services/preview-components", {
+      adapter: "statuspage",
+      baseUrl: "http://127.0.0.1:1",
+    });
+    assert.equal(status, 502);
   } finally {
     await app.close();
   }

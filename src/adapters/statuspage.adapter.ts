@@ -1,6 +1,12 @@
 import { z } from "zod";
-import type { Adapter, FetchContext, IncidentHistoryResult, ServiceRef } from "../core/adapter.interface.ts";
-import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
+import type {
+  Adapter,
+  ComponentPreview,
+  FetchContext,
+  IncidentHistoryResult,
+  ServiceRef,
+} from "../core/adapter.interface.ts";
+import type { ComponentStatus, HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 
 /**
  * The generic adapter for Atlassian Statuspage, which most providers run on —
@@ -13,6 +19,16 @@ const INCIDENTS_PATH = "/api/v2/incidents.json";
 
 /** The public API returns at most this many incidents, newest first, unpaginated. */
 const FEED_CAP = 50;
+
+/** One entry in Statuspage's `components` array — a component or a group. */
+const componentSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  status: z.string().optional(),
+  group: z.boolean().optional(),
+  group_id: z.string().nullable().optional(),
+  showcase: z.boolean().optional(),
+});
 
 /**
  * Deliberately lenient: individual fields are optional because a provider that
@@ -33,6 +49,10 @@ const summarySchema = z.object({
       }),
     )
     .optional(),
+  // .catch() rather than a bare .optional(): a provider sending a malformed
+  // components list (wrong shape entirely) must degrade to "no components
+  // reported this cycle", not throw and drop the whole poll.
+  components: z.array(componentSchema).optional().catch(undefined),
 });
 
 const historySchema = z.object({
@@ -64,6 +84,24 @@ function mapIndicator(indicator: string | undefined): OverallStatus {
   // An indicator we have never seen is treated as the worst case: silently
   // downgrading an outage to operational is the one failure mode that matters.
   return INDICATORS[indicator] ?? "major_outage";
+}
+
+/**
+ * Statuspage's per-component vocabulary. `under_maintenance` maps to `unknown`
+ * deliberately: the normalized model has no maintenance state, and `unknown` is
+ * not comparable in the diff engine, so a maintenance window stays silent.
+ */
+const COMPONENT_STATUSES: Record<string, OverallStatus> = {
+  operational: "operational",
+  degraded_performance: "degraded",
+  partial_outage: "partial_outage",
+  major_outage: "major_outage",
+  under_maintenance: "unknown",
+};
+
+function mapComponentStatus(status: string | undefined): OverallStatus {
+  if (status === undefined) return "unknown";
+  return COMPONENT_STATUSES[status] ?? "major_outage";
 }
 
 /**
@@ -99,10 +137,27 @@ export function parseSummary(raw: unknown, service: ServiceRef): NormalizedStatu
     ];
   });
 
+  const byId = new Map(
+    (parsed.components ?? [])
+      .filter((component) => component.id !== undefined && component.group !== true)
+      .map((component) => [component.id as string, component]),
+  );
+  // Selection order, payload name when present, `unknown` when the provider no
+  // longer exposes the component — never a false transition, never a crash.
+  const components: ComponentStatus[] = (service.components ?? []).map(({ id, name }) => {
+    const found = byId.get(id);
+    return {
+      id,
+      name: found?.name ?? name,
+      status: found === undefined ? "unknown" : mapComponentStatus(found.status),
+    };
+  });
+
   return {
     provider: service.id,
     overallStatus: mapIndicator(parsed.status?.indicator),
     activeIncidents,
+    components,
     fetchedAt,
   };
 }
@@ -149,6 +204,28 @@ export function parseIncidentHistory(raw: unknown, service: ServiceRef): Inciden
   };
 }
 
+/** Pure mapping for the picker, exported for the fixture suite. */
+export function parseComponentList(raw: unknown, service: ServiceRef): ComponentPreview[] {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`statuspage summary for ${service.id} is not an object`);
+  }
+  const parsed = summarySchema.parse(raw);
+  const rows = parsed.components ?? [];
+  const groupNames = new Map(
+    rows
+      .filter((row) => row.group === true && row.id !== undefined)
+      .map((row) => [row.id as string, row.name ?? ""]),
+  );
+  return rows
+    .filter((row) => row.group !== true && row.id !== undefined)
+    .map((row) => ({
+      id: row.id as string,
+      name: row.name ?? "",
+      group: row.group_id == null ? null : (groupNames.get(row.group_id) ?? null),
+      showcase: row.showcase ?? false,
+    }));
+}
+
 export const statuspageAdapter: Adapter = {
   id: "statuspage",
 
@@ -174,5 +251,17 @@ export const statuspageAdapter: Adapter = {
       throw new Error(`statuspage incident history for ${service.id} failed: HTTP ${response.status}`);
     }
     return parseIncidentHistory(await response.json(), service);
+  },
+
+  async listComponents(service: ServiceRef, ctx: FetchContext): Promise<ComponentPreview[]> {
+    const url = `${service.baseUrl}${SUMMARY_PATH}`;
+    const response = await fetch(url, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(ctx.timeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`statuspage components fetch for ${service.id} failed: HTTP ${response.status}`);
+    }
+    return parseComponentList(await response.json(), service);
   },
 };

@@ -31,6 +31,14 @@ async function freshDb(): Promise<DatabaseSync> {
   return db;
 }
 
+/** Migrated but unseeded, so tests are free to use ids like "github" themselves. */
+async function freshDbNoSeed(): Promise<DatabaseSync> {
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-cfg-"));
+  const db = openDatabase(join(dir, "isitdown.db"));
+  migrate(db);
+  return db;
+}
+
 test("load maps the seeded database onto a usable runtime config", async () => {
   const db = await freshDb();
   const config = await createDbConfigSource(db, {}, silent).load();
@@ -195,6 +203,47 @@ test("updating or deleting an unknown service is reported rather than silently i
   assert.equal(updateService(db, "nope", { name: "x" }), false);
   assert.equal(deleteService(db, "nope"), false);
   assert.equal(updateService(db, "github", { name: "GitHub" }), true);
+  db.close();
+});
+
+test("a component selection round-trips through insert and list", async () => {
+  const db = await freshDbNoSeed();
+  insertService(db, {
+    id: "github",
+    name: "GitHub",
+    adapter: "statuspage",
+    baseUrl: "https://www.githubstatus.com",
+    enabled: true,
+    components: [{ id: "8l4ygp009s5s", name: "Git Operations" }],
+  });
+  const [service] = listServices(db);
+  assert.deepEqual(service?.components, [{ id: "8l4ygp009s5s", name: "Git Operations" }]);
+  db.close();
+});
+
+test("updating the selection replaces it wholesale", async () => {
+  const db = await freshDbNoSeed();
+  insertService(db, {
+    id: "github",
+    name: "GitHub",
+    adapter: "statuspage",
+    baseUrl: "https://www.githubstatus.com",
+    enabled: true,
+    components: [{ id: "8l4ygp009s5s", name: "Git Operations" }],
+  });
+  updateService(db, "github", { components: [{ id: "4230lsnqdsld", name: "Webhooks" }] });
+  const [service] = listServices(db);
+  assert.deepEqual(service?.components, [{ id: "4230lsnqdsld", name: "Webhooks" }]);
+  db.close();
+});
+
+test("a service stored before v2 lists an empty selection", async () => {
+  const db = await freshDbNoSeed();
+  db.prepare(
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, created_at, components) VALUES (?, ?, ?, ?, NULL, 1, ?, NULL)",
+  ).run("legacy", "Legacy", "statuspage", "https://status.example.com", "2026-08-20T00:00:00.000Z");
+  const service = listServices(db).find((entry) => entry.id === "legacy");
+  assert.deepEqual(service?.components, []);
   db.close();
 });
 

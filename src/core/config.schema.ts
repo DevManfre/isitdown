@@ -29,6 +29,18 @@ const httpUrl = z
   // A trailing slash would double up when an adapter appends its endpoint path.
   .transform((value) => value.replace(/\/+$/, ""));
 
+export const componentSelectionSchema = z
+  .array(
+    z.object({
+      id: z.string().min(1),
+      /** Snapshot of the provider's name at selection time; display fallback. */
+      name: z.string().trim().min(1),
+    }),
+  )
+  .refine((list) => new Set(list.map((component) => component.id)).size === list.length, {
+    message: "component ids must be unique",
+  });
+
 export const serviceDefinitionSchema = z.object({
   id: slug,
   name: z.string().trim().min(1),
@@ -36,6 +48,7 @@ export const serviceDefinitionSchema = z.object({
   baseUrl: httpUrl,
   enabled: z.boolean().default(true),
   options: z.record(z.string()).optional(),
+  components: componentSelectionSchema.default([]),
 });
 
 export const pollingSchema = z.object({

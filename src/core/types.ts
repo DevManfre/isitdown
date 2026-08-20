@@ -39,16 +39,27 @@ export interface HistoricalIncident {
   updatedAt: string;
 }
 
+/** One sub-component of a provider's status page, e.g. "GitHub Actions". */
+export interface ComponentStatus {
+  id: string;
+  /** Provider's current display name for the component. */
+  name: string;
+  status: OverallStatus;
+}
+
 export interface NormalizedStatus {
   provider: string;
   overallStatus: OverallStatus;
   activeIncidents: Incident[];
+  /** Selected components only; empty when the service selects none. */
+  components: ComponentStatus[];
   /** ISO 8601, UTC. When the poll that produced this completed. */
   fetchedAt: string;
 }
 
 export type StatusChangeKind =
   | "status_change"
+  | "component_status_change"
   | "incident_opened"
   | "incident_updated"
   | "incident_resolved"
@@ -66,6 +77,8 @@ export interface StatusChange {
   currentStatus: OverallStatus;
   /** Present for every incident_* kind. */
   incident?: Incident | undefined;
+  /** Present for component_status_change only; the statuses are the component's. */
+  component?: { id: string; name: string } | undefined;
   /** Present for monitoring_degraded only. */
   failureCount?: number | undefined;
   /** ISO 8601, UTC. */

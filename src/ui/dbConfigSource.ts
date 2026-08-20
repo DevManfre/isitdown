@@ -1,6 +1,11 @@
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
-import { localeSchema, pollingSchema, serviceDefinitionSchema } from "../core/config.schema.ts";
+import {
+  componentSelectionSchema,
+  localeSchema,
+  pollingSchema,
+  serviceDefinitionSchema,
+} from "../core/config.schema.ts";
 import type {
   ChannelConfig,
   ConfigSource,
@@ -52,6 +57,7 @@ const serviceRowSchema = z.object({
   base_url: z.string(),
   options: z.string().nullable(),
   enabled: z.number(),
+  components: z.string().nullable(),
 });
 
 export interface StoredChannel {
@@ -104,7 +110,7 @@ export function writeSettings(db: DatabaseSync, patch: Partial<Record<keyof Sett
 
 export function listServices(db: DatabaseSync): ServiceDefinition[] {
   return db
-    .prepare("SELECT id, name, adapter, base_url, options, enabled FROM services ORDER BY id")
+    .prepare("SELECT id, name, adapter, base_url, options, enabled, components FROM services ORDER BY id")
     .all()
     .map((row) => serviceRowSchema.parse(row))
     .map((row) => ({
@@ -113,6 +119,8 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       adapter: row.adapter,
       baseUrl: row.base_url,
       enabled: row.enabled === 1,
+      components:
+        row.components === null ? [] : componentSelectionSchema.catch([]).parse(JSON.parse(row.components)),
       ...(row.options === null ? {} : { options: JSON.parse(row.options) as Record<string, string> }),
     }));
 }
@@ -120,7 +128,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
 export function insertService(db: DatabaseSync, definition: ServiceDefinition): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -128,6 +136,7 @@ export function insertService(db: DatabaseSync, definition: ServiceDefinition): 
     parsed.baseUrl,
     parsed.options === undefined ? null : JSON.stringify(parsed.options),
     parsed.enabled ? 1 : 0,
+    parsed.components.length === 0 ? null : JSON.stringify(parsed.components),
     new Date().toISOString(),
   );
 }
@@ -147,6 +156,9 @@ export function updateService(
   if (parsed.baseUrl !== undefined) columns["base_url"] = parsed.baseUrl;
   if (parsed.enabled !== undefined) columns["enabled"] = parsed.enabled ? 1 : 0;
   if (parsed.options !== undefined) columns["options"] = JSON.stringify(parsed.options);
+  if (parsed.components !== undefined) {
+    columns["components"] = parsed.components.length === 0 ? null : JSON.stringify(parsed.components);
+  }
   if (Object.keys(columns).length === 0) return exists(db, id);
 
   const assignments = Object.keys(columns)

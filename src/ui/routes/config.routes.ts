@@ -17,6 +17,7 @@ import {
 import type { UiRuntimeCore } from "../runtime.ts";
 
 const servicePatchSchema = serviceDefinitionSchema.partial().omit({ id: true });
+const previewComponentsSchema = serviceDefinitionSchema.pick({ adapter: true, baseUrl: true });
 const settingsPatchSchema = pollingSchema.partial();
 const channelPatchSchema = z.object({
   enabled: z.boolean().optional(),
@@ -71,6 +72,38 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     // Fire-and-forget: the response must not wait on a provider's status page.
     // backfillOne never rejects; failures are logged inside the service.
     void runtime.backfill.backfillOne(parsed.data.id);
+  });
+
+  // Read-only reach upstream: it records nothing and notifies nothing, exactly
+  // like the connection test — the picker just needs the list before a service
+  // row exists.
+  router.post("/config/services/preview-components", async (req, res) => {
+    const parsed = previewComponentsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+    let adapter;
+    try {
+      adapter = getAdapter(parsed.data.adapter);
+    } catch {
+      res.status(400).json({ error: { message: `unknown adapter: ${parsed.data.adapter}` } });
+      return;
+    }
+    if (adapter.listComponents === undefined) {
+      res.json({ supported: false, components: [] });
+      return;
+    }
+    const { requestTimeoutSeconds } = readSettings(db, runtime.logger);
+    try {
+      const components = await adapter.listComponents(
+        { id: "preview", name: "preview", baseUrl: parsed.data.baseUrl },
+        { timeoutMs: requestTimeoutSeconds * 1000 },
+      );
+      res.json({ supported: true, components });
+    } catch (error) {
+      res.status(502).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+    }
   });
 
   router.patch("/config/services/:id", (req, res) => {
@@ -153,7 +186,13 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     const { requestTimeoutSeconds } = readSettings(db, runtime.logger);
     try {
       const status = await getAdapter(service.adapter).fetchStatus(
-        { id: service.id, name: service.name, baseUrl: service.baseUrl, options: service.options },
+        {
+          id: service.id,
+          name: service.name,
+          baseUrl: service.baseUrl,
+          options: service.options,
+          components: service.components,
+        },
         { timeoutMs: requestTimeoutSeconds * 1000 },
       );
       res.json({ ok: true, overallStatus: status.overallStatus });
@@ -193,6 +232,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       adapter: "statuspage",
       baseUrl: "https://example.com",
       enabled: true,
+      components: [],
     };
     const record = await runtime.dispatcher.sendTest(notifier, service, config.locale);
     res.json(record.ok ? { ok: true } : { ok: false, error: record.error });

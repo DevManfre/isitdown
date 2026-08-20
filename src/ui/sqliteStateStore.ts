@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { ProviderRuntimeState } from "../core/stateStore.interface.ts";
-import { incidentSchema } from "../core/status.schema.ts";
+import { componentStatusSchema, incidentSchema } from "../core/status.schema.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { z } from "zod";
 import type {
@@ -13,6 +13,7 @@ import type {
 } from "./historyStore.interface.ts";
 
 const incidentsColumnSchema = z.array(incidentSchema);
+const componentsColumnSchema = z.array(componentStatusSchema);
 
 /**
  * Rows come back from SQLite untyped, and a column read is external input like a
@@ -30,6 +31,7 @@ const overallStatusSchema = z.enum([
 const stateRowSchema = z.object({
   overall_status: overallStatusSchema,
   active_incidents: z.string(),
+  components: z.string(),
   fetched_at: z.string(),
   failure_count: z.number(),
   degraded_notified: z.number(),
@@ -51,6 +53,7 @@ const notificationRowSchema = z.object({
   channel: z.string(),
   kind: z.enum([
     "status_change",
+    "component_status_change",
     "incident_opened",
     "incident_updated",
     "incident_resolved",
@@ -94,9 +97,11 @@ const RANK_TO_STATUS = Object.fromEntries(
   Object.entries(SEVERITY_RANK).map(([status, rank]) => [rank, status as OverallStatus]),
 ) as Record<number, OverallStatus>;
 
-const RANK_CASE = `CASE overall_status ${Object.entries(SEVERITY_RANK)
-  .map(([status, rank]) => `WHEN '${status}' THEN ${rank}`)
-  .join(" ")} ELSE ${SEVERITY_RANK.major_outage} END`;
+const rankCaseFor = (column: string): string =>
+  `CASE ${column} ${Object.entries(SEVERITY_RANK)
+    .map(([status, rank]) => `WHEN '${status}' THEN ${rank}`)
+    .join(" ")} ELSE ${SEVERITY_RANK.major_outage} END`;
+const RANK_CASE = rankCaseFor("overall_status");
 
 /**
  * A provider's own timestamp is untrusted input like the rest of its payload.
@@ -133,8 +138,9 @@ const toIncidentRow = (row: IncidentDbRow): IncidentRow => ({
  * The UI edition's store. It satisfies the shared StateStore contract exactly as
  * the Light edition's file store does, and adds the history the dashboard reads.
  *
- * `saveStatus` does three things in one transaction: it updates the current state,
- * appends one sample, and reconciles the incident table. Recording history inside
+ * `saveStatus` does several things in one transaction: it updates the current
+ * state, appends one status sample and one component sample per non-`unknown`
+ * component, and reconciles the incident table. Recording history inside
  * `saveStatus` is what keeps the core poller unaware that history exists at all,
  * and it guarantees the uptime bars and the incident timeline are derived from the
  * same write — the two views cannot disagree.
@@ -144,29 +150,33 @@ const toIncidentRow = (row: IncidentDbRow): IncidentRow => ({
  */
 export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
   const selectState = db.prepare(
-    "SELECT overall_status, active_incidents, fetched_at, failure_count, degraded_notified FROM provider_state WHERE provider_id = ?",
+    "SELECT overall_status, active_incidents, components, fetched_at, failure_count, degraded_notified FROM provider_state WHERE provider_id = ?",
   );
   const upsertState = db.prepare(`
-    INSERT INTO provider_state (provider_id, overall_status, active_incidents, fetched_at, failure_count, degraded_notified)
-    VALUES (?, ?, ?, ?, 0, 0)
+    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, fetched_at, failure_count, degraded_notified)
+    VALUES (?, ?, ?, ?, ?, 0, 0)
     ON CONFLICT (provider_id) DO UPDATE SET
       overall_status = excluded.overall_status,
       active_incidents = excluded.active_incidents,
+      components = excluded.components,
       fetched_at = excluded.fetched_at
   `);
   const bumpFailure = db.prepare(`
-    INSERT INTO provider_state (provider_id, overall_status, active_incidents, fetched_at, failure_count, degraded_notified)
-    VALUES (?, 'unknown', '[]', ?, 1, 0)
+    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, fetched_at, failure_count, degraded_notified)
+    VALUES (?, 'unknown', '[]', '[]', ?, 1, 0)
     ON CONFLICT (provider_id) DO UPDATE SET failure_count = failure_count + 1
   `);
   const clearFailure = db.prepare("UPDATE provider_state SET failure_count = 0 WHERE provider_id = ?");
   const setDegraded = db.prepare(`
-    INSERT INTO provider_state (provider_id, overall_status, active_incidents, fetched_at, failure_count, degraded_notified)
-    VALUES (?, 'unknown', '[]', ?, 0, ?)
+    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, fetched_at, failure_count, degraded_notified)
+    VALUES (?, 'unknown', '[]', '[]', ?, 0, ?)
     ON CONFLICT (provider_id) DO UPDATE SET degraded_notified = excluded.degraded_notified
   `);
   const insertSample = db.prepare(
     "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok) VALUES (?, ?, ?, ?)",
+  );
+  const insertComponentSample = db.prepare(
+    "INSERT INTO component_samples (provider_id, component_id, observed_at, status, ok) VALUES (?, ?, ?, ?, ?)",
   );
   const upsertIncident = db.prepare(`
     INSERT INTO incidents (provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at)
@@ -210,6 +220,7 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
                 provider: providerId,
                 overallStatus: row.overall_status,
                 activeIncidents: readIncidents(row.active_incidents),
+                components: componentsColumnSchema.parse(JSON.parse(row.components)),
                 fetchedAt: row.fetched_at,
               },
         failureCount: row.failure_count,
@@ -224,6 +235,7 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
           status.provider,
           status.overallStatus,
           JSON.stringify(status.activeIncidents),
+          JSON.stringify(status.components),
           status.fetchedAt,
         );
         insertSample.run(
@@ -232,6 +244,19 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
           status.overallStatus,
           status.overallStatus === "operational" ? 1 : 0,
         );
+
+        // `unknown` writes no sample: an unmeasured component must not read as
+        // downtime, and a gap-filled day already renders as unknown in the bars.
+        for (const component of status.components) {
+          if (component.status === "unknown") continue;
+          insertComponentSample.run(
+            status.provider,
+            component.id,
+            status.fetchedAt,
+            component.status,
+            component.status === "operational" ? 1 : 0,
+          );
+        }
 
         // Resolve first, then reopen or update whatever is still active: an
         // incident present in this poll ends up with resolved_at NULL either way.
@@ -359,6 +384,30 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
       }));
     },
 
+    async getComponentDailyBuckets(providerId: string, componentId: string, days: number): Promise<DailyBucket[]> {
+      const from = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+      const rows = db
+        .prepare(
+          `SELECT date(observed_at) AS day,
+                  MAX(${rankCaseFor("status")}) AS worst,
+                  SUM(ok) AS ok_samples,
+                  COUNT(*) AS total_samples
+           FROM component_samples
+           WHERE provider_id = ? AND component_id = ? AND observed_at >= ?
+           GROUP BY day
+           ORDER BY day ASC`,
+        )
+        .all(providerId, componentId, from)
+        .map((raw) => bucketRowSchema.parse(raw));
+
+      return rows.map((row) => ({
+        day: row.day,
+        worstStatus: RANK_TO_STATUS[row.worst] ?? "unknown",
+        okSamples: row.ok_samples,
+        totalSamples: row.total_samples,
+      }));
+    },
+
     async listProviderIds(): Promise<string[]> {
       return db
         .prepare("SELECT id FROM services ORDER BY id")
@@ -383,6 +432,7 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
     async pruneOlderThan(days: number): Promise<void> {
       const cutoff = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
       db.prepare("DELETE FROM status_samples WHERE observed_at < ?").run(cutoff);
+      db.prepare("DELETE FROM component_samples WHERE observed_at < ?").run(cutoff);
       db.prepare("DELETE FROM notifications WHERE sent_at < ?").run(cutoff);
       db.prepare("DELETE FROM incidents WHERE resolved_at IS NOT NULL AND resolved_at < ?").run(cutoff);
     },

@@ -10,6 +10,7 @@ import * as api from "../api.js";
 import { animate, element, stagger, statusColor, statusDot, uptimeStrip } from "../charts.js";
 import { formatPercent, t } from "../i18n.js";
 import { confirmModal, openModal } from "../components/modal.js";
+import { createComponentPicker } from "../components/componentPicker.js";
 import { refresh } from "../app.js";
 
 const RANGE_DAYS = 90;
@@ -163,15 +164,32 @@ export function editButton(provider) {
   const button = element("button", "btn btn-primary btn-row", t("action.edit"));
   button.type = "button";
   button.addEventListener("click", () => {
-    openModal({
+    // `modal` is assigned right after openModal below; the picker's load
+    // button only becomes clickable once the dialog is on screen, so the
+    // closure below always sees it set by the time it runs. Reading the live
+    // input (rather than the `provider` captured at click time) means editing
+    // the base URL and then choosing components previews the new one.
+    /** @type {ReturnType<typeof openModal>} */
+    let modal;
+    const picker = createComponentPicker({
+      load: () =>
+        api.previewComponents({ adapter: provider.adapter, baseUrl: modal.inputs.baseUrl.value.trim() }),
+      initial: provider.componentSelection ?? [],
+    });
+    modal = openModal({
       title: provider.name,
       confirmLabel: t("action.save"),
       fields: [
         { name: "name", label: t("field.name"), value: provider.name },
         { name: "baseUrl", label: t("field.base-url"), value: provider.baseUrl, mono: true },
+        { label: t("components.field"), render: (wrap) => picker.mount(wrap) },
       ],
       onConfirm: async (values) => {
-        await api.patchService(provider.id, { name: values.name, baseUrl: values.baseUrl });
+        await api.patchService(provider.id, {
+          name: values.name,
+          baseUrl: values.baseUrl,
+          components: picker.value(),
+        });
         await refresh();
       },
     });
@@ -210,7 +228,15 @@ function addHint() {
 /** Shared with the header's add button, which dispatches an event. */
 export function openAddServiceDialog() {
   let adapter = "statuspage";
-  const modal = openModal({
+  // `modal` is assigned right after openModal below; the picker's load button
+  // only becomes clickable once the dialog is on screen, so the closure below
+  // always sees it set by the time it runs.
+  /** @type {ReturnType<typeof openModal>} */
+  let modal;
+  const picker = createComponentPicker({
+    load: () => api.previewComponents({ adapter, baseUrl: modal.inputs.baseUrl.value.trim() }),
+  });
+  modal = openModal({
     title: t("add.title"),
     subtitle: t("add.subtitle"),
     confirmLabel: t("action.add"),
@@ -243,9 +269,10 @@ export function openAddServiceDialog() {
         mono: true,
         hint: t("add.note"),
       },
+      { label: t("components.field"), render: (wrap) => picker.mount(wrap) },
     ],
     onConfirm: async (values) => {
-      await api.addService({ ...values, adapter, enabled: true });
+      await api.addService({ ...values, adapter, enabled: true, components: picker.value() });
       const result = await api.testService(values.id);
       await refresh();
       if (!result.ok) {

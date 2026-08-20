@@ -12,6 +12,7 @@
   "incident.status.postmortem": "Postmortem",
 
   "notification.status.changed": "{provider} — {severity}\n\nStatus changed from {previous} to {current}.\nUpdated: {updatedAt}\n\n{url}",
+  "notification.component.changed": "{provider} — {severity}\n\nComponent {component} changed from {previous} to {current}.\nUpdated: {updatedAt}\n\n{url}",
   "notification.incident.opened": "{provider} — {severity}\n\nIncident: {title}\nStatus: {status}\nUpdated: {updatedAt}\n\n{url}",
   "notification.incident.updated": "{provider} — {severity}\n\nIncident: {title}\nStatus: {status}\nUpdated: {updatedAt}\n\n{url}",
   "notification.incident.resolved": "{provider} — {severity}\n\nIncident \"{title}\" has been resolved.\nUpdated: {updatedAt}\n\n{url}",
