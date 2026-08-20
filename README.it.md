@@ -697,6 +697,22 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `POST` | `/poll` | Esegue subito un ciclo, tramite lo scheduler. Restituisce il riepilogo del ciclo. |
 | `GET` | `/` | La dashboard. |
 
+### 6.1 Backfill dello storico
+
+All'avvio — e ogni volta che un provider viene aggiunto dalla dashboard —
+l'edizione UI ricostruisce fino a 90 giorni di storico dal feed pubblico
+degli incidenti del provider (`/api/v2/incidents.json` per i provider basati
+su Statuspage), così le barre di uptime non partono vuote su un container
+nuovo.
+
+Lo storico ricostruito è derivato, non misurato: un giorno è segnato come
+degradato o down solo se un incidente noto lo ha attraversato, e i giorni
+coperti senza incidenti sono considerati operativi. Il feed pubblico
+restituisce al massimo i 50 incidenti più recenti, quindi la copertura varia
+per provider; i giorni oltre la portata del feed restano grigi ("nessun
+dato") ed esclusi dalle percentuali di uptime. Il backfill non genera mai
+notifiche e non sovrascrive mai campioni osservati.
+
 Non c'è autenticazione: questa è una dashboard locale per un singolo operatore. Non
 pubblicare la porta 3000 su una rete di cui non ti fidi.
 
