@@ -690,6 +690,21 @@ back reports a parse failure instead of the real problem.
 | `POST` | `/poll` | Run a cycle now, through the scheduler. Returns the cycle summary. |
 | `GET` | `/` | The dashboard. |
 
+### 6.1 History backfill
+
+At startup — and whenever a provider is added from the dashboard — the UI
+edition reconstructs up to 90 days of history from the provider's public
+incident feed (`/api/v2/incidents.json` for Statuspage-based providers), so
+the uptime bars are not empty on a fresh container.
+
+Reconstructed history is derived, not measured: a day is marked degraded or
+down only when a known incident overlapped it, and covered days without
+incidents are assumed operational. The public feed returns at most its 50
+most recent incidents, so coverage varies per provider; days older than the
+feed's reach stay grey ("no data") and are excluded from the uptime
+percentages. Backfill never triggers notifications and never overwrites
+observed samples.
+
 There is no authentication: this is a local, single-operator dashboard. Do not
 publish port 3000 to a network you do not trust.
 
