@@ -87,7 +87,7 @@ function leftColumn(config, state) {
     left.style.justifyContent = "flex-start";
     left.style.gap = "10px";
     const dot = element("span", "dot dot-sm");
-    dot.style.background = service.enabled ? "var(--status-operational)" : "var(--color-neutral-700)";
+    dot.style.background = service.enabled ? "var(--status-operational-fill)" : "var(--color-neutral-700)";
     left.append(dot, element("span", "provider-name", service.name));
     const meta = element("span", "mono muted", `${service.adapter} · ${hostOf(service.baseUrl)}`);
     meta.style.fontSize = "10.5px";
@@ -121,7 +121,7 @@ function channelCard(channel, delay) {
   left.style.justifyContent = "flex-start";
   left.style.gap = "8px";
   const dot = element("span", "dot dot-sm");
-  dot.style.background = channel.enabled ? "var(--status-operational)" : "var(--color-neutral-700)";
+  dot.style.background = channel.enabled ? "var(--status-operational-fill)" : "var(--color-neutral-700)";
   left.append(dot, element("span", "provider-name", channel.id));
   head.append(left, element("span", "mono muted", t(channel.enabled ? "channel.enabled" : "channel.disabled")));
   card.append(head);

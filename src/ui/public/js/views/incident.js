@@ -12,7 +12,7 @@ import * as api from "../api.js";
 import { animate, element, pollStrip, stagger, statusDot } from "../charts.js";
 import { formatDateTime, formatDuration, formatTime, t } from "../i18n.js";
 import { navigate } from "../app.js";
-import { impactKey, incidentStatusKey, impactColor, nameLookup } from "./incidents.js";
+import { impactKey, incidentStatusKey, impactColor, impactFill, nameLookup } from "./incidents.js";
 
 const STEPS = ["investigating", "identified", "monitoring", "resolved"];
 
@@ -106,10 +106,10 @@ function stepper(incident) {
     dot.style.width = "9px";
     dot.style.height = "9px";
     const active = index <= reached;
-    dot.style.background = active ? impactColor(incident.impact) : "var(--color-neutral-800)";
+    dot.style.background = active ? impactFill(incident.impact) : "var(--color-neutral-800)";
     // The step the incident is sitting on keeps pulsing while it is open.
     if (index === reached && incident.resolvedAt === null) {
-      dot.style.color = impactColor(incident.impact);
+      dot.style.color = impactFill(incident.impact);
       dot.classList.add("dot-pulse");
     }
 

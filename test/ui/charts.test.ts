@@ -1,7 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // The mapping helpers are pure, so they are exercised without a browser.
-import { barSpec, faviconCandidates, stagger, statusColor, trimToLatest } from "../../src/ui/public/js/charts.js";
+import {
+  barSpec,
+  faviconCandidates,
+  stagger,
+  statusColor,
+  statusFill,
+  trimToLatest,
+} from "../../src/ui/public/js/charts.js";
 
 test("every status maps to its own colour and height token", () => {
   const specs = ["operational", "degraded", "partial_outage", "major_outage", "unknown"].map(barSpec);
@@ -56,8 +63,24 @@ test("an unrecognised status degrades to unknown instead of rendering nothing", 
   assert.equal(spec.color, "var(--status-unknown)");
 });
 
-test("statusColor is the token a dot or a ring paints with", () => {
+test("statusColor is the token a label written in its status colour uses", () => {
   assert.equal(statusColor("degraded"), "var(--status-degraded)");
+});
+
+test("a painted shape uses the fill token, never the text one", () => {
+  const specs = ["operational", "degraded", "partial_outage", "major_outage", "unknown"].map(barSpec);
+  assert.deepEqual(
+    specs.map((spec) => spec.fill),
+    [
+      "var(--status-operational-fill)",
+      "var(--status-degraded-fill)",
+      "var(--status-partial-outage-fill)",
+      "var(--status-major-outage-fill)",
+      "var(--status-unknown-fill)",
+    ],
+  );
+  assert.equal(statusFill("degraded"), "var(--status-degraded-fill)");
+  assert.equal(statusFill("gremlins"), "var(--status-unknown-fill)");
 });
 
 test("each bar row scale reads its own height token for the same status", () => {

@@ -104,7 +104,7 @@ function renderRail() {
     const row = element("div", "rail-channel");
     const dot = element("span", "dot dot-sm");
     dot.style.background = channel.enabled
-      ? "var(--status-operational)"
+      ? "var(--status-operational-fill)"
       : "var(--color-neutral-700)";
     row.append(dot, element("span", undefined, channel.id));
     dom.railChannels.append(row);

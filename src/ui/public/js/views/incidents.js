@@ -7,7 +7,7 @@
  */
 
 import * as api from "../api.js";
-import { animate, element, stagger, statusColor, statusDot } from "../charts.js";
+import { animate, element, stagger, statusColor, statusDot, statusFill } from "../charts.js";
 import { formatDateTime, formatRelative, t } from "../i18n.js";
 import { navigate } from "../app.js";
 
@@ -127,7 +127,7 @@ function feedPanel(notifications, providerName) {
     row.style.borderTop = "1px solid var(--color-divider)";
 
     const dot = element("span", "dot dot-sm");
-    dot.style.background = record.ok ? "var(--status-operational)" : "var(--status-major-outage)";
+    dot.style.background = record.ok ? "var(--status-operational-fill)" : "var(--status-major-outage-fill)";
     dot.style.transform = "translateY(-2px)";
 
     const text = element("div", "stack-tight");
@@ -224,6 +224,7 @@ const IMPACT_STATUS = {
 };
 export const impactStatus = (impact) => IMPACT_STATUS[impact] ?? "unknown";
 export const impactColor = (impact) => statusColor(impactStatus(impact));
+export const impactFill = (impact) => statusFill(impactStatus(impact));
 
 export function nameLookup(state) {
   const names = new Map((state.status?.providers ?? []).map((provider) => [provider.id, provider.name]));
