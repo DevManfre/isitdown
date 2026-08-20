@@ -1,0 +1,45 @@
+{
+  "incidents": [
+    {
+      "id": "inc-asia",
+      "name": "Network congestion in Singapore",
+      "impact": "minor",
+      "status": "resolved",
+      "created_at": "2026-08-10T09:00:00.000Z",
+      "updated_at": "2026-08-10T10:00:00.000Z",
+      "resolved_at": "2026-08-10T10:00:00.000Z",
+      "components": [
+        {
+          "id": "sin",
+          "name": "Singapore - (SIN)",
+          "group_id": "grp-asia"
+        }
+      ]
+    },
+    {
+      "id": "inc-europe",
+      "name": "Packet loss in Amsterdam",
+      "impact": "major",
+      "status": "resolved",
+      "created_at": "2026-08-12T09:00:00.000Z",
+      "updated_at": "2026-08-12T09:45:00.000Z",
+      "resolved_at": "2026-08-12T09:45:00.000Z",
+      "components": [
+        {
+          "id": "ams",
+          "name": "Amsterdam, Netherlands - (AMS)",
+          "group_id": "grp-eu"
+        }
+      ]
+    },
+    {
+      "id": "inc-page",
+      "name": "Status page maintenance",
+      "impact": "none",
+      "status": "resolved",
+      "created_at": "2026-08-14T09:00:00.000Z",
+      "updated_at": "2026-08-14T09:10:00.000Z",
+      "resolved_at": "2026-08-14T09:10:00.000Z"
+    }
+  ]
+}

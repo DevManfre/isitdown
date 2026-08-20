@@ -113,3 +113,121 @@ test("a selected component flip notifies once and builds history", async () => {
     await new Promise<void>((resolve) => receiver.close(() => resolve()));
   }
 });
+
+test("a provider scoped to its selection ignores an incident in another region", async () => {
+  // Fake statuspage shaped like Cloudflare's: two regions, one component each,
+  // and a page indicator that reacts to anything anywhere.
+  const summary: {
+    status: { indicator: string };
+    components: { id: string; name: string; status: string; group: boolean; group_id: string | null }[];
+    incidents: { id: string; name: string; impact: string; status: string; created_at: string; components: { id: string }[] }[];
+  } = {
+    status: { indicator: "none" },
+    components: [
+      { id: "grp-eu", name: "Europe", status: "operational", group: true, group_id: null },
+      { id: "ams", name: "Amsterdam", status: "operational", group: false, group_id: "grp-eu" },
+      { id: "grp-asia", name: "Asia", status: "operational", group: true, group_id: null },
+      { id: "sin", name: "Singapore", status: "operational", group: false, group_id: "grp-asia" },
+    ],
+    incidents: [],
+  };
+  const provider: Server = createServer((req, res) => {
+    if (req.url === "/api/v2/summary.json") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(summary));
+      return;
+    }
+    if (req.url === "/api/v2/incidents.json") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ incidents: [] }));
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+
+  const deliveries: unknown[] = [];
+  const receiver: Server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      deliveries.push(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("{}");
+    });
+  });
+
+  await new Promise<void>((resolve) => provider.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => receiver.listen(0, "127.0.0.1", resolve));
+  const providerUrl = `http://127.0.0.1:${(provider.address() as AddressInfo).port}`;
+  const receiverUrl = `http://127.0.0.1:${(receiver.address() as AddressInfo).port}/hook`;
+
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-ui-scope-"));
+  const runtime = await buildUiRuntime({
+    dbPath: join(dir, "isitdown.db"),
+    env: { WEBHOOK_URL: receiverUrl },
+    logger: silent,
+  });
+
+  try {
+    for (const service of listServices(runtime.db)) deleteService(runtime.db, service.id);
+    insertService(runtime.db, {
+      id: "fake",
+      name: "Fake Provider",
+      adapter: "statuspage",
+      baseUrl: providerUrl,
+      enabled: true,
+      components: [{ id: "ams", name: "Amsterdam" }],
+      scopeToComponents: true,
+    });
+    updateChannel(runtime.db, "webhook", { enabled: true, fields: { urlEnv: "WEBHOOK_URL" } });
+
+    await runtime.scheduler.triggerNow();
+    assert.equal(deliveries.length, 0, "a baseline poll must never notify");
+
+    // Singapore breaks: the page indicator moves and the provider opens an
+    // incident there. Amsterdam is untouched, so the operator must hear nothing.
+    summary.status.indicator = "major";
+    summary.components[3]!.status = "major_outage";
+    summary.incidents = [
+      {
+        id: "inc-asia",
+        name: "Outage in Singapore",
+        impact: "major",
+        status: "investigating",
+        created_at: "2026-08-19T09:00:00.000Z",
+        components: [{ id: "sin" }],
+      },
+    ];
+    await runtime.scheduler.triggerNow();
+    assert.deepEqual(deliveries, [], "an incident outside the selection must stay silent");
+
+    // Amsterdam now degrades too: that one is in scope and must arrive.
+    summary.components[1]!.status = "degraded_performance";
+    summary.incidents.push({
+      id: "inc-eu",
+      name: "Packet loss in Amsterdam",
+      impact: "minor",
+      status: "investigating",
+      created_at: "2026-08-19T10:00:00.000Z",
+      components: [{ id: "ams" }],
+    });
+    await runtime.scheduler.triggerNow();
+    // Three: the provider's own status, folded from the selection rather than
+    // from the page indicator, plus the component transition and the incident.
+    const messages = deliveries.map((delivery) => (delivery as { message: string }).message);
+    assert.equal(messages.length, 3, `expected three in-scope notifications, got ${messages.join(" | ")}`);
+    assert.ok(
+      messages.some((message) => /Amsterdam/.test(message)),
+      "the in-scope component transition must be reported",
+    );
+    assert.ok(
+      messages.every((message) => !/Singapore/.test(message)),
+      "nothing from the unselected region may appear",
+    );
+  } finally {
+    await runtime.close();
+    await new Promise<void>((resolve) => provider.close(() => resolve()));
+    await new Promise<void>((resolve) => receiver.close(() => resolve()));
+  }
+});

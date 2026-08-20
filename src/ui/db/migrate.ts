@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -111,6 +111,15 @@ export function migrate(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_component_samples_provider_component_time
         ON component_samples (provider_id, component_id, observed_at);
     `);
+  }
+
+  if (from < 3) {
+    const serviceColumns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!serviceColumns.includes("scope_to_components")) {
+      db.exec("ALTER TABLE services ADD COLUMN scope_to_components INTEGER NOT NULL DEFAULT 0");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

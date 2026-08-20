@@ -15,6 +15,8 @@ export interface ServiceDefinition {
   enabled: boolean;
   options?: Record<string, string> | undefined;
   components: { id: string; name: string }[];
+  /** Report only what the selection covers. Meaningless with no selection. */
+  scopeToComponents: boolean;
 }
 
 export interface ChannelConfig {

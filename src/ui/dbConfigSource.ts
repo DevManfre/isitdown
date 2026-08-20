@@ -58,6 +58,7 @@ const serviceRowSchema = z.object({
   options: z.string().nullable(),
   enabled: z.number(),
   components: z.string().nullable(),
+  scope_to_components: z.number(),
 });
 
 export interface StoredChannel {
@@ -110,7 +111,9 @@ export function writeSettings(db: DatabaseSync, patch: Partial<Record<keyof Sett
 
 export function listServices(db: DatabaseSync): ServiceDefinition[] {
   return db
-    .prepare("SELECT id, name, adapter, base_url, options, enabled, components FROM services ORDER BY id")
+    .prepare(
+      "SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components FROM services ORDER BY id",
+    )
     .all()
     .map((row) => serviceRowSchema.parse(row))
     .map((row) => ({
@@ -121,6 +124,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       enabled: row.enabled === 1,
       components:
         row.components === null ? [] : componentSelectionSchema.catch([]).parse(JSON.parse(row.components)),
+      scopeToComponents: row.scope_to_components === 1,
       ...(row.options === null ? {} : { options: JSON.parse(row.options) as Record<string, string> }),
     }));
 }
@@ -128,7 +132,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
 export function insertService(db: DatabaseSync, definition: ServiceDefinition): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -137,6 +141,7 @@ export function insertService(db: DatabaseSync, definition: ServiceDefinition): 
     parsed.options === undefined ? null : JSON.stringify(parsed.options),
     parsed.enabled ? 1 : 0,
     parsed.components.length === 0 ? null : JSON.stringify(parsed.components),
+    parsed.scopeToComponents ? 1 : 0,
     new Date().toISOString(),
   );
 }
@@ -158,6 +163,9 @@ export function updateService(
   if (parsed.options !== undefined) columns["options"] = JSON.stringify(parsed.options);
   if (parsed.components !== undefined) {
     columns["components"] = parsed.components.length === 0 ? null : JSON.stringify(parsed.components);
+  }
+  if (parsed.scopeToComponents !== undefined) {
+    columns["scope_to_components"] = parsed.scopeToComponents ? 1 : 0;
   }
   if (Object.keys(columns).length === 0) return exists(db, id);
 

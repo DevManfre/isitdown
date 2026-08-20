@@ -85,6 +85,7 @@ test("a fresh database gets the v2 component schema", () => {
   assert.ok(tables.includes("component_samples"));
   const serviceColumns = db.prepare("PRAGMA table_info(services)").all().map((row) => (row as { name: string }).name);
   assert.ok(serviceColumns.includes("components"));
+  assert.ok(serviceColumns.includes("scope_to_components"));
   const stateColumns = db.prepare("PRAGMA table_info(provider_state)").all().map((row) => (row as { name: string }).name);
   assert.ok(stateColumns.includes("components"));
 });
@@ -113,8 +114,29 @@ test("migrating from user_version 1 adds columns and keeps data", () => {
   assert.equal((db.prepare("SELECT COUNT(*) AS n FROM services").get() as { n: number } | undefined)?.n, 1);
   assert.equal(
     (db.prepare("PRAGMA user_version").get() as { user_version: number } | undefined)?.user_version,
-    2,
+    3,
   );
+});
+
+test("migrating from user_version 2 adds the scope column, defaulting to the whole page", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE services (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, adapter TEXT NOT NULL,
+      base_url TEXT NOT NULL, options TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+      components TEXT, created_at TEXT NOT NULL
+    );
+    PRAGMA user_version = 2;
+  `);
+  db.prepare("INSERT INTO services (id, name, adapter, base_url, created_at) VALUES (?, ?, ?, ?, ?)").run(
+    "github", "GitHub", "statuspage", "https://www.githubstatus.com", "2026-08-20T00:00:00.000Z",
+  );
+  migrate(db);
+  const row = db.prepare("SELECT scope_to_components FROM services WHERE id = 'github'").get() as
+    | { scope_to_components: number }
+    | undefined;
+  // An upgrade must not narrow a provider the operator never asked to narrow.
+  assert.equal(row?.scope_to_components, 0);
 });
 
 test("seedDefaults gives a fresh database three providers to watch", async () => {

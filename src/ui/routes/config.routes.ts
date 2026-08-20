@@ -192,6 +192,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
           baseUrl: service.baseUrl,
           options: service.options,
           components: service.components,
+          scopeToComponents: service.scopeToComponents,
         },
         { timeoutMs: requestTimeoutSeconds * 1000 },
       );
@@ -233,6 +234,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       baseUrl: "https://example.com",
       enabled: true,
       components: [],
+      scopeToComponents: false,
     };
     const record = await runtime.dispatcher.sendTest(notifier, service, config.locale);
     res.json(record.ok ? { ok: true } : { ok: false, error: record.error });

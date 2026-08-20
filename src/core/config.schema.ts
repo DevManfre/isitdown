@@ -49,6 +49,7 @@ export const serviceDefinitionSchema = z.object({
   enabled: z.boolean().default(true),
   options: z.record(z.string()).optional(),
   components: componentSelectionSchema.default([]),
+  scopeToComponents: z.boolean().default(false),
 });
 
 export const pollingSchema = z.object({

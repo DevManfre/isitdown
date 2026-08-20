@@ -20,6 +20,16 @@ const INCIDENTS_PATH = "/api/v2/incidents.json";
 /** The public API returns at most this many incidents, newest first, unpaginated. */
 const FEED_CAP = 50;
 
+/**
+ * The components an incident is attributed to. Only the ids matter here, and an
+ * unreadable list degrades to "no attribution" rather than throwing: an incident
+ * whose attribution cannot be read must still be reported, never swallowed.
+ */
+const attributionSchema = z
+  .array(z.object({ id: z.string().optional() }))
+  .optional()
+  .catch(undefined);
+
 /** One entry in Statuspage's `components` array — a component or a group. */
 const componentSchema = z.object({
   id: z.string().optional(),
@@ -46,6 +56,7 @@ const summarySchema = z.object({
         status: z.string().optional(),
         updated_at: z.string().optional(),
         created_at: z.string().optional(),
+        components: attributionSchema,
       }),
     )
     .optional(),
@@ -65,6 +76,7 @@ const historySchema = z.object({
       created_at: z.string().optional(),
       updated_at: z.string().optional(),
       resolved_at: z.string().nullable().optional(),
+      components: attributionSchema,
     }),
   ),
 });
@@ -104,6 +116,39 @@ function mapComponentStatus(status: string | undefined): OverallStatus {
   return COMPONENT_STATUSES[status] ?? "major_outage";
 }
 
+/** Severity worst last. `unknown` is absent: it ranks nowhere, it only abstains. */
+const SEVERITY: OverallStatus[] = ["operational", "degraded", "partial_outage", "major_outage"];
+
+/**
+ * How a scoped provider reads its selection: the worst status any selected
+ * component reports, and `unknown` when none of them reports one at all. Never
+ * optimistic — a selection the provider has dropped must not read as a recovery.
+ */
+function worstOf(components: ComponentStatus[]): OverallStatus {
+  const worst = components.reduce((rank, component) => Math.max(rank, SEVERITY.indexOf(component.status)), -1);
+  return SEVERITY[worst] ?? "unknown";
+}
+
+/**
+ * Whether a scoped provider should ignore this incident. An incident with no
+ * component attribution is a page-wide announcement and never out of scope:
+ * dropping it would hide the provider's own global notices.
+ */
+function outOfScope(attributed: { id?: string | undefined }[] | undefined, selected: Set<string>): boolean {
+  if (attributed === undefined || attributed.length === 0) return false;
+  return !attributed.some((component) => component.id !== undefined && selected.has(component.id));
+}
+
+/**
+ * Scoping only bites once something is selected: an operator who asks for it
+ * and then picks nothing must keep seeing the whole page, not go silent.
+ */
+function scopeOf(service: ServiceRef): Set<string> | null {
+  const selection = service.components ?? [];
+  if (service.scopeToComponents !== true || selection.length === 0) return null;
+  return new Set(selection.map((component) => component.id));
+}
+
 /**
  * Pure mapping from a summary payload to the internal shape, exported so the
  * fixture suite can exercise it without any network.
@@ -122,10 +167,12 @@ export function parseSummary(raw: unknown, service: ServiceRef): NormalizedStatu
   }
 
   const fetchedAt = new Date().toISOString();
+  const scope = scopeOf(service);
   const activeIncidents: Incident[] = (parsed.incidents ?? []).flatMap((incident) => {
     const id = incident.id;
     if (id === undefined) return [];
     if (CLOSED_STATUSES.has(incident.status ?? "")) return [];
+    if (scope !== null && outOfScope(incident.components, scope)) return [];
     return [
       {
         id,
@@ -155,7 +202,7 @@ export function parseSummary(raw: unknown, service: ServiceRef): NormalizedStatu
 
   return {
     provider: service.id,
-    overallStatus: mapIndicator(parsed.status?.indicator),
+    overallStatus: scope === null ? mapIndicator(parsed.status?.indicator) : worstOf(components),
     activeIncidents,
     components,
     fetchedAt,
@@ -173,10 +220,12 @@ export function parseIncidentHistory(raw: unknown, service: ServiceRef): Inciden
   }
   const parsed = historySchema.parse(raw);
 
+  const scope = scopeOf(service);
   const incidents: HistoricalIncident[] = parsed.incidents.flatMap((incident) => {
     const id = incident.id;
     const createdAt = incident.created_at;
     if (id === undefined || createdAt === undefined) return [];
+    if (scope !== null && outOfScope(incident.components, scope)) return [];
     const closed = CLOSED_STATUSES.has(incident.status ?? "");
     return [
       {

@@ -53,6 +53,7 @@ function groupComponents(components) {
  * @param {{
  *   load: () => Promise<{ supported: boolean, components: { id: string, name: string, group: string | null, showcase: boolean }[] }>,
  *   initial?: { id: string, name: string }[],
+ *   initialScope?: boolean,
  * }} options
  */
 export function createComponentPicker(options) {
@@ -61,6 +62,26 @@ export function createComponentPicker(options) {
   const count = element("span", "mono muted", t("components.selected", { count: selected.size }));
   const message = element("p", "muted");
   message.hidden = true;
+
+  /** Refreshers for the per-group boxes, rebuilt on every load. @type {(() => void)[]} */
+  const groupSyncs = [];
+
+  const scopeRow = element("label", "component-picker-scope");
+  const scopeWrap = element("span", "component-picker-check");
+  const scopeBox = /** @type {HTMLInputElement} */ (element("input", "component-picker-checkbox"));
+  scopeBox.type = "checkbox";
+  scopeBox.checked = options.initialScope === true;
+  scopeWrap.append(scopeBox, icon(ICON_CHECK));
+  scopeRow.append(scopeWrap, element("span", "component-picker-scope-label", t("components.scope")));
+
+  /** Everything that has to follow a change of selection, in one place. */
+  function afterChange() {
+    count.textContent = t("components.selected", { count: selected.size });
+    for (const sync of groupSyncs) sync();
+    // Scoping to an empty selection would mean scoping to nothing at all.
+    scopeBox.disabled = selected.size === 0;
+  }
+  scopeBox.disabled = selected.size === 0;
 
   const searchWrap = element("div", "component-picker-search");
   searchWrap.hidden = true;
@@ -103,8 +124,11 @@ export function createComponentPicker(options) {
     }
   });
 
-  /** @param {{ id: string, name: string }} member */
-  function memberRow(member) {
+  /**
+   * @param {{ id: string, name: string }} member
+   * @param {(() => void)[]} syncs collects this row's own refresher for its group
+   */
+  function memberRow(member, syncs) {
     const row = element("label", "component-picker-row");
     row.dataset.name = member.name.toLowerCase();
     const checkWrap = element("span", "component-picker-check");
@@ -114,7 +138,10 @@ export function createComponentPicker(options) {
     box.addEventListener("change", () => {
       if (box.checked) selected.set(member.id, member.name);
       else selected.delete(member.id);
-      count.textContent = t("components.selected", { count: selected.size });
+      afterChange();
+    });
+    syncs.push(() => {
+      box.checked = selected.has(member.id);
     });
     checkWrap.append(box, icon(ICON_CHECK));
     row.append(checkWrap, element("span", "component-picker-row-name", member.name));
@@ -132,13 +159,40 @@ export function createComponentPicker(options) {
     );
     details.open = single;
     const summary = element("summary", "component-picker-group-summary");
+
+    /** @type {(() => void)[]} */
+    const rowSyncs = [];
+    const allWrap = element("span", "component-picker-check");
+    const all = /** @type {HTMLInputElement} */ (element("input", "component-picker-checkbox"));
+    all.type = "checkbox";
+    all.setAttribute("aria-label", t("components.select-all", { group: label }));
+    // Without this the click reaches the <summary> and folds the group shut as
+    // a side effect of ticking a region — the one thing a region box must not do.
+    allWrap.addEventListener("click", (event) => event.stopPropagation());
+    all.addEventListener("change", () => {
+      for (const member of members) {
+        if (all.checked) selected.set(member.id, member.name);
+        else selected.delete(member.id);
+      }
+      for (const sync of rowSyncs) sync();
+      afterChange();
+    });
+    allWrap.append(all, icon(ICON_CHECK));
+
     summary.append(
       icon(ICON_CHEVRON),
+      allWrap,
       element("span", "component-picker-group-name", label),
       element("span", "component-picker-group-count", String(members.length)),
     );
     details.append(summary);
-    for (const member of members) details.append(memberRow(member));
+    for (const member of members) details.append(memberRow(member, rowSyncs));
+
+    groupSyncs.push(() => {
+      const picked = members.filter((member) => selected.has(member.id)).length;
+      all.checked = picked === members.length;
+      all.indeterminate = picked > 0 && picked < members.length;
+    });
     return details;
   }
 
@@ -151,15 +205,15 @@ export function createComponentPicker(options) {
     for (const id of selected.keys()) {
       if (!freshIds.has(id)) selected.delete(id);
     }
-    count.textContent = t("components.selected", { count: selected.size });
-
     search.value = "";
     listWrap.replaceChildren();
+    groupSyncs.length = 0;
     const groups = groupComponents(components);
     const single = groups.size === 1;
     for (const [label, members] of groups) {
       listWrap.append(groupSection(label, members, single));
     }
+    afterChange();
     searchWrap.hidden = false;
     listWrap.hidden = false;
   }
@@ -189,8 +243,11 @@ export function createComponentPicker(options) {
       header.append(loadButton, count);
       root.append(header, message, searchWrap, listWrap);
       root.append(element("span", "mono field-hint", t("components.hint")));
+      root.append(scopeRow, element("span", "mono field-hint", t("components.scope-hint")));
       wrap.append(root);
     },
     value: () => [...selected.entries()].map(([id, name]) => ({ id, name })),
+    // Nothing selected means nothing to scope to, whatever the box remembers.
+    scopeToComponents: () => scopeBox.checked && selected.size > 0,
   };
 }
