@@ -2,6 +2,7 @@
 design
 docs/superpowers
 specs
+.superpowers
 
 # Node / build output
 node_modules/
