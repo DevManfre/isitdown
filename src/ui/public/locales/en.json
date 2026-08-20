@@ -83,6 +83,7 @@
   "providers.empty": "No providers configured yet.",
   "providers.remove-confirm": "Remove {name}? Its uptime history and incidents go with it.",
 
+  "incidents.filter.label": "Incident filter",
   "incidents.active": "Active incident",
   "incidents.closed": "Closed",
   "incidents.notifications-sent": "Notifications sent",

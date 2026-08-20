@@ -17,37 +17,97 @@ const FILTERS = [
   { key: "filter.resolved", value: "resolved" },
 ];
 
-let filter = "all";
+/** The chosen filter survives a reload, the way the rail's collapsed state does. */
+const FILTER_STORAGE_KEY = "isitdown.incidentFilter";
+
+let filter = storedFilter();
+
+function storedFilter() {
+  try {
+    const stored = localStorage.getItem(FILTER_STORAGE_KEY);
+    return FILTERS.some((entry) => entry.value === stored) ? stored : "all";
+  } catch {
+    return "all";
+  }
+}
+
+function rememberFilter() {
+  try {
+    localStorage.setItem(FILTER_STORAGE_KEY, filter);
+  } catch {
+    /* only costs the choice surviving a reload */
+  }
+}
 
 export async function renderIncidents(container, state) {
   const [incidents, feed] = await Promise.all([api.getIncidents(), api.getNotifications(8)]);
   const providerName = nameLookup(state);
 
-  container.append(filterRow());
+  // The filter is a view of data already in hand, so switching repaints these
+  // sections rather than re-running the route, which would refetch both endpoints.
+  const sections = element("div", "incidents-sections");
+  const paint = () => {
+    sections.replaceChildren();
+    const grid = element("div", "grid-incidents");
+    // "resolved" drops the active card, so the feed takes the whole row rather
+    // than leaving the column it vacated empty.
+    if (filter === "resolved") grid.classList.add("grid-incidents-single");
+    else grid.append(activePanel(incidents.active, providerName));
+    grid.append(feedPanel(feed.notifications, providerName));
+    sections.append(grid);
+    if (filter !== "active") sections.append(closedList(incidents.closed, providerName));
+  };
 
-  const grid = element("div", "grid-incidents");
-  grid.append(activePanel(incidents.active, providerName), feedPanel(feed.notifications, providerName));
-  container.append(grid);
-
-  if (filter !== "active") container.append(closedList(incidents.closed, providerName));
+  container.append(filterRow(incidents, paint));
+  paint();
+  container.append(sections);
 }
 
-function filterRow() {
+/**
+ * The counts ride inside the pills so the operator reads how much each filter
+ * holds without having to switch to it.
+ */
+function filterRow(incidents, onChange) {
+  const counts = {
+    all: incidents.active.length + incidents.closed.length,
+    active: incidents.active.length,
+    resolved: incidents.closed.length,
+  };
+
   const row = element("div", "header-actions");
+  const seg = element("div", "seg seg-pills");
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", t("incidents.filter.label"));
+
   for (const entry of FILTERS) {
-    const tag = element("button", "tag tag-outline mono", t(entry.key));
-    tag.type = "button";
-    tag.style.cursor = "pointer";
-    if (entry.value !== filter) {
-      tag.style.borderColor = "var(--color-neutral-800)";
-      tag.style.color = "var(--color-neutral-500)";
-    }
-    tag.addEventListener("click", () => {
+    const option = element("button", "seg-opt mono", t(entry.key));
+    option.type = "button";
+    option.setAttribute("aria-pressed", String(entry.value === filter));
+    option.append(element("span", "seg-count", String(counts[entry.value])));
+    option.addEventListener("click", () => {
+      if (filter === entry.value) return;
       filter = entry.value;
-      window.dispatchEvent(new HashChangeEvent("hashchange"));
+      rememberFilter();
+      for (const sibling of seg.children) {
+        sibling.setAttribute("aria-pressed", String(sibling === option));
+      }
+      onChange();
     });
-    row.append(tag);
+    seg.append(option);
   }
+
+  // A grouped control is walked with the arrow keys, not only tabbed through.
+  seg.addEventListener("keydown", (event) => {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    const options = [...seg.children];
+    const next = options[(options.indexOf(document.activeElement) + step + options.length) % options.length];
+    next.focus();
+    next.click();
+  });
+
+  row.append(seg);
   return row;
 }
 

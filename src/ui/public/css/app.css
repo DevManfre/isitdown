@@ -498,6 +498,18 @@
   gap: 20px;
   align-items: start;
 }
+/* The "resolved" filter takes the active card out of the row, so what is left
+   spans it rather than sitting beside an empty column. */
+.grid-incidents-single {
+  grid-template-columns: 1fr;
+}
+/* The panels and the closed list keep the view's own rhythm even though the
+   filter repaints them as one block. */
+.incidents-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 .panel {
   border: 1px solid var(--color-neutral-800);
   border-radius: var(--radius-md);
@@ -548,6 +560,14 @@
 }
 .seg-pills .seg-opt[aria-pressed="true"]:hover {
   background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+/* How many incidents each filter holds, kept a step quieter than its label. */
+.seg-count {
+  font-size: 10px;
+  color: var(--color-neutral-600);
+}
+.seg-opt[aria-pressed="true"] .seg-count {
+  color: var(--color-accent);
 }
 
 /* — row actions — */

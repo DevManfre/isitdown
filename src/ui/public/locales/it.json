@@ -83,6 +83,7 @@
   "providers.empty": "Nessun provider configurato.",
   "providers.remove-confirm": "Rimuovere {name}? Anche la sua cronologia di uptime e i suoi incidenti verranno eliminati.",
 
+  "incidents.filter.label": "Filtro incidenti",
   "incidents.active": "Incidente attivo",
   "incidents.closed": "Chiusi",
   "incidents.notifications-sent": "Notifiche inviate",
