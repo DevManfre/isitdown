@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -12,7 +12,8 @@ export const SCHEMA_VERSION = 1;
  */
 export function migrate(db: DatabaseSync): void {
   const [row] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
-  if ((row?.user_version ?? 0) >= SCHEMA_VERSION) return;
+  const from = row?.user_version ?? 0;
+  if (from >= SCHEMA_VERSION) return;
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS services (
@@ -83,6 +84,34 @@ export function migrate(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_notifications_sent
       ON notifications (sent_at);
   `);
+
+  if (from < 2) {
+    // PRAGMA guards make a half-applied upgrade safe to re-run.
+    const serviceColumns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!serviceColumns.includes("components")) {
+      db.exec("ALTER TABLE services ADD COLUMN components TEXT");
+    }
+    const stateColumns = (db.prepare("PRAGMA table_info(provider_state)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!stateColumns.includes("components")) {
+      db.exec("ALTER TABLE provider_state ADD COLUMN components TEXT NOT NULL DEFAULT '[]'");
+    }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS component_samples (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider_id  TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        component_id TEXT NOT NULL,
+        observed_at  TEXT NOT NULL,
+        status       TEXT NOT NULL,
+        ok           INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_component_samples_provider_component_time
+        ON component_samples (provider_id, component_id, observed_at);
+    `);
+  }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }

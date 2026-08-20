@@ -26,6 +26,7 @@ const STATUS_KEY: Record<OverallStatus, string> = {
 
 const TEMPLATE: Record<StatusChangeKind, string> = {
   status_change: "notification.status.changed",
+  component_status_change: "notification.component.changed",
   incident_opened: "notification.incident.opened",
   incident_updated: "notification.incident.updated",
   incident_resolved: "notification.incident.resolved",
@@ -72,6 +73,7 @@ export function renderMessage(payload: NotificationPayload): string {
     status: incidentStatusLabel(change.incident?.status ?? "", locale),
     count: change.failureCount ?? 0,
     lastStatus: statusLabel(change.currentStatus, locale),
+    component: change.component?.name ?? "",
     updatedAt,
     url: service.statusUrl,
   });

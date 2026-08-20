@@ -75,6 +75,52 @@ test("service definition keeps adapter options when given", () => {
   assert.deepEqual(parsed.options, { selector: "#status" });
 });
 
+test("a service definition without components defaults to an empty selection", () => {
+  const parsed = serviceDefinitionSchema.parse({
+    id: "github",
+    name: "GitHub",
+    adapter: "statuspage",
+    baseUrl: "https://www.githubstatus.com",
+  });
+  assert.deepEqual(parsed.components, []);
+});
+
+test("a component selection carries id and name", () => {
+  const parsed = serviceDefinitionSchema.parse({
+    id: "github",
+    name: "GitHub",
+    adapter: "statuspage",
+    baseUrl: "https://www.githubstatus.com",
+    components: [{ id: "8l4ygp009s5s", name: "Git Operations" }],
+  });
+  assert.deepEqual(parsed.components, [{ id: "8l4ygp009s5s", name: "Git Operations" }]);
+});
+
+test("a component entry with an empty id is rejected", () => {
+  const result = serviceDefinitionSchema.safeParse({
+    id: "github",
+    name: "GitHub",
+    adapter: "statuspage",
+    baseUrl: "https://www.githubstatus.com",
+    components: [{ id: "", name: "Git Operations" }],
+  });
+  assert.equal(result.success, false);
+});
+
+test("a component selection with a duplicated id is rejected", () => {
+  const result = serviceDefinitionSchema.safeParse({
+    id: "github",
+    name: "GitHub",
+    adapter: "statuspage",
+    baseUrl: "https://www.githubstatus.com",
+    components: [
+      { id: "c1", name: "A" },
+      { id: "c1", name: "A" },
+    ],
+  });
+  assert.equal(result.success, false);
+});
+
 test("polling schema fills every default", () => {
   assert.deepEqual(pollingSchema.parse({}), {
     intervalMinutes: 3,

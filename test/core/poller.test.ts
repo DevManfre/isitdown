@@ -11,6 +11,7 @@ import { getAdapter } from "../../src/adapters/index.ts";
 import { createFileStateStore } from "../../src/light/fileStateStore.ts";
 import type { RuntimeConfig, ServiceDefinition } from "../../src/core/configSource.interface.ts";
 import type { StateStore } from "../../src/core/stateStore.interface.ts";
+import type { ServiceRef } from "../../src/core/adapter.interface.ts";
 
 const silent = createLogger("error", () => {});
 
@@ -51,6 +52,7 @@ const service = (id: string, baseUrl: string, over: Partial<ServiceDefinition> =
   adapter: "statuspage",
   baseUrl,
   enabled: true,
+  components: [],
   ...over,
 });
 
@@ -406,5 +408,42 @@ test("an incident opening and the status moving are reported as separate changes
   } finally {
     await store.close();
     await provider.close();
+  }
+});
+
+test("the poller hands the component selection to the adapter", async () => {
+  let seen: ServiceRef | undefined;
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const poller = createPoller({
+    getAdapter: () => ({
+      id: "stub",
+      fetchStatus: async (service) => {
+        seen = service;
+        return {
+          provider: service.id,
+          overallStatus: "operational",
+          activeIncidents: [],
+          components: [],
+          fetchedAt: new Date().toISOString(),
+        };
+      },
+    }),
+    store,
+    logger: silent,
+    sleep: timer.sleep,
+  });
+  const cfg = config([
+    service("github", "http://127.0.0.1:1", {
+      adapter: "stub",
+      components: [{ id: "c1", name: "Actions" }],
+    }),
+  ]);
+
+  try {
+    await poller.runCycle(cfg);
+    assert.deepEqual(seen?.components, [{ id: "c1", name: "Actions" }]);
+  } finally {
+    await store.close();
   }
 });

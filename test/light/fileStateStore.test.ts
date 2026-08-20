@@ -50,6 +50,7 @@ test("the file is human-readable JSON carrying its version", async () => {
     provider: "github",
     overallStatus: "degraded",
     activeIncidents: [],
+    components: [],
     fetchedAt: "2026-08-19T14:05:00.000Z",
   });
   await store.close();
@@ -88,6 +89,7 @@ test("concurrent mutations from a whole poll cycle all land and leave no temp fi
             provider,
             overallStatus: "degraded",
             activeIncidents: [],
+            components: [],
             fetchedAt: "2026-08-19T14:05:00.000Z",
           })
         : store.recordFailure(provider),

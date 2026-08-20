@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { buildUiRuntime, type UiRuntime } from "../../src/ui/runtime.ts";
+import { updateService } from "../../src/ui/dbConfigSource.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import type { Incident, OverallStatus } from "../../src/core/types.ts";
 
@@ -53,6 +54,7 @@ const save = (
     provider,
     overallStatus: status,
     activeIncidents: incidents,
+    components: [],
     fetchedAt: when,
   });
 
@@ -129,6 +131,49 @@ test("history for an unknown provider is a 404", async () => {
   const app = await api();
   try {
     assert.equal((await app.get("/history?provider=nope")).status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
+test("component history returns one entry per selected component", async () => {
+  const app = await api();
+  try {
+    updateService(app.runtime.db, "github", { components: [{ id: "c1", name: "Actions" }] });
+    await app.runtime.store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [{ id: "c1", name: "Actions", status: "operational" }],
+      fetchedAt: at(0),
+    });
+
+    const { status, body } = await app.get("/history/components?provider=github&days=7");
+    assert.equal(status, 200);
+    const payload = body as { components: { componentId: string; buckets: unknown[] }[] };
+    assert.equal(payload.components.length, 1);
+    assert.equal(payload.components[0]?.componentId, "c1");
+    assert.equal(payload.components[0]?.buckets.length, 7);
+  } finally {
+    await app.close();
+  }
+});
+
+test("component history 404s an unknown provider", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.get("/history/components?provider=nope&days=7");
+    assert.equal(status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
+test("component history rejects a window it does not serve", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.get("/history/components?provider=github&days=13");
+    assert.equal(status, 400);
   } finally {
     await app.close();
   }

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { buildUiRuntime, type UiRuntime } from "../../src/ui/runtime.ts";
+import { updateService } from "../../src/ui/dbConfigSource.ts";
 import { createLogger } from "../../src/core/logger.ts";
 
 const silent = createLogger("error", () => {});
@@ -78,6 +79,7 @@ test("status lists every enabled provider with its current state", async () => {
           updatedAt: "2026-08-19T14:00:00.000Z",
         },
       ],
+      components: [],
       fetchedAt: "2026-08-19T14:05:00.000Z",
     });
 
@@ -105,6 +107,39 @@ test("status lists every enabled provider with its current state", async () => {
     assert.equal(github?.activeIncidents.length, 1);
     assert.equal(github?.baseUrl, "https://www.githubstatus.com");
     assert.equal(typeof github?.uptime90, "number");
+  } finally {
+    await app.close();
+  }
+});
+
+test("status carries current component statuses and the selection", async () => {
+  const app = await api();
+  try {
+    updateService(app.runtime.db, "github", { components: [{ id: "c1", name: "Actions" }] });
+    await app.runtime.store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [{ id: "c1", name: "Actions", status: "operational" }],
+      fetchedAt: "2026-08-19T14:05:00.000Z",
+    });
+
+    const { body } = await app.get("/status");
+    const payload = body as {
+      providers: {
+        id: string;
+        componentSelection: { id: string; name: string }[];
+        components: { id: string; status: string }[];
+      }[];
+    };
+    const provider = payload.providers.find((entry) => entry.id === "github");
+    assert.deepEqual(provider?.componentSelection, [{ id: "c1", name: "Actions" }]);
+    assert.equal(provider?.components[0]?.id, "c1");
+    assert.ok(
+      ["operational", "degraded", "partial_outage", "major_outage", "unknown"].includes(
+        provider?.components[0]?.status ?? "",
+      ),
+    );
   } finally {
     await app.close();
   }
@@ -184,6 +219,7 @@ test("samples older than the retention window are pruned at boot", async () => {
     provider: "github",
     overallStatus: "operational",
     activeIncidents: [],
+    components: [],
     fetchedAt: ancient,
   });
   await first.close();

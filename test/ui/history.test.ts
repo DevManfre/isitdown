@@ -32,7 +32,7 @@ async function harness(providers: string[] = ["github"]): Promise<{
 }
 
 const sample = (store: HistoryStore, provider: string, at: string, status: OverallStatus) =>
-  store.saveStatus({ provider, overallStatus: status, activeIncidents: [], fetchedAt: at });
+  store.saveStatus({ provider, overallStatus: status, activeIncidents: [], components: [], fetchedAt: at });
 
 test("a week of operational samples is a hundred percent uptime with one bucket per day", async () => {
   const { store, history } = await harness();
@@ -140,6 +140,7 @@ test("the incident count is the incidents that started inside the window", async
     activeIncidents: [
       { id: "recent", name: "x", impact: "minor", status: "investigating", updatedAt: daysAgo(3) },
     ],
+    components: [],
     fetchedAt: daysAgo(3),
   });
   await store.saveStatus({
@@ -148,6 +149,7 @@ test("the incident count is the incidents that started inside the window", async
     activeIncidents: [
       { id: "old", name: "y", impact: "minor", status: "investigating", updatedAt: daysAgo(80) },
     ],
+    components: [],
     fetchedAt: daysAgo(80),
   });
 
@@ -255,4 +257,49 @@ test("a month with no samples reports no uptime rather than zero percent", async
   for (const month of summary.months.slice(0, -1)) {
     assert.equal(month.uptime, null, `${month.month} had no samples, so 0% would be a lie`);
   }
+});
+
+test("component histories are gap-filled and windowed like the provider's", async () => {
+  const { store } = await harness();
+  // "c1" gets a day of 20 component samples, 10 of them operational, one day
+  // before the service's fixed "today" of 2026-08-20 — i.e. yesterday.
+  for (let hour = 0; hour < 10; hour += 1) {
+    await store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [{ id: "c1", name: "Actions", status: "operational" }],
+      fetchedAt: daysAgo(0, hour),
+    });
+  }
+  for (let hour = 10; hour < 20; hour += 1) {
+    await store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [{ id: "c1", name: "Actions", status: "degraded" }],
+      fetchedAt: daysAgo(0, hour),
+    });
+  }
+  // "c2" is never sampled at all.
+
+  const service = createHistoryService(store, { now: () => new Date("2026-08-20T12:00:00.000Z") });
+  const histories = await service.getComponentHistories(
+    "github",
+    [
+      { id: "c1", name: "Actions" },
+      { id: "c2", name: "Pages" },
+    ],
+    7,
+  );
+  assert.equal(histories.length, 2);
+  assert.equal(histories[0]?.componentId, "c1");
+  assert.equal(histories[0]?.name, "Actions");
+  assert.equal(histories[0]?.buckets.length, 7);
+  assert.equal(histories[0]?.uptime7, 50);
+  assert.equal(histories[0]?.sampleCount, 20);
+  // never measured: zero samples and 0% must not be conflated — sampleCount tells them apart
+  assert.equal(histories[1]?.sampleCount, 0);
+  assert.equal(histories[1]?.buckets.every((bucket) => bucket.status === "unknown"), true);
+  await store.close();
 });

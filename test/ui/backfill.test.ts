@@ -234,7 +234,13 @@ test("backfillAll is idempotent: a second run adds nothing", async () => {
 test("backfill stops at the earliest real sample and never overlaps it", async () => {
   const { db, store } = await storeHarness(["svc"]);
   const realAt = "2026-08-19T11:00:00.000Z";
-  await store.saveStatus({ provider: "svc", overallStatus: "operational", activeIncidents: [], fetchedAt: realAt });
+  await store.saveStatus({
+    provider: "svc",
+    overallStatus: "operational",
+    activeIncidents: [],
+    components: [],
+    fetchedAt: realAt,
+  });
   await createBackfillService({
     getAdapter: () => fakeAdapter(),
     store,

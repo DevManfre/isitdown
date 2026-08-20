@@ -44,6 +44,8 @@ export interface DailyBucket {
 export interface HistoryStore extends StateStore {
   /** One row per day that has samples, oldest first. Days with none are absent. */
   getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]>;
+  /** Daily buckets for one selected component, same shape as the provider's. */
+  getComponentDailyBuckets(providerId: string, componentId: string, days: number): Promise<DailyBucket[]>;
   /** Every configured provider, enabled or not: its history is real either way. */
   listProviderIds(): Promise<string[]>;
   recordNotification(record: SentRecord): Promise<void>;

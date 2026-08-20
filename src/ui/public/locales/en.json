@@ -134,6 +134,17 @@
   "add.test-ok": "Reachable — reported {status}.",
   "add.test-failed": "Could not reach it: {error}",
 
+  "components.field": "Components",
+  "components.load": "Choose components",
+  "components.search": "Search components",
+  "components.selected": "{count} selected",
+  "components.empty": "This provider exposes no components",
+  "components.unsupported": "This adapter cannot list components",
+  "components.hint": "Optional: with none selected, only the overall status is monitored",
+  "components.ungrouped": "Other",
+  "components.rows-title": "Components",
+  "components.never-measured": "No samples yet",
+
   "channel.enabled": "enabled",
   "channel.disabled": "disabled",
   "channel.env-set": "set",

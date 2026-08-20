@@ -27,6 +27,8 @@ export const getHistory = (days, provider) =>
     "GET",
     `./history?days=${days}${provider === undefined ? "" : `&provider=${encodeURIComponent(provider)}`}`,
   );
+export const getComponentHistory = (provider, days) =>
+  request("GET", `./history/components?days=${days}&provider=${encodeURIComponent(provider)}`);
 
 export const getIncidents = (provider) =>
   request("GET", `./incidents${provider === undefined ? "" : `?provider=${encodeURIComponent(provider)}`}`);
@@ -37,6 +39,7 @@ export const getNotifications = (limit = 20) => request("GET", `./notifications?
 
 export const getConfig = () => request("GET", "./config");
 export const addService = (service) => request("POST", "./config/services", service);
+export const previewComponents = (body) => request("POST", "./config/services/preview-components", body);
 export const patchService = (id, patch) =>
   request("PATCH", `./config/services/${encodeURIComponent(id)}`, patch);
 export const removeService = (id) => request("DELETE", `./config/services/${encodeURIComponent(id)}`);

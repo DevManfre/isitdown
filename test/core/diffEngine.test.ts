@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { diff } from "../../src/core/diffEngine.ts";
 import type {
+  ComponentStatus,
   Incident,
   NormalizedStatus,
   OverallStatus,
@@ -17,11 +18,23 @@ const inc = (over: Partial<Incident> = {}): Incident => ({
   ...over,
 });
 
-const snap = (overallStatus: OverallStatus, activeIncidents: Incident[] = []): NormalizedStatus => ({
+const snap = (
+  overallStatus: OverallStatus,
+  activeIncidents: Incident[] = [],
+  components: ComponentStatus[] = [],
+): NormalizedStatus => ({
   provider: "github",
   overallStatus,
   activeIncidents,
+  components,
   fetchedAt: "2026-08-19T14:05:00.000Z",
+});
+
+const comp = (over: Partial<ComponentStatus> = {}): ComponentStatus => ({
+  id: "c1",
+  name: "Actions",
+  status: "operational",
+  ...over,
 });
 
 const cases: {
@@ -121,6 +134,42 @@ const cases: {
     next: snap("degraded", [inc({ id: "new" })]),
     expect: ["incident_opened", "incident_resolved"],
   },
+  {
+    name: "a component degrading is a component change",
+    previous: snap("operational", [], [comp()]),
+    next: snap("operational", [], [comp({ status: "degraded" })]),
+    expect: ["component_status_change"],
+  },
+  {
+    name: "a component recovering is a component change",
+    previous: snap("operational", [], [comp({ status: "major_outage" })]),
+    next: snap("operational", [], [comp()]),
+    expect: ["component_status_change"],
+  },
+  {
+    name: "a newly selected component is a baseline, not news",
+    previous: snap("operational"),
+    next: snap("operational", [], [comp({ status: "major_outage" })]),
+    expect: [],
+  },
+  {
+    name: "a component disappearing is silent",
+    previous: snap("operational", [], [comp()]),
+    next: snap("operational"),
+    expect: [],
+  },
+  {
+    name: "unknown on either side of a component is not comparable",
+    previous: snap("operational", [], [comp({ status: "unknown" })]),
+    next: snap("operational", [], [comp({ status: "major_outage" })]),
+    expect: [],
+  },
+  {
+    name: "an overall change and a component change report together",
+    previous: snap("operational", [], [comp()]),
+    next: snap("degraded", [], [comp({ status: "degraded" })]),
+    expect: ["status_change", "component_status_change"],
+  },
 ];
 
 for (const c of cases) {
@@ -161,4 +210,21 @@ test("diff never mutates its arguments", () => {
   const before = JSON.stringify([previous, next]);
   diff(previous, next);
   assert.equal(JSON.stringify([previous, next]), before);
+});
+
+test("a component change carries the component and its own statuses", () => {
+  const changes = diff(
+    snap("operational", [], [comp()]),
+    snap("operational", [], [comp({ status: "degraded" })]),
+  );
+  assert.deepEqual(changes, [
+    {
+      kind: "component_status_change",
+      providerId: "github",
+      previousStatus: "operational",
+      currentStatus: "degraded",
+      component: { id: "c1", name: "Actions" },
+      at: "2026-08-19T14:05:00.000Z",
+    },
+  ]);
 });

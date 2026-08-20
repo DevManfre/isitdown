@@ -29,6 +29,7 @@ const snap = (provider: string, overallStatus: OverallStatus): NormalizedStatus 
       updatedAt: "2026-08-19T14:00:00.000Z",
     },
   ],
+  components: [],
   fetchedAt: "2026-08-19T14:05:00.000Z",
 });
 

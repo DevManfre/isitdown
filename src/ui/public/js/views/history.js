@@ -8,7 +8,16 @@
  */
 
 import * as api from "../api.js";
-import { animate, element, monthColumns, stagger, statusColor, uptimeBarRow } from "../charts.js";
+import {
+  animate,
+  element,
+  monthColumns,
+  stagger,
+  statusColor,
+  statusDot,
+  uptimeBarRow,
+  uptimeStrip,
+} from "../charts.js";
 import { formatDay, formatPercent, t, tPlural } from "../i18n.js";
 
 const RANGES = [7, 30, 90];
@@ -25,7 +34,8 @@ const statusKey = (status) => STATUS_KEYS[status] ?? STATUS_KEYS.unknown;
 
 export async function renderHistory(container, state) {
   const summary = await api.getHistory(days);
-  const names = new Map((state.status?.providers ?? []).map((provider) => [provider.id, provider.name]));
+  const statusById = new Map((state.status?.providers ?? []).map((provider) => [provider.id, provider]));
+  const names = new Map([...statusById].map(([id, provider]) => [id, provider.name]));
 
   container.append(summaryRow(summary), animate(element("div", "fade-rule"), "anim-sweep", "200ms"));
 
@@ -38,9 +48,84 @@ export async function renderHistory(container, state) {
   summary.providers.forEach((provider, index) => {
     const block = providerBlock(provider, names.get(provider.providerId) ?? provider.providerId);
     rows.append(animate(block, "anim-rise", stagger(index, 80)));
+    const statusProvider = statusById.get(provider.providerId);
+    // /status already carries the selection: skip the request entirely for
+    // the common case of a provider with nothing selected.
+    if ((statusProvider?.componentSelection ?? []).length > 0) {
+      appendComponentRows(block, provider.providerId, statusProvider);
+    }
   });
   container.append(rows, exportRow());
 }
+
+/**
+ * Fetches and appends the component breakdown once it resolves, independent of
+ * the rest of the view: a provider's own figures are already on screen, so a
+ * slow or failing component fetch must not hold up — or blank out — the page.
+ * Only called for a provider with a non-empty component selection.
+ * @param {HTMLElement} block
+ * @param {string} providerId
+ * @param {{ components?: { id: string, name: string, status: string }[] } | undefined} statusProvider
+ */
+function appendComponentRows(block, providerId, statusProvider) {
+  const currentById = new Map(
+    (statusProvider?.components ?? []).map((component) => [component.id, component]),
+  );
+  componentRows(providerId, currentById)
+    .then((section) => {
+      if (section !== null) block.append(element("div", "fade-rule"), section);
+    })
+    .catch(() => {
+      // The provider's own uptime figures already rendered; a missing
+      // component breakdown is not worth surfacing as a page-level error.
+    });
+}
+
+/**
+ * One row per selected component under the provider's own strip: dot, name,
+ * strip, percentage. Rendered — and requested — only when the provider
+ * selects components.
+ * @param {string} providerId
+ * @param {Map<string, { id: string, name: string, status: string }>} currentById component id -> current status payload
+ */
+async function componentRows(providerId, currentById) {
+  const { components } = await api.getComponentHistory(providerId, days);
+  if (components.length === 0) return null;
+
+  const section = element("div", "stack-tight component-rows");
+  section.append(element("span", "kicker kicker-accent", t("components.rows-title")));
+  for (const component of components) {
+    const row = element("div", "component-row row-between");
+    const current = currentById.get(component.componentId);
+
+    const left = element("div", "row-between component-row-name");
+    left.style.justifyContent = "flex-start";
+    left.style.gap = "9px";
+    left.append(statusDot(current?.status ?? "unknown"));
+    // Prefer the payload's current name over the selection's stale snapshot;
+    // fall back to it only when the provider no longer reports the component
+    // (never polled, or dropped upstream).
+    left.append(element("span", "component-row-name-text", current?.name ?? component.name));
+    row.append(left);
+
+    row.append(uptimeStrip(component.buckets));
+
+    const never = component.sampleCount === 0;
+    row.append(
+      element(
+        "span",
+        `mono component-row-figure${never ? " muted" : ""}`,
+        never ? t("components.never-measured") : formatPercent(uptimeFor(component, days)),
+      ),
+    );
+
+    section.append(row);
+  }
+  return section;
+}
+
+const uptimeFor = (component, days) =>
+  days <= 7 ? component.uptime7 : days <= 30 ? component.uptime30 : component.uptime90;
 
 function summaryRow(summary) {
   const row = element("div", "row-between");

@@ -11,6 +11,8 @@ export interface ServiceRef {
   baseUrl: string;
   /** Adapter-specific extras from config, e.g. a CSS selector for a scraper. */
   options?: Record<string, string> | undefined;
+  /** Selected components; the adapter reports only these. Absent = none. */
+  components?: { id: string; name: string }[] | undefined;
 }
 
 export interface FetchContext {
@@ -24,6 +26,16 @@ export interface IncidentHistoryResult {
    * provider's full incident history (fewer entries than the feed cap).
    */
   coverageStart: string | null;
+}
+
+/** What the UI's picker shows before any component is selected. */
+export interface ComponentPreview {
+  id: string;
+  name: string;
+  /** Resolved group label (e.g. a Cloudflare region), null for ungrouped. */
+  group: string | null;
+  /** Statuspage's "featured" flag; a hint for the picker, nothing more. */
+  showcase: boolean;
 }
 
 export interface Adapter {
@@ -42,4 +54,10 @@ export interface Adapter {
    * no backfillable history.
    */
   fetchIncidentHistory?(service: ServiceRef, ctx: FetchContext): Promise<IncidentHistoryResult>;
+  /**
+   * Lists the components a provider exposes, for the selection picker. Optional:
+   * an adapter without it simply offers no component monitoring. Throws like
+   * `fetchStatus` does.
+   */
+  listComponents?(service: ServiceRef, ctx: FetchContext): Promise<ComponentPreview[]>;
 }

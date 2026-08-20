@@ -94,6 +94,25 @@ test("a monitoring degraded warning reports the failure count and last known sta
   assert.ok(message.startsWith("⚪"), message);
 });
 
+test("a component change message names the component and uses its severity", () => {
+  const text = renderMessage({
+    change: {
+      kind: "component_status_change",
+      providerId: "github",
+      previousStatus: "operational",
+      currentStatus: "degraded",
+      component: { id: "c1", name: "Actions" },
+      at: "2026-08-19T14:05:00.000Z",
+    },
+    service: { id: "github", name: "GitHub", statusUrl: "https://www.githubstatus.com" },
+    locale: "en",
+  });
+  assert.ok(text.startsWith("🟡"));
+  assert.match(text, /GitHub — DEGRADED/);
+  assert.match(text, /Component Actions changed from Operational to Degraded\./);
+  assert.match(text, /https:\/\/www\.githubstatus\.com/);
+});
+
 test("an unknown provider lifecycle word falls through untranslated rather than blank", () => {
   const message = renderMessage(
     payloadFor({
@@ -110,6 +129,7 @@ test("an unknown provider lifecycle word falls through untranslated rather than 
 test("no rendered message leaves an unfilled placeholder", () => {
   const changes: StatusChange[] = [
     { kind: "status_change", providerId: "github", previousStatus: "operational", currentStatus: "degraded", at: incident.updatedAt },
+    { kind: "component_status_change", providerId: "github", previousStatus: "operational", currentStatus: "degraded", component: { id: "c1", name: "Actions" }, at: incident.updatedAt },
     { kind: "incident_opened", providerId: "github", currentStatus: "degraded", incident, at: incident.updatedAt },
     { kind: "incident_updated", providerId: "github", currentStatus: "degraded", incident, at: incident.updatedAt },
     { kind: "incident_resolved", providerId: "github", currentStatus: "operational", incident, at: incident.updatedAt },

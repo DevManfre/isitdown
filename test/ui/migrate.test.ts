@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "../../src/ui/db/open.ts";
 import { migrate, SCHEMA_VERSION } from "../../src/ui/db/migrate.ts";
 import { seedDefaults } from "../../src/ui/db/seed.ts";
@@ -25,6 +25,7 @@ test("migrate creates every table the dashboard reads", async () => {
   migrate(db);
   assert.deepEqual(names(db, "table"), [
     "channels",
+    "component_samples",
     "incidents",
     "notifications",
     "provider_state",
@@ -72,6 +73,48 @@ test("migrate is idempotent and never touches existing rows", async () => {
     ["github"],
   );
   db.close();
+});
+
+test("a fresh database gets the v2 component schema", () => {
+  const db = new DatabaseSync(":memory:");
+  migrate(db);
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+    .all()
+    .map((row) => (row as { name: string }).name);
+  assert.ok(tables.includes("component_samples"));
+  const serviceColumns = db.prepare("PRAGMA table_info(services)").all().map((row) => (row as { name: string }).name);
+  assert.ok(serviceColumns.includes("components"));
+  const stateColumns = db.prepare("PRAGMA table_info(provider_state)").all().map((row) => (row as { name: string }).name);
+  assert.ok(stateColumns.includes("components"));
+});
+
+test("migrating from user_version 1 adds columns and keeps data", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE services (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, adapter TEXT NOT NULL,
+      base_url TEXT NOT NULL, options TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE provider_state (
+      provider_id TEXT PRIMARY KEY, overall_status TEXT NOT NULL,
+      active_incidents TEXT NOT NULL, fetched_at TEXT NOT NULL,
+      failure_count INTEGER NOT NULL DEFAULT 0, degraded_notified INTEGER NOT NULL DEFAULT 0
+    );
+    PRAGMA user_version = 1;
+  `);
+  db.prepare("INSERT INTO services (id, name, adapter, base_url, created_at) VALUES (?, ?, ?, ?, ?)").run(
+    "github", "GitHub", "statuspage", "https://www.githubstatus.com", "2026-08-20T00:00:00.000Z",
+  );
+  migrate(db);
+  const columns = db.prepare("PRAGMA table_info(services)").all().map((row) => (row as { name: string }).name);
+  assert.ok(columns.includes("components"));
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM services").get() as { n: number } | undefined)?.n, 1);
+  assert.equal(
+    (db.prepare("PRAGMA user_version").get() as { user_version: number } | undefined)?.user_version,
+    2,
+  );
 });
 
 test("seedDefaults gives a fresh database three providers to watch", async () => {

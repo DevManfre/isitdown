@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { parseSummary, parseIncidentHistory, statuspageAdapter } from "../../src/adapters/statuspage.adapter.ts";
+import {
+  parseSummary,
+  parseIncidentHistory,
+  parseComponentList,
+  statuspageAdapter,
+} from "../../src/adapters/statuspage.adapter.ts";
 import { getAdapter } from "../../src/adapters/index.ts";
 import type { ServiceRef } from "../../src/core/adapter.interface.ts";
 
@@ -125,6 +130,50 @@ test("a fundamentally broken body throws so the poller can retry", () => {
 test("the provider id comes from the service, not from the payload", () => {
   const status = parseSummary(fixture("operational"), { ...service, id: "renamed" });
   assert.equal(status.provider, "renamed");
+});
+
+const withSelection = (components: { id: string; name: string }[]): ServiceRef => ({
+  ...service,
+  components,
+});
+
+test("no selection yields no components even when the payload has them", () => {
+  const status = parseSummary(fixture("components-mixed"), service);
+  assert.deepEqual(status.components, []);
+});
+
+test("selected components are mapped in selection order with payload names", () => {
+  const status = parseSummary(
+    fixture("components-mixed"),
+    withSelection([
+      { id: "cmp2", name: "Old Dashboard Name" },
+      { id: "cmp1", name: "API" },
+    ]),
+  );
+  assert.deepEqual(status.components, [
+    { id: "cmp2", name: "Dashboard", status: "degraded" },
+    { id: "cmp1", name: "API", status: "operational" },
+  ]);
+});
+
+test("component status words map onto the normalized vocabulary", () => {
+  const status = parseSummary(
+    fixture("components-mixed"),
+    withSelection([
+      { id: "cmp3", name: "Webhooks" },
+      { id: "cmp4", name: "Batch Jobs" },
+      { id: "cmp5", name: "Edge Cache" },
+    ]),
+  );
+  assert.deepEqual(
+    status.components.map((component) => component.status),
+    ["partial_outage", "unknown", "major_outage"],
+  );
+});
+
+test("a selected component missing from the payload reads unknown with the snapshot name", () => {
+  const status = parseSummary(fixture("components-mixed"), withSelection([{ id: "gone", name: "Removed Thing" }]));
+  assert.deepEqual(status.components, [{ id: "gone", name: "Removed Thing", status: "unknown" }]);
 });
 
 test("fetchStatus requests the summary endpoint under the service base url", async () => {
@@ -293,6 +342,50 @@ test("fetchIncidentHistory throws on a non-2xx response", async () => {
       await assert.rejects(
         statuspageAdapter.fetchIncidentHistory!({ ...service, baseUrl }, { timeoutMs: 2000 }),
         /503/,
+      );
+    },
+  );
+});
+
+test("parseComponentList excludes group containers and resolves group labels", () => {
+  const previews = parseComponentList(fixture("components-mixed"), service);
+  assert.deepEqual(previews, [
+    { id: "cmp1", name: "API", group: "Core Services", showcase: true },
+    { id: "cmp2", name: "Dashboard", group: "Core Services", showcase: true },
+    { id: "cmp3", name: "Webhooks", group: null, showcase: false },
+    { id: "cmp4", name: "Batch Jobs", group: null, showcase: false },
+    { id: "cmp5", name: "Edge Cache", group: null, showcase: false },
+  ]);
+});
+
+test("listComponents fetches the summary over HTTP", async () => {
+  await withServer(
+    (_req, res) => {
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify(fixture("components-mixed")));
+    },
+    async (baseUrl) => {
+      const previews = await statuspageAdapter.listComponents?.(
+        { id: "fixture", name: "Fixture", baseUrl },
+        { timeoutMs: 2000 },
+      );
+      assert.equal(previews?.length, 5);
+      assert.equal(previews?.[0]?.id, "cmp1");
+    },
+  );
+});
+
+test("listComponents throws on a non-2xx response", async () => {
+  await withServer(
+    (_req, res) => {
+      res.statusCode = 500;
+      res.end("nope");
+    },
+    async (baseUrl) => {
+      await assert.rejects(
+        statuspageAdapter.listComponents?.({ id: "fixture", name: "Fixture", baseUrl }, { timeoutMs: 2000 }) ??
+          Promise.reject(new Error("listComponents missing")),
+        /HTTP 500/,
       );
     },
   );

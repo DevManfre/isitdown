@@ -44,6 +44,7 @@ const snap = (over: Partial<NormalizedStatus> = {}): NormalizedStatus => ({
   provider: "github",
   overallStatus: "degraded",
   activeIncidents: [inc()],
+  components: [],
   fetchedAt: "2026-08-19T14:05:00.000Z",
   ...over,
 });
@@ -299,6 +300,7 @@ test("a provider timestamp ahead of our clock cannot start an incident in the fu
     provider: "github",
     overallStatus: "major_outage",
     activeIncidents: [inc({ updatedAt: "2099-01-01T00:00:00.000Z" })],
+    components: [],
     fetchedAt: "2026-08-19T14:05:00.000Z",
   });
 
@@ -310,6 +312,7 @@ test("a provider timestamp ahead of our clock cannot start an incident in the fu
     provider: "github",
     overallStatus: "operational",
     activeIncidents: [],
+    components: [],
     fetchedAt: "2026-08-19T15:00:00.000Z",
   });
   const [resolved] = await store.listIncidents({ providerId: "github" });
@@ -326,6 +329,7 @@ test("a normal past provider timestamp is kept as the start time", async () => {
     provider: "github",
     overallStatus: "degraded",
     activeIncidents: [inc({ updatedAt: "2026-08-19T13:30:00.000Z" })],
+    components: [],
     fetchedAt: "2026-08-19T14:05:00.000Z",
   });
   const [row] = await store.listIncidents({ providerId: "github" });
@@ -389,5 +393,58 @@ test("applyBackfill never overwrites incident row live path owns", async () => {
   const incident = await store.getIncident("github", "h1");
   assert.equal(incident?.status, "investigating", "the live row must win");
   assert.equal(incident?.resolvedAt, null);
+  await store.close();
+});
+
+test("saveStatus persists component state and appends component samples", async () => {
+  const { store } = await harness();
+  await store.saveStatus({
+    provider: "github",
+    overallStatus: "operational",
+    activeIncidents: [],
+    components: [
+      { id: "c1", name: "Actions", status: "degraded" },
+      { id: "c2", name: "Pages", status: "operational" },
+    ],
+    fetchedAt: "2026-08-20T10:00:00.000Z",
+  });
+  const state = await store.getState("github");
+  assert.deepEqual(state.last?.components, [
+    { id: "c1", name: "Actions", status: "degraded" },
+    { id: "c2", name: "Pages", status: "operational" },
+  ]);
+  const buckets = await store.getComponentDailyBuckets("github", "c1", 7);
+  assert.equal(buckets.length, 1);
+  assert.equal(buckets[0]?.worstStatus, "degraded");
+  assert.equal(buckets[0]?.okSamples, 0);
+  assert.equal(buckets[0]?.totalSamples, 1);
+  await store.close();
+});
+
+test("an unknown component status writes no sample", async () => {
+  const { store } = await harness();
+  await store.saveStatus({
+    provider: "github",
+    overallStatus: "operational",
+    activeIncidents: [],
+    components: [{ id: "c1", name: "Actions", status: "unknown" }],
+    fetchedAt: "2026-08-20T10:00:00.000Z",
+  });
+  assert.deepEqual(await store.getComponentDailyBuckets("github", "c1", 7), []);
+  await store.close();
+});
+
+test("pruning removes old component samples", async () => {
+  const { store } = await harness();
+  const old = new Date(Date.now() - 200 * 24 * 3600 * 1000).toISOString();
+  await store.saveStatus({
+    provider: "github",
+    overallStatus: "operational",
+    activeIncidents: [],
+    components: [{ id: "c1", name: "Actions", status: "degraded" }],
+    fetchedAt: old,
+  });
+  await store.pruneOlderThan(30);
+  assert.deepEqual(await store.getComponentDailyBuckets("github", "c1", 365), []);
   await store.close();
 });

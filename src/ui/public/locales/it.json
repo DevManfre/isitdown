@@ -134,6 +134,17 @@
   "add.test-ok": "Raggiungibile — ha risposto {status}.",
   "add.test-failed": "Non raggiungibile: {error}",
 
+  "components.field": "Componenti",
+  "components.load": "Scegli i componenti",
+  "components.search": "Cerca componenti",
+  "components.selected": "{count} selezionati",
+  "components.empty": "Questo provider non espone componenti",
+  "components.unsupported": "Questo adapter non può elencare i componenti",
+  "components.hint": "Facoltativo: senza selezione viene monitorato solo lo stato generale",
+  "components.ungrouped": "Altri",
+  "components.rows-title": "Componenti",
+  "components.never-measured": "Ancora nessun campione",
+
   "channel.enabled": "attivo",
   "channel.disabled": "disattivo",
   "channel.env-set": "impostata",

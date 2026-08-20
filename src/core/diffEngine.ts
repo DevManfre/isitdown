@@ -28,6 +28,25 @@ export function diff(previous: NormalizedStatus | null, next: NormalizedStatus):
     });
   }
 
+  // Components follow the same two rules: a side the component is missing from
+  // is a baseline (newly selected) or a removal (deselected or dropped by the
+  // provider), never news; `unknown` is not comparable.
+  const previousComponents = new Map(previous.components.map((component) => [component.id, component]));
+  for (const component of next.components) {
+    const seen = previousComponents.get(component.id);
+    if (seen === undefined) continue;
+    if (seen.status === "unknown" || component.status === "unknown") continue;
+    if (seen.status !== component.status) {
+      changes.push({
+        ...base,
+        kind: "component_status_change",
+        previousStatus: seen.status,
+        currentStatus: component.status,
+        component: { id: component.id, name: component.name },
+      });
+    }
+  }
+
   const before = new Map(previous.activeIncidents.map((incident) => [incident.id, incident]));
   const after = new Map(next.activeIncidents.map((incident) => [incident.id, incident]));
 

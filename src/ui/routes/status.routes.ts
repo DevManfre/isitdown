@@ -40,6 +40,8 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
           enabled: service.enabled,
           overallStatus: state.last?.overallStatus ?? "unknown",
           activeIncidents: state.last?.activeIncidents ?? [],
+          components: state.last?.components ?? [],
+          componentSelection: service.components,
           fetchedAt: state.last?.fetchedAt ?? null,
           failureCount: state.failureCount,
           uptime90: history.uptime90,
