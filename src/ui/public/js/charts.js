@@ -139,15 +139,18 @@ export function uptimeStrip(buckets) {
 /**
  * A provider tile: a ring in its status colour around its short code.
  *
- * The ring is a gauge of the last percent, not of the whole scale — the
- * prototype's own geometry. At 99% or below it stays at a 6° stub, because a
- * ring that reads as empty says less than one that reads as barely started.
+ * The ring is a gauge of the whole 0–100% scale. The prototype zoomed on the
+ * last percent, which only worked while live polling kept every uptime between
+ * 99 and 100 — backfilled history makes far lower values normal and would
+ * collapse every ring to a stub. A measured uptime keeps a 6° floor, because a
+ * ring that reads as empty says less than one that reads as barely started;
+ * zero (never measured, or fully down) renders as an unbroken grey ring.
  */
 export function uptimeRing(provider, delay) {
   const tile = animate(element("div", "ring-tile"), "anim-rise", delay);
   const ring = animate(element("div", "ring"), "anim-ring", delay);
   const color = statusColor(provider.overallStatus);
-  const degrees = Math.max(6, (provider.uptime90 - 99) * 360);
+  const degrees = provider.uptime90 > 0 ? Math.max(6, (provider.uptime90 / 100) * 360) : 0;
   ring.style.background = `conic-gradient(${color} 0 ${degrees}deg, var(--status-unknown) ${degrees}deg 360deg)`;
 
   const inner = element("div", "ring-inner");
