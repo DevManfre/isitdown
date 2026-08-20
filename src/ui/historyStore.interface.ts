@@ -1,6 +1,6 @@
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { StateStore } from "../core/stateStore.interface.ts";
-import type { OverallStatus } from "../core/types.ts";
+import type { HistoricalIncident, OverallStatus } from "../core/types.ts";
 
 /**
  * What the UI edition needs on top of the shared StateStore: the history the
@@ -53,4 +53,15 @@ export interface HistoryStore extends StateStore {
   /** Newest first, for the incident view's poll strip. */
   getRecentSamples(providerId: string, limit: number): Promise<SampleRow[]>;
   pruneOlderThan(days: number): Promise<void>;
+  /** MIN(observed_at) from provider, or null when no samples yet. */
+  getEarliestSampleTime(providerId: string): Promise<string | null>;
+  /**
+   * Backfill write path: samples plus historical incidents in one transaction.
+   * Never touches provider_state — the first real poll must still see a null
+   * baseline — and never overwrites an incident row the live path already owns.
+   */
+  applyBackfill(
+    providerId: string,
+    data: { samples: SampleRow[]; incidents: HistoricalIncident[] },
+  ): Promise<void>;
 }

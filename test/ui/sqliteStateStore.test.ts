@@ -9,7 +9,7 @@ import { migrate } from "../../src/ui/db/migrate.ts";
 import { createSqliteStateStore } from "../../src/ui/sqliteStateStore.ts";
 import { CONTRACT_PROVIDER_IDS, runStateStoreContract } from "../core/stateStore.contract.ts";
 import type { HistoryStore } from "../../src/ui/historyStore.interface.ts";
-import type { Incident, NormalizedStatus } from "../../src/core/types.ts";
+import type { HistoricalIncident, Incident, NormalizedStatus } from "../../src/core/types.ts";
 
 function seedServices(db: DatabaseSync, ids: readonly string[]): void {
   const insert = db.prepare(
@@ -330,5 +330,64 @@ test("a normal past provider timestamp is kept as the start time", async () => {
   });
   const [row] = await store.listIncidents({ providerId: "github" });
   assert.equal(row?.startedAt, "2026-08-19T13:30:00.000Z", "the provider knows when it began");
+  await store.close();
+});
+
+const histIncident = (over: Partial<HistoricalIncident> = {}): HistoricalIncident => ({
+  id: "h1",
+  name: "API errors",
+  impact: "major",
+  status: "resolved",
+  startedAt: "2026-08-10T10:00:00.000Z",
+  resolvedAt: "2026-08-10T12:30:00.000Z",
+  updatedAt: "2026-08-10T12:30:00.000Z",
+  ...over,
+});
+
+test("getEarliestSampleTime is null with no samples and MIN(observed_at) with some", async () => {
+  const { store } = await harness();
+  assert.equal(await store.getEarliestSampleTime("github"), null);
+  await store.saveStatus(snap({ fetchedAt: "2026-08-19T14:05:00.000Z" }));
+  await store.saveStatus(snap({ fetchedAt: "2026-08-18T14:05:00.000Z" }));
+  assert.equal(await store.getEarliestSampleTime("github"), "2026-08-18T14:05:00.000Z");
+  await store.close();
+});
+
+test("applyBackfill writes samples and historical incidents, never touches provider_state", async () => {
+  const { db, store } = await harness();
+  await store.applyBackfill("github", {
+    samples: [
+      { observedAt: "2026-08-10T10:00:00.000Z", overallStatus: "operational", ok: true },
+      { observedAt: "2026-08-10T11:00:00.000Z", overallStatus: "partial_outage", ok: false },
+    ],
+    incidents: [histIncident()],
+  });
+
+  const rows = db.prepare("SELECT overall_status, ok FROM status_samples ORDER BY observed_at").all() as {
+    overall_status: string;
+    ok: number;
+  }[];
+  assert.deepEqual(rows.map((row) => ({ ...row })), [
+    { overall_status: "operational", ok: 1 },
+    { overall_status: "partial_outage", ok: 0 },
+  ]);
+  const incident = await store.getIncident("github", "h1");
+  assert.equal(incident?.startedAt, "2026-08-10T10:00:00.000Z");
+  assert.equal(incident?.resolvedAt, "2026-08-10T12:30:00.000Z");
+  const state = await store.getState("github");
+  assert.equal(state.last, null, "backfill must not create poll baseline");
+  await store.close();
+});
+
+test("applyBackfill never overwrites incident row live path owns", async () => {
+  const { store } = await harness();
+  await store.saveStatus(snap({ activeIncidents: [inc({ id: "h1", status: "investigating" })] }));
+  await store.applyBackfill("github", {
+    samples: [],
+    incidents: [histIncident({ id: "h1", status: "resolved" })],
+  });
+  const incident = await store.getIncident("github", "h1");
+  assert.equal(incident?.status, "investigating", "the live row must win");
+  assert.equal(incident?.resolvedAt, null);
   await store.close();
 });

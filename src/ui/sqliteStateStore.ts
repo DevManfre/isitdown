@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { ProviderRuntimeState } from "../core/stateStore.interface.ts";
 import { incidentSchema } from "../core/status.schema.ts";
-import type { Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
+import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { z } from "zod";
 import type {
   DailyBucket,
@@ -184,6 +184,14 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
   const insertNotification = db.prepare(
     "INSERT INTO notifications (provider_id, channel, kind, text, sent_at, ok, error) VALUES (?, ?, ?, ?, ?, ?, ?)",
   );
+  const selectEarliestSampleTime = db.prepare(
+    "SELECT MIN(observed_at) AS earliest FROM status_samples WHERE provider_id = ?",
+  );
+  const insertBackfillIncident = db.prepare(`
+    INSERT INTO incidents (provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (provider_id, incident_id) DO NOTHING
+  `);
 
   function readIncidents(json: string): Incident[] {
     return incidentsColumnSchema.parse(JSON.parse(json));
@@ -377,6 +385,43 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
       db.prepare("DELETE FROM status_samples WHERE observed_at < ?").run(cutoff);
       db.prepare("DELETE FROM notifications WHERE sent_at < ?").run(cutoff);
       db.prepare("DELETE FROM incidents WHERE resolved_at IS NOT NULL AND resolved_at < ?").run(cutoff);
+    },
+
+    async getEarliestSampleTime(providerId: string): Promise<string | null> {
+      const raw = selectEarliestSampleTime.get(providerId);
+      const row = z.object({ earliest: z.string().nullable() }).parse(raw);
+      return row.earliest;
+    },
+
+    async applyBackfill(
+      providerId: string,
+      data: { samples: SampleRow[]; incidents: HistoricalIncident[] },
+    ): Promise<void> {
+      db.exec("BEGIN");
+      try {
+        // Insert samples as-is: do not create provider_state.
+        for (const sample of data.samples) {
+          insertSample.run(providerId, sample.observedAt, sample.overallStatus, sample.ok ? 1 : 0);
+        }
+        // Insert incidents with ON CONFLICT DO NOTHING: the live path owns the row
+        // if it already exists, backfill never overwrites.
+        for (const incident of data.incidents) {
+          insertBackfillIncident.run(
+            providerId,
+            incident.id,
+            incident.name,
+            incident.impact,
+            incident.status,
+            incident.startedAt,
+            incident.updatedAt,
+            incident.resolvedAt,
+          );
+        }
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
     },
 
     async close(): Promise<void> {
