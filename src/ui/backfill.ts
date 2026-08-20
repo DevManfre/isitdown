@@ -2,8 +2,7 @@ import type { Adapter } from "../core/adapter.interface.ts";
 import type { ConfigSource, PollingConfig, ServiceDefinition } from "../core/configSource.interface.ts";
 import type { HistoricalIncident, OverallStatus } from "../core/types.ts";
 import type { Logger } from "../core/logger.ts";
-import type { SampleRow } from "./historyStore.interface.ts";
-import type { HistoryStore } from "./historyStore.interface.ts";
+import type { HistoryStore, SampleRow } from "./historyStore.interface.ts";
 
 /** How far back the bars can possibly reach; the 90-day view is the widest. */
 export const BACKFILL_DAYS = 90;
@@ -138,16 +137,29 @@ export function createBackfillService(deps: BackfillDeps): BackfillService {
 
   return {
     async backfillAll(): Promise<void> {
-      const config = await deps.configSource.load();
-      // Sequential on purpose: this is a boot-time nicety, not a poll cycle.
-      for (const service of config.services) await attempt(service, config.polling);
+      try {
+        const config = await deps.configSource.load();
+        // Sequential on purpose: this is a boot-time nicety, not a poll cycle.
+        for (const service of config.services) await attempt(service, config.polling);
+      } catch (error) {
+        deps.logger.warn("history backfill failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     },
 
     async backfillOne(serviceId: string): Promise<void> {
-      const config = await deps.configSource.load();
-      const service = config.services.find((entry) => entry.id === serviceId);
-      if (service === undefined) return; // unknown or disabled: nothing to do
-      await attempt(service, config.polling);
+      try {
+        const config = await deps.configSource.load();
+        const service = config.services.find((entry) => entry.id === serviceId);
+        if (service === undefined) return; // unknown or disabled: nothing to do
+        await attempt(service, config.polling);
+      } catch (error) {
+        deps.logger.warn("history backfill failed", {
+          providerId: serviceId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     },
   };
 }
