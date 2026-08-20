@@ -5,6 +5,10 @@
  * The rail is generated from the route table, so a view that is not registered
  * cannot be linked to. `/status` is re-read every 30 seconds — it is a pure DB
  * read on the server, which is why polling it is cheap.
+ *
+ * That poll must not be visible: it repaints only when the payload changed,
+ * and when it does it builds the new view off-screen and swaps it in one go,
+ * so the page never blanks while a view waits for its own requests.
  */
 
 import * as api from "./api.js";
@@ -17,6 +21,7 @@ import { renderIncidents } from "./views/incidents.js";
 import { renderIncident } from "./views/incident.js";
 import { renderHistory } from "./views/history.js";
 import { renderSettings } from "./views/settings.js";
+import { shouldHoldRefresh, snapshot } from "./refresh.js";
 
 const REFRESH_MS = 30_000;
 
@@ -36,6 +41,9 @@ const ROUTES = [
  * remount key lives here; `data-animate` on the container is how CSS sees it.
  */
 let animatedKey;
+
+/** Fingerprint of the state the current DOM was built from. */
+let rendered;
 
 const state = {
   status: undefined,
@@ -66,12 +74,27 @@ export const navigate = (hash) => {
 
 /** Views call this after a write so the whole shell reflects the new state. */
 export async function refresh() {
+  await load(true);
+}
+
+/**
+ * Re-reads the shell's data. A write repaints unconditionally — the operator
+ * asked for it and is waiting to see it; the background poll repaints only on
+ * a changed payload, which on a five-minute poll interval is one tick in ten.
+ *
+ * @param {boolean} force repaint even when nothing changed
+ */
+async function load(force) {
   const [status, config] = await Promise.all([api.getStatus(), api.getConfig()]);
   state.status = status;
   state.config = config;
+  const fingerprint = snapshot(status, config);
+  const changed = fingerprint !== rendered;
+  rendered = fingerprint;
+  if (!force && !changed) return;
   renderRail();
   renderHeader();
-  await renderView();
+  await renderView({ offscreen: true });
 }
 
 function parseRoute() {
@@ -207,7 +230,14 @@ function playEntryAnimations() {
   dom.view.setAttribute("data-animate", viewName());
 }
 
-async function renderView() {
+/**
+ * @param {{ offscreen?: boolean }} [options] render into a detached container
+ * and swap it in once it is complete. Clearing `#view` up front instead would
+ * leave the page empty for as long as the view's own requests take, which on a
+ * refresh reads as the page reloading itself under the operator.
+ */
+async function renderView(options) {
+  const offscreen = options?.offscreen === true;
   const route = ROUTES.find((entry) => entry.path === state.route.path) ?? ROUTES[0];
   const render =
     state.route.params.length > 0 && route.detail !== undefined ? route.detail : route.render;
@@ -215,13 +245,21 @@ async function renderView() {
   const replay = key !== animatedKey;
   animatedKey = key;
 
-  dom.view.className = `view view-${viewName()}`;
-  dom.view.removeAttribute("data-animate");
-  dom.view.replaceChildren();
+  // Views are handed a container they may restyle (the overview drops `.view`),
+  // so the class list travels with the swap.
+  const target = offscreen ? document.createElement("div") : dom.view;
+  target.className = `view view-${viewName()}`;
+  target.removeAttribute("data-animate");
+  target.replaceChildren();
   try {
-    await render(dom.view, state);
+    await render(target, state);
   } catch (error) {
-    dom.view.replaceChildren(element("p", "empty", t("error.load-failed", { error: error.message })));
+    target.replaceChildren(element("p", "empty", t("error.load-failed", { error: error.message })));
+  }
+  if (offscreen) {
+    dom.view.className = target.className;
+    dom.view.removeAttribute("data-animate");
+    dom.view.replaceChildren(...target.childNodes);
   }
   // After the content is in place, so the whole view animates as one.
   if (replay) playEntryAnimations();
@@ -303,6 +341,21 @@ async function switchLanguage(language) {
   }
 }
 
+/** What the background refresh needs to know about the page right now. */
+function pageState() {
+  const active = document.activeElement;
+  const tag = active === null ? "" : active.tagName;
+  return {
+    hidden: document.hidden,
+    dialogOpen: document.querySelector(".dialog-backdrop") !== null,
+    editing:
+      tag === "INPUT" ||
+      tag === "TEXTAREA" ||
+      tag === "SELECT" ||
+      (active instanceof HTMLElement && active.isContentEditable),
+  };
+}
+
 async function start() {
   try {
     state.preferences = await api.getPreferences();
@@ -327,10 +380,17 @@ async function start() {
 
   await refresh();
   setInterval(() => {
-    void refresh().catch(() => {
+    if (shouldHoldRefresh(pageState())) return;
+    void load(false).catch(() => {
       /* a failed refresh keeps the last view rather than blanking it */
     });
   }, REFRESH_MS);
+  // A tab that was hidden across several ticks catches up the moment it is
+  // looked at again, rather than showing stale data for up to 30 seconds.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    void load(false).catch(() => {});
+  });
   setInterval(renderCountdown, 1000);
 }
 
