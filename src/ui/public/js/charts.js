@@ -17,30 +17,35 @@ import { formatPercent } from "./i18n.js";
 const TOKENS = {
   operational: {
     color: "var(--status-operational)",
+    fill: "var(--status-operational-fill)",
     height: "var(--bar-operational)",
     compact: "var(--bar-compact-operational)",
     poll: "var(--bar-poll-operational)",
   },
   degraded: {
     color: "var(--status-degraded)",
+    fill: "var(--status-degraded-fill)",
     height: "var(--bar-degraded)",
     compact: "var(--bar-compact-degraded)",
     poll: "var(--bar-poll-degraded)",
   },
   partial_outage: {
     color: "var(--status-partial-outage)",
+    fill: "var(--status-partial-outage-fill)",
     height: "var(--bar-partial-outage)",
     compact: "var(--bar-compact-partial-outage)",
     poll: "var(--bar-poll-partial-outage)",
   },
   major_outage: {
     color: "var(--status-major-outage)",
+    fill: "var(--status-major-outage-fill)",
     height: "var(--bar-major-outage)",
     compact: "var(--bar-compact-major-outage)",
     poll: "var(--bar-poll-major-outage)",
   },
   unknown: {
     color: "var(--status-unknown)",
+    fill: "var(--status-unknown-fill)",
     height: "var(--bar-unknown)",
     compact: "var(--bar-compact-unknown)",
     poll: "var(--bar-poll-unknown)",
@@ -56,7 +61,7 @@ export function barSpec(status, scale = "row") {
   const known = Object.hasOwn(TOKENS, status) ? status : "unknown";
   const token = TOKENS[known];
   const height = scale === "compact" ? token.compact : scale === "poll" ? token.poll : token.height;
-  return { status: known, color: token.color, height, muted: known === "unknown" };
+  return { status: known, color: token.color, fill: token.fill, height, muted: known === "unknown" };
 }
 
 /**
@@ -72,7 +77,11 @@ export function animate(node, className, delay) {
   return node;
 }
 
+/** The token a label written in its status colour uses. */
 export const statusColor = (status) => barSpec(status).color;
+
+/** The token a bar, ring or dot is painted with. */
+export const statusFill = (status) => barSpec(status).fill;
 
 /**
  * Where a provider's icon may live, in the order worth trying. The page's own
@@ -115,7 +124,7 @@ export function uptimeBarRow(buckets, title, scale = "row") {
     const spec = barSpec(bucket.status, scale);
     const bar = element("span", "bar");
     bar.style.height = spec.height;
-    bar.style.background = spec.color;
+    bar.style.background = spec.fill;
     if (spec.muted) bar.style.opacity = "0.45";
     bar.title = title === undefined ? "" : title(bucket);
     row.append(animate(bar, "anim-bar", stagger(index, 5)));
@@ -129,7 +138,7 @@ export function uptimeStrip(buckets) {
   buckets.forEach((bucket, index) => {
     const spec = barSpec(bucket.status);
     const bar = element("span", "bar");
-    bar.style.background = spec.color;
+    bar.style.background = spec.fill;
     if (spec.muted) bar.style.opacity = "0.45";
     row.append(animate(bar, "anim-bar anim-bar-strip", stagger(index, 5)));
   });
@@ -151,7 +160,7 @@ export function uptimeRing(provider, delay) {
   const ring = animate(element("div", "ring"), "anim-ring", delay);
   const color = statusColor(provider.overallStatus);
   const degrees = provider.uptime90 > 0 ? Math.max(6, (provider.uptime90 / 100) * 360) : 0;
-  ring.style.background = `conic-gradient(${color} 0 ${degrees}deg, var(--status-unknown) ${degrees}deg 360deg)`;
+  ring.style.background = `conic-gradient(${statusFill(provider.overallStatus)} 0 ${degrees}deg, var(--status-unknown-fill) ${degrees}deg 360deg)`;
 
   const inner = element("div", "ring-inner");
   const short = element("span", "ring-label", provider.name.slice(0, 3).toUpperCase());
@@ -224,7 +233,7 @@ export function pollStrip(samples, size = 24) {
       const spec = barSpec(sample.overallStatus, "poll");
       const bar = element("span", "bar");
       bar.style.height = spec.height;
-      bar.style.background = spec.color;
+      bar.style.background = spec.fill;
       if (spec.muted) bar.style.opacity = "0.45";
       strip.append(animate(bar, "anim-bar", stagger(index, 22)));
     });
@@ -240,13 +249,13 @@ export function pollStrip(samples, size = 24) {
  */
 export function statusDot(status, glow = 0, pulse = false) {
   const dot = element("span", "dot");
-  dot.style.background = statusColor(status);
+  dot.style.background = statusFill(status);
   if (glow > 0) {
-    dot.style.boxShadow = `0 0 ${glow}px color-mix(in srgb, ${statusColor(status)} 55%, transparent)`;
+    dot.style.boxShadow = `0 0 ${glow}px color-mix(in srgb, ${statusFill(status)} 55%, transparent)`;
   }
   if (pulse) {
     // The pulse expands in currentColor, so the dot carries its colour twice.
-    dot.style.color = statusColor(status);
+    dot.style.color = statusFill(status);
     dot.classList.add("dot-pulse");
   }
   return dot;
