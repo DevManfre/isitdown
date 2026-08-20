@@ -37,7 +37,7 @@ export interface Adapter {
   fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus>;
   /**
    * Throws on a network error, a non-2xx response or an unparseable body so
-   * the backfill retry and failure accounting can act. Degrades quietly on a
+   * the caller logs a warning and skips the provider. Degrades quietly on a
    * missing individual field instead. An adapter without this method simply has
    * no backfillable history.
    */

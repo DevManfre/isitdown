@@ -273,11 +273,17 @@ test("testing a service connection reports the status it saw without recording a
 
     // Wait for backfill to settle: poll until sample count is non-zero and stable.
     // applyBackfill writes in one transaction, so stable non-zero = backfill complete.
+    const count = () =>
+      (
+        app.runtime.db
+          .prepare("SELECT COUNT(*) AS n FROM status_samples WHERE provider_id = 'fake'")
+          .get() as { n: number }
+      ).n;
     const deadline = Date.now() + 5000;
     let sampleCount = 0;
     let previousCount = -1;
     while (Date.now() < deadline) {
-      sampleCount = (await app.runtime.store.getRecentSamples("fake", 1000)).length;
+      sampleCount = count();
       if (sampleCount > 0 && sampleCount === previousCount) {
         break; // Stable non-zero count: backfill settled.
       }
@@ -287,14 +293,14 @@ test("testing a service connection reports the status it saw without recording a
     assert.ok(sampleCount > 0, "backfill must create samples");
 
     // Snapshot samples before the test endpoint call.
-    const samplesBefore = (await app.runtime.store.getRecentSamples("fake", 1000)).length;
+    const samplesBefore = count();
 
     const { status, body } = await app.request("POST", "/config/services/fake/test");
     assert.equal(status, 200);
     assert.deepEqual(body, { ok: true, overallStatus: "major_outage" });
 
     // Verify the test endpoint itself recorded no new samples — it is diagnostics only.
-    const samplesAfter = (await app.runtime.store.getRecentSamples("fake", 1000)).length;
+    const samplesAfter = count();
     assert.equal(samplesAfter, samplesBefore, "test endpoint must not record samples");
     assert.deepEqual(await app.runtime.store.listNotifications(5), []);
     assert.equal((await app.runtime.store.getState("fake")).last, null);

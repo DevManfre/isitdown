@@ -53,7 +53,7 @@ export interface HistoryStore extends StateStore {
   /** Newest first, for the incident view's poll strip. */
   getRecentSamples(providerId: string, limit: number): Promise<SampleRow[]>;
   pruneOlderThan(days: number): Promise<void>;
-  /** MIN(observed_at) from provider, or null when no samples yet. */
+  /** MIN(observed_at) for the provider, or null when it has no samples yet. */
   getEarliestSampleTime(providerId: string): Promise<string | null>;
   /**
    * Backfill write path: samples plus historical incidents in one transaction.
