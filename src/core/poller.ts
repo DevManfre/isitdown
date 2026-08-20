@@ -76,6 +76,7 @@ export function createPoller(deps: PollerDeps): Poller {
             baseUrl: service.baseUrl,
             options: service.options,
             components: service.components,
+            scopeToComponents: service.scopeToComponents,
           },
           { timeoutMs },
         );

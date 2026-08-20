@@ -1007,6 +1007,27 @@
   background: transparent;
   cursor: pointer;
 }
+.component-picker-checkbox:indeterminate {
+  background: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-color: var(--color-accent);
+}
+
+.component-picker-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.component-picker-scope {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.component-picker-scope-label {
+  font-size: 13px;
+}
+
 .component-picker-checkbox:checked {
   background: var(--color-accent);
   border-color: var(--color-accent);

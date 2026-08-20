@@ -221,6 +221,24 @@ test("a component selection round-trips through insert and list", async () => {
   db.close();
 });
 
+test("scoping to the selection round-trips and can be switched back off", async () => {
+  const db = await freshDbNoSeed();
+  insertService(db, {
+    id: "cloudflare",
+    name: "Cloudflare",
+    adapter: "statuspage",
+    baseUrl: "https://www.cloudflarestatus.com",
+    enabled: true,
+    components: [{ id: "57ctn3f2qsyj", name: "Amsterdam, Netherlands - (AMS)" }],
+    scopeToComponents: true,
+  });
+  assert.equal(listServices(db)[0]?.scopeToComponents, true);
+
+  updateService(db, "cloudflare", { scopeToComponents: false });
+  assert.equal(listServices(db)[0]?.scopeToComponents, false);
+  db.close();
+});
+
 test("updating the selection replaces it wholesale", async () => {
   const db = await freshDbNoSeed();
   insertService(db, {

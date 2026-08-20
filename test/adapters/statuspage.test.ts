@@ -176,6 +176,70 @@ test("a selected component missing from the payload reads unknown with the snaps
   assert.deepEqual(status.components, [{ id: "gone", name: "Removed Thing", status: "unknown" }]);
 });
 
+const EUROPE = [{ id: "ams", name: "Amsterdam, Netherlands - (AMS)" }];
+
+const scopedTo = (components: { id: string; name: string }[]): ServiceRef => ({
+  ...service,
+  components,
+  scopeToComponents: true,
+});
+
+test("scoping to components drops an incident that touches none of them", () => {
+  const status = parseSummary(fixture("regional"), scopedTo(EUROPE));
+  assert.deepEqual(
+    status.activeIncidents.map((incident) => incident.id),
+    ["inc-europe", "inc-page"],
+  );
+});
+
+test("an incident with no component attribution is page-wide and always kept", () => {
+  const status = parseSummary(fixture("regional"), scopedTo([{ id: "nowhere", name: "Nowhere" }]));
+  assert.deepEqual(
+    status.activeIncidents.map((incident) => incident.id),
+    ["inc-page"],
+  );
+});
+
+test("without scoping every incident is reported, whatever the selection", () => {
+  const status = parseSummary(fixture("regional"), withSelection(EUROPE));
+  assert.deepEqual(
+    status.activeIncidents.map((incident) => incident.id),
+    ["inc-asia", "inc-europe", "inc-page"],
+  );
+});
+
+test("a scoped overall status is the worst selected component, not the page indicator", () => {
+  const europe = parseSummary(fixture("regional"), scopedTo(EUROPE));
+  // The page indicator is `minor`; Amsterdam alone is operational.
+  assert.equal(europe.overallStatus, "operational");
+
+  const both = parseSummary(fixture("regional"), scopedTo([...EUROPE, { id: "sin", name: "Singapore - (SIN)" }]));
+  assert.equal(both.overallStatus, "partial_outage");
+});
+
+test("a scoped overall status is unknown when no selected component reports one", () => {
+  const status = parseSummary(fixture("regional"), scopedTo([{ id: "nowhere", name: "Nowhere" }]));
+  // Never operational: the diff engine must not read a dropped component as a recovery.
+  assert.equal(status.overallStatus, "unknown");
+});
+
+test("scoping with an empty selection leaves the page status and incidents alone", () => {
+  const status = parseSummary(fixture("regional"), { ...service, components: [], scopeToComponents: true });
+  assert.equal(status.overallStatus, "degraded");
+  assert.equal(status.activeIncidents.length, 3);
+});
+
+test("scoping filters incident history the same way, so charts match notifications", () => {
+  const scoped = parseIncidentHistory(fixture("regional-history"), scopedTo(EUROPE));
+  assert.deepEqual(
+    scoped.incidents.map((incident) => incident.id),
+    ["inc-europe", "inc-page"],
+  );
+
+  const unscoped = parseIncidentHistory(fixture("regional-history"), withSelection(EUROPE));
+  assert.equal(unscoped.incidents.length, 3);
+});
+
 test("fetchStatus requests the summary endpoint under the service base url", async () => {
   const seen: string[] = [];
   await withServer(

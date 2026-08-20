@@ -22,6 +22,18 @@ services:
     id: cloudflare
     adapter: statuspage
     baseUrl: https://www.cloudflarestatus.com
+    # Optional: watch only part of a provider. Component ids come from
+    # <baseUrl>/api/v2/summary.json, where Cloudflare groups its data centres by
+    # region. With scopeToComponents an incident attributed only to components
+    # outside this list is ignored, and the reported status is the worst of these
+    # components rather than the page-wide indicator. A notice the provider
+    # attaches to no component at all is page-wide and always reported.
+    scopeToComponents: true
+    components:
+      - id: 57ctn3f2qsyj
+        name: Amsterdam, Netherlands - (AMS)
+      - id: k8q1kmz4gfms
+        name: Milan, Italy - (MXP)
 
   - name: Anthropic
     id: anthropic

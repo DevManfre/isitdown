@@ -85,6 +85,28 @@ test("a service definition without components defaults to an empty selection", (
   assert.deepEqual(parsed.components, []);
 });
 
+test("a service definition reports the whole page unless it is scoped", () => {
+  const parsed = serviceDefinitionSchema.parse({
+    id: "cloudflare",
+    name: "Cloudflare",
+    adapter: "statuspage",
+    baseUrl: "https://www.cloudflarestatus.com",
+  });
+  assert.equal(parsed.scopeToComponents, false);
+});
+
+test("a service definition can be scoped to its selection", () => {
+  const parsed = serviceDefinitionSchema.parse({
+    id: "cloudflare",
+    name: "Cloudflare",
+    adapter: "statuspage",
+    baseUrl: "https://www.cloudflarestatus.com",
+    components: [{ id: "57ctn3f2qsyj", name: "Amsterdam, Netherlands - (AMS)" }],
+    scopeToComponents: true,
+  });
+  assert.equal(parsed.scopeToComponents, true);
+});
+
 test("a component selection carries id and name", () => {
   const parsed = serviceDefinitionSchema.parse({
     id: "github",

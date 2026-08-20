@@ -175,6 +175,7 @@ export function editButton(provider) {
       load: () =>
         api.previewComponents({ adapter: provider.adapter, baseUrl: modal.inputs.baseUrl.value.trim() }),
       initial: provider.componentSelection ?? [],
+      initialScope: provider.scopeToComponents === true,
     });
     modal = openModal({
       title: provider.name,
@@ -189,6 +190,7 @@ export function editButton(provider) {
           name: values.name,
           baseUrl: values.baseUrl,
           components: picker.value(),
+          scopeToComponents: picker.scopeToComponents(),
         });
         await refresh();
       },
@@ -272,7 +274,13 @@ export function openAddServiceDialog() {
       { label: t("components.field"), render: (wrap) => picker.mount(wrap) },
     ],
     onConfirm: async (values) => {
-      await api.addService({ ...values, adapter, enabled: true, components: picker.value() });
+      await api.addService({
+        ...values,
+        adapter,
+        enabled: true,
+        components: picker.value(),
+        scopeToComponents: picker.scopeToComponents(),
+      });
       const result = await api.testService(values.id);
       await refresh();
       if (!result.ok) {

@@ -105,7 +105,14 @@ export function createBackfillService(deps: BackfillDeps): BackfillService {
     if (to <= from) return; // already backfilled, or 90 days of real samples exist
 
     const history = await adapter.fetchIncidentHistory(
-      { id: service.id, name: service.name, baseUrl: service.baseUrl, options: service.options },
+      {
+        id: service.id,
+        name: service.name,
+        baseUrl: service.baseUrl,
+        options: service.options,
+        components: service.components,
+        scopeToComponents: service.scopeToComponents,
+      },
       { timeoutMs: polling.requestTimeoutSeconds * 1000 },
     );
     const samples = deriveSamples(

@@ -321,6 +321,25 @@ Note that a provider can report `degraded` with **zero** open incidents — Stat
 derives the indicator from component state too. A degraded status grid alongside an
 empty Incidents view is correct, not a bug.
 
+#### Watching only part of a provider
+
+A provider can expose hundreds of components: Cloudflare lists every data centre,
+grouped by region (Africa, Asia, Europe, …). Select the components that matter and
+tick **Report only the selected components** — `scopeToComponents: true` in the Light
+edition's `config.yml` — to narrow the whole provider to that selection:
+
+- an incident the provider attributes only to components outside the selection is
+  dropped, so it neither notifies nor reaches the charts and the timeline;
+- the provider's reported status becomes the worst status among the selected
+  components instead of the page-wide `status.indicator`;
+- an incident attached to no component at all is a page-wide notice and is always
+  reported;
+- with nothing selected the flag does nothing: scoping to an empty selection would
+  mean silencing the provider.
+
+Each group header in the picker carries its own checkbox, so a whole region is one
+click.
+
 For a provider that is not on Statuspage, add an adapter under `src/adapters/`.
 
 ### 3.6 Notification channels

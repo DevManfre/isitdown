@@ -13,6 +13,13 @@ export interface ServiceRef {
   options?: Record<string, string> | undefined;
   /** Selected components; the adapter reports only these. Absent = none. */
   components?: { id: string; name: string }[] | undefined;
+  /**
+   * Narrows the whole provider to the selection: an incident attributed only to
+   * unselected components is dropped, and the overall status is folded from the
+   * selected components instead of the provider's page-wide indicator. Ignored
+   * while nothing is selected, so ticking it alone can never silence a provider.
+   */
+  scopeToComponents?: boolean | undefined;
 }
 
 export interface FetchContext {

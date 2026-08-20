@@ -325,6 +325,26 @@ Attenzione: un provider può riportare `degraded` con **zero** incidenti aperti 
 Statuspage deriva l'indicator anche dallo stato dei componenti. Una griglia degradata
 insieme a una vista Incidenti vuota è corretta, non un bug.
 
+#### Monitorare solo una parte di un provider
+
+Un provider può esporre centinaia di componenti: Cloudflare elenca ogni data center,
+raggruppato per regione (Africa, Asia, Europa, …). Seleziona i componenti che
+interessano e attiva **Segnala solo i componenti selezionati** — `scopeToComponents:
+true` nel `config.yml` dell'edizione Light — per restringere tutto il provider a
+quella selezione:
+
+- un incidente che il provider attribuisce soltanto a componenti fuori dalla
+  selezione viene scartato: non notifica e non finisce nei grafici né nella timeline;
+- lo stato riportato del provider diventa il peggiore tra i componenti selezionati
+  invece dello `status.indicator` di tutta la pagina;
+- un incidente non attribuito ad alcun componente è un avviso generale e viene
+  sempre segnalato;
+- senza alcuna selezione il flag non fa nulla: restringere a una selezione vuota
+  significherebbe silenziare il provider.
+
+Ogni intestazione di gruppo nel picker ha la propria casella, quindi un'intera
+regione è un solo clic.
+
 Per un provider che non sta su Statuspage, aggiungi un adapter sotto `src/adapters/`.
 
 ### 3.6 Canali di notifica

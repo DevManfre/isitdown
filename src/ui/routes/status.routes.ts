@@ -42,6 +42,7 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
           activeIncidents: state.last?.activeIncidents ?? [],
           components: state.last?.components ?? [],
           componentSelection: service.components,
+          scopeToComponents: service.scopeToComponents,
           fetchedAt: state.last?.fetchedAt ?? null,
           failureCount: state.failureCount,
           uptime90: history.uptime90,
