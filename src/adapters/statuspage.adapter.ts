@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { Adapter, FetchContext, ServiceRef } from "../core/adapter.interface.ts";
-import type { Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
+import type { Adapter, FetchContext, IncidentHistoryResult, ServiceRef } from "../core/adapter.interface.ts";
+import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 
 /**
  * The generic adapter for Atlassian Statuspage, which most providers run on —
@@ -9,6 +9,10 @@ import type { Incident, NormalizedStatus, OverallStatus } from "../core/types.ts
  */
 
 const SUMMARY_PATH = "/api/v2/summary.json";
+const INCIDENTS_PATH = "/api/v2/incidents.json";
+
+/** The public API returns at most this many incidents, newest first, unpaginated. */
+const FEED_CAP = 50;
 
 /**
  * Deliberately lenient: individual fields are optional because a provider that
@@ -29,6 +33,20 @@ const summarySchema = z.object({
       }),
     )
     .optional(),
+});
+
+const historySchema = z.object({
+  incidents: z.array(
+    z.object({
+      id: z.string().optional(),
+      name: z.string().optional(),
+      impact: z.string().optional(),
+      status: z.string().optional(),
+      created_at: z.string().optional(),
+      updated_at: z.string().optional(),
+      resolved_at: z.string().nullable().optional(),
+    }),
+  ),
 });
 
 const INDICATORS: Record<string, OverallStatus> = {
@@ -89,6 +107,48 @@ export function parseSummary(raw: unknown, service: ServiceRef): NormalizedStatu
   };
 }
 
+/**
+ * Pure mapping from an incidents.json payload, exported for the fixture suite.
+ * Throws when the body is not a Statuspage incident list at all. An entry
+ * without an id or a start time cannot be placed on a timeline and is dropped.
+ */
+export function parseIncidentHistory(raw: unknown, service: ServiceRef): IncidentHistoryResult {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`statuspage incident history for ${service.id} is not an object`);
+  }
+  const parsed = historySchema.parse(raw);
+
+  const incidents: HistoricalIncident[] = parsed.incidents.flatMap((incident) => {
+    const id = incident.id;
+    const createdAt = incident.created_at;
+    if (id === undefined || createdAt === undefined) return [];
+    const closed = CLOSED_STATUSES.has(incident.status ?? "");
+    return [
+      {
+        id,
+        name: incident.name ?? "",
+        impact: incident.impact ?? "",
+        status: incident.status ?? "",
+        startedAt: createdAt,
+        // A closed incident missing resolved_at still ended; its last update is
+        // the best end time available, and null would read as "still open".
+        resolvedAt: incident.resolved_at ?? (closed ? (incident.updated_at ?? createdAt) : null),
+        updatedAt: incident.updated_at ?? createdAt,
+      },
+    ];
+  });
+
+  const oldest = incidents.reduce<string | null>(
+    (min, incident) => (min === null || incident.startedAt < min ? incident.startedAt : min),
+    null,
+  );
+  return {
+    incidents,
+    // A full feed proves nothing about what rolled off before its oldest entry.
+    coverageStart: parsed.incidents.length >= FEED_CAP ? oldest : null,
+  };
+}
+
 export const statuspageAdapter: Adapter = {
   id: "statuspage",
 
@@ -102,5 +162,17 @@ export const statuspageAdapter: Adapter = {
       throw new Error(`statuspage fetch for ${service.id} failed: HTTP ${response.status}`);
     }
     return parseSummary(await response.json(), service);
+  },
+
+  async fetchIncidentHistory(service: ServiceRef, ctx: FetchContext): Promise<IncidentHistoryResult> {
+    const url = `${service.baseUrl}${INCIDENTS_PATH}`;
+    const response = await fetch(url, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(ctx.timeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`statuspage incident history for ${service.id} failed: HTTP ${response.status}`);
+    }
+    return parseIncidentHistory(await response.json(), service);
   },
 };
