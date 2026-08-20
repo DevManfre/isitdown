@@ -1,4 +1,4 @@
-import type { NormalizedStatus } from "./types.ts";
+import type { HistoricalIncident, NormalizedStatus } from "./types.ts";
 
 /**
  * What an adapter needs to know about the service it is fetching. A generic
@@ -17,6 +17,15 @@ export interface FetchContext {
   timeoutMs: number;
 }
 
+export interface IncidentHistoryResult {
+  incidents: HistoricalIncident[];
+  /**
+   * ISO timestamp the feed is complete back to. Null means the feed holds the
+   * provider's full incident history (fewer entries than the feed cap).
+   */
+  coverageStart: string | null;
+}
+
 export interface Adapter {
   /** Registry key, e.g. "statuspage". */
   id: string;
@@ -26,4 +35,11 @@ export interface Adapter {
    * missing individual field instead.
    */
   fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus>;
+  /**
+   * Throws on a network error, a non-2xx response or an unparseable body so
+   * the backfill retry and failure accounting can act. Degrades quietly on a
+   * missing individual field instead. An adapter without this method simply has
+   * no backfillable history.
+   */
+  fetchIncidentHistory?(service: ServiceRef, ctx: FetchContext): Promise<IncidentHistoryResult>;
 }

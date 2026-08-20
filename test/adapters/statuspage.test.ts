@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { parseSummary, statuspageAdapter } from "../../src/adapters/statuspage.adapter.ts";
+import { parseSummary, parseIncidentHistory, statuspageAdapter } from "../../src/adapters/statuspage.adapter.ts";
 import { getAdapter } from "../../src/adapters/index.ts";
 import type { ServiceRef } from "../../src/core/adapter.interface.ts";
 
@@ -202,4 +202,98 @@ test("fetchStatus gives up once the timeout passes", async () => {
 test("the registry resolves statuspage and rejects an unknown adapter by name", () => {
   assert.equal(getAdapter("statuspage").id, "statuspage");
   assert.throws(() => getAdapter("nope"), /nope/);
+});
+
+test("incident history maps every entry with its start and resolution", () => {
+  const result = parseIncidentHistory(fixture("incidents-history"), service);
+  assert.equal(result.incidents.length, 3);
+  assert.deepEqual(result.incidents[1], {
+    id: "hist-major",
+    name: "API errors",
+    impact: "major",
+    status: "resolved",
+    startedAt: "2026-08-10T10:00:00.000Z",
+    resolvedAt: "2026-08-10T12:30:00.000Z",
+    updatedAt: "2026-08-10T12:30:00.000Z",
+  });
+});
+
+test("an open incident keeps a null resolvedAt", () => {
+  const result = parseIncidentHistory(fixture("incidents-history"), service);
+  assert.equal(result.incidents[0]?.resolvedAt, null);
+});
+
+test("a closed incident without resolved_at falls back to updated_at", () => {
+  const result = parseIncidentHistory(fixture("incidents-history"), service);
+  assert.equal(result.incidents[2]?.resolvedAt, "2026-07-28T09:00:00.000Z");
+});
+
+test("under the feed cap the coverage is the full history", () => {
+  const result = parseIncidentHistory(fixture("incidents-history"), service);
+  assert.equal(result.coverageStart, null);
+});
+
+test("at the feed cap the coverage starts at the oldest entry", () => {
+  const incidents = Array.from({ length: 50 }, (_, i) => ({
+    id: `cap-${i}`,
+    name: `Incident ${i}`,
+    status: "resolved",
+    impact: "minor",
+    created_at: `2026-06-${String((i % 28) + 1).padStart(2, "0")}T00:00:00.000Z`,
+    updated_at: `2026-06-${String((i % 28) + 1).padStart(2, "0")}T01:00:00.000Z`,
+    resolved_at: `2026-06-${String((i % 28) + 1).padStart(2, "0")}T01:00:00.000Z`,
+  }));
+  const result = parseIncidentHistory({ incidents }, service);
+  assert.equal(result.coverageStart, "2026-06-01T00:00:00.000Z");
+});
+
+test("a history entry without id or created_at is dropped", () => {
+  const result = parseIncidentHistory(
+    {
+      incidents: [
+        { name: "no id", status: "resolved", created_at: "2026-08-01T00:00:00.000Z" },
+        { id: "no-created", name: "no created_at", status: "resolved" },
+        { id: "kept", status: "resolved", created_at: "2026-08-02T00:00:00.000Z", updated_at: "2026-08-02T01:00:00.000Z" },
+      ],
+    },
+    service,
+  );
+  assert.deepEqual(result.incidents.map((incident) => incident.id), ["kept"]);
+});
+
+test("a fundamentally broken history body throws so the caller can skip the provider", () => {
+  for (const body of ["not json at all", 42, null, [], { nothing: true }]) {
+    assert.throws(() => parseIncidentHistory(body, service), `expected ${JSON.stringify(body)} to throw`);
+  }
+});
+
+test("fetchIncidentHistory requests the incidents endpoint under the service base url", async () => {
+  const seen: string[] = [];
+  await withServer(
+    (req, res) => {
+      seen.push(req.url ?? "");
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ incidents: [] }));
+    },
+    async (baseUrl) => {
+      const result = await statuspageAdapter.fetchIncidentHistory?.({ ...service, baseUrl }, { timeoutMs: 2000 });
+      assert.deepEqual(result, { incidents: [], coverageStart: null });
+      assert.deepEqual(seen, ["/api/v2/incidents.json"]);
+    },
+  );
+});
+
+test("fetchIncidentHistory throws on a non-2xx response", async () => {
+  await withServer(
+    (_req, res) => {
+      res.writeHead(503);
+      res.end("nope");
+    },
+    async (baseUrl) => {
+      await assert.rejects(
+        statuspageAdapter.fetchIncidentHistory!({ ...service, baseUrl }, { timeoutMs: 2000 }),
+        /503/,
+      );
+    },
+  );
 });

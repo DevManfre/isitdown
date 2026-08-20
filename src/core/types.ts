@@ -24,6 +24,21 @@ export interface Incident {
   updatedAt: string;
 }
 
+export interface HistoricalIncident {
+  id: string;
+  name: string;
+  /** Provider's own impact word, e.g. "minor". Not normalised. */
+  impact: string;
+  /** Provider's own lifecycle word. Not normalised. */
+  status: string;
+  /** ISO 8601, UTC. */
+  startedAt: string;
+  /** ISO 8601, UTC. Null while the incident is still open. */
+  resolvedAt: string | null;
+  /** ISO 8601, UTC. */
+  updatedAt: string;
+}
+
 export interface NormalizedStatus {
   provider: string;
   overallStatus: OverallStatus;
