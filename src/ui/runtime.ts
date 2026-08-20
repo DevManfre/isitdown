@@ -8,6 +8,7 @@ import { createPoller, type CycleResult } from "../core/poller.ts";
 import { createScheduler, type Scheduler } from "../core/scheduler.ts";
 import { buildNotifiers } from "../notifiers/index.ts";
 import { createApp } from "./app.ts";
+import { createBackfillService, type BackfillService } from "./backfill.ts";
 import { createDbConfigSource, listServices } from "./dbConfigSource.ts";
 import { migrate } from "./db/migrate.ts";
 import { openDatabase } from "./db/open.ts";
@@ -40,6 +41,8 @@ export interface UiRuntimeCore {
   history: ReturnType<typeof createHistoryService>;
   configSource: ConfigSource;
   scheduler: Scheduler;
+  /** Built here, run by the server at boot — never by the runtime builder, so tests stay offline. */
+  backfill: BackfillService;
   logger: Logger;
   /** Every configured provider, including disabled ones — the dashboard shows both. */
   listAllServices(): ServiceDefinition[];
@@ -91,6 +94,8 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     },
   });
 
+  const backfill = createBackfillService({ getAdapter, store, configSource, logger });
+
   await store.pruneOlderThan(RETENTION_DAYS);
   const pruneTimer = setInterval(() => {
     void store.pruneOlderThan(RETENTION_DAYS).catch((error: unknown) => {
@@ -109,6 +114,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     history,
     configSource,
     scheduler,
+    backfill,
     logger,
     listAllServices: () => listServices(db),
     providerCount: () => listServices(db).length,

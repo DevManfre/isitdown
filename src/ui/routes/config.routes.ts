@@ -68,6 +68,9 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     }
     insertService(db, parsed.data);
     res.status(201).json(listServices(db).find((service) => service.id === parsed.data.id));
+    // Fire-and-forget: the response must not wait on a provider's status page.
+    // backfillOne never rejects; failures are logged inside the service.
+    void runtime.backfill.backfillOne(parsed.data.id);
   });
 
   router.patch("/config/services/:id", (req, res) => {

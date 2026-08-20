@@ -40,4 +40,6 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
   });
 }
 
+// Reconstruct the 90-day charts before the first poll writes a real sample.
+await started.backfill.backfillAll();
 await started.scheduler.start();
