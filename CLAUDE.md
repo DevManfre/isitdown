@@ -34,6 +34,26 @@ docker compose --profile light up -d --build        # Light edition, container
 docker compose --profile ui up -d --build           # UI edition, container
 ```
 
+## Every change ships to the running instance
+
+The dashboard is served out of `dist/ui/public` and the container mounts no
+source directory, so an edit under `src/` changes nothing the operator can see
+until it is rebuilt. A change is therefore not done when the file is saved —
+it is done when the running instance shows it. Every time:
+
+1. Find how it is running: `docker ps --filter name=isitdown`, otherwise a local
+   `node dist/…` process.
+2. Redeploy that same way — container: `docker compose --profile ui up -d --build`;
+   local: `npm run build:ui`, then restart the process.
+3. Prove it is live before reporting, don't assume: container healthy in
+   `docker compose ps`, and for an asset the value itself, e.g.
+   `curl -s localhost:3000/css/tokens.css | grep -- '--color-surface'`.
+4. Say what to reload — `http://localhost:3000`, hard refresh (Ctrl+Shift+R)
+   after a CSS/JS change.
+
+Holds for anything the operator can look at: CSS, dashboard JS, HTML, locales,
+routes, notifier text. Never leave "now run the build yourself" as the last step.
+
 ## Testing
 
 ```bash
