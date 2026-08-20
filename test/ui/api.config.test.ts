@@ -48,13 +48,16 @@ async function api(env: NodeJS.ProcessEnv = {}): Promise<Api> {
 
 async function fakeProvider(indicator = "none"): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = createServer((req, res) => {
-    if (req.url !== "/api/v2/summary.json") {
+    if (req.url === "/api/v2/summary.json") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ status: { indicator }, incidents: [] }));
+    } else if (req.url === "/api/v2/incidents.json") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ incidents: [] }));
+    } else {
       res.writeHead(404);
       res.end();
-      return;
     }
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ status: { indicator }, incidents: [] }));
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
@@ -88,19 +91,21 @@ test("config returns the services, the polling settings and the channels", async
 });
 
 test("adding a service returns 201 and it shows up in the config", async () => {
+  const provider = await fakeProvider();
   const app = await api();
   try {
     const { status } = await app.request("POST", "/config/services", {
       id: "vercel",
       name: "Vercel",
       adapter: "statuspage",
-      baseUrl: "https://www.vercel-status.com",
+      baseUrl: provider.baseUrl,
     });
     assert.equal(status, 201);
     const config = (await app.request("GET", "/config")).body as { services: { id: string }[] };
     assert.ok(config.services.some((service) => service.id === "vercel"));
   } finally {
     await app.close();
+    await provider.close();
   }
 });
 
@@ -266,12 +271,31 @@ test("testing a service connection reports the status it saw without recording a
       baseUrl: provider.baseUrl,
     });
 
+    // Wait for backfill to settle: poll until sample count is non-zero and stable.
+    // applyBackfill writes in one transaction, so stable non-zero = backfill complete.
+    const deadline = Date.now() + 5000;
+    let sampleCount = 0;
+    let previousCount = -1;
+    while (Date.now() < deadline) {
+      sampleCount = (await app.runtime.store.getRecentSamples("fake", 1000)).length;
+      if (sampleCount > 0 && sampleCount === previousCount) {
+        break; // Stable non-zero count: backfill settled.
+      }
+      previousCount = sampleCount;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.ok(sampleCount > 0, "backfill must create samples");
+
+    // Snapshot samples before the test endpoint call.
+    const samplesBefore = (await app.runtime.store.getRecentSamples("fake", 1000)).length;
+
     const { status, body } = await app.request("POST", "/config/services/fake/test");
     assert.equal(status, 200);
     assert.deepEqual(body, { ok: true, overallStatus: "major_outage" });
 
-    // A connection test is diagnostics: it must not become history or an alert.
-    assert.deepEqual(await app.runtime.store.getRecentSamples("fake", 5), []);
+    // Verify the test endpoint itself recorded no new samples — it is diagnostics only.
+    const samplesAfter = (await app.runtime.store.getRecentSamples("fake", 1000)).length;
+    assert.equal(samplesAfter, samplesBefore, "test endpoint must not record samples");
     assert.deepEqual(await app.runtime.store.listNotifications(5), []);
     assert.equal((await app.runtime.store.getState("fake")).last, null);
   } finally {
