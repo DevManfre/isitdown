@@ -9,14 +9,14 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node tools/copy-assets.mjs",
+    "build": "tsc -p tsconfig.json && vite build && node tools/copy-assets.mjs",
     "build:light": "tsc -p tsconfig.light.json && node tools/copy-assets.mjs",
-    "build:ui": "tsc -p tsconfig.json && node tools/copy-assets.mjs",
-    "dev:ui": "DB_PATH=./data/isitdown.db node --watch --env-file-if-exists=.env src/ui/server.ts",
+    "build:ui": "tsc -p tsconfig.json && vite build && node tools/copy-assets.mjs",
+    "dev:ui": "concurrently -n server,vite -c blue,magenta \"DB_PATH=./data/isitdown.db WEB_DIR=./dist/ui/web node --watch --env-file-if-exists=.env src/ui/server.ts\" \"vite\"",
     "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
-    "test": "node --test \"test/**/*.test.ts\"",
+    "test": "node --test \"test/**/*.test.ts\" && vitest run",
     "test:integration": "node --test \"test/**/*.itest.ts\"",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.public.json"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {
     "express": "^5.2.1",
@@ -24,8 +24,22 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.5",
     "@types/express": "^5.0.6",
     "@types/node": "^24.0.0",
-    "typescript": "^5.9.0"
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "concurrently": "^10.0.5",
+    "happy-dom": "^20.11.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.0",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }

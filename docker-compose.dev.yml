@@ -16,6 +16,16 @@ services:
       target: ui
     environment:
       NODE_ENV: development
+      WEB_DIR: /app/dist/ui/web
     volumes:
       - ./src:/app/src:ro
-    command: ["node", "--watch", "src/ui/server.ts"]
+      - ./vite.config.ts:/app/vite.config.ts:ro
+      - ./tsconfig.web.json:/app/tsconfig.web.json:ro
+      - isitdown-ui-build:/app/dist
+    command:
+      - sh
+      - -c
+      - "npx vite build --watch & exec node --watch src/ui/server.ts"
+
+volumes:
+  isitdown-ui-build:

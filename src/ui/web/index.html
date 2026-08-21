@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IsItDown</title>
+    <!-- Runs before stylesheets paint anything: without it the page would show
+         the light palette for one frame on a dark desktop. "system" stamps
+         nothing and lets the media query decide. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("isitdown.theme");
+          if (stored === "light" || stored === "dark") {
+            document.documentElement.setAttribute("data-theme", stored);
+          }
+          var lang = localStorage.getItem("isitdown.uiLocale");
+          if (lang) document.documentElement.setAttribute("lang", lang);
+          if (localStorage.getItem("isitdown.railCollapsed") === "true") {
+            document.documentElement.setAttribute("data-rail", "collapsed");
+          }
+        } catch (error) {
+          /* a blocked localStorage just means the system theme is used */
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>
