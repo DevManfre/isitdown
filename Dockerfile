@@ -4,9 +4,10 @@
 #   docker build --target ui    -t isitdown:ui    .
 #
 # A third target, `dev`, exists only for docker-compose.dev.yml — it is never
-# built by `docker compose --profile ui up` (that pins `target: ui`) and has
-# no `-t isitdown:dev` convention of its own. `ui` is deliberately the last
-# stage in this file, so a target-less `docker build .` still builds `ui`.
+# built by `docker compose --profile ui up` (that pins `target: ui`) and it is
+# tagged `isitdown:dev`, never `isitdown:ui`, so a dev build cannot overwrite
+# the production image. `ui` is deliberately the last stage in this file, so a
+# target-less `docker build .` still builds `ui`.
 #
 # The `ui` stage starts FROM `light`, so the UI image is the Light image plus a
 # single thin layer: everything below it — base image, production dependencies,
@@ -48,14 +49,21 @@ CMD ["node", "dist/light/index.js"]
 # FROM builder, not light/ui: dev mode needs the full devDependencies tree
 # (vite) and node_modules that npm ci --omit=dev deliberately drops from the
 # runtime stages. docker-compose.dev.yml mounts ./src read-only over this and
-# rebuilds the React bundle on save; the image's own dist/ is the fallback
-# until that rebuild lands in the isitdown-ui-build volume.
+# Vite rewrites the React bundle into this stage's own /app/dist on save —
+# writable because the stage stays root, and deliberately not a volume, so the
+# tree never outlives the image it was built from.
+#
+# NODE_ENV and the healthcheck are this stage's own, not inherited from
+# light/ui: the image says development rather than leaving it to the compose
+# override, and liveness is judged on the source tree the stage actually runs
+# (types stripped at load) rather than on a compiled artifact it never loads.
 FROM builder AS dev
+ENV NODE_ENV=development
 ENV DB_PATH=/app/data/isitdown.db
 ENV PORT=3000
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD ["node", "dist/ui/healthcheck.js"]
+  CMD ["node", "src/ui/healthcheck.ts"]
 CMD ["sh", "-c", "npx vite build --watch & exec node --watch src/ui/server.ts"]
 
 # --- UI edition: the light image plus the server layer ----------------------------
