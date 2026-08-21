@@ -17,11 +17,34 @@ async function filesUnder(dir: string, extensions: string[]): Promise<string[]> 
   return found;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Byte offset of one CSS block's real rule, by its selector (which must
+ * include the trailing " {").
+ *
+ * A plain `css.indexOf(selector)` also matches this file's own header
+ * comment, which quotes ':root[data-theme="dark"]' in prose describing the
+ * palette's structure, on a line that happens to start with exactly that
+ * text. `indexOf` lands on the prose, then the caller's own `indexOf("{", …)`
+ * walks forward to the *next* "{" in the file — which belongs to a
+ * different block entirely (in practice, the light block), so a selector
+ * without its brace silently resolves to the wrong rule. Requiring the
+ * selector's own opening brace, anchored to the start of a line, rules the
+ * prose out: that comment line is never followed immediately by "{".
+ */
+function blockStart(css: string, selector: string): number {
+  const pattern = new RegExp(`^\\s*${escapeRegExp(selector)}`, "m");
+  const match = pattern.exec(css);
+  assert.ok(match, `tokens.css has no ${selector} block`);
+  return (match as RegExpExecArray).index;
+}
+
 /** Custom properties declared inside one CSS block, by its selector. */
 function declaredIn(css: string, selector: string): string[] {
-  const start = css.indexOf(selector);
-  assert.notEqual(start, -1, `tokens.css has no ${selector} block`);
-  const open = css.indexOf("{", start);
+  const open = css.indexOf("{", blockStart(css, selector));
   const close = css.indexOf("}", open);
   return [...css.slice(open, close).matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1] as string).sort();
 }
@@ -48,8 +71,8 @@ test("no hex colour is hardcoded in the dashboard markup or scripts", async () =
 test("the light and dark palettes declare exactly the same tokens", () => {
   const css = readFileSync(TOKENS, "utf8");
   const light = declaredIn(css, ":root {");
-  const dark = declaredIn(css, ':root[data-theme="dark"]');
-  const system = declaredIn(css, ':root:not([data-theme="light"])');
+  const dark = declaredIn(css, ':root[data-theme="dark"] {');
+  const system = declaredIn(css, ':root:not([data-theme="light"]) {');
 
   assert.ok(light.length > 20, `expected a full palette, got ${light.length} tokens`);
   assert.deepEqual(dark, light, "a token defined in one theme but not the other renders wrong");
@@ -65,7 +88,7 @@ test("every status in the severity model has its own colour token in both themes
     "--status-major-outage",
     "--status-unknown",
   ];
-  for (const selector of [":root {", ':root[data-theme="dark"]', ':root:not([data-theme="light"])']) {
+  for (const selector of [":root {", ':root[data-theme="dark"] {', ':root:not([data-theme="light"]) {']) {
     const declared = declaredIn(css, selector);
     for (const token of required) {
       assert.ok(declared.includes(token), `${selector} is missing ${token}`);
