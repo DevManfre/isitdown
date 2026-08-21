@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](tsconfig.json)
 [![Dashboard](https://img.shields.io/badge/dashboard-vanilla%20JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](#92-tech-stack)
 
-[![Tests](https://img.shields.io/badge/tests-301%20passing-brightgreen?style=flat-square)](#93-tests-and-checks)
+[![Tests](https://img.shields.io/badge/tests-301%20passing-brightgreen?style=flat-square)](#94-tests-and-checks)
 [![Runtime dependencies](https://img.shields.io/badge/runtime%20deps-3-lightgrey?style=flat-square)](#92-tech-stack)
 [![Docker](https://img.shields.io/badge/docker-light%20%7C%20ui-2496ED?style=flat-square&logo=docker&logoColor=white)](#4-docker)
 [![i18n](https://img.shields.io/badge/i18n-en%20%7C%20it-orange?style=flat-square)](#82-localisation)
@@ -64,8 +64,9 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
 - [9. Development](#9-development)
   - [9.1 Repo structure](#91-repo-structure)
   - [9.2 Tech stack](#92-tech-stack)
-  - [9.3 Tests and checks](#93-tests-and-checks)
-  - [9.4 Conventions](#94-conventions)
+  - [9.3 Live development](#93-live-development)
+  - [9.4 Tests and checks](#94-tests-and-checks)
+  - [9.5 Conventions](#95-conventions)
 - [10. Roadmap](#10-roadmap)
 - [11. Branch layout and merge policy](#11-branch-layout-and-merge-policy)
   - [Setup, once per clone](#setup-once-per-clone)
@@ -409,6 +410,10 @@ docker compose --profile ui    up -d --build   # data volume only, publishes :30
 docker compose --profile light --profile ui up -d      # both
 docker compose --profile light --profile ui down       # stop; volumes survive
 ```
+
+A third file, `docker-compose.dev.yml`, layers on top of the `ui` profile and runs
+the edition straight from the source tree with no build step — see
+[9.3](#93-live-development).
 
 ### 4.3 Volumes, healthchecks, users
 
@@ -1033,6 +1038,7 @@ isitdown/
 ├── design/                            Claude Design prototypes (git-ignored: on disk, not in a clone)
 ├── Dockerfile                         builder → light → ui (ui is FROM light)
 ├── docker-compose.yml                 both editions as profiles
+├── docker-compose.dev.yml             dev override: UI edition live from src/, no build
 ├── config.example.yml                 tracked template; config.yml is git-ignored
 ├── .env.example                       secret variable names, never values
 ├── .nvmrc  .npmrc                     pins Node 24 and makes an older one fail loudly
@@ -1063,7 +1069,43 @@ interfaces instead. A test enforces this, including the edition-only dependencie
 Runtime dependencies, exhaustively: `zod`, `yaml` (both editions) and `express`
 (UI). Dev dependencies: `typescript`, `@types/node`, `@types/express`.
 
-### 9.3 Tests and checks
+### 9.3 Live development
+
+Rebuilding the image for a one-line CSS change is slow enough to discourage making
+the change. Node 24 strips TypeScript types at load time, so the UI edition can run
+from `src/` with no build step at all:
+
+```bash
+npm run dev:docker   # container: docker-compose.dev.yml layered over the ui profile
+npm run dev:ui       # local process, database at ./data/isitdown.db
+```
+
+`docker-compose.dev.yml` overrides the `isitdown-ui` service only: `./src` is mounted
+read-only on `/app/src` and the command becomes `node --watch src/ui/server.ts`. The
+image is still the production one and has to exist — build it once with `--build` —
+but nothing inside it is used except `node_modules` and the healthcheck. The static
+middleware resolves the dashboard relative to the module it runs from, so running
+from `src/` serves `src/ui/public` rather than the baked `dist/ui/public`.
+
+| Edit | What happens |
+|---|---|
+| `src/ui/public/**` — CSS, dashboard JS, HTML, locales | Served from the mounted source: hard refresh (Ctrl+Shift+R), no restart |
+| any `.ts` | `node --watch` restarts the server in about a second; scheduler and backfill restart with it |
+| a dependency or the `Dockerfile` | Rebuild once: `docker compose --profile ui up -d --build` |
+
+Two things dev mode does not do. It does not type-check — stripping types is not
+compiling them, so `npm run typecheck` stays mandatory. And it produces no `dist/`,
+so shipping still goes out the normal way:
+
+```bash
+docker compose --profile ui up -d --build   # back to the built image
+```
+
+`docker inspect -f '{{.Config.Cmd}}' isitdown-ui` tells the two apart:
+`node dist/ui/server.js` is the built image, `node --watch src/ui/server.ts` is dev
+mode.
+
+### 9.4 Tests and checks
 
 ```bash
 npm test                 # unit suite:        test/**/*.test.ts
@@ -1101,7 +1143,7 @@ Notable suites:
 Since the dashboard has no build step, `tsc --checkJs` runs over it too — it is the
 only static check that code path gets.
 
-### 9.4 Conventions
+### 9.5 Conventions
 
 - Validate every external input with `zod` at the boundary; trust internals.
 - One adapter per file under `src/adapters/`, one notifier per file under

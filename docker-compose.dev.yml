@@ -1,0 +1,21 @@
+# Development override: run the UI edition straight from the source tree.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d
+#   (or: npm run dev:docker)
+#
+# Node 24 strips the TypeScript types at load time, so the container needs no
+# build step: `src` is mounted read-only, `node --watch` restarts the server
+# when a `.ts` file changes, and the dashboard is served from the mounted
+# `src/ui/public` — a hard refresh is enough for CSS/JS/HTML/locale edits.
+#
+# The image is still the production one, so build it once (`--build`) after a
+# dependency change; everything else is live.
+services:
+  isitdown-ui:
+    build:
+      target: ui
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./src:/app/src:ro
+    command: ["node", "--watch", "src/ui/server.ts"]

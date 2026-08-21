@@ -12,6 +12,8 @@
     "build": "tsc -p tsconfig.json && node tools/copy-assets.mjs",
     "build:light": "tsc -p tsconfig.light.json && node tools/copy-assets.mjs",
     "build:ui": "tsc -p tsconfig.json && node tools/copy-assets.mjs",
+    "dev:ui": "DB_PATH=./data/isitdown.db node --watch --env-file-if-exists=.env src/ui/server.ts",
+    "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
     "test": "node --test \"test/**/*.test.ts\"",
     "test:integration": "node --test \"test/**/*.itest.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.public.json"
