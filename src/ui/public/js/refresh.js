@@ -30,3 +30,22 @@ export function snapshot(status, config) {
 export function shouldHoldRefresh(page) {
   return page.hidden || page.dialogOpen || page.editing;
 }
+
+/**
+ * What a repaint does to the entry animations of the view it paints.
+ *
+ * A changed view, language or theme is a remount in the prototype, so the
+ * animations replay from the start. Anything else — a poll tick, a write the
+ * operator just made — has to be invisible, so the nodes it paints are held
+ * still. What it must *not* do is silence the container: the gate on `#view` is
+ * what lets a later interaction, a filter rebuilding its list, animate the
+ * nodes it inserts, which is why a quiet repaint puts the gate straight back.
+ *
+ * @param {string | undefined} previousKey the key the current DOM was built with
+ * @param {string} key the key this repaint builds with
+ * @returns {{ replay: boolean, quiet: boolean }}
+ */
+export function entryAnimationPlan(previousKey, key) {
+  const replay = key !== previousKey;
+  return { replay, quiet: !replay };
+}

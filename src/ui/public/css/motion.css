@@ -4,8 +4,9 @@
 
    The prototype restarts every entry animation whenever the view, the language
    or the theme changes, and never on a data refresh. Here that remount key is
-   `data-animate` on #view: app.js stamps it when the key changes and leaves it
-   off for the 30-second poll, so a refresh never re-plays the page. Every entry
+   `data-animate` on #view: app.js re-stamps it when the key changes, and a
+   refresh instead marks the nodes it swaps in `.anim-quiet` so they stay put
+   while the gate remains open for whatever the operator does next. Every entry
    animation is therefore written as a descendant of #view[data-animate];
    looping motion (a pulsing dot) and the transitions live outside that gate.
 
@@ -161,6 +162,15 @@
 }
 #view[data-animate] .anim-bar-month {
   animation-duration: 0.65s;
+}
+
+/* A repaint the operator did not ask for swaps its nodes into a container that
+   is still gated for animation, and every mark among them would play — the page
+   re-playing itself under the cursor. app.js marks those nodes instead of taking
+   the gate off the container, so a filter rebuilding its list still animates;
+   the mark is dropped again the moment the view really is meant to replay. */
+#view[data-animate] .anim-quiet {
+  animation: none !important;
 }
 
 .anim-sweep {
