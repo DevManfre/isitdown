@@ -12,11 +12,34 @@ import { describe, expect, it } from "vitest";
 
 const css = readFileSync(new URL("./tokens.css", import.meta.url), "utf8");
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Byte offset of one CSS block's real rule, by its selector (which must
+ * include the trailing " {").
+ *
+ * A plain `css.indexOf(selector)` also matches this file's own header
+ * comment, which quotes ':root[data-theme="dark"]' in prose describing the
+ * palette's structure, on a line that happens to start with exactly that
+ * text. `indexOf` lands on the prose, then the caller's own `indexOf("{", …)`
+ * walks forward to the *next* "{" in the file — which belongs to a
+ * different block entirely (in practice, the light block), so a selector
+ * without its brace silently resolves to the wrong rule. Requiring the
+ * selector's own opening brace, anchored to the start of a line, rules the
+ * prose out: that comment line is never followed immediately by "{".
+ */
+function blockStart(selector: string): number {
+  const pattern = new RegExp(`^\\s*${escapeRegExp(selector)}`, "m");
+  const match = pattern.exec(css);
+  expect(match, `tokens.css has no ${selector} block`).not.toBeNull();
+  return match!.index;
+}
+
 /** Custom properties declared inside one CSS block, by its selector. */
 function declaredIn(selector: string): string[] {
-  const start = css.indexOf(selector);
-  expect(start, `tokens.css has no ${selector} block`).not.toBe(-1);
-  const open = css.indexOf("{", start);
+  const open = css.indexOf("{", blockStart(selector));
   const close = css.indexOf("}", open);
   return [...css.slice(open, close).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1] as string).sort();
 }
@@ -29,7 +52,7 @@ const SEMANTIC = [
   "--border", "--input", "--ring", "--radius",
 ];
 
-const BLOCKS = [":root {", ':root[data-theme="dark"]', ':root:not([data-theme="light"])'];
+const BLOCKS = [":root {", ':root[data-theme="dark"] {', ':root:not([data-theme="light"]) {'];
 
 describe("the shadcn theme contract", () => {
   it("declares every semantic token in every theme block", () => {
@@ -49,8 +72,8 @@ describe("the shadcn theme contract", () => {
 
   it("resolves every semantic token to a palette var, never a literal", () => {
     for (const block of BLOCKS) {
-      const start = css.indexOf(block);
-      const body = css.slice(css.indexOf("{", start), css.indexOf("}", css.indexOf("{", start)));
+      const open = css.indexOf("{", blockStart(block));
+      const body = css.slice(open, css.indexOf("}", open));
       for (const token of SEMANTIC) {
         if (token === "--radius") continue;
         const match = body.match(new RegExp(`${token}\\s*:\\s*([^;]+);`));
