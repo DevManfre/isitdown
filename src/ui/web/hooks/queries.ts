@@ -53,7 +53,7 @@ export const useNotifications = (limit = 20) =>
 export const usePreferences = () => useQuery({ queryKey: ["preferences"], queryFn: api.getPreferences });
 
 /** Everything a write can invalidate. A config write moves the status grid too. */
-const WRITE_KEYS = [["status"], ["config"], ["history"], ["incidents"], ["notifications"]];
+const WRITE_KEYS = [["status"], ["config"], ["history"], ["incidents"], ["incident"], ["notifications"]];
 
 function useInvalidateAll() {
   const client = useQueryClient();
