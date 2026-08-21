@@ -3,20 +3,23 @@
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d
 #   (or: npm run dev:docker)
 #
-# Node 24 strips the TypeScript types at load time, so the container needs no
-# build step: `src` is mounted read-only, `node --watch` restarts the server
-# when a `.ts` file changes, and the dashboard is served from the mounted
-# `src/ui/public` — a hard refresh is enough for CSS/JS/HTML/locale edits.
+# Node 24 strips the TypeScript types at load time, so the vanilla dashboard
+# needs no build step: `src` is mounted read-only, `node --watch` restarts the
+# server when a `.ts` file changes, and the vanilla dashboard is served from
+# the mounted `src/ui/public` at `/` — a hard refresh is enough for its
+# CSS/JS/HTML/locale edits. The React bundle has a build step: Vite watches
+# `src/ui/web` and rewrites `dist/ui/web` on every save, served at `/next`.
 #
-# The image is still the production one, so build it once (`--build`) after a
-# dependency change; everything else is live.
+# The `dev` build target (not `light`/`ui`) is required for this: it keeps the
+# devDependencies (Vite) and the full source tree that the production image's
+# `npm ci --omit=dev` deliberately drops. Rebuild the image (`--build`) after
+# a dependency change; everything else is live.
 services:
   isitdown-ui:
     build:
-      target: ui
+      target: dev
     environment:
       NODE_ENV: development
-      WEB_DIR: /app/dist/ui/web
     volumes:
       - ./src:/app/src:ro
       - ./vite.config.ts:/app/vite.config.ts:ro

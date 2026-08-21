@@ -3,6 +3,11 @@
 #   docker build --target light -t isitdown:light .
 #   docker build --target ui    -t isitdown:ui    .
 #
+# A third target, `dev`, exists only for docker-compose.dev.yml — it is never
+# built by `docker compose --profile ui up` (that pins `target: ui`) and has
+# no `-t isitdown:dev` convention of its own. `ui` is deliberately the last
+# stage in this file, so a target-less `docker build .` still builds `ui`.
+#
 # The `ui` stage starts FROM `light`, so the UI image is the Light image plus a
 # single thin layer: everything below it — base image, production dependencies,
 # core engine — is shared on disk and in a registry.
@@ -39,10 +44,25 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD ["node", "dist/light/healthcheck.js"]
 CMD ["node", "dist/light/index.js"]
 
+# --- UI edition, dev mode: the builder stage, live -----------------------------
+# FROM builder, not light/ui: dev mode needs the full devDependencies tree
+# (vite) and node_modules that npm ci --omit=dev deliberately drops from the
+# runtime stages. docker-compose.dev.yml mounts ./src read-only over this and
+# rebuilds the React bundle on save; the image's own dist/ is the fallback
+# until that rebuild lands in the isitdown-ui-build volume.
+FROM builder AS dev
+ENV DB_PATH=/app/data/isitdown.db
+ENV PORT=3000
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["node", "dist/ui/healthcheck.js"]
+CMD ["sh", "-c", "npx vite build --watch & exec node --watch src/ui/server.ts"]
+
 # --- UI edition: the light image plus the server layer ----------------------------
 # Starting FROM light means every layer below this point — base image, production
 # dependencies, core engine — is shared with isitdown:light on disk and in a
-# registry. The UI image is that image plus one thin layer.
+# registry. The UI image is that image plus one thin layer. Kept as the last
+# stage in the file so a target-less `docker build .` still builds this one.
 FROM light AS ui
 ENV DB_PATH=/app/data/isitdown.db
 ENV PORT=3000
