@@ -1,1 +1,9 @@
 @import "tailwindcss";
+@import "./tokens.css";
+
+/* The viewer's own ground shows through a transparent body. */
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
