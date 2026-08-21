@@ -18,7 +18,7 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY tsconfig.json tsconfig.light.json tsconfig.web.json vite.config.ts ./
+COPY tsconfig.json tsconfig.light.json tsconfig.web.json vite.config.ts components.json ./
 COPY tools ./tools
 COPY src ./src
 # Builds every edition once, so this layer is shared by both runtime stages.
