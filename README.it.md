@@ -1103,10 +1103,12 @@ npm run dev:ui       # processo locale, database in ./data/isitdown.db
 ```
 
 `docker-compose.dev.yml` sovrascrive solo il servizio `isitdown-ui`: `./src` viene
-montato in sola lettura su `/app/src` e il comando diventa
-`node --watch src/ui/server.ts`. L'immagine resta quella di produzione e deve
-esistere — va costruita una volta con `--build` — ma di essa non si usa nulla oltre
-a `node_modules` e all'healthcheck. Il middleware statico risolve la dashboard
+montato in sola lettura su `/app/src` e il comando diventa Vite in watch mode
+insieme a `node --watch src/ui/server.ts`. L'immagine è la sua: l'override costruisce
+il target `dev` e la tagga `isitdown:dev`, perché la modalità di sviluppo ha bisogno
+delle dipendenze di sviluppo che la build di produzione scarta — e perché una build di
+sviluppo non deve mai sovrascrivere `isitdown:ui`, il tag che risolve il profilo `ui`.
+Il middleware statico risolve la dashboard
 rispetto al modulo da cui gira, quindi partendo da `src/` serve `src/ui/public` e non
 il `dist/ui/public` incluso nell'immagine.
 
@@ -1114,18 +1116,23 @@ il `dist/ui/public` incluso nell'immagine.
 |---|---|
 | `src/ui/public/**` — CSS, JS della dashboard, HTML, cataloghi | Servita dal sorgente montato: hard refresh (Ctrl+Shift+R), nessun restart |
 | un qualsiasi `.ts` | `node --watch` riavvia il server in circa un secondo; scheduler e backfill ripartono con lui |
-| una dipendenza o il `Dockerfile` | Ricostruire una volta: `docker compose --profile ui up -d --build` |
+| una dipendenza o il `Dockerfile` | Ricostruire una volta l'immagine di sviluppo: `npm run dev:docker -- --build` |
 
 Due cose che la modalità di sviluppo non fa. Non esegue il type-check — rimuovere i
-tipi non è compilarli, quindi `npm run typecheck` resta obbligatorio. E non produce
-`dist/`, quindi il rilascio passa comunque dalla via normale:
+tipi non è compilarli, quindi `npm run typecheck` resta obbligatorio. E il solo
+`dist/` che produce è il bundle React di Vite, scritto dentro il container e buttato
+via con lui, quindi il rilascio passa comunque dalla via normale:
 
 ```bash
 docker compose --profile ui up -d --build   # si torna all'immagine costruita
 ```
 
-`docker inspect -f '{{.Config.Cmd}}' isitdown-ui` distingue i due casi:
-`node dist/ui/server.js` è l'immagine costruita, `node --watch src/ui/server.ts` è la
+Entrambe le modalità riusano il nome container `isitdown-ui` — di proposito, perché è
+questo che le rende mutuamente esclusive su porta e database — quindi per distinguerle
+si guarda l'immagine o il comando. `docker compose ps` mostra `isitdown:ui` per
+l'immagine costruita e `isitdown:dev` per la modalità di sviluppo; `docker inspect -f
+'{{.Config.Cmd}}' isitdown-ui` mostra `node dist/ui/server.js` per l'immagine
+costruita e `node --watch src/ui/server.ts`, dietro il watcher di Vite, per la
 modalità di sviluppo.
 
 ### 9.4 Test e controlli

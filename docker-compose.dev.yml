@@ -14,21 +14,28 @@
 # devDependencies (Vite) and the full source tree that the production image's
 # `npm ci --omit=dev` deliberately drops. Rebuild the image (`--build`) after
 # a dependency change; everything else is live.
+#
+# Three overrides stop this container from passing itself off as production:
+# its own `image:` tag, so a dev build never overwrites `isitdown:ui`; no
+# restart policy, so it cannot come back after a reboot as the thing listening
+# on :3000; and no volume over `/app/dist`, so Vite's output lives and dies
+# with the container instead of outliving the image it came from. The service
+# keeps the base file's `container_name` and data volume on purpose — that is
+# what makes dev and production mutually exclusive, so the two can never both
+# hold the port or write the same SQLite file.
 services:
   isitdown-ui:
     build:
       target: dev
+    image: isitdown:dev
+    restart: "no"
     environment:
       NODE_ENV: development
     volumes:
       - ./src:/app/src:ro
       - ./vite.config.ts:/app/vite.config.ts:ro
       - ./tsconfig.web.json:/app/tsconfig.web.json:ro
-      - isitdown-ui-build:/app/dist
     command:
       - sh
       - -c
       - "npx vite build --watch & exec node --watch src/ui/server.ts"
-
-volumes:
-  isitdown-ui-build:

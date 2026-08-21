@@ -1081,9 +1081,11 @@ npm run dev:ui       # local process, database at ./data/isitdown.db
 ```
 
 `docker-compose.dev.yml` overrides the `isitdown-ui` service only: `./src` is mounted
-read-only on `/app/src` and the command becomes `node --watch src/ui/server.ts`. The
-image is still the production one and has to exist — build it once with `--build` —
-but nothing inside it is used except `node_modules` and the healthcheck. The static
+read-only on `/app/src` and the command becomes Vite in watch mode alongside
+`node --watch src/ui/server.ts`. The image is its own: the override builds the
+`dev` target and tags it `isitdown:dev`, because dev mode needs the
+devDependencies the production build drops — and because a dev build must never
+overwrite `isitdown:ui`, the tag the `ui` profile resolves. The static
 middleware resolves the dashboard relative to the module it runs from, so running
 from `src/` serves `src/ui/public` rather than the baked `dist/ui/public`.
 
@@ -1091,19 +1093,23 @@ from `src/` serves `src/ui/public` rather than the baked `dist/ui/public`.
 |---|---|
 | `src/ui/public/**` — CSS, dashboard JS, HTML, locales | Served from the mounted source: hard refresh (Ctrl+Shift+R), no restart |
 | any `.ts` | `node --watch` restarts the server in about a second; scheduler and backfill restart with it |
-| a dependency or the `Dockerfile` | Rebuild once: `docker compose --profile ui up -d --build` |
+| a dependency or the `Dockerfile` | Rebuild the dev image once: `npm run dev:docker -- --build` |
 
 Two things dev mode does not do. It does not type-check — stripping types is not
-compiling them, so `npm run typecheck` stays mandatory. And it produces no `dist/`,
-so shipping still goes out the normal way:
+compiling them, so `npm run typecheck` stays mandatory. And the only `dist/` it
+produces is Vite's React bundle, written inside the container and thrown away with
+it, so shipping still goes out the normal way:
 
 ```bash
 docker compose --profile ui up -d --build   # back to the built image
 ```
 
-`docker inspect -f '{{.Config.Cmd}}' isitdown-ui` tells the two apart:
-`node dist/ui/server.js` is the built image, `node --watch src/ui/server.ts` is dev
-mode.
+Both modes reuse the `isitdown-ui` container name — deliberately, since that is what
+keeps them mutually exclusive on the port and the database — so read the image or the
+command to tell them apart. `docker compose ps` shows `isitdown:ui` for the built
+image and `isitdown:dev` for dev mode; `docker inspect -f '{{.Config.Cmd}}'
+isitdown-ui` shows `node dist/ui/server.js` for the built image and
+`node --watch src/ui/server.ts`, behind Vite's watcher, for dev mode.
 
 ### 9.4 Tests and checks
 
