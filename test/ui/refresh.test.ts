@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // Both helpers are pure, so the refresh policy is exercised without a browser.
-import { shouldHoldRefresh, snapshot } from "../../src/ui/public/js/refresh.js";
+import { entryAnimationPlan, shouldHoldRefresh, snapshot } from "../../src/ui/public/js/refresh.js";
 
 const status = {
   providers: [{ id: "github", status: "operational", activeIncidents: [] }],
@@ -39,4 +39,29 @@ test("a refresh only goes ahead on a visible page with nothing being edited", ()
   assert.equal(shouldHoldRefresh({ hidden: true, dialogOpen: false, editing: false }), true);
   assert.equal(shouldHoldRefresh({ hidden: false, dialogOpen: true, editing: false }), true);
   assert.equal(shouldHoldRefresh({ hidden: false, dialogOpen: false, editing: true }), true);
+});
+
+test("a repaint that must not replay silences its own nodes, never the container", () => {
+  // The gate on the container is what a later interaction — a filter rebuilding
+  // its list — needs to animate the nodes it inserts, so a quiet repaint marks
+  // what it swaps in instead of taking the gate away.
+  assert.deepEqual(entryAnimationPlan("providers||en|nocturne", "providers||en|nocturne"), {
+    replay: false,
+    quiet: true,
+  });
+});
+
+test("a new view, language or theme replays the entry animations", () => {
+  assert.deepEqual(entryAnimationPlan("providers||en|nocturne", "incidents||en|nocturne"), {
+    replay: true,
+    quiet: false,
+  });
+  assert.deepEqual(entryAnimationPlan("providers||en|nocturne", "providers||it|nocturne"), {
+    replay: true,
+    quiet: false,
+  });
+  assert.deepEqual(entryAnimationPlan(undefined, "overview||en|nocturne"), {
+    replay: true,
+    quiet: false,
+  });
 });

@@ -21,7 +21,7 @@ import { renderIncidents } from "./views/incidents.js";
 import { renderIncident } from "./views/incident.js";
 import { renderHistory } from "./views/history.js";
 import { renderSettings } from "./views/settings.js";
-import { shouldHoldRefresh, snapshot } from "./refresh.js";
+import { entryAnimationPlan, shouldHoldRefresh, snapshot } from "./refresh.js";
 
 const REFRESH_MS = 30_000;
 
@@ -221,12 +221,29 @@ function viewName() {
 const animationKey = () =>
   [viewName(), state.route.params.join("/"), state.preferences.uiLocale, currentTheme()].join("|");
 
+/** The mark motion.css silences a single node's entry animation with. */
+const QUIET = "anim-quiet";
+
 /** Stamps the container so every entry animation inside it plays from the start. */
 function playEntryAnimations() {
+  // What an earlier quiet repaint held still is exactly what a replay moves.
+  for (const node of dom.view.querySelectorAll(`.${QUIET}`)) node.classList.remove(QUIET);
   dom.view.removeAttribute("data-animate");
   // Reading a layout property between the two writes is what makes the
   // container's own animation restart rather than continue where it was.
   void dom.view.offsetWidth;
+  dom.view.setAttribute("data-animate", viewName());
+}
+
+/**
+ * Holds the repaint the operator did not ask for still, then puts the gate
+ * back. Leaving the gate off instead is what used to silence the view for the
+ * rest of its life: every list a filter rebuilt afterwards appeared without
+ * animating, because the marks its nodes carry only mean anything inside a
+ * gated container.
+ */
+function silenceEntryAnimations() {
+  for (const node of dom.view.querySelectorAll('[class*="anim-"]')) node.classList.add(QUIET);
   dom.view.setAttribute("data-animate", viewName());
 }
 
@@ -242,14 +259,16 @@ async function renderView(options) {
   const render =
     state.route.params.length > 0 && route.detail !== undefined ? route.detail : route.render;
   const key = animationKey();
-  const replay = key !== animatedKey;
+  const { replay, quiet } = entryAnimationPlan(animatedKey, key);
   animatedKey = key;
 
   // Views are handed a container they may restyle (the overview drops `.view`),
   // so the class list travels with the swap.
   const target = offscreen ? document.createElement("div") : dom.view;
   target.className = `view view-${viewName()}`;
-  target.removeAttribute("data-animate");
+  // Nothing half-built may play, so the gate comes off for the build and goes
+  // back on below — restamped by a replay, or with the new nodes held still.
+  if (!offscreen) dom.view.removeAttribute("data-animate");
   target.replaceChildren();
   try {
     await render(target, state);
@@ -263,6 +282,7 @@ async function renderView(options) {
   }
   // After the content is in place, so the whole view animates as one.
   if (replay) playEntryAnimations();
+  if (quiet) silenceEntryAnimations();
 }
 
 function wireHeader() {
