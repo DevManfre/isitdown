@@ -78,9 +78,8 @@
   "overview.body.down": "{providers} is not operational. The other providers are responding normally.",
   "overview.uptime-window": "{uptime} · 90d",
 
-  "providers.intro": "A provider is an adapter plus a base URL. Changes apply on the next cycle — no restart.",
-  "providers.add-hint": "Add a provider — any Atlassian status page works with the {adapter} adapter.",
-  "providers.empty": "No providers configured yet.",
+  "providers.intro": "A provider is an adapter plus a base URL. Add, edit and remove them in Settings.",
+  "providers.empty": "No providers configured yet — add one in Settings.",
   "providers.remove-confirm": "Remove {name}? Its uptime history and incidents go with it.",
 
   "incidents.filter.label": "Incident filter",

@@ -1,9 +1,11 @@
 /**
  * Design 3a's Providers table: one row per configured provider with its status,
- * an inline uptime strip, its uptime and incident counts, and edit/remove.
+ * an inline uptime strip, and its uptime and incident counts. The table is
+ * read-only — adding, editing and removing a provider all live in Settings, so
+ * a glance at the fleet can never turn into an accidental edit.
  *
- * The add-service dialog is opened both from the header button and from the
- * dashed hint row at the bottom of the table.
+ * The edit/remove buttons and the add-service dialog are still defined here,
+ * next to the provider model they act on, and imported by the Settings view.
  */
 
 import * as api from "../api.js";
@@ -57,7 +59,6 @@ export async function renderProviders(container, state) {
     }),
   );
   container.append(list);
-  container.append(addHint());
 }
 
 function listFor(all, byId, state) {
@@ -103,7 +104,6 @@ function table(providers, byId, state) {
     const label = column.key === "column.range" ? t(column.key, { days: RANGE_DAYS }) : t(column.key);
     headRow.append(element("th", column.className, label));
   }
-  headRow.append(element("th", "col-actions"));
   head.append(headRow);
   table.append(head);
 
@@ -139,11 +139,6 @@ function table(providers, byId, state) {
     const pollCell = element("td", "mono muted num", `${state.status?.pollIntervalMinutes ?? "-"}m`);
     const adapterCell = element("td", "mono muted num", provider.adapter);
 
-    const actionsCell = element("td", "num");
-    const actions = element("div", "row-actions");
-    actions.append(editButton(provider), removeButton(provider));
-    actionsCell.append(actions);
-
     row.append(
       nameCell,
       statusCell,
@@ -152,7 +147,6 @@ function table(providers, byId, state) {
       incidentsCell,
       pollCell,
       adapterCell,
-      actionsCell,
     );
     body.append(row);
   });
@@ -216,18 +210,7 @@ export function removeButton(provider) {
   return button;
 }
 
-function addHint() {
-  // Last in, after the table has finished settling.
-  const hint = animate(element("div", "add-hint"), "anim-rise", "340ms");
-  hint.append(element("span", "muted", t("providers.add-hint", { adapter: "statuspage" })));
-  const button = element("button", "btn btn-primary", t("action.add-service"));
-  button.type = "button";
-  button.addEventListener("click", openAddServiceDialog);
-  hint.append(button);
-  return hint;
-}
-
-/** Shared with the header's add button, which dispatches an event. */
+/** Opened from the Settings view, which owns the provider list. */
 export function openAddServiceDialog() {
   let adapter = "statuspage";
   // `modal` is assigned right after openModal below; the picker's load button

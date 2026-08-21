@@ -357,12 +357,10 @@
   border-color: var(--color-accent);
   transform: translateX(3px);
 }
-.panel-channel,
-.add-hint {
+.panel-channel {
   transition: border-color 0.24s ease;
 }
-.panel-channel:hover,
-.add-hint:hover {
+.panel-channel:hover {
   border-color: var(--color-accent);
 }
 

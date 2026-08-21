@@ -620,12 +620,6 @@
 .table .col-range {
   width: 210px;
 }
-/* Sized by its buttons, never wrapped: "Edit / Remove" is wider than the
-   prototype's "Edit / ✕" and two lines of it stretches every row. */
-.table .col-actions {
-  width: 1%;
-  white-space: nowrap;
-}
 
 /* Hover marks the row it is on without repainting it: the row's own rule lights
    up in the accent and the text steps to full contrast. No slab of colour. */
@@ -914,15 +908,6 @@
   border: 1px solid var(--color-neutral-800);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
-}
-.add-hint {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  border: 1px dashed var(--color-neutral-800);
-  border-radius: var(--radius-md);
-  padding: 14px 18px;
 }
 
 /* — component picker (add/edit service dialog) — */
