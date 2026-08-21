@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](tsconfig.json)
 [![Dashboard](https://img.shields.io/badge/dashboard-vanilla%20JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](#92-stack-tecnologico)
 
-[![Test](https://img.shields.io/badge/tests-301%20passing-brightgreen?style=flat-square)](#93-test-e-controlli)
+[![Test](https://img.shields.io/badge/tests-301%20passing-brightgreen?style=flat-square)](#94-test-e-controlli)
 [![Dipendenze runtime](https://img.shields.io/badge/runtime%20deps-3-lightgrey?style=flat-square)](#92-stack-tecnologico)
 [![Docker](https://img.shields.io/badge/docker-light%20%7C%20ui-2496ED?style=flat-square&logo=docker&logoColor=white)](#4-docker)
 [![i18n](https://img.shields.io/badge/i18n-en%20%7C%20it-orange?style=flat-square)](#82-localizzazione)
@@ -64,8 +64,9 @@ server) e **UI** (lo stesso motore più una dashboard locale, configurabile a ru
 - [9. Sviluppo](#9-sviluppo)
   - [9.1 Struttura del repository](#91-struttura-del-repository)
   - [9.2 Stack tecnologico](#92-stack-tecnologico)
-  - [9.3 Test e controlli](#93-test-e-controlli)
-  - [9.4 Convenzioni](#94-convenzioni)
+  - [9.3 Sviluppo live](#93-sviluppo-live)
+  - [9.4 Test e controlli](#94-test-e-controlli)
+  - [9.5 Convenzioni](#95-convenzioni)
 - [10. Roadmap](#10-roadmap)
 - [11. Layout dei branch e politica di merge](#11-layout-dei-branch-e-politica-di-merge)
   - [Setup, una volta per clone](#setup-una-volta-per-clone)
@@ -415,6 +416,10 @@ docker compose --profile ui    up -d --build   # solo volume dati, pubblica la :
 docker compose --profile light --profile ui up -d      # entrambe
 docker compose --profile light --profile ui down       # ferma; i volumi sopravvivono
 ```
+
+Un terzo file, `docker-compose.dev.yml`, si sovrappone al profilo `ui` ed esegue
+l'edizione direttamente dal sorgente, senza alcuna build — vedi
+[9.3](#93-sviluppo-live).
 
 ### 4.3 Volumi, healthcheck, utenti
 
@@ -1054,6 +1059,7 @@ isitdown/
 ├── design/                            prototipi Claude Design (in .gitignore: su disco, non in un clone)
 ├── Dockerfile                         builder → light → ui (ui è FROM light)
 ├── docker-compose.yml                 entrambe le edizioni come profili
+├── docker-compose.dev.yml             override di sviluppo: edizione UI live da src/, senza build
 ├── config.example.yml                 template versionato; config.yml è in .gitignore
 ├── .env.example                       nomi delle variabili dei segreti, mai valori
 ├── .nvmrc  .npmrc                     fissano Node 24 e fanno fallire in modo esplicito una versione più vecchia
@@ -1085,7 +1091,44 @@ esclusive di un'edizione.
 Dipendenze a runtime, tutte: `zod`, `yaml` (entrambe le edizioni) ed `express` (UI).
 Dipendenze di sviluppo: `typescript`, `@types/node`, `@types/express`.
 
-### 9.3 Test e controlli
+### 9.3 Sviluppo live
+
+Ricostruire l'immagine per una riga di CSS è abbastanza lento da scoraggiare la
+modifica stessa. Node 24 rimuove i tipi TypeScript al caricamento, quindi l'edizione
+UI può girare da `src/` senza alcuna build:
+
+```bash
+npm run dev:docker   # container: docker-compose.dev.yml sovrapposto al profilo ui
+npm run dev:ui       # processo locale, database in ./data/isitdown.db
+```
+
+`docker-compose.dev.yml` sovrascrive solo il servizio `isitdown-ui`: `./src` viene
+montato in sola lettura su `/app/src` e il comando diventa
+`node --watch src/ui/server.ts`. L'immagine resta quella di produzione e deve
+esistere — va costruita una volta con `--build` — ma di essa non si usa nulla oltre
+a `node_modules` e all'healthcheck. Il middleware statico risolve la dashboard
+rispetto al modulo da cui gira, quindi partendo da `src/` serve `src/ui/public` e non
+il `dist/ui/public` incluso nell'immagine.
+
+| Modifica | Cosa succede |
+|---|---|
+| `src/ui/public/**` — CSS, JS della dashboard, HTML, cataloghi | Servita dal sorgente montato: hard refresh (Ctrl+Shift+R), nessun restart |
+| un qualsiasi `.ts` | `node --watch` riavvia il server in circa un secondo; scheduler e backfill ripartono con lui |
+| una dipendenza o il `Dockerfile` | Ricostruire una volta: `docker compose --profile ui up -d --build` |
+
+Due cose che la modalità di sviluppo non fa. Non esegue il type-check — rimuovere i
+tipi non è compilarli, quindi `npm run typecheck` resta obbligatorio. E non produce
+`dist/`, quindi il rilascio passa comunque dalla via normale:
+
+```bash
+docker compose --profile ui up -d --build   # si torna all'immagine costruita
+```
+
+`docker inspect -f '{{.Config.Cmd}}' isitdown-ui` distingue i due casi:
+`node dist/ui/server.js` è l'immagine costruita, `node --watch src/ui/server.ts` è la
+modalità di sviluppo.
+
+### 9.4 Test e controlli
 
 ```bash
 npm test                 # suite unitaria:   test/**/*.test.ts
@@ -1126,7 +1169,7 @@ Suite notevoli:
 Dato che la dashboard non ha uno step di build, `tsc --checkJs` gira anche su di lei: è
 il solo controllo statico che quel codice riceve.
 
-### 9.4 Convenzioni
+### 9.5 Convenzioni
 
 - Validare ogni input esterno con `zod` al confine; fidarsi dell'interno.
 - Un adapter per file sotto `src/adapters/`, un notifier per file sotto

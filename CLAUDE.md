@@ -32,7 +32,16 @@ npm run build:ui && node dist/ui/server.js          # UI edition, local
 
 docker compose --profile light up -d --build        # Light edition, container
 docker compose --profile ui up -d --build           # UI edition, container
+
+npm run dev:docker                                  # UI edition, container, live from src/
+npm run dev:ui                                      # UI edition, local, live from src/
 ```
+
+`dev:docker` / `dev:ui` run the UI edition straight from the source tree: Node 24
+strips the TypeScript types at load time, `node --watch` restarts the server on a
+`.ts` change, and the dashboard is served from `src/ui/public`, so a CSS/JS/HTML/
+locale edit needs nothing but a hard refresh. Type stripping does *not* type-check
+— `npm run typecheck` and a real `--build` before shipping still matter.
 
 ## Every change ships to the running instance
 
@@ -42,9 +51,12 @@ until it is rebuilt. A change is therefore not done when the file is saved —
 it is done when the running instance shows it. Every time:
 
 1. Find how it is running: `docker ps --filter name=isitdown`, otherwise a local
-   `node dist/…` process.
+   `node dist/…` process. `docker inspect -f '{{.Config.Cmd}}' isitdown-ui` says
+   which mode: `node dist/ui/server.js` is a built image, `node --watch
+   src/ui/server.ts` is dev mode.
 2. Redeploy that same way — container: `docker compose --profile ui up -d --build`;
-   local: `npm run build:ui`, then restart the process.
+   local: `npm run build:ui`, then restart the process. In dev mode there is
+   nothing to redeploy: the edit is already live, so go straight to step 3.
 3. Prove it is live before reporting, don't assume: container healthy in
    `docker compose ps`, and for an asset the value itself, e.g.
    `curl -s localhost:3000/css/tokens.css | grep -- '--color-surface'`.
