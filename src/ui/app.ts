@@ -7,7 +7,10 @@ import { preferencesRoutes } from "./routes/preferences.routes.ts";
 import { statusRoutes } from "./routes/status.routes.ts";
 import type { UiRuntimeCore } from "./runtime.ts";
 
-const PUBLIC_DIR = new URL("./public/", import.meta.url);
+const PUBLIC_DIR = process.env["WEB_DIR"] ?? new URL("./public/", import.meta.url).pathname;
+// Staging mount for the React bundle while the port is in progress. Deleted by
+// the cutover commit, together with src/ui/public.
+const WEB_STAGING_DIR = new URL("../../dist/ui/web/", import.meta.url).pathname;
 
 /**
  * The dashboard's HTTP surface. Every response is JSON except the static
@@ -26,7 +29,8 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(configRoutes(runtime));
   app.use(preferencesRoutes(runtime));
 
-  app.use(express.static(PUBLIC_DIR.pathname, { extensions: ["html"] }));
+  app.use(express.static(PUBLIC_DIR, { extensions: ["html"] }));
+  app.use("/next", express.static(WEB_STAGING_DIR, { extensions: ["html"] }));
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: { message: "not found" } });

@@ -11,6 +11,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const assets = [
   { from: "src/core/i18n", to: "dist/core/i18n", filter: (p) => !p.endsWith(".ts") },
   { from: "src/ui/public", to: "dist/ui/public" },
+  // The server enumerates the dashboard catalogs from disk to build the
+  // uiLocale enum, so they must exist in dist even though Vite also bundles
+  // them into the client.
+  { from: "src/ui/web/locales", to: "dist/ui/web/locales" },
 ];
 
 for (const asset of assets) {
