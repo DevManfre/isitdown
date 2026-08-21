@@ -1,0 +1,391 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   IsItDown — colour, type, spacing and elevation tokens.
+
+   This is the ONLY file in the dashboard allowed to contain a colour literal;
+   a test enforces that. Everything else references var(--…).
+
+   Palette: Nocturne (design/claude-design-prototypes). Nocturne is a dark
+   system, and the prototype's own light mode reads the same tonal ramps from the
+   other end. The light block re-spaces those ramps: the prototype packed its
+   muted greys and status hues near the dark end, which reads heavy on a light
+   ground, so each step here is set to the contrast ratio its dark-mode
+   counterpart carries (AA 4.5:1 for every hue used as text).
+
+   Structure follows the spec: the light palette on bare :root, overridden in
+   :root[data-theme="dark"] for an explicit choice, and mirrored under
+   prefers-color-scheme for "system". The three blocks declare identical token
+   sets, so no component can end up with a token that exists in one theme only.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --color-bg: #f3f5fe;
+  /* Cards sit above the page here, not below it: on a light ground the surface
+     is the lighter of the two, and the neutral-800 hairline keeps the edge. */
+  --color-surface: #ffffff;
+  --color-text: #292b31;
+  --color-divider: color-mix(in srgb, #292b31 12%, transparent);
+
+  --color-neutral-100: #161826;
+  --color-neutral-200: #292b31;
+  --color-neutral-300: #3f424d;
+  --color-neutral-400: #43464f;
+  --color-neutral-500: #595d6c;
+  --color-neutral-600: #686c7e;
+  --color-neutral-700: #b2b6ca;
+  --color-neutral-800: #cfd3e5;
+  --color-neutral-900: #f3f5fe;
+
+  --color-accent: #5d5294;
+  --color-accent-100: #2b2741;
+  --color-accent-200: #423a6a;
+  --color-accent-300: #5d5294;
+  --color-accent-400: #5d5294;
+  --color-accent-500: #796cbf;
+  --color-accent-600: #968ae0;
+  --color-accent-700: #b5abfc;
+  --color-accent-800: #d2cefd;
+  --color-accent-900: #e7e5fe;
+
+  /* Severity. Partial and major share a hue and are told apart by bar height
+     and label, exactly as the prototype draws them. */
+  --status-operational: #2f7a55;
+  --status-degraded: #8f6a1e;
+  --status-partial-outage: #b04a2f;
+  --status-major-outage: #b04a2f;
+  --status-unknown: #d7dbeb;
+  --status-accent: #574aa0;
+
+  /* The same severities as they are painted, not written. A bar, a ring or a dot
+     is a graphic (3:1) while a label is text (4.5:1), and on a light ground that
+     gap is wide: holding the chart to the text ratio is what made the uptime wall
+     read as a slab of dark blocks. Dark mode has room for one value, so there the
+     two sets are identical. */
+  --status-operational-fill: #3b9c6d;
+  --status-degraded-fill: #b87f1c;
+  --status-partial-outage-fill: #ca5a3a;
+  --status-major-outage-fill: #ca5a3a;
+  --status-unknown-fill: #d7dbeb;
+
+  --status-operational-tint: rgba(47, 122, 85, 0.1);
+  --status-degraded-tint: rgba(143, 106, 30, 0.12);
+  --status-outage-tint: rgba(176, 74, 47, 0.12);
+  --status-accent-tint: rgba(87, 74, 160, 0.12);
+
+  --status-operational-border: rgba(47, 122, 85, 0.35);
+  --status-degraded-border: rgba(143, 106, 30, 0.4);
+  --status-outage-border: rgba(176, 74, 47, 0.4);
+  --status-accent-border: rgba(87, 74, 160, 0.4);
+
+  --scrim: rgba(41, 43, 49, 0.55);
+
+  --shadow-sm: 0 0 0 1px #cfd3e5;
+  --shadow-md: 0 0 0 1px #cfd3e5, 0 6px 18px rgba(41, 43, 49, 0.12);
+  --shadow-lg: 0 0 0 1px #b2b6ca, 0 16px 40px rgba(41, 43, 49, 0.18);
+
+  --font-heading: "Inter", system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --space-1: 2.8px;
+  --space-2: 5.6px;
+  --space-3: 8.4px;
+  --space-4: 11.2px;
+  --space-6: 16.8px;
+  --space-8: 22.4px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --rail-width: 196px;
+
+  --ring-icon-bg: #ffffff;
+  --rail-width-collapsed: 30px;
+
+  /* ── shadcn semantic contract ─────────────────────────────────────────────
+     shadcn components address colour through these names. Mapping them onto
+     the Nocturne palette here is what makes a stock shadcn component inherit
+     this design system instead of shipping its own defaults. No literal may
+     appear on the right-hand side. */
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-surface);
+  --secondary: var(--color-neutral-800);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-neutral-800);
+  --muted-foreground: var(--color-neutral-500);
+  --accent: var(--color-accent-200);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--status-major-outage);
+  --destructive-foreground: var(--color-surface);
+  --border: var(--color-divider);
+  --input: var(--color-divider);
+  --ring: var(--color-accent);
+  --radius: var(--radius-md);
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #161826;
+  --color-surface: #232532;
+  --color-text: #e9e9ed;
+  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+
+  --color-neutral-100: #f3f5fe;
+  --color-neutral-200: #e4e7f5;
+  --color-neutral-300: #cfd3e5;
+  --color-neutral-400: #b2b6ca;
+  --color-neutral-500: #9397ab;
+  --color-neutral-600: #75798c;
+  --color-neutral-700: #595d6c;
+  --color-neutral-800: #3f424d;
+  --color-neutral-900: #292b31;
+
+  --color-accent: #9184d9;
+  --color-accent-100: #f5f4ff;
+  --color-accent-200: #e7e5fe;
+  --color-accent-300: #d2cefd;
+  --color-accent-400: #b5abfc;
+  --color-accent-500: #968ae0;
+  --color-accent-600: #796cbf;
+  --color-accent-700: #5d5294;
+  --color-accent-800: #423a6a;
+  --color-accent-900: #2b2741;
+
+  --status-operational: #56a37f;
+  --status-degraded: #d8a34a;
+  --status-partial-outage: #d2694f;
+  --status-major-outage: #d2694f;
+  --status-unknown: #2a2d3c;
+  --status-accent: #9184d9;
+
+  --status-operational-fill: #56a37f;
+  --status-degraded-fill: #d8a34a;
+  --status-partial-outage-fill: #d2694f;
+  --status-major-outage-fill: #d2694f;
+  --status-unknown-fill: #2a2d3c;
+
+  --status-operational-tint: rgba(86, 163, 122, 0.1);
+  --status-degraded-tint: rgba(216, 163, 74, 0.12);
+  --status-outage-tint: rgba(210, 105, 79, 0.12);
+  --status-accent-tint: rgba(145, 132, 217, 0.12);
+
+  --status-operational-border: rgba(86, 163, 122, 0.35);
+  --status-degraded-border: rgba(216, 163, 74, 0.4);
+  --status-outage-border: rgba(210, 105, 79, 0.4);
+  --status-accent-border: rgba(145, 132, 217, 0.4);
+
+  --scrim: rgba(10, 11, 18, 0.72);
+
+  --shadow-sm: 0 0 0 1px #3f424d;
+  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+
+  --font-heading: "Inter", system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --space-1: 2.8px;
+  --space-2: 5.6px;
+  --space-3: 8.4px;
+  --space-4: 11.2px;
+  --space-6: 16.8px;
+  --space-8: 22.4px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --rail-width: 196px;
+
+  --ring-icon-bg: #ffffff;
+  --rail-width-collapsed: 30px;
+
+  /* ── shadcn semantic contract ─────────────────────────────────────────────
+     shadcn components address colour through these names. Mapping them onto
+     the Nocturne palette here is what makes a stock shadcn component inherit
+     this design system instead of shipping its own defaults. No literal may
+     appear on the right-hand side. */
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-surface);
+  --secondary: var(--color-neutral-800);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-neutral-800);
+  --muted-foreground: var(--color-neutral-500);
+  --accent: var(--color-accent-200);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--status-major-outage);
+  --destructive-foreground: var(--color-surface);
+  --border: var(--color-divider);
+  --input: var(--color-divider);
+  --ring: var(--color-accent);
+  --radius: var(--radius-md);
+}
+
+/* "System" is the default: no data-theme attribute is set, so the OS decides.
+   Guarded so an explicit light choice still wins on a dark desktop. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #161826;
+    --color-surface: #232532;
+    --color-text: #e9e9ed;
+    --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+
+    --color-neutral-100: #f3f5fe;
+    --color-neutral-200: #e4e7f5;
+    --color-neutral-300: #cfd3e5;
+    --color-neutral-400: #b2b6ca;
+    --color-neutral-500: #9397ab;
+    --color-neutral-600: #75798c;
+    --color-neutral-700: #595d6c;
+    --color-neutral-800: #3f424d;
+    --color-neutral-900: #292b31;
+
+    --color-accent: #9184d9;
+    --color-accent-100: #f5f4ff;
+    --color-accent-200: #e7e5fe;
+    --color-accent-300: #d2cefd;
+    --color-accent-400: #b5abfc;
+    --color-accent-500: #968ae0;
+    --color-accent-600: #796cbf;
+    --color-accent-700: #5d5294;
+    --color-accent-800: #423a6a;
+    --color-accent-900: #2b2741;
+
+    --status-operational: #56a37f;
+    --status-degraded: #d8a34a;
+    --status-partial-outage: #d2694f;
+    --status-major-outage: #d2694f;
+    --status-unknown: #2a2d3c;
+    --status-accent: #9184d9;
+
+    --status-operational-fill: #56a37f;
+    --status-degraded-fill: #d8a34a;
+    --status-partial-outage-fill: #d2694f;
+    --status-major-outage-fill: #d2694f;
+    --status-unknown-fill: #2a2d3c;
+
+    --status-operational-tint: rgba(86, 163, 122, 0.1);
+    --status-degraded-tint: rgba(216, 163, 74, 0.12);
+    --status-outage-tint: rgba(210, 105, 79, 0.12);
+    --status-accent-tint: rgba(145, 132, 217, 0.12);
+
+    --status-operational-border: rgba(86, 163, 122, 0.35);
+    --status-degraded-border: rgba(216, 163, 74, 0.4);
+    --status-outage-border: rgba(210, 105, 79, 0.4);
+    --status-accent-border: rgba(145, 132, 217, 0.4);
+
+    --scrim: rgba(10, 11, 18, 0.72);
+
+    --shadow-sm: 0 0 0 1px #3f424d;
+    --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+
+    --font-heading: "Inter", system-ui, sans-serif;
+    --font-heading-weight: 500;
+    --font-body: "Inter", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+    --space-1: 2.8px;
+    --space-2: 5.6px;
+    --space-3: 8.4px;
+    --space-4: 11.2px;
+    --space-6: 16.8px;
+    --space-8: 22.4px;
+
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 14px;
+
+    --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+    --rail-width: 196px;
+
+    --ring-icon-bg: #ffffff;
+    --rail-width-collapsed: 30px;
+
+    /* ── shadcn semantic contract ───────────────────────────────────────────
+       shadcn components address colour through these names. Mapping them onto
+       the Nocturne palette here is what makes a stock shadcn component inherit
+       this design system instead of shipping its own defaults. No literal may
+       appear on the right-hand side. */
+    --background: var(--color-bg);
+    --foreground: var(--color-text);
+    --card: var(--color-surface);
+    --card-foreground: var(--color-text);
+    --popover: var(--color-surface);
+    --popover-foreground: var(--color-text);
+    --primary: var(--color-accent);
+    --primary-foreground: var(--color-surface);
+    --secondary: var(--color-neutral-800);
+    --secondary-foreground: var(--color-text);
+    --muted: var(--color-neutral-800);
+    --muted-foreground: var(--color-neutral-500);
+    --accent: var(--color-accent-200);
+    --accent-foreground: var(--color-text);
+    --destructive: var(--status-major-outage);
+    --destructive-foreground: var(--color-surface);
+    --border: var(--color-divider);
+    --input: var(--color-divider);
+    --ring: var(--color-accent);
+    --radius: var(--radius-md);
+  }
+}
+
+/* Tailwind's `dark:` prefix must follow this repo's attribute, not shadcn's
+   default `.dark` class: the pre-paint script in index.html stamps
+   data-theme, and "system" stamps nothing at all so the media query decides. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Palette tokens exposed as Tailwind utilities: bg-background, text-foreground,
+   border-border, text-status-operational, font-mono, rounded-lg, … */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-status-operational: var(--status-operational);
+  --color-status-degraded: var(--status-degraded);
+  --color-status-partial-outage: var(--status-partial-outage);
+  --color-status-major-outage: var(--status-major-outage);
+  --color-status-unknown: var(--status-unknown);
+
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}

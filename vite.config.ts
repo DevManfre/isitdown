@@ -23,8 +23,5 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
     include: ["**/*.test.tsx", "**/*.test.ts"],
-    // This task adds no *.test.tsx yet — the first lands in Task 2. Without
-    // this, `vitest run` exits 1 on an empty suite and `npm test` never passes.
-    passWithNoTests: true,
   },
 });
