@@ -29,7 +29,18 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   });
   const text = await response.text();
-  const payload = text === "" ? undefined : (JSON.parse(text) as unknown);
+  // A non-JSON body (an empty string, an upstream proxy's HTML error page, a
+  // body-size-limit rejection) must not escape as a raw SyntaxError: that
+  // would break the promise above. Treat it the same as an empty body —
+  // nothing usable to read the server's own message from.
+  let payload: unknown;
+  if (text !== "") {
+    try {
+      payload = JSON.parse(text) as unknown;
+    } catch {
+      payload = undefined;
+    }
+  }
   if (!response.ok) {
     const message = (payload as { error?: { message?: string } })?.error?.message;
     throw new Error(message ?? `HTTP ${response.status}`);
@@ -44,6 +55,12 @@ export const pollNow = () =>
     "/poll",
   );
 
+/**
+ * Returns `HistorySummary` when `provider` is omitted, `ProviderHistory`
+ * otherwise. There is no literal tag to switch on; a caller discriminates by
+ * shape instead — `providerId` is unique to `ProviderHistory`, `months` and
+ * `providers` unique to `HistorySummary`.
+ */
 export const getHistory = (days: number, provider?: string): Promise<HistorySummary | ProviderHistory> =>
   provider === undefined
     ? request<HistorySummary>("GET", `/history?days=${days}`)
