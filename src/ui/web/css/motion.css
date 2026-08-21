@@ -1,0 +1,381 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Motion, from design 3a: the entry animations of a view and the hover/press
+   states of everything you can click.
+
+   The prototype restarts every entry animation whenever the view, the language
+   or the theme changes, and never on a data refresh. Here that remount key is
+   `data-animate` on #view: the shell re-stamps it when the key changes, and a
+   background refresh that leaves the key untouched plays no animation at all
+   — React's own `key` remount replaces the DOM outright, so there is no
+   separate repaint left to hold still for. Every entry animation is therefore
+   written as a descendant of #view[data-animate]; looping motion (a pulsing
+   dot) and the transitions live outside that gate.
+
+   Stagger delays are set inline by the views — a per-item delay is data, not a
+   style. Durations and curves stay here.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* — keyframes — */
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* A bar grows out of its baseline, which is why every bar sets transform-origin. */
+@keyframes bar-grow {
+  from {
+    opacity: 0.2;
+    transform: scaleY(0.06);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+@keyframes sweep {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+@keyframes ring-in {
+  from {
+    opacity: 0;
+    transform: rotate(-70deg) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes modal-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+/* The ring expands in the dot's own colour: currentColor, set beside background. */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  70% {
+    opacity: 0.85;
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* — entry animations — */
+#view[data-animate] {
+  animation: view-in 0.42s var(--ease-out) both;
+}
+/* The incident detail enters a touch slower; it is a page, not a panel. */
+#view[data-animate="incident"] {
+  animation-duration: 0.45s;
+}
+
+#view[data-animate] .anim-rise {
+  animation: rise 0.5s var(--ease-out) both;
+}
+#view[data-animate] .anim-rise-hero {
+  animation-duration: 0.58s;
+}
+#view[data-animate] .anim-rise-column {
+  animation-duration: 0.55s;
+}
+#view[data-animate] .anim-rise-row {
+  animation-duration: 0.48s;
+}
+#view[data-animate] .anim-rise-table-row {
+  animation-duration: 0.46s;
+}
+#view[data-animate] .anim-fade {
+  animation: fade 0.5s ease both;
+}
+#view[data-animate] .anim-sweep {
+  animation: sweep 0.7s var(--ease-out) both;
+}
+#view[data-animate] .anim-sweep-step {
+  animation-duration: 0.55s;
+}
+#view[data-animate] .anim-ring {
+  animation: ring-in 0.7s var(--ease-out) both;
+}
+#view[data-animate] .anim-bar {
+  animation: bar-grow 0.5s var(--ease-out) both;
+}
+#view[data-animate] .anim-bar-strip {
+  animation-duration: 0.45s;
+}
+#view[data-animate] .anim-bar-month {
+  animation-duration: 0.65s;
+}
+
+.anim-sweep {
+  transform-origin: left;
+}
+/* A chart grows out of its baseline, so the wrapper — not the SVG rects, which
+   Recharts owns — carries the origin. */
+#view[data-animate] .anim-bar,
+#view[data-animate] .anim-bar-strip,
+#view[data-animate] .anim-bar-month {
+  transform-origin: bottom;
+}
+
+/* An open incident keeps pulsing: it is the one thing on the page still moving. */
+.dot-pulse {
+  animation: pulse 2.4s ease-out infinite;
+}
+
+/* — dialog — */
+/* Radix drives data-state on the overlay and the content; the keyframes are the
+   prototype's own. Closing runs the entry in reverse and faster: leaving should
+   not be a wait. */
+[data-slot="dialog-overlay"][data-state="open"] {
+  animation: fade 0.28s ease both;
+  backdrop-filter: blur(3px);
+}
+[data-slot="dialog-content"][data-state="open"] {
+  animation: modal-in 0.42s var(--ease-out) 40ms both;
+}
+[data-slot="dialog-overlay"][data-state="closed"] {
+  animation: fade-out 0.22s ease both;
+  pointer-events: none;
+}
+[data-slot="dialog-content"][data-state="closed"] {
+  animation: modal-out 0.22s ease both;
+}
+
+/* — rail — */
+/* The strip widens on hover and the pin chevron flips; content fades with it. */
+.rail {
+  transition: width 0.28s var(--ease-out);
+}
+.console {
+  transition: grid-template-columns 0.28s var(--ease-out);
+}
+.rail-toggle {
+  transition: color 0.2s ease;
+}
+.rail-toggle-chevron {
+  transition: transform 0.4s var(--ease-out);
+}
+:root[data-rail="collapsed"] .rail-toggle-chevron {
+  transform: rotate(225deg);
+  margin-left: -2px;
+}
+.rail-links,
+.rail-foot {
+  transition: opacity 0.22s ease;
+}
+.rail-brand {
+  transition: padding 0.28s var(--ease-out);
+}
+.rail-dot,
+.rail-name {
+  transition: opacity 0.22s ease;
+}
+/* Hovering nudges the label 4px further in, pressing settles at 2px. */
+.rail-link {
+  transition:
+    background 0.22s var(--ease-out),
+    color 0.22s ease,
+    border-color 0.22s ease,
+    padding-left 0.22s var(--ease-out);
+}
+.rail-link:hover {
+  padding-left: calc(var(--space-6) + 4px);
+}
+.rail-link:active {
+  padding-left: calc(var(--space-6) + 2px);
+}
+
+/* — header controls — */
+.lang-opt {
+  transition:
+    color 0.2s ease,
+    background 0.24s var(--ease-out);
+}
+.lang-opt:hover {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.theme-btn {
+  transition: background 0.24s ease;
+}
+.theme-dot {
+  transition:
+    background 0.35s var(--ease-out),
+    transform 0.5s var(--ease-out);
+}
+:root[data-theme="light"] .theme-dot {
+  transform: rotate(180deg);
+}
+
+/* — buttons — */
+/* The prototype's primary action gains an accent bloom on hover and dips on
+   press; the tint is 16% rather than the design system's own 12%. */
+[data-slot="button"] {
+  transition:
+    background 0.22s ease,
+    border-color 0.22s ease,
+    color 0.2s ease,
+    /* .btn-ghost transitioned opacity; the merged rule must keep it or a
+       dim-by-default ghost button snaps to full brightness instead of fading. */
+    opacity 0.2s ease,
+    transform 0.18s var(--ease-out),
+    box-shadow 0.24s ease;
+}
+[data-slot="button"]:active {
+  transform: scale(0.96);
+}
+[data-slot="button"][data-variant="default"]:hover {
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+[data-slot="button"][data-variant="destructive"]:hover {
+  box-shadow: 0 0 18px var(--status-outage-tint);
+}
+
+.back-link {
+  transition:
+    color 0.2s ease,
+    transform 0.22s var(--ease-out);
+}
+.back-link:hover {
+  color: var(--color-accent);
+  transform: translateX(-3px);
+}
+
+/* — segmented controls, badges and table rows — */
+[data-slot="toggle-group-item"] {
+  transition:
+    background 0.22s ease,
+    color 0.2s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+[data-slot="badge"] {
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.16s ease;
+}
+[data-slot="badge"]:hover {
+  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
+  color: var(--color-text);
+}
+[data-slot="badge"]:active {
+  transform: scale(0.95);
+}
+[data-slot="table-row"] {
+  transition: background 0.2s ease;
+}
+[data-slot="table-cell"] {
+  transition: color 0.2s ease;
+}
+
+/* — rows, tiles and panels — */
+.incident-row {
+  transition: background 0.2s ease;
+}
+.ring-tile {
+  transition:
+    border-color 0.24s ease,
+    transform 0.24s var(--ease-out);
+}
+.ring-tile:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
+}
+.service-row {
+  transition:
+    border-color 0.22s ease,
+    transform 0.22s var(--ease-out);
+}
+.service-row:hover {
+  border-color: var(--color-accent);
+  transform: translateX(3px);
+}
+.panel-channel {
+  transition: border-color 0.24s ease;
+}
+.panel-channel:hover {
+  border-color: var(--color-accent);
+}
+
+/* Reduced motion keeps every state change, and none of the travel. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .ring-tile:hover,
+  .service-row:hover,
+  .back-link:hover,
+  [data-slot="button"]:active,
+  [data-slot="badge"]:active {
+    transform: none;
+  }
+  .rail-link:hover,
+  .rail-link:active {
+    padding-left: var(--space-6);
+  }
+}

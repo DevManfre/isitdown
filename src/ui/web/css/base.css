@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./tokens.css";
+@import "./motion.css";
 
 /* The viewer's own ground shows through a transparent body. */
 body {
