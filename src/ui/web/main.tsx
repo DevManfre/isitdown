@@ -7,6 +7,6 @@ if (root === null) throw new Error("#root is missing from index.html");
 
 createRoot(root).render(
   <StrictMode>
-    <p data-testid="scaffold">react scaffold</p>
+    <p data-testid="scaffold" />
   </StrictMode>,
 );
