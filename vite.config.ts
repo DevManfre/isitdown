@@ -7,6 +7,9 @@ const API_PATHS = ["/status", "/config", "/history", "/incidents", "/notificatio
 export default defineConfig({
   root: "src/ui/web",
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: { "@": new URL("./src/ui/web/", import.meta.url).pathname },
+  },
   build: {
     // Staging output until the cutover commit moves this to dist/ui/public.
     outDir: "../../../dist/ui/web",
