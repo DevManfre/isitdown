@@ -44,6 +44,7 @@ Skipping this and going straight to typing is the single biggest source of code 
 | Comments | Match the density. Explain *why*, never *what*. No comment that restates the line below it. |
 | Logging | Use the existing logger and level conventions. No stray `console.log`. |
 | Async | Match the pattern (async/await vs promise chains vs callbacks). |
+| UI components | Reuse a shadcn primitive under `src/ui/web/components/ui/` before writing a new one — see the `shadcn-components` skill for how to add one without breaking the theme. |
 
 ## Writing the change
 

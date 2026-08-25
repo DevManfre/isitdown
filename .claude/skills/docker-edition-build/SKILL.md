@@ -21,10 +21,52 @@ docker compose --profile light build
 docker compose --profile ui build
 ```
 
-There is **one** `Dockerfile` with named stages (`builder`, `light`, `ui`), not a
-`Dockerfile.light` and a `Dockerfile.ui`. The `ui` stage starts `FROM light`, so
-the UI image is the Light image plus one thin layer — if a change to the light
-stage breaks, it breaks both editions, so rebuild and check both.
+There are **four** named stages, in this order: `builder`, `light`, `dev`, `ui`.
+Not a `Dockerfile.light` and a `Dockerfile.ui` — one `Dockerfile`. Order matters:
+`ui` is deliberately last so a target-less `docker build .` still builds it.
+
+- `builder` runs `npm ci` with full devDependencies, copies `tsconfig.json`,
+  `tsconfig.light.json`, `tsconfig.web.json`, `vite.config.ts`, and
+  `components.json`, then `npm run build`, which runs `tsc` for the server,
+  `vite build` for the dashboard (emitting the hashed bundle straight into
+  `dist/ui/public` — that directory is Vite's build output now, not a tree
+  copied verbatim from source), and `tools/copy-assets.mjs` for the two
+  things `tsc`/Vite don't touch: `src/core/i18n` (notification catalogs,
+  needed by both editions at runtime) and `src/ui/web/locales` (dashboard
+  catalogs the server enumerates from disk, even though Vite also bundles
+  them into the client).
+- `light` and `ui` copy their compiled output from `builder` and run
+  `npm ci --omit=dev`, so neither runtime stage carries Vite or any other
+  devDependency.
+- `dev` exists only for `docker-compose.dev.yml` / `npm run dev:docker`. It
+  is never built by `docker compose --profile ui up` (that pins `target: ui`)
+  and is tagged `isitdown:dev`, never `isitdown:ui`, so a dev build can't
+  overwrite the production image. It needs the full `builder` tree — with
+  devDependencies, i.e. Vite — because the `light`/`ui` stages' `npm ci
+  --omit=dev` deliberately drops exactly what `dev` mode needs to rebuild the
+  bundle on save.
+- `ui` starts `FROM light`, so the UI image is the Light image plus one thin
+  layer — if a change to the light stage breaks, it breaks both editions, so
+  rebuild and check both.
+
+### `WEB_DIR` in the two dev modes
+
+`src/ui/app.ts` reads `WEB_DIR` for where to serve the dashboard from,
+defaulting to `src/ui/public` next to `app.ts` — a path that no longer exists
+on disk at all now that the build output lives in `dist/ui/public`.
+
+- `npm run dev:ui` (local) sets `WEB_DIR=./dist/ui/public` explicitly on the
+  Express process and *also* runs a Vite dev server with HMR on `:5173`
+  (proxying API paths back to `:3000`) — the dashboard the operator should
+  look at is `:5173`, not the Express-served `WEB_DIR`.
+- `npm run dev:docker` sets `WEB_DIR=/app/dist/ui/public` in
+  `docker-compose.dev.yml` and relies on `vite build --watch` (started in the
+  `dev` stage's `CMD`) to keep that directory current on every save — there
+  is no Vite dev server or HMR in this mode, only Express on `:3000` serving
+  whatever the last watch-triggered build produced.
+
+See `CLAUDE.md`'s "Build & run" section for the operator-facing version of
+this split.
 
 ## Running
 
@@ -44,7 +86,7 @@ Sanity checklist before declaring a build "done":
 ## Common build failures
 
 - **"Cannot find module" at runtime but build succeeded**: usually means `COPY --from=builder /app/dist/<edition> ./dist` is copying the wrong sub-path, or `npm run build:light`/`build:ui` isn't actually splitting output by edition. Check the build script in `package.json` first.
-- **UI edition builds but dashboard shows blank page**: check that `src/ui/public` (or the built frontend) was actually copied into the runtime stage — it's easy to forget alongside `dist/`.
+- **UI edition builds but dashboard shows blank page**: check that `dist/ui/public` (Vite's build output, produced by `vite build` inside the `builder` stage's `npm run build`) was actually copied into the runtime stage alongside the rest of `dist/`. Also check the entry asset itself, not just `index.html` — see CLAUDE.md's "prove it live" recipe; a bundle whose hashed asset 404s still serves a perfectly normal-looking `index.html`.
 - **Light edition container exits immediately**: almost always a config validation failure (missing required field, bad YAML) — check `docker logs` before assuming it's a code bug.
 
 ## Tagging for release

@@ -34,7 +34,7 @@ Leave these as plain English literals — they are not user-facing text:
 | String appears in | Catalog | Loaded by |
 |---|---|---|
 | Notification message (Telegram/Discord/Slack/webhook) | `src/core/i18n/<lang>.json` | both editions, via `src/core/i18n/index.ts` |
-| Dashboard / browser UI | `src/ui/public/locales/<lang>.json` | UI edition only, client-side |
+| Dashboard / browser UI | `src/ui/web/locales/<lang>.json` | UI edition only, client-side, via `i18next.init({ resources })` in `src/ui/web/lib/i18n.ts` |
 
 2. **Name the key**: flat, dotted, lowercase — `<area>.<subject>.<variant>`. No nesting, no dynamic key building.
 
@@ -75,13 +75,44 @@ const message = t(locale, "notification.incident.opened", {
 });
 ```
 
-```html
-<!-- dashboard: mark the node, let i18n.js fill it -->
-<button data-i18n="service.add.button"></button>
-<h2 data-i18n="service.empty-state.title"></h2>
+```tsx
+// dashboard: resolve the key, never the text
+const { t } = useTranslation();
+<Button>{t("service.add.button")}</Button>
+<h2>{t("service.empty-state.title")}</h2>
 ```
 
+## i18next configuration invariants
+
+`src/ui/web/lib/i18n.ts` configures the dashboard's i18next instance. These
+choices are deliberate — don't "simplify" them back to the library defaults:
+
+- **`keySeparator: false`** — a dotted key like `service.add.button` is one
+  flat key, not a nested path (`service` → `add` → `button`). Key names stay
+  dotted for readability without i18next trying to resolve them as a tree.
+- **`nsSeparator: false`** — disables namespace splitting on the key passed
+  to `t()`. This is a **key-side** setting only: it never touches a resolved
+  catalog *value*. A colon inside a translation value (`"Impatto: {impact}"`)
+  is safe to render regardless of how `nsSeparator` is set, because
+  `nsSeparator` never parses values, only the string handed to `t()`.
+  Disabling it is still the right defensive default for this repo's flat,
+  dotted-key convention — it just doesn't provide a value-side guarantee, and
+  a comment claiming it does is describing the wrong mechanism.
+- **Single-brace interpolation** (`prefix: "{", suffix: "}"`) — placeholders
+  are `{provider}`, not i18next's default `{{provider}}`.
+- **Plurals** use `_one` / `_other` key suffixes, selected by `Intl.PluralRules`
+  under the hood — never `key + (n === 1 ? "" : "s")`.
+- Catalogs are imported JSON, registered directly as i18next `resources` at
+  init time — not fetched, so there's no request path for a stale or missing
+  catalog file at runtime.
+- `returnNull: false` is set but is inert: it has been i18next's own default
+  since v24, and no catalog value is ever a JSON `null`. Keep it or drop it;
+  don't describe it as load-bearing.
+
 ## Interpolation, plurals, formatting
+
+Mechanism for the dashboard catalog is in the invariants block above; the
+authoring rules are the same in both layers:
 
 - **Named placeholders only**: `{provider}`, `{count}`. Never build a sentence by concatenating translated fragments — word order differs per language.
 - **Plurals**: one key per form (`incident.count.one` / `incident.count.other`) selected with `Intl.PluralRules`. Never `key + (n === 1 ? "" : "s")`.
@@ -93,7 +124,16 @@ const message = t(locale, "notification.incident.opened", {
 - `en` is the fallback: a missing key renders the English string, never an empty node and never the raw key.
 - Catalogs are validated with `zod` at load, like every other external input.
 - `src/core/i18n/` stays edition-agnostic — the Diff Engine keeps passing structured payloads and stays language-unaware; translation happens in the notifier. Never import `src/ui` or `src/light` from it.
-- Adding a language = one JSON file per layer + a registry entry. If it needs a code change, the design is wrong.
+- Adding a language = one JSON file per layer, plus one line in
+  `src/ui/web/lib/i18n.ts` (the `SUPPORTED` array and the `resources`
+  object). That registry line **is** the intended code change, not a
+  design failure — catalogs are bundled at build time (see the
+  invariants block above), so "registered" means "listed in the
+  module that builds the `resources` object," not "fetched at
+  runtime with nothing to touch in code." The old "if it needs a code
+  change, the design is wrong" absolute described the previous,
+  fetch-at-runtime catalog loader; it no longer applies now that
+  catalogs are imported JSON.
 
 ## Rationalizations — all of them mean "add the key"
 
@@ -115,6 +155,7 @@ const message = t(locale, "notification.incident.opened", {
 - `+` joining a translated fragment to anything.
 - A `key` built at runtime from variables (`"status." + s`) with no exhaustive map of the possible keys — the parity test can't see those.
 - A new key in `en.json` and nowhere else.
+- An English sentence typed straight into JSX, or a literal `aria-label` / `title` / `placeholder` string instead of a `t()` call. `test/ui/strings.test.ts` scans for this, but it's a heuristic (it strips comments and only flags multi-word text or a handful of known attributes) — the rule lives in this skill, not in whatever that test happens to catch.
 
 ## Checklist before finishing
 
