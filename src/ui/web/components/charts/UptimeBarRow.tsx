@@ -28,7 +28,10 @@ export function UptimeBarRow({
   return (
     <ChartContainer
       config={chartConfigFor(scale)}
-      className={cn("anim-bar w-full", scale !== "row" && "anim-bar-strip", className)}
+      // `anim-bar-strip`'s 0.45s timing belongs to UptimeStrip alone — vanilla
+      // never applied it to the compact bar row, only to uptimeStrip(). Every
+      // UptimeBarRow scale (row, compact, poll) keeps the base 0.5s `anim-bar`.
+      className={cn("anim-bar w-full", className)}
       style={{ height: HEIGHT[scale] }}
     >
       <BarChart data={data} barCategoryGap={1} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
