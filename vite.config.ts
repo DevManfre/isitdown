@@ -6,17 +6,15 @@ const API_PATHS = ["/status", "/config", "/history", "/incidents", "/notificatio
 
 export default defineConfig({
   root: "src/ui/web",
-  // Relative, not absolute: the bundle is staged at /next/ during the port
-  // and moves to / at the cutover commit. A relative base resolves correctly
-  // in both places, so this line needs no second change later.
+  // Relative, not absolute: this resolved correctly both while the bundle was
+  // staged at /next/ during the port and now that it is served from /.
   base: "./",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: { "@": new URL("./src/ui/web/", import.meta.url).pathname },
   },
   build: {
-    // Staging output until the cutover commit moves this to dist/ui/public.
-    outDir: "../../../dist/ui/web",
+    outDir: "../../../dist/ui/public",
     // Required explicitly: outDir is outside the Vite root, so Vite refuses to
     // clear it otherwise.
     emptyOutDir: true,

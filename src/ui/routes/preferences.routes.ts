@@ -1,11 +1,11 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { Router } from "express";
 import { z } from "zod";
 import { availableLocales as notificationLocales } from "../../core/i18n/index.ts";
 import { readSettings, writeSettings } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 
-const LOCALES_DIR = new URL("../public/locales/", import.meta.url);
+const LOCALES_DIR = new URL("../web/locales/", import.meta.url);
 
 /**
  * Dashboard locales are whatever catalogs are on disk, so adding a language is
@@ -62,17 +62,6 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
     }
     writeSettings(runtime.db, parsed.data);
     res.json(current());
-  });
-
-  // `:lang` is matched against the catalogs actually present and never used to
-  // build a path, so no request can walk out of the locales directory.
-  router.get("/locales/:lang.json", (req, res) => {
-    const lang = req.params.lang;
-    if (!uiLocales.includes(lang)) {
-      res.status(404).json({ error: { message: `no catalog for ${lang}` } });
-      return;
-    }
-    res.type("application/json").send(readFileSync(new URL(`${lang}.json`, LOCALES_DIR), "utf8"));
   });
 
   return router;

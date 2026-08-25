@@ -16,5 +16,3 @@ config.yml
 *.db-journal
 *.db-wal
 *.db-shm
-
-dist/ui/web
