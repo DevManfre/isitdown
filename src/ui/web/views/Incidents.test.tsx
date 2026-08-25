@@ -5,6 +5,19 @@ import i18n from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders } from "@/test/harness.tsx";
 import { Incidents } from "./Incidents.tsx";
 
+/**
+ * Matches a filter radio by the START of its accessible name, not an exact
+ * match. The pill's decorative count span is aria-hidden (a real a11y
+ * improvement — a bare number doesn't belong in a control's spoken name),
+ * but this query must not depend on that attribute being present: if it
+ * were ever removed, the accessible name would become e.g. "active 2"
+ * instead of "active", and an exact-match query would silently stop
+ * finding the control.
+ */
+const radioNamed = (label: string) => ({
+  name: (accessibleName: string) => accessibleName.startsWith(label),
+});
+
 const incidents = {
   active: [{ providerId: "github", incidentId: "i1", name: "API errors", impact: "major",
              status: "investigating", startedAt: "2026-08-21T09:00:00Z",
@@ -36,14 +49,14 @@ describe("Incidents", () => {
 
   it("hides closed incidents under the active filter", async () => {
     renderWithProviders(<Incidents />, fixtures);
-    await userEvent.click(await screen.findByRole("radio", { name: i18n.t("filter.active") }));
+    await userEvent.click(await screen.findByRole("radio", radioNamed(i18n.t("filter.active"))));
     expect(screen.queryByText("Old blip")).toBeNull();
     expect(screen.getByText("API errors")).toBeInTheDocument();
   });
 
   it("hides active incidents under the resolved filter", async () => {
     renderWithProviders(<Incidents />, fixtures);
-    await userEvent.click(await screen.findByRole("radio", { name: i18n.t("filter.resolved") }));
+    await userEvent.click(await screen.findByRole("radio", radioNamed(i18n.t("filter.resolved"))));
     expect(screen.queryByText("API errors")).toBeNull();
     expect(screen.getByText("Old blip")).toBeInTheDocument();
   });

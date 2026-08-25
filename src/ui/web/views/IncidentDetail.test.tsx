@@ -26,6 +26,13 @@ const mount = () =>
     status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
   }, "/incidents/:providerId/:incidentId");
 
+/** Same fixture, with actionLog swapped out — for the empty-state case. */
+const mountWithActionLog = (actionLog: typeof detail.actionLog) =>
+  renderWithProviders(<IncidentDetail />, {
+    incident: { ...detail, actionLog },
+    status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+  }, "/incidents/:providerId/:incidentId");
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("IncidentDetail", () => {
@@ -86,6 +93,12 @@ describe("IncidentDetail", () => {
     mount();
     expect(await screen.findByText("GitHub — MAJOR OUTAGE")).toBeInTheDocument();
     expect(await screen.findByText(/telegram/)).toBeInTheDocument();
+  });
+
+  it("keeps a keyed empty state when nothing has been sent for this incident yet", async () => {
+    mountWithActionLog([]);
+    expect(await screen.findByText(i18n.t("incidents.empty-notifications"))).toBeInTheDocument();
+    expect(screen.queryByText("GitHub — MAJOR OUTAGE")).toBeNull();
   });
 
   it("keeps a keyed empty state for the provider's other open incidents", async () => {
