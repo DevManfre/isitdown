@@ -88,7 +88,9 @@ export function Incidents() {
           type="single"
           value={filter}
           onValueChange={(next) => {
-            if (next === "") return;
+            // Same guarded pattern as readFilter() above: check membership
+            // at runtime before narrowing, rather than a bare cast.
+            if (!FILTERS.some((entry) => entry.value === next)) return;
             const picked = next as Filter;
             setFilter(picked);
             rememberFilter(picked);
@@ -98,9 +100,13 @@ export function Incidents() {
           {FILTERS.map((entry) => (
             <ToggleGroupItem key={entry.value} value={entry.value}>
               {t(entry.labelKey)}
-              {/* The count rides inside the pill (incidents.js:86) but stays
-                  out of the accessible name, so `getByRole("radio", {name})`
-                  can still match the plain filter label. */}
+              {/* aria-hidden because a decorative count doesn't belong in a
+                  control's spoken name (vanilla's equivalent span,
+                  incidents.js:86, has no such attribute and so does include
+                  the count) — a real a11y improvement, not just query
+                  convenience. Incidents.test.tsx scopes its radio queries
+                  by a name-matcher function rather than depending on this
+                  attribute, so removing it later would not break the test. */}
               <span aria-hidden="true" className="ml-1.5 text-[10px] text-muted-foreground">
                 {counts[entry.value]}
               </span>
@@ -111,7 +117,7 @@ export function Incidents() {
 
       <div className={cn("grid grid-cols-1 gap-6", showActive && "lg:grid-cols-[2fr_1fr]")}>
         {showActive && (
-          <Card className="anim-rise flex flex-col gap-3 border-primary/40 bg-primary/5 p-4">
+          <Card className="anim-rise flex flex-col gap-3 border-primary/40 bg-primary/5 p-4" style={{ animationDelay: "60ms" }}>
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase tracking-widest text-primary">{t("incidents.active")}</span>
               {current !== undefined && (
@@ -165,7 +171,7 @@ export function Incidents() {
           </Card>
         )}
 
-        <Card className="panel-channel flex flex-col gap-3 p-4">
+        <Card className="anim-rise panel-channel flex flex-col gap-3 p-4" style={{ animationDelay: "140ms" }}>
           <span className="text-xs uppercase tracking-widest text-muted-foreground">
             {t("incidents.notifications-sent")}
           </span>
