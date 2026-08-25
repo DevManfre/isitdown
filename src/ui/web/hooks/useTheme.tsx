@@ -6,11 +6,11 @@ export type ThemeMode = (typeof MODES)[number];
 
 interface ThemeApi {
   mode: ThemeMode;
-  cycle: () => void;
+  cycle: () => ThemeMode;
   set: (mode: ThemeMode) => void;
 }
 
-const ThemeContext = createContext<ThemeApi>({ mode: "system", cycle: () => {}, set: () => {} });
+const ThemeContext = createContext<ThemeApi>({ mode: "system", cycle: () => "system", set: () => {} });
 
 const read = (): ThemeMode => {
   try {
@@ -57,10 +57,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => media.removeEventListener("change", onChange);
   }, [mode]);
 
-  const cycle = useCallback(
-    () => setMode((current) => MODES[(MODES.indexOf(current) + 1) % MODES.length] as ThemeMode),
-    [],
-  );
+  // A prior click's mode change flows into this render's `mode` before the
+  // handler that reads the return value runs again, so the closure over
+  // `mode` is not stale; the alternative — computing off ref state instead
+  // of `mode` — would only matter for two cycles dispatched within one
+  // render, which a theme button cannot do.
+  const cycle = useCallback((): ThemeMode => {
+    const next = MODES[(MODES.indexOf(mode) + 1) % MODES.length] as ThemeMode;
+    setMode(next);
+    return next;
+  }, [mode]);
 
   const api = useMemo<ThemeApi>(() => ({ mode, cycle, set: setMode }), [mode, cycle]);
   return <ThemeContext.Provider value={api}>{children}</ThemeContext.Provider>;

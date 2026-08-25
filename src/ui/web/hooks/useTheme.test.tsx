@@ -1,19 +1,23 @@
 import { act, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ThemeProvider, useTheme } from "./useTheme.tsx";
 
 function Probe() {
   const { mode, cycle } = useTheme();
+  const [returned, setReturned] = useState<string | null>(null);
   return (
     <div>
       <span data-testid="mode">{mode}</span>
-      <button onClick={cycle}>cycle</button>
+      <span data-testid="returned">{returned}</span>
+      <button onClick={() => setReturned(cycle())}>cycle</button>
     </div>
   );
 }
 
 const mount = () => render(<ThemeProvider><Probe /></ThemeProvider>);
 const mode = () => screen.getByTestId("mode").textContent;
+const returned = () => screen.getByTestId("returned").textContent;
 const attr = () => document.documentElement.getAttribute("data-theme");
 
 afterEach(() => {
@@ -52,5 +56,12 @@ describe("useTheme", () => {
     mount();
     expect(mode()).toBe("dark");
     expect(attr()).toBe("dark");
+  });
+
+  it("cycle() returns the mode it switches to, not just void", () => {
+    mount();
+    act(() => screen.getByText("cycle").click());
+    expect(returned()).toBe(mode());
+    expect(returned()).toBe("light");
   });
 });

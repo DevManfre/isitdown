@@ -1,6 +1,7 @@
 {
   "app.name": "IsItDown",
 
+  "nav.views": "Views",
   "nav.overview": "Overview",
   "nav.providers": "Providers",
   "nav.incidents": "Incidents",

@@ -1,6 +1,9 @@
 import { Outlet, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
+import { Rail } from "@/components/Rail.tsx";
+import { Header } from "@/components/Header.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
+import { useRail } from "@/hooks/useRail.tsx";
 
 /**
  * What a repaint does to the view's entry animations.
@@ -24,19 +27,30 @@ export function App() {
   const params = useParams();
   const { i18n } = useTranslation();
   const { mode } = useTheme();
+  const { collapsed } = useRail();
 
   const paramString = [params["providerId"], params["incidentId"]].filter(Boolean).join("/");
   const view = currentView(location.pathname, paramString !== "");
 
-  // Task 8 wraps this in the console grid and adds the rail and the header.
   return (
-    <main
-      id="view"
-      key={viewKey(view, paramString, i18n.language, mode)}
-      data-animate={view}
-      className="min-w-0 flex-1 px-8 py-6"
+    <div
+      className="console grid min-h-screen"
+      style={{
+        gridTemplateColumns: `${collapsed ? "var(--rail-width-collapsed)" : "var(--rail-width)"} 1fr`,
+      }}
     >
-      <Outlet />
-    </main>
+      <Rail />
+      <div className="flex min-w-0 flex-col">
+        <Header view={view} />
+        <main
+          id="view"
+          key={viewKey(view, paramString, i18n.language, mode)}
+          data-animate={view}
+          className="min-w-0 flex-1 px-8 py-6"
+        >
+          <Outlet />
+        </main>
+      </div>
+    </div>
   );
 }

@@ -6,6 +6,7 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/lib/i18n.ts";
 import { BusyProvider } from "@/hooks/useBusy.tsx";
 import { ThemeProvider } from "@/hooks/useTheme.tsx";
+import { RailProvider } from "@/hooks/useRail.tsx";
 import { router } from "@/routes.tsx";
 import "./css/base.css";
 
@@ -29,9 +30,11 @@ createRoot(root).render(
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={client}>
         <ThemeProvider>
-          <BusyProvider>
-            <RouterProvider router={router} />
-          </BusyProvider>
+          <RailProvider>
+            <BusyProvider>
+              <RouterProvider router={router} />
+            </BusyProvider>
+          </RailProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </I18nextProvider>
