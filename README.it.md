@@ -4,9 +4,8 @@
 [![Licenza](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A5%2024-5FA04E?style=flat-square&logo=node.js&logoColor=white)](.nvmrc)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](tsconfig.json)
-[![Dashboard](https://img.shields.io/badge/dashboard-vanilla%20JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](#92-stack-tecnologico)
+[![Dashboard](https://img.shields.io/badge/dashboard-react-61DAFB?style=flat-square&logo=react&logoColor=black)](#92-stack-tecnologico)
 
-[![Test](https://img.shields.io/badge/tests-301%20passing-brightgreen?style=flat-square)](#94-test-e-controlli)
 [![Dipendenze runtime](https://img.shields.io/badge/runtime%20deps-3-lightgrey?style=flat-square)](#92-stack-tecnologico)
 [![Docker](https://img.shields.io/badge/docker-light%20%7C%20ui-2496ED?style=flat-square&logo=docker&logoColor=white)](#4-docker)
 [![i18n](https://img.shields.io/badge/i18n-en%20%7C%20it-orange?style=flat-square)](#82-localizzazione)
@@ -114,7 +113,7 @@ Anthropic       operational    ████████████████�
 | Cronologia uptime e grafici | — | viste 7/30/90 giorni |
 | Tema | — | chiaro / scuro / sistema |
 | Localizzazione | testo delle notifiche | testo delle notifiche **e** tutta la dashboard |
-| Impronta | immagine 263MB, nessuna porta in ascolto | 264MB: l'immagine Light più un layer |
+| Impronta | immagine 264MB, nessuna porta in ascolto | 267MB: l'immagine Light più un layer |
 
 Entrambe le edizioni eseguono lo stesso motore. Differiscono solo per ciò che viene
 iniettato: da dove arriva la configurazione e dove viene tenuto lo stato.
@@ -149,9 +148,11 @@ Possono girare entrambe insieme: usano volumi dati separati.
 
 ### 2.2 Senza Docker
 
-Richiede **Node 24**: `.nvmrc` lo fissa e `npm install` rifiuta versioni più
-vecchie, perché la build si appoggia al driver SQLite integrato nel runtime e al suo
-supporto TypeScript nativo.
+Richiede **Node 24** sia per la build sia per il runtime: `.nvmrc` lo fissa e
+`npm install` rifiuta versioni più vecchie, perché il driver SQLite integrato nel
+runtime e il suo supporto TypeScript nativo sono fondamentali anche in fase di
+build. `build:ui` in più esegue Vite per pacchettizzare la dashboard; `build:light`
+salta questo passaggio, dato che Light non distribuisce nessuna dashboard.
 
 ```bash
 nvm use                             # oppure: nvm install 24
@@ -381,16 +382,33 @@ interfaccia `Notifier`; non sono ancora implementati.
 
 ### 4.1 Immagini e target di build
 
-Un solo `Dockerfile`, tre stage. Lo stage `ui` parte `FROM light`, quindi l'immagine
-UI è l'immagine Light più un unico layer sottile: immagine base, dipendenze di
-produzione e tutto il motore sono condivisi su disco e in un registry.
+Un solo `Dockerfile`, quattro stage. `builder` compila tutto una volta sola;
+`light` e `ui` sono le due immagini di runtime distribuite; `dev` esiste solo per
+lo [sviluppo live](#93-sviluppo-live) e non viene mai costruito da
+`docker compose --profile ui up`.
 
 ```
-builder  node:24-alpine   npm ci, tsc, copia in dist gli asset non-TS
+builder  node:24-alpine   npm ci (con le devDependencies), tsc, vite build, copia in dist gli asset non-TS
 light    node:24-alpine   dipendenze prod + dist/{core,adapters,notifiers,light}
                           VOLUME /app/config /app/data · nessun EXPOSE · nessun server
+dev      FROM builder     mantiene le devDependencies · vite build --watch + node --watch · taggato solo isitdown:dev
 ui       FROM light       + dist/ui (dashboard e cataloghi) · EXPOSE 3000
 ```
+
+`builder` adesso copia anche `tsconfig.web.json`, `vite.config.ts` e
+`components.json` insieme ai tsconfig del server, e `npm run build` esegue `tsc`,
+poi Vite, poi la copia degli asset — un unico layer `RUN` condiviso da entrambi gli
+stage di runtime sotto di esso. `light` e `ui` sono per il resto invariati: lo
+stage `ui` continua a partire `FROM light`, quindi l'immagine UI è l'immagine
+Light più un unico layer sottile — immagine base, dipendenze di produzione e tutto
+il motore sono condivisi su disco e in un registry.
+
+`dev`, il terzo stage, è `FROM builder` invece che `FROM light`: lo sviluppo live
+ha bisogno delle devDependencies (Vite, React, gli strumenti di test) che
+`npm ci --omit=dev` di `light` scarta deliberatamente, quindi non può girare da
+nessuna delle due immagini distribuite. È taggato `isitdown:dev`, mai
+`isitdown:ui`, e solo `docker-compose.dev.yml` lo costruisce; un `docker build .`
+senza target o `docker compose --profile ui up` non lo toccano mai.
 
 ```bash
 docker build --target light -t isitdown:light .
@@ -418,7 +436,8 @@ docker compose --profile light --profile ui down       # ferma; i volumi sopravv
 ```
 
 Un terzo file, `docker-compose.dev.yml`, si sovrappone al profilo `ui` ed esegue
-l'edizione direttamente dal sorgente, senza alcuna build — vedi
+l'edizione direttamente dal sorgente, ricostruendo in background il bundle della
+dashboard a ogni modifica invece di richiedere un'immagine nuova — vedi
 [9.3](#93-sviluppo-live).
 
 ### 4.3 Volumi, healthcheck, utenti
@@ -689,7 +708,7 @@ Per l'edizione Light imposta le stesse due variabili, `telegram.enabled: true` i
 | Una colonna del mese mostra `—` | Nessun campione in quel mese. Volutamente non `0%`, che si leggerebbe come un outage lungo un mese. |
 | Non arriva mai nessuna notifica | Il canale è `enabled` e la sua variabile si risolve? `GET /config` mostra `isSet` per ogni campo. Poi `POST /config/channels/<id>/test`. |
 | Arrivano notifiche ripetute per la stessa cosa | Non dovrebbe essere possibile: decide solo il diff engine. Raccogli `docker logs` e il feed `/notifications`. |
-| La dashboard mostra chiavi grezze tipo `nav.overview` | Un catalogo non si è caricato. Controlla `GET /locales/en.json`. |
+| La dashboard mostra chiavi grezze tipo `nav.overview` | Una chiave senza voce nel catalogo — dovrebbe essere impossibile, i test delle guardie sulla lingua colgono ogni chiamata letterale `t("...")` prima del rilascio. Una chiave costruita dinamicamente (`t(prefisso + suffisso)`) è la sola forma che quei test non possono vedere; controlla il punto di chiamata. |
 
 Alza il dettaglio con `LOG_LEVEL=debug`, che logga ogni singolo tentativo di poll,
 retry compresi.
@@ -718,7 +737,6 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `POST` | `/config/services/:id/test` | Una fetch reale verso quel provider. Non registra nulla. |
 | `POST` | `/config/channels/:id/test` | Una notifica di test, attraverso il dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
-| `GET` | `/locales/:lang.json` | Catalogo della dashboard. `404` per una lingua senza catalogo, così il client ricade su `en`. |
 | `POST` | `/poll` | Esegue subito un ciclo, tramite lo scheduler. Restituisce il riepilogo del ciclo. |
 | `GET` | `/` | La dashboard. |
 
@@ -936,6 +954,16 @@ Edizione UI. Tre stati: **chiaro / scuro / sistema**, ciclati dall'header.
   `:root:not([data-theme="light"])` così "sistema" funziona in entrambe le direzioni.
   Tutti e tre i blocchi dichiarano un set di token identico, e anche questo è
   verificato da un test: un token definito in un solo tema si renderizzerebbe male.
+- **I componenti shadcn leggono gli stessi token.** `tokens.css` mappa anche le
+  variabili semantiche che le primitive shadcn si aspettano — `--background`,
+  `--foreground`, `--primary`, `--border`, `--ring` e le altre — su questa palette,
+  così un componente shadcn di serie non richiede nessun override per componente per
+  adattarsi al design system. La variante `dark:` di Tailwind è ri-legata, tramite
+  `@custom-variant`, dalla classe predefinita `.dark` di shadcn all'attributo
+  `[data-theme="dark"]` di questo repo, così il toggle del tema esistente — che
+  imposta un attributo, non una classe — continua a pilotarlo. Nulla di questo
+  tocca lo script di pre-paint qui sotto, che continua a impostare solo
+  `data-theme`.
 - **I grafici leggono gli stessi token**, quindi non hanno mai bisogno di una palette
   scura separata.
 - **Sistema è il default.** Senza una scelta esplicita il tema segue il sistema
@@ -955,7 +983,19 @@ Due livelli, con `en` come lingua di partenza e fallback in entrambi:
 | Livello | File | Usato da |
 |---|---|---|
 | Testo delle notifiche | `src/core/i18n/<lang>.json` | entrambe le edizioni |
-| Testo della dashboard | `src/ui/public/locales/<lang>.json` | edizione UI |
+| Testo della dashboard | `src/ui/web/locales/<lang>.json` | edizione UI |
+
+`src/core/i18n/` non è toccato dallo stack della dashboard; il server continua a
+risolvere da sé le stringhe di notifica, in entrambe le edizioni, esattamente come
+prima. La dashboard ora risolve le proprie stringhe tramite `react-i18next`,
+configurato con `keySeparator: false` e interpolazione a parentesi singola
+(`{name}`, non la `{{name}}` predefinita) — le stesse chiavi piatte
+`area.subject.variant` e la stessa sintassi dei placeholder che i cataloghi già
+usavano. I plurali usano i suffissi di chiave `_one`/`_other` di i18next, non una
+coppia con il punto. I cataloghi sono **incorporati nel bundle, non recuperati via
+fetch**: `src/ui/web/lib/i18n.ts` importa entrambi i file JSON direttamente, quindi
+viaggiano dentro il bundle JS e `GET /locales/:lang.json` non esiste più come
+route.
 
 Regole imposte dai test, non solo documentate:
 
@@ -970,13 +1010,17 @@ Regole imposte dai test, non solo documentate:
   renderizzerebbe come la chiave stessa nel browser.
 - **Mai comporre una frase da frammenti tradotti.** L'ordine delle parole cambia da
   lingua a lingua, quindi una chiave contiene l'intera frase. I plurali sono chiavi
-  separate `.one`/`.other` selezionate con `Intl.PluralRules`.
+  separate `_one`/`_other`, non composte nel punto di chiamata.
 - **Date, numeri, percentuali e durate** passano da `Intl.*` nella lingua attiva. I
   timestamp delle notifiche sono l'eccezione deliberata: sempre UTC con suffisso
   esplicito, così un operatore che legge avvisi in due lingue non deve mai indovinare.
 - La lingua della dashboard e quella delle notifiche sono **impostazioni separate**:
   una UI in inglese può mandare avvisi in italiano.
-- Aggiungere una lingua è un file JSON per livello. Nessuna modifica al codice.
+- Aggiungere una lingua di **notifica** è un file JSON sotto `src/core/i18n/` —
+  nessuna modifica al codice. Aggiungere una lingua della **dashboard** è un file
+  JSON sotto `src/ui/web/locales/` più una riga di import in
+  `src/ui/web/lib/i18n.ts`, perché i cataloghi sono incorporati nel bundle invece
+  che scoperti da disco a runtime.
 
 In distribuzione: `en` e `it`. La risoluzione della lingua è la preferenza salvata,
 poi `en`.
@@ -1030,22 +1074,33 @@ isitdown/
 │       ├── server.ts                  entrypoint
 │       ├── runtime.ts                 wiring, condiviso coi test delle API
 │       ├── app.ts                     app Express: route, dashboard statica, errori JSON
+│       ├── routePaths.ts              la tabella delle route della dashboard, condivisa col router client
 │       ├── healthcheck.ts             interroga /health
 │       ├── sqliteStateStore.ts        StateStore + cronologia, una transazione per salvataggio
 │       ├── historyStore.interface.ts  il contratto della cronologia (la UI ne è l'unico consumatore)
 │       ├── history.ts                 aggregazione di uptime e incidenti
+│       ├── backfill.ts                ricostruisce 90 giorni di storico dagli incidenti di un provider al primo avvio
 │       ├── dbConfigSource.ts          configurazione da SQLite; risolve i segreti per nome di variabile
 │       ├── db/                        open.ts, migrate.ts, seed.ts
 │       ├── routes/                    status, history, incidents, notifications, config, preferences
-│       └── public/                    la dashboard: nessun framework, nessun bundler
-│           ├── index.html             script del tema pre-paint, rail, header, contenitore delle viste
+│       └── web/                       la dashboard: react, vite, shadcn/ui
+│           ├── index.html             script del tema pre-paint, font, #root
+│           ├── main.tsx               albero dei provider: i18n, query, tema, router
+│           ├── App.tsx                shell della console: rail, header, contenitore delle viste
+│           ├── routes.tsx             route con hash
+│           ├── components/ui/         primitive shadcn
+│           ├── components/            rail, header, indicatore di polling, charts/
+│           ├── views/                 overview, providers, incidents, incident,
+│           │                          history, settings
+│           ├── hooks/                 queries, theme, rail, busy
+│           ├── lib/                   api, types, chartConfig, format, i18n
+│           ├── css/base.css            punto di ingresso Tailwind: importa tailwindcss, tokens, motion
 │           ├── css/tokens.css         l'unico file con un colore letterale
-│           ├── css/nocturne.css       livello dei componenti del design system
-│           ├── css/app.css            layout della console
-│           ├── js/                    app (router), api, i18n, theme, charts, components/, views/
+│           ├── css/motion.css         keyframes, animazioni d'ingresso, transizioni
 │           └── locales/               en.json (sorgente) + it.json
 ├── tools/
-│   └── copy-assets.mjs                copia in dist i cataloghi i18n e la dashboard
+│   └── copy-assets.mjs                copia in dist i cataloghi i18n e delle lingue della dashboard (il
+│                                       bundle della dashboard è già output di Vite, non di questo script)
 ├── test/
 │   ├── core/                          diff engine, poller, scheduler, dispatcher, i18n, schemi
 │   │   └── stateStore.contract.ts     una suite che ogni implementazione di StateStore deve passare
@@ -1057,16 +1112,22 @@ isitdown/
 │   ├── helpers/
 │   └── integration/                   *.itest.ts — provider finto e ricevitore webhook end to end
 ├── design/                            prototipi Claude Design (in .gitignore: su disco, non in un clone)
-├── Dockerfile                         builder → light → ui (ui è FROM light)
+├── Dockerfile                         builder → light → dev → ui (dev è FROM builder; ui è FROM light)
 ├── docker-compose.yml                 entrambe le edizioni come profili
-├── docker-compose.dev.yml             override di sviluppo: edizione UI live da src/, senza build
+├── docker-compose.dev.yml             override di sviluppo: edizione UI live da src/, Vite ricompila il bundle in watch
 ├── config.example.yml                 template versionato; config.yml è in .gitignore
 ├── .env.example                       nomi delle variabili dei segreti, mai valori
 ├── .nvmrc  .npmrc                     fissano Node 24 e fanno fallire in modo esplicito una versione più vecchia
 ├── tsconfig.json                      TypeScript del server
 ├── tsconfig.light.json                la build Light: esclude src/ui
-└── tsconfig.public.json               checkJs sulla dashboard, che non ha uno step di build
+├── tsconfig.web.json                  la dashboard: lib DOM + react-jsx
+├── vite.config.ts                     bundle, proxy di sviluppo, config di vitest
+└── components.json                    configurazione della CLI shadcn
 ```
+
+I test dei componenti e degli hook della dashboard vivono insieme al codice sotto
+`web/`, come `*.test.tsx` accanto a ciò che testano, e sono raccolti da lì da
+Vitest — il resto dell'albero segue la convenzione `test/` di sopra.
 
 **Regola d'oro:** `src/core`, `src/adapters` e `src/notifiers` non importano mai da
 `src/light` o `src/ui`. Il comportamento specifico dell'edizione viene iniettato
@@ -1084,65 +1145,95 @@ esclusive di un'edizione.
 | Storage | file JSON (Light) · `node:sqlite` integrato (UI) | Nessun modulo nativo, quindi nessun compilatore in alcuno stage di build. |
 | Validazione | `zod` | Ogni input esterno: file di configurazione, payload dei provider, righe del database, cataloghi. |
 | Parsing configurazione | `yaml` | |
-| Test runner | `node:test` integrato | |
-| Dashboard | Express + moduli ES vanilla e CSS puro | Nessun framework, nessun bundler, nessuna libreria di grafici. |
+| Test runner | `node:test` integrato, più Vitest | `node:test` esegue server, core, adapter, notifier e le guardie basate su filesystem direttamente da `.ts`; Vitest e React Testing Library coprono `src/ui/web/`, perché lo strip dei tipi di Node non trasforma JSX. |
+| Dashboard | React 19 + Vite + Tailwind v4 + shadcn/ui | Incorporata nel bundle in `dist/ui/public`; le primitive Radix sono tematizzate interamente da `tokens.css`. |
+| Charts | Recharts, tramite il wrapper `chart` di shadcn | I dati restano aggregati lato server; il client non deriva mai una percentuale. |
+| Client routing | `react-router` 8, basato su hash | Il routing basato su percorso non era disponibile: `/incidents/:providerId/:incidentId` è già un endpoint API. |
+| Client i18n | `react-i18next` | Cataloghi piatti, interpolazione a parentesi singola, incorporati nel bundle invece che recuperati via fetch. |
+| Server state | TanStack Query | `refetchInterval` di 30 secondi, refetch al focus, sospeso mentre un dialogo o un campo è in uso. |
 | Container | un `Dockerfile` multi-stage | `--target light` / `--target ui`, `node:24-alpine`. |
 
-Dipendenze a runtime, tutte: `zod`, `yaml` (entrambe le edizioni) ed `express` (UI).
-Dipendenze di sviluppo: `typescript`, `@types/node`, `@types/express`.
+Dipendenze a runtime, in modo esaustivo: `zod`, `yaml` (entrambe le edizioni) ed
+`express` (UI). Tutto ciò che la dashboard usa — React, Vite, Tailwind, le
+primitive Radix di shadcn/ui, TanStack Query, react-i18next, Recharts e il resto —
+è una devDependency compilata in asset statici al momento della build, così
+l'immagine `ui` guadagna un bundle, non un albero di dipendenze. Dipendenze di
+sviluppo per il resto: `typescript`, `@types/node`, `@types/express`,
+`@types/react`, `@types/react-dom`, i plugin di Vite, Vitest e React Testing
+Library.
 
 ### 9.3 Sviluppo live
 
-Ricostruire l'immagine per una riga di CSS è abbastanza lento da scoraggiare la
-modifica stessa. Node 24 rimuove i tipi TypeScript al caricamento, quindi l'edizione
-UI può girare da `src/` senza alcuna build:
+Due modalità, per due cicli diversi:
 
 ```bash
-npm run dev:docker   # container: docker-compose.dev.yml sovrapposto al profilo ui
-npm run dev:ui       # processo locale, database in ./data/isitdown.db
+npm run dev:ui       # locale: Express su :3000, dev server di Vite su :5173 con HMR
+npm run dev:docker   # container: Vite ricompila in watch su dist/, Express serve :3000
 ```
 
-`docker-compose.dev.yml` sovrascrive solo il servizio `isitdown-ui`: `./src` viene
-montato in sola lettura su `/app/src` e il comando diventa Vite in watch mode
-insieme a `node --watch src/ui/server.ts`. L'immagine è la sua: l'override costruisce
-il target `dev` e la tagga `isitdown:dev`, perché la modalità di sviluppo ha bisogno
-delle dipendenze di sviluppo che la build di produzione scarta — e perché una build di
-sviluppo non deve mai sovrascrivere `isitdown:ui`, il tag che risolve il profilo `ui`.
-Il middleware statico risolve la dashboard
-rispetto al modulo da cui gira, quindi partendo da `src/` serve `src/ui/public` e non
-il `dist/ui/public` incluso nell'immagine.
+`dev:ui` esegue server e Vite come due processi locali insieme (`concurrently`).
+Il browser parla con Vite su **5173** — è lì che vive l'HMR — e il proxy del dev
+server di Vite instrada ogni percorso API (`/status`, `/config`, `/history`,
+`/incidents`, `/notifications`, `/poll`, `/api`, `/health`) verso il vero server
+Express su 3000. Visitare direttamente la :3000 serve invece quel che già si trova
+in `dist/ui/public`, che non è live.
 
-| Modifica | Cosa succede |
-|---|---|
-| `src/ui/public/**` — CSS, JS della dashboard, HTML, cataloghi | Servita dal sorgente montato: hard refresh (Ctrl+Shift+R), nessun restart |
-| un qualsiasi `.ts` | `node --watch` riavvia il server in circa un secondo; scheduler e backfill ripartono con lui |
-| una dipendenza o il `Dockerfile` | Ricostruire una volta l'immagine di sviluppo: `npm run dev:docker -- --build` |
+`dev:docker` è la modalità fedele: una sola porta, lo stesso URL e la stessa porta
+che userebbe un operatore, nulla in mezzo — è questo che rende significativi anche
+contro di essa i controlli rapidi di [5.1](#51-controlli-rapidi).
+`docker-compose.dev.yml` sovrascrive il servizio `isitdown-ui` per costruire il
+target `dev` (taggato `isitdown:dev`, mai `isitdown:ui`), monta `./src`,
+`vite.config.ts` e `tsconfig.web.json` in sola lettura, ed esegue `npx vite build
+--watch & exec node --watch src/ui/server.ts` — Vite riscrive il bundle in
+`dist/ui/public` a ogni modifica del sorgente, in background, e l'unico processo
+Express su :3000 serve sempre quel che Vite ha scritto per ultimo.
+
+`WEB_DIR` deve essere impostata esplicitamente in ogni modalità di sviluppo,
+locale o containerizzata: il valore predefinito del server (in `app.ts`,
+`./public/` relativo a se stesso) si risolve correttamente solo quando il modulo
+gira da `dist/ui/`, dove finisce davvero la build di Vite. Eseguire direttamente
+il modulo *sorgente* — esattamente quel che fa la modalità di sviluppo — fa
+risolvere quello stesso predefinito accanto a `src/ui/`, dove non esiste più nulla
+chiamato `public/`: il sorgente della dashboard ora vive sotto `src/ui/web/`. Sia
+lo script npm di `dev:ui` che `docker-compose.dev.yml` impostano `WEB_DIR` sul
+percorso costruito `dist/ui/public` esplicitamente per questo motivo.
+
+| Modifica | `dev:ui` | `dev:docker` |
+|---|---|---|
+| `.tsx`, `.ts` o CSS sotto `web/` | HMR, nessun reload | ricompila in circa un secondo, poi hard refresh |
+| un JSON di lingua sotto `web/locales/` | HMR | ricompila, hard refresh |
+| un qualsiasi `.ts` del server | `node --watch` riavvia | `node --watch` riavvia |
+| una dipendenza in `package.json` | `npm install` (poi restart) | `npm run dev:docker -- --build` |
+| il `Dockerfile` | nessun effetto — `dev:ui` non tocca mai Docker | `npm run dev:docker -- --build` |
+
+Una ricompilazione cambia il nome del file del bundle, non solo il suo contenuto —
+i nomi degli asset sono content-hashed — quindi "hard refresh" basta in ogni caso:
+l'`index.html` appena scritto punta sempre al nuovo hash, e non c'è un caso di
+cache stantia da gestire come eccezione.
 
 Due cose che la modalità di sviluppo non fa. Non esegue il type-check — rimuovere i
-tipi non è compilarli, quindi `npm run typecheck` resta obbligatorio. E il solo
-`dist/` che produce è il bundle React di Vite, scritto dentro il container e buttato
-via con lui, quindi il rilascio passa comunque dalla via normale:
+tipi non è compilarli, quindi `npm run typecheck` resta obbligatorio. E il `dist/`
+di nessuna delle due modalità è quello che va in produzione: il rilascio passa
+comunque dalla via normale,
 
 ```bash
 docker compose --profile ui up -d --build   # si torna all'immagine costruita
 ```
 
-Entrambe le modalità riusano il nome container `isitdown-ui` — di proposito, perché è
-questo che le rende mutuamente esclusive su porta e database — quindi per distinguerle
-si guarda l'immagine o il comando. `docker compose ps` mostra `isitdown:ui` per
-l'immagine costruita e `isitdown:dev` per la modalità di sviluppo; `docker inspect -f
-'{{.Config.Cmd}}' isitdown-ui` mostra `node dist/ui/server.js` per l'immagine
-costruita e `node --watch src/ui/server.ts`, dietro il watcher di Vite, per la
-modalità di sviluppo.
+Per distinguere la modalità di un container in esecuzione: `docker compose ps`
+mostra `isitdown:ui` per l'immagine costruita e `isitdown:dev` per la modalità di
+sviluppo; `docker inspect -f '{{.Config.Cmd}}' isitdown-ui` mostra
+`node dist/ui/server.js` per l'immagine costruita, e `sh -c "npx vite build
+--watch & exec node --watch src/ui/server.ts"` per la modalità di sviluppo.
 
 ### 9.4 Test e controlli
 
 ```bash
-npm test                 # suite unitaria:   test/**/*.test.ts
-npm run test:integration # suite end-to-end: test/**/*.itest.ts
-npm run typecheck        # TypeScript del server, più il JS della dashboard via checkJs
+npm test                 # suite node:test + vitest run
+npm run test:integration # suite end-to-end:  test/**/*.itest.ts
+npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
 npm run build:light      # tsc + copia asset, escludendo src/ui
-npm run build:ui         # tsc + copia asset, tutto
+npm run build:ui         # tsc + vite build + copia asset
 ```
 
 **Nessun test raggiunge mai un provider reale.** Gli adapter sono testati contro
@@ -1166,15 +1257,24 @@ Suite notevoli:
   invio Telegram fallito non metta mai il token nel proprio errore.
 - **API** — ogni route contro un server reale su un database temporaneo, inclusa la
   verifica che nessun body di risposta contenga un valore dell'ambiente.
-- **Guardie su tema e lingue** — nessun esadecimale fuori dal file dei token, set di
-  token identici tra i temi, parità dei cataloghi, e ogni chiave `t()` che si risolve.
+- **Guardie su tema e lingue** — nessun esadecimale fuori dal file dei token (la
+  scansione cattura anche un esadecimale infilato in un valore arbitrario di
+  Tailwind, ad es. `bg-[#1a1a2e]`), un'asserzione di parità dei token semantici
+  che verifica che ogni variabile shadcn si risolva in un `var()` della palette e
+  sia dichiarata identica in tutti e tre i blocchi tema, parità dei cataloghi, ogni
+  chiave `t()` che si risolve, e una scansione per una frase inglese digitata
+  direttamente nel JSX — un'euristica, deliberatamente più debole della scansione
+  esatta sui nodi di testo che ha sostituito, perché il JSX non offre un modo
+  privo di parsing per distinguere un'espressione tradotta da un letterale.
 - **End to end** — un provider finto e un ricevitore webhook: una transizione consegna
   esattamente una notifica, un ciclo invariato nessuna, un restart nessuna, un provider
   irraggiungibile conserva l'ultimo stato noto, e l'entrypoint resta vivo tra i cicli e
   esce con 0 su `SIGTERM`.
 
-Dato che la dashboard non ha uno step di build, `tsc --checkJs` gira anche su di lei: è
-il solo controllo statico che quel codice riceve.
+La dashboard è ora TypeScript vero, verificato dal proprio `tsconfig.web.json`
+invece che da un passaggio guidato da JSDoc su JavaScript puro; i suoi componenti e
+hook sono testati con Vitest e React Testing Library, collocati come `*.test.tsx`
+accanto a ciò che coprono.
 
 ### 9.5 Convenzioni
 
@@ -1188,6 +1288,11 @@ il solo controllo statico che quel codice riceve.
   mai una riga di log.
 - Le nuove superfici della dashboard si prototipano in `design/` prima di essere
   implementate.
+- Per la maggior parte delle superfici esiste già un componente shadcn — usare
+  quello, e `cn()` per le classi condizionali, invece di scrivere una nuova classe
+  di componente.
+- I colori arrivano a un grafico solo tramite `chartConfig`, mai come letterale e
+  mai come nome di token costruito a runtime.
 - Commit: `<emoji> <TITOLO> - <descrizione>`, in inglese, gitmoji.
 
 ---
@@ -1222,10 +1327,6 @@ Ancora aperto:
 - Consapevolezza delle manutenzioni programmate. L'adapter ignora
   `scheduled_maintenances` di Statuspage, e il modello di severità non ha uno stato di
   manutenzione.
-- Dettaglio a livello di componente. L'adapter normalizza lo stato complessivo di un
-  provider e i suoi incidenti, non i singoli componenti, quindi la vista incidente
-  mostra gli altri incidenti aperti del provider dove il prototipo disegnava un
-  pannello dei componenti.
 - Una revisione madrelingua delle stringhe italiane.
 
 Non-obiettivi espliciti: autenticazione multi-utente (questa è una dashboard locale per
