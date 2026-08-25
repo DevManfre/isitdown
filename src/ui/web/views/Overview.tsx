@@ -7,22 +7,10 @@ import { UptimeRing } from "@/components/charts/UptimeRing.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { formatPercent, formatRelative } from "@/lib/format.ts";
+import { summaryProviders } from "@/lib/history.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
-import type { HistoryBucket, HistorySummary, ProviderHistory } from "@/lib/types.ts";
 
 const WINDOW_DAYS = 90;
-
-/**
- * `useHistory(WINDOW_DAYS)` is called with no provider, so the API
- * guarantees a `HistorySummary` — but its declared return type is the same
- * undiscriminated union `getHistory` always carries. `"providers" in value`
- * narrows without a cast: only `HistorySummary` has that field.
- */
-function summaryProviders(
-  value: HistorySummary | ProviderHistory | undefined,
-): { providerId: string; buckets: HistoryBucket[] }[] {
-  return value !== undefined && "providers" in value ? value.providers : [];
-}
 
 /**
  * Design 3a's Overview: the gradient hero with the headline and two calls to

@@ -100,4 +100,21 @@ describe("Overview", () => {
     });
     expect(await screen.findByText("99.90% · 90d")).toBeInTheDocument();
   });
+
+  // Regression for the review finding: on an initial-load failure, `status`
+  // stayed undefined and `providers` fell back to `[]`, so this view used to
+  // render "all operational" over a load failure instead of the error
+  // boundary. `errors: { status: 500 }` makes the /status fetch fail with
+  // nothing to show yet, so `throwOnError` (lib/queryClient.ts) must throw
+  // and the harness's `ViewError` route must render `error.load-failed`
+  // instead of any provider copy.
+  it("shows the load-failed message instead of 'all operational' when /status fails", async () => {
+    renderWithProviders(<Overview />, {
+      status: { providers: [], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+      history,
+      errors: { status: 500 },
+    });
+    expect(await screen.findByText(i18n.t("error.load-failed", { error: "HTTP 500" }))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("overview.title.all-operational"))).toBeNull();
+  });
 });
