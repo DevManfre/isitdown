@@ -112,6 +112,7 @@
   "history.downtime": "{minutes} min di down",
   "history.month-no-data": "—",
   "history.export": "Servito da",
+  "history.export-aria": "Scarica il JSON dello storico per gli ultimi {days} giorni",
 
   "settings.polling": "Polling",
   "settings.services": "Servizi monitorati",
@@ -142,7 +143,7 @@
   "components.empty": "Questo provider non espone componenti",
   "components.unsupported": "Questo adapter non può elencare i componenti",
   "components.hint": "Facoltativo: senza selezione viene monitorato solo lo stato generale",
-  "components.select-all": "Seleziona tutti i componenti di {group}",
+  "components.select-all": "Seleziona tutti i componenti visibili",
   "components.scope": "Segnala solo i componenti selezionati",
   "components.scope-hint": "Gli incidenti attribuiti soltanto ad altri componenti vengono ignorati e lo stato mostrato è il peggiore della selezione. Un avviso che il provider non attribuisce a nessun componente resta segnalato.",
   "components.ungrouped": "Altri",
