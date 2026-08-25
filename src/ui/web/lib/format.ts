@@ -50,3 +50,19 @@ export function formatDuration(locale: string, minutes: number): string {
   if (hours < 24) return inUnit("hour", Math.round(hours * 10) / 10);
   return inUnit("day", Math.round((hours / 24) * 10) / 10);
 }
+
+/**
+ * A base URL as the operator reads it: just the host. Falls back to the raw
+ * string when it does not parse, so a half-typed service still shows what was
+ * entered rather than nothing. Port of providers.js:119-123's own `hostOf`.
+ *
+ * Shared rather than duplicated: `Providers` and `Settings` each carried a
+ * byte-identical private copy.
+ */
+export const hostOf = (baseUrl: string): string => {
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return baseUrl;
+  }
+};

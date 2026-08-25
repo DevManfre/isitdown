@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Rail } from "@/components/Rail.tsx";
 import { Header } from "@/components/Header.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
-import { useRail } from "@/hooks/useRail.tsx";
+import { usePreferenceSync } from "@/hooks/usePreferenceSync.tsx";
 
 /**
  * What a repaint does to the view's entry animations.
@@ -27,18 +27,16 @@ export function App() {
   const params = useParams();
   const { i18n } = useTranslation();
   const { mode } = useTheme();
-  const { collapsed } = useRail();
+  // Seeds theme and locale from the server on a browser that has no stored
+  // choice of its own. Mounted here, in the shell, so it runs once per session
+  // rather than once per view.
+  usePreferenceSync();
 
   const paramString = [params["providerId"], params["incidentId"]].filter(Boolean).join("/");
   const view = currentView(location.pathname, paramString !== "");
 
   return (
-    <div
-      className="console grid min-h-screen"
-      style={{
-        gridTemplateColumns: `${collapsed ? "var(--rail-width-collapsed)" : "var(--rail-width)"} 1fr`,
-      }}
-    >
+    <div className="console grid min-h-screen">
       <Rail />
       <div className="flex min-w-0 flex-col">
         <Header view={view} />

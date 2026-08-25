@@ -10,16 +10,9 @@ import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
 import { useChannelMutations, useConfig, useServiceMutations, useSettingsMutation } from "@/hooks/queries.ts";
-import { useBusyControls } from "@/hooks/useBusy.tsx";
+import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
+import { hostOf } from "@/lib/format.ts";
 import type { DescribedChannel, ServiceDefinition } from "@/lib/types.ts";
-
-const hostOf = (baseUrl: string): string => {
-  try {
-    return new URL(baseUrl).host;
-  } catch {
-    return baseUrl;
-  }
-};
 
 /**
  * A small yes/no dialog for removing a service, on the same `Dialog` the
@@ -102,14 +95,12 @@ export function RemoveServiceDialog({ service, trigger }: { service: ServiceDefi
  */
 function ChannelCard({ channel }: { channel: DescribedChannel }) {
   const { t } = useTranslation();
-  const { setEditing } = useBusyControls();
+  const fieldProps = useFieldProps();
   const { patch, test } = useChannelMutations();
   const [envValues, setEnvValues] = useState<Record<string, string>>(
     Object.fromEntries(channel.fields.map((field) => [field.name, field.envVar])),
   );
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
-
-  const fieldProps = { onFocus: () => setEditing(true), onBlur: () => setEditing(false) };
 
   const save = (): void => {
     patch.mutate({
@@ -209,7 +200,8 @@ export function Settings() {
   const { t } = useTranslation();
   const { data: config } = useConfig();
   const settingsMutation = useSettingsMutation();
-  const { setEditing } = useBusyControls();
+  // Above the early return below: a hook cannot be called conditionally.
+  const fieldProps = useFieldProps();
 
   const [interval_, setInterval_] = useState<number | undefined>(undefined);
   const [timeout_, setTimeout_] = useState<number | undefined>(undefined);
@@ -221,8 +213,6 @@ export function Settings() {
   const interval = interval_ ?? config.polling.intervalMinutes;
   const timeout = timeout_ ?? config.polling.requestTimeoutSeconds;
   const maxRetries = retries ?? config.polling.maxRetries;
-
-  const fieldProps = { onFocus: () => setEditing(true), onBlur: () => setEditing(false) };
 
   const savePolling = (): void => {
     setPollingMessage(undefined);

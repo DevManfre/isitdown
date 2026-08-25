@@ -15,6 +15,12 @@ export function StatusDot({
   const fill = statusFill(status);
   return (
     <span
+      // A dot has no role to query by, so it carries the status it is drawing
+      // as a data attribute — the same idiom as `data-slot` / `data-variant` on
+      // the shadcn primitives. It is the semantic hook a test needs (and reads
+      // as what the dot *means*), instead of the `.dot` styling class, which a
+      // restyle could rename without changing anything an operator sees.
+      data-status={status}
       className={cn("dot inline-block rounded-full", pulse && "dot-pulse")}
       style={{
         width: size,

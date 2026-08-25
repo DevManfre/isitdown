@@ -48,7 +48,10 @@ describe("History", () => {
   it("offers 7, 30 and 90 day ranges", async () => {
     renderWithProviders(<History />, fixtures);
     for (const days of [7, 30, 90]) {
-      expect(await screen.findByRole("radio", { name: `${days}d` })).toBeInTheDocument();
+      // Compact "7d" on screen, spelled-out and translated as the accessible
+      // name — assert the name an operator using a reader actually hears.
+      const pill = await screen.findByRole("radio", { name: i18n.t("column.range", { days }) });
+      expect(pill).toHaveTextContent(`${days}d`);
     }
   });
 
@@ -56,7 +59,8 @@ describe("History", () => {
     renderWithProviders(<History />, fixtures);
     await screen.findByText(/99[.,]42/);
     const before = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
-    await userEvent.click(await screen.findByRole("radio", { name: "7d" }));
+    // The pill reads "7d" but its accessible name is the spelled-out range.
+    await userEvent.click(await screen.findByRole("radio", { name: i18n.t("column.range", { days: 7 }) }));
     const after = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
     expect(after).toBeGreaterThan(before);
     const requested = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
@@ -97,7 +101,16 @@ describe("a provider's component breakdown (ComponentRows)", () => {
     ...extra,
   });
 
-  const dotFor = (name: string) => screen.getByText(name).parentElement!.querySelector(".dot") as HTMLElement;
+  /**
+   * The component's status dot, by the status it is drawing rather than by its
+   * styling class. `[data-status]` is StatusDot's own semantic hook; the old
+   * `.dot` query broke on any restyle that renamed the class and told you
+   * nothing about what the dot meant.
+   */
+  const statusOfDot = (name: string): string | null => {
+    const row = screen.getByText(name).closest("div");
+    return row?.querySelector("[data-status]")?.getAttribute("data-status") ?? null;
+  };
 
   it("marks a never-measured component and shows the live status dot, distinct from a measured one", async () => {
     renderWithProviders(
@@ -133,8 +146,8 @@ describe("a provider's component breakdown (ComponentRows)", () => {
     expect(await screen.findByText("Component One")).toBeInTheDocument();
     expect(await screen.findByText("Component Two")).toBeInTheDocument();
     // live: c1 has a current entry (degraded); c2 has none, falls back to "unknown".
-    expect(dotFor("Component One").getAttribute("style")).toContain("--status-degraded-fill");
-    expect(dotFor("Component Two").getAttribute("style")).toContain("--status-unknown-fill");
+    expect(statusOfDot("Component One")).toBe("degraded");
+    expect(statusOfDot("Component Two")).toBe("unknown");
     // sampleCount === 0 reads as "never measured", not a bogus 0% — and only
     // on that one row, not on Component One's too.
     expect(screen.getAllByText(i18n.t("components.never-measured"))).toHaveLength(1);

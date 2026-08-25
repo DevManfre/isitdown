@@ -15,6 +15,3 @@ export function faviconCandidates(baseUrl: string): string[] {
     return [];
   }
 }
-
-/** Keeps only the newest `size` entries of a newest-first list. */
-export const trimToLatest = <T>(list: T[], size: number): T[] => list.slice(0, size);

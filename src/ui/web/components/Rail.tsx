@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink } from "react-router";
 import { useTranslation } from "react-i18next";
 import { NAV_ROUTES, ROUTE_PATHS, type RouteName } from "../../routePaths.ts";
@@ -10,6 +11,11 @@ export function Rail() {
   const { collapsed, toggle } = useRail();
   const { data: status } = useStatusChrome();
   const { data: config } = useConfigChrome();
+  // Right after the collapse click the pointer is still standing on the rail,
+  // and :hover alone would reopen it in the same instant. `.rail-hold` blinds
+  // that hover (see motion.css) until the pointer has actually left once —
+  // vanilla's app.js kept the same class for the same reason.
+  const [hold, setHold] = useState(false);
 
   const badgeFor = (name: RouteName): string | undefined => {
     if (status === undefined) return undefined;
@@ -22,7 +28,14 @@ export function Rail() {
   };
 
   return (
-    <nav className="rail flex flex-col gap-4 border-r border-border bg-card py-4" aria-label={t("nav.views")}>
+    <nav
+      className={cn(
+        "rail flex flex-col gap-4 overflow-hidden border-r border-border bg-card py-4",
+        hold && "rail-hold",
+      )}
+      aria-label={t("nav.views")}
+      onMouseLeave={() => setHold(false)}
+    >
       <div className="rail-brand flex items-center gap-2 px-6">
         <span className="rail-dot size-2 rounded-full bg-primary" />
         <span className="rail-name font-medium">{t("app.name")}</span>
@@ -31,7 +44,14 @@ export function Rail() {
           className="rail-toggle ml-auto text-muted-foreground"
           aria-expanded={!collapsed}
           aria-label={t(collapsed ? "nav.rail-expand" : "nav.rail-collapse")}
-          onClick={toggle}
+          onClick={(event) => {
+            const collapsing = !collapsed;
+            toggle();
+            // Focus would hold the rail open through :focus-within just as
+            // surely as hover would, so it is dropped on the way down.
+            if (collapsing) event.currentTarget.blur();
+            setHold(collapsing);
+          }}
         >
           <span className="rail-toggle-chevron block size-2 rotate-45 border-r-2 border-b-2 border-current" />
         </button>

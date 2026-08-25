@@ -170,8 +170,17 @@ export function History() {
               setDays(Number(next));
             }}
           >
+            {/* The visible label stays the prototype's compact "7d" pill (design
+                3a sets it at 11px / 3px 9px, and a row of "Last 30 days" does
+                not fit that control). The accessible name is the spelled-out,
+                translated range, so a screen reader hears "Last 7 days" rather
+                than the bare token "7d". */}
             {RANGES.map((range) => (
-              <ToggleGroupItem key={range} value={String(range)}>
+              <ToggleGroupItem
+                key={range}
+                value={String(range)}
+                aria-label={t("column.range", { days: range })}
+              >
                 {`${range}d`}
               </ToggleGroupItem>
             ))}

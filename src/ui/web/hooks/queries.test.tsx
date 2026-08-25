@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { Component, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useConfigChrome, useStatusChrome } from "./queries.ts";
+import { useConfigChrome, useIncidents, useStatusChrome } from "./queries.ts";
+import { BusyProvider, useFieldProps } from "./useBusy.tsx";
 
 /**
  * `WRITE_KEYS` in `queries.ts` invalidates by prefix match: TanStack Query
@@ -127,5 +128,60 @@ describe("useConfigChrome", () => {
     );
     expect(await screen.findByText("chrome-no-data:true")).toBeInTheDocument();
     expect(screen.queryByText("boundary-tripped")).toBeNull();
+  });
+});
+
+/**
+ * Every view query now polls on the same busy-gated interval the chrome queries
+ * use. The interval itself is covered where it matters — Incidents.test.tsx
+ * watches a new incident appear with the view mounted — but the `busy ? false`
+ * half of each of those five branches has no visible symptom, so it is asserted
+ * here: a refetch that lands while the operator is typing would overwrite the
+ * form under them, which is the whole reason `useBusy` exists.
+ */
+describe("the view queries' busy gate", () => {
+  function Probe() {
+    useIncidents();
+    const fieldProps = useFieldProps();
+    return <input aria-label="field" {...fieldProps} />;
+  }
+
+  const fetchCount = () => (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("holds the interval while a field has focus, and resumes it on blur", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ active: [], closed: [] }) })),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <BusyProvider>
+          <Probe />
+        </BusyProvider>
+      </QueryClientProvider>,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    act(() => screen.getByLabelText("field").focus());
+    const held = fetchCount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(90_000);
+    });
+    expect(fetchCount(), "a poll fired while the operator was typing").toBe(held);
+
+    act(() => screen.getByLabelText("field").blur());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(fetchCount(), "the poll never resumed after the field was released").toBeGreaterThan(held);
   });
 });

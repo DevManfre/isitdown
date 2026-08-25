@@ -16,18 +16,21 @@ export type SupportedLocale = (typeof SUPPORTED)[number];
 
 export const supportedLocales = SUPPORTED;
 
-const stored = (() => {
+const LOCALE_KEY = "isitdown.uiLocale";
+
+/** The operator's own choice in this browser, or `undefined` if they have none. */
+const stored = (): string | undefined => {
   try {
-    return localStorage.getItem("isitdown.uiLocale") ?? undefined;
+    return localStorage.getItem(LOCALE_KEY) ?? undefined;
   } catch {
     /* a blocked localStorage only costs the remembered choice */
     return undefined;
   }
-})();
+};
 
 void i18next.use(initReactI18next).init({
   resources: { en: { translation: en }, it: { translation: it } },
-  lng: resolve(stored),
+  lng: resolve(stored()),
   fallbackLng: "en",
   // "overview.title.down" is one key, not a path; a ":" inside a value is text.
   keySeparator: false,
@@ -51,11 +54,27 @@ export async function switchLocale(lang: string): Promise<SupportedLocale> {
   await i18next.changeLanguage(next);
   document.documentElement.setAttribute("lang", next);
   try {
-    localStorage.setItem("isitdown.uiLocale", next);
+    localStorage.setItem(LOCALE_KEY, next);
   } catch {
     /* only the pre-paint lang hint is lost */
   }
   return next;
+}
+
+/**
+ * Applies the locale the server remembers, so a fresh browser starts where the
+ * operator left off (design spec §7.4) — but never over a choice this browser
+ * already carries. Returns the locale it applied, or `undefined` if it left the
+ * local choice alone.
+ *
+ * The check reads localStorage at call time rather than at module load, which
+ * is what makes an operator who switched language *while* the preferences
+ * request was still in flight keep their click: `switchLocale` is the only
+ * thing that writes this key, so anything there is a real choice.
+ */
+export async function adoptLocale(lang: string): Promise<SupportedLocale | undefined> {
+  if (stored() !== undefined) return undefined;
+  return switchLocale(lang);
 }
 
 export default i18next;

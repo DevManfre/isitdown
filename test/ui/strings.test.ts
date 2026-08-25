@@ -17,10 +17,10 @@ const WEB = new URL("../../src/ui/web/", import.meta.url).pathname;
 // addition to go unjustified. Empty for now: this set used to carry
 // "presentation", added for `role="presentation"` in UptimeRing.tsx, but
 // neither scan can ever reach it — the attribute scan only matches
-// aria-label/title/placeholder (role carries no reader-facing text), and
-// the JSX-text scan requires two or more words. Removing it left every test
-// below passing, confirming it was never live; deleted rather than kept as
-// a placeholder that reads as a guard exception and isn't one.
+// aria-label/title/placeholder (role carries no reader-facing text). Removing
+// it left every test below passing, confirming it was never live; deleted
+// rather than kept as a placeholder that reads as a guard exception and isn't
+// one.
 const ALLOWED = new Set<string>([]);
 
 // Assertions run against the code, not the prose that documents it. Block
@@ -36,12 +36,22 @@ const ALLOWED = new Set<string>([]);
 const strip = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(?<!:)\/\/.*$/gm, "");
 
+// components/ui/ is NOT exempt. It used to be, on the premise that
+// "shadcn-generated primitives carry no copy" — which is simply untrue:
+// stock `dialog.tsx` ships an English "Close" twice, once as the icon button's
+// screen-reader label and once as the footer's optional button, and the
+// default-on `showCloseButton` put the first of those in every dialog the
+// dashboard renders. Nothing in the tree overrode it, so screen-reader users
+// got English whatever the locale, and this guard was looking the other way.
+// A generated file is exactly where unreviewed English arrives from, so it is
+// the last directory that should be skipped. `node_modules` is skipped because
+// Vitest's own cache lives under src/ui/web/node_modules.
 async function filesUnder(dir: string, extensions: string[]): Promise<string[]> {
   const found: string[] = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === "ui") continue; // shadcn-generated primitives carry no copy
+      if (entry.name === "node_modules") continue;
       found.push(...(await filesUnder(path, extensions)));
     } else if (extensions.some((extension) => entry.name.endsWith(extension))) {
       found.push(path);
@@ -50,13 +60,16 @@ async function filesUnder(dir: string, extensions: string[]): Promise<string[]> 
   return found;
 }
 
-test("no english sentence is typed straight into JSX", async () => {
+test("no english copy is typed straight into JSX", async () => {
   const offenders: string[] = [];
   for (const file of await filesUnder(WEB, [".tsx"])) {
     if (file.endsWith(".test.tsx")) continue;
     const source = strip(readFileSync(file, "utf8"));
-    // >Two or more words of prose< between tags, with no {expression} in sight.
-    for (const match of source.matchAll(/>\s*([A-Z][a-z]+(?: [a-z]+){1,})\s*</g)) {
+    // >One or more words of prose< between tags, with no {expression} in sight.
+    // One, not two: the two-word minimum was the second reason dialog.tsx's
+    // "Close" went unseen for the whole port — a single-word button label is
+    // the most common literal there is, and every one of them is copy.
+    for (const match of source.matchAll(/>\s*([A-Z][a-z]+(?: [a-z]+)*)\s*</g)) {
       const text = (match[1] as string).trim();
       if (!ALLOWED.has(text)) offenders.push(`${file}: "${text}"`);
     }

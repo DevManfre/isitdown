@@ -7,12 +7,22 @@ import { join } from "node:path";
 const WEB = new URL("../../src/ui/web/", import.meta.url).pathname;
 const TOKENS = join(WEB, "css/tokens.css");
 
+// components/ui/ is NOT exempt. It used to be, as "shadcn-generated
+// primitives, not our design tokens" — and that exemption is what let stock
+// shadcn's `text-white` sit in button.tsx and badge.tsx, and `bg-black/50` in
+// dialog.tsx, for the whole port. The proof they were wrong rather than
+// stylistic: `--destructive-foreground` is declared in all three theme blocks
+// and forced to exist by tokens.test.ts, yet its only reference anywhere in the
+// tree was that test — the guard keeping the token alive was its sole consumer,
+// because `text-white` had displaced it. A generated file is exactly where
+// off-palette colour arrives from. `node_modules` is skipped because Vitest's
+// own cache lives under src/ui/web/node_modules.
 async function filesUnder(dir: string, extensions: string[]): Promise<string[]> {
   const found: string[] = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === "ui") continue; // shadcn-generated primitives, not our design tokens
+      if (entry.name === "node_modules") continue;
       found.push(...(await filesUnder(path, extensions)));
     } else if (extensions.some((extension) => entry.name.endsWith(extension))) {
       found.push(path);
@@ -20,6 +30,55 @@ async function filesUnder(dir: string, extensions: string[]): Promise<string[]> 
   }
   return found;
 }
+
+/**
+ * Tailwind's own palette, as utility class names. Every one of these is a
+ * literal colour that ignores the theme: `text-white` renders white in the
+ * light theme too, where the destructive button's foreground is meant to be
+ * the surface colour.
+ */
+const TAILWIND_COLOURS = [
+  "white", "black", "slate", "gray", "grey", "zinc", "neutral", "stone", "red",
+  "orange", "amber", "yellow", "lime", "green", "emerald", "teal", "cyan", "sky",
+  "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose",
+].join("|");
+
+const UTILITY_PREFIXES = [
+  "bg", "text", "border", "fill", "stroke", "ring", "outline", "shadow", "from",
+  "via", "to", "decoration", "divide", "accent", "caret", "placeholder",
+].join("|");
+
+/**
+ * A colour utility built from Tailwind's palette rather than this app's tokens
+ * — `text-white`, `bg-red-500`, `bg-black/50`. The optional shade (`-500`) and
+ * opacity modifier (`/50`) are both invisible to a hex-only scan, which is the
+ * second reason these three literals survived the whole port.
+ *
+ * The lookarounds keep it off this app's own token utilities, whose names end
+ * in a colour-ish word (`bg-status-major-outage`, `text-muted-foreground`):
+ * a match must start and end at a class-name boundary.
+ */
+const tailwindColour = new RegExp(
+  `(?<![-\\w])(?:${UTILITY_PREFIXES})-(?:${TAILWIND_COLOURS})(?:-\\d{2,3})?(?:\\/\\d{1,3})?(?![-\\w])`,
+  "g",
+);
+
+/**
+ * Hex colours allowed to stay, each with the reason it is not a declaration.
+ *
+ * chart.tsx's `#ccc` and `#fff` are attribute *selectors*
+ * (`[&_.recharts-dot[stroke='#fff']]:stroke-transparent`) matching values
+ * Recharts hardcodes into its own SVG output. They are how the shadcn chart
+ * wrapper reaches those defaults and repaints them in token colours — the
+ * literal is the thing being overridden, not a colour being set. Delete them
+ * and Recharts' own grey shows through.
+ */
+const ALLOWED_HEX: Record<string, string[]> = {
+  "components/ui/chart.tsx": ["#ccc", "#fff"],
+};
+
+const allowedIn = (file: string, hex: string): boolean =>
+  Object.entries(ALLOWED_HEX).some(([suffix, hexes]) => file.endsWith(suffix) && hexes.includes(hex));
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -70,20 +129,63 @@ test("only tokens.css contains a hex colour", async () => {
   assert.deepEqual(offenders, [], "every colour outside the token file must be a var()");
 });
 
+// 3-to-8 digits, not 6. A six-digit-only scan cannot see `#ccc` or `#fff`,
+// which is the short form anything hand-written actually uses.
 test("no hex colour is hardcoded in the dashboard markup or scripts", async () => {
   const offenders: string[] = [];
   for (const file of await filesUnder(WEB, [".ts", ".tsx", ".html"])) {
-    const hexes = strip(readFileSync(file, "utf8")).match(/#[0-9a-fA-F]{6}\b/g);
-    if (hexes !== null) offenders.push(`${file}: ${[...new Set(hexes)].join(", ")}`);
+    const hexes = strip(readFileSync(file, "utf8")).match(/#[0-9a-fA-F]{3,8}\b/g);
+    if (hexes === null) continue;
+    const unexplained = [...new Set(hexes)].filter((hex) => !allowedIn(file, hex));
+    if (unexplained.length > 0) offenders.push(`${file}: ${unexplained.join(", ")}`);
   }
-  assert.deepEqual(offenders, []);
+  assert.deepEqual(offenders, [], "every colour must come from a tokens.css var()");
+});
+
+test("no tailwind palette colour stands in for a design token", async () => {
+  const offenders: string[] = [];
+  for (const file of await filesUnder(WEB, [".ts", ".tsx", ".html"])) {
+    const hits = strip(readFileSync(file, "utf8")).match(tailwindColour);
+    if (hits !== null) offenders.push(`${file}: ${[...new Set(hits)].join(", ")}`);
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "a Tailwind palette class is a literal colour: use the semantic token utility (text-destructive-foreground, bg-scrim, …)",
+  );
+});
+
+// The token whose absence proved C2: declared in all three theme blocks, forced
+// to exist by tokens.test.ts, and before this wave its only reference in the
+// whole tree was that test. A token nothing renders is a token something has
+// quietly displaced — and this catches that even if the palette scan above is
+// ever narrowed again.
+test("every foreground token the palette declares is actually rendered somewhere", async () => {
+  const files = await filesUnder(WEB, [".ts", ".tsx", ".html", ".css"]);
+  const sources = files
+    .filter((file) => file !== TOKENS)
+    .map((file) => strip(readFileSync(file, "utf8")))
+    .join("\n");
+
+  for (const token of ["--destructive-foreground", "--scrim"]) {
+    const utility = token.replace(/^--/, "");
+    const used = sources.includes(`var(${token})`) || new RegExp(`-${utility}(?![-\\w])`).test(sources);
+    assert.ok(used, `${token} is declared but nothing outside tokens.css uses it — has a literal displaced it?`);
+  }
 });
 
 test("no Tailwind arbitrary value smuggles in a hex colour", async () => {
   const offenders: string[] = [];
   for (const file of await filesUnder(WEB, [".ts", ".tsx"])) {
     const hits = readFileSync(file, "utf8").match(/\[[^\]]*#[0-9a-fA-F]{3,8}[^\]]*\]/g);
-    if (hits !== null) offenders.push(`${file}: ${[...new Set(hits)].join(", ")}`);
+    if (hits === null) continue;
+    // Same allowlist as the plain-hex scan: a bracketed *selector* matching a
+    // hex Recharts hardcodes is not a colour this app is setting.
+    const unexplained = [...new Set(hits)].filter((hit) => {
+      const hex = /#[0-9a-fA-F]{3,8}/.exec(hit)?.[0] ?? "";
+      return !allowedIn(file, hex);
+    });
+    if (unexplained.length > 0) offenders.push(`${file}: ${unexplained.join(", ")}`);
   }
   assert.deepEqual(offenders, [], "a colour in a utility class is still a colour outside the token file");
 });
@@ -129,6 +231,24 @@ test("every status in the severity model has its own colour token in both themes
 // out of sync with the real one (as this file's brace bug just did) rather
 // than adding coverage.
 
+/**
+ * Custom properties that are legitimately not design tokens, each with the
+ * reason it is set somewhere other than tokens.css. Not colours, and not
+ * theme-dependent — a `var()` here reads a value its own component or Radix
+ * put there.
+ */
+const NON_TOKEN_PROPERTIES: Record<string, string> = {
+  // Radix's Select popper measures the trigger and writes these onto the
+  // content element at runtime, so the dropdown can match the trigger's box.
+  // Nothing in this repo declares them and nothing should.
+  "--radix-select-trigger-height": "set by Radix's Select popper at runtime",
+  "--radix-select-trigger-width": "set by Radix's Select popper at runtime",
+  // toggle-group.tsx declares this itself, inline, one line above the `var()`
+  // that reads it: `style={{ "--gap": spacing }}`. A component-local variable
+  // passing a prop into a utility class, not a palette entry.
+  "--gap": "declared inline by toggle-group.tsx itself, from its `spacing` prop",
+};
+
 test("every custom property the dashboard references is declared in tokens.css", async () => {
   const css = readFileSync(TOKENS, "utf8");
   const declared = new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1] as string));
@@ -138,6 +258,7 @@ test("every custom property the dashboard references is declared in tokens.css",
     const source = strip(readFileSync(file, "utf8"));
     for (const match of source.matchAll(/var\((--[\w-]+)/g)) {
       const name = match[1] as string;
+      if (name in NON_TOKEN_PROPERTIES) continue;
       if (!declared.has(name)) missing.add(`${name} (in ${file})`);
     }
   }

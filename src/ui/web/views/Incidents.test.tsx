@@ -1,8 +1,8 @@
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
-import { providerFixture, renderWithProviders } from "@/test/harness.tsx";
+import { providerFixture, renderWithProviders, stubApi } from "@/test/harness.tsx";
 import { Incidents } from "./Incidents.tsx";
 
 /**
@@ -41,6 +41,32 @@ afterEach(() => {
 });
 
 describe("Incidents", () => {
+  // The reason `useIncidents` carries a `refetchInterval` at all. Only the
+  // status and config queries had one, so an operator sitting on this view
+  // watched the rail badge tick to "1 open incident" while the list beside it
+  // stayed empty indefinitely — `staleTime` plus `refetchOnWindowFocus` hid it
+  // from anyone who left the tab and came back, but not from anyone watching.
+  // Nothing here navigates, clicks or remounts: the view is mounted, the clock
+  // moves, and the new incident has to appear on its own.
+  it("surfaces a new incident on the next poll, with the view still mounted", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderWithProviders(<Incidents />, { ...fixtures, incidents: { active: [], closed: [] } });
+      expect(await screen.findByText(i18n.t("incidents.empty-active"))).toBeInTheDocument();
+      expect(screen.queryByText("API errors")).toBeNull();
+
+      // The server has recorded an incident since the view loaded.
+      stubApi(fixtures);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+
+      expect(await screen.findByText("API errors")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("lists an active incident and a closed one under the all filter", async () => {
     renderWithProviders(<Incidents />, fixtures);
     expect(await screen.findByText("API errors")).toBeInTheDocument();

@@ -1,13 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { faviconCandidates, trimToLatest } from "../../src/ui/web/lib/favicon.ts";
+import { faviconCandidates } from "../../src/ui/web/lib/favicon.ts";
 import {
   severity,
   statusColor,
   statusFill,
   statusLabelKey,
   statusMuted,
+  trimToLatest,
 } from "../../src/ui/web/lib/chartConfig.ts";
 
 const STATUSES = ["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const;

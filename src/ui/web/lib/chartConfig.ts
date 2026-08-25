@@ -79,3 +79,13 @@ export function chartConfigFor(
     ]),
   );
 }
+
+/**
+ * Keeps only the newest `size` entries of a newest-first list — what a strip
+ * chart does before it draws.
+ *
+ * It lived in `favicon.ts` for no reason other than that both helpers came off
+ * charts.js in the same pass; nothing about it has to do with favicons, and a
+ * test importing a list helper from a favicon module is how that stays hidden.
+ */
+export const trimToLatest = <T>(list: T[], size: number): T[] => list.slice(0, size);

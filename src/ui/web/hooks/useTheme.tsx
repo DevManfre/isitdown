@@ -8,19 +8,32 @@ interface ThemeApi {
   mode: ThemeMode;
   cycle: () => ThemeMode;
   set: (mode: ThemeMode) => void;
+  /**
+   * Apply the server's remembered theme — but only if this browser has no
+   * choice of its own. See `ThemeProvider` for why that precedence.
+   */
+  adopt: (mode: ThemeMode) => void;
 }
 
-const ThemeContext = createContext<ThemeApi>({ mode: "system", cycle: () => "system", set: () => {} });
+const ThemeContext = createContext<ThemeApi>({
+  mode: "system",
+  cycle: () => "system",
+  set: () => {},
+  adopt: () => {},
+});
 
-const read = (): ThemeMode => {
+/** The operator's own choice in this browser, or `null` if they have none. */
+const stored = (): ThemeMode | null => {
   try {
-    const stored = localStorage.getItem(KEY);
-    return MODES.includes(stored as ThemeMode) ? (stored as ThemeMode) : "system";
+    const value = localStorage.getItem(KEY);
+    return MODES.includes(value as ThemeMode) ? (value as ThemeMode) : null;
   } catch {
     /* a blocked localStorage only costs the pre-paint hint */
-    return "system";
+    return null;
   }
 };
+
+const read = (): ThemeMode => stored() ?? "system";
 
 const stamp = (mode: ThemeMode) => {
   const root = document.documentElement;
@@ -34,10 +47,24 @@ const stamp = (mode: ThemeMode) => {
  * The choice is stored twice on purpose: in localStorage so the inline head
  * script can apply it before first paint, and in the database — by whoever
  * consumes `set` — so a fresh browser against the same instance starts where
- * the operator left off.
+ * the operator left off. `usePreferenceSync` reads the database half back.
+ *
+ * localStorage wins when both exist, and `adopt` is how that is enforced. The
+ * pre-paint script has already stamped the local choice on <html> before React
+ * runs; letting a later server value override it would repaint the page into a
+ * different theme a beat after it appeared, which is the exact flash the
+ * pre-paint script exists to prevent. So the server value seeds the theme only
+ * when this browser has none.
+ *
+ * Whether it has one is sampled here, at mount, and not inside `adopt`: the
+ * effect below writes `mode` to localStorage on the very first render, so by
+ * the time the preferences request comes back there is always *something*
+ * stored and a check made then could never tell a real choice from that
+ * write-back.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>(read);
+  const [hasOwnChoice] = useState(() => stored() !== null);
 
   useEffect(() => {
     stamp(mode);
@@ -68,7 +95,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return next;
   }, [mode]);
 
-  const api = useMemo<ThemeApi>(() => ({ mode, cycle, set: setMode }), [mode, cycle]);
+  const adopt = useCallback(
+    (next: ThemeMode) => {
+      if (hasOwnChoice) return;
+      setMode(next);
+    },
+    [hasOwnChoice],
+  );
+
+  const api = useMemo<ThemeApi>(() => ({ mode, cycle, set: setMode, adopt }), [mode, cycle, adopt]);
   return <ThemeContext.Provider value={api}>{children}</ThemeContext.Provider>;
 }
 

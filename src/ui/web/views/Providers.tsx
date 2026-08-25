@@ -6,20 +6,11 @@ import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
-import { formatPercent } from "@/lib/format.ts";
+import { formatPercent, hostOf } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
 import { cn } from "@/lib/utils.ts";
 
 const WINDOW_DAYS = 90;
-
-/** Ported verbatim from providers.js:280-286 — a malformed baseUrl falls back to itself. */
-function hostOf(baseUrl: string): string {
-  try {
-    return new URL(baseUrl).host;
-  } catch {
-    return baseUrl;
-  }
-}
 
 type Filter = "all" | "issues";
 
