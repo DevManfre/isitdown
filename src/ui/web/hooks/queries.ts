@@ -49,6 +49,27 @@ export function useConfig() {
   });
 }
 
+/**
+ * Same cache entry as {@link useConfig} (`["config"]`), but never throws.
+ *
+ * Same reason as {@link useStatusChrome}: `Rail` reads config directly for
+ * its own chrome (the notifier-channel list), as a sibling of the current
+ * view's `<Outlet/>` in `App.tsx`. A throw from `useConfig()` there would
+ * escape past the view's error boundary and take the whole shell down.
+ * Degrading to `data === undefined` lets `Rail` fall back to its existing
+ * `config?.channels ?? []`, matching vanilla's own `state.config?.channels
+ * ?? []` — an empty notifier section, not a broken one.
+ */
+export function useConfigChrome() {
+  const busy = useBusy();
+  return useQuery({
+    queryKey: ["config"],
+    queryFn: api.getConfig,
+    refetchInterval: busy ? false : REFRESH_MS,
+    throwOnError: false,
+  });
+}
+
 export const useHistory = (days: number, provider?: string) =>
   useQuery({
     queryKey: ["history", days, provider ?? null],

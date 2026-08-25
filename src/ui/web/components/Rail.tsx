@@ -1,7 +1,7 @@
 import { NavLink } from "react-router";
 import { useTranslation } from "react-i18next";
 import { NAV_ROUTES, ROUTE_PATHS, type RouteName } from "../../routePaths.ts";
-import { useConfig, useStatusChrome } from "@/hooks/queries.ts";
+import { useConfigChrome, useStatusChrome } from "@/hooks/queries.ts";
 import { useRail } from "@/hooks/useRail.tsx";
 import { cn } from "@/lib/utils.ts";
 
@@ -9,7 +9,7 @@ export function Rail() {
   const { t } = useTranslation();
   const { collapsed, toggle } = useRail();
   const { data: status } = useStatusChrome();
-  const { data: config } = useConfig();
+  const { data: config } = useConfigChrome();
 
   const badgeFor = (name: RouteName): string | undefined => {
     if (status === undefined) return undefined;
