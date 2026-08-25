@@ -16,6 +16,9 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Assertions run against the code, not the prose that documents it.
+const strip = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, "");
+
 /**
  * Byte offset of one CSS block's real rule, by its selector (which must
  * include the trailing " {").
@@ -41,7 +44,7 @@ function blockStart(selector: string): number {
 function declaredIn(selector: string): string[] {
   const open = css.indexOf("{", blockStart(selector));
   const close = css.indexOf("}", open);
-  return [...css.slice(open, close).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1] as string).sort();
+  return [...strip(css.slice(open, close)).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1] as string).sort();
 }
 
 const SEMANTIC = [
@@ -84,11 +87,11 @@ describe("the shadcn theme contract", () => {
   });
 
   it("declares no --bar-* token, which Recharts replaced", () => {
-    expect(css).not.toMatch(/--bar-/);
+    expect(strip(css)).not.toMatch(/--bar-/);
   });
 
   it("binds the dark variant to the data-theme attribute, not a class", () => {
-    expect(css).toMatch(/@custom-variant\s+dark\s*\(&:where\(\[data-theme="dark"\]/);
-    expect(css).not.toMatch(/@custom-variant\s+dark\s*\(&:is\(\.dark/);
+    expect(strip(css)).toMatch(/@custom-variant\s+dark\s*\(&:where\(\[data-theme="dark"\]/);
+    expect(strip(css)).not.toMatch(/@custom-variant\s+dark\s*\(&:is\(\.dark/);
   });
 });
