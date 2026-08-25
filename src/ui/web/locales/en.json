@@ -112,6 +112,7 @@
   "history.downtime": "{minutes} min down",
   "history.month-no-data": "—",
   "history.export": "Served by",
+  "history.export-aria": "Download the raw history JSON for the last {days} days",
 
   "settings.polling": "Polling",
   "settings.services": "Monitored services",
@@ -142,7 +143,7 @@
   "components.empty": "This provider exposes no components",
   "components.unsupported": "This adapter cannot list components",
   "components.hint": "Optional: with none selected, only the overall status is monitored",
-  "components.select-all": "Select every component in {group}",
+  "components.select-all": "Select every visible component",
   "components.scope": "Report only the selected components",
   "components.scope-hint": "Incidents attributed only to other components are ignored, and the status shown is the worst of the selection. A notice the provider attaches to no component stays reported.",
   "components.ungrouped": "Other",

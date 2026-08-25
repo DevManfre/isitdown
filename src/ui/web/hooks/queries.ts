@@ -76,10 +76,20 @@ export const useHistory = (days: number, provider?: string) =>
     queryFn: () => api.getHistory(days, provider),
   });
 
+/**
+ * Never throws. Vanilla's own reasoning (`history.js:70-82`): "the provider's
+ * own uptime figures already rendered; a missing component breakdown is not
+ * worth surfacing as a page-level error." `History`'s per-provider row (and
+ * its month columns and export button) must survive a component-history
+ * fetch failure for one provider intact — that isolation is a property of
+ * this query, not of the one call site that happens to use it today, so it
+ * lives here rather than as a `throwOnError` override in `History.tsx`.
+ */
 export const useComponentHistory = (provider: string, days: number) =>
   useQuery({
     queryKey: ["history", "components", provider, days],
     queryFn: () => api.getComponentHistory(provider, days),
+    throwOnError: false,
   });
 
 export const useIncidents = (provider?: string) =>
