@@ -48,6 +48,18 @@ npm test                    # unit: adapters + diff engine + state store
 npm run test:integration    # spins up a fake local HTTP server as a stand-in provider, asserts an end-to-end notification fires on a simulated status change
 ```
 
+`npm test` runs two runners, not one: `node --test` covers the server, the
+core engine, the adapters/notifiers, and the fs-based dashboard guards (the
+tests that scan `src/ui/web/` source files for a stray hex colour or a
+literal string without parsing them as JSX) — everything in this skill so
+far runs there. Anything that actually renders JSX runs under **Vitest**
+instead, because Node's built-in type stripping erases TypeScript syntax but
+does not transform JSX; `node --test` would throw on the first `<Component
+/>` it tried to load. This split is orthogonal to what's under test here —
+the diff-engine table, adapter fixtures, and `StateStore` interchangeability
+rules below are unaffected either way, and the never-touch-a-live-provider
+rule for fixtures applies regardless of which runner executes the test.
+
 ## Anti-patterns to avoid
 
 - Don't mock the Diff Engine itself when testing the Poller or Notifier — test them against the real Diff Engine with fixture inputs, since the interaction between components is exactly where notification bugs (missed or duplicate alerts) tend to hide.

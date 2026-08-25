@@ -74,6 +74,36 @@ Add a row when a bug is found. That row *is* the regression test.
 - One logical behaviour per test. Multiple `expect`s are fine if they describe one behaviour.
 - Test names state the behaviour and its condition: `returns no notification when the incident list is only reordered`. Not `test diff engine 3`.
 
+## React Testing Library (dashboard components)
+
+Same discipline as everywhere else in this skill, applied to the dashboard's
+Vitest + Testing Library suite:
+
+- **Query by role or accessible label text, never by class name.** Reach for
+  `data-testid` only when no role exists for the element — a component test
+  that queries `.card-title` breaks on a restyle that changed nothing a user
+  could observe; one that queries `getByRole("button", { name: /add/i })`
+  doesn't.
+- **Assert behaviour, not markup.** "Focus moved to the new field", "the
+  request is suspended", "the filtered list no longer shows Cloudflare" — not
+  "the DOM now contains a `<div class="row">`". If the assertion would still
+  pass after a markup-only refactor that didn't change what the user sees or
+  can do, it's testing the wrong layer.
+- **No snapshot-only tests.** A snapshot records what the component currently
+  renders, not what it's supposed to render — it can't fail in a way that
+  tells you which behaviour broke, and it always "passes" after a blind
+  `-u`.
+- **`userEvent` over `fireEvent`.** `userEvent` fires the full sequence a real
+  interaction produces (focus, pointer events, `input`, `change`, …);
+  `fireEvent` fires one synthetic event and can pass while missing a bug a
+  real click would trigger (a focus-dependent handler, a debounce keyed off
+  a specific event order).
+- **Never wrap an assertion in `waitFor` just to make a race pass.** If a
+  test is flaky without it, find out what you're actually waiting for — a
+  query settling, a fetch resolving, an animation frame — and wait for that
+  specific thing (`findBy*`, an explicit mock resolution) rather than
+  papering over the race with a retrying assertion.
+
 ## When a test fails
 
 **A failing test is information. Read it before you touch anything.**
