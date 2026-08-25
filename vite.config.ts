@@ -6,6 +6,10 @@ const API_PATHS = ["/status", "/config", "/history", "/incidents", "/notificatio
 
 export default defineConfig({
   root: "src/ui/web",
+  // Relative, not absolute: the bundle is staged at /next/ during the port
+  // and moves to / at the cutover commit. A relative base resolves correctly
+  // in both places, so this line needs no second change later.
+  base: "./",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: { "@": new URL("./src/ui/web/", import.meta.url).pathname },
