@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { PollIndicator } from "./PollIndicator.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
-import { usePreferencesMutation, useStatus } from "@/hooks/queries.ts";
+import { usePreferencesMutation, useStatusChrome } from "@/hooks/queries.ts";
 import { useTheme } from "@/hooks/useTheme.tsx";
 import { supportedLocales, switchLocale } from "@/lib/i18n.ts";
 import { formatRelative } from "@/lib/format.ts";
@@ -19,7 +19,7 @@ const TITLE_KEYS: Record<string, string> = {
 export function Header({ view }: { view: string }) {
   const { t, i18n } = useTranslation();
   const { mode, cycle } = useTheme();
-  const { data: status } = useStatus();
+  const { data: status } = useStatusChrome();
   const savePreferences = usePreferencesMutation();
 
   const lastSeen = status?.lastPollAt ?? null;

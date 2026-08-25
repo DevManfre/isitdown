@@ -14,6 +14,32 @@ export function useStatus() {
   });
 }
 
+/**
+ * Same cache entry as {@link useStatus} (`["status"]`), but never throws.
+ *
+ * `Rail`, `Header` and `PollIndicator` render as siblings of the current
+ * view's `<Outlet/>` in `App.tsx`, not as its descendants — so a plain
+ * `useStatus()` there would throw under the app's global `throwOnError`
+ * predicate right alongside the view, and that throw escapes past the
+ * nested error boundary meant to catch a failed *view*, taking the whole
+ * shell down with it (including the rail, which should stay standing while
+ * a view shows its own error). Chrome components read status through this
+ * hook instead, so only the view itself can trip that boundary; the chrome
+ * degrades to `data === undefined` exactly like a still-loading query,
+ * which every chrome consumer already renders gracefully (no badge, no
+ * countdown) — see `app.js`'s `badgeFor()` in the vanilla dashboard for the
+ * same graceful-degradation contract this mirrors.
+ */
+export function useStatusChrome() {
+  const busy = useBusy();
+  return useQuery({
+    queryKey: ["status"],
+    queryFn: api.getStatus,
+    refetchInterval: busy ? false : REFRESH_MS,
+    throwOnError: false,
+  });
+}
+
 export function useConfig() {
   const busy = useBusy();
   return useQuery({

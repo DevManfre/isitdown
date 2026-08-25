@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
-import { usePollNow, useStatus } from "@/hooks/queries.ts";
+import { usePollNow, useStatusChrome } from "@/hooks/queries.ts";
 import { cn } from "@/lib/utils.ts";
 
 export function PollIndicator() {
   const { t } = useTranslation();
-  const { data: status } = useStatus();
+  const { data: status } = useStatusChrome();
   const poll = usePollNow();
   // Re-renders once a second so the countdown ticks without refetching.
   const [, tick] = useState(0);
