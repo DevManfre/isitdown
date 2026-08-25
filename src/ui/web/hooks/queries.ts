@@ -70,11 +70,38 @@ export function useConfigChrome() {
   });
 }
 
-export const useHistory = (days: number, provider?: string) =>
-  useQuery({
+/**
+ * Every query below polls on the same busy-gated interval as `useStatus` and
+ * `useConfig`, so the view an operator is actually looking at keeps up with the
+ * server's own polling instead of freezing at whatever it loaded with.
+ *
+ * Vanilla got this for free: its 30s tick re-rendered the current view, which
+ * re-fetched that view's data. The React port wired `refetchInterval` onto the
+ * status and config queries only, so an operator sitting on Incidents watched
+ * the rail badge tick to "1 open incident" while the list beside it stayed
+ * empty indefinitely.
+ *
+ * The interval is per-query rather than an invalidation of these keys whenever
+ * `["status"]` moves, for three reasons: it is the one mechanism already in the
+ * file, so there is a single rule to reason about; it covers data that changes
+ * without the status fingerprint changing at all (a notification row is written
+ * by the notifier, and history buckets grow on every poll, whether or not any
+ * provider's status moved); and it honours `useBusy`, which a cache
+ * invalidation fired from a status change would bypass and refetch out from
+ * under an operator mid-edit.
+ *
+ * TanStack only polls *mounted* queries, and `refetchIntervalInBackground`
+ * stays at its default `false`, so this costs nothing for a view nobody is
+ * looking at or a tab nobody has in front of them.
+ */
+export const useHistory = (days: number, provider?: string) => {
+  const busy = useBusy();
+  return useQuery({
     queryKey: ["history", days, provider ?? null],
     queryFn: () => api.getHistory(days, provider),
+    refetchInterval: busy ? false : REFRESH_MS,
   });
+};
 
 /**
  * Never throws. Vanilla's own reasoning (`history.js:70-82`): "the provider's
@@ -85,29 +112,55 @@ export const useHistory = (days: number, provider?: string) =>
  * this query, not of the one call site that happens to use it today, so it
  * lives here rather than as a `throwOnError` override in `History.tsx`.
  */
-export const useComponentHistory = (provider: string, days: number) =>
-  useQuery({
+export const useComponentHistory = (provider: string, days: number) => {
+  const busy = useBusy();
+  return useQuery({
     queryKey: ["history", "components", provider, days],
     queryFn: () => api.getComponentHistory(provider, days),
     throwOnError: false,
+    refetchInterval: busy ? false : REFRESH_MS,
   });
+};
 
-export const useIncidents = (provider?: string) =>
-  useQuery({
+export const useIncidents = (provider?: string) => {
+  const busy = useBusy();
+  return useQuery({
     queryKey: ["incidents", provider ?? null],
     queryFn: () => api.getIncidents(provider),
+    refetchInterval: busy ? false : REFRESH_MS,
   });
+};
 
-export const useIncident = (providerId: string, incidentId: string) =>
-  useQuery({
+export const useIncident = (providerId: string, incidentId: string) => {
+  const busy = useBusy();
+  return useQuery({
     queryKey: ["incident", providerId, incidentId],
     queryFn: () => api.getIncident(providerId, incidentId),
+    refetchInterval: busy ? false : REFRESH_MS,
   });
+};
 
-export const useNotifications = (limit = 20) =>
-  useQuery({ queryKey: ["notifications", limit], queryFn: () => api.getNotifications(limit) });
+export const useNotifications = (limit = 20) => {
+  const busy = useBusy();
+  return useQuery({
+    queryKey: ["notifications", limit],
+    queryFn: () => api.getNotifications(limit),
+    refetchInterval: busy ? false : REFRESH_MS,
+  });
+};
 
-export const usePreferences = () => useQuery({ queryKey: ["preferences"], queryFn: api.getPreferences });
+/**
+ * The stored preferences, read once at startup by `usePreferenceSync` so a
+ * fresh browser starts where the operator left off (design spec §7.4).
+ *
+ * Never throws. `usePreferenceSync` is mounted in the app shell, above every
+ * view's error boundary, so under the client's throwing default a server that
+ * is not answering yet would take down the whole dashboard rather than one
+ * view. Vanilla said the same thing in a comment: "defaults are fine if the
+ * server is not answering yet" (app.js's `start()`).
+ */
+export const usePreferences = () =>
+  useQuery({ queryKey: ["preferences"], queryFn: api.getPreferences, throwOnError: false });
 
 /** Everything a write can invalidate. A config write moves the status grid too. */
 const WRITE_KEYS = [["status"], ["config"], ["history"], ["incidents"], ["incident"], ["notifications"]];

@@ -9,17 +9,11 @@ import { Label } from "@/components/ui/label.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentPicker, type ComponentPickerEntry, type ComponentPickerSelection } from "@/components/ComponentPicker.tsx";
 import { useServiceMutations } from "@/hooks/queries.ts";
-import { useBusyControls } from "@/hooks/useBusy.tsx";
+import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { previewComponents } from "@/lib/api.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
 
 const ADAPTERS = ["statuspage", "custom"] as const;
-
-/** Field-level focus/blur wiring shared by every editable input in the form. */
-function useFieldProps() {
-  const { setEditing } = useBusyControls();
-  return { onFocus: () => setEditing(true), onBlur: () => setEditing(false) };
-}
 
 /**
  * Add/edit dialog for a monitored service, on shadcn's Radix `Dialog`. Port of

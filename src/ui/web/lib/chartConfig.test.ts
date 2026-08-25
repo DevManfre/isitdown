@@ -8,7 +8,7 @@
 // src/ui/web/css/tokens.test.ts for the precedent.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey } from "./chartConfig.ts";
+import { chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, trimToLatest } from "./chartConfig.ts";
 import en from "@/locales/en.json";
 
 const STATUSES = ["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const;
@@ -80,5 +80,15 @@ describe("chartConfig", () => {
   it("declares no colour literal of its own", () => {
     const source = readFileSync(new URL("./chartConfig.ts", import.meta.url), "utf8");
     expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+  });
+});
+
+describe("trimToLatest", () => {
+  it("keeps the newest entries of a newest-first list", () => {
+    expect(trimToLatest([5, 4, 3, 2, 1], 3)).toEqual([5, 4, 3]);
+  });
+
+  it("returns the whole list when it is shorter than the window", () => {
+    expect(trimToLatest([1], 3)).toEqual([1]);
   });
 });

@@ -201,12 +201,48 @@
 }
 
 /* — rail — */
-/* The strip widens on hover and the pin chevron flips; content fades with it. */
+/* The strip widens on hover and the pin chevron flips; content fades with it.
+   The whole collapse mechanism, ported from the vanilla dashboard's
+   app.css:67-92. It lives here, not as a style prop in App.tsx: an inline
+   `grid-template-columns` outranks every stylesheet rule, so the peek-expand
+   below could never override it, and the four transitions further down would
+   be animating state changes that never happen.
+   Pinned open, the rail is a full-width grid column. Collapsed, the column
+   shrinks to a strip and only the chevron stays visible until the pointer (or
+   keyboard focus) arrives. Hover-opening widens the column *and* the rail
+   together, so the page gives way instead of being covered. */
+.console {
+  grid-template-columns: var(--rail-width) 1fr;
+  transition: grid-template-columns 0.28s var(--ease-out);
+}
 .rail {
   transition: width 0.28s var(--ease-out);
 }
-.console {
-  transition: grid-template-columns 0.28s var(--ease-out);
+:root[data-rail="collapsed"] .console {
+  grid-template-columns: var(--rail-width-collapsed) 1fr;
+}
+:root[data-rail="collapsed"] .console:has(.rail:hover:not(.rail-hold)),
+:root[data-rail="collapsed"] .console:has(.rail:focus-within) {
+  grid-template-columns: var(--rail-width) 1fr;
+}
+:root[data-rail="collapsed"] .rail {
+  width: var(--rail-width-collapsed);
+}
+/* .rail-hold marks the strip the pointer is still standing on right after the
+   collapse click: without it, :hover would reopen the rail in the same instant.
+   Rail.tsx lifts it on the first mouseleave (vanilla's app.js did the same). */
+:root[data-rail="collapsed"] .rail:hover:not(.rail-hold),
+:root[data-rail="collapsed"] .rail:focus-within {
+  width: var(--rail-width);
+}
+:root[data-rail="collapsed"] .rail:not(:hover):not(:focus-within) :is(.rail-dot, .rail-name, .rail-links, .rail-foot),
+:root[data-rail="collapsed"] .rail.rail-hold :is(.rail-dot, .rail-name, .rail-links, .rail-foot) {
+  opacity: 0;
+}
+:root[data-rail="collapsed"] .rail:not(:hover):not(:focus-within) .rail-brand,
+:root[data-rail="collapsed"] .rail.rail-hold .rail-brand {
+  padding-left: 6px;
+  padding-right: 6px;
 }
 .rail-toggle {
   transition: color 0.2s ease;

@@ -1,7 +1,6 @@
 import { Bar, BarChart, Cell, YAxis } from "recharts";
 import { ChartContainer } from "@/components/ui/chart.tsx";
-import { chartConfigFor, severity, statusFill, statusMuted } from "@/lib/chartConfig.ts";
-import { trimToLatest } from "@/lib/favicon.ts";
+import { chartConfigFor, severity, statusFill, statusMuted, trimToLatest } from "@/lib/chartConfig.ts";
 import type { SampleRow } from "@/lib/types.ts";
 
 /** The incident view's strip of the most recent polls, oldest on the left. */

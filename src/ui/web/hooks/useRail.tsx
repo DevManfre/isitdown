@@ -20,8 +20,15 @@ const read = () => {
 
 /**
  * Pinned open, or a collapsed hover strip. The attribute lives on <html> so the
- * pre-paint script in index.html can restore it before the first frame, and
- * hover-expanding the collapsed rail stays CSS alone.
+ * pre-paint script in index.html can restore it before the first frame.
+ *
+ * This hook owns the pin only. Peeking at a collapsed rail — the width, the
+ * fade of its labels, the brand's padding — is CSS reacting to `:hover` and
+ * `:focus-within` under `[data-rail="collapsed"]`, in motion.css, with no state
+ * here to drive it. The one exception is `.rail-hold`, the anti-reflicker guard
+ * that stops the collapse click's own lingering hover from reopening what it
+ * just closed; that is a transient, per-element concern, so `Rail` holds it
+ * locally rather than putting it in this shared context.
  */
 export function RailProvider({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(read);

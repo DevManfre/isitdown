@@ -77,4 +77,39 @@ describe("Rail", () => {
     mount();
     expect(await screen.findByText("telegram")).toBeInTheDocument();
   });
+
+  // The rail's peek-expand is CSS (motion.css), and `.rail-hold` is the one
+  // piece of it React has to supply: without the class, the pointer that just
+  // clicked collapse is still hovering the rail, `:hover` fires immediately and
+  // the rail reopens in the same instant it closed. Vanilla's app.js wired
+  // exactly this; the React port dropped it along with the rest of the
+  // mechanism, so it is asserted here rather than assumed.
+  describe("the anti-reflicker hold on the collapse click", () => {
+    const rail = () => screen.getByRole("navigation", { name: i18n.t("nav.views") });
+
+    it("holds the collapsed rail shut until the pointer has left once", async () => {
+      mount();
+      const toggle = await screen.findByRole("button", { name: i18n.t("nav.rail-collapse") });
+
+      expect(rail().classList.contains("rail-hold")).toBe(false);
+
+      await userEvent.click(toggle);
+      expect(rail().classList.contains("rail-hold")).toBe(true);
+      // Focus would pin the rail open through :focus-within just as surely as
+      // hover would, so the toggle must not still hold it after the click.
+      expect(document.activeElement).not.toBe(toggle);
+
+      await userEvent.unhover(rail());
+      expect(rail().classList.contains("rail-hold")).toBe(false);
+    });
+
+    it("does not hold the rail on the click that expands it again", async () => {
+      mount();
+      await userEvent.click(await screen.findByRole("button", { name: i18n.t("nav.rail-collapse") }));
+      await userEvent.unhover(rail());
+
+      await userEvent.click(await screen.findByRole("button", { name: i18n.t("nav.rail-expand") }));
+      expect(rail().classList.contains("rail-hold")).toBe(false);
+    });
+  });
 });

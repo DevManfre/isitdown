@@ -5,7 +5,40 @@ import { dirname, join, normalize, sep } from "node:path";
 
 const SHARED = ["src/core", "src/adapters", "src/notifiers"];
 const EDITIONS = ["src/light", "src/ui"];
-const UI_ONLY_MODULES = ["express", "node:sqlite"];
+/**
+ * Packages that belong to one edition and must never appear in the shared
+ * engine. `express` and `node:sqlite` are the UI edition's server; everything
+ * after them is the React dashboard, which Vite bundles into static assets at
+ * image-build time and which is absent from both runtime images (the Docker
+ * stages install with `--omit=dev`).
+ *
+ * The dashboard entries were added after the React port: `src/core` importing
+ * `react` or `@tanstack/react-query` would break the golden rule exactly as
+ * importing `express` would, and would additionally put a devDependency on the
+ * Light edition's runtime path, where it does not exist. Before this the list
+ * covered only the server, so a shared module could have reached for any of
+ * these unnoticed.
+ */
+const UI_ONLY_MODULES = [
+  // UI edition server
+  "express",
+  "node:sqlite",
+  // dashboard runtime
+  "react",
+  "react-dom",
+  "react-dom/client",
+  "react-router",
+  "react-i18next",
+  "i18next",
+  "@tanstack/react-query",
+  "recharts",
+  "radix-ui",
+  "lucide-react",
+  "class-variance-authority",
+  "clsx",
+  "tailwind-merge",
+  "tailwindcss",
+];
 
 async function sourceFiles(dir: string): Promise<string[]> {
   const found: string[] = [];
@@ -46,7 +79,15 @@ test("no shared module imports an edition-only dependency", async () => {
   for (const dir of SHARED) {
     for (const file of await sourceFiles(dir)) {
       for (const specifier of importsOf(await readFile(file, "utf8"))) {
-        if (UI_ONLY_MODULES.includes(specifier)) offenders.push(`${file} imports ${specifier}`);
+        // Match the package root, not just the exact string: "react-dom/client"
+        // and "recharts/es6/chart" are the same dependency as their bare names,
+        // and an exact-match check would wave both through.
+        const root = specifier.startsWith("@")
+          ? specifier.split("/").slice(0, 2).join("/")
+          : (specifier.split("/")[0] ?? specifier);
+        if (UI_ONLY_MODULES.includes(specifier) || UI_ONLY_MODULES.includes(root)) {
+          offenders.push(`${file} imports ${specifier}`);
+        }
       }
     }
   }

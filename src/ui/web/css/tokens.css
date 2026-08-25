@@ -372,6 +372,9 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  /* The dialog scrim. It carries its own alpha per theme, so `bg-scrim`
+     takes no opacity modifier. */
+  --color-scrim: var(--scrim);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
