@@ -249,25 +249,18 @@ export function IncidentDetail() {
 
           <div className="flex flex-col gap-3">
             <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("column.status")}</span>
+            {/* incident.js:214-221 — .service-row with exactly two children:
+                a bare status span and a "mono muted" timestamp span. Kept
+                verbatim; a Testing Library query that collided with the
+                stepper's own label is a defect in the query, not a reason
+                to reshape this row (see IncidentDetail.test.tsx). */}
             <div
-              className="anim-rise anim-rise-row rounded-md border border-border px-3 py-2"
+              className="service-row anim-rise anim-rise-row flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
               style={{ animationDelay: "200ms" }}
             >
-              {/* The stepper above already carries the exact same catalog
-                  string with its own aria-current label. Testing Library's
-                  text matcher joins only an element's own direct text-node
-                  children (nested elements don't count), so a bare
-                  "{status}<span>{date}</span>" pair would still read as an
-                  isolated "Monitoring" node and collide with the stepper's
-                  exact-text query. The middot is a real, non-whitespace
-                  character in that direct-text join, so it survives
-                  normalization and keeps this row's own text from ever
-                  being read as the bare status word alone. */}
-              <span className="text-sm">
-                {t(incidentStatusKey(incident.status))} ·{" "}
-                <span className="font-mono text-xs text-muted-foreground">
-                  {formatDateTime(i18n.language, incident.updatedAt)}
-                </span>
+              <span className="text-sm">{t(incidentStatusKey(incident.status))}</span>
+              <span className="font-mono text-xs text-muted-foreground">
+                {formatDateTime(i18n.language, incident.updatedAt)}
               </span>
             </div>
           </div>
