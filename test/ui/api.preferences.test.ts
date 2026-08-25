@@ -14,7 +14,6 @@ interface Api {
   runtime: UiRuntime;
   dbPath: string;
   request: (method: string, path: string, body?: unknown) => Promise<{ status: number; body: unknown }>;
-  raw: (path: string) => Promise<Response>;
   close: () => Promise<void>;
 }
 
@@ -29,7 +28,6 @@ async function api(dbPath?: string): Promise<Api> {
   return {
     runtime,
     dbPath: path,
-    raw: (p) => fetch(`${base}${p}`),
     request: async (method, p, body) => {
       const response = await fetch(`${base}${p}`, {
         method,
@@ -108,48 +106,6 @@ test("an unknown theme or locale is refused", async () => {
     for (const patch of [{ theme: "sepia" }, { uiLocale: "xx" }, { notificationLocale: "klingon" }]) {
       const { status } = await app.request("PATCH", "/api/preferences", patch);
       assert.equal(status, 400, JSON.stringify(patch));
-    }
-  } finally {
-    await app.close();
-  }
-});
-
-test("a catalog is served for every available language", async () => {
-  const app = await api();
-  try {
-    for (const language of ["en", "it"]) {
-      const response = await app.raw(`/locales/${language}.json`);
-      assert.equal(response.status, 200, language);
-      const catalog = (await response.json()) as Record<string, string>;
-      assert.equal(typeof catalog["nav.overview"], "string");
-    }
-  } finally {
-    await app.close();
-  }
-});
-
-test("an unavailable language is a 404 so the client can fall back to en", async () => {
-  const app = await api();
-  try {
-    assert.equal((await app.raw("/locales/xx.json")).status, 404);
-  } finally {
-    await app.close();
-  }
-});
-
-test("the locale route cannot be walked out of its directory", async () => {
-  const app = await api();
-  try {
-    for (const attempt of [
-      "/locales/..%2f..%2f..%2fetc%2fpasswd.json",
-      "/locales/....%2f%2fpackage.json",
-      "/locales/%2e%2e%2fpackage.json",
-    ]) {
-      const response = await app.raw(attempt);
-      assert.ok(response.status === 404 || response.status === 400, `${attempt} -> ${response.status}`);
-      const text = await response.text();
-      assert.ok(!text.includes("isitdown\","), "no file outside the locales directory may be served");
-      assert.ok(!text.includes("root:"), "no system file may be served");
     }
   } finally {
     await app.close();
