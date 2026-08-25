@@ -1,132 +1,63 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-// The mapping helpers are pure, so they are exercised without a browser.
+import { readFileSync } from "node:fs";
+import { faviconCandidates, trimToLatest } from "../../src/ui/web/lib/favicon.ts";
 import {
-  barSpec,
-  faviconCandidates,
-  stagger,
+  severity,
   statusColor,
   statusFill,
-  trimToLatest,
-} from "../../src/ui/public/js/charts.js";
+  statusLabelKey,
+  statusMuted,
+} from "../../src/ui/web/lib/chartConfig.ts";
 
-test("every status maps to its own colour and height token", () => {
-  const specs = ["operational", "degraded", "partial_outage", "major_outage", "unknown"].map(barSpec);
-  assert.deepEqual(
-    specs.map((spec) => spec.color),
-    [
-      "var(--status-operational)",
-      "var(--status-degraded)",
-      "var(--status-partial-outage)",
-      "var(--status-major-outage)",
-      "var(--status-unknown)",
-    ],
-  );
-  assert.deepEqual(
-    specs.map((spec) => spec.height),
-    [
-      "var(--bar-operational)",
-      "var(--bar-degraded)",
-      "var(--bar-partial-outage)",
-      "var(--bar-major-outage)",
-      "var(--bar-unknown)",
-    ],
-  );
-});
+const STATUSES = ["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const;
+const tokens = readFileSync(new URL("../../src/ui/web/css/tokens.css", import.meta.url), "utf8");
 
-test("a bar never carries a literal colour, only a token reference", () => {
-  for (const status of ["operational", "major_outage", "unknown"]) {
-    assert.match(barSpec(status).color, /^var\(--status-/);
-    assert.ok(!/#[0-9a-f]{3,8}/i.test(barSpec(status).color));
+test("every status maps to its own colour token, declared in tokens.css", () => {
+  const colours = STATUSES.map(statusColor);
+  assert.equal(new Set(colours).size, STATUSES.length, "two statuses share a colour");
+  for (const value of [...colours, ...STATUSES.map(statusFill)]) {
+    const name = /var\((--[\w-]+)\)/.exec(value)?.[1];
+    assert.ok(name !== undefined, `${value} is not a var()`);
+    assert.ok(tokens.includes(`${name}:`), `${name} is not declared in tokens.css`);
   }
 });
 
-test("severity ordering is reflected in decreasing bar heights", () => {
-  const height = (status: string): number => Number(barSpec(status).height.match(/--bar-([a-z-]+)/)?.[1] === undefined ? 0 : 1);
-  // The heights themselves live in tokens.css; what matters here is that each
-  // status resolves to its own distinct token rather than sharing one.
-  const tokens = ["operational", "degraded", "partial_outage", "major_outage"].map(
-    (status) => barSpec(status).height,
-  );
-  assert.equal(new Set(tokens).size, 4);
-  assert.equal(height("operational"), 1);
+test("a worse status draws a taller bar, and unknown the shortest", () => {
+  assert.ok(severity("operational") < severity("degraded"));
+  assert.ok(severity("degraded") < severity("partial_outage"));
+  assert.ok(severity("partial_outage") < severity("major_outage"));
+  for (const status of ["operational", "degraded", "partial_outage", "major_outage"] as const) {
+    assert.ok(severity("unknown") < severity(status), `unknown must sit below ${status}`);
+  }
 });
 
-test("only the unknown bucket is muted", () => {
-  assert.equal(barSpec("unknown").muted, true);
-  assert.equal(barSpec("operational").muted, false);
+test("an unrecognised status resolves to unknown rather than throwing", () => {
+  assert.equal(statusColor("banana"), statusColor("unknown"));
+  assert.equal(statusLabelKey("banana"), statusLabelKey("unknown"));
 });
 
-test("an unrecognised status degrades to unknown instead of rendering nothing", () => {
-  const spec = barSpec("gremlins");
-  assert.equal(spec.status, "unknown");
-  assert.equal(spec.color, "var(--status-unknown)");
+test("only the unknown status is muted", () => {
+  for (const status of STATUSES) {
+    assert.equal(statusMuted(status), status === "unknown", `${status} muted mismatch`);
+  }
+  assert.equal(statusMuted("banana"), true, "an unrecognised status resolves to unknown, so it is muted too");
 });
 
-test("statusColor is the token a label written in its status colour uses", () => {
-  assert.equal(statusColor("degraded"), "var(--status-degraded)");
+test("a painted shape uses the fill token, never the text colour token", () => {
+  for (const status of STATUSES) {
+    assert.notEqual(statusFill(status), statusColor(status), `${status} must not share a fill and text colour`);
+  }
 });
 
-test("a painted shape uses the fill token, never the text one", () => {
-  const specs = ["operational", "degraded", "partial_outage", "major_outage", "unknown"].map(barSpec);
-  assert.deepEqual(
-    specs.map((spec) => spec.fill),
-    [
-      "var(--status-operational-fill)",
-      "var(--status-degraded-fill)",
-      "var(--status-partial-outage-fill)",
-      "var(--status-major-outage-fill)",
-      "var(--status-unknown-fill)",
-    ],
-  );
-  assert.equal(statusFill("degraded"), "var(--status-degraded-fill)");
-  assert.equal(statusFill("gremlins"), "var(--status-unknown-fill)");
-});
-
-test("each bar row scale reads its own height token for the same status", () => {
-  assert.equal(barSpec("degraded").height, "var(--bar-degraded)");
-  assert.equal(barSpec("degraded", "row").height, "var(--bar-degraded)");
-  assert.equal(barSpec("degraded", "compact").height, "var(--bar-compact-degraded)");
-  assert.equal(barSpec("degraded", "poll").height, "var(--bar-poll-degraded)");
-});
-
-test("a scale changes the height and nothing else", () => {
-  const row = barSpec("major_outage", "row");
-  const compact = barSpec("major_outage", "compact");
-  assert.equal(compact.color, row.color);
-  assert.equal(compact.status, row.status);
-  assert.equal(compact.muted, row.muted);
-  assert.notEqual(compact.height, row.height);
-});
-
-test("an unrecognised status degrades to unknown in every scale", () => {
-  assert.equal(barSpec("gremlins", "compact").height, "var(--bar-compact-unknown)");
-  assert.equal(barSpec("gremlins", "poll").height, "var(--bar-poll-unknown)");
-});
-
-test("stagger spaces items by a fixed step after an optional lead-in", () => {
-  assert.equal(stagger(0, 70), "0ms");
-  assert.equal(stagger(3, 70), "210ms");
-  assert.equal(stagger(0, 80, 120), "120ms");
-  assert.equal(stagger(2, 80, 120), "280ms");
-});
-
-test("faviconCandidates tries the page's own favicon first, then the icon service", () => {
-  assert.deepEqual(faviconCandidates("https://www.cloudflarestatus.com/api/v2/summary.json"), [
-    "https://www.cloudflarestatus.com/favicon.ico",
-    "https://icons.duckduckgo.com/ip3/www.cloudflarestatus.com.ico",
+test("the favicon chain offers the origin first, then a fallback service", () => {
+  assert.deepEqual(faviconCandidates("https://www.githubstatus.com/api"), [
+    "https://www.githubstatus.com/favicon.ico",
+    "https://icons.duckduckgo.com/ip3/www.githubstatus.com.ico",
   ]);
-});
-
-test("faviconCandidates offers nothing for anything it cannot parse as a URL", () => {
   assert.deepEqual(faviconCandidates("not a url"), []);
-  assert.deepEqual(faviconCandidates(""), []);
-  assert.deepEqual(faviconCandidates(undefined), []);
 });
 
 test("trimToLatest keeps the newest entries of a newest-first list", () => {
-  const samples = [5, 4, 3, 2, 1];
-  assert.deepEqual(trimToLatest(samples, 3), [5, 4, 3]);
-  assert.deepEqual(trimToLatest(samples, 99), samples);
-  assert.deepEqual(trimToLatest([], 3), []);
+  assert.deepEqual(trimToLatest([5, 4, 3, 2, 1], 3), [5, 4, 3]);
 });

@@ -35,21 +35,39 @@ describe("chartConfig", () => {
     }
   });
 
-  it("orders severity so a worse status draws a taller bar", () => {
-    expect(severity("operational", "row")).toBeLessThan(severity("degraded", "row"));
-    expect(severity("degraded", "row")).toBeLessThan(severity("partial_outage", "row"));
-    expect(severity("partial_outage", "row")).toBeLessThan(severity("major_outage", "row"));
-  });
-
-  it("gives unknown the shortest bar of all", () => {
-    for (const status of ["operational", "degraded", "partial_outage", "major_outage"] as const) {
-      expect(severity("unknown", "row")).toBeLessThan(severity(status, "row"));
+  it("orders severity so a worse status draws a taller bar, in every bar scale", () => {
+    for (const scale of ["row", "compact", "poll"] as const) {
+      expect(severity("operational", scale)).toBeLessThan(severity("degraded", scale));
+      expect(severity("degraded", scale)).toBeLessThan(severity("partial_outage", scale));
+      expect(severity("partial_outage", scale)).toBeLessThan(severity("major_outage", scale));
+      for (const status of ["operational", "degraded", "partial_outage", "major_outage"] as const) {
+        expect(
+          severity("unknown", scale),
+          `unknown must sit below ${status} at scale "${scale}"`,
+        ).toBeLessThan(severity(status, scale));
+      }
     }
   });
 
-  it("scales compact and poll rows below the full row", () => {
-    expect(severity("major_outage", "compact")).toBeLessThan(severity("major_outage", "row"));
-    expect(severity("major_outage", "poll")).toBeLessThan(severity("major_outage", "row"));
+  it("applies its own status-independent multiplier per scale, distinguishing compact from poll", () => {
+    const ratio = (status: (typeof STATUSES)[number], scale: "row" | "compact" | "poll") =>
+      severity(status, scale) / STATUS_CHART[status].bar;
+
+    // The multiplier a scale applies must not depend on which status it is
+    // applied to — otherwise "compact" or "poll" would silently reorder the
+    // severity ranking rather than just shrinking it uniformly.
+    for (const scale of ["row", "compact", "poll"] as const) {
+      const baseline = ratio("operational", scale);
+      for (const status of STATUSES) {
+        expect(
+          ratio(status, scale),
+          `${status} at scale "${scale}" must scale by the same multiplier as every other status`,
+        ).toBeCloseTo(baseline, 10);
+      }
+    }
+
+    expect(ratio("major_outage", "compact")).toBeLessThan(ratio("major_outage", "poll"));
+    expect(ratio("major_outage", "poll")).toBeLessThan(ratio("major_outage", "row"));
   });
 
   it("hands shadcn a config entry per status", () => {
