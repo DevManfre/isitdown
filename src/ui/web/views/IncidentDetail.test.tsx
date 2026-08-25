@@ -37,14 +37,49 @@ describe("IncidentDetail", () => {
 
   it("marks the stepper at the incident's current lifecycle word", async () => {
     mount();
-    const step = await screen.findByText(i18n.t("incident.status.monitoring"));
+    // Scoped to the element that actually carries aria-current: the status
+    // meta row below (incident.js:214-221) renders the identical catalog
+    // word in its own span, so an unscoped text query would find both and
+    // throw "multiple elements". Scoping by selector is the fix, not
+    // reshaping the row to avoid the collision.
+    const step = await screen.findByText(i18n.t("incident.status.monitoring"), {
+      selector: '[aria-current="step"]',
+    });
     expect(step).toHaveAttribute("aria-current", "step");
   });
 
-  it("labels every timeline entry from the catalog, never a raw label", async () => {
+  it("renders the status meta row as two elements, matching vanilla's service-row", async () => {
     mount();
-    expect(await screen.findByText(i18n.t("incident.timeline.opened"))).toBeInTheDocument();
-    expect(await screen.findByText(i18n.t("incident.timeline.observed"))).toBeInTheDocument();
+    const kicker = await screen.findByText(i18n.t("column.status"));
+    const row = kicker.nextElementSibling;
+    if (!(row instanceof HTMLElement)) throw new Error("expected a status row element next to its kicker");
+    // Exactly two children: a bare status span and a "mono muted" timestamp
+    // span (incident.js:217-220) — not one span carrying both, whatever
+    // separator joins them.
+    expect(row.children).toHaveLength(2);
+    const status = row.children.item(0);
+    const timestamp = row.children.item(1);
+    if (status === null || timestamp === null) throw new Error("expected two children in the status row");
+    expect(status).toHaveTextContent(i18n.t("incident.status.monitoring"));
+    expect(timestamp).not.toHaveTextContent(i18n.t("incident.status.monitoring"));
+    expect(timestamp).not.toBe(status);
+  });
+
+  it("labels every timeline entry from the catalog, in the active language, not a raw label", async () => {
+    // en.json's incident.timeline.opened/observed are coincidentally
+    // identical to the raw internal label ("opened"/"observed"), so an
+    // English-only assertion here cannot tell t() apart from an unwired
+    // literal. it.json differs ("aperto"/"osservato") — switch to it for
+    // this one assertion so the catalog value and the raw label diverge and
+    // the assertion has something to detect.
+    await i18n.changeLanguage("it");
+    try {
+      mount();
+      expect(await screen.findByText(i18n.getFixedT("it")("incident.timeline.opened"))).toBeInTheDocument();
+      expect(await screen.findByText(i18n.getFixedT("it")("incident.timeline.observed"))).toBeInTheDocument();
+    } finally {
+      await i18n.changeLanguage("en");
+    }
   });
 
   it("shows what was actually sent, per channel", async () => {
