@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { Component, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useStatusChrome } from "./queries.ts";
+import { useConfigChrome, useStatusChrome } from "./queries.ts";
 
 /**
  * `WRITE_KEYS` in `queries.ts` invalidates by prefix match: TanStack Query
@@ -42,18 +42,30 @@ class Boundary extends Component<{ children: ReactNode }, { hasError: boolean }>
   }
 }
 
-function Probe() {
-  const { data, isError, fetchStatus } = useStatusChrome();
-  // "chrome-no-data" alone is also true while the query is still pending
-  // (data is undefined before the first fetch resolves, same as after a
-  // failure) — asserting on that text without checking settlement lets a
-  // test pass trivially during the loading render, before the fetch has
-  // even had a chance to fail and throw. Distinguishing the still-fetching
-  // case from the settled-with-error case forces the assertion below to
-  // actually wait for the failure to happen.
-  if (fetchStatus === "fetching" && data === undefined) return <p>chrome-pending</p>;
-  return <p>{data === undefined ? `chrome-no-data:${String(isError)}` : "chrome-has-data"}</p>;
+interface ChromeQueryResult {
+  data: unknown;
+  isError: boolean;
+  fetchStatus: "fetching" | "paused" | "idle";
 }
+
+// "chrome-no-data" alone is also true while the query is still pending
+// (data is undefined before the first fetch resolves, same as after a
+// failure) — asserting on that text without checking settlement lets a
+// test pass trivially during the loading render, before the fetch has
+// even had a chance to fail and throw. Distinguishing the still-fetching
+// case from the settled-with-error case forces the assertion below to
+// actually wait for the failure to happen. Shared by every *Chrome hook's
+// regression test below, since they all need the same distinction.
+function makeChromeProbe(useHook: () => ChromeQueryResult) {
+  return function Probe() {
+    const { data, isError, fetchStatus } = useHook();
+    if (fetchStatus === "fetching" && data === undefined) return <p>chrome-pending</p>;
+    return <p>{data === undefined ? `chrome-no-data:${String(isError)}` : "chrome-has-data"}</p>;
+  };
+}
+
+const StatusProbe = makeChromeProbe(useStatusChrome);
+const ConfigProbe = makeChromeProbe(useConfigChrome);
 
 describe("useStatusChrome", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -78,12 +90,41 @@ describe("useStatusChrome", () => {
     render(
       <QueryClientProvider client={client}>
         <Boundary>
-          <Probe />
+          <StatusProbe />
         </Boundary>
       </QueryClientProvider>,
     );
     // Waits out the real fetch-then-fail cycle: only settles once the query
     // has actually reached its error state, not on the pending render.
+    expect(await screen.findByText("chrome-no-data:true")).toBeInTheDocument();
+    expect(screen.queryByText("boundary-tripped")).toBeNull();
+  });
+});
+
+describe("useConfigChrome", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  // Same shape as useStatusChrome above: Rail also reads config directly
+  // for its own chrome (the notifier-channel list), as a sibling of
+  // <Outlet/>, so a /config load failure needs the same non-throwing
+  // variant for the same reason.
+  it("degrades to no data instead of throwing when /config fails, even under the app's throwing default", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 500, text: async () => "" })),
+    );
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, throwOnError: (_error, query) => query.state.data === undefined },
+      },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <Boundary>
+          <ConfigProbe />
+        </Boundary>
+      </QueryClientProvider>,
+    );
     expect(await screen.findByText("chrome-no-data:true")).toBeInTheDocument();
     expect(screen.queryByText("boundary-tripped")).toBeNull();
   });
