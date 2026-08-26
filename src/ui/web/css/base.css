@@ -8,3 +8,17 @@ body {
   color: var(--color-text);
   font-family: var(--font-body);
 }
+
+/* No scrollbar gutter, anywhere: this is one operator's console, every
+   scrollable surface on it is short, and a permanent grey track down the side
+   of a dark dashboard is the loudest thing on the page. Scrolling itself is
+   untouched — wheel, trackpad, keys and touch all still work; only the bar
+   that draws it goes. Both properties are needed: `scrollbar-width` is the
+   standard one (Firefox), the pseudo-element is what Chromium and Safari
+   listen to. */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
