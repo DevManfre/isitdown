@@ -332,7 +332,11 @@
 
 /* — buttons — */
 /* The prototype's primary action gains an accent bloom on hover and dips on
-   press; the tint is 16% rather than the design system's own 12%. */
+   press. The bloom is the glow only: the prototype's button is a tinted outline
+   whose label is --color-text, so its 16%-tint hover reads fine there, but this
+   one is a solid fill whose label is --primary-foreground. Swapping the fill for
+   a tint left that label floating on the page colour at 1.05:1, so the fill
+   stays solid and moves to --primary-hover instead. */
 [data-slot="button"] {
   transition:
     background 0.22s ease,
@@ -348,7 +352,7 @@
   transform: scale(0.96);
 }
 [data-slot="button"][data-variant="default"]:hover {
-  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  background: var(--primary-hover);
   box-shadow: 0 0 18px color-mix(in srgb, var(--color-accent) 22%, transparent);
 }
 [data-slot="button"][data-variant="destructive"]:hover {
