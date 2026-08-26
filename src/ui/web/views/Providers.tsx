@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
@@ -12,7 +12,49 @@ import { cn } from "@/lib/utils.ts";
 
 const WINDOW_DAYS = 90;
 
+/** How long a dropped row stays mounted; in step with `.anim-sink` in motion.css. */
+const EXIT_MS = 220;
+
 type Filter = "all" | "issues";
+
+/**
+ * The ids the filter has just dropped, held for one exit-animation beat.
+ *
+ * An unmounted row cannot animate, so flipping to "issues" used to blink the
+ * operational rows out of existence while the arriving ones rose in. Keeping
+ * each dropped row mounted for the length of `.anim-sink` buys the leave the
+ * choreography the entry already had.
+ */
+function useLeavingIds(shownIds: readonly string[]): ReadonlySet<string> {
+  // The ids themselves are the identity of a render: `shownIds` is a fresh
+  // array every time, and only a change of membership means anything here.
+  const key = shownIds.join(",");
+  const [tracked, setTracked] = useState<{ key: string; leaving: ReadonlySet<string> }>(() => ({
+    key,
+    leaving: new Set(),
+  }));
+
+  // Worked out during the render that first sees the new filter, not in an
+  // effect afterwards: React discards this pass and re-runs it with `leaving`
+  // already filled, so the dropped rows stay in the DOM they are in. An effect
+  // would commit one paint without them first, and the row would be torn down
+  // and rebuilt just to fade — a flash, which is the thing being fixed.
+  if (tracked.key !== key) {
+    const shown = new Set(shownIds);
+    const gone = tracked.key === "" ? [] : tracked.key.split(",").filter((id) => !shown.has(id));
+    setTracked({ key, leaving: new Set(gone) });
+  }
+
+  useEffect(() => {
+    if (tracked.leaving.size === 0) return;
+    // Reduced motion plays no exit animation, so there is nothing to wait for.
+    const hold = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : EXIT_MS;
+    const timer = setTimeout(() => setTracked((current) => ({ key: current.key, leaving: new Set() })), hold);
+    return () => clearTimeout(timer);
+  }, [tracked]);
+
+  return tracked.leaving;
+}
 
 /**
  * Design 3a's Providers table: one row per configured provider with its
@@ -32,13 +74,21 @@ export function Providers() {
   const providers = status?.providers ?? [];
   const byId = new Map(summaryProviders(summary).map((p) => [p.providerId, p]));
 
+  // providers.js:64-67 — showIssuesOnly filters client-side to providers with
+  // an open issue; the "all" fleet is otherwise shown in its configured order.
+  const filtered = filter === "issues" ? providers.filter((p) => p.overallStatus !== "operational") : providers;
+  const shownIds = filtered.map((p) => p.id);
+  const shown = new Set(shownIds);
+  // Sits above the empty-state return below: a hook cannot go behind one.
+  const leaving = useLeavingIds(shownIds);
+
   if (providers.length === 0) {
     return <p className="text-muted-foreground">{t("providers.empty")}</p>;
   }
 
-  // providers.js:64-67 — showIssuesOnly filters client-side to providers with
-  // an open issue; the "all" fleet is otherwise shown in its configured order.
-  const filtered = filter === "issues" ? providers.filter((p) => p.overallStatus !== "operational") : providers;
+  // A row the filter has just dropped keeps its slot until `.anim-sink` has
+  // played, so the table empties the way it fills instead of blinking.
+  const rows = providers.filter((p) => shown.has(p.id) || leaving.has(p.id));
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,7 +116,7 @@ export function Providers() {
           <ToggleGroupItem value="issues">{t("filter.issues")}</ToggleGroupItem>
         </ToggleGroup>
       </div>
-      {filtered.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="text-muted-foreground">{t("providers.empty")}</p>
       ) : (
         <Table>
@@ -80,15 +130,20 @@ export function Providers() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((provider, index) => {
+            {rows.map((provider, index) => {
               const history = byId.get(provider.id);
+              const isLeaving = leaving.has(provider.id);
               return (
                 <TableRow
                   key={provider.id}
                   // A disabled provider is still listed, only dimmed: its
                   // history is real either way.
-                  className={cn("anim-rise anim-rise-table-row", !provider.enabled && "opacity-55")}
-                  style={{ animationDelay: `${index * 60}ms` }}
+                  className={cn(
+                    isLeaving ? "anim-sink" : "anim-rise anim-rise-table-row",
+                    !provider.enabled && "opacity-55",
+                  )}
+                  // A row on its way out goes at once; only arrivals stagger.
+                  style={{ animationDelay: isLeaving ? "0ms" : `${index * 60}ms` }}
                 >
                   <TableCell>
                     <span className="flex items-center gap-2">

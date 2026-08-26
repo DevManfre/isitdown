@@ -93,6 +93,17 @@
     opacity: 0;
   }
 }
+/* The mirror of `rise`, for a row leaving the page instead of arriving on it. */
+@keyframes sink {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
 @keyframes modal-out {
   from {
     opacity: 1;
@@ -131,6 +142,21 @@
   50% {
     opacity: 1;
     transform: scale(1.06);
+  }
+}
+
+/* The theme glyph arriving after a click: a quarter turn out of the button and
+   a fade, so a mode change reads as one mark replacing another rather than a
+   flicker. Rides `rotate`, not `transform`, so a Tailwind transform utility on
+   the icon would compose with it instead of being overwritten. */
+@keyframes theme-swap {
+  from {
+    opacity: 0;
+    rotate: -90deg;
+  }
+  to {
+    opacity: 1;
+    rotate: none;
   }
 }
 
@@ -178,6 +204,17 @@
 }
 #view[data-animate] .anim-bar-month {
   animation-duration: 0.65s;
+}
+
+/* — exit animations — */
+/* A row the filter has just dropped leaves the way the dialog does: the entry
+   run backwards and faster, because leaving should not be a wait. Deliberately
+   outside the #view[data-animate] gate — an exit is not an entry, and it is
+   driven by a class swap on a row already on the page, never by a remount.
+   Keep the duration in step with EXIT_MS in Providers.tsx, which is what holds
+   the row mounted long enough to play it. */
+.anim-sink {
+  animation: sink 0.22s ease both;
 }
 
 .anim-sweep {
@@ -326,13 +363,11 @@
 .theme-btn {
   transition: background 0.24s ease;
 }
-.theme-dot {
-  transition:
-    background 0.35s var(--ease-out),
-    transform 0.5s var(--ease-out);
-}
-:root[data-theme="light"] .theme-dot {
-  transform: rotate(180deg);
+/* Each mode mounts its own glyph, so there is no single element left to
+   transition the way the prototype's dot spun between two modes. Header.tsx
+   keys the icon on the mode; the remount plays this instead. */
+.theme-icon {
+  animation: theme-swap 0.34s var(--ease-out) both;
 }
 
 /* — buttons — */
