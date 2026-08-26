@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitForElementToBeRemoved, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
@@ -115,11 +115,46 @@ describe("Providers", () => {
     renderWithProviders(<Providers />, { status, history });
     await screen.findByText("GitHub");
     await user.click(screen.getByRole("button", { name: i18n.t("filter.issues") }));
-    expect(screen.queryByText("GitHub")).toBeNull();
+    // The dropped rows animate out first (see below), so they leave the DOM a
+    // beat later rather than on the click itself.
+    await waitForElementToBeRemoved(() => screen.queryByText("GitHub"));
     expect(screen.queryByText("Cloudflare")).toBeNull();
     expect(await screen.findByText("Discord")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: i18n.t("filter.issues") })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: i18n.t("filter.all") })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  // The entry animation was one-sided: rows rose in on a filter change and
+  // blinked out of existence on the way back. A dropped row keeps its slot,
+  // and its class, for exactly as long as `.anim-sink` needs.
+  it("animates a dropped row out instead of unmounting it on the spot", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Providers />, { status, history });
+    await screen.findByText("GitHub");
+    await user.click(screen.getByRole("button", { name: i18n.t("filter.issues") }));
+
+    const leaving = screen.getByText("GitHub").closest("tr");
+    if (leaving === null) throw new Error("expected the dropped provider to still have a row");
+    expect(leaving).toHaveClass("anim-sink");
+    expect(leaving).not.toHaveClass("anim-rise");
+    // No stagger on the way out: every dropped row goes at once.
+    expect(leaving).toHaveStyle({ animationDelay: "0ms" });
+
+    await waitForElementToBeRemoved(() => screen.queryByText("GitHub"));
+  });
+
+  // Coming back to "all" must not leave the outgoing rows stuck mid-fade: the
+  // rows that were leaving are the very rows arriving again.
+  it("clears the leaving rows when the filter widens again", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Providers />, { status, history });
+    await screen.findByText("GitHub");
+    await user.click(screen.getByRole("button", { name: i18n.t("filter.issues") }));
+    await user.click(screen.getByRole("button", { name: i18n.t("filter.all") }));
+
+    const row = (await screen.findByText("GitHub")).closest("tr");
+    expect(row).toHaveClass("anim-rise");
+    expect(row).not.toHaveClass("anim-sink");
   });
 
   // providers.js:86 — "if (showIssuesOnly === issuesOnly) return" — clicking

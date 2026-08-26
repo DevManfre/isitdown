@@ -19,6 +19,14 @@ describe("motion.css after the react port", () => {
     }
   });
 
+  // A leave is not an entry: it fires on a class swap on a row already on the
+  // page, so gating it on the remount attribute would keep it from ever running.
+  it("keeps the row exit animation outside that gate", () => {
+    expect(code).toContain("@keyframes sink");
+    expect(code).toMatch(/(^|\n)\.anim-sink \{/);
+    expect(code).not.toContain("#view[data-animate] .anim-sink");
+  });
+
   it("drops the vanilla repaint hack", () => {
     expect(code).not.toContain("anim-quiet");
   });
