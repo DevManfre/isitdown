@@ -65,6 +65,7 @@
   "meta.next-poll-label": "Prossimo poll",
   "meta.countdown": "{minutes}m {seconds}s",
   "meta.countdown-seconds": "{seconds}s",
+  "meta.polling": "Poll in corso",
   "meta.never-polled": "nessun poll ancora",
 
   "overview.kicker": "Stato upstream",

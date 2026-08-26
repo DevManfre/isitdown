@@ -48,7 +48,6 @@ export interface UiRuntimeCore {
   listAllServices(): ServiceDefinition[];
   providerCount(): number;
   lastCycleAt(): string | null;
-  nextPollAt(intervalMinutes: number): string | null;
   notificationFeedLimit: number;
   close(): Promise<void>;
 }
@@ -119,10 +118,6 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     listAllServices: () => listServices(db),
     providerCount: () => listServices(db).length,
     lastCycleAt: () => lastCycle?.finishedAt ?? null,
-    nextPollAt: (intervalMinutes: number) =>
-      lastCycle === undefined
-        ? null
-        : new Date(Date.parse(lastCycle.finishedAt) + intervalMinutes * 60_000).toISOString(),
     notificationFeedLimit: NOTIFICATION_FEED_LIMIT,
     async close(): Promise<void> {
       clearInterval(pruneTimer);

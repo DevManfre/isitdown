@@ -54,7 +54,15 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
       providers,
       pollIntervalMinutes: config.polling.intervalMinutes,
       lastPollAt: runtime.lastCycleAt(),
-      nextPollAt: runtime.nextPollAt(config.polling.intervalMinutes),
+      // The scheduler's armed deadline, never `lastPollAt + interval`: the two
+      // disagree by the jitter of the arming draw and by any interval change
+      // made since, and the countdown reads "0s" for every second of the gap.
+      nextPollAt: runtime.scheduler.nextRunAt(),
+      // The clock `nextPollAt` is stamped on. The dashboard measures its own
+      // offset from this rather than assuming the browser and the container
+      // agree — they drift apart across a host suspend, and a browser running
+      // even minutes ahead reads every deadline as already expired.
+      serverNow: new Date().toISOString(),
     });
   });
 

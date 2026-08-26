@@ -53,6 +53,12 @@ export interface StatusResponse {
   pollIntervalMinutes: number;
   lastPollAt: string | null;
   nextPollAt: string | null;
+  /**
+   * What the server's clock read as it answered. Optional because the
+   * dashboard has to degrade gracefully without it (a response served from
+   * cache, an older server) — it then falls back to the browser's clock.
+   */
+  serverNow?: string | null;
 }
 
 export interface HistoryBucket {
