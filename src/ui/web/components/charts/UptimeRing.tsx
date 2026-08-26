@@ -51,11 +51,20 @@ export function UptimeRing({ provider, delay }: { provider: ProviderStatus; dela
         </ChartContainer>
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           {icon !== undefined && (
+            // The favicon sits on its own white disc filling the ring's core:
+            // a dark mark (GitHub's octocat) is invisible against the
+            // dashboard's own dark surface otherwise. The three-letter
+            // fallback below needs no disc — it is painted in the status
+            // colour, which reads on either surface.
             <img
               role="presentation"
               alt=""
               src={icon}
-              className={loaded ? "size-6" : "hidden"}
+              className={
+                loaded
+                  ? "size-15 rounded-full bg-[var(--ring-icon-bg)] object-contain p-2.5"
+                  : "hidden"
+              }
               onLoad={() => setLoaded(true)}
               onError={() => setAttempt((n) => n + 1)}
             />
