@@ -119,6 +119,21 @@
   }
 }
 
+/* The beacon's calm state: nothing to attend to, so it only breathes. Scale
+   rather than the dot's expanding ring — an icon has a silhouette, and growing
+   a box-shadow around one draws a square halo. */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
 /* — entry animations — */
 #view[data-animate] {
   animation: view-in 0.42s var(--ease-out) both;
@@ -179,6 +194,20 @@
 /* An open incident keeps pulsing: it is the one thing on the page still moving. */
 .dot-pulse {
   animation: pulse 2.4s ease-out infinite;
+}
+
+/* The Overview beacon. Motion graded to the news: a settled estate breathes, a
+   fault pulses on the dot's own 2.4s, and a major outage runs it at half that
+   — fast enough to catch an eye crossing the room. */
+.beacon-breathe {
+  animation: breathe 3.6s ease-in-out infinite;
+}
+.beacon-pulse {
+  animation: pulse 2.4s ease-out infinite;
+  border-radius: 50%;
+}
+.beacon-urgent {
+  animation-duration: 1.2s;
 }
 
 /* — dialog — */

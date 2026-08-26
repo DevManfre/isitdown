@@ -8,7 +8,7 @@
 // src/ui/web/css/tokens.test.ts for the precedent.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, trimToLatest } from "./chartConfig.ts";
+import { chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, statusTier, tierColor, trimToLatest, worstTier } from "./chartConfig.ts";
 import en from "@/locales/en.json";
 
 const STATUSES = ["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const;
@@ -90,5 +90,57 @@ describe("trimToLatest", () => {
 
   it("returns the whole list when it is shorter than the window", () => {
     expect(trimToLatest([1], 3)).toEqual([1]);
+  });
+});
+
+/**
+ * The operator-facing reduction of the five statuses to the three colours the
+ * Overview beacon draws. It lives here for the same reason the rest of this
+ * module does: one place knows the severity model, so a new status cannot
+ * quietly acquire a colour the guard tests never see.
+ */
+describe("statusTier", () => {
+  it("reduces every status to the tier its colour says", () => {
+    expect(statusTier("operational")).toBe("ok");
+    expect(statusTier("degraded")).toBe("warn");
+    expect(statusTier("partial_outage")).toBe("warn");
+    expect(statusTier("major_outage")).toBe("danger");
+    expect(statusTier("unknown")).toBe("unknown");
+  });
+
+  it("treats an unrecognised status as unknown, like the rest of the module", () => {
+    expect(statusTier("banana")).toBe("unknown");
+  });
+
+  it("gives every tier a colour drawn from the status tokens, never a literal", () => {
+    expect(tierColor("ok")).toBe(statusColor("operational"));
+    expect(tierColor("warn")).toBe(statusColor("degraded"));
+    expect(tierColor("danger")).toBe(statusColor("major_outage"));
+    expect(tierColor("unknown")).toBe(statusColor("unknown"));
+  });
+});
+
+describe("worstTier", () => {
+  it("is the worst tier present, not the most common", () => {
+    expect(worstTier(["operational", "operational", "degraded"])).toBe("warn");
+    expect(worstTier(["operational", "degraded", "major_outage"])).toBe("danger");
+  });
+
+  it("is ok only when every provider is operational", () => {
+    expect(worstTier(["operational", "operational"])).toBe("ok");
+  });
+
+  // The headline beside the beacon already counts a never-measured provider as
+  // not operational; a green beacon next to it would contradict it.
+  it("ranks a never-measured provider above ok, so green means measured", () => {
+    expect(worstTier(["operational", "unknown"])).toBe("unknown");
+  });
+
+  it("still ranks a real fault above a never-measured one", () => {
+    expect(worstTier(["unknown", "degraded"])).toBe("warn");
+  });
+
+  it("reports unknown when there is no provider at all", () => {
+    expect(worstTier([])).toBe("unknown");
   });
 });

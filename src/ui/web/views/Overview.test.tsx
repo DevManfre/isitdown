@@ -118,3 +118,62 @@ describe("Overview", () => {
     expect(screen.queryByText(i18n.t("overview.title.all-operational"))).toBeNull();
   });
 });
+
+/**
+ * The hero's beacon: one colour and one shape for the whole estate, chosen by
+ * the worst provider present — the same verdict the headline beside it gives
+ * in words, for an operator who only glances.
+ */
+describe("Overview's status beacon", () => {
+  const tier = () => screen.getByTestId("status-beacon").getAttribute("data-tier");
+
+  it("is ok when every provider is operational", async () => {
+    renderWithProviders(<Overview />, {
+      status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+      history,
+    });
+    // The provider name only renders once the status query has answered; the
+    // beacon itself is on screen from the first paint, reading "unknown"
+    // because nothing has been measured yet.
+    await screen.findAllByText("GitHub");
+    expect(tier()).toBe("ok");
+  });
+
+  it("warns for a degraded provider rather than going straight to danger", async () => {
+    renderWithProviders(<Overview />, {
+      status: {
+        providers: [providerFixture(), providerFixture({ id: "cf", name: "Cloudflare", overallStatus: "degraded" })],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
+      history,
+    });
+    // The provider name only renders once the status query has answered; the
+    // beacon itself is on screen from the first paint, reading "unknown"
+    // because nothing has been measured yet.
+    await screen.findAllByText("GitHub");
+    expect(tier()).toBe("warn");
+  });
+
+  it("takes the worst provider, not the most common one", async () => {
+    renderWithProviders(<Overview />, {
+      status: {
+        providers: [
+          providerFixture(),
+          providerFixture({ id: "cf", name: "Cloudflare", overallStatus: "degraded" }),
+          providerFixture({ id: "an", name: "Anthropic", overallStatus: "major_outage" }),
+        ],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
+      history,
+    });
+    // The provider name only renders once the status query has answered; the
+    // beacon itself is on screen from the first paint, reading "unknown"
+    // because nothing has been measured yet.
+    await screen.findAllByText("GitHub");
+    expect(tier()).toBe("danger");
+  });
+});
