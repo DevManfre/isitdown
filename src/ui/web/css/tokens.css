@@ -6,10 +6,10 @@
 
    Palette: Nocturne (design/claude-design-prototypes). Nocturne is a dark
    system, and the prototype's own light mode reads the same tonal ramps from the
-   other end. The light block re-spaces those ramps: the prototype packed its
-   muted greys and status hues near the dark end, which reads heavy on a light
-   ground, so each step here is set to the contrast ratio its dark-mode
-   counterpart carries (AA 4.5:1 for every hue used as text).
+   other end. Both blocks carry the prototype's own values: the light steps are
+   the ones it darkens itself to hold AA 4.5:1 on a light ground, so nothing is
+   re-spaced or re-derived here — a token that differs between the two themes
+   differs because the design says so.
 
    Structure follows the spec: the light palette on bare :root, overridden in
    :root[data-theme="dark"] for an explicit choice, and mirrored under
@@ -19,18 +19,18 @@
 
 :root {
   --color-bg: #f3f5fe;
-  /* Cards sit above the page here, not below it: on a light ground the surface
-     is the lighter of the two, and the neutral-800 hairline keeps the edge. */
-  --color-surface: #ffffff;
+  /* Cards sit a step *under* the page on this ground, as the prototype has them:
+     the surface is the darker of the two and the divider carries the edge. */
+  --color-surface: #e4e7f5;
   --color-text: #292b31;
-  --color-divider: color-mix(in srgb, #292b31 12%, transparent);
+  --color-divider: color-mix(in srgb, #292b31 18%, transparent);
 
   --color-neutral-100: #161826;
   --color-neutral-200: #292b31;
   --color-neutral-300: #3f424d;
-  --color-neutral-400: #43464f;
-  --color-neutral-500: #595d6c;
-  --color-neutral-600: #686c7e;
+  --color-neutral-400: #292b31;
+  --color-neutral-500: #3f424d;
+  --color-neutral-600: #595d6c;
   --color-neutral-700: #b2b6ca;
   --color-neutral-800: #cfd3e5;
   --color-neutral-900: #f3f5fe;
@@ -48,33 +48,35 @@
 
   /* Severity. Partial and major share a hue and are told apart by bar height
      and label, exactly as the prototype draws them. */
-  --status-operational: #2f7a55;
-  --status-degraded: #8f6a1e;
-  --status-partial-outage: #b04a2f;
-  --status-major-outage: #b04a2f;
-  --status-unknown: #d7dbeb;
-  --status-accent: #574aa0;
+  --status-operational: #2f6b4f;
+  --status-degraded: #8a6420;
+  --status-partial-outage: #9c3f2a;
+  --status-major-outage: #9c3f2a;
+  --status-unknown: #cfd3e5;
+  --status-accent: #4a3f86;
 
   /* The same severities as they are painted, not written. A bar, a ring or a dot
-     is a graphic (3:1) while a label is text (4.5:1), and on a light ground that
-     gap is wide: holding the chart to the text ratio is what made the uptime wall
-     read as a slab of dark blocks. Dark mode has room for one value, so there the
-     two sets are identical. */
+     is a graphic (3:1) while a label is text (4.5:1). On a light ground the set
+     above has to go dark enough to clear the text ratio, which lands all three
+     hues within 1.24:1 of each other — a 90-bar wall then reads as one slab
+     instead of green, amber and red. These sit at the graphic ratio instead, so
+     the hues stay apart. Dark mode has room for one value, so there the two
+     sets are identical. */
   --status-operational-fill: #3b9c6d;
   --status-degraded-fill: #b87f1c;
   --status-partial-outage-fill: #ca5a3a;
   --status-major-outage-fill: #ca5a3a;
-  --status-unknown-fill: #d7dbeb;
+  --status-unknown-fill: #cfd3e5;
 
-  --status-operational-tint: rgba(47, 122, 85, 0.1);
-  --status-degraded-tint: rgba(143, 106, 30, 0.12);
-  --status-outage-tint: rgba(176, 74, 47, 0.12);
-  --status-accent-tint: rgba(87, 74, 160, 0.12);
+  --status-operational-tint: rgba(47, 107, 79, 0.1);
+  --status-degraded-tint: rgba(138, 100, 32, 0.12);
+  --status-outage-tint: rgba(156, 63, 42, 0.12);
+  --status-accent-tint: rgba(74, 63, 134, 0.12);
 
-  --status-operational-border: rgba(47, 122, 85, 0.35);
-  --status-degraded-border: rgba(143, 106, 30, 0.4);
-  --status-outage-border: rgba(176, 74, 47, 0.4);
-  --status-accent-border: rgba(87, 74, 160, 0.4);
+  --status-operational-border: rgba(47, 107, 79, 0.35);
+  --status-degraded-border: rgba(138, 100, 32, 0.4);
+  --status-outage-border: rgba(156, 63, 42, 0.4);
+  --status-accent-border: rgba(74, 63, 134, 0.4);
 
   --scrim: rgba(41, 43, 49, 0.55);
 
@@ -117,12 +119,22 @@
   --popover: var(--color-surface);
   --popover-foreground: var(--color-text);
   --primary: var(--color-accent);
+  /* Hover keeps a solid fill and steps the accent one stop *away* from
+     --primary-foreground: darker on the light ground, brighter on the dark
+     one. Fading the fill towards the page drags it under the label. */
+  --primary-hover: var(--color-accent-200);
   --primary-foreground: var(--color-surface);
   --secondary: var(--color-neutral-800);
   --secondary-foreground: var(--color-text);
   --muted: var(--color-neutral-800);
   --muted-foreground: var(--color-neutral-500);
-  --accent: var(--color-accent-200);
+  /* A wash of the accent over whatever ground it lands on — the value the
+     prototype uses for the rail's active row. A ramp step cannot work here:
+     accent-200 is the dark end in light mode and the light end in dark mode,
+     while --accent-foreground is --color-text in both, so the pair inverted
+     itself into 1.02:1 in dark and 1.38:1 in light. A tint keeps the text
+     colour readable on either ground. */
+  --accent: color-mix(in srgb, var(--color-accent) 14%, transparent);
   --accent-foreground: var(--color-text);
   --destructive: var(--status-major-outage);
   --destructive-foreground: var(--color-surface);
@@ -223,12 +235,22 @@
   --popover: var(--color-surface);
   --popover-foreground: var(--color-text);
   --primary: var(--color-accent);
+  /* Hover keeps a solid fill and steps the accent one stop *away* from
+     --primary-foreground: darker on the light ground, brighter on the dark
+     one. Fading the fill towards the page drags it under the label. */
+  --primary-hover: var(--color-accent-400);
   --primary-foreground: var(--color-surface);
   --secondary: var(--color-neutral-800);
   --secondary-foreground: var(--color-text);
   --muted: var(--color-neutral-800);
   --muted-foreground: var(--color-neutral-500);
-  --accent: var(--color-accent-200);
+  /* A wash of the accent over whatever ground it lands on — the value the
+     prototype uses for the rail's active row. A ramp step cannot work here:
+     accent-200 is the dark end in light mode and the light end in dark mode,
+     while --accent-foreground is --color-text in both, so the pair inverted
+     itself into 1.02:1 in dark and 1.38:1 in light. A tint keeps the text
+     colour readable on either ground. */
+  --accent: color-mix(in srgb, var(--color-accent) 14%, transparent);
   --accent-foreground: var(--color-text);
   --destructive: var(--status-major-outage);
   --destructive-foreground: var(--color-surface);
@@ -332,12 +354,22 @@
     --popover: var(--color-surface);
     --popover-foreground: var(--color-text);
     --primary: var(--color-accent);
+    /* Hover keeps a solid fill and steps the accent one stop *away* from
+       --primary-foreground: darker on the light ground, brighter on the dark
+       one. Fading the fill towards the page drags it under the label. */
+    --primary-hover: var(--color-accent-400);
     --primary-foreground: var(--color-surface);
     --secondary: var(--color-neutral-800);
     --secondary-foreground: var(--color-text);
     --muted: var(--color-neutral-800);
     --muted-foreground: var(--color-neutral-500);
-    --accent: var(--color-accent-200);
+    /* A wash of the accent over whatever ground it lands on — the value the
+       prototype uses for the rail's active row. A ramp step cannot work here:
+       accent-200 is the dark end in light mode and the light end in dark mode,
+       while --accent-foreground is --color-text in both, so the pair inverted
+       itself into 1.02:1 in dark and 1.38:1 in light. A tint keeps the text
+       colour readable on either ground. */
+    --accent: color-mix(in srgb, var(--color-accent) 14%, transparent);
     --accent-foreground: var(--color-text);
     --destructive: var(--status-major-outage);
     --destructive-foreground: var(--color-surface);
@@ -363,6 +395,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
