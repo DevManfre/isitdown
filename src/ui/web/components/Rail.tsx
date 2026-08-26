@@ -53,7 +53,7 @@ export function Rail() {
             setHold(collapsing);
           }}
         >
-          <span className="rail-toggle-chevron block size-2 rotate-45 border-r-2 border-b-2 border-current" />
+          <span className="rail-toggle-chevron block size-2 rotate-45 border-b-2 border-l-2 border-current" />
         </button>
       </div>
 
