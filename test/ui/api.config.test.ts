@@ -443,3 +443,23 @@ test("preview-components reports an unreachable provider as 502", async () => {
     await app.close();
   }
 });
+
+test("lowering the interval leaves the armed countdown alone rather than pushing it into the past", async () => {
+  const app = await api();
+  try {
+    await app.request("POST", "/poll");
+    const before = (await app.request("GET", "/status")).body as { nextPollAt: string | null };
+
+    // The scheduler re-reads the config on its next cycle, by design — so the
+    // cycle already on the clock keeps its own deadline. Recomputing the
+    // countdown from the new, shorter interval would date it two minutes into
+    // the past and leave the dashboard reading "0s" until the real cycle ran.
+    await app.request("PATCH", "/config/settings", { intervalMinutes: 1 });
+    const after = (await app.request("GET", "/status")).body as { nextPollAt: string | null };
+
+    assert.equal(after.nextPollAt, before.nextPollAt);
+    assert.ok(after.nextPollAt !== null && Date.parse(after.nextPollAt) > Date.now());
+  } finally {
+    await app.close();
+  }
+});

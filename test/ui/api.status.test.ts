@@ -228,3 +228,21 @@ test("samples older than the retention window are pruned at boot", async () => {
   assert.deepEqual(await second.store.getRecentSamples("github", 10), []);
   await second.close();
 });
+
+test("status hands the dashboard the deadline the scheduler will actually fire on", async () => {
+  const app = await api();
+  try {
+    await app.post("/poll");
+    const { body } = await app.get("/status");
+    const { nextPollAt } = body as { nextPollAt: string | null };
+
+    assert.equal(
+      nextPollAt,
+      app.runtime.scheduler.nextRunAt(),
+      "a deadline computed from the interval instead of the armed timer parks the countdown at zero",
+    );
+    assert.ok(nextPollAt !== null && Date.parse(nextPollAt) > Date.now(), "a fresh cycle leaves the countdown running");
+  } finally {
+    await app.close();
+  }
+});

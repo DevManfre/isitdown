@@ -185,3 +185,63 @@ describe("the view queries' busy gate", () => {
     expect(fetchCount(), "the poll never resumed after the field was released").toBeGreaterThan(held);
   });
 });
+
+/**
+ * The mirror of the gate above, and the reason it must not cover `["status"]`.
+ *
+ * `useBusy` exists so a refetch cannot overwrite a form under the operator —
+ * and the forms read `["config"]`, never `["status"]`. What `["status"]` feeds
+ * is read-only chrome: the status grid and the header countdown, which is
+ * drawn client-side from `nextPollAt` and so runs itself down to zero on its
+ * own. Holding that query therefore cannot protect an edit; it can only strand
+ * the countdown at "0s" for as long as the operator leaves a field focused —
+ * a dashboard that looks stopped, on a server that is polling perfectly well.
+ */
+describe("the countdown's own query is never held", () => {
+  function Probe() {
+    useStatusChrome();
+    const fieldProps = useFieldProps();
+    return <input aria-label="field" {...fieldProps} />;
+  }
+
+  const fetchCount = () => (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps re-reading the next deadline while a field has focus", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const body = {
+      providers: [],
+      pollIntervalMinutes: 3,
+      lastPollAt: null,
+      nextPollAt: new Date(Date.now() + 200_000).toISOString(),
+      serverNow: new Date().toISOString(),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, status: 200, text: async () => JSON.stringify(body) })),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <BusyProvider>
+          <Probe />
+        </BusyProvider>
+      </QueryClientProvider>,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    act(() => screen.getByLabelText("field").focus());
+    const held = fetchCount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(90_000);
+    });
+
+    expect(fetchCount(), "the countdown's clock stopped because a field had focus").toBeGreaterThan(held);
+  });
+});

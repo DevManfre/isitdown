@@ -405,3 +405,140 @@ test("two sequential manual polls each run a cycle", async (t) => {
   assert.equal(poller.calls, 3, "a finished cycle must not be handed back to the next caller");
   scheduler.stop();
 });
+
+// The dashboard's countdown is drawn from the scheduler's armed deadline. It
+// used to be guessed by the HTTP layer as `lastCycle.finishedAt + interval`,
+// which is wrong whenever the real timer lands later than that guess — the
+// countdown then parks at "0s" until the cycle actually finishes. The four
+// tests below pin the deadline to the timer that will really fire.
+
+test("nextRunAt is null before a cycle has armed anything", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const scheduler = createScheduler({
+    configSource: fakeConfigSource(),
+    poller: fakePoller(),
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    random: noJitter,
+  });
+
+  assert.equal(scheduler.nextRunAt(), null, "nothing is armed, so there is no deadline to show");
+  scheduler.stop();
+});
+
+test("nextRunAt reports the armed deadline with the jitter that was actually drawn", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  const scheduler = createScheduler({
+    configSource: fakeConfigSource(),
+    poller: fakePoller(),
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    // The longest draw: interval * 1.1, eighteen seconds beyond a plain interval.
+    random: () => 1,
+  });
+
+  await scheduler.start();
+  assert.equal(
+    scheduler.nextRunAt(),
+    new Date(3 * 60_000 * 1.1).toISOString(),
+    "a countdown built from a plain interval would hit zero eighteen seconds early",
+  );
+  scheduler.stop();
+});
+
+test("nextRunAt is null once stopped, because no cycle is coming", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const scheduler = createScheduler({
+    configSource: fakeConfigSource(),
+    poller: fakePoller(),
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    random: noJitter,
+  });
+
+  await scheduler.start();
+  assert.notEqual(scheduler.nextRunAt(), null);
+  scheduler.stop();
+  assert.equal(scheduler.nextRunAt(), null);
+});
+
+test("a manual poll re-arms, so the next automatic cycle is a full interval after it", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const poller = fakePoller();
+  const scheduler = createScheduler({
+    configSource: fakeConfigSource(),
+    poller,
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    random: noJitter,
+  });
+
+  await scheduler.start();
+  t.mock.timers.tick(60_000);
+  await scheduler.triggerNow();
+
+  t.mock.timers.tick(3 * 60_000 - 1);
+  await scheduler.settled();
+  assert.equal(poller.calls, 2, "the timer armed before the manual poll must not still be standing");
+
+  t.mock.timers.tick(1);
+  await scheduler.settled();
+  assert.equal(poller.calls, 3, "the interval restarts from the manual poll");
+  scheduler.stop();
+});
+
+test("no cycle runs before the deadline the dashboard is counting down to", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  // Each arm() draws once. A fixed draw hides a leaked timer, because both
+  // copies then land on the same millisecond and the second joins the first.
+  const draws = [0.5, 0, 1];
+  let drawn = 0;
+  const random = (): number => draws[drawn++] ?? 0.5;
+
+  let release: (() => void) | undefined;
+  let gate: Promise<void> | undefined;
+  const poller = fakePoller(async () => {
+    if (gate !== undefined) await gate;
+    return cycleResult();
+  });
+  const scheduler = createScheduler({
+    configSource: fakeConfigSource(),
+    poller,
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    random,
+  });
+
+  await scheduler.start();
+
+  // The manual poll opens the cycle, so its continuation is first in line; the
+  // scheduled tick that lands mid-cycle joins behind it and arms again after
+  // the manual poll already did. An arm that does not clear the standing timer
+  // leaves both alive, and the earlier of the two polls before the countdown
+  // the operator is watching has run out.
+  gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const manual = scheduler.triggerNow();
+  t.mock.timers.tick(3 * 60_000);
+  release?.();
+  await manual;
+  await scheduler.settled();
+  gate = undefined;
+  assert.equal(poller.calls, 2, "the tick must join the manual cycle rather than run a second one");
+
+  const deadline = Date.parse(scheduler.nextRunAt() ?? "");
+  t.mock.timers.tick(deadline - Date.now() - 1);
+  await scheduler.settled();
+  assert.equal(poller.calls, 2, "a poll before the published deadline means a second timer is still armed");
+
+  t.mock.timers.tick(1);
+  await scheduler.settled();
+  assert.equal(poller.calls, 3);
+  scheduler.stop();
+});

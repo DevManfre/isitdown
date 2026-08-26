@@ -12,6 +12,17 @@ export interface Scheduler {
   start(): Promise<void>;
   /** Runs a cycle on demand, joining one already in flight rather than duplicating it. */
   triggerNow(): Promise<CycleResult>;
+  /**
+   * When the armed timer will actually fire, or `null` if nothing is armed.
+   *
+   * The dashboard's countdown is drawn from this. It has to come from the
+   * timer rather than be recomputed as `lastCycle.finishedAt + interval`,
+   * because the two disagree by the jitter drawn in `arm()` (up to a tenth of
+   * an interval either way) and by any interval change made since — and every
+   * second the real cycle lands beyond a guessed deadline is a second the
+   * dashboard spends showing "0s".
+   */
+  nextRunAt(): string | null;
   stop(): void;
   /** Resolves once no cycle is in flight. Lets tests await a timer-driven cycle. */
   settled(): Promise<void>;
@@ -45,6 +56,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
   const random = deps.random ?? Math.random;
 
   let timer: NodeJS.Timeout | undefined;
+  let armedFor: number | undefined;
   let stopped = false;
   let inFlight: Promise<CycleResult> | undefined;
   let lastIntervalMinutes = 3;
@@ -80,7 +92,19 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     return run;
   }
 
+  /**
+   * Arms the next cycle, replacing whatever was armed before.
+   *
+   * Clearing first is what makes it safe to call from more than one place. A
+   * manual poll that a scheduled tick joins mid-cycle leaves both of them
+   * arming afterwards, and two live timers poll the provider twice an interval
+   * — the earlier one firing before the deadline the dashboard is counting
+   * down to, which is the countdown lying in the other direction.
+   */
   function arm(): void {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+    armedFor = undefined;
     if (stopped) return;
     const interval = lastIntervalMinutes * 60_000;
     // Spread instances out so a fleet of IsItDown containers does not hit
@@ -89,6 +113,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     // Deliberately referenced: this timer is the only thing keeping the Light
     // edition's event loop alive between cycles, and unref'ing it made the
     // container exit after its first poll.
+    armedFor = Date.now() + delay;
     timer = setTimeout(() => {
       void tick();
     }, delay);
@@ -114,12 +139,23 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       await tick();
     },
 
-    triggerNow(): Promise<CycleResult> {
-      return cycle();
+    async triggerNow(): Promise<CycleResult> {
+      const result = await cycle();
+      // The interval restarts from this poll. Leaving the standing timer alone
+      // would fire the automatic cycle early — within seconds of a manual one,
+      // in the worst case — and the countdown the dashboard just reset to a
+      // full interval would be a lie for the whole of it.
+      arm();
+      return result;
+    },
+
+    nextRunAt(): string | null {
+      return armedFor === undefined ? null : new Date(armedFor).toISOString();
     },
 
     stop(): void {
       stopped = true;
+      armedFor = undefined;
       if (timer !== undefined) {
         clearTimeout(timer);
         timer = undefined;

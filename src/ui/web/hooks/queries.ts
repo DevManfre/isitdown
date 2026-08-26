@@ -1,16 +1,29 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type Query } from "@tanstack/react-query";
 import * as api from "@/lib/api.ts";
+import { msUntilNextPoll, REFRESH_MS, statusRefetchDelay } from "@/lib/statusRefetch.ts";
+import type { StatusResponse } from "@/lib/types.ts";
 import { useBusy } from "./useBusy.tsx";
 
-/** The dashboard's poll of the server's stored state. */
-const REFRESH_MS = 30_000;
+/**
+ * `["status"]` refetches on the countdown rather than on the flat idle rhythm:
+ * it is the one query whose payload says when it will next change, and the
+ * header's countdown has nothing to show between the deadline passing and the
+ * next read landing. Every other query below keeps the flat interval.
+ *
+ * It is also the one query the busy gate must not cover. `useBusy` is there so
+ * a refetch cannot overwrite a form under the operator — and every form reads
+ * `["config"]`. `["status"]` feeds read-only chrome, so holding it protects
+ * nothing and strands the countdown at "0s" for as long as a field keeps
+ * focus: a dashboard that looks stopped while the server polls on time.
+ */
+const statusRefetchInterval = (query: Query<StatusResponse>): number =>
+  statusRefetchDelay(msUntilNextPoll(query.state.data, query.state.dataUpdatedAt, Date.now()));
 
 export function useStatus() {
-  const busy = useBusy();
   return useQuery({
     queryKey: ["status"],
     queryFn: api.getStatus,
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: statusRefetchInterval,
   });
 }
 
@@ -31,11 +44,10 @@ export function useStatus() {
  * same graceful-degradation contract this mirrors.
  */
 export function useStatusChrome() {
-  const busy = useBusy();
   return useQuery({
     queryKey: ["status"],
     queryFn: api.getStatus,
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: statusRefetchInterval,
     throwOnError: false,
   });
 }
