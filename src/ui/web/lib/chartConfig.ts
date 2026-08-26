@@ -63,6 +63,54 @@ export const statusLabelKey = (status: string) => STATUS_CHART[known(status)].la
 export const statusMuted = (status: string) => known(status) === "unknown";
 
 /**
+ * The three colours an operator reads at a glance, plus "not measured".
+ *
+ * The five statuses carry the detail; a tier carries the verdict. `degraded`
+ * and `partial_outage` share the warning tier deliberately — keeping red for
+ * `major_outage` alone is what makes red mean something when it appears.
+ */
+export type StatusTier = "ok" | "warn" | "danger" | "unknown";
+
+const TIER: Record<OverallStatus, StatusTier> = {
+  operational: "ok",
+  degraded: "warn",
+  partial_outage: "warn",
+  major_outage: "danger",
+  unknown: "unknown",
+};
+
+/** Which tier a tier outranks. The beacon shows the highest one present. */
+const TIER_RANK: Record<StatusTier, number> = { ok: 0, unknown: 1, warn: 2, danger: 3 };
+
+const TIER_STATUS: Record<StatusTier, OverallStatus> = {
+  ok: "operational",
+  warn: "degraded",
+  danger: "major_outage",
+  unknown: "unknown",
+};
+
+export const statusTier = (status: string): StatusTier => TIER[known(status)];
+
+/** The tier's colour is a status colour, so it stays a token like every other. */
+export const tierColor = (tier: StatusTier): string => statusColor(TIER_STATUS[tier]);
+
+/**
+ * The worst tier across a set of providers — what the Overview headline is
+ * already saying in words, as one colour.
+ *
+ * `unknown` outranks `ok` rather than sitting below it: the headline counts a
+ * never-measured provider as not operational, and a green beacon beside that
+ * sentence would contradict it. It stays below a real fault, because "we did
+ * not measure" is not "it is down".
+ */
+export const worstTier = (statuses: string[]): StatusTier =>
+  statuses.length === 0
+    ? "unknown"
+    : statuses
+        .map(statusTier)
+        .reduce((worst, tier) => (TIER_RANK[tier] > TIER_RANK[worst] ? tier : worst), "ok");
+
+/**
  * The shadcn chart config, so a tooltip and a legend read the same colours.
  * `label` is a catalog key: whoever renders it resolves it with `t()`.
  *

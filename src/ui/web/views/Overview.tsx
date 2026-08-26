@@ -1,11 +1,12 @@
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
+import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
 import { UptimeRing } from "@/components/charts/UptimeRing.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
-import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
+import { statusColor, statusLabelKey, worstTier } from "@/lib/chartConfig.ts";
 import { formatPercent, formatRelative } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
@@ -56,11 +57,17 @@ export function Overview() {
           <span className="anim-rise text-xs uppercase tracking-widest text-primary">
             {t("overview.kicker")}
           </span>
-          <h2 className="anim-rise anim-rise-hero text-3xl font-medium" style={{ animationDelay: "60ms" }}>
-            {down.length === 0
-              ? t("overview.title.all-operational")
-              : t("overview.title.down", { count: down.length })}
-          </h2>
+          {/* The beacon shares the headline's line rather than sitting above
+              it: the two say the same thing, and splitting them reads as two
+              separate claims. */}
+          <div className="anim-rise anim-rise-hero flex items-center gap-3" style={{ animationDelay: "60ms" }}>
+            <StatusBeacon tier={worstTier(providers.map((p) => p.overallStatus))} />
+            <h2 className="text-3xl font-medium">
+              {down.length === 0
+                ? t("overview.title.all-operational")
+                : t("overview.title.down", { count: down.length })}
+            </h2>
+          </div>
           <p className="anim-rise anim-rise-hero text-muted-foreground" style={{ animationDelay: "130ms" }}>
             {down.length === 0
               ? t("overview.body.all-operational", {
