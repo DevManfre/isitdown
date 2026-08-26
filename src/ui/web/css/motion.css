@@ -276,11 +276,16 @@
 .rail-toggle {
   transition: color 0.2s ease;
 }
+/* Rail.tsx draws the chevron from two borders and points it left with
+   Tailwind's `rotate-45`, which sets the standalone `rotate` property — so the
+   flip has to ride `rotate` as well. `transform: rotate(225deg)` here composed
+   with it instead of replacing it and landed the glyph on 270°, an
+   axis-aligned corner rather than a chevron. */
 .rail-toggle-chevron {
-  transition: transform 0.4s var(--ease-out);
+  transition: rotate 0.4s var(--ease-out);
 }
 :root[data-rail="collapsed"] .rail-toggle-chevron {
-  transform: rotate(225deg);
+  rotate: 225deg;
   margin-left: -2px;
 }
 .rail-links,

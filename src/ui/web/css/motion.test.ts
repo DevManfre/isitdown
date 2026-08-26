@@ -92,8 +92,14 @@ describe("motion.css after the react port", () => {
       expect(code).toMatch(/:root\[data-rail="collapsed"\][^{]*\.rail-brand[^{]*\{[^}]*padding-left:/);
     });
 
-    it("still flips the pin chevron", () => {
-      expect(code).toMatch(/:root\[data-rail="collapsed"\]\s+\.rail-toggle-chevron/);
+    // The span carries Tailwind's `rotate-45`, which sets the standalone
+    // `rotate` property. A `transform: rotate(...)` flip here would compose
+    // with it rather than replace it, so the flip has to ride `rotate` too.
+    it("still flips the pin chevron, on the property `rotate-45` sets", () => {
+      const rule = /:root\[data-rail="collapsed"\]\s+\.rail-toggle-chevron\s*\{([^}]*)\}/.exec(code);
+      expect(rule, "no collapsed rule for the pin chevron").not.toBeNull();
+      expect(rule?.[1]).toMatch(/\brotate:\s*225deg/);
+      expect(rule?.[1], "a transform flip would compose with rotate-45").not.toMatch(/transform:/);
     });
   });
 });
