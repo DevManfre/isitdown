@@ -2,14 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import createGlobe, { type COBEOptions } from "cobe";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip.tsx";
-import { statusLabelKey, statusTier, tierFill, type StatusTier } from "@/lib/chartConfig.ts";
+import { drawOrder, statusLabelKey, statusTier, tierFill } from "@/lib/chartConfig.ts";
 import { projectGlobe } from "@/lib/globeProjection.ts";
 import { tokenRgb } from "@/lib/tokenRgb.ts";
 import { markerRadius, type MapCell } from "@/lib/mapCells.ts";
-
-/** Same order the flat map uses, same reason: a fault must never be painted
- * under an operational neighbour. */
-const DRAW_ORDER: Record<StatusTier, number> = { ok: 0, unknown: 1, warn: 2, danger: 3 };
 
 /**
  * cobe 2.0.1's shipped `COBEOptions` (`node_modules/cobe/dist/index.d.ts`)
@@ -141,7 +137,7 @@ export function StatusGlobe({
         .map((cell) => ({ cell, projected: projectGlobe(cell.lat, cell.lon, phi, THETA, RADIUS) }))
         .filter((entry) => entry.projected.facing)
         .sort(
-          (a, b) => DRAW_ORDER[statusTier(a.cell.worst)] - DRAW_ORDER[statusTier(b.cell.worst)],
+          (a, b) => drawOrder(statusTier(a.cell.worst)) - drawOrder(statusTier(b.cell.worst)),
         ),
     [cells, phi],
   );

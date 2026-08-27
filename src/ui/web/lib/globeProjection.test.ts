@@ -16,9 +16,24 @@ describe("projectGlobe", () => {
   });
 
   it("puts the north pole above the centre", () => {
-    const { y, facing } = projectGlobe(90, 0, 0, 0, R);
-    expect(facing).toBe(true);
+    // theta = 0 (no tilt) is the one case where this assertion is exact
+    // rather than approximate-by-construction: with no tilt, the pole
+    // projects straight up, y = -radius. This does NOT also assert
+    // `facing` — at theta = 0 the pole sits exactly on the visibility
+    // terminator (z1 is mathematically 0), and floating point rounds
+    // that to a tiny positive epsilon (`Math.cos(Math.PI / 2)` is
+    // `6.123233995736766e-17`, not 0) rather than to 0 itself. Asserting
+    // `facing` here would pin that rounding artifact, not a real
+    // invariant — a harmless reordering of the trigonometry could flip
+    // its sign. See the next test for `facing` away from this edge.
+    const { y } = projectGlobe(90, 0, 0, 0, R);
     expect(y).toBeCloseTo(-R, 5);
+  });
+
+  it("keeps the north pole facing once the globe is tilted away from the flat case", () => {
+    // theta = 0.25 is production's own tilt (`THETA` in StatusGlobe.tsx),
+    // well clear of the theta = 0 terminator case above.
+    expect(projectGlobe(90, 0, 0, 0.25, R).facing).toBe(true);
   });
 
   it("keeps every projected point inside the disc", () => {

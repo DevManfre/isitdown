@@ -91,6 +91,15 @@ const TIER: Record<OverallStatus, StatusTier> = {
 /** Which tier a tier outranks. The beacon shows the highest one present. */
 const TIER_RANK: Record<StatusTier, number> = { ok: 0, unknown: 1, warn: 2, danger: 3 };
 
+/**
+ * A tier's position in paint order: worse drawn last, so a fault is never
+ * painted under an operational neighbour. Every map view (`DottedWorld`,
+ * `StatusGlobe`) sorts its cells by this before rendering — they reuse
+ * `TIER_RANK` rather than each keeping its own copy of the same ranking,
+ * which is exactly the drift `mapCells.ts` already guards `worst` against.
+ */
+export const drawOrder = (tier: StatusTier): number => TIER_RANK[tier];
+
 const TIER_STATUS: Record<StatusTier, OverallStatus> = {
   ok: "operational",
   warn: "degraded",
