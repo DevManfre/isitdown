@@ -19,6 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {
+    "cobe": "^2.0.1",
     "express": "^5.2.1",
     "yaml": "^2.5.0",
     "zod": "^3.25.0"

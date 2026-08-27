@@ -169,6 +169,7 @@
   "error.load-failed": "Could not load this view: {error}",
   "empty.no-data": "No data yet.",
 
+  "map.aria.globe": "Globe view of monitored locations",
   "map.aria.world": "World map of monitored locations",
   "map.cell.aria_one": "{locations} — {status}",
   "map.cell.aria_other": "{count} locations including {locations} — {status}",
