@@ -66,7 +66,7 @@ const seed = (runtime: UiRuntime, providerId: string, providerName: string) => {
     .run(providerId, providerName);
 };
 
-test("an empty database serves an empty map", async () => {
+test("no map data yet serves an empty map", async () => {
   const app = await api();
   try {
     const { status, body } = await app.get("/map");
@@ -131,6 +131,9 @@ test("generatedAt is the newest observed_at, not the response time", async () =>
 
     const payload = (await app.get("/map")).body as MapBody;
     assert.equal(payload.generatedAt, "2026-08-27T10:00:00.000Z");
+    // located === total, so nothing is unplaced and the provider must not
+    // appear with count: 0 — the filter at map.routes.ts:47 is what this pins.
+    assert.deepEqual(payload.unlocated, []);
   } finally {
     await app.close();
   }
