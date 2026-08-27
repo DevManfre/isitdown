@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -120,6 +120,35 @@ export function migrate(db: DatabaseSync): void {
     if (!serviceColumns.includes("scope_to_components")) {
       db.exec("ALTER TABLE services ADD COLUMN scope_to_components INTEGER NOT NULL DEFAULT 0");
     }
+  }
+
+  if (from < 4) {
+    // Latest-snapshot only, on purpose: the map answers "where is the fleet
+    // right now", and an append-only table at 450 components a poll would add
+    // roughly 216k rows a day for one provider. Replay is an explicit non-goal.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS map_points (
+        provider_id  TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        component_id TEXT NOT NULL,
+        name         TEXT NOT NULL,
+        lat          REAL NOT NULL,
+        lon          REAL NOT NULL,
+        source       TEXT NOT NULL,
+        status       TEXT NOT NULL,
+        observed_at  TEXT NOT NULL,
+        PRIMARY KEY (provider_id, component_id)
+      );
+
+      -- Two jobs: the honest "N could not be placed" line the card shows, and
+      -- the skip that keeps the map lane from re-fetching a provider whose
+      -- components are all functional (GitHub) on every cycle.
+      CREATE TABLE IF NOT EXISTS map_geo_state (
+        provider_id TEXT PRIMARY KEY REFERENCES services(id) ON DELETE CASCADE,
+        located     INTEGER NOT NULL,
+        total       INTEGER NOT NULL,
+        checked_at  TEXT NOT NULL
+      );
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
