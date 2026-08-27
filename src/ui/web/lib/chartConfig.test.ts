@@ -8,7 +8,7 @@
 // src/ui/web/css/tokens.test.ts for the precedent.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { AGGREGATE_FILL, chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, statusTier, tierColor, trimToLatest, worstTier } from "./chartConfig.ts";
+import { AGGREGATE_FILL, chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, statusTier, tierColor, tierFill, trimToLatest, worstStatus, worstTier } from "./chartConfig.ts";
 import en from "@/locales/en.json";
 
 const STATUSES = ["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const;
@@ -152,5 +152,43 @@ describe("worstTier", () => {
 
   it("reports unknown when there is no provider at all", () => {
     expect(worstTier([])).toBe("unknown");
+  });
+});
+
+describe("worstStatus", () => {
+  it("returns operational for an empty set", () => {
+    expect(worstStatus([])).toBe("operational");
+  });
+
+  it("takes the worst of several", () => {
+    expect(worstStatus(["operational", "major_outage", "degraded"])).toBe("major_outage");
+  });
+
+  it("ranks unknown below a real fault and above operational", () => {
+    // The same rule the Overview's beacon already applies: "we did not
+    // measure" must not read louder than "it is down", but it is not "fine".
+    expect(worstStatus(["unknown", "degraded"])).toBe("degraded");
+    expect(worstStatus(["operational", "unknown"])).toBe("unknown");
+  });
+
+  it("treats an unrecognised word as unknown", () => {
+    expect(worstStatus(["operational", "banana"])).toBe("unknown");
+  });
+});
+
+describe("tierFill", () => {
+  it("returns a token for every tier, never a literal colour", () => {
+    for (const tier of ["ok", "warn", "danger", "unknown"] as const) {
+      expect(tierFill(tier)).toMatch(/^var\(--/);
+    }
+  });
+
+  it("is not tierColor, because a mark is not text", () => {
+    // Why this function exists at all: --status-* is tuned for text on the
+    // page background, and in the light theme its four values sit within a
+    // hair of each other. A 4px marker filled with the text colour cannot be
+    // told apart from an operational one. --status-*-fill is the token
+    // declared for a chart mark.
+    expect(tierFill("danger")).not.toBe(tierColor("danger"));
   });
 });
