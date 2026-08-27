@@ -122,6 +122,22 @@ describe("Overview", () => {
     expect(await screen.findByText(i18n.t("error.load-failed", { error: "HTTP 500" }))).toBeInTheDocument();
     expect(screen.queryByText(i18n.t("overview.title.all-operational"))).toBeNull();
   });
+
+  it("does not draw the geographic card by default", async () => {
+    // `mapView` defaults to `off`, so an operator who never opened Settings
+    // must see exactly the Overview they had before this feature existed.
+    // `usePreferences()` here resolves against this harness's `status`
+    // fixture (nothing in this suite supplies a `/api/preferences` fixture),
+    // whose shape has no `mapView` at all — the same "undefined preference"
+    // an operator's first-ever load actually sees, and the case `?? "off"`
+    // in GeoCard exists for.
+    renderWithProviders(<Overview />, {
+      status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+      history,
+    });
+    await screen.findAllByText("GitHub");
+    expect(screen.queryByText(i18n.t("map.title"))).not.toBeInTheDocument();
+  });
 });
 
 /**
