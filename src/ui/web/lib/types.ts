@@ -216,8 +216,11 @@ export interface RuntimeConfigResponse {
   channels: DescribedChannel[];
 }
 
+export type MapView = "off" | "map" | "globe";
+
 export interface Preferences {
   theme: "light" | "dark" | "system";
   uiLocale: string;
   notificationLocale: string;
+  mapView: MapView;
 }

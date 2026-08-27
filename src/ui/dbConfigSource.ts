@@ -40,9 +40,17 @@ const settingsSchema = z.object({
   theme: z.enum(["light", "dark", "system"]).catch("system"),
   uiLocale: localeSchema.catch("en"),
   notificationLocale: localeSchema.catch("en"),
+  /**
+   * Which geographic view the Overview draws, if any. `off` is the default
+   * because a fleet of functional-component providers has nothing to place, and
+   * an empty world map is worse than no card.
+   */
+  mapView: z.enum(["off", "map", "globe"]).catch("off"),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
+
+export type MapView = Settings["mapView"];
 
 const channelRowSchema = z.object({
   id: z.string(),
