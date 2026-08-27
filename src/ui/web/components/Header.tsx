@@ -1,11 +1,23 @@
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { PollIndicator } from "./PollIndicator.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { usePreferencesMutation, useStatusChrome } from "@/hooks/queries.ts";
-import { useTheme } from "@/hooks/useTheme.tsx";
+import { useTheme, type ThemeMode } from "@/hooks/useTheme.tsx";
 import { supportedLocales, switchLocale } from "@/lib/i18n.ts";
 import { formatRelative } from "@/lib/format.ts";
 import { cn } from "@/lib/utils.ts";
+
+/**
+ * One glyph per mode, so the button says which theme is on without being read.
+ * The prototype spun a single dot 180° between two modes; there are three here,
+ * and a rotation cannot distinguish "system" from either end of it.
+ */
+const THEME_ICONS: Record<ThemeMode, typeof Sun> = {
+  light: Sun,
+  dark: Moon,
+  system: Monitor,
+};
 
 const TITLE_KEYS: Record<string, string> = {
   overview: "nav.overview",
@@ -26,6 +38,7 @@ export function Header({ view }: { view: string }) {
   // theme.mode's template needs {mode}; an empty call would leak the raw
   // "{mode} mode" placeholder into the aria-label instead of "Light mode".
   const themeTitle = t("theme.mode", { mode: t(`theme.${mode}`) });
+  const ThemeIcon = THEME_ICONS[mode];
 
   return (
     <header className="header flex items-center justify-between gap-4 border-b border-border px-8 py-4">
@@ -60,7 +73,7 @@ export function Header({ view }: { view: string }) {
 
         <button
           type="button"
-          className="theme-btn rounded p-1.5"
+          className="theme-btn rounded p-1.5 text-primary"
           aria-label={themeTitle}
           title={themeTitle}
           onClick={() => {
@@ -71,7 +84,18 @@ export function Header({ view }: { view: string }) {
             savePreferences.mutate({ theme: next });
           }}
         >
-          <span className="theme-dot block size-3 rounded-full bg-primary" />
+          {/* Keyed on the mode so every swap mounts a fresh element and plays
+              the entry animation — two different icons are two different
+              elements, and a transition has nothing to interpolate across
+              that. The button's aria-label already names the mode. */}
+          <ThemeIcon
+            key={mode}
+            data-testid="theme-icon"
+            data-mode={mode}
+            className="theme-icon size-4"
+            strokeWidth={1.6}
+            aria-hidden="true"
+          />
         </button>
 
         <Separator orientation="vertical" className="header-sep h-6" />
