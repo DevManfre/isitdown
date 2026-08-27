@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rowShifts } from "./rowShift.ts";
+import { isReorder, rowShifts } from "./rowShift.ts";
 
 const tops = (entries: Record<string, number>) => new Map(Object.entries(entries));
 
@@ -34,5 +34,31 @@ describe("rowShifts", () => {
 
   it("has nothing to say about the first measurement", () => {
     expect(rowShifts(new Map(), tops({ a: 0, b: 48 })).size).toBe(0);
+  });
+});
+
+describe("isReorder", () => {
+  it("says no when the same rows are in the same places", () => {
+    expect(isReorder(["a", "b", "c"], ["a", "b", "c"])).toBe(false);
+  });
+
+  it("says yes when two rows swapped places", () => {
+    expect(isReorder(["a", "b", "c"], ["a", "c", "b"])).toBe(true);
+  });
+
+  it("says yes when a row arrived and when one went", () => {
+    expect(isReorder(["a", "b"], ["a", "n", "b"])).toBe(true);
+    expect(isReorder(["a", "b"], ["a"])).toBe(true);
+  });
+
+  // The case the FLIP has to stay out of: an accordion panel unfolds under a
+  // row and shoves everything below it down, with the rows themselves
+  // untouched. The panel's own animation is already playing that.
+  it("says no when only a panel opened between two rows", () => {
+    expect(isReorder(["a", "b"], ["a", "b"])).toBe(false);
+  });
+
+  it("has nothing to reorder on the first measurement", () => {
+    expect(isReorder([], [])).toBe(false);
   });
 });

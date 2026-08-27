@@ -17,3 +17,18 @@ export function rowShifts(
   }
   return shifts;
 }
+
+/**
+ * Whether a layout change is one a FLIP is for at all: rows swapping places,
+ * arriving, or leaving. The sequence of ids is what says so.
+ *
+ * An accordion panel unfolding under a row shoves everything below it down
+ * without touching which rows are on the page or in what order, and that
+ * motion is the panel's own animation to play. Replaying it as a FLIP fights
+ * it — and worse, the panel keeps growing after the commit that mounted it,
+ * with no render to re-measure on, so the offsets left behind go stale and the
+ * next unrelated render reads the whole unfold as a jump that never happened.
+ */
+export function isReorder(previous: readonly string[], current: readonly string[]): boolean {
+  return previous.length !== current.length || previous.some((id, index) => current[index] !== id);
+}
