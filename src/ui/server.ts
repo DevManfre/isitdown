@@ -43,3 +43,12 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
 // Reconstruct the 90-day charts before the first poll writes a real sample.
 await started.backfill.backfillAll();
 await started.scheduler.start();
+
+started.mapLane.start();
+// One immediate pass so a fresh container has markers on the map before the
+// first quarter-hour interval elapses, rather than an empty card until then.
+void started.mapLane.refresh().catch((error: unknown) => {
+  logger.error("initial map refresh failed", {
+    error: error instanceof Error ? error.message : String(error),
+  });
+});

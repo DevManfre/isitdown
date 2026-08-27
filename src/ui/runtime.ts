@@ -13,8 +13,11 @@ import { createDbConfigSource, listServices } from "./dbConfigSource.ts";
 import { migrate } from "./db/migrate.ts";
 import { openDatabase } from "./db/open.ts";
 import { seedDefaults } from "./db/seed.ts";
+import { loadGeoTables } from "./geo/resolveLocation.ts";
 import { createHistoryService } from "./history.ts";
 import type { HistoryStore } from "./historyStore.interface.ts";
+import { createMapLane, type MapLane } from "./mapLane.ts";
+import { createMapStore, type MapStore } from "./mapStore.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
 
 /** Kept a month beyond the 90-day view so a full window is always available. */
@@ -43,6 +46,12 @@ export interface UiRuntimeCore {
   scheduler: Scheduler;
   /** Built here, run by the server at boot — never by the runtime builder, so tests stay offline. */
   backfill: BackfillService;
+  mapStore: MapStore;
+  /**
+   * Started by the server, like the scheduler — never by the runtime builder,
+   * so tests stay offline and can drive `refresh()` explicitly.
+   */
+  mapLane: MapLane;
   logger: Logger;
   /** Every configured provider, including disabled ones — the dashboard shows both. */
   listAllServices(): ServiceDefinition[];
@@ -73,6 +82,16 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   const store = createSqliteStateStore(db);
   const history = createHistoryService(store);
   const configSource = createDbConfigSource(db, options.env, logger);
+
+  const mapStore = createMapStore(db);
+  const mapLane = createMapLane({
+    store: mapStore,
+    tables: loadGeoTables(),
+    logger,
+    getAdapter,
+    listServices: () => listServices(db),
+    timeoutMs: 8000,
+  });
 
   const poller = createPoller({ getAdapter, store, logger });
   const dispatcher = createDispatcher({
@@ -114,6 +133,8 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     configSource,
     scheduler,
     backfill,
+    mapStore,
+    mapLane,
     logger,
     listAllServices: () => listServices(db),
     providerCount: () => listServices(db).length,
@@ -121,6 +142,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     notificationFeedLimit: NOTIFICATION_FEED_LIMIT,
     async close(): Promise<void> {
       clearInterval(pruneTimer);
+      mapLane.stop();
       scheduler.stop();
       await scheduler.settled();
       await store.close();
