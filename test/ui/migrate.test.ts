@@ -27,6 +27,8 @@ test("migrate creates every table the dashboard reads", async () => {
     "channels",
     "component_samples",
     "incidents",
+    "map_geo_state",
+    "map_points",
     "notifications",
     "provider_state",
     "services",
@@ -114,7 +116,7 @@ test("migrating from user_version 1 adds columns and keeps data", () => {
   assert.equal((db.prepare("SELECT COUNT(*) AS n FROM services").get() as { n: number } | undefined)?.n, 1);
   assert.equal(
     (db.prepare("PRAGMA user_version").get() as { user_version: number } | undefined)?.user_version,
-    3,
+    SCHEMA_VERSION,
   );
 });
 
@@ -262,5 +264,69 @@ test("deleting a service takes its history with it", async () => {
     .prepare("SELECT COUNT(*) AS n FROM status_samples WHERE provider_id = ?")
     .all("github") as { n: number }[];
   assert.equal(samples?.n, 0, "orphaned history would keep showing a deleted provider");
+  db.close();
+});
+
+test("migrating to v4 creates the map tables", async () => {
+  const db = await freshDb();
+  migrate(db);
+
+  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[])
+    .map((row) => row.name);
+  assert.ok(tables.includes("map_points"), "map_points missing");
+  assert.ok(tables.includes("map_geo_state"), "map_geo_state missing");
+
+  const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
+  assert.equal(version?.user_version, 4);
+  db.close();
+});
+
+test("map_points is keyed by provider and component", async () => {
+  const db = await freshDb();
+  migrate(db);
+  db.prepare(
+    `INSERT INTO services (id, name, adapter, base_url, enabled, scope_to_components, created_at)
+     VALUES ('cloudflare', 'Cloudflare', 'statuspage', 'https://x', 1, 0, '2026-08-27T00:00:00.000Z')`,
+  ).run();
+
+  const insert = db.prepare(
+    `INSERT INTO map_points (provider_id, component_id, name, lat, lon, source, status, observed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  insert.run("cloudflare", "c1", "Amsterdam - (AMS)", 52.31, 4.76, "iata", "operational", "2026-08-27T00:00:00.000Z");
+  assert.throws(() => {
+    insert.run("cloudflare", "c1", "Amsterdam - (AMS)", 52.31, 4.76, "iata", "degraded", "2026-08-27T00:15:00.000Z");
+  }, /UNIQUE|PRIMARY/i);
+  db.close();
+});
+
+test("deleting a service clears its map rows", async () => {
+  const db = await freshDb();
+  migrate(db);
+  db.prepare(
+    `INSERT INTO services (id, name, adapter, base_url, enabled, scope_to_components, created_at)
+     VALUES ('cloudflare', 'Cloudflare', 'statuspage', 'https://x', 1, 0, '2026-08-27T00:00:00.000Z')`,
+  ).run();
+  db.prepare(
+    `INSERT INTO map_points (provider_id, component_id, name, lat, lon, source, status, observed_at)
+     VALUES ('cloudflare', 'c1', 'n', 1, 2, 'iata', 'operational', '2026-08-27T00:00:00.000Z')`,
+  ).run();
+  db.prepare(`INSERT INTO map_geo_state (provider_id, located, total, checked_at)
+              VALUES ('cloudflare', 1, 12, '2026-08-27T00:00:00.000Z')`).run();
+
+  db.exec("PRAGMA foreign_keys = ON");
+  db.prepare("DELETE FROM services WHERE id = 'cloudflare'").run();
+
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM map_points").all() as { n: number }[])[0]?.n, 0);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM map_geo_state").all() as { n: number }[])[0]?.n, 0);
+  db.close();
+});
+
+test("migrate is idempotent at v4", async () => {
+  const db = await freshDb();
+  migrate(db);
+  migrate(db);
+  const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
+  assert.equal(version?.user_version, 4);
   db.close();
 });
