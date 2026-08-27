@@ -2,11 +2,40 @@
 @import "./tokens.css";
 @import "./motion.css";
 
-/* The viewer's own ground shows through a transparent body. */
+/* Tailwind v4 defaults an un-coloured `border` to `currentColor`, and the
+   shadcn primitives under components/ui/ are written for the base layer that
+   ships with the upstream preset and was never brought across: `border` with
+   no `border-border` beside it. Card, dialog, select and dropdown were
+   therefore outlining themselves in --color-text — a full-contrast box drawn
+   around a surface whose separation is supposed to come from a hairline and a
+   shadow. Everything that wants an outline in the text colour asks for it by
+   name (`border-current`), so this only reaches the ones that never named a
+   colour at all. */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+}
+
+/* The viewer's own ground shows through a transparent body.
+
+   `background-color` and `background-image` are set separately on purpose:
+   --gradient-page is `none` in dark, and the shorthand would then reset the
+   colour along with it. Fixed attachment keeps the two blooms anchored to the
+   viewport rather than sliding up a long Cronologia page, which is the
+   difference between a lit room and a painted backdrop scrolling past. */
 body {
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  background-image: var(--gradient-page);
+  background-attachment: fixed;
   color: var(--color-text);
   font-family: var(--font-body);
+}
+
+/* The rail's own plane, painted over the `bg-card` it carries in the markup.
+   `none` in dark leaves that card fill showing, untouched. */
+.rail {
+  background-image: var(--gradient-rail);
 }
 
 /* No scrollbar gutter, anywhere: this is one operator's console, every

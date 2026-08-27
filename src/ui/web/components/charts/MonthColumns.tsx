@@ -9,8 +9,10 @@ import { formatPercent } from "@/lib/format.ts";
  * Four calendar months of aggregate uptime. A month with no samples is drawn at
  * a floor and faded: 0% would read as an outage that never happened.
  *
- * The bar itself is drawn in the accent gradient (app.css:732 —
- * `linear-gradient(180deg, var(--color-accent-500), var(--color-accent-800))`),
+ * The bar itself is drawn in the accent gradient — accent-400 into accent-700,
+ * a pair that runs saturated→pale on light and pale→deep on dark, where the
+ * prototype's 500→800 faded into the card's own fill at the bar's base once
+ * light-mode cards went white —
  * never a status colour: a month's *height* already carries how much of it was
  * uptime, and painting every bar operational-green on top of that would read
  * as "all good" regardless of what the number actually says. The gradient
@@ -37,8 +39,8 @@ export function MonthColumns({
       <svg width="0" height="0" aria-hidden="true" focusable="false">
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-accent-500)" />
-            <stop offset="100%" stopColor="var(--color-accent-800)" />
+            <stop offset="0%" stopColor="var(--color-accent-400)" />
+            <stop offset="100%" stopColor="var(--color-accent-700)" />
           </linearGradient>
         </defs>
       </svg>
