@@ -1,8 +1,9 @@
 import { useId, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 
 /** One entry as `previewComponents` reports it — before any service row exists for it. */
@@ -50,7 +51,7 @@ export function ComponentPicker({
   scopeToComponents?: boolean;
   onScopeChange?: (next: boolean) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [search, setSearch] = useState("");
   const scopeId = useId();
 
@@ -113,7 +114,12 @@ export function ComponentPicker({
         />
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-muted-foreground">
-            {t("components.selected", { count: value.length })}
+            <Trans
+              i18nKey="components.selected"
+              count={value.length}
+              values={{ count: value.length }}
+              components={[<NumberTicker locale={i18n.language} value={value.length} />]}
+            />
           </span>
           <Button type="button" variant="ghost" size="sm" onClick={selectAllVisible}>
             {t("components.select-all")}

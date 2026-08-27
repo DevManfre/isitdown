@@ -1,9 +1,9 @@
 import { PolarAngleAxis, RadialBar, RadialBarChart } from "recharts";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
 import { ChartContainer } from "@/components/ui/chart.tsx";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { AGGREGATE_FILL, chartConfigFor, statusFill } from "@/lib/chartConfig.ts";
-import { formatPercent } from "@/lib/format.ts";
 
 /**
  * What the ring grid becomes once there are too many providers to draw one
@@ -59,7 +59,7 @@ export function FleetSummary({
         </ChartContainer>
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span className="font-mono text-[11.5px] text-primary">
-            {formatPercent(i18n.language, average)}
+            <NumberTicker locale={i18n.language} value={average} decimalPlaces={2} suffix="%" />
           </span>
         </div>
       </div>
@@ -72,14 +72,24 @@ export function FleetSummary({
             variant="outline"
             className="border-status-operational/35 bg-status-operational/10 font-mono text-status-operational"
           >
-            {t("overview.summary.operational", { count: operational })}
+            <Trans
+                i18nKey="overview.summary.operational"
+                count={operational}
+                values={{ count: operational }}
+                components={[<NumberTicker locale={i18n.language} value={operational} />]}
+              />
           </Badge>
           {alarm > 0 && (
             <Badge
               variant="outline"
               className="border-destructive/40 bg-destructive/12 font-mono text-destructive"
             >
-              {t("overview.summary.alarm", { count: alarm })}
+              <Trans
+                i18nKey="overview.summary.alarm"
+                count={alarm}
+                values={{ count: alarm }}
+                components={[<NumberTicker locale={i18n.language} value={alarm} />]}
+              />
             </Badge>
           )}
         </div>

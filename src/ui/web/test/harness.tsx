@@ -108,6 +108,15 @@ export function renderWithProviders(ui: ReactElement, fixtures: Fixtures = {}, r
   );
 }
 
+/**
+ * The sentence an operator reads for a key whose number is a `<Trans>` slot.
+ * `i18n.t` hands back the catalog value with its `<0>…</0>` tags still in it —
+ * the browser never shows those, `Trans` swaps them for the `NumberTicker`. A
+ * test asserting on `t()` alone would be asserting on markup nobody reads.
+ */
+export const sentence = (key: string, values: Record<string, unknown> = {}): string =>
+  i18n.t(key, values).replace(/<\/?\d+>/g, "");
+
 export const providerFixture = (over: Partial<ProviderStatus> = {}): ProviderStatus => ({
   id: "github",
   name: "GitHub",

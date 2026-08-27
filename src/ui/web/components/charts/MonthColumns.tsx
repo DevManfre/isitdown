@@ -2,8 +2,8 @@ import { useId } from "react";
 import { Bar, BarChart, Cell, YAxis } from "recharts";
 import { useTranslation } from "react-i18next";
 import { ChartContainer } from "@/components/ui/chart.tsx";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { chartConfigFor } from "@/lib/chartConfig.ts";
-import { formatPercent } from "@/lib/format.ts";
 
 /**
  * Four calendar months of aggregate uptime. A month with no samples is drawn at
@@ -47,7 +47,11 @@ export function MonthColumns({
       {months.map((month, index) => (
         <div key={month.month} className="month-col flex flex-1 flex-col items-center gap-1">
           <span className="anim-fade font-mono text-xs text-muted-foreground">
-            {month.uptime === null ? noDataLabel : formatPercent(i18n.language, month.uptime)}
+            {month.uptime === null ? (
+              noDataLabel
+            ) : (
+              <NumberTicker locale={i18n.language} value={month.uptime} decimalPlaces={2} suffix="%" />
+            )}
           </span>
           <ChartContainer
             config={chartConfigFor()}

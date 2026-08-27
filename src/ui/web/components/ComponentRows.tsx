@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import { useComponentHistory } from "@/hooks/queries.ts";
-import { formatPercent } from "@/lib/format.ts";
 import type { ComponentHistory, ComponentStatus } from "@/lib/types.ts";
 
 const uptimeFor = (component: ComponentHistory, days: number) =>
@@ -62,7 +62,16 @@ export function ComponentRows({
                 <UptimeStrip buckets={component.buckets} />
               </span>
               <span className={`font-mono text-xs ${never ? "text-muted-foreground" : ""}`}>
-                {never ? t("components.never-measured") : formatPercent(i18n.language, uptimeFor(component, days))}
+                {never ? (
+                  t("components.never-measured")
+                ) : (
+                  <NumberTicker
+                    locale={i18n.language}
+                    value={uptimeFor(component, days)}
+                    decimalPlaces={2}
+                    suffix="%"
+                  />
+                )}
               </span>
             </div>
           );

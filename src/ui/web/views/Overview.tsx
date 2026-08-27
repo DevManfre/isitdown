@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { FleetGroups } from "@/components/FleetGroups.tsx";
 import { FleetRings } from "@/components/FleetRings.tsx";
 import { FleetRows } from "@/components/FleetRows.tsx";
@@ -8,7 +9,7 @@ import { FleetSummary } from "@/components/FleetSummary.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { worstTier } from "@/lib/chartConfig.ts";
-import { formatPercent, formatRelative } from "@/lib/format.ts";
+import { formatRelative } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
 import { overviewShape } from "@/lib/overviewShape.ts";
 import { cn } from "@/lib/utils.ts";
@@ -77,7 +78,14 @@ export function Overview() {
             ? t("overview.title.all-disabled")
             : down.length === 0
               ? t("overview.title.all-operational")
-              : t("overview.title.down", { count: down.length })}
+              : (
+                  <Trans
+                    i18nKey="overview.title.down"
+                    count={down.length}
+                    values={{ count: down.length }}
+                    components={[<NumberTicker locale={i18n.language} value={down.length} />]}
+                  />
+                )}
         </h2>
       </div>
       {/* Capped in `ch` rather than by its grid column: in the band shape the
@@ -91,12 +99,18 @@ export function Overview() {
           className="anim-rise anim-rise-hero max-w-[68ch] text-muted-foreground"
           style={{ animationDelay: "130ms" }}
         >
-          {down.length === 0
-            ? t("overview.body.all-operational", {
+          {down.length === 0 ? (
+            <Trans
+              i18nKey="overview.body.all-operational"
+              values={{
                 count: providers.length,
                 since: lastSeen === undefined ? t("meta.never-polled") : formatRelative(i18n.language, lastSeen),
-              })
-            : t("overview.body.down", { providers: down.map((p) => p.name).join(", ") })}
+              }}
+              components={[<NumberTicker locale={i18n.language} value={providers.length} />]}
+            />
+          ) : (
+            t("overview.body.down", { providers: down.map((p) => p.name).join(", ") })
+          )}
         </p>
       )}
       <div className="anim-rise anim-rise-hero flex gap-2" style={{ animationDelay: "200ms" }}>
@@ -168,7 +182,13 @@ export function Overview() {
               className="anim-fade text-sm text-muted-foreground"
               style={{ animationDelay: `${providers.length * 70}ms` }}
             >
-              {t("overview.uptime-window", { uptime: formatPercent(i18n.language, average) })}
+              <Trans
+                i18nKey="overview.uptime-window"
+                values={{ uptime: average }}
+                components={[
+                  <NumberTicker locale={i18n.language} value={average} decimalPlaces={2} suffix="%" />,
+                ]}
+              />
             </div>
           </>
         )}

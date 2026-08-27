@@ -89,7 +89,12 @@ test("every key the dashboard asks for exists in the en catalog", async () => {
   for (const file of await sourceFiles(webDir)) {
     if (file.endsWith(".test.ts") || file.endsWith(".test.tsx")) continue;
     const source = strip(readFileSync(file, "utf8"));
-    for (const match of source.matchAll(/\bt\(\s*"([\w.-]+)"/g)) {
+    // Both ways a view asks for a key: `t("…")`, and the `i18nKey` of a
+    // `<Trans>` — the form a sentence takes once the number inside it is a
+    // `NumberTicker` in a `<0>` slot. A key reached only through `Trans` is as
+    // able to be missing as any other.
+    const asked = [...source.matchAll(/\bt\(\s*"([\w.-]+)"/g), ...source.matchAll(/\bi18nKey="([\w.-]+)"/g)];
+    for (const match of asked) {
       const key = match[1] as string;
       // react-i18next resolves a count-bearing call ("t(key, { count })")
       // against `${key}_one` / `${key}_other`, never against the bare key —
