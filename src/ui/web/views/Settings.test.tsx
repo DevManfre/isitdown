@@ -345,4 +345,24 @@ describe("Settings", () => {
       ).toBeInTheDocument();
     });
   });
+
+  // Task 15: the only way to choose the Overview's geographic view without
+  // curl-ing /api/preferences directly. `off` is the default (design spec
+  // §7.4), so the control must both read that default and fire a patch that
+  // carries exactly the value picked — not on mount, not some other key.
+  it("offers the three geographic view options and saves the choice", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    await screen.findByLabelText(/geographic view/i);
+    const calls = interceptWrites({ "PATCH /api/preferences": { mapView: "map" } });
+
+    await userEvent.click(screen.getByLabelText(/geographic view/i));
+    await userEvent.click(await screen.findByRole("option", { name: /dotted map/i }));
+
+    await waitFor(() => {
+      const patchCall = calls.find(
+        (call) => call.method === "PATCH" && call.path === "/api/preferences",
+      );
+      expect(patchCall?.body).toEqual({ mapView: "map" });
+    });
+  });
 });

@@ -7,12 +7,20 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
-import { useChannelMutations, useConfig, useServiceMutations, useSettingsMutation } from "@/hooks/queries.ts";
+import {
+  useChannelMutations,
+  useConfig,
+  usePreferences,
+  usePreferencesMutation,
+  useServiceMutations,
+  useSettingsMutation,
+} from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { hostOf } from "@/lib/format.ts";
-import type { DescribedChannel, ServiceDefinition } from "@/lib/types.ts";
+import type { DescribedChannel, MapView, ServiceDefinition } from "@/lib/types.ts";
 
 /**
  * A small yes/no dialog for removing a service, on the same `Dialog` the
@@ -199,6 +207,8 @@ function ChannelCard({ channel }: { channel: DescribedChannel }) {
 export function Settings() {
   const { t } = useTranslation();
   const { data: config } = useConfig();
+  const { data: preferences } = usePreferences();
+  const patchPreferences = usePreferencesMutation();
   const settingsMutation = useSettingsMutation();
   const servicePatch = useServiceMutations().patch;
   // Above the early return below: a hook cannot be called conditionally.
@@ -269,6 +279,26 @@ export function Settings() {
               {t("action.save")}
             </Button>
             <span className="text-xs text-muted-foreground">{pollingMessage ?? t("settings.hot-note")}</span>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="map-view">{t("settings.map-view.label")}</Label>
+            <Select
+              value={preferences?.mapView ?? "off"}
+              onValueChange={(value) => patchPreferences.mutate({ mapView: value as MapView })}
+            >
+              <SelectTrigger id="map-view">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="off">{t("settings.map-view.off")}</SelectItem>
+                <SelectItem value="map">{t("settings.map-view.map")}</SelectItem>
+                <SelectItem value="globe">{t("settings.map-view.globe")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">{t("settings.map-view.hint")}</p>
           </div>
         </section>
 
