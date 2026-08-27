@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { ComponentRows } from "@/components/ComponentRows.tsx";
 import { MonthColumns } from "@/components/charts/MonthColumns.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
-import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
-import { useComponentHistory, useHistory, useStatus } from "@/hooks/queries.ts";
+import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { formatPercent } from "@/lib/format.ts";
-import type { ComponentHistory, ComponentStatus, HistorySummary, OverallStatus, ProviderHistory } from "@/lib/types.ts";
+import type { ComponentStatus, HistorySummary, OverallStatus, ProviderHistory } from "@/lib/types.ts";
 
 const RANGES = [7, 30, 90] as const;
 
@@ -17,9 +17,6 @@ const severity = (status: string) => SEVERITY[status] ?? 0;
 
 const monthLabel = (locale: string, month: string) =>
   new Intl.DateTimeFormat(locale, { month: "short" }).format(new Date(`${month}-01T00:00:00Z`));
-
-const uptimeFor = (component: ComponentHistory, days: number) =>
-  (days <= 7 ? component.uptime7 : days <= 30 ? component.uptime30 : component.uptime90);
 
 /**
  * `getHistory(days)` with no provider always resolves to a `HistorySummary`;
@@ -39,52 +36,6 @@ function downloadHistoryJson(summary: HistorySummary, days: number): void {
   anchor.download = `history-${days}d.json`;
   anchor.click();
   URL.revokeObjectURL(url);
-}
-
-/**
- * Per-component breakdown under a provider's own row. Mounted only when that
- * provider has a non-empty `componentSelection` (the parent decides), so the
- * `/history/components` request never fires for the common case of a
- * provider with nothing selected — same gating as history.js:54.
- */
-function ComponentRows({
-  providerId, days, current,
-}: {
-  providerId: string;
-  days: number;
-  current: ComponentStatus[];
-}) {
-  const { t, i18n } = useTranslation();
-  const { data } = useComponentHistory(providerId, days);
-  if (data === undefined) return null;
-
-  const currentById = new Map(current.map((component) => [component.id, component]));
-
-  return (
-    <div className="component-rows flex flex-col gap-2 border-t border-border pt-3">
-      <span className="text-xs uppercase tracking-widest text-primary">{t("components.rows-title")}</span>
-      {data.components.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("components.unsupported")}</p>
-      ) : (
-        data.components.map((component) => {
-          const live = currentById.get(component.componentId);
-          const never = component.sampleCount === 0;
-          return (
-            <div key={component.componentId} className="flex items-center justify-between gap-3">
-              <span className="flex min-w-0 items-center gap-2 text-sm">
-                <StatusDot status={live?.status ?? "unknown"} size={7} />
-                <span className="truncate">{live?.name ?? component.name}</span>
-              </span>
-              <UptimeStrip buckets={component.buckets} />
-              <span className={`font-mono text-xs ${never ? "text-muted-foreground" : ""}`}>
-                {never ? t("components.never-measured") : formatPercent(i18n.language, uptimeFor(component, days))}
-              </span>
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
 }
 
 function ProviderBlock({
@@ -122,7 +73,14 @@ function ProviderBlock({
         </div>
       </div>
       <UptimeBarRow buckets={provider.buckets} scale="row" />
-      {selection.length > 0 && <ComponentRows providerId={provider.providerId} days={days} current={current} />}
+      {selection.length > 0 && (
+        <ComponentRows
+          providerId={provider.providerId}
+          days={days}
+          current={current}
+          heading={t("components.rows-title")}
+        />
+      )}
     </div>
   );
 }

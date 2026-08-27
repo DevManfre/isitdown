@@ -30,7 +30,7 @@ const renderedOrder = (): string[] =>
   screen
     .getAllByRole("row")
     .slice(1)
-    .map((row) => (within(row).getAllByRole("cell")[0]?.textContent ?? "").replace(HOST, ""));
+    .map((row) => (within(row).getAllByRole("cell")[1]?.textContent ?? "").replace(HOST, ""));
 
 /** Clicks a column header, which is the data table's sort control. */
 const sortBy = (user: ReturnType<typeof userEvent.setup>, columnKey: string) =>
@@ -196,6 +196,187 @@ describe("Providers", () => {
     });
     expect(await screen.findByText(i18n.t("error.load-failed", { error: "HTTP 500" }))).toBeInTheDocument();
     expect(screen.queryByText(i18n.t("providers.empty"))).toBeNull();
+  });
+
+  // A provider row that monitors individual components is an accordion: the
+  // chevron expands it into what is actually being monitored and how each
+  // part is doing. Same breakdown the History view shows per provider block —
+  // literally the same `ComponentRows` component, so the two cannot drift.
+  describe("component accordion", () => {
+    const anthropic = providerFixture({
+      id: "anthropic",
+      name: "Anthropic",
+      componentSelection: [
+        { id: "api", name: "API" },
+        { id: "console", name: "Console" },
+      ],
+      components: [
+        { id: "api", name: "API", status: "operational" },
+        { id: "console", name: "Console", status: "degraded" },
+      ],
+    });
+    const statusWithComponents = {
+      providers: [providerFixture(), anthropic],
+      pollIntervalMinutes: 5,
+      lastPollAt: null,
+      nextPollAt: null,
+    };
+    const componentHistory = {
+      provider: "anthropic",
+      days: 90,
+      components: [
+        { componentId: "api", name: "API", buckets: [], uptime7: 100, uptime30: 100, uptime90: 99.4, sampleCount: 12 },
+        { componentId: "console", name: "Console", buckets: [], uptime7: 0, uptime30: 0, uptime90: 0, sampleCount: 0 },
+      ],
+    };
+    const fixtures = { status: statusWithComponents, history, componentHistory };
+
+    /** Every path the stubbed fetch has been asked for so far. */
+    const fetched = (): string[] =>
+      (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.map((call) => String(call[0]));
+
+    const toggles = () => screen.queryAllByRole("button", { name: i18n.t("providers.components-toggle") });
+
+    /** The panel a chevron controls, read off the control itself. */
+    const panelIdOf = (toggle: HTMLElement): string => toggle.getAttribute("aria-controls") ?? "";
+
+    it("offers an expand control only for a provider that monitors components", async () => {
+      renderWithProviders(<Providers />, fixtures);
+      await screen.findByText("Anthropic");
+      expect(toggles()).toHaveLength(1);
+
+      const github = screen.getByText("GitHub").closest("tr");
+      if (github === null) throw new Error("expected a table row");
+      expect(within(github).queryByRole("button")).toBeNull();
+    });
+
+    it("expands the row into its monitored components and how each is doing", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, fixtures);
+      await screen.findByText("Anthropic");
+      expect(screen.queryByText("API")).toBeNull();
+
+      await user.click(toggles()[0]!);
+
+      expect(await screen.findByText("API")).toBeInTheDocument();
+      expect(screen.getByText("Console")).toBeInTheDocument();
+      // The component's own 90-day uptime, not the provider's.
+      expect(screen.getByText("99.40%")).toBeInTheDocument();
+      // Never sampled is not 0% uptime.
+      expect(screen.getByText(i18n.t("components.never-measured"))).toBeInTheDocument();
+    });
+
+    // The breakdown costs a request, so it must not be paid for on load for
+    // every provider in the fleet — only for the row actually opened.
+    it("requests the component breakdown only once the row is expanded", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, fixtures);
+      await screen.findByText("Anthropic");
+      expect(fetched().filter((path) => path.startsWith("/history/components"))).toHaveLength(0);
+
+      await user.click(toggles()[0]!);
+      await screen.findByText("API");
+      const breakdowns = fetched().filter((path) => path.startsWith("/history/components"));
+      expect(breakdowns).toHaveLength(1);
+      expect(breakdowns[0]).toContain("provider=anthropic");
+    });
+
+    // The expanded panel has to be reachable from the control that opened it,
+    // not merely visible beneath it.
+    it("wires the control to the panel it opens with aria-expanded and aria-controls", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, fixtures);
+      await screen.findByText("Anthropic");
+      expect(toggles()[0]).toHaveAttribute("aria-expanded", "false");
+
+      await user.click(toggles()[0]!);
+      const toggle = toggles()[0]!;
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      const panelId = toggle.getAttribute("aria-controls");
+      expect(panelId).not.toBeNull();
+      const panel = document.getElementById(panelId!);
+      expect(panel).not.toBeNull();
+      expect(within(panel!).getByText("API")).toBeInTheDocument();
+    });
+
+    it("collapses the row again on a second click", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, fixtures);
+      await screen.findByText("Anthropic");
+
+      await user.click(toggles()[0]!);
+      await screen.findByText("API");
+      await user.click(toggles()[0]!);
+
+      expect(screen.queryByText("API")).toBeNull();
+      expect(toggles()[0]).toHaveAttribute("aria-expanded", "false");
+    });
+
+    // Two providers open at once: comparing a degraded provider against a
+    // healthy one is the reason to expand anything at all.
+    // The panel is content, not a row an operator can act on: no heading of
+    // its own (the chevron already said what it is) and none of TableRow's
+    // hover highlight.
+    it("gives the panel no heading and no hover highlight", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, fixtures);
+      await screen.findByText("Anthropic");
+
+      await user.click(toggles()[0]!);
+      await screen.findByText("API");
+
+      expect(screen.queryByText(i18n.t("components.rows-title"))).toBeNull();
+      const panel = document.getElementById(panelIdOf(toggles()[0]!));
+      expect(panel).toHaveClass("hover:bg-transparent");
+    });
+
+    // Sorting rebuilds the row order, and a status refetch rebuilds the row
+    // data every poll. Neither is a reason for the panel an operator opened to
+    // snap shut under them.
+    it("keeps a row expanded across a re-sort", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, fixtures);
+      await screen.findByText("Anthropic");
+
+      await user.click(toggles()[0]!);
+      await screen.findByText("API");
+      await sortBy(user, "column.provider");
+
+      expect(toggles()[0]).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText("API")).toBeInTheDocument();
+    });
+
+    it("keeps more than one row expanded at a time", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, {
+        status: {
+          providers: [
+            anthropic,
+            providerFixture({
+              id: "cf",
+              name: "Cloudflare",
+              componentSelection: [{ id: "cdn", name: "CDN" }],
+              components: [{ id: "cdn", name: "CDN", status: "operational" }],
+            }),
+          ],
+          pollIntervalMinutes: 5,
+          lastPollAt: null,
+          nextPollAt: null,
+        },
+        history,
+        componentHistory,
+      });
+      await screen.findByText("Anthropic");
+
+      await user.click(toggles()[0]!);
+      await user.click(toggles()[1]!);
+
+      expect(toggles()[0]).toHaveAttribute("aria-expanded", "true");
+      expect(toggles()[1]).toHaveAttribute("aria-expanded", "true");
+      // Both fixtures resolve to the same breakdown, so each open panel
+      // contributes one "API" row.
+      expect(screen.getAllByText("API")).toHaveLength(2);
+    });
   });
 
   // The table is a TanStack (shadcn data-table) instance, so every column

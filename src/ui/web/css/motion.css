@@ -36,6 +36,16 @@
     transform: none;
   }
 }
+@keyframes unfold {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
 @keyframes fade {
   from {
     opacity: 0;
@@ -215,6 +225,21 @@
    the row mounted long enough to play it. */
 .anim-sink {
   animation: sink 0.22s ease both;
+}
+
+/* An accordion row unfolding open. Outside the #view[data-animate] gate for
+   the same reason .anim-sink is: the panel mounts into a view that is already
+   on the page, so gating it on a remount would mean it never ran. The row
+   grows out of nothing rather than appearing at full height — a `1fr` track
+   resolves to the panel's own height, which no keyframe can hardcode — so the
+   single grid child clips whatever has not been revealed yet. */
+.anim-unfold {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: unfold 0.28s var(--ease-out) both;
+}
+.anim-unfold > * {
+  overflow: hidden;
 }
 
 .anim-sweep {
