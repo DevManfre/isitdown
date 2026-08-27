@@ -122,11 +122,25 @@ describe("GeoCard", () => {
   it("draws the globe when the preference says globe", () => {
     preferences.mockReturnValue(prefs("globe"));
     getMap.mockReturnValue({
-      data: { points: [point(52.31, 4.76)], unlocated: [], generatedAt: "2026-08-27T10:00:00.000Z" },
+      data: {
+        points: [point(52.31, 4.76)],
+        unlocated: [{ providerId: "github", providerName: "GitHub", count: 3 }],
+        generatedAt: "2026-08-27T10:00:00.000Z",
+      },
       isError: false,
     });
     renderCard();
     expect(screen.getByRole("img").getAttribute("aria-label")).toMatch(/globe|globo/i);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // The footnote sits outside the map/globe ternary in GeoCard.tsx (it is
+    // rendered whenever `located > 0`, regardless of `view`), so it must show
+    // up here too — not only in the flat-map test above. Asserting the exact
+    // interpolated sentence from the real catalog (rather than a loose digit
+    // regex) also catches a `located`/`unplaced` swap: with 1 located point
+    // and 3 unplaced components, a swap would render "3 components located
+    // · 1 could not be placed" instead, which would not match this string.
+    expect(
+      screen.getByText(i18n.t("map.footnote", { located: 1, unplaced: 3 })),
+    ).toBeInTheDocument();
   });
 });
