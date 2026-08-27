@@ -120,6 +120,34 @@ export const worstTier = (statuses: string[]): StatusTier =>
         .reduce((worst, tier) => (TIER_RANK[tier] > TIER_RANK[worst] ? tier : worst), "ok");
 
 /**
+ * The worst status in a set, as a status rather than as a tier.
+ *
+ * `worstTier` already answers this for the beacon, which only needs the
+ * verdict. A map cell needs the status itself, because its tooltip names it.
+ * Routed through `worstTier` and `TIER_STATUS` rather than carrying its own
+ * ranking table — one ordering, in one place.
+ *
+ * The empty set is guarded separately rather than delegated to `worstTier`:
+ * `worstTier([])` deliberately answers `unknown` because the Overview beacon
+ * must not read a never-polled fleet as green. A map cell has no equivalent
+ * case — `binPoints` never calls this with an empty bucket — so the vacuous
+ * answer here is the harmless one, `operational`, not a borrowed alarm.
+ */
+export const worstStatus = (statuses: string[]): OverallStatus =>
+  statuses.length === 0 ? "operational" : TIER_STATUS[worstTier(statuses)];
+
+/**
+ * A tier's colour for a mark rather than for text.
+ *
+ * `tierColor` returns `--status-*`, which is tuned for text on the page
+ * background; in the light theme those values are nearly indistinguishable
+ * from each other, so a small filled marker taking them cannot be read. Every
+ * other chart in this dashboard fills with `--status-*-fill`, and so does the
+ * map.
+ */
+export const tierFill = (tier: StatusTier): string => statusFill(TIER_STATUS[tier]);
+
+/**
  * The shadcn chart config, so a tooltip and a legend read the same colours.
  * `label` is a catalog key: whoever renders it resolves it with `t()`.
  *
