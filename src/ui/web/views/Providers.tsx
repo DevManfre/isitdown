@@ -22,7 +22,7 @@ import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { severity, statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { formatPercent, hostOf } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
-import { rowShifts } from "@/lib/rowShift.ts";
+import { isReorder, rowShifts } from "@/lib/rowShift.ts";
 import type { ComponentStatus, HistoryBucket, OverallStatus, ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -172,6 +172,12 @@ function useLeavingIds(shownIds: readonly string[]): ReadonlySet<string> {
  * The offset rides `translate`, not `transform`: `rise` is an
  * `animation-fill-mode: both` animation that keeps its final `transform: none`
  * applied to the row for good, and an animation outranks an inline style.
+ *
+ * Only a reorder is played (`isReorder`). A row also moves when the accordion
+ * panel above it unfolds, and that travel belongs to `.anim-unfold`; measuring
+ * it here produced two motions on one row at open, and — because the panel
+ * keeps growing with no render to re-measure on — a stale baseline that the
+ * next poll replayed as an 89px jump nothing had asked for.
  */
 function useRowShift() {
   const body = useRef<HTMLTableSectionElement>(null);
@@ -186,8 +192,13 @@ function useRowShift() {
       ]),
     );
     const current = new Map([...rows].map(([id, row]) => [id, row.offsetTop]));
-    const shifts = rowShifts(tops.current, current);
+    const previous = tops.current;
+    // Re-baselined either way, and before the gate: an accordion panel goes on
+    // growing after the commit that mounted it, so the measurement this leaves
+    // behind is the only one the next render can trust.
     tops.current = current;
+    if (!isReorder([...previous.keys()], [...current.keys()])) return;
+    const shifts = rowShifts(previous, current);
     if (shifts.size === 0) return;
 
     for (const [id, offset] of shifts) {
