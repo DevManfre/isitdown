@@ -294,37 +294,36 @@
 /* — rail — */
 /* The strip widens on hover and the pin chevron flips; content fades with it.
    The whole collapse mechanism, ported from the vanilla dashboard's
-   app.css:67-92. It lives here, not as a style prop in App.tsx: an inline
-   `grid-template-columns` outranks every stylesheet rule, so the peek-expand
-   below could never override it, and the four transitions further down would
-   be animating state changes that never happen.
-   Pinned open, the rail is a full-width grid column. Collapsed, the column
-   shrinks to a strip and only the chevron stays visible until the pointer (or
-   keyboard focus) arrives. Hover-opening widens the column *and* the rail
-   together, so the page gives way instead of being covered. */
-.console {
-  grid-template-columns: var(--rail-width) 1fr;
-  transition: grid-template-columns 0.28s var(--ease-out);
-}
-.rail {
+   app.css:67-92 and now expressed through the shadcn Sidebar primitive.
+
+   The rail used to be a grid track this file sized, and the peek widened the
+   track and the strip in two separate rules. `Sidebar` renders both halves
+   itself — a `sidebar-gap` that holds the column open in normal flow and a
+   fixed `sidebar-container` that paints it — and sizes each one off
+   --sidebar-width-icon while collapsed. Both read that variable, and both
+   inherit it, so the peek is now a single declaration: raise it to the full
+   rail width on the wrapper and the column and the strip widen together, the
+   page giving way instead of being covered.
+
+   That variable is declared in tokens.css off --rail-width-collapsed, not
+   inline by the provider. Stock shadcn writes it onto the wrapper as a style
+   prop, and an inline declaration outranks every stylesheet rule — the
+   override below could never have beaten it (see the note at the top of
+   components/ui/sidebar.tsx).
+
+   `data-rail` on <html> stays the state this file reads. `useRail` owns it,
+   the pre-paint script in index.html restores it, and the Sidebar's own
+   `data-state` is a mirror of the same boolean. */
+[data-slot="sidebar-gap"],
+[data-slot="sidebar-container"] {
   transition: width 0.28s var(--ease-out);
-}
-:root[data-rail="collapsed"] .console {
-  grid-template-columns: var(--rail-width-collapsed) 1fr;
-}
-:root[data-rail="collapsed"] .console:has(.rail:hover:not(.rail-hold)),
-:root[data-rail="collapsed"] .console:has(.rail:focus-within) {
-  grid-template-columns: var(--rail-width) 1fr;
-}
-:root[data-rail="collapsed"] .rail {
-  width: var(--rail-width-collapsed);
 }
 /* .rail-hold marks the strip the pointer is still standing on right after the
    collapse click: without it, :hover would reopen the rail in the same instant.
    Rail.tsx lifts it on the first mouseleave (vanilla's app.js did the same). */
-:root[data-rail="collapsed"] .rail:hover:not(.rail-hold),
-:root[data-rail="collapsed"] .rail:focus-within {
-  width: var(--rail-width);
+:root[data-rail="collapsed"] .console:has(.rail:hover:not(.rail-hold)),
+:root[data-rail="collapsed"] .console:has(.rail:focus-within) {
+  --sidebar-width-icon: var(--rail-width);
 }
 :root[data-rail="collapsed"] .rail:not(:hover):not(:focus-within) :is(.rail-dot, .rail-name, .rail-links, .rail-foot),
 :root[data-rail="collapsed"] .rail.rail-hold :is(.rail-dot, .rail-name, .rail-links, .rail-foot) {
@@ -361,18 +360,30 @@
 .rail-name {
   transition: opacity 0.22s ease;
 }
-/* Hovering nudges the label 4px further in, pressing settles at 2px. */
-.rail-link {
+/* Hovering nudges the label 4px further in, pressing settles at 2px.
+
+   `SidebarMenuButton` supplies the row's fill and its active state, so the
+   only things left here are the accent edge the prototype gives the active
+   row — which no shadcn variant draws — and the nudge. The base padding is
+   set here too: the hand-rolled row carried Tailwind's `pl-6` (24px) while
+   these rules nudged to `--space-6 + 4px` (20.8px), so hovering pulled the
+   label *left*. One origin, one unit, and the nudge goes the way it reads. */
+[data-slot="sidebar-menu-button"] {
+  padding-left: var(--space-6);
+  border-left: 2px solid transparent;
   transition:
     background 0.22s var(--ease-out),
     color 0.22s ease,
     border-color 0.22s ease,
     padding-left 0.22s var(--ease-out);
 }
-.rail-link:hover {
+[data-slot="sidebar-menu-button"][data-active="true"] {
+  border-left-color: var(--color-primary);
+}
+[data-slot="sidebar-menu-button"]:hover {
   padding-left: calc(var(--space-6) + 4px);
 }
-.rail-link:active {
+[data-slot="sidebar-menu-button"]:active {
   padding-left: calc(var(--space-6) + 2px);
 }
 
@@ -515,8 +526,8 @@
   [data-slot="badge"]:active {
     transform: none;
   }
-  .rail-link:hover,
-  .rail-link:active {
+  [data-slot="sidebar-menu-button"]:hover,
+  [data-slot="sidebar-menu-button"]:active {
     padding-left: var(--space-6);
   }
 }

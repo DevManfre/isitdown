@@ -2,6 +2,8 @@ import { Outlet, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Rail } from "@/components/Rail.tsx";
 import { Header } from "@/components/Header.tsx";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar.tsx";
+import { useRail } from "@/hooks/useRail.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
 import { usePreferenceSync } from "@/hooks/usePreferenceSync.tsx";
 
@@ -27,6 +29,7 @@ export function App() {
   const params = useParams();
   const { i18n } = useTranslation();
   const { mode } = useTheme();
+  const { collapsed, toggle } = useRail();
   // Seeds theme and locale from the server on a browser that has no stored
   // choice of its own. Mounted here, in the shell, so it runs once per session
   // rather than once per view.
@@ -36,19 +39,26 @@ export function App() {
   const view = currentView(location.pathname, paramString !== "");
 
   return (
-    <div className="console grid min-h-screen">
+    // `SidebarProvider` is driven, not trusted with the state: `useRail` owns
+    // the pin, persists it and stamps data-rail on <html> for the pre-paint
+    // script, so the provider is handed the same boolean rather than keeping a
+    // second copy of it. `.console` is what motion.css hangs the peek on.
+    <SidebarProvider className="console" open={!collapsed} onOpenChange={toggle}>
       <Rail />
-      <div className="flex min-w-0 flex-col">
+      {/* `SidebarInset` is the page's one <main>, so the animated view below is
+          a div. Its stock `bg-background` is dropped: the body carries
+          --gradient-page, and an opaque fill here would paint over it. */}
+      <SidebarInset className="min-w-0 bg-transparent">
         <Header view={view} />
-        <main
+        <div
           id="view"
           key={viewKey(view, paramString, i18n.language, mode)}
           data-animate={view}
           className="min-w-0 flex-1 px-8 py-6"
         >
           <Outlet />
-        </main>
-      </div>
-    </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

@@ -10,6 +10,8 @@
   "nav.notifier": "Notifier",
   "nav.rail-collapse": "Collapse the sidebar",
   "nav.rail-expand": "Expand the sidebar",
+  "nav.sidebar-toggle": "Toggle the sidebar",
+  "nav.sidebar-mobile": "Shows the sidebar on a narrow screen.",
 
   "action.add-service": "Add service",
   "action.poll-now": "Poll now",
@@ -78,9 +80,9 @@
 
   "providers.intro": "A provider is an adapter plus a base URL. Add, edit and remove them in Settings.",
   "providers.empty": "No providers configured yet — add one in Settings.",
+  "providers.components-toggle": "Show monitored components",
   "providers.remove-confirm": "Remove {name}? Its uptime history and incidents go with it.",
 
-  "providers.components-toggle": "Show monitored components",
   "incidents.filter.label": "Incident filter",
   "incidents.active": "Active incident",
   "incidents.closed": "Closed",

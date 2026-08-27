@@ -10,6 +10,8 @@
   "nav.notifier": "Notifiche",
   "nav.rail-collapse": "Comprimi la barra laterale",
   "nav.rail-expand": "Espandi la barra laterale",
+  "nav.sidebar-toggle": "Apri o chiudi la barra laterale",
+  "nav.sidebar-mobile": "Mostra la barra laterale su schermo stretto.",
 
   "action.add-service": "Aggiungi servizio",
   "action.poll-now": "Aggiorna ora",
@@ -78,9 +80,9 @@
 
   "providers.intro": "Ogni provider è un adapter più un base URL. Si aggiungono, modificano e rimuovono nelle Impostazioni.",
   "providers.empty": "Nessun provider configurato — aggiungine uno nelle Impostazioni.",
+  "providers.components-toggle": "Mostra i componenti monitorati",
   "providers.remove-confirm": "Rimuovere {name}? Anche la sua cronologia di uptime e i suoi incidenti verranno eliminati.",
 
-  "providers.components-toggle": "Mostra i componenti monitorati",
   "incidents.filter.label": "Filtro incidenti",
   "incidents.active": "Incidente attivo",
   "incidents.closed": "Chiusi",
