@@ -27,6 +27,17 @@ describe("motion.css after the react port", () => {
     expect(code).not.toContain("#view[data-animate] .anim-sink");
   });
 
+  // The shift that closes the gap under a dropped row is set inline on the row,
+  // which an `animation-fill-mode: both` entry animation would outrank on
+  // `transform` — so it rides `translate`, and this is the transition that
+  // makes the ranks close rather than jump.
+  it("transitions a table row on `translate`, and still on background", () => {
+    const rule = /\[data-slot="table-row"\]\s*\{([^}]*)\}/.exec(code);
+    expect(rule, "no transition rule for table rows").not.toBeNull();
+    expect(rule?.[1]).toMatch(/\btranslate\s+[\d.]+s/);
+    expect(rule?.[1], "the row's own background fade must survive it").toMatch(/\bbackground\s+[\d.]+s/);
+  });
+
   it("drops the vanilla repaint hack", () => {
     expect(code).not.toContain("anim-quiet");
   });

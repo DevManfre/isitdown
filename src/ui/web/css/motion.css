@@ -431,8 +431,15 @@
 [data-slot="badge"]:active {
   transform: scale(0.95);
 }
+/* `translate` carries the ranks closing over a dropped row (useRowShift in
+   Providers.tsx). It has to be its own property rather than a transform: the
+   entry animation fills `transform` forever, and an animation outranks the
+   inline style the shift is set through. Slower than the 0.22s dissolve that
+   precedes it, so the gap closes as a settle rather than a second snap. */
 [data-slot="table-row"] {
-  transition: background 0.2s ease;
+  transition:
+    background 0.2s ease,
+    translate 0.28s var(--ease-out);
 }
 [data-slot="table-cell"] {
   transition: color 0.2s ease;
