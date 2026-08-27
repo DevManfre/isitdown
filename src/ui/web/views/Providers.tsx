@@ -1,13 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  createColumnHelper,
+  createSortedRowModel,
+  rowSortingFeature,
+  sortFn_basic,
+  sortFn_text,
+  tableFeatures,
+  useTable,
+} from "@tanstack/react-table";
+import type { SortDirection } from "@tanstack/react-table";
+import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
+import { Button } from "@/components/ui/button.tsx";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
-import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
+import { severity, statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { formatPercent, hostOf } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
+import { rowShifts } from "@/lib/rowShift.ts";
+import type { HistoryBucket, OverallStatus, ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
 const WINDOW_DAYS = 90;
@@ -16,6 +30,81 @@ const WINDOW_DAYS = 90;
 const EXIT_MS = 220;
 
 type Filter = "all" | "issues";
+
+/** No provider yet: a fresh fallback array each render would invalidate the row model. */
+const NO_PROVIDERS: ProviderStatus[] = [];
+
+/**
+ * One table row, flattened.
+ *
+ * A sortable column has to sort on the same value its cell shows, so uptime
+ * and the incident count are resolved out of the history summary here rather
+ * than inside the cell renderer.
+ */
+interface ProviderRow {
+  id: string;
+  name: string;
+  host: string;
+  adapter: string;
+  status: OverallStatus;
+  /**
+   * chartConfig's severity weight, so the status column sorts by how bad a
+   * status is rather than alphabetically by its label. `unknown` sits below
+   * `operational` there on purpose: never measured is not a fault.
+   */
+  severity: number;
+  uptime: number;
+  incidents: number;
+  buckets: HistoryBucket[];
+  enabled: boolean;
+}
+
+/**
+ * The data table's feature set — sorting, and nothing else.
+ *
+ * TanStack Table v9 installs a feature's state and APIs only where the
+ * feature is registered, so there is no filtered row model here (the
+ * all/issues toggle stays plain component state, as it was) and no
+ * pagination: the fleet is a handful of rows.
+ */
+const features = tableFeatures({
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { text: sortFn_text, basic: sortFn_basic },
+});
+
+const helper = createColumnHelper<typeof features, ProviderRow>();
+
+/** Only what the header control touches, so it carries none of the table's generics. */
+interface SortableColumn {
+  getIsSorted: () => false | SortDirection;
+  getToggleSortingHandler: () => ((event: unknown) => void) | undefined;
+}
+
+/**
+ * A column header as the table's sort control: shadcn's data-table pattern of
+ * a ghost button inside the `<th>`, the arrow standing in for the state.
+ */
+function SortHead({ column, label }: { column: SortableColumn; label: string }) {
+  const sorted = column.getIsSorted();
+  const Icon = sorted === "asc" ? ArrowUp : sorted === "desc" ? ArrowDown : ChevronsUpDown;
+  return (
+    <Button variant="ghost" size="sm" className="-mx-2" onClick={column.getToggleSortingHandler()}>
+      {label}
+      <Icon className={cn("size-3", sorted === false && "opacity-40")} />
+    </Button>
+  );
+}
+
+/** What `aria-sort` on the header cell says, so the state reaches a screen reader too. */
+const ariaSort = (sorted: false | SortDirection): "ascending" | "descending" | "none" =>
+  sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none";
+
+const hasIssue = (provider: ProviderStatus) => provider.overallStatus !== "operational";
+
+/** The ids the filter keeps: the whole fleet, or only what has an open issue. */
+const shownBy = (providers: readonly ProviderStatus[], filter: Filter): string[] =>
+  (filter === "issues" ? providers.filter(hasIssue) : providers).map((provider) => provider.id);
 
 /**
  * The ids the filter has just dropped, held for one exit-animation beat.
@@ -57,6 +146,60 @@ function useLeavingIds(shownIds: readonly string[]): ReadonlySet<string> {
 }
 
 /**
+ * Plays the closing of the gap a dropped row leaves behind, instead of letting
+ * the rows below it jump a row's height the instant it unmounts.
+ *
+ * `.anim-sink` only dissolves the row that is going; the collision underneath
+ * it was still a cut. So every commit measures the body, and any row that
+ * changed place is put back where it was and released a frame later — the rows
+ * close ranks along the same curve the rest of the view moves on. It smooths
+ * the opposite case for free: rows pushed down by an arriving one glide down
+ * while that one rises.
+ *
+ * The offset rides `translate`, not `transform`: `rise` is an
+ * `animation-fill-mode: both` animation that keeps its final `transform: none`
+ * applied to the row for good, and an animation outranks an inline style.
+ */
+function useRowShift() {
+  const body = useRef<HTMLTableSectionElement>(null);
+  const tops = useRef<ReadonlyMap<string, number>>(new Map());
+
+  useLayoutEffect(() => {
+    if (body.current === null) return;
+    const rows = new Map(
+      [...body.current.querySelectorAll<HTMLTableRowElement>("tr[data-row-id]")].map((row) => [
+        row.dataset.rowId ?? "",
+        row,
+      ]),
+    );
+    const current = new Map([...rows].map(([id, row]) => [id, row.offsetTop]));
+    const shifts = rowShifts(tops.current, current);
+    tops.current = current;
+    if (shifts.size === 0) return;
+
+    for (const [id, offset] of shifts) {
+      const row = rows.get(id);
+      if (row === undefined) continue;
+      row.style.transition = "none";
+      row.style.translate = `0 ${offset}px`;
+      // Reading a layout property commits that start position; without the
+      // flush the browser only ever sees the final one and nothing animates.
+      void row.offsetHeight;
+      row.style.transition = "";
+    }
+    const frame = requestAnimationFrame(() => {
+      for (const id of shifts.keys()) {
+        const row = rows.get(id);
+        if (row !== undefined) row.style.translate = "";
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  });
+
+  return body;
+}
+
+/**
  * Design 3a's Providers table: one row per configured provider with its
  * status, an inline uptime strip, and its uptime and incident counts.
  *
@@ -64,6 +207,12 @@ function useLeavingIds(shownIds: readonly string[]): ReadonlySet<string> {
  * Settings (Task 12), so a glance at the fleet can never turn into an
  * accidental edit. Straight port of src/ui/public/js/views/providers.js,
  * minus the edit/remove buttons and add-service dialog that move there.
+ *
+ * The rows are a shadcn data table (TanStack Table v9) rather than a plain
+ * `<Table>`: every column header sorts, which is what a fleet view is for —
+ * worst status, worst uptime, most incidents, each one click away. The
+ * reorder animates itself, because useRowShift already plays any change of
+ * row position as motion.
  */
 export function Providers() {
   const { t, i18n } = useTranslation();
@@ -71,24 +220,109 @@ export function Providers() {
   const { data: summary } = useHistory(WINDOW_DAYS);
   const [filter, setFilter] = useState<Filter>("all");
 
-  const providers = status?.providers ?? [];
-  const byId = new Map(summaryProviders(summary).map((p) => [p.providerId, p]));
+  const providers = status?.providers ?? NO_PROVIDERS;
 
-  // providers.js:64-67 — showIssuesOnly filters client-side to providers with
-  // an open issue; the "all" fleet is otherwise shown in its configured order.
-  const filtered = filter === "issues" ? providers.filter((p) => p.overallStatus !== "operational") : providers;
-  const shownIds = filtered.map((p) => p.id);
-  const shown = new Set(shownIds);
+  // providers.js:64-67 — showIssuesOnly filters client-side to the providers
+  // with an open issue; "all" is otherwise the fleet in its configured order.
+  const shownIds = shownBy(providers, filter);
   // Sits above the empty-state return below: a hook cannot go behind one.
   const leaving = useLeavingIds(shownIds);
+  const body = useRowShift();
 
-  if (providers.length === 0) {
-    return <p className="text-muted-foreground">{t("providers.empty")}</p>;
-  }
+  // The row model is rebuilt from this array's identity, so it is memoised on
+  // the three things that actually change it. `leaving` is state: a new Set
+  // only when membership changed.
+  const data = useMemo<ProviderRow[]>(() => {
+    const byId = new Map(summaryProviders(summary).map((provider) => [provider.providerId, provider]));
+    const shown = new Set(shownBy(providers, filter));
+    return providers
+      .filter((provider) => shown.has(provider.id) || leaving.has(provider.id))
+      .map((provider) => {
+        const history = byId.get(provider.id);
+        return {
+          id: provider.id,
+          name: provider.name,
+          host: hostOf(provider.baseUrl),
+          adapter: provider.adapter,
+          status: provider.overallStatus,
+          severity: severity(provider.overallStatus),
+          uptime: history?.uptime90 ?? provider.uptime90,
+          incidents: history?.incidentCount ?? 0,
+          buckets: history?.buckets ?? [],
+          enabled: provider.enabled,
+        };
+      });
+  }, [providers, summary, filter, leaving]);
 
-  // A row the filter has just dropped keeps its slot until `.anim-sink` has
-  // played, so the table empties the way it fills instead of blinking.
-  const rows = providers.filter((p) => shown.has(p.id) || leaving.has(p.id));
+  // Rebuilt when the catalog language changes, since every header label and
+  // the status labels are resolved through `t()` in here.
+  const columns = useMemo(
+    () =>
+      helper.columns([
+        helper.accessor("name", {
+          header: ({ column }) => <SortHead column={column} label={t("column.provider")} />,
+          sortFn: "text",
+          cell: ({ row }) => (
+            <span className="flex items-center gap-2">
+              <StatusDot status={row.original.status} glow={8} />
+              <span className="flex flex-col">
+                <span>{row.original.name}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{row.original.host}</span>
+              </span>
+            </span>
+          ),
+        }),
+        helper.accessor("adapter", {
+          header: ({ column }) => <SortHead column={column} label={t("column.adapter")} />,
+          sortFn: "text",
+          cell: ({ getValue }) => <span className="font-mono text-xs">{getValue()}</span>,
+        }),
+        helper.accessor("severity", {
+          header: ({ column }) => <SortHead column={column} label={t("column.status")} />,
+          sortFn: "basic",
+          // Worst first on the first click: that is the row being looked for.
+          sortDescFirst: true,
+          cell: ({ row }) => (
+            <span style={{ color: statusColor(row.original.status) }}>
+              {t(statusLabelKey(row.original.status))}
+            </span>
+          ),
+        }),
+        helper.accessor("uptime", {
+          header: ({ column }) => <SortHead column={column} label={t("column.uptime")} />,
+          sortFn: "basic",
+          // Lowest uptime first, for the same reason.
+          sortDescFirst: false,
+          cell: ({ row }) => (
+            <span className="flex min-w-40 items-center gap-3">
+              <UptimeStrip buckets={row.original.buckets} />
+              <span className="font-mono text-xs">{formatPercent(i18n.language, row.original.uptime)}</span>
+            </span>
+          ),
+        }),
+        helper.accessor("incidents", {
+          header: ({ column }) => <SortHead column={column} label={t("column.incidents")} />,
+          sortFn: "basic",
+          // Busiest provider first.
+          sortDescFirst: true,
+          cell: ({ getValue }) => <span className="font-mono text-xs">{getValue()}</span>,
+        }),
+      ]),
+    [t, i18n.language],
+  );
+
+  const table = useTable({
+    features,
+    columns,
+    data,
+    // Provider ids are what the exit animation and the FLIP measure rows by.
+    getRowId: (row) => row.id,
+    // A third click on a header drops the sort instead of cycling back to
+    // ascending, so the configured order stays one click away.
+    enableSortingRemoval: true,
+    // One column at a time: five columns do not need a shift-click contract.
+    enableMultiSort: false,
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -96,8 +330,8 @@ export function Providers() {
         <p className="anim-fade text-sm text-muted-foreground">{t("providers.intro")}</p>
         {/* providers.js:73-97 (headerRow) — a seg-pills toggle beside the
             intro line. `type="multiple"` (not "single") so Radix leaves the
-            plain `aria-pressed` attribute alone instead of swapping it for
-            `role="radio"`/`aria-checked` — matching this codebase's own
+            plain `aria-pressed` attribute alone instead of swapping in
+            `role="radio"`/`aria-checked` — matching the codebase's own
             convention (Header.tsx's language switcher) and motion.css's
             `[data-slot="toggle-group-item"]` transition hook either way.
             Single-selection is enforced by hand below. */}
@@ -116,59 +350,44 @@ export function Providers() {
           <ToggleGroupItem value="issues">{t("filter.issues")}</ToggleGroupItem>
         </ToggleGroup>
       </div>
-      {rows.length === 0 ? (
+      {data.length === 0 ? (
         <p className="text-muted-foreground">{t("providers.empty")}</p>
       ) : (
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>{t("column.provider")}</TableHead>
-              <TableHead>{t("column.adapter")}</TableHead>
-              <TableHead>{t("column.status")}</TableHead>
-              <TableHead>{t("column.uptime")}</TableHead>
-              <TableHead>{t("column.incidents")}</TableHead>
-            </TableRow>
+            {table.getHeaderGroups().map((group) => (
+              <TableRow key={group.id}>
+                {group.headers.map((header) => (
+                  <TableHead key={header.id} aria-sort={ariaSort(header.column.getIsSorted())}>
+                    <table.FlexRender header={header} />
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
           </TableHeader>
-          <TableBody>
-            {rows.map((provider, index) => {
-              const history = byId.get(provider.id);
-              const isLeaving = leaving.has(provider.id);
+          <TableBody ref={body}>
+            {table.getRowModel().rows.map((row, index) => {
+              const isLeaving = leaving.has(row.id);
               return (
                 <TableRow
-                  key={provider.id}
+                  key={row.id}
+                  // What useRowShift measures each row by; a key is React's
+                  // own bookkeeping and never reaches the DOM.
+                  data-row-id={row.id}
                   // A disabled provider is still listed, only dimmed: its
                   // history is real either way.
                   className={cn(
                     isLeaving ? "anim-sink" : "anim-rise anim-rise-table-row",
-                    !provider.enabled && "opacity-55",
+                    !row.original.enabled && "opacity-55",
                   )}
                   // A row on its way out goes at once; only arrivals stagger.
                   style={{ animationDelay: isLeaving ? "0ms" : `${index * 60}ms` }}
                 >
-                  <TableCell>
-                    <span className="flex items-center gap-2">
-                      <StatusDot status={provider.overallStatus} glow={8} />
-                      <span className="flex flex-col">
-                        <span>{provider.name}</span>
-                        <span className="font-mono text-[10px] text-muted-foreground">
-                          {hostOf(provider.baseUrl)}
-                        </span>
-                      </span>
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{provider.adapter}</TableCell>
-                  <TableCell style={{ color: statusColor(provider.overallStatus) }}>
-                    {t(statusLabelKey(provider.overallStatus))}
-                  </TableCell>
-                  <TableCell className="min-w-40">
-                    <span className="flex items-center gap-3">
-                      <UptimeStrip buckets={history?.buckets ?? []} />
-                      <span className="font-mono text-xs">
-                        {formatPercent(i18n.language, history?.uptime90 ?? provider.uptime90)}
-                      </span>
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{history?.incidentCount ?? 0}</TableCell>
+                  {row.getAllCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      <table.FlexRender cell={cell} />
+                    </TableCell>
+                  ))}
                 </TableRow>
               );
             })}

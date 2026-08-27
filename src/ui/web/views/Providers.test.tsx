@@ -21,6 +21,21 @@ const history = {
   providers: [{ providerId: "github", buckets: [], uptime90: 99.9, incidentCount: 2 }],
 };
 
+// Every fixture provider shares one baseUrl, so the host line the provider
+// cell renders beneath the name strips back out of the cell's text.
+const HOST = "www.githubstatus.com";
+
+/** The provider names in the order the table renders them, top row first. */
+const renderedOrder = (): string[] =>
+  screen
+    .getAllByRole("row")
+    .slice(1)
+    .map((row) => (within(row).getAllByRole("cell")[0]?.textContent ?? "").replace(HOST, ""));
+
+/** Clicks a column header, which is the data table's sort control. */
+const sortBy = (user: ReturnType<typeof userEvent.setup>, columnKey: string) =>
+  user.click(screen.getByRole("button", { name: i18n.t(columnKey) }));
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Providers", () => {
@@ -181,5 +196,134 @@ describe("Providers", () => {
     });
     expect(await screen.findByText(i18n.t("error.load-failed", { error: "HTTP 500" }))).toBeInTheDocument();
     expect(screen.queryByText(i18n.t("providers.empty"))).toBeNull();
+  });
+
+  // The table is a TanStack (shadcn data-table) instance, so every column
+  // header is a sort control: clicking one re-orders the rows client-side.
+  // These pin the order an operator reads, not the sorting state object.
+  describe("sorting", () => {
+    it("sorts by provider name, reverses, then returns to the configured order", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, { status, history });
+      await screen.findByText("GitHub");
+      expect(renderedOrder()).toEqual(["GitHub", "Cloudflare", "Discord"]);
+
+      await sortBy(user, "column.provider");
+      expect(renderedOrder()).toEqual(["Cloudflare", "Discord", "GitHub"]);
+
+      await sortBy(user, "column.provider");
+      expect(renderedOrder()).toEqual(["GitHub", "Discord", "Cloudflare"]);
+
+      // Third click drops the sort rather than cycling back to ascending, so
+      // the configured order stays reachable.
+      await sortBy(user, "column.provider");
+      expect(renderedOrder()).toEqual(["GitHub", "Cloudflare", "Discord"]);
+    });
+
+    // Status has to sort by how bad it is, not by its label: alphabetically
+    // "Degraded" leads and "Operational" trails, which would read as an
+    // ordering by severity while being nothing of the sort.
+    it("sorts the status column worst-first, by severity and not by label", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, {
+        status: {
+          providers: [
+            providerFixture({ id: "github", name: "GitHub" }),
+            providerFixture({ id: "cf", name: "Cloudflare", overallStatus: "degraded" }),
+            providerFixture({ id: "discord", name: "Discord", overallStatus: "major_outage" }),
+          ],
+          pollIntervalMinutes: 5,
+          lastPollAt: null,
+          nextPollAt: null,
+        },
+        history,
+      });
+      await screen.findByText("GitHub");
+
+      await sortBy(user, "column.status");
+      expect(renderedOrder()).toEqual(["Discord", "Cloudflare", "GitHub"]);
+
+      await sortBy(user, "column.status");
+      expect(renderedOrder()).toEqual(["GitHub", "Cloudflare", "Discord"]);
+    });
+
+    // "100" sorts before "9.5" as text; the column is a number.
+    it("sorts uptime numerically, not as text", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, {
+        status: {
+          providers: [
+            providerFixture({ id: "github", name: "GitHub" }),
+            providerFixture({ id: "cf", name: "Cloudflare" }),
+            providerFixture({ id: "discord", name: "Discord" }),
+          ],
+          pollIntervalMinutes: 5,
+          lastPollAt: null,
+          nextPollAt: null,
+        },
+        history: {
+          aggregateUptime: 70,
+          months: [],
+          providers: [
+            { providerId: "github", buckets: [], uptime90: 100, incidentCount: 0 },
+            { providerId: "cf", buckets: [], uptime90: 9.5, incidentCount: 0 },
+            { providerId: "discord", buckets: [], uptime90: 99.9, incidentCount: 0 },
+          ],
+        },
+      });
+      await screen.findByText("GitHub");
+
+      // Worst uptime first: that is the row an operator is looking for.
+      await sortBy(user, "column.uptime");
+      expect(renderedOrder()).toEqual(["Cloudflare", "Discord", "GitHub"]);
+
+      await sortBy(user, "column.uptime");
+      expect(renderedOrder()).toEqual(["GitHub", "Discord", "Cloudflare"]);
+    });
+
+    it("sorts by incident count, busiest provider first", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, { status, history });
+      await screen.findByText("GitHub");
+
+      // Only GitHub has incidents in the history fixture (2).
+      await sortBy(user, "column.incidents");
+      expect(renderedOrder()[0]).toBe("GitHub");
+    });
+
+    it("sorts by adapter", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, {
+        status: {
+          providers: [
+            providerFixture({ id: "github", name: "GitHub", adapter: "statuspage" }),
+            providerFixture({ id: "cf", name: "Cloudflare", adapter: "atlassian" }),
+          ],
+          pollIntervalMinutes: 5,
+          lastPollAt: null,
+          nextPollAt: null,
+        },
+        history,
+      });
+      await screen.findByText("GitHub");
+
+      await sortBy(user, "column.adapter");
+      expect(renderedOrder()).toEqual(["Cloudflare", "GitHub"]);
+    });
+
+    // Sort state has to reach a screen reader too, and `aria-sort` on the
+    // header cell is what carries it.
+    it("reports the sorted column and its direction with aria-sort", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, { status, history });
+      await screen.findByText("GitHub");
+      const header = () => screen.getByRole("button", { name: i18n.t("column.provider") }).closest("th");
+
+      expect(header()).toHaveAttribute("aria-sort", "none");
+      await sortBy(user, "column.provider");
+      expect(header()).toHaveAttribute("aria-sort", "ascending");
+      await sortBy(user, "column.provider");
+      expect(header()).toHaveAttribute("aria-sort", "descending");
+    });
   });
 });
