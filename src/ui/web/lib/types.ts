@@ -216,6 +216,30 @@ export interface RuntimeConfigResponse {
   channels: DescribedChannel[];
 }
 
+export interface MapPoint {
+  providerId: string;
+  providerName: string;
+  componentId: string;
+  name: string;
+  lat: number;
+  lon: number;
+  status: OverallStatus;
+  source: "iata" | "region";
+}
+
+export interface UnlocatedProvider {
+  providerId: string;
+  providerName: string;
+  count: number;
+}
+
+export interface MapResponse {
+  points: MapPoint[];
+  unlocated: UnlocatedProvider[];
+  /** Newest observation in the snapshot, null when nothing is stored yet. */
+  generatedAt: string | null;
+}
+
 export type MapView = "off" | "map" | "globe";
 
 export interface Preferences {

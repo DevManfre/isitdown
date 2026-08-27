@@ -3,6 +3,7 @@ import type {
   ComponentPreview,
   IncidentDetail,
   IncidentsResponse,
+  MapResponse,
   OverallStatus,
   Preferences,
   ProviderHistory,
@@ -109,6 +110,8 @@ export const patchChannel = (id: string, patch: unknown) =>
   request<unknown>("PATCH", `/config/channels/${encodeURIComponent(id)}`, patch);
 export const testChannel = (id: string) =>
   request<{ ok: boolean; error?: string }>("POST", `/config/channels/${encodeURIComponent(id)}/test`);
+
+export const getMap = () => request<MapResponse>("GET", "/map");
 
 export const getPreferences = () => request<Preferences>("GET", "/api/preferences");
 export const patchPreferences = (patch: Partial<Preferences>) =>

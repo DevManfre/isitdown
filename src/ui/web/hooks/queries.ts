@@ -162,6 +162,26 @@ export const useNotifications = (limit = 20) => {
 };
 
 /**
+ * The Overview's geographic card.
+ *
+ * `enabled` is the stored `mapView` preference being anything but `off`: the
+ * card is not merely hidden when the operator has not asked for it, the request
+ * is never issued. Never throws, for the same reason the chrome hooks do not —
+ * a failed map must show its own error inside the card, not replace the
+ * Overview with one.
+ */
+export function useMap(enabled: boolean) {
+  const busy = useBusy();
+  return useQuery({
+    queryKey: ["map"],
+    queryFn: api.getMap,
+    enabled,
+    refetchInterval: busy ? false : REFRESH_MS,
+    throwOnError: false,
+  });
+}
+
+/**
  * The stored preferences, read once at startup by `usePreferenceSync` so a
  * fresh browser starts where the operator left off (design spec §7.4).
  *

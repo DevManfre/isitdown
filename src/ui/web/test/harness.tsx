@@ -11,7 +11,15 @@ import { BusyProvider } from "@/hooks/useBusy.tsx";
 import { ThemeProvider } from "@/hooks/useTheme.tsx";
 import type { ProviderStatus } from "@/lib/types.ts";
 
-type FixtureKey = "status" | "config" | "history" | "incidents" | "incident" | "notifications" | "componentHistory";
+type FixtureKey =
+  | "status"
+  | "config"
+  | "history"
+  | "incidents"
+  | "incident"
+  | "notifications"
+  | "componentHistory"
+  | "map";
 
 export interface Fixtures {
   status?: unknown;
@@ -21,6 +29,7 @@ export interface Fixtures {
   incident?: unknown;
   notifications?: unknown;
   componentHistory?: unknown;
+  map?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -56,7 +65,9 @@ export function stubApi(fixtures: Fixtures): void {
                 ? "notifications"
                 : path.startsWith("/config")
                   ? "config"
-                  : "status";
+                  : path.startsWith("/map")
+                    ? "map"
+                    : "status";
       const errorStatus = fixtures.errors?.[key];
       if (errorStatus !== undefined) {
         return { ok: false, status: errorStatus, text: async () => "" };

@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { Component, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useConfigChrome, useIncidents, useStatusChrome } from "./queries.ts";
+import { createQueryClient } from "@/lib/queryClient.ts";
+import { useConfigChrome, useIncidents, useMap, useStatusChrome } from "./queries.ts";
 import { BusyProvider, useFieldProps } from "./useBusy.tsx";
 
 /**
@@ -243,5 +244,48 @@ describe("the countdown's own query is never held", () => {
     });
 
     expect(fetchCount(), "the countdown's clock stopped because a field had focus").toBeGreaterThan(held);
+  });
+});
+
+/**
+ * `off` must disable the query outright, not merely hide the card it feeds:
+ * a hidden-but-fetching card would still poll the server every refresh
+ * interval for a view nobody is looking at. `enabled` is the caller's
+ * `mapView !== "off"` — these two cases are the ones `useMap` itself owns.
+ */
+describe("useMap", () => {
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={createQueryClient({ retry: false })}>{children}</QueryClientProvider>
+  );
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("issues no request when disabled", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useMap(false), { wrapper });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.current.data).toBeUndefined();
+
+    // A query that dispatched but has not resolved yet would also show
+    // `data === undefined` above — give any such fetch a further tick before
+    // trusting the assertion, so this proves no *request*, not just no data.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fetches /map when enabled", async () => {
+    const body = { points: [], unlocated: [], generatedAt: null };
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, text: async () => JSON.stringify(body) }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useMap(true), { wrapper });
+
+    await waitFor(() => expect(result.current.data).toEqual(body));
+    expect(fetchMock).toHaveBeenCalledWith("/map", expect.anything());
   });
 });
