@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { MotionGlobalConfig } from "motion/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NumberTicker, tickerDuration } from "./number-ticker";
 
 // The suite runs with the reduced-motion preference reported as set
@@ -42,4 +43,32 @@ describe("NumberTicker", () => {
     rerender(<NumberTicker locale="en" value={5} />);
     expect(screen.getByText("5")).toBeInTheDocument();
   });
+
+  // The one test that lets the spring actually run: an operator opening the
+  // dashboard sees every figure count, including the ones below the fold, so
+  // an observer that never reports the span as visible must not hold it at 0.
+  it("counts on load rather than waiting for the figure to be scrolled into view", async () => {
+    MotionGlobalConfig.skipAnimations = false;
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+        takeRecords() {
+          return [];
+        }
+      },
+    );
+
+    render(<NumberTicker locale="en" value={42} />);
+
+    // Longer than the ticker's own run — see `tickerDuration`.
+    expect(await screen.findByText("42", {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+});
+
+afterEach(() => {
+  MotionGlobalConfig.skipAnimations = true;
+  vi.unstubAllGlobals();
 });
