@@ -411,6 +411,7 @@ test("preview-components lists a statuspage provider's components", async () => 
       name: "API",
       group: "Core Services",
       showcase: true,
+      status: "operational",
     });
   } finally {
     await app.close();
