@@ -200,6 +200,7 @@ export function Settings() {
   const { t } = useTranslation();
   const { data: config } = useConfig();
   const settingsMutation = useSettingsMutation();
+  const servicePatch = useServiceMutations().patch;
   // Above the early return below: a hook cannot be called conditionally.
   const fieldProps = useFieldProps();
 
@@ -292,12 +293,33 @@ export function Settings() {
                         background: service.enabled ? "var(--status-operational-fill)" : "var(--color-neutral-700)",
                       }}
                     />
-                    <span className="truncate text-sm">{service.name}</span>
-                    <span className="font-mono text-[10.5px] text-muted-foreground">
+                    {/* The name and its state hold their width and the meta
+                        line gives way: with the toggle taking its place on the
+                        right there is no longer room for all three, and a
+                        clipped adapter reads better than a clipped provider
+                        name or a row gone to two lines. */}
+                    <span className="max-w-48 shrink-0 truncate text-sm">{service.name}</span>
+                    {/* The state word beside the dot, as a channel row carries
+                        it: colour alone does not say which of the two states a
+                        muted dot means. */}
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                      {t(service.enabled ? "service.enabled" : "service.disabled")}
+                    </span>
+                    <span className="truncate font-mono text-[10.5px] text-muted-foreground">
                       {`${service.adapter} · ${hostOf(service.baseUrl)}`}
                     </span>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
+                    {/* Taking a provider out of the rotation is not deleting it:
+                        the poller already skips a disabled service, and this is
+                        the only place in the dashboard that can set the flag. */}
+                    <Switch
+                      aria-label={`${service.name} — ${t(service.enabled ? "service.enabled" : "service.disabled")}`}
+                      checked={service.enabled}
+                      onCheckedChange={(next) =>
+                        servicePatch.mutate({ id: service.id, patch: { enabled: next } })
+                      }
+                    />
                     <ServiceDialog
                       mode="edit"
                       service={service}
