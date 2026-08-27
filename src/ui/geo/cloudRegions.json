@@ -1,0 +1,22 @@
+{
+  "us-east-1": { "lat": 39.0438, "lon": -77.4874 },
+  "us-east-2": { "lat": 40.0, "lon": -83.0 },
+  "us-west-1": { "lat": 37.3541, "lon": -121.9552 },
+  "us-west-2": { "lat": 45.8399, "lon": -119.7006 },
+  "eu-west-1": { "lat": 53.3498, "lon": -6.2603 },
+  "eu-west-2": { "lat": 51.5074, "lon": -0.1278 },
+  "eu-central-1": { "lat": 50.1109, "lon": 8.6821 },
+  "ap-southeast-1": { "lat": 1.3521, "lon": 103.8198 },
+  "ap-southeast-2": { "lat": -33.8688, "lon": 151.2093 },
+  "ap-northeast-1": { "lat": 35.6762, "lon": 139.6503 },
+  "sa-east-1": { "lat": -23.5505, "lon": -46.6333 },
+  "europe-west1": { "lat": 50.4501, "lon": 3.8196 },
+  "europe-west4": { "lat": 53.4386, "lon": 6.8355 },
+  "us-central1": { "lat": 41.2619, "lon": -95.8608 },
+  "eastus": { "lat": 37.3719, "lon": -79.8164 },
+  "westeurope": { "lat": 52.3676, "lon": 4.9041 },
+  "northeurope": { "lat": 53.3498, "lon": -6.2603 },
+  "fra1": { "lat": 50.1109, "lon": 8.6821 },
+  "iad1": { "lat": 38.9531, "lon": -77.4565 },
+  "sfo1": { "lat": 37.7749, "lon": -122.4194 }
+}
