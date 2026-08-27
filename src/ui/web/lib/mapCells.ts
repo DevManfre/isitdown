@@ -38,9 +38,11 @@ export const markerRadius = (count: number): number =>
  * Groups points into a lat/lon grid so a fleet of hundreds of edge locations
  * draws as a couple hundred markers instead of overlapping every one of them.
  *
- * Binning is by floor, not by rounding: `floor` puts every longitude in exactly
- * one cell with no seam, where rounding folds 179 and -179 into the same
- * bucket — the antimeridian is where a naive grid quietly goes wrong.
+ * Binning is by `floor`: it partitions longitude into `[n*S, (n+1)*S)` cells
+ * aligned to the origin. `round` would partition just as cleanly but with the
+ * boundaries offset half a cell, so what matters is only that one of them is
+ * chosen and the tests pin which — a mix of the two across a codebase is how a
+ * marker ends up one cell away from the dot it belongs to.
  *
  * A cell's position is the centroid of its own points rather than the cell's
  * centre: a single PoP should be drawn where it is, not nudged to a grid node.

@@ -45,7 +45,18 @@ describe("binPoints", () => {
     expect(cells[0]?.worst).toBe("degraded");
   });
 
-  it("keeps the antimeridian's two sides apart", () => {
+  it("bins by floor, not by rounding", () => {
+    // 1.9 and 2.1 both fall in cell 0 under floor (0.475 and 0.525 both floor
+    // to 0) but split into cells 0 and 1 under rounding. This is the pair that
+    // pins the operator; the antimeridian pair below yields two cells either
+    // way and pins only that ±179 stay apart.
+    expect(binPoints([point(0, 1.9), point(0, 2.1)], 4)).toHaveLength(1);
+  });
+
+  it("keeps the antimeridian's two sides from merging", () => {
+    // Not evidence for floor over round — both partition ±179 into separate
+    // cells at 4°. What this pins is that a longitude wrap near ±180 does not
+    // fold two opposite-side points into one bucket.
     const cells = binPoints([point(0, 179), point(0, -179)], 4);
     expect(cells).toHaveLength(2);
   });
