@@ -68,16 +68,20 @@ describe("motion.css after the react port", () => {
   // The React port carried exactly one of app.css:67-92's rules across — the
   // chevron rotation — and left the four `transition: opacity` / `padding`
   // declarations below animating state changes that no longer happened. The
-  // collapsed rail shrank its grid track to 30px while 196px of fully opaque
-  // labels stayed put, with no way to peek at the nav. These assertions are the
-  // shape of that whole mechanism, so losing a piece of it fails here rather
-  // than in a screenshot nobody takes.
+  // collapsed rail shrank its track to 30px while 196px of fully opaque labels
+  // stayed put, with no way to peek at the nav. These assertions are the shape
+  // of that whole mechanism, so losing a piece of it fails here rather than in
+  // a screenshot nobody takes.
+  //
+  // The track is no longer a grid this file sizes. `Sidebar` renders its own
+  // gap and container and sizes both off --sidebar-width-icon, so the peek is
+  // one override of that variable — but it has to stay one that reaches both
+  // halves, which is why it is set on the wrapper and not on the strip.
   describe("the collapsed rail keeps its whole collapse mechanism", () => {
-    it("owns the grid tracks, so the state rules below have something to override", () => {
-      expect(code).toMatch(/\.console\s*\{[^}]*grid-template-columns:\s*var\(--rail-width\)\s+1fr/);
-      expect(code).toMatch(
-        /:root\[data-rail="collapsed"\]\s+\.console\s*\{[^}]*grid-template-columns:\s*var\(--rail-width-collapsed\)/,
-      );
+    it("animates both halves of the track, which is what the peek resizes", () => {
+      const rule = /\[data-slot="sidebar-gap"\],\s*\[data-slot="sidebar-container"\]\s*\{([^}]*)\}/.exec(code);
+      expect(rule, "the gap and the container must animate together or the page tears").not.toBeNull();
+      expect(rule?.[1]).toMatch(/transition:\s*width/);
     });
 
     it("peek-expands the track on hover and on keyboard focus", () => {
@@ -85,10 +89,14 @@ describe("motion.css after the react port", () => {
       expect(code).toContain(':root[data-rail="collapsed"] .console:has(.rail:focus-within)');
     });
 
-    it("peek-expands the rail itself, which is what `transition: width` animates", () => {
-      expect(code).toContain(':root[data-rail="collapsed"] .rail:hover:not(.rail-hold)');
-      expect(code).toContain(':root[data-rail="collapsed"] .rail:focus-within');
-      expect(code).toMatch(/:root\[data-rail="collapsed"\]\s+\.rail\s*\{[^}]*width:\s*var\(--rail-width-collapsed\)/);
+    // Raising the icon width to the full rail width is the whole peek: the gap
+    // and the container both read the variable and both inherit it from here,
+    // so the column and the strip widen together and the page gives way instead
+    // of being covered. Setting a `width` on the strip alone would cover it.
+    it("peek-expands by raising the icon width to the full rail width", () => {
+      const rule = /:root\[data-rail="collapsed"\] \.console:has\(\.rail:focus-within\)\s*\{([^}]*)\}/.exec(code);
+      expect(rule, "no peek rule on the wrapper").not.toBeNull();
+      expect(rule?.[1]).toMatch(/--sidebar-width-icon:\s*var\(--rail-width\)/);
     });
 
     // Every one of these four has a `transition: opacity` waiting for it in the

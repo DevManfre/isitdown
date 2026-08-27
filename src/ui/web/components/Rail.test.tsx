@@ -5,7 +5,8 @@ import { createHashRouter, RouterProvider } from "react-router";
 import { I18nextProvider } from "react-i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
-import { RailProvider } from "@/hooks/useRail.tsx";
+import { RailProvider, useRail } from "@/hooks/useRail.tsx";
+import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { Rail } from "./Rail.tsx";
 
 const status = {
@@ -19,9 +20,23 @@ const status = {
 };
 const config = { polling: {}, services: [], channels: [{ id: "telegram", enabled: true, fields: [] }] };
 
-function mount() {
+// The rail is a `Sidebar`, so it needs the primitive's context — and App wires
+// that context to `useRail` rather than letting it keep its own copy of the
+// state. Mounting it the same way here is what keeps the collapse assertions
+// below honest: they are watching the real path from click to <html>.
+function Shell() {
+  const { collapsed, toggle } = useRail();
+  return (
+    <SidebarProvider className="console" open={!collapsed} onOpenChange={toggle}>
+      <Rail />
+    </SidebarProvider>
+  );
+}
+
+function mount(path = "/") {
+  window.location.hash = `#${path}`;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const router = createHashRouter([{ path: "/", element: <Rail /> }]);
+  const router = createHashRouter([{ path: "*", element: <Shell /> }]);
   return render(
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={client}>
@@ -43,6 +58,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   localStorage.clear();
+  window.location.hash = "";
   document.documentElement.removeAttribute("data-rail");
 });
 
@@ -71,6 +87,18 @@ describe("Rail", () => {
     mount();
     await userEvent.click(await screen.findByRole("button", { name: i18n.t("nav.rail-collapse") }));
     expect(await screen.findByRole("button", { name: i18n.t("nav.rail-expand") })).toBeInTheDocument();
+  });
+
+  // `asChild` hands the row to NavLink, which means the primitive can no longer
+  // read the active state out of NavLink's render prop — Rail.tsx computes it
+  // with `matchPath` instead. The unended match is the part worth pinning: an
+  // incident's own page is still the Incidents view.
+  it("marks the row for the current view, and keeps it marked on a detail route", async () => {
+    mount("/incidents/github/i1");
+    expect(await screen.findByRole("link", { name: i18n.t("nav.incidents") }))
+      .toHaveAttribute("data-active", "true");
+    expect(screen.getByRole("link", { name: i18n.t("nav.overview") }))
+      .toHaveAttribute("data-active", "false");
   });
 
   it("shows one dot per configured channel", async () => {

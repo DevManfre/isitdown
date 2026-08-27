@@ -32,9 +32,11 @@ body {
   font-family: var(--font-body);
 }
 
-/* The rail's own plane, painted over the `bg-card` it carries in the markup.
-   `none` in dark leaves that card fill showing, untouched. */
-.rail {
+/* The rail's own plane, painted over the `bg-sidebar` fill the primitive
+   carries. `Sidebar` paints that fill on its inner element, one level below the
+   container `.rail` lands on, so the wash has to go on the inner or the fill
+   would cover it. `none` in dark leaves the fill showing, untouched. */
+.rail [data-slot="sidebar-inner"] {
   background-image: var(--gradient-rail);
 }
 
