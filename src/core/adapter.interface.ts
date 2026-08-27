@@ -1,4 +1,4 @@
-import type { HistoricalIncident, NormalizedStatus } from "./types.ts";
+import type { HistoricalIncident, NormalizedStatus, OverallStatus } from "./types.ts";
 
 /**
  * What an adapter needs to know about the service it is fetching. A generic
@@ -43,6 +43,19 @@ export interface ComponentPreview {
   group: string | null;
   /** Statuspage's "featured" flag; a hint for the picker, nothing more. */
   showcase: boolean;
+  /**
+   * The component's current status, normalized. This is additive: the value
+   * is already sitting in the same summary row an adapter parses to build the
+   * rest of the preview, so populating it costs no extra fetch or parsing.
+   * `listComponents` is a UI-only path — Light never calls it and never
+   * constructs a `ComponentPreview` — so Light pays nothing for this field
+   * either. Kept out of `NormalizedStatus.components`, which only ever holds
+   * the operator's selected components: the diff engine walks that list and
+   * fires one notification per changed entry, so widening it to every
+   * component a provider lists would turn a single busy provider into a
+   * notification storm.
+   */
+  status: OverallStatus;
 }
 
 export interface Adapter {

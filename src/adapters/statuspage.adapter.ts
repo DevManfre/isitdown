@@ -272,6 +272,7 @@ export function parseComponentList(raw: unknown, service: ServiceRef): Component
       name: row.name ?? "",
       group: row.group_id == null ? null : (groupNames.get(row.group_id) ?? null),
       showcase: row.showcase ?? false,
+      status: mapComponentStatus(row.status),
     }));
 }
 

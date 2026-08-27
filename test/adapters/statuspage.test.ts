@@ -414,11 +414,11 @@ test("fetchIncidentHistory throws on a non-2xx response", async () => {
 test("parseComponentList excludes group containers and resolves group labels", () => {
   const previews = parseComponentList(fixture("components-mixed"), service);
   assert.deepEqual(previews, [
-    { id: "cmp1", name: "API", group: "Core Services", showcase: true },
-    { id: "cmp2", name: "Dashboard", group: "Core Services", showcase: true },
-    { id: "cmp3", name: "Webhooks", group: null, showcase: false },
-    { id: "cmp4", name: "Batch Jobs", group: null, showcase: false },
-    { id: "cmp5", name: "Edge Cache", group: null, showcase: false },
+    { id: "cmp1", name: "API", group: "Core Services", showcase: true, status: "operational" },
+    { id: "cmp2", name: "Dashboard", group: "Core Services", showcase: true, status: "degraded" },
+    { id: "cmp3", name: "Webhooks", group: null, showcase: false, status: "partial_outage" },
+    { id: "cmp4", name: "Batch Jobs", group: null, showcase: false, status: "unknown" },
+    { id: "cmp5", name: "Edge Cache", group: null, showcase: false, status: "major_outage" },
   ]);
 });
 
@@ -453,4 +453,28 @@ test("listComponents throws on a non-2xx response", async () => {
       );
     },
   );
+});
+
+test("parseComponentList carries each component's current status", () => {
+  const list = parseComponentList(fixture("components-mixed"), service);
+  assert.ok(list.length > 0);
+  for (const component of list) {
+    assert.ok(
+      ["operational", "degraded", "partial_outage", "major_outage", "unknown"].includes(component.status),
+      `${component.name} had status ${component.status}`,
+    );
+  }
+});
+
+test("parseComponentList maps an unrecognised status word to major_outage", () => {
+  // Not "unknown": `mapComponentStatus` ends in `?? "major_outage"`
+  // (statuspage.adapter.ts:114), a deliberate fail-loud choice — a status word
+  // the adapter does not recognise is treated as worst-case, never as benign.
+  // Reusing that mapper is the point of this task, so this test pins its real
+  // behaviour rather than a second, kinder mapping.
+  const list = parseComponentList(
+    { components: [{ id: "a", name: "Thing", status: "not_a_real_status" }] },
+    { id: "x", name: "X", baseUrl: "https://example.com" },
+  );
+  assert.equal(list[0]?.status, "major_outage");
 });
