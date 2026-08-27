@@ -365,4 +365,19 @@ describe("Settings", () => {
       expect(patchCall?.body).toEqual({ mapView: "map" });
     });
   });
+
+  // Review gap 3: the harness had no `/api/preferences` fixture bucket, so a
+  // GET there fell through to the `status` fixture — the initial-`off`
+  // assertion above passed only by coincidence (the status fixture happens
+  // to lack a `mapView` field). This exercises the actual readback path: an
+  // operator who set `globe` last time must see `globe` again, not silently
+  // fall back to `off`. Asserted on the rendered label a person reads, not
+  // on the internal value passed to `Select`.
+  it("reads a stored preference back into the control instead of always showing the default", async () => {
+    renderWithProviders(<Settings />, { ...fixtures, preferences: { mapView: "globe" } });
+
+    const trigger = await screen.findByLabelText(/geographic view/i);
+    expect(within(trigger).getByText(i18n.t("settings.map-view.globe"))).toBeInTheDocument();
+    expect(within(trigger).queryByText(i18n.t("settings.map-view.off"))).toBeNull();
+  });
 });

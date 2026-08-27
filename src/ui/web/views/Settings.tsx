@@ -283,6 +283,7 @@ export function Settings() {
         </section>
 
         <section className="flex flex-col gap-3">
+          <span className="text-xs uppercase tracking-widest text-primary">{t("settings.map-view")}</span>
           <div className="flex flex-col gap-2">
             <Label htmlFor="map-view">{t("settings.map-view.label")}</Label>
             <Select
