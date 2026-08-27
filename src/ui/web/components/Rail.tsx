@@ -1,6 +1,7 @@
 import { matchPath, NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { NAV_ROUTES, ROUTE_PATHS, type RouteName } from "../../routePaths.ts";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import {
   Sidebar,
   SidebarContent,
@@ -21,17 +22,17 @@ import { cn } from "@/lib/utils.ts";
  * primitive's collapsed-width rules — is ever reachable here.
  */
 export function Rail() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { pathname } = useLocation();
   const { data: status } = useStatusChrome();
   const { data: config } = useConfigChrome();
 
-  const badgeFor = (name: RouteName): string | undefined => {
+  const badgeFor = (name: RouteName): number | undefined => {
     if (status === undefined) return undefined;
-    if (name === "providers") return String(status.providers.length);
+    if (name === "providers") return status.providers.length;
     if (name === "incidents") {
       const open = status.providers.reduce((total, p) => total + p.activeIncidents.length, 0);
-      return open === 0 ? undefined : String(open);
+      return open === 0 ? undefined : open;
     }
     return undefined;
   };
@@ -71,7 +72,7 @@ export function Rail() {
                           : "bg-muted text-muted-foreground",
                       )}
                     >
-                      {badge}
+                      <NumberTicker locale={i18n.language} value={badge} />
                     </SidebarMenuBadge>
                   )}
                 </SidebarMenuItem>

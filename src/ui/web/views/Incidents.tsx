@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { Card } from "@/components/ui/card.tsx";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { useIncidents, useNotifications, useStatus } from "@/hooks/queries.ts";
@@ -108,7 +109,7 @@ export function Incidents() {
                   by a name-matcher function rather than depending on this
                   attribute, so removing it later would not break the test. */}
               <span aria-hidden="true" className="ml-1.5 text-[10px] text-muted-foreground">
-                {counts[entry.value]}
+                <NumberTicker locale={i18n.language} value={counts[entry.value]} />
               </span>
             </ToggleGroupItem>
           ))}

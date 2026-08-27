@@ -13,6 +13,7 @@ import {
 import type { SortDirection } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ChevronRight, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentRows } from "@/components/ComponentRows.tsx";
@@ -20,7 +21,7 @@ import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { severity, statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
-import { formatPercent, hostOf } from "@/lib/format.ts";
+import { hostOf } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
 import { isReorder, rowShifts } from "@/lib/rowShift.ts";
 import type { ComponentStatus, HistoryBucket, OverallStatus, ProviderStatus } from "@/lib/types.ts";
@@ -349,7 +350,9 @@ export function Providers() {
           cell: ({ row }) => (
             <span className="flex min-w-40 items-center gap-3">
               <UptimeStrip buckets={row.original.buckets} />
-              <span className="font-mono text-xs">{formatPercent(i18n.language, row.original.uptime)}</span>
+              <span className="font-mono text-xs">
+                <NumberTicker locale={i18n.language} value={row.original.uptime} decimalPlaces={2} suffix="%" />
+              </span>
             </span>
           ),
         }),
@@ -358,7 +361,11 @@ export function Providers() {
           sortFn: "basic",
           // Busiest provider first.
           sortDescFirst: true,
-          cell: ({ getValue }) => <span className="font-mono text-xs">{getValue()}</span>,
+          cell: ({ getValue }) => (
+            <span className="font-mono text-xs">
+              <NumberTicker locale={i18n.language} value={getValue()} />
+            </span>
+          ),
         }),
       ]),
     [t, i18n.language],

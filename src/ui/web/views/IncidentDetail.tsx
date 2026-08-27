@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import { PollStrip } from "@/components/charts/PollStrip.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
@@ -236,7 +237,12 @@ export function IncidentDetail() {
 
           <div className="flex flex-col gap-3">
             <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {t("incident.last-polls", { count: polls.length })}
+              <Trans
+                i18nKey="incident.last-polls"
+                count={polls.length}
+                values={{ count: polls.length }}
+                components={[<NumberTicker locale={i18n.language} value={polls.length} />]}
+              />
             </span>
             <PollStrip samples={polls} />
             {first !== undefined && last !== undefined && (

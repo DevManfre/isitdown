@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
-import { providerFixture, renderWithProviders } from "@/test/harness.tsx";
+import { providerFixture, renderWithProviders, sentence } from "@/test/harness.tsx";
 import type { ProviderStatus } from "@/lib/types.ts";
 import { Overview } from "./Overview.tsx";
 
@@ -48,7 +48,11 @@ describe("Overview", () => {
       },
       history,
     });
-    expect(await screen.findByText(i18n.t("overview.title.down", { count: 2 }))).toBeInTheDocument();
+    // The count is a `NumberTicker`, so the headline is split across two
+    // elements: match the tail, then read the whole line back off it.
+    expect(await screen.findByText("providers are off the line.", { exact: false })).toHaveTextContent(
+      sentence("overview.title.down", { count: 2 }),
+    );
   });
 
   it("offers an incident-details action only when an incident is open", async () => {
@@ -99,7 +103,7 @@ describe("Overview", () => {
       status: { providers: [providerFixture({ uptime90: 99.9 })], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
       history,
     });
-    expect(await screen.findByText("99.90% · 90d")).toBeInTheDocument();
+    expect(await screen.findByText("· 90d", { exact: false })).toHaveTextContent("99.90% · 90d");
   });
 
   // Regression for the review finding: on an initial-load failure, `status`
@@ -228,7 +232,7 @@ describe("Overview with a disabled provider", () => {
       history,
     });
     // 99.90%, not the 74.95% an unmeasured provider would drag it to.
-    expect(await screen.findByText("99.90% · 90d")).toBeInTheDocument();
+    expect(await screen.findByText("· 90d", { exact: false })).toHaveTextContent("99.90% · 90d");
   });
 
   it("keeps its status out of the headline, so a disabled provider is not 'off the line'", async () => {

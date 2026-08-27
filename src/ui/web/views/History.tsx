@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentRows } from "@/components/ComponentRows.tsx";
 import { MonthColumns } from "@/components/charts/MonthColumns.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
-import { formatPercent } from "@/lib/format.ts";
 import type { ComponentStatus, HistorySummary, OverallStatus, ProviderHistory } from "@/lib/types.ts";
 
 const RANGES = [7, 30, 90] as const;
@@ -62,13 +62,33 @@ function ProviderBlock({
           <span className="provider-name text-sm">{name}</span>
         </div>
         <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-muted-foreground">
-          <span>{`7d ${formatPercent(i18n.language, provider.uptime7)}`}</span>
-          <span>{`30d ${formatPercent(i18n.language, provider.uptime30)}`}</span>
-          <span style={{ color: "var(--color-neutral-300)" }}>{`90d ${formatPercent(i18n.language, provider.uptime90)}`}</span>
           <span>
-            {t("history.incidents", { count: provider.incidentCount })}
+            {"7d "}
+            <NumberTicker locale={i18n.language} value={provider.uptime7} decimalPlaces={2} suffix="%" />
+          </span>
+          <span>
+            {"30d "}
+            <NumberTicker locale={i18n.language} value={provider.uptime30} decimalPlaces={2} suffix="%" />
+          </span>
+          <span style={{ color: "var(--color-neutral-300)" }}>
+            {"90d "}
+            <NumberTicker locale={i18n.language} value={provider.uptime90} decimalPlaces={2} suffix="%" />
+          </span>
+          <span>
+            <Trans
+              i18nKey="history.incidents"
+              count={provider.incidentCount}
+              values={{ count: provider.incidentCount }}
+              components={[<NumberTicker locale={i18n.language} value={provider.incidentCount} />]}
+            />
             {" · "}
-            <span>{t("history.downtime", { minutes: provider.downtimeMinutes })}</span>
+            <span>
+              <Trans
+                i18nKey="history.downtime"
+                values={{ minutes: provider.downtimeMinutes }}
+                components={[<NumberTicker locale={i18n.language} value={provider.downtimeMinutes} />]}
+              />
+            </span>
           </span>
         </div>
       </div>
@@ -113,9 +133,15 @@ export function History() {
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div className="anim-rise anim-rise-column flex flex-col gap-2" style={{ animationDelay: "0ms" }}>
           <span className="text-xs uppercase tracking-widest text-primary">{t("history.kicker")}</span>
-          <span className="font-mono text-3xl font-medium">{formatPercent(i18n.language, summary.aggregateUptime)}</span>
+          <span className="font-mono text-3xl font-medium">
+            <NumberTicker locale={i18n.language} value={summary.aggregateUptime} decimalPlaces={2} suffix="%" />
+          </span>
           <span className="text-sm text-muted-foreground">
-            {t("history.subtitle", { count: summary.providers.length, days })}
+            <Trans
+              i18nKey="history.subtitle"
+              values={{ count: summary.providers.length, days }}
+              components={[<NumberTicker locale={i18n.language} value={summary.providers.length} />]}
+            />
           </span>
         </div>
 

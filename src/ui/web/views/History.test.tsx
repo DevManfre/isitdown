@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
-import { providerFixture, renderWithProviders } from "@/test/harness.tsx";
+import { providerFixture, renderWithProviders, sentence } from "@/test/harness.tsx";
 import { History } from "./History.tsx";
 
 const summary = {
@@ -72,7 +72,9 @@ describe("History", () => {
     expect(await screen.findByText("GitHub")).toBeInTheDocument();
     // history.downtime's real catalog template is "{minutes} min down" (a
     // numeric placeholder) — not the "{duration}" string the brief guessed.
-    expect(await screen.findByText(i18n.t("history.downtime", { minutes: 35 }))).toBeInTheDocument();
+    expect(await screen.findByText("min down", { exact: false })).toHaveTextContent(
+      sentence("history.downtime", { minutes: 35 }),
+    );
   });
 });
 

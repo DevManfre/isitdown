@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card.tsx";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ProviderRow } from "@/components/FleetRows.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
-import { formatPercent } from "@/lib/format.ts";
 import type { HistoryBucket, ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -19,6 +19,8 @@ function GroupHeader({
   tone: "alarm" | "ok";
   open: boolean;
 }) {
+  const { i18n } = useTranslation();
+
   return (
     <CollapsibleTrigger className="flex w-full items-center gap-2 text-left">
       {/* One glyph rotated, not two swapped: Radix already owns the state, and
@@ -38,7 +40,7 @@ function GroupHeader({
             : "border-status-operational/35 bg-status-operational/10 text-status-operational",
         )}
       >
-        {count}
+        <NumberTicker locale={i18n.language} value={count} />
       </Badge>
     </CollapsibleTrigger>
   );
@@ -67,9 +69,13 @@ function DotStrip({ providers }: { providers: ProviderStatus[] }) {
           <HoverCardContent className="flex w-auto flex-col gap-1 p-3">
             <span className="text-sm">{provider.name}</span>
             <span className="font-mono text-[11px] text-muted-foreground">
-              {t("overview.uptime-window", {
-                uptime: formatPercent(i18n.language, provider.uptime90),
-              })}
+              <Trans
+                i18nKey="overview.uptime-window"
+                values={{ uptime: provider.uptime90 }}
+                components={[
+                  <NumberTicker locale={i18n.language} value={provider.uptime90} decimalPlaces={2} suffix="%" />,
+                ]}
+              />
             </span>
             <span
               className="font-mono text-[11px]"
