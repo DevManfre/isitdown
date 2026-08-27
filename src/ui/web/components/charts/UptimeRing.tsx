@@ -4,6 +4,7 @@ import { ChartContainer } from "@/components/ui/chart.tsx";
 import { chartConfigFor, statusColor, statusFill } from "@/lib/chartConfig.ts";
 import { faviconCandidates } from "@/lib/favicon.ts";
 import type { ProviderStatus } from "@/lib/types.ts";
+import { cn } from "@/lib/utils.ts";
 
 /**
  * A provider tile: a ring in its status colour around its short code.
@@ -17,7 +18,9 @@ import type { ProviderStatus } from "@/lib/types.ts";
  * ring that reads as empty says less than one that reads as barely started.
  * Zero — never measured, or fully down — renders as an unbroken grey ring.
  */
-export function UptimeRing({ provider, delay }: { provider: ProviderStatus; delay?: string }) {
+export function UptimeRing({
+  provider, delay, size = 80,
+}: { provider: ProviderStatus; delay?: string; size?: number }) {
   const candidates = faviconCandidates(provider.baseUrl);
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -25,15 +28,44 @@ export function UptimeRing({ provider, delay }: { provider: ProviderStatus; dela
 
   const value = provider.uptime90 > 0 ? Math.max(2, provider.uptime90) : 0;
 
+  // The whole tile is proportional to its ring, so one `size` carries the
+  // 80px hero grid and the 56px band without a second set of numbers: the
+  // favicon disc fills the ring's core at 75% and insets by an eighth, the
+  // ratios the 80px original already used (`size-15`, `p-2.5`).
+  const disc = Math.round(size * 0.75);
+  const inset = Math.round(size * 0.125);
+  const large = size >= 80;
+
   return (
     <div
-      className="ring-tile anim-rise flex flex-col items-center gap-2 rounded-lg border border-border p-4"
+      // The semantic hook a caller (and a test) reads, rather than the
+      // `ring-tile` styling class a restyle could rename — the same idiom as
+      // StatusDot's `data-status` and the shadcn primitives' `data-slot`.
+      data-slot="uptime-ring"
+      className={cn(
+        "ring-tile anim-rise flex flex-col items-center border border-border",
+        // A fixed 112px at the hero size (80px ring + p-4 both sides), so a
+        // long provider name truncates instead of stretching one tile wider
+        // than its neighbours in a wrapping row. In the band the width comes
+        // from the grid track instead.
+        large ? "w-28 gap-2 rounded-lg p-4" : "gap-1.5 rounded-md p-3",
+      )}
       style={delay === undefined ? undefined : { animationDelay: delay }}
     >
-      <div className="relative size-20">
-        <ChartContainer config={chartConfigFor()} className="anim-ring size-20">
+      <div className="relative" style={{ width: size, height: size }}>
+        <ChartContainer
+          config={chartConfigFor()}
+          className="anim-ring"
+          style={{ width: size, height: size }}
+        >
           <RadialBarChart
             data={[{ name: provider.id, value }]}
+            // Recharts insets a polar chart by 5px a side by default, so the
+            // drawn ring was smaller than its box while the favicon disc kept
+            // filling 75% of the box — which left a 2px band at 56px and only 5
+            // of the intended 9.6px at 80. Zero margin makes the ring the size
+            // innerRadius/outerRadius already claim.
+            margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
             innerRadius="76%"
             outerRadius="100%"
             startAngle={90}
@@ -61,22 +93,26 @@ export function UptimeRing({ provider, delay }: { provider: ProviderStatus; dela
               alt=""
               src={icon}
               className={
-                loaded
-                  ? "size-15 rounded-full bg-[var(--ring-icon-bg)] object-contain p-2.5"
-                  : "hidden"
+                loaded ? "rounded-full bg-[var(--ring-icon-bg)] object-contain" : "hidden"
               }
+              style={{ width: disc, height: disc, padding: inset }}
               onLoad={() => setLoaded(true)}
               onError={() => setAttempt((n) => n + 1)}
             />
           )}
           {!loaded && (
-            <span className="font-mono text-sm" style={{ color: statusColor(provider.overallStatus) }}>
+            <span
+              className={cn("font-mono", large ? "text-sm" : "text-[11px]")}
+              style={{ color: statusColor(provider.overallStatus) }}
+            >
               {provider.name.slice(0, 3).toUpperCase()}
             </span>
           )}
         </div>
       </div>
-      <span className="text-sm">{provider.name}</span>
+      <span className={cn("max-w-full truncate", large ? "text-sm" : "text-xs")}>
+        {provider.name}
+      </span>
     </div>
   );
 }

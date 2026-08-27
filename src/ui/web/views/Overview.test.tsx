@@ -2,6 +2,7 @@ import { screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders } from "@/test/harness.tsx";
+import type { ProviderStatus } from "@/lib/types.ts";
 import { Overview } from "./Overview.tsx";
 
 const history = {
@@ -116,6 +117,144 @@ describe("Overview", () => {
     });
     expect(await screen.findByText(i18n.t("error.load-failed", { error: "HTTP 500" }))).toBeInTheDocument();
     expect(screen.queryByText(i18n.t("overview.title.all-operational"))).toBeNull();
+  });
+});
+
+/**
+ * How the fleet is drawn changes at two counts (see lib/overviewShape.ts).
+ * What these pin is the space claim behind that: past six providers the rings
+ * shrink and leave the hero, and past fourteen they stop being drawn at all —
+ * which is the whole reason the hero's height stops tracking the fleet.
+ */
+describe("Overview's fleet shapes", () => {
+  const statusOf = (providers: ProviderStatus[]) => ({
+    providers,
+    pollIntervalMinutes: 5,
+    lastPollAt: null,
+    nextPollAt: null,
+  });
+
+  /** A fleet of `count`, whose first provider is the one in trouble. */
+  const fleet = (count: number): ProviderStatus[] =>
+    Array.from({ length: count }, (_, i) =>
+      providerFixture({
+        id: `p${i}`,
+        name: `Provider ${i}`,
+        ...(i === 0 ? { overallStatus: "major_outage" as const } : {}),
+      }),
+    );
+
+  const rings = () => document.querySelectorAll('[data-slot="uptime-ring"]');
+  /** The ring's own box, which `size` writes inline — the pixel claim itself. */
+  const ringBox = () => rings()[0]?.querySelector("div")?.getAttribute("style") ?? "";
+
+  it("draws an 80px ring per provider while the fleet fits beside the copy", async () => {
+    renderWithProviders(<Overview />, { status: statusOf(fleet(6)), history });
+    // Two matches per name while the rings are drawn — the ring's label and
+    // the row's, as the other suites' `findAllByText` already accounts for.
+    await screen.findAllByText("Provider 1");
+    expect(rings()).toHaveLength(6);
+    expect(ringBox()).toContain("width: 80px");
+    expect(screen.queryByText(i18n.t("overview.group.operational"))).toBeNull();
+  });
+
+  it("keeps every ring but halves it into the band past six providers", async () => {
+    renderWithProviders(<Overview />, { status: statusOf(fleet(10)), history });
+    await screen.findAllByText("Provider 1");
+    expect(rings()).toHaveLength(10);
+    expect(ringBox()).toContain("width: 56px");
+  });
+
+  it("stops drawing rings past fourteen and shows the aggregate figure instead", async () => {
+    renderWithProviders(<Overview />, { status: statusOf(fleet(15)), history });
+    await screen.findByText(i18n.t("overview.group.operational"));
+    expect(rings()).toHaveLength(0);
+    expect(document.querySelector('[data-slot="fleet-summary"]')).not.toBeNull();
+    expect(screen.getByText(i18n.t("overview.summary.window"))).toBeInTheDocument();
+  });
+
+  it("opens the group of providers in trouble and leaves the operational one shut", async () => {
+    renderWithProviders(<Overview />, { status: statusOf(fleet(15)), history });
+    await screen.findByText(i18n.t("overview.group.problems"));
+    // The one provider in trouble is drawn as a row; the fourteen healthy ones
+    // are a strip of dots, so none of their names is on the page yet.
+    expect(screen.getByText("Provider 0")).toBeInTheDocument();
+    expect(screen.queryByText("Provider 7")).toBeNull();
+  });
+
+  it("reveals the operational rows when its group is opened", async () => {
+    renderWithProviders(<Overview />, { status: statusOf(fleet(15)), history });
+    const trigger = await screen.findByRole("button", {
+      name: new RegExp(i18n.t("overview.group.operational")),
+    });
+    await trigger.click();
+    expect(await screen.findByText("Provider 7")).toBeInTheDocument();
+  });
+});
+
+/**
+ * A disabled provider is one the poller has been told to skip (poller.ts:164),
+ * so nothing about it is being measured any more. This view therefore leaves it
+ * out entirely rather than drawing a stale ring and folding an unmeasured
+ * figure into the fleet's average.
+ */
+describe("Overview with a disabled provider", () => {
+  const statusOf = (providers: ProviderStatus[]) => ({
+    providers,
+    pollIntervalMinutes: 5,
+    lastPollAt: null,
+    nextPollAt: null,
+  });
+
+  it("draws neither a ring nor a row for it", async () => {
+    renderWithProviders(<Overview />, {
+      status: statusOf([
+        providerFixture(),
+        providerFixture({ id: "cf", name: "Cloudflare", enabled: false }),
+      ]),
+      history,
+    });
+    await screen.findAllByText("GitHub");
+    expect(screen.queryByText("Cloudflare")).toBeNull();
+    expect(document.querySelectorAll('[data-slot="uptime-ring"]')).toHaveLength(1);
+  });
+
+  it("keeps its uptime out of the fleet average", async () => {
+    renderWithProviders(<Overview />, {
+      status: statusOf([
+        providerFixture({ uptime90: 99.9 }),
+        providerFixture({ id: "cf", name: "Cloudflare", enabled: false, uptime90: 50 }),
+      ]),
+      history,
+    });
+    // 99.90%, not the 74.95% an unmeasured provider would drag it to.
+    expect(await screen.findByText("99.90% · 90d")).toBeInTheDocument();
+  });
+
+  it("keeps its status out of the headline, so a disabled provider is not 'off the line'", async () => {
+    renderWithProviders(<Overview />, {
+      status: statusOf([
+        providerFixture(),
+        providerFixture({ id: "cf", name: "Cloudflare", enabled: false, overallStatus: "major_outage" }),
+      ]),
+      history,
+    });
+    // Waiting for the provider name first is load-bearing: before /status
+    // answers, `providers` is empty and the headline already reads
+    // all-operational, so a bare findByText here passes on the loading state
+    // and would never have caught the disabled provider being counted.
+    await screen.findAllByText("GitHub");
+    expect(screen.getByText(i18n.t("overview.title.all-operational"))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("overview.title.down", { count: 1 }))).toBeNull();
+  });
+
+  it("says the fleet is disabled, not that nothing is configured, when every provider is off", async () => {
+    renderWithProviders(<Overview />, {
+      status: statusOf([providerFixture({ enabled: false })]),
+      history,
+    });
+    expect(await screen.findByText(i18n.t("overview.all-disabled"))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("providers.empty"))).toBeNull();
   });
 });
 

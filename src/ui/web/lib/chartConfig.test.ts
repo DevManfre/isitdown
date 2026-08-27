@@ -8,7 +8,7 @@
 // src/ui/web/css/tokens.test.ts for the precedent.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, statusTier, tierColor, trimToLatest, worstTier } from "./chartConfig.ts";
+import { AGGREGATE_FILL, chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, statusTier, tierColor, trimToLatest, worstTier } from "./chartConfig.ts";
 import en from "@/locales/en.json";
 
 const STATUSES = ["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const;
@@ -27,6 +27,16 @@ describe("chartConfig", () => {
         expect(tokens, `${name} is not declared in tokens.css`).toContain(`${name}:`);
       }
     }
+  });
+
+  // The Overview's dense shape draws one aggregate uptime ring for the whole
+  // fleet. No provider is "average", so that mark must not borrow a severity
+  // colour — green would claim every provider is operational.
+  it("gives the aggregate mark a token of its own, never a severity colour", () => {
+    const name = AGGREGATE_FILL.match(/var\((--[\w-]+)\)/)?.[1];
+    expect(name, `aggregate must use a var(), got ${AGGREGATE_FILL}`).toBeDefined();
+    expect(tokens, `${name} is not declared in tokens.css`).toContain(`${name}:`);
+    expect(STATUSES.map(statusFill)).not.toContain(AGGREGATE_FILL);
   });
 
   it("names a catalog key per status, present in en.json", () => {

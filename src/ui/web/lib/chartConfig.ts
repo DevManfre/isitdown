@@ -45,6 +45,15 @@ export const STATUS_CHART = {
   },
 } as const satisfies Record<OverallStatus, { labelKey: string; color: string; fill: string; bar: number }>;
 
+/**
+ * The Overview's dense shape draws one ring for the fleet's average uptime.
+ * That is not a status — no provider is "average" — so it must not take a
+ * STATUS_CHART colour: green would read as "everything is operational".
+ * `--status-accent` is the token declared for exactly this, a chart mark that
+ * reads as the product's accent rather than as a severity.
+ */
+export const AGGREGATE_FILL = "var(--status-accent)";
+
 /** Which of the three bar rows a chart belongs to; each has its own scale. */
 export type BarScale = "row" | "compact" | "poll";
 
