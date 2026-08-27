@@ -1,18 +1,10 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip.tsx";
-import { statusLabelKey, statusTier, tierFill, type StatusTier } from "@/lib/chartConfig.ts";
+import { drawOrder, statusLabelKey, statusTier, tierFill } from "@/lib/chartConfig.ts";
 import { projectEquirect } from "@/lib/mapProjection.ts";
 import { markerRadius, type MapCell } from "@/lib/mapCells.ts";
 import grid from "@/lib/mapGrid.generated.json" with { type: "json" };
-
-/**
- * Cells are drawn worst-last so a fault is never painted underneath an
- * operational neighbour. At 4° the European cells overlap enough for draw order
- * to decide what an operator actually sees — the prototype in `design/` showed
- * Frankfurt disappearing under Amsterdam without this.
- */
-const DRAW_ORDER: Record<StatusTier, number> = { ok: 0, unknown: 1, warn: 2, danger: 3 };
 
 /**
  * The dotted world map: a base grid of land dots with one status marker per
@@ -34,9 +26,14 @@ export function DottedWorld({
   const { t } = useTranslation();
   const { width, height, points } = grid;
 
-  // Worst-last. Sorting a copy, never `cells` itself — it is the caller's array.
+  // Worst-last, via the shared `drawOrder` (chartConfig.ts) so this map and
+  // the globe can never disagree on which fault wins. At 4° the European
+  // cells overlap enough for draw order to decide what an operator actually
+  // sees — the prototype in `design/` showed Frankfurt disappearing under
+  // Amsterdam without this. Sorting a copy, never `cells` itself — it is the
+  // caller's array.
   const ordered = useMemo(
-    () => [...cells].sort((a, b) => DRAW_ORDER[statusTier(a.worst)] - DRAW_ORDER[statusTier(b.worst)]),
+    () => [...cells].sort((a, b) => drawOrder(statusTier(a.worst)) - drawOrder(statusTier(b.worst))),
     [cells],
   );
 
