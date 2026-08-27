@@ -127,6 +127,7 @@
   "settings.jitter-note": "Le richieste sono sfasate e l'intervallo ha un jitter, così i provider non vengono mai interrogati all'unisono.",
   "settings.hot-note": "Applicato al ciclo successivo, senza restart.",
   "settings.secret-note": "Le credenziali vengono lette dall'ambiente. Qui si imposta il nome della variabile; il valore non finisce mai nel database.",
+  "settings.map-view": "Vista geografica",
   "settings.map-view.label": "Vista geografica",
   "settings.map-view.off": "Disattivata",
   "settings.map-view.map": "Mappa a punti",

@@ -127,6 +127,7 @@
   "settings.jitter-note": "Requests are staggered and the interval carries jitter, so providers are never hit in lockstep.",
   "settings.hot-note": "Applied on the next cycle — no restart.",
   "settings.secret-note": "Credentials are read from the environment. Set the variable name here; the value never touches the database.",
+  "settings.map-view": "Geographic view",
   "settings.map-view.label": "Geographic view",
   "settings.map-view.off": "Off",
   "settings.map-view.map": "Dotted map",
