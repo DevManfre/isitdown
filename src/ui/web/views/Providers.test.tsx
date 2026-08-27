@@ -308,8 +308,31 @@ describe("Providers", () => {
       await screen.findByText("API");
       await user.click(toggles()[0]!);
 
-      expect(screen.queryByText("API")).toBeNull();
       expect(toggles()[0]).toHaveAttribute("aria-expanded", "false");
+      // Gone once the fold has played, the way a filtered-out row is gone once
+      // `.anim-sink` has.
+      await waitForElementToBeRemoved(() => screen.queryByText("API"));
+    });
+
+    // The open was choreographed and the close was a cut: the panel went in a
+    // single frame and the rows below jumped up its full height after it. It
+    // leaves the way a dropped row does, held for as long as `.anim-fold` runs.
+    it("folds the panel out on collapse instead of cutting it", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Providers />, fixtures);
+      await screen.findByText("Anthropic");
+
+      await user.click(toggles()[0]!);
+      await screen.findByText("API");
+      const panel = document.getElementById(panelIdOf(toggles()[0]!));
+      if (panel === null) throw new Error("expected the chevron to have opened a panel");
+      expect(panel.querySelector(".anim-unfold")).not.toBeNull();
+
+      await user.click(toggles()[0]!);
+      expect(panel.querySelector(".anim-fold")).not.toBeNull();
+      expect(panel.querySelector(".anim-unfold")).toBeNull();
+
+      await waitForElementToBeRemoved(() => screen.queryByText("API"));
     });
 
     // Two providers open at once: comparing a degraded provider against a

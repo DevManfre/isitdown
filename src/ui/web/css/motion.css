@@ -46,6 +46,17 @@
     opacity: 1;
   }
 }
+/* The mirror of `unfold`, for an accordion panel closing instead of opening. */
+@keyframes fold {
+  from {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
 @keyframes fade {
   from {
     opacity: 0;
@@ -232,13 +243,27 @@
    on the page, so gating it on a remount would mean it never ran. The row
    grows out of nothing rather than appearing at full height — a `1fr` track
    resolves to the panel's own height, which no keyframe can hardcode — so the
-   single grid child clips whatever has not been revealed yet. */
+   single grid child clips whatever has not been revealed yet. That child has
+   to be a bare box: an `fr` track is never flexed below its content's base
+   size, so padding on the clipped element itself floors the track at that
+   padding and the travel stops there. The panel's own padding sits inside it. */
 .anim-unfold {
   display: grid;
   grid-template-rows: 1fr;
   animation: unfold 0.28s var(--ease-out) both;
 }
-.anim-unfold > * {
+/* And closing again. The panel used to be cut away in the frame the chevron
+   was clicked, with the rows beneath it jumping up its full height after it;
+   it now leaves the way the dialog does, the entry run backwards and faster.
+   Keep the duration in step with FOLD_MS in Providers.tsx, which is what holds
+   the panel mounted long enough to play it. */
+.anim-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  animation: fold 0.22s ease both;
+}
+.anim-unfold > *,
+.anim-fold > * {
   overflow: hidden;
 }
 
