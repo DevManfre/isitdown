@@ -167,5 +167,10 @@
   "channel.test-failed": "Test fallito: {error}",
 
   "error.load-failed": "Impossibile caricare questa vista: {error}",
-  "empty.no-data": "Ancora nessun dato."
+  "empty.no-data": "Ancora nessun dato.",
+
+  "map.aria.world": "Mappa del mondo delle sedi monitorate",
+  "map.cell.aria_one": "{locations} — {status}",
+  "map.cell.aria_other": "{count} sedi tra cui {locations} — {status}",
+  "map.cell.more": " e altre {count}"
 }
