@@ -1,8 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   createColumnHelper,
   createSortedRowModel,
+  rowExpandingFeature,
   rowSortingFeature,
   sortFn_basic,
   sortFn_text,
@@ -10,10 +11,11 @@ import {
   useTable,
 } from "@tanstack/react-table";
 import type { SortDirection } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { ComponentRows } from "@/components/ComponentRows.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
@@ -21,7 +23,7 @@ import { severity, statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { formatPercent, hostOf } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
 import { rowShifts } from "@/lib/rowShift.ts";
-import type { HistoryBucket, OverallStatus, ProviderStatus } from "@/lib/types.ts";
+import type { ComponentStatus, HistoryBucket, OverallStatus, ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
 const WINDOW_DAYS = 90;
@@ -57,6 +59,13 @@ interface ProviderRow {
   incidents: number;
   buckets: HistoryBucket[];
   enabled: boolean;
+  /**
+   * The components this provider actually monitors, and the live status of
+   * each. A provider with an empty selection watches only the overall status,
+   * so it has nothing to expand — which is what `getRowCanExpand` reads.
+   */
+  monitored: { id: string; name: string }[];
+  components: ComponentStatus[];
 }
 
 /**
@@ -68,6 +77,7 @@ interface ProviderRow {
  * pagination: the fleet is a handful of rows.
  */
 const features = tableFeatures({
+  rowExpandingFeature,
   rowSortingFeature,
   sortedRowModel: createSortedRowModel(),
   sortFns: { text: sortFn_text, basic: sortFn_basic },
@@ -95,6 +105,9 @@ function SortHead({ column, label }: { column: SortableColumn; label: string }) 
     </Button>
   );
 }
+
+/** The id a chevron's `aria-controls` points at: that row's own detail panel. */
+const panelId = (rowId: string) => `components-${rowId}`;
 
 /** What `aria-sort` on the header cell says, so the state reaches a screen reader too. */
 const ariaSort = (sorted: false | SortDirection): "ascending" | "descending" | "none" =>
@@ -250,6 +263,8 @@ export function Providers() {
           incidents: history?.incidentCount ?? 0,
           buckets: history?.buckets ?? [],
           enabled: provider.enabled,
+          monitored: provider.componentSelection,
+          components: provider.components,
         };
       });
   }, [providers, summary, filter, leaving]);
@@ -259,6 +274,27 @@ export function Providers() {
   const columns = useMemo(
     () =>
       helper.columns([
+        // The accordion's own column: a chevron on the rows that have
+        // components to show, an empty cell on the rest. No header label —
+        // the control belongs to the row, and a column of chevrons is not a
+        // dimension anyone sorts by.
+        helper.display({
+          id: "expand",
+          header: () => null,
+          cell: ({ row }) =>
+            row.getCanExpand() ? (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-expanded={row.getIsExpanded()}
+                aria-controls={panelId(row.id)}
+                aria-label={t("providers.components-toggle")}
+                onClick={row.getToggleExpandedHandler()}
+              >
+                <ChevronRight className={cn("size-4 transition-transform", row.getIsExpanded() && "rotate-90")} />
+              </Button>
+            ) : null,
+        }),
         helper.accessor("name", {
           header: ({ column }) => <SortHead column={column} label={t("column.provider")} />,
           sortFn: "text",
@@ -322,6 +358,11 @@ export function Providers() {
     enableSortingRemoval: true,
     // One column at a time: five columns do not need a shift-click contract.
     enableMultiSort: false,
+    // The panel a chevron opens is a detail row this view renders itself, not
+    // a tree of sub-rows for the row model to flatten in — so expansion is
+    // manual, and only a row with a component selection can open at all.
+    manualExpanding: true,
+    getRowCanExpand: (row) => row.original.monitored.length > 0,
   });
 
   return (
@@ -369,26 +410,47 @@ export function Providers() {
             {table.getRowModel().rows.map((row, index) => {
               const isLeaving = leaving.has(row.id);
               return (
-                <TableRow
-                  key={row.id}
-                  // What useRowShift measures each row by; a key is React's
-                  // own bookkeeping and never reaches the DOM.
-                  data-row-id={row.id}
-                  // A disabled provider is still listed, only dimmed: its
-                  // history is real either way.
-                  className={cn(
-                    isLeaving ? "anim-sink" : "anim-rise anim-rise-table-row",
-                    !row.original.enabled && "opacity-55",
+                <Fragment key={row.id}>
+                  <TableRow
+                    // What useRowShift measures each row by; a key is React's
+                    // own bookkeeping and never reaches the DOM.
+                    data-row-id={row.id}
+                    // A disabled provider is still listed, only dimmed: its
+                    // history is real either way.
+                    className={cn(
+                      isLeaving ? "anim-sink" : "anim-rise anim-rise-table-row",
+                      !row.original.enabled && "opacity-55",
+                    )}
+                    // A row on its way out goes at once; only arrivals stagger.
+                    style={{ animationDelay: isLeaving ? "0ms" : `${index * 60}ms` }}
+                  >
+                    {row.getAllCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        <table.FlexRender cell={cell} />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  {/* The panel the chevron opens. Deliberately carries no
+                      `data-row-id`: useRowShift measures provider rows only, so
+                      the rows below still close ranks as this one unfolds. */}
+                  {row.getIsExpanded() && (
+                    // No hover on the panel: TableRow's own `hover:bg-muted/50`
+                    // is for a row an operator can act on, and this is content.
+                    <TableRow id={panelId(row.id)} className="hover:bg-transparent">
+                      <TableCell colSpan={row.getAllCells().length} className="p-0 whitespace-normal">
+                        <div className="anim-unfold">
+                          <div className="px-2 pb-4">
+                            <ComponentRows
+                              providerId={row.original.id}
+                              days={WINDOW_DAYS}
+                              current={row.original.components}
+                            />
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   )}
-                  // A row on its way out goes at once; only arrivals stagger.
-                  style={{ animationDelay: isLeaving ? "0ms" : `${index * 60}ms` }}
-                >
-                  {row.getAllCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      <table.FlexRender cell={cell} />
-                    </TableCell>
-                  ))}
-                </TableRow>
+                </Fragment>
               );
             })}
           </TableBody>

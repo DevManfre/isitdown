@@ -80,6 +80,7 @@
   "providers.empty": "No providers configured yet — add one in Settings.",
   "providers.remove-confirm": "Remove {name}? Its uptime history and incidents go with it.",
 
+  "providers.components-toggle": "Show monitored components",
   "incidents.filter.label": "Incident filter",
   "incidents.active": "Active incident",
   "incidents.closed": "Closed",
