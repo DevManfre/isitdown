@@ -33,6 +33,7 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
     theme: z.enum(["light", "dark", "system"]).optional(),
     uiLocale: z.enum(uiLocales as [string, ...string[]]).optional(),
     notificationLocale: z.enum(notificationLocales as unknown as [string, ...string[]]).optional(),
+    mapView: z.enum(["off", "map", "globe"]).optional(),
   });
 
   const current = () => {
@@ -41,6 +42,7 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
       theme: settings.theme,
       uiLocale: settings.uiLocale,
       notificationLocale: settings.notificationLocale,
+      mapView: settings.mapView,
     };
   };
 

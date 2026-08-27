@@ -50,7 +50,7 @@ test("preferences default to following the system theme and English", async () =
   try {
     const { status, body } = await app.request("GET", "/api/preferences");
     assert.equal(status, 200);
-    assert.deepEqual(body, { theme: "system", uiLocale: "en", notificationLocale: "en" });
+    assert.deepEqual(body, { theme: "system", uiLocale: "en", notificationLocale: "en", mapView: "off" });
   } finally {
     await app.close();
   }
@@ -64,7 +64,7 @@ test("a preference change round-trips and survives a restart", async () => {
       uiLocale: "it",
     });
     assert.equal(status, 200);
-    assert.deepEqual(body, { theme: "dark", uiLocale: "it", notificationLocale: "en" });
+    assert.deepEqual(body, { theme: "dark", uiLocale: "it", notificationLocale: "en", mapView: "off" });
     await app.close();
 
     const restarted = await api(app.dbPath);
@@ -73,6 +73,7 @@ test("a preference change round-trips and survives a restart", async () => {
         theme: "dark",
         uiLocale: "it",
         notificationLocale: "en",
+        mapView: "off",
       });
     } finally {
       await restarted.close();
