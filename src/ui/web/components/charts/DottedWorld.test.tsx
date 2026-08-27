@@ -6,6 +6,7 @@ import { I18nextProvider } from "react-i18next";
 import { DottedWorld } from "./DottedWorld.tsx";
 import { TooltipProvider } from "@/components/ui/tooltip.tsx";
 import i18n from "@/lib/i18n.ts";
+import { tierFill } from "@/lib/chartConfig.ts";
 import type { MapCell } from "@/lib/mapCells.ts";
 import type { MapPoint } from "@/lib/types.ts";
 
@@ -104,13 +105,17 @@ describe("DottedWorld", () => {
     expect(Math.max(...radii)).toBeLessThanOrEqual(5);
   });
 
-  it("takes every marker colour from a token, never a literal", () => {
+  it("takes every marker colour from the fill token, never the text token or a literal", () => {
     render(
       <Wrap>
         <DottedWorld cells={[cell({ worst: "major_outage" })]} onSelect={() => {}} />
       </Wrap>,
     );
-    expect(screen.getByRole("button").getAttribute("fill")).toMatch(/^var\(--/);
+    // `toMatch(/^var\(--/)` alone passes for tierColor(tier) just as much as
+    // tierFill(tier) — both resolve to a var(--...) string. Pin the exact
+    // -fill token so swapping tierFill for tierColor (the regression this
+    // constraint exists to catch) actually fails here.
+    expect(screen.getByRole("button").getAttribute("fill")).toBe(tierFill("danger"));
   });
 
   it("rings a fault cell and leaves an operational one unringed", () => {
@@ -119,7 +124,11 @@ describe("DottedWorld", () => {
         <DottedWorld cells={[cell({ worst: "major_outage" })]} onSelect={() => {}} />
       </Wrap>,
     );
-    expect(container.querySelectorAll("circle[stroke]")).toHaveLength(1);
+    const rings = container.querySelectorAll("circle[stroke]");
+    expect(rings).toHaveLength(1);
+    // Same gap as the marker-fill test: presence alone doesn't rule out
+    // tierColor(tier) or a literal on the ring's stroke.
+    expect(rings[0]?.getAttribute("stroke")).toBe(tierFill("danger"));
 
     const plain = render(
       <Wrap>
