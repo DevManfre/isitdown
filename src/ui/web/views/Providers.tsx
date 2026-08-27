@@ -31,6 +31,9 @@ const WINDOW_DAYS = 90;
 /** How long a dropped row stays mounted; in step with `.anim-sink` in motion.css. */
 const EXIT_MS = 220;
 
+/** How long a collapsing panel stays mounted; in step with `.anim-fold` there. */
+const FOLD_MS = 220;
+
 type Filter = "all" | "issues";
 
 /** No provider yet: a fresh fallback array each render would invalidate the row model. */
@@ -120,42 +123,45 @@ const shownBy = (providers: readonly ProviderStatus[], filter: Filter): string[]
   (filter === "issues" ? providers.filter(hasIssue) : providers).map((provider) => provider.id);
 
 /**
- * The ids the filter has just dropped, held for one exit-animation beat.
+ * The ids that were on the page a render ago and are not any more, held for
+ * one exit-animation beat.
  *
- * An unmounted row cannot animate, so flipping to "issues" used to blink the
- * operational rows out of existence while the arriving ones rose in. Keeping
- * each dropped row mounted for the length of `.anim-sink` buys the leave the
- * choreography the entry already had.
+ * Nothing unmounted can animate, so flipping to "issues" used to blink the
+ * operational rows out of existence while the arriving ones rose in, and
+ * collapsing a row used to cut its panel away in a single frame. Keeping what
+ * is going mounted for the length of its exit buys the leave the choreography
+ * the entry already had — `.anim-sink` for a dropped row, `.anim-fold` for a
+ * closing panel.
  */
-function useLeavingIds(shownIds: readonly string[]): ReadonlySet<string> {
-  // The ids themselves are the identity of a render: `shownIds` is a fresh
-  // array every time, and only a change of membership means anything here.
-  const key = shownIds.join(",");
-  const [tracked, setTracked] = useState<{ key: string; leaving: ReadonlySet<string> }>(() => ({
+function useOutgoing(ids: readonly string[], hold: number): ReadonlySet<string> {
+  // The ids themselves are the identity of a render: `ids` is a fresh array
+  // every time, and only a change of membership means anything here.
+  const key = ids.join(",");
+  const [tracked, setTracked] = useState<{ key: string; outgoing: ReadonlySet<string> }>(() => ({
     key,
-    leaving: new Set(),
+    outgoing: new Set(),
   }));
 
-  // Worked out during the render that first sees the new filter, not in an
-  // effect afterwards: React discards this pass and re-runs it with `leaving`
-  // already filled, so the dropped rows stay in the DOM they are in. An effect
-  // would commit one paint without them first, and the row would be torn down
-  // and rebuilt just to fade — a flash, which is the thing being fixed.
+  // Worked out during the render that first sees the change, not in an effect
+  // afterwards: React discards this pass and re-runs it with `outgoing`
+  // already filled, so what is leaving stays in the DOM it is in. An effect
+  // would commit one paint without it first, and it would be torn down and
+  // rebuilt just to fade — a flash, which is the thing being fixed.
   if (tracked.key !== key) {
-    const shown = new Set(shownIds);
-    const gone = tracked.key === "" ? [] : tracked.key.split(",").filter((id) => !shown.has(id));
-    setTracked({ key, leaving: new Set(gone) });
+    const present = new Set(ids);
+    const gone = tracked.key === "" ? [] : tracked.key.split(",").filter((id) => !present.has(id));
+    setTracked({ key, outgoing: new Set(gone) });
   }
 
   useEffect(() => {
-    if (tracked.leaving.size === 0) return;
+    if (tracked.outgoing.size === 0) return;
     // Reduced motion plays no exit animation, so there is nothing to wait for.
-    const hold = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : EXIT_MS;
-    const timer = setTimeout(() => setTracked((current) => ({ key: current.key, leaving: new Set() })), hold);
+    const wait = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : hold;
+    const timer = setTimeout(() => setTracked((current) => ({ key: current.key, outgoing: new Set() })), wait);
     return () => clearTimeout(timer);
-  }, [tracked]);
+  }, [tracked, hold]);
 
-  return tracked.leaving;
+  return tracked.outgoing;
 }
 
 /**
@@ -250,7 +256,7 @@ export function Providers() {
   // with an open issue; "all" is otherwise the fleet in its configured order.
   const shownIds = shownBy(providers, filter);
   // Sits above the empty-state return below: a hook cannot go behind one.
-  const leaving = useLeavingIds(shownIds);
+  const leaving = useOutgoing(shownIds, EXIT_MS);
   const body = useRowShift();
 
   // The row model is rebuilt from this array's identity, so it is memoised on
@@ -376,6 +382,14 @@ export function Providers() {
     getRowCanExpand: (row) => row.original.monitored.length > 0,
   });
 
+  const rows = table.getRowModel().rows;
+  // A panel the operator has just closed is held open for one fold, the same
+  // way a filtered-out row is held for one sink.
+  const folding = useOutgoing(
+    rows.filter((row) => row.getIsExpanded()).map((row) => row.id),
+    FOLD_MS,
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -418,7 +432,7 @@ export function Providers() {
             ))}
           </TableHeader>
           <TableBody ref={body}>
-            {table.getRowModel().rows.map((row, index) => {
+            {rows.map((row, index) => {
               const isLeaving = leaving.has(row.id);
               return (
                 <Fragment key={row.id}>
@@ -444,18 +458,25 @@ export function Providers() {
                   {/* The panel the chevron opens. Deliberately carries no
                       `data-row-id`: useRowShift measures provider rows only, so
                       the rows below still close ranks as this one unfolds. */}
-                  {row.getIsExpanded() && (
+                  {(row.getIsExpanded() || folding.has(row.id)) && (
                     // No hover on the panel: TableRow's own `hover:bg-muted/50`
                     // is for a row an operator can act on, and this is content.
                     <TableRow id={panelId(row.id)} className="hover:bg-transparent">
                       <TableCell colSpan={row.getAllCells().length} className="p-0 whitespace-normal">
-                        <div className="anim-unfold">
-                          <div className="px-2 pb-4">
-                            <ComponentRows
-                              providerId={row.original.id}
-                              days={WINDOW_DAYS}
-                              current={row.original.components}
-                            />
+                        <div className={row.getIsExpanded() ? "anim-unfold" : "anim-fold"}>
+                          {/* Bare on purpose: this is the clipping box, and the
+                              padding belongs inside it. A `fr` track can never
+                              flex below its content's base size, so padding
+                              here would floor the fold at 16px and leave only
+                              the fade to play. */}
+                          <div>
+                            <div className="px-2 pb-4">
+                              <ComponentRows
+                                providerId={row.original.id}
+                                days={WINDOW_DAYS}
+                                current={row.original.components}
+                              />
+                            </div>
                           </div>
                         </div>
                       </TableCell>
