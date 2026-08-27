@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { matchPath, NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { NAV_ROUTES, ROUTE_PATHS, type RouteName } from "../../routePaths.ts";
@@ -14,31 +13,18 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar.tsx";
 import { useConfigChrome, useStatusChrome } from "@/hooks/queries.ts";
-import { useRail } from "@/hooks/useRail.tsx";
 import { cn } from "@/lib/utils.ts";
 
 /**
- * The rail is the shadcn `Sidebar` primitive, collapsing to an icon strip.
- *
- * Two of its collapsed-state rules are overridden per row rather than fought in
- * CSS. Stock `collapsible="icon"` squares every menu button off at 32px and
- * hides the badges outright, because a stock icon rail has room for a glyph and
- * nothing else. This one keeps its labels and peeks back to full width on hover
- * (motion.css), so during a peek those rules would clip exactly what the peek
- * exists to show. `cn()` is tailwind-merge, so an override with the same variant
- * and the same utility group replaces the primitive's own.
+ * The rail is the shadcn `Sidebar` primitive, pinned open: App holds the
+ * provider's `open` at true, so no collapsed state — and none of the
+ * primitive's collapsed-width rules — is ever reachable here.
  */
 export function Rail() {
   const { t } = useTranslation();
-  const { collapsed, toggle } = useRail();
   const { pathname } = useLocation();
   const { data: status } = useStatusChrome();
   const { data: config } = useConfigChrome();
-  // Right after the collapse click the pointer is still standing on the rail,
-  // and `:hover` alone would reopen it in the same instant. `.rail-hold` blinds
-  // the hover (see motion.css) until the pointer has actually left once —
-  // the vanilla dashboard's app.js kept the same class for the same reason.
-  const [hold, setHold] = useState(false);
 
   const badgeFor = (name: RouteName): string | undefined => {
     if (status === undefined) return undefined;
@@ -51,32 +37,10 @@ export function Rail() {
   };
 
   return (
-    <Sidebar
-      collapsible="icon"
-      role="navigation"
-      aria-label={t("nav.views")}
-      className={cn("rail", hold && "rail-hold")}
-      onMouseLeave={() => setHold(false)}
-    >
+    <Sidebar role="navigation" aria-label={t("nav.views")} className="rail">
       <SidebarHeader className="rail-brand flex-row items-center gap-2 overflow-hidden px-6 py-4">
         <span className="rail-dot size-2 shrink-0 rounded-full bg-primary" />
         <span className="rail-name font-medium">{t("app.name")}</span>
-        <button
-          type="button"
-          className="rail-toggle ml-auto text-muted-foreground"
-          aria-expanded={!collapsed}
-          aria-label={t(collapsed ? "nav.rail-expand" : "nav.rail-collapse")}
-          onClick={(event) => {
-            const collapsing = !collapsed;
-            toggle();
-            // Focus would hold the rail open through :focus-within just as
-            // surely as hover would, so it is dropped on the way down.
-            if (collapsing) event.currentTarget.blur();
-            setHold(collapsing);
-          }}
-        >
-          <span className="rail-toggle-chevron block size-2 rotate-45 border-b-2 border-l-2 border-current" />
-        </button>
       </SidebarHeader>
 
       <SidebarContent>
@@ -94,14 +58,14 @@ export function Rail() {
                     // so the state has to be handed in rather than read out of
                     // NavLink's render prop.
                     isActive={matchPath({ path: ROUTE_PATHS[name], end: false }, pathname) !== null}
-                    className="rounded-none group-data-[collapsible=icon]:size-auto!"
+                    className="rounded-none"
                   >
                     <NavLink to={ROUTE_PATHS[name]}>{t(labelKey)}</NavLink>
                   </SidebarMenuButton>
                   {badge !== undefined && (
                     <SidebarMenuBadge
                       className={cn(
-                        "rail-badge mr-4 group-data-[collapsible=icon]:flex",
+                        "rail-badge mr-4",
                         name === "incidents"
                           ? "bg-destructive/15 text-destructive"
                           : "bg-muted text-muted-foreground",

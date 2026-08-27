@@ -9,7 +9,6 @@ import i18n from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders, stubApi, type Fixtures } from "@/test/harness.tsx";
 import { createQueryClient } from "@/lib/queryClient.ts";
 import { BusyProvider, useBusy } from "@/hooks/useBusy.tsx";
-import { RailProvider } from "@/hooks/useRail.tsx";
 import { ThemeProvider } from "@/hooks/useTheme.tsx";
 import { RemoveServiceDialog, Settings } from "./Settings.tsx";
 
@@ -199,12 +198,10 @@ describe("Settings", () => {
       <I18nextProvider i18n={i18n}>
         <QueryClientProvider client={client}>
           <ThemeProvider>
-            <RailProvider>
-              <BusyProvider>
-                <RouterProvider router={router} />
-                <BusyProbe />
-              </BusyProvider>
-            </RailProvider>
+            <BusyProvider>
+              <RouterProvider router={router} />
+              <BusyProbe />
+            </BusyProvider>
           </ThemeProvider>
         </QueryClientProvider>
       </I18nextProvider>,

@@ -8,7 +8,6 @@ import i18n from "@/lib/i18n.ts";
 import { createQueryClient } from "@/lib/queryClient.ts";
 import { ViewError } from "@/components/ViewError.tsx";
 import { BusyProvider } from "@/hooks/useBusy.tsx";
-import { RailProvider } from "@/hooks/useRail.tsx";
 import { ThemeProvider } from "@/hooks/useTheme.tsx";
 import type { ProviderStatus } from "@/lib/types.ts";
 
@@ -100,11 +99,9 @@ export function renderWithProviders(ui: ReactElement, fixtures: Fixtures = {}, r
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={client}>
         <ThemeProvider>
-          <RailProvider>
-            <BusyProvider>
-              <RouterProvider router={router} />
-            </BusyProvider>
-          </RailProvider>
+          <BusyProvider>
+            <RouterProvider router={router} />
+          </BusyProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </I18nextProvider>,

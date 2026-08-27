@@ -36,14 +36,12 @@ import {
  *    test/ui/strings.test.ts, which scans this directory for exactly that.
  * 2. The width constants are gone. Stock shadcn wrote 16rem/3rem/18rem onto
  *    the provider's wrapper as an inline style prop, and an inline declaration
- *    outranks every stylesheet — motion.css could not have widened the
- *    collapsed strip on hover against it. tokens.css declares --sidebar-width,
- *    --sidebar-width-icon and --sidebar-width-mobile off --rail-width instead,
- *    which is what makes the peek one override on the sidebar element.
- * 3. The `sidebar_state` cookie write is gone with them. `useRail` owns this
- *    state: it persists to localStorage and stamps data-rail on <html>, which
- *    the pre-paint script in index.html reads back before first paint. A
- *    second copy in a cookie nothing reads could only drift out of sync.
+ *    outranks every stylesheet, so no rule of ours could ever have resized the
+ *    rail against it. tokens.css declares --sidebar-width, --sidebar-width-icon
+ *    and --sidebar-width-mobile off --rail-width instead.
+ * 3. The `sidebar_state` cookie write is gone with them. App pins `open` at
+ *    true — the rail has no collapse control — so there is no state left to
+ *    persist, and a cookie nothing reads could only drift out of sync.
  */
 
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
