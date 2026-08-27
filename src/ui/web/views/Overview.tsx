@@ -51,7 +51,7 @@ export function Overview() {
           inset for its own content. */}
       <div
         className="view-hero -mx-8 -mt-6 grid grid-cols-1 gap-8 px-8 pt-6 pb-6 md:grid-cols-2"
-        style={{ background: "radial-gradient(110% 70% at 8% 0%, var(--color-accent-900), transparent 60%)" }}
+        style={{ background: "var(--gradient-hero)" }}
       >
         <div className="hero-copy flex flex-col gap-3">
           <span className="anim-rise text-xs uppercase tracking-widest text-primary">
