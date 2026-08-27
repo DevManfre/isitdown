@@ -161,6 +161,8 @@
 
   "channel.enabled": "enabled",
   "channel.disabled": "disabled",
+  "service.enabled": "enabled",
+  "service.disabled": "disabled",
   "channel.env-set": "set",
   "channel.env-missing": "not set",
   "channel.test-ok": "Test message sent.",

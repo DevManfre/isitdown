@@ -255,6 +255,31 @@ describe("Settings", () => {
     expect(probe).toHaveTextContent("false");
   });
 
+  // A provider can be taken out of the rotation without being deleted: the
+  // poller has always skipped a disabled service (poller.ts:164) and the PATCH
+  // route has always accepted `enabled`, but nothing in the browser could set
+  // it — the add dialog hard-codes `enabled: true` and edit never sends it.
+  it("a service toggle issues its patch", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const toggle = await screen.findByRole("switch", { name: "GitHub — enabled" });
+    const calls = interceptWrites({ "PATCH /config/services/github": {} });
+
+    await userEvent.click(toggle);
+
+    await waitFor(() => {
+      const patchCall = calls.find(
+        (call) => call.method === "PATCH" && call.path === "/config/services/github",
+      );
+      expect(patchCall?.body).toEqual({ enabled: false });
+    });
+  });
+
+  it("reads a disabled service as off, so the row states it rather than only tinting a dot", async () => {
+    const services = [{ ...config.services[0], enabled: false }];
+    renderWithProviders(<Settings />, { ...fixtures, config: { ...config, services } });
+    expect(await screen.findByRole("switch", { name: "GitHub — disabled" })).not.toBeChecked();
+  });
+
   it("a channel toggle issues its patch", async () => {
     renderWithProviders(<Settings />, fixtures);
     const toggle = await screen.findByRole("switch", { name: "telegram — enabled" });
