@@ -173,5 +173,11 @@
   "map.aria.world": "World map of monitored locations",
   "map.cell.aria_one": "{locations} — {status}",
   "map.cell.aria_other": "{count} locations including {locations} — {status}",
-  "map.cell.more": " and {count} more"
+  "map.cell.more": " and {count} more",
+
+  "map.title": "Where the fleet is",
+  "map.error": "The map could not be loaded.",
+  "map.empty_one": "No component has a known location · 1 could not be placed",
+  "map.empty_other": "No component has a known location · {count} could not be placed",
+  "map.footnote": "{located} components located · {unplaced} could not be placed"
 }

@@ -6,6 +6,7 @@ import { FleetGroups } from "@/components/FleetGroups.tsx";
 import { FleetRings } from "@/components/FleetRings.tsx";
 import { FleetRows } from "@/components/FleetRows.tsx";
 import { FleetSummary } from "@/components/FleetSummary.tsx";
+import { GeoCard } from "@/components/GeoCard.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { worstTier } from "@/lib/chartConfig.ts";
@@ -166,6 +167,11 @@ export function Overview() {
       <div className="overview-rows flex flex-col gap-4">
         {/* The rule sweeps in under the hero, before the rows arrive. */}
         <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "220ms" }} />
+
+        {/* A summary belongs above the detail. The card renders nothing at all
+            when `mapView` is `off`, which is the default, so the Overview's
+            existing shape is unchanged for anyone who has not asked for it. */}
+        <GeoCard />
 
         {providers.length === 0 ? (
           <p className="text-muted-foreground">
