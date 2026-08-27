@@ -9,58 +9,62 @@
 // dotted-map@3.1.0's getPoints() returns only { x, y } pixel coordinates for
 // the base land grid — lat/lng is populated only on pins added via addPin(),
 // never on the grid itself (see
-// node_modules/dotted-map/dist/without-countries.mjs). To get the
-// { lat, lon } this script actually needs, it replays the same inverse
-// projection dotted-map runs internally to decide land vs. water in the
-// first place (node_modules/dotted-map/dist/index.mjs, getMap()'s sampling
-// loop), reading the map instance's X_MIN/Y_MAX/X_RANGE/Y_RANGE/proj4String.
-// Those fields are typed `private` in dotted-map's .d.ts, but there is no
-// real (`#`) private field backing them — they are plain enumerable
-// properties at runtime, verified by inspecting the instance directly — so
-// the cast below is a deliberate read of that runtime shape, not a guess.
-// That's also why proj4 is a direct devDependency here: it's the exact
-// library dotted-map itself uses for this projection.
+// node_modules/dotted-map/dist/without-countries.mjs). Recovering { lat, lon }
+// from { x, y } would normally need the inverse of whatever map projection
+// generated the grid — but requesting the "equirectangular" projection (the
+// same one `projectEquirect` in mapProjection.ts already uses) makes that
+// inverse pure linear interpolation: x is linear in longitude, y is linear in
+// latitude, so no trigonometry and no extra dependency (proj4, which
+// dotted-map itself depends on for the general case) is needed here.
+//
+// getMapJSON() — a plain function, not a class method — returns the same
+// generation output a class instance's getPoints() would, but as the
+// publicly-typed MapData shape (points, width, height, region, ...), so this
+// reads real numbers off documented fields instead of reaching into a class
+// instance's fields that the .d.ts marks `private` (they are plain enumerable
+// properties at runtime, but getMapJSON's shape is the supported way to get
+// them and won't break on a patch release the way reading `private` fields
+// could).
+//
+// The region is passed explicitly rather than left at dotted-map's default:
+// the default DEFAULT_WORLD_REGION only reaches lat -56..71 / lng -168..168,
+// well short of what `projectEquirect` treats as the full map (-90..90 is
+// unusable at the poles for a linear projection, so -60..84 covers the
+// inhabited world without the extreme pole distortion; -180..180 is the full
+// longitude range `projectEquirect` projects onto). Without this, a real PoP
+// near either edge (e.g. Auckland, lon 174.76) would render past the last
+// drawn land dot, floating in blank space — the grid's extent and the
+// renderer's projection domain must agree by construction.
 //
 // Run: node --experimental-strip-types scripts/genMapGrid.ts
 import { writeFileSync } from "node:fs";
-import DottedMap from "dotted-map";
-import proj4 from "proj4";
+import { getMapJSON } from "dotted-map";
 
 const OUT = new URL("../src/ui/web/lib/mapGrid.generated.json", import.meta.url);
 
-interface MapInternals {
-  readonly X_MIN: number;
-  readonly Y_MAX: number;
-  readonly X_RANGE: number;
-  readonly Y_RANGE: number;
-  readonly width: number;
-  readonly height: number;
-  readonly proj4String: string;
+interface RawMapData {
+  points: Record<string, { x: number; y: number }>;
+  width: number;
+  height: number;
 }
+
+// Inhabited latitudes only, and the same full longitude span projectEquirect
+// projects onto — see the header comment for why.
+const REGION = { lat: { min: -60, max: 84 }, lng: { min: -180, max: 180 } };
 
 // 60 rows of dots over the inhabited latitudes. Settled against the prototype
 // in `design/`: denser reads as noise behind the status markers, sparser stops
 // reading as a world.
-const map = new DottedMap({ height: 60, grid: "diagonal" });
-const internals = map as unknown as MapInternals;
+const raw = JSON.parse(
+  getMapJSON({ height: 60, grid: "diagonal", projection: { name: "equirectangular" }, region: REGION }),
+) as RawMapData;
 
-const points = map
-  .getPoints()
-  .map(({ x, y }) => {
-    const [lon, lat] = proj4(internals.proj4String, "WGS84", [
-      (x / internals.width) * internals.X_RANGE + internals.X_MIN,
-      internals.Y_MAX - (y / internals.height) * internals.Y_RANGE,
-    ]);
-    return {
-      lat: Math.round(lat * 100) / 100,
-      lon: Math.round(lon * 100) / 100,
-    };
-  })
-  // Antarctica hosts nothing anyone monitors. dotted-map's default world
-  // region already stops at lat -56 (see DEFAULT_WORLD_REGION in
-  // node_modules/dotted-map/dist/index.mjs), so this ends up a no-op with
-  // today's settings — kept as a guard in case that default ever reaches
-  // further south.
+const points = Object.values(raw.points)
+  .map(({ x, y }) => ({
+    lat: Math.round((REGION.lat.max - (y / raw.height) * (REGION.lat.max - REGION.lat.min)) * 100) / 100,
+    lon: Math.round((REGION.lng.min + (x / raw.width) * (REGION.lng.max - REGION.lng.min)) * 100) / 100,
+  }))
+  // Antarctica hosts nothing anyone monitors.
   .filter((point) => point.lat > -60);
 
 writeFileSync(
