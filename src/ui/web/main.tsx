@@ -7,7 +7,6 @@ import i18n from "@/lib/i18n.ts";
 import { createQueryClient } from "@/lib/queryClient.ts";
 import { BusyProvider } from "@/hooks/useBusy.tsx";
 import { ThemeProvider } from "@/hooks/useTheme.tsx";
-import { RailProvider } from "@/hooks/useRail.tsx";
 import { router } from "@/routes.tsx";
 import "./css/base.css";
 
@@ -21,11 +20,9 @@ createRoot(root).render(
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={client}>
         <ThemeProvider>
-          <RailProvider>
-            <BusyProvider>
-              <RouterProvider router={router} />
-            </BusyProvider>
-          </RailProvider>
+          <BusyProvider>
+            <RouterProvider router={router} />
+          </BusyProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </I18nextProvider>

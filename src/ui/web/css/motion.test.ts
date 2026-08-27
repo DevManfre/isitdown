@@ -65,68 +65,11 @@ describe("motion.css after the react port", () => {
     expect(code).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
-  // The React port carried exactly one of app.css:67-92's rules across — the
-  // chevron rotation — and left the four `transition: opacity` / `padding`
-  // declarations below animating state changes that no longer happened. The
-  // collapsed rail shrank its track to 30px while 196px of fully opaque labels
-  // stayed put, with no way to peek at the nav. These assertions are the shape
-  // of that whole mechanism, so losing a piece of it fails here rather than in
-  // a screenshot nobody takes.
-  //
-  // The track is no longer a grid this file sizes. `Sidebar` renders its own
-  // gap and container and sizes both off --sidebar-width-icon, so the peek is
-  // one override of that variable — but it has to stay one that reaches both
-  // halves, which is why it is set on the wrapper and not on the strip.
-  describe("the collapsed rail keeps its whole collapse mechanism", () => {
-    it("animates both halves of the track, which is what the peek resizes", () => {
-      const rule = /\[data-slot="sidebar-gap"\],\s*\[data-slot="sidebar-container"\]\s*\{([^}]*)\}/.exec(code);
-      expect(rule, "the gap and the container must animate together or the page tears").not.toBeNull();
-      expect(rule?.[1]).toMatch(/transition:\s*width/);
-    });
-
-    it("peek-expands the track on hover and on keyboard focus", () => {
-      expect(code).toContain(':root[data-rail="collapsed"] .console:has(.rail:hover:not(.rail-hold))');
-      expect(code).toContain(':root[data-rail="collapsed"] .console:has(.rail:focus-within)');
-    });
-
-    // Raising the icon width to the full rail width is the whole peek: the gap
-    // and the container both read the variable and both inherit it from here,
-    // so the column and the strip widen together and the page gives way instead
-    // of being covered. Setting a `width` on the strip alone would cover it.
-    it("peek-expands by raising the icon width to the full rail width", () => {
-      const rule = /:root\[data-rail="collapsed"\] \.console:has\(\.rail:focus-within\)\s*\{([^}]*)\}/.exec(code);
-      expect(rule, "no peek rule on the wrapper").not.toBeNull();
-      expect(rule?.[1]).toMatch(/--sidebar-width-icon:\s*var\(--rail-width\)/);
-    });
-
-    // Every one of these four has a `transition: opacity` waiting for it in the
-    // block above; a class dropped from this list is a label that stays lit at
-    // full opacity over the collapsed strip.
-    it("fades all four content groups while collapsed and unhovered", () => {
-      const rule = /:root\[data-rail="collapsed"\][^{]*:is\(([^)]*)\)[^{]*\{[^}]*opacity:\s*0/.exec(code);
-      expect(rule, "no opacity:0 rule for the collapsed rail's content").not.toBeNull();
-      for (const cls of [".rail-dot", ".rail-name", ".rail-links", ".rail-foot"]) {
-        expect(rule?.[1], `${cls} stays opaque over the collapsed strip`).toContain(cls);
-      }
-    });
-
-    it("keeps the .rail-hold guard on both the fade and the width", () => {
-      expect(code).toContain(".rail.rail-hold");
-      expect(code).toContain(":not(.rail-hold)");
-    });
-
-    it("shifts the brand padding in, which is what `transition: padding` animates", () => {
-      expect(code).toMatch(/:root\[data-rail="collapsed"\][^{]*\.rail-brand[^{]*\{[^}]*padding-left:/);
-    });
-
-    // The span carries Tailwind's `rotate-45`, which sets the standalone
-    // `rotate` property. A `transform: rotate(...)` flip here would compose
-    // with it rather than replace it, so the flip has to ride `rotate` too.
-    it("still flips the pin chevron, on the property `rotate-45` sets", () => {
-      const rule = /:root\[data-rail="collapsed"\]\s+\.rail-toggle-chevron\s*\{([^}]*)\}/.exec(code);
-      expect(rule, "no collapsed rule for the pin chevron").not.toBeNull();
-      expect(rule?.[1]).toMatch(/\brotate:\s*225deg/);
-      expect(rule?.[1], "a transform flip would compose with rotate-45").not.toMatch(/transform:/);
-    });
+  // The rail is pinned open now: no pin, no chevron, no peek widening a
+  // collapsed strip. Nothing here may animate a state that cannot happen.
+  it("keeps no trace of the collapse mechanism the rail no longer has", () => {
+    for (const dead of ['[data-rail="collapsed"]', ".rail-toggle", ".rail-hold"]) {
+      expect(code, `${dead} outlived the rail's collapse control`).not.toContain(dead);
+    }
   });
 });
