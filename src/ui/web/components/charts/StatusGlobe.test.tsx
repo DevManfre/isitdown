@@ -8,17 +8,17 @@ import i18n from "@/lib/i18n.ts";
 import type { MapCell } from "@/lib/mapCells.ts";
 
 const destroy = vi.fn();
+const update = vi.fn();
 // Typed explicitly rather than inferred from the zero-arg implementation
 // below: an untyped `vi.fn(() => ...)` infers a call signature of `()`, which
 // makes `createGlobe.mock.calls[0][1]` (the options object cobe was called
-// with) a type error later in this file. cobe's own `COBEOptions` omits
-// `onRender` (see `StatusGlobe.tsx`), so this mirrors it with the one field
-// the tests actually read off the mock's captured call.
+// with) a type error later in this file.
 const createGlobe = vi.fn<
-  (canvas: HTMLCanvasElement, options: { onRender?: (state: Record<string, number>) => void }) => {
+  (canvas: HTMLCanvasElement, options: Record<string, unknown>) => {
     destroy: () => void;
+    update: (state: { phi?: number }) => void;
   }
->(() => ({ destroy }));
+>(() => ({ destroy, update }));
 
 // happy-dom has no WebGL, so the canvas cannot be exercised here at all. The
 // mock is what makes the rest of the component — the overlay, the markers,
@@ -64,6 +64,7 @@ describe("StatusGlobe", () => {
   beforeEach(() => {
     createGlobe.mockClear();
     destroy.mockClear();
+    update.mockClear();
     document.documentElement.removeAttribute("data-theme");
   });
 
@@ -166,12 +167,28 @@ describe("StatusGlobe", () => {
     expect(label).toContain("2 more");
   });
 
-  it("does not set state from cobe's per-frame callback", () => {
-    // The whole reason the rotation lives in a ref: `onRender` fires every
-    // animation frame, and a `setState` there would re-render every marker
-    // ~60 times a second on a dashboard an operator leaves open all day.
-    // Driving `onRender` 30 times must not produce 30 renders.
+  it("does not set state from the rotation loop, but still drives it", () => {
+    // The whole reason the rotation lives in a ref: the requestAnimationFrame
+    // loop that calls `globe.update()` runs every animation frame, and a
+    // `setState` there would re-render every marker ~60 times a second on a
+    // dashboard an operator leaves open all day. Driving that loop 30 times
+    // must not produce 30 renders.
     //
+    // cobe 2.0.1 has no `onRender` callback for the component to hand a
+    // frame-by-frame hook to (see StatusGlobe.tsx) — the component drives its
+    // own `requestAnimationFrame` loop instead, so that is what this test
+    // pumps. `requestAnimationFrame` is stubbed to queue callbacks rather
+    // than fire them on a real clock, so the 30 frames are deterministic
+    // instead of racing the test runner's actual animation timing.
+    const queue: FrameRequestCallback[] = [];
+    const raf = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        queue.push(callback);
+        return queue.length;
+      });
+    const caf = vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+
     // `Profiler` counts commits of this exact subtree. A `renders` counter
     // on a *parent* component would not catch a regression here: React only
     // re-renders the component whose own state changed, never its parent —
@@ -191,23 +208,25 @@ describe("StatusGlobe", () => {
       </Wrap>,
     );
 
-    const onRender = createGlobe.mock.calls[0]?.[1]?.onRender;
-    expect(onRender).toBeTypeOf("function");
-
     const before = commits;
-    const state: Record<string, number> = {};
     // `act` is required here, not just React-testing hygiene: without it, a
-    // stray `setState` inside `onRender` would schedule a re-render that
-    // React only commits on a later tick, after this assertion already ran
-    // — the check below would pass whether or not the regression is present.
+    // stray `setState` inside the loop would schedule a re-render that React
+    // only commits on a later tick, after this assertion already ran — the
+    // check below would pass whether or not the regression is present.
     // Wrapping in a synchronous `act` forces any such update to flush before
     // `commits` is read, so this is what makes the assertion capable of
     // catching it at all.
     act(() => {
-      for (let i = 0; i < 30; i += 1) onRender?.(state);
+      for (let i = 0; i < 30; i += 1) queue.shift()?.(i);
     });
     expect(commits).toBe(before);
-    // It still advanced the canvas's own rotation.
-    expect(state["phi"]).toBeGreaterThan(0);
+    // It still advanced the canvas's own rotation, through cobe's real API —
+    // `update()`, not a fictional per-frame callback.
+    expect(update).toHaveBeenCalledTimes(30);
+    const lastPhi = (update.mock.calls.at(-1)?.[0] as { phi?: number } | undefined)?.phi;
+    expect(lastPhi).toBeGreaterThan(0);
+
+    raf.mockRestore();
+    caf.mockRestore();
   });
 });
