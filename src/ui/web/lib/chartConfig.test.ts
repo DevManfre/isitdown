@@ -156,8 +156,12 @@ describe("worstTier", () => {
 });
 
 describe("worstStatus", () => {
-  it("returns operational for an empty set", () => {
-    expect(worstStatus([])).toBe("operational");
+  it("returns unknown for an empty set, matching worstTier's own empty answer", () => {
+    // Unreachable in practice (`binPoints` never calls this with an empty
+    // bucket), but two sibling functions disagreeing about the vacuous case
+    // reads as a bug to the next person — see the comment on worstStatus.
+    expect(worstStatus([])).toBe(worstTier([]));
+    expect(worstStatus([])).toBe("unknown");
   });
 
   it("takes the worst of several", () => {
@@ -173,6 +177,22 @@ describe("worstStatus", () => {
 
   it("treats an unrecognised word as unknown", () => {
     expect(worstStatus(["operational", "banana"])).toBe("unknown");
+  });
+
+  it("names the most severe status actually present within the worst tier", () => {
+    // degraded and partial_outage share the warn tier (by colour, deliberately),
+    // but a map cell's tooltip and aria-label name the status itself — routing
+    // through worstTier + TIER_STATUS alone would collapse a real
+    // partial_outage into the tier's representative "degraded", which is a
+    // status nothing in the set actually has.
+    expect(worstStatus(["partial_outage"])).toBe("partial_outage");
+    expect(worstStatus(["degraded", "partial_outage"])).toBe("partial_outage");
+    expect(worstStatus(["partial_outage", "degraded"])).toBe("partial_outage");
+    // The tier's representative status is still right when it IS the most
+    // severe member present.
+    expect(worstStatus(["degraded"])).toBe("degraded");
+    // A worse tier still wins outright, regardless of what shares the lesser one.
+    expect(worstStatus(["partial_outage", "major_outage"])).toBe("major_outage");
   });
 });
 
