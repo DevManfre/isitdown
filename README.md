@@ -1056,8 +1056,11 @@ isitdown/
 │       ├── history.ts                  uptime and incident aggregation
 │       ├── backfill.ts                 reconstructs 90 days of history from a provider's incidents on first boot
 │       ├── dbConfigSource.ts           config from SQLite; resolves secrets by variable name
+│       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
+│       ├── mapStore.ts                 map_points + map_geo_state persistence
+│       ├── geo/                        resolveLocation.ts + the IATA/cloud-region lookup tables it resolves against
 │       ├── db/                         open.ts, migrate.ts, seed.ts
-│       ├── routes/                     status, history, incidents, notifications, config, preferences
+│       ├── routes/                     status, history, incidents, notifications, config, preferences, map
 │       └── web/                        the dashboard: react, vite, shadcn/ui
 │           ├── index.html              pre-paint theme script, fonts, #root
 │           ├── main.tsx                provider tree: i18n, query, theme, router
