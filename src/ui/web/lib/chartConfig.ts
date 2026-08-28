@@ -132,18 +132,30 @@ export const worstTier = (statuses: string[]): StatusTier =>
  * The worst status in a set, as a status rather than as a tier.
  *
  * `worstTier` already answers this for the beacon, which only needs the
- * verdict. A map cell needs the status itself, because its tooltip names it.
- * Routed through `worstTier` and `TIER_STATUS` rather than carrying its own
- * ranking table — one ordering, in one place.
+ * verdict. A map cell needs the status itself, because its tooltip and
+ * aria-label both name it — and `degraded` and `partial_outage` share a tier
+ * by colour, deliberately, but are not the same status. Answering with
+ * `TIER_STATUS[worstTier(statuses)]` alone would collapse a real
+ * `partial_outage` into `degraded`, a status nothing in the set has. Instead:
+ * take the worst tier as `worstTier` already does, then rank by
+ * `STATUS_CHART[x].bar` (its existing severity weight — no second ranking
+ * table) to name the most severe status actually present within that tier.
  *
- * The empty set is guarded separately rather than delegated to `worstTier`:
- * `worstTier([])` deliberately answers `unknown` because the Overview beacon
- * must not read a never-polled fleet as green. A map cell has no equivalent
- * case — `binPoints` never calls this with an empty bucket — so the vacuous
- * answer here is the harmless one, `operational`, not a borrowed alarm.
+ * The empty set is guarded separately rather than computed: `statuses` is
+ * never empty in practice (`binPoints` never calls this with an empty
+ * bucket), so the answer here is unreachable, but it is made to agree with
+ * `worstTier([])` — `"unknown"` — rather than picking a different value for
+ * no reason. Two sibling functions disagreeing about the vacuous case reads
+ * as a bug to the next person, not as an intentional choice.
  */
-export const worstStatus = (statuses: string[]): OverallStatus =>
-  statuses.length === 0 ? "operational" : TIER_STATUS[worstTier(statuses)];
+export const worstStatus = (statuses: string[]): OverallStatus => {
+  if (statuses.length === 0) return "unknown";
+  const tier = worstTier(statuses);
+  return statuses
+    .map(known)
+    .filter((status) => statusTier(status) === tier)
+    .reduce((worst, status) => (STATUS_CHART[status].bar > STATUS_CHART[worst].bar ? status : worst));
+};
 
 /**
  * A tier's colour for a mark rather than for text.
