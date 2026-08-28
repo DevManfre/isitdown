@@ -185,5 +185,7 @@
   "map.error": "The map could not be loaded.",
   "map.empty_one": "No component has a known location · 1 could not be placed",
   "map.empty_other": "No component has a known location · {count} could not be placed",
-  "map.footnote": "{located} components located · {unplaced} could not be placed"
+  "map.footnote_one": "{count} component located · {unplaced} could not be placed",
+  "map.footnote_other": "{count} components located · {unplaced} could not be placed",
+  "map.footnote.age": "Snapshot from {age}"
 }

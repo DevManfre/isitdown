@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { createHashRouter, RouterProvider } from "react-router";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/lib/i18n.ts";
 import { GeoCard } from "./GeoCard.tsx";
@@ -56,12 +56,31 @@ const prefs = (mapView: Preferences["mapView"]) => ({ data: { mapView } });
  * and must supply both.
  */
 function renderCard() {
-  const router = createHashRouter([{ path: "*", element: <GeoCard /> }]);
-  return render(
+  // A plain component `MemoryRouter`, not `createHashRouter` +
+  // `RouterProvider`: the data router keeps its matched route elements in its
+  // own store and only replaces them on a navigation, so re-rendering with
+  // `RouterProvider` never reached `GeoCard` at all — a router-plumbing
+  // artefact, not a claim about GeoCard itself. `MemoryRouter` has no such
+  // store: it is a normal component tree.
+  const buildUi = () => (
     <I18nextProvider i18n={i18n}>
-      <RouterProvider router={router} />
-    </I18nextProvider>,
+      <MemoryRouter>
+        <Routes>
+          <Route path="*" element={<GeoCard />} />
+        </Routes>
+      </MemoryRouter>
+    </I18nextProvider>
   );
+  const result = render(buildUi());
+  return {
+    ...result,
+    // Rebuilds the element on every call, not reused from a captured
+    // variable: React bails out of a whole subtree's re-render when the
+    // exact same element *reference* is passed again, which is exactly what
+    // the rerender test below needs to not happen when a mocked hook's
+    // return value has changed underneath it.
+    rerender: () => result.rerender(buildUi()),
+  };
 }
 
 describe("GeoCard", () => {
@@ -140,7 +159,64 @@ describe("GeoCard", () => {
     // and 3 unplaced components, a swap would render "3 components located
     // · 1 could not be placed" instead, which would not match this string.
     expect(
-      screen.getByText(i18n.t("map.footnote", { located: 1, unplaced: 3 })),
+      screen.getByText(i18n.t("map.footnote", { count: 1, unplaced: 3 })),
     ).toBeInTheDocument();
+  });
+
+  it("says nothing about placement while the first fetch is still pending", () => {
+    // `useMap`'s pending state has no `data` yet — `located === 0` at that
+    // point is not evidence of anything, just the initial state, and
+    // rendering "No component has a known location" during it would state a
+    // fact about the fleet before the fetch has even answered.
+    preferences.mockReturnValue(prefs("map"));
+    getMap.mockReturnValue({ data: undefined, isError: false, isPending: true });
+    renderCard();
+    expect(screen.queryByText(/could not be placed/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows how old the snapshot is, from generatedAt", () => {
+    preferences.mockReturnValue(prefs("map"));
+    getMap.mockReturnValue({
+      data: {
+        points: [point(52.31, 4.76)],
+        unlocated: [],
+        generatedAt: new Date(Date.now() - 3600_000).toISOString(),
+      } satisfies MapResponse,
+      isError: false,
+    });
+    renderCard();
+    expect(screen.getByText(i18n.t("map.footnote.age", { age: "1 hour ago" }))).toBeInTheDocument();
+  });
+
+  it("redraws its markers when the query returns different data", () => {
+    // Proves the memo that bins points into cells actually depends on the
+    // data it is fed — a `useMemo` with a frozen dependency array would leave
+    // the map permanently showing its first render's markers, which in
+    // production is worse than stale: the map goes silently wrong and stays
+    // wrong for the rest of the session.
+    preferences.mockReturnValue(prefs("map"));
+    getMap.mockReturnValue({
+      data: {
+        points: [point(52.31, 4.76)],
+        unlocated: [],
+        generatedAt: "2026-08-27T10:00:00.000Z",
+      } satisfies MapResponse,
+      isError: false,
+    });
+    const { rerender } = renderCard();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+
+    getMap.mockReturnValue({
+      data: {
+        points: [point(52.31, 4.76), point(-33.87, 151.21), point(40.71, -74.0)],
+        unlocated: [],
+        generatedAt: "2026-08-27T10:00:00.000Z",
+      } satisfies MapResponse,
+      isError: false,
+    });
+    rerender();
+    expect(screen.getAllByRole("button")).toHaveLength(3);
   });
 });

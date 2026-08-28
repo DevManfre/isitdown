@@ -46,11 +46,13 @@ export function mapRoutes(runtime: UiRuntimeCore): Router {
       }))
       .filter((entry) => entry.count > 0);
 
-    // The newest observation across the snapshot, not the time this response
-    // was built: when the lane's own fetch has been failing, the card must be
-    // able to say how old what it is drawing actually is.
+    // The OLDEST observation across the snapshot, not the newest and not the
+    // time this response was built. The newest point is the most optimistic
+    // reading available and would mask a stale provider sitting behind a
+    // freshly-polled one; the card's staleness signal has to report the
+    // point an operator would actually distrust.
     const generatedAt = located.reduce<string | null>(
-      (newest, point) => (newest === null || point.observedAt > newest ? point.observedAt : newest),
+      (oldest, point) => (oldest === null || point.observedAt < oldest ? point.observedAt : oldest),
       null,
     );
 

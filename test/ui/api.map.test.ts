@@ -110,7 +110,11 @@ test("a point carries its provider's display name", async () => {
   }
 });
 
-test("generatedAt is the newest observed_at, not the response time", async () => {
+test("generatedAt is the oldest observed_at, not the response time", async () => {
+  // Oldest, not newest: the newest observation across a snapshot is the most
+  // optimistic reading available and masks a stale provider behind a
+  // freshly-polled one. The card's staleness signal must report the point an
+  // operator would actually distrust.
   const app = await api();
   try {
     seed(app.runtime, "cloudflare", "Cloudflare");
@@ -130,7 +134,7 @@ test("generatedAt is the newest observed_at, not the response time", async () =>
     );
 
     const payload = (await app.get("/map")).body as MapBody;
-    assert.equal(payload.generatedAt, "2026-08-27T10:00:00.000Z");
+    assert.equal(payload.generatedAt, "2026-08-27T09:00:00.000Z");
     // located === total, so nothing is unplaced and the provider must not
     // appear with count: 0 — the filter at map.routes.ts:47 is what this pins.
     assert.deepEqual(payload.unlocated, []);
