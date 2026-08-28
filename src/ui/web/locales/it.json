@@ -183,9 +183,9 @@
 
   "map.title": "Dove si trova la flotta",
   "map.error": "Impossibile caricare la mappa.",
-  "map.empty_one": "Nessun componente ha una posizione nota · 1 non è stato possibile localizzarlo",
-  "map.empty_other": "Nessun componente ha una posizione nota · {count} non è stato possibile localizzarli",
-  "map.footnote_one": "{count} componente localizzato · {unplaced} non è stato possibile localizzarli",
-  "map.footnote_other": "{count} componenti localizzati · {unplaced} non è stato possibile localizzarli",
-  "map.footnote.age": "Istantanea da {age}"
+  "map.empty_one": "Nessun componente ha una posizione nota · 1 non localizzato",
+  "map.empty_other": "Nessun componente ha una posizione nota · {count} non localizzati",
+  "map.footnote_one": "{count} componente localizzato · {unplaced} senza posizione nota",
+  "map.footnote_other": "{count} componenti localizzati · {unplaced} senza posizione nota",
+  "map.footnote.age": "Aggiornato {age}"
 }
