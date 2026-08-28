@@ -7,17 +7,6 @@ import { projectGlobe } from "@/lib/globeProjection.ts";
 import { tokenRgb } from "@/lib/tokenRgb.ts";
 import { describeLocations, markerRadius, type MapCell } from "@/lib/mapCells.ts";
 
-/**
- * cobe 2.0.1's shipped `COBEOptions` (`node_modules/cobe/dist/index.d.ts`)
- * omits `onRender`, even though the runtime reads it and the package's own
- * README documents it as the way to drive rotation frame by frame. That is a
- * gap in the upstream `.d.ts`, not a real API limitation, so this patches the
- * type locally rather than casting the whole options object to `any`.
- */
-type GlobeOptions = COBEOptions & {
-  onRender?: (state: Record<string, number>) => void;
-};
-
 const SIZE = 480;
 /**
  * Radius of the marker overlay's circle, in the same pixel space as `SIZE`.
@@ -46,12 +35,13 @@ const THETA = 0.25;
 /**
  * How often the marker overlay catches up to the canvas.
  *
- * cobe's `onRender` fires every animation frame. Calling `setState` there
- * would re-render ~80 markers 60 times a second on a dashboard an operator
- * leaves open all day. The rotation lives in a ref that `onRender` writes,
- * and the overlay re-reads it on this interval instead: at 0.002 rad/frame
- * the markers lag the globe by under a degree, invisible, for a sixth of the
- * renders that a per-frame `setState` would have cost.
+ * The rotation loop below (`requestAnimationFrame` driving `globe.update()`)
+ * runs every animation frame. Calling `setState` there would re-render ~80
+ * markers 60 times a second on a dashboard an operator leaves open all day.
+ * The rotation lives in a ref that loop writes, and the overlay re-reads it
+ * on this interval instead: at 0.002 rad/frame the markers lag the globe by
+ * under a degree, invisible, for a sixth of the renders that a per-frame
+ * `setState` would have cost.
  */
 const OVERLAY_MS = 100;
 
@@ -78,10 +68,10 @@ export function StatusGlobe({
 }) {
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // The canvas's live rotation. A ref, not state: `onRender` writes it every
-  // frame, and a state write there would re-render the whole overlay 60
-  // times a second. `phi` below is the sampled copy the markers are actually
-  // drawn from.
+  // The canvas's live rotation. A ref, not state: the rotation loop below
+  // writes it every frame, and a state write there would re-render the whole
+  // overlay 60 times a second. `phi` below is the sampled copy the markers
+  // are actually drawn from.
   const rotationRef = useRef(0);
   const [phi, setPhi] = useState(0);
   // Bumped on a theme change so the effect below re-reads its tokens and
@@ -114,20 +104,33 @@ export function StatusGlobe({
     const canvas = canvasRef.current;
     if (canvas === null) return;
 
-    // Typed as `GlobeOptions`, not inlined into the call: an object literal
-    // passed straight to `createGlobe` would be checked against cobe's own
-    // (incomplete) `COBEOptions` and rejected for the `onRender` it doesn't
-    // declare. Going through a typed variable first is what lets the patched
-    // type take effect without casting to `any`.
-    const options: GlobeOptions = {
+    const options: COBEOptions = {
       devicePixelRatio: window.devicePixelRatio || 1,
       width: SIZE * 2,
       height: SIZE * 2,
       phi: 0,
       theta: THETA,
+      // `dark: 1` selects cobe's "glowing dots on a black ocean" rendering
+      // path rather than "flat-lit grey sphere" — the two are genuinely
+      // different shader branches, not a brightness slider, so this can't be
+      // eased up gradually. It reads correctly in both themes: verified with
+      // a standalone cobe harness driving this exact value against both
+      // `--muted` tones (the harness was needed because, as it turned out,
+      // this value was never the bug — see the note right after the
+      // `createGlobe` call below).
       dark: 1,
+      // How sharply a dot's brightness falls off from the sphere's centre
+      // toward its limb (`pow(facing, diffuse)`). 1.2 is cobe's own README
+      // default; lower values (tried 0.4 in the harness) just wash out the
+      // limb faster with no gain in legibility, so this was left alone.
       diffuse: 1.2,
       mapSamples: 16000,
+      // Land dots are drawn several times over-bright on purpose and clip to
+      // white (`baseColor * mapBrightness`, mapBrightness = 6): that's what
+      // makes them read as crisp dots against the near-black ocean
+      // (`baseColor * 0.1`) rather than a faint grey smudge. Confirmed
+      // against both `--muted` tones in the harness; there was no need to
+      // move off cobe's own README default here either.
       mapBrightness: 6,
       // Resolved tokens, never literals: `tokens.css` stays the one place a
       // colour is decided, including in this WebGL uniform.
@@ -135,17 +138,35 @@ export function StatusGlobe({
       markerColor: tokenRgb("--status-accent"),
       glowColor: tokenRgb("--background"),
       markers: [],
-      onRender: (state) => {
-        rotationRef.current += 0.002;
-        state["phi"] = rotationRef.current;
-        // Deliberately no setState here — see OVERLAY_MS above. This
-        // callback runs every frame; the overlay samples the ref on its own
-        // interval instead.
-      },
     };
     const globe = createGlobe(canvas, options);
 
-    return () => globe.destroy();
+    // cobe 2.0.1's actual runtime (`node_modules/cobe/dist/index.esm.js`) has
+    // no `onRender` callback at all — the string does not appear anywhere in
+    // it, despite the package's own README still documenting one. `createGlobe`
+    // paints a single frame synchronously at construction time, using its 1x1
+    // black placeholder texture (the real world-map `<img>` is still decoding
+    // off a data: URI at that point), and never repaints again on its own.
+    // That single stale frame is the entire "featureless black ball" bug: no
+    // colour or brightness value could ever have fixed it, because the real
+    // map texture was never painted in the first place. The fix is to drive
+    // rendering ourselves, the way cobe's returned `update()` method actually
+    // expects, on a real `requestAnimationFrame` loop — which also happens to
+    // be what makes the earth rotate at all.
+    let frame: number;
+    const tick = () => {
+      rotationRef.current += 0.002;
+      globe.update({ phi: rotationRef.current });
+      // Deliberately no setState here — see OVERLAY_MS above. This runs every
+      // frame; the overlay samples the ref on its own interval instead.
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      globe.destroy();
+    };
   }, [themeEpoch]);
 
   // Worst-last, same reason as the flat map: a fault must not be painted
