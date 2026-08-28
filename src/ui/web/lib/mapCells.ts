@@ -75,5 +75,19 @@ export function binPoints(points: MapPoint[], cellDegrees: number = CELL_DEGREES
     }));
 }
 
+/**
+ * The names shown for a cell, capped so a Cloudflare hub of 40+ PoPs does not
+ * narrate every one of them. Shared by the tooltip and the accessible label of
+ * both map views, so the two can never disagree on the cap — before this
+ * existed, the tooltip capped at 6 and the aria-label did not, so a
+ * screen-reader user heard every location a sighted one only saw six of.
+ */
+export function describeLocations(
+  points: MapPoint[],
+  limit = 6,
+): { shown: string[]; more: number } {
+  return { shown: points.slice(0, limit).map((point) => point.name), more: Math.max(0, points.length - limit) };
+}
+
 /** Re-exported so a component never assembles a tier itself. */
 export { statusTier };

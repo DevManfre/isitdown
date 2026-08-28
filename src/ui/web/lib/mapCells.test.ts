@@ -45,6 +45,14 @@ describe("binPoints", () => {
     expect(cells[0]?.worst).toBe("degraded");
   });
 
+  it("names partial_outage rather than collapsing it into degraded", () => {
+    // The colour collapse (both share the warn tier) is correct and
+    // deliberate; the status NAME is not allowed to collapse the same way,
+    // because the tooltip and aria-label both render it verbatim.
+    const cells = binPoints([point(52.0, 4.0, "partial_outage")], 4);
+    expect(cells[0]?.worst).toBe("partial_outage");
+  });
+
   it("bins by floor, not by rounding", () => {
     // 1.9 and 2.1 both fall in cell 0 under floor (0.475 and 0.525 both floor
     // to 0) but split into cells 0 and 1 under rounding. This is the pair that

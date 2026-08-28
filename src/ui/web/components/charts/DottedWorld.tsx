@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip.tsx";
 import { drawOrder, statusLabelKey, statusTier, tierFill } from "@/lib/chartConfig.ts";
 import { projectEquirect } from "@/lib/mapProjection.ts";
-import { markerRadius, type MapCell } from "@/lib/mapCells.ts";
+import { describeLocations, markerRadius, type MapCell } from "@/lib/mapCells.ts";
 import grid from "@/lib/mapGrid.generated.json" with { type: "json" };
 
 /**
@@ -61,9 +61,13 @@ export function DottedWorld({
           const { x, y } = projectEquirect(cell.lat, cell.lon, width, height);
           const radius = markerRadius(cell.count);
           const tier = statusTier(cell.worst);
+          // Same cap as the tooltip below, via the same helper: before this,
+          // the tooltip capped at 6 names and the aria-label did not, so a
+          // screen-reader user heard every PoP a sighted one only saw six of.
+          const { shown, more } = describeLocations(cell.points);
           const label = t("map.cell.aria", {
             count: cell.count,
-            locations: cell.points.map((point) => point.name).join(", "),
+            locations: shown.join(", ") + (more > 0 ? t("map.cell.more", { count: more }) : ""),
             status: t(statusLabelKey(cell.worst)),
           });
 
@@ -108,11 +112,8 @@ export function DottedWorld({
               <TooltipContent>
                 <p className="font-medium">{t(statusLabelKey(cell.worst))}</p>
                 <p className="text-xs text-muted-foreground">
-                  {cell.points
-                    .slice(0, 6)
-                    .map((point) => point.name)
-                    .join(", ")}
-                  {cell.points.length > 6 ? t("map.cell.more", { count: cell.points.length - 6 }) : ""}
+                  {shown.join(", ")}
+                  {more > 0 ? t("map.cell.more", { count: more }) : ""}
                 </p>
               </TooltipContent>
             </Tooltip>

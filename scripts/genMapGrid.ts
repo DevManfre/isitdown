@@ -59,13 +59,10 @@ const raw = JSON.parse(
   getMapJSON({ height: 60, grid: "diagonal", projection: { name: "equirectangular" }, region: REGION }),
 ) as RawMapData;
 
-const points = Object.values(raw.points)
-  .map(({ x, y }) => ({
-    lat: Math.round((REGION.lat.max - (y / raw.height) * (REGION.lat.max - REGION.lat.min)) * 100) / 100,
-    lon: Math.round((REGION.lng.min + (x / raw.width) * (REGION.lng.max - REGION.lng.min)) * 100) / 100,
-  }))
-  // Antarctica hosts nothing anyone monitors.
-  .filter((point) => point.lat > -60);
+const points = Object.values(raw.points).map(({ x, y }) => ({
+  lat: Math.round((REGION.lat.max - (y / raw.height) * (REGION.lat.max - REGION.lat.min)) * 100) / 100,
+  lon: Math.round((REGION.lng.min + (x / raw.width) * (REGION.lng.max - REGION.lng.min)) * 100) / 100,
+}));
 
 writeFileSync(
   OUT,

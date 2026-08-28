@@ -76,6 +76,23 @@ describe("DottedWorld", () => {
     expect(screen.getByRole("button").getAttribute("aria-label")).toContain("Amsterdam");
   });
 
+  it("caps the aria-label at 6 names, matching the tooltip's own cap", () => {
+    // Before this fix the tooltip capped at 6 names but the aria-label did
+    // not, so a screen-reader user heard every PoP a sighted one only saw
+    // six of.
+    const points = Array.from({ length: 8 }, (_, index) => point(`PoP ${index}`));
+    render(
+      <Wrap>
+        <DottedWorld cells={[cell({ count: 8, points })]} onSelect={() => {}} />
+      </Wrap>,
+    );
+    const label = screen.getByRole("button").getAttribute("aria-label") ?? "";
+    for (let index = 0; index < 6; index += 1) expect(label).toContain(`PoP ${index}`);
+    expect(label).not.toContain("PoP 6");
+    expect(label).not.toContain("PoP 7");
+    expect(label).toContain("2 more");
+  });
+
   it("calls onSelect with the clicked cell", async () => {
     const onSelect = vi.fn();
     const target = cell({ count: 3 });
