@@ -19,7 +19,28 @@ type GlobeOptions = COBEOptions & {
 };
 
 const SIZE = 480;
-const RADIUS = SIZE / 2 - 8;
+/**
+ * Radius of the marker overlay's circle, in the same pixel space as `SIZE`.
+ *
+ * Not a free choice: cobe draws the earth at a fixed radius relative to its
+ * canvas, and the overlay has to land markers on that same sphere. Verified
+ * directly against the installed package
+ * (`node_modules/cobe/dist/index.esm.js`): its fragment shader tests the
+ * sphere with `if(a<=.64)` and derives the surface normal via
+ * `sqrt(.64-a)`, where `a` is the squared distance from centre in a
+ * coordinate space that spans [-1, 1] across the canvas — so cobe's earth has
+ * radius² = 0.64, i.e. radius = 0.8 of half-width. Its `scale` option
+ * (`B = t.scale||1` in the same file) defaults to 1, and this component
+ * passes none, so at `SIZE = 480` the earth is drawn at `0.8 * 240 = 192`px.
+ *
+ * `SIZE * 0.4` is exactly that: `0.8 * (SIZE / 2)`. The previous value here,
+ * `SIZE / 2 - 8` = 232, assumed the earth nearly fills the canvas — it
+ * doesn't — and put markers 20.8% further out than the globe's own edge,
+ * landing roughly a third of them in the empty space beyond it. If a `scale`
+ * option is ever passed to `createGlobe` below, this constant must be
+ * multiplied by it too, or the mismatch comes back.
+ */
+const RADIUS = SIZE * 0.4;
 const THETA = 0.25;
 
 /**
