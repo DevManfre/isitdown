@@ -7,6 +7,7 @@ import { DottedWorld } from "@/components/charts/DottedWorld.tsx";
 import { StatusGlobe } from "@/components/charts/StatusGlobe.tsx";
 import { useMap, usePreferences } from "@/hooks/queries.ts";
 import { binPoints, CELL_DEGREES, type MapCell } from "@/lib/mapCells.ts";
+import { formatRelative } from "@/lib/format.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
 
 /**
@@ -23,10 +24,10 @@ import { ROUTE_PATHS } from "../../routePaths.ts";
  * a provider that lists only functional components has no geography to show.
  */
 export function GeoCard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const view = usePreferences().data?.mapView ?? "off";
-  const { data, isError } = useMap(view !== "off");
+  const { data, isError, isPending } = useMap(view !== "off");
 
   const cells: MapCell[] = useMemo(
     () => binPoints(data?.points ?? [], CELL_DEGREES),
@@ -58,7 +59,7 @@ export function GeoCard() {
         <p role="alert" className="text-sm text-muted-foreground">
           {t("map.error")}
         </p>
-      ) : located === 0 ? (
+      ) : isPending ? null : located === 0 ? (
         <p className="text-sm text-muted-foreground">
           {t("map.empty", { count: unplaced })}
         </p>
@@ -81,7 +82,16 @@ export function GeoCard() {
 
       {located > 0 && (
         <p className="text-xs text-muted-foreground">
-          {t("map.footnote", { located, unplaced })}
+          {t("map.footnote", { count: located, unplaced })}
+          {data?.generatedAt != null && (
+            // A separate node from the footnote sentence above, not
+            // concatenated into it: the spec (design doc, "Edge cases") calls
+            // this out twice as the staleness signal an operator needs, and it
+            // has to stay legible — and independently assertable — on its own.
+            <span className="block">
+              {t("map.footnote.age", { age: formatRelative(i18n.language, data.generatedAt) })}
+            </span>
+          )}
         </p>
       )}
     </Card>

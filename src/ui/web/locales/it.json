@@ -185,5 +185,7 @@
   "map.error": "Impossibile caricare la mappa.",
   "map.empty_one": "Nessun componente ha una posizione nota · 1 non è stato possibile localizzarlo",
   "map.empty_other": "Nessun componente ha una posizione nota · {count} non è stato possibile localizzarli",
-  "map.footnote": "{located} componenti localizzati · {unplaced} non è stato possibile localizzarli"
+  "map.footnote_one": "{count} componente localizzato · {unplaced} non è stato possibile localizzarli",
+  "map.footnote_other": "{count} componenti localizzati · {unplaced} non è stato possibile localizzarli",
+  "map.footnote.age": "Istantanea da {age}"
 }
