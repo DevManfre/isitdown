@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { openDatabase } from "../../src/ui/db/open.ts";
 import { migrate } from "../../src/ui/db/migrate.ts";
 import { createMapStore } from "../../src/ui/mapStore.ts";
-import { createMapLane } from "../../src/ui/mapLane.ts";
+import { createMapLane, MAP_REFRESH_MS } from "../../src/ui/mapLane.ts";
 import { loadGeoTables } from "../../src/ui/geo/resolveLocation.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import type { Adapter, ComponentPreview } from "../../src/core/adapter.interface.ts";
@@ -215,4 +215,101 @@ test("a service naming an unregistered adapter does not stop the rest of the fle
 
   await lane.refresh(new Date("2026-08-27T10:00:00.000Z"));
   assert.equal(store.listPoints().length, 1, "cloudflare's markers must survive");
+});
+
+// Only `setInterval` is mocked below — `runRefresh`'s own awaits still run on
+// real microtasks/macrotasks, so a real `setImmediate` round-trip is what lets
+// them settle before an assertion reads `calls`.
+const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+test("start() fires a refresh only once a full interval has elapsed", async (t) => {
+  // Proven by mutation before this test existed: making the interval body a
+  // no-op left every other test in this file green, because none of them
+  // call start() or stop() at all.
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  const { lane, calls } = harness([service("cloudflare")], {
+    cloudflare: [preview("c1", "Amsterdam, Netherlands - (AMS)")],
+  });
+
+  lane.start();
+  t.mock.timers.tick(MAP_REFRESH_MS - 1);
+  await flush();
+  assert.deepEqual(calls, [], "must not fire before a full interval has elapsed");
+
+  t.mock.timers.tick(1);
+  await flush();
+  assert.deepEqual(calls, ["cloudflare"]);
+
+  lane.stop();
+});
+
+test("stop() prevents any further firing", async (t) => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  const { lane, calls } = harness([service("cloudflare")], {
+    cloudflare: [preview("c1", "Amsterdam, Netherlands - (AMS)")],
+  });
+
+  lane.start();
+  t.mock.timers.tick(MAP_REFRESH_MS);
+  await flush();
+  assert.deepEqual(calls, ["cloudflare"]);
+
+  lane.stop();
+  t.mock.timers.tick(MAP_REFRESH_MS * 3);
+  await flush();
+  assert.deepEqual(calls, ["cloudflare"], "stop() must leave nothing armed");
+});
+
+test("a slow refresh is not started a second time while it is still in flight", async (t) => {
+  // scheduler.ts:50-52 solves the same overlap problem by chaining a fresh
+  // setTimeout after each cycle instead of using setInterval at all. This
+  // lane keeps setInterval and guards overlap with a simple in-flight flag
+  // instead — see mapLane.ts for why that fits this lane better.
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  let release: (() => void) | undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const calls: string[] = [];
+  const db = openDatabase(":memory:");
+  migrate(db);
+  db.prepare(
+    `INSERT INTO services (id, name, adapter, base_url, enabled, scope_to_components, created_at)
+     VALUES ('cloudflare', 'cloudflare', 'statuspage', 'https://example.com', 1, 0, '2026-08-27T09:00:00.000Z')`,
+  ).run();
+  const store = createMapStore(db);
+  const lane = createMapLane({
+    store,
+    tables,
+    logger: silent,
+    getAdapter: () => ({
+      id: "statuspage",
+      fetchStatus: () => {
+        throw new Error("unused");
+      },
+      listComponents: async (ref) => {
+        calls.push(ref.id);
+        await gate;
+        return [preview("c1", "Amsterdam, Netherlands - (AMS)")];
+      },
+    }),
+    listServices: () => [service("cloudflare")],
+    timeoutMs: 1000,
+  });
+
+  lane.start();
+  t.mock.timers.tick(MAP_REFRESH_MS);
+  await flush();
+  assert.deepEqual(calls, ["cloudflare"], "the first tick starts the one in-flight refresh");
+
+  // A second full interval elapses while the first refresh is still gated on
+  // `gate` — without the overlap guard this starts a second, concurrent pass
+  // hitting every adapter twice at once.
+  t.mock.timers.tick(MAP_REFRESH_MS);
+  await flush();
+  assert.deepEqual(calls, ["cloudflare"], "an in-flight refresh must not be started a second time");
+
+  release?.();
+  await flush();
+  lane.stop();
 });

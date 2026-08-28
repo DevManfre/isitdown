@@ -48,6 +48,22 @@ export interface MapLane {
  */
 export function createMapLane(deps: MapLaneDeps): MapLane {
   let timer: NodeJS.Timeout | undefined;
+  // True while a refresh started by the interval is still running. Guards
+  // against overlap: without it, a fleet slow enough for one pass to exceed
+  // MAP_REFRESH_MS would have the next tick start a second pass over the
+  // first, hitting every adapter twice at once.
+  //
+  // `scheduler.ts` solves the same overlap problem by chaining a fresh
+  // setTimeout after each cycle rather than using setInterval at all — right
+  // for the poll cycle, which also has to track exactly when the next cycle
+  // is armed (the dashboard's countdown reads it) and jitters the delay so a
+  // fleet of containers does not hit every provider on the same second. This
+  // lane has no countdown to keep honest and nothing downstream ever asks
+  // when it will next run (`MapLane` exposes only `refresh`/`start`/`stop`),
+  // so adopting that whole chained-timer/jitter machinery would be solving a
+  // problem this lane doesn't have. A boolean guard on the existing
+  // setInterval is the smaller change that solves the actual one.
+  let refreshing = false;
 
   async function refreshProvider(service: ServiceDefinition, now: Date): Promise<void> {
     const adapter = deps.getAdapter(service.adapter);
@@ -90,45 +106,59 @@ export function createMapLane(deps: MapLaneDeps): MapLane {
     });
   }
 
-  return {
-    async refresh(now = new Date()): Promise<void> {
-      const skipUntil = new Map(
-        deps.store
-          .listGeoState()
-          .filter((state) => state.located === 0)
-          .map((state) => [state.providerId, Date.parse(state.checkedAt) + RECHECK_AFTER_MS]),
-      );
+  async function runRefresh(now: Date): Promise<void> {
+    const skipUntil = new Map(
+      deps.store
+        .listGeoState()
+        .filter((state) => state.located === 0)
+        .map((state) => [state.providerId, Date.parse(state.checkedAt) + RECHECK_AFTER_MS]),
+    );
 
-      for (const service of deps.listServices()) {
-        // A disabled provider is one the operator has told the poller to
-        // skip, so nothing about it is measured — the Overview already
-        // leaves it out of the fleet, and the map follows the same rule.
-        if (!service.enabled) continue;
+    for (const service of deps.listServices()) {
+      // A disabled provider is one the operator has told the poller to
+      // skip, so nothing about it is measured — the Overview already
+      // leaves it out of the fleet, and the map follows the same rule.
+      if (!service.enabled) continue;
 
-        const until = skipUntil.get(service.id);
-        if (until !== undefined && now.getTime() < until) continue;
+      const until = skipUntil.get(service.id);
+      if (until !== undefined && now.getTime() < until) continue;
 
-        try {
-          await refreshProvider(service, now);
-        } catch (error) {
-          // One provider's outage must not cost the others their markers.
-          // Its previous snapshot stays in place; `observedAt` carries its age.
-          deps.logger.warn("map lane refresh failed", {
-            provider: service.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+      try {
+        await refreshProvider(service, now);
+      } catch (error) {
+        // One provider's outage must not cost the others their markers.
+        // Its previous snapshot stays in place; `observedAt` carries its age.
+        deps.logger.warn("map lane refresh failed", {
+          provider: service.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
+    }
+  }
+
+  return {
+    refresh(now = new Date()): Promise<void> {
+      return runRefresh(now);
     },
 
     start(): void {
       if (timer !== undefined) return;
+      // A local closure, not `this.refresh()`: the callback below is handed
+      // to `setInterval`, which invokes it with no receiver, so a method that
+      // reads `this` only works by the accident of how `start` itself
+      // happened to be called. `runRefresh` needs no `this` at all.
       timer = setInterval(() => {
-        void this.refresh().catch((error: unknown) => {
-          deps.logger.error("map lane cycle failed", {
-            error: error instanceof Error ? error.message : String(error),
+        if (refreshing) return;
+        refreshing = true;
+        void runRefresh(new Date())
+          .catch((error: unknown) => {
+            deps.logger.error("map lane cycle failed", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          })
+          .finally(() => {
+            refreshing = false;
           });
-        });
       }, MAP_REFRESH_MS);
       timer.unref();
     },
