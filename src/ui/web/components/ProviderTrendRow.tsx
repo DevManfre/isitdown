@@ -55,7 +55,7 @@ export function ProviderTrendRow({
           slides left into the delta column and the header stops matching. An
           empty span holds the column open. */}
       <span>
-        <DeltaChip current={uptime} previous={provider.previousUptime} days={days} />
+        <DeltaChip current={uptime} previous={provider.previousUptime} days={days} compact />
       </span>
       <span className="font-mono text-xs text-muted-foreground">
         <Trans

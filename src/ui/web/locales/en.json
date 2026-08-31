@@ -131,6 +131,7 @@
   "history.month-no-data": "—",
   "history.trend-title": "Daily uptime",
   "history.delta": "{value} pp vs previous {days} days",
+  "history.delta-short": "{value} pp",
   "history.range-active": "Last {days} days",
   "history.download": "Download JSON, last {days} days",
   "history.col-provider": "Provider",
@@ -139,7 +140,7 @@
   "history.col-delta": "Change",
   "history.col-incidents": "Incidents",
   "history.open-detail": "Open {name} history detail",
-  "history.drawer-window": "Last {days} days",
+  "history.drawer-bars": "Daily status",
   "history.legend-title": "Colour key",
 
   "settings.polling": "Polling",

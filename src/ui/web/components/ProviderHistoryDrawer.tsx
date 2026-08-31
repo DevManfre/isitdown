@@ -74,7 +74,7 @@ export function ProviderHistoryDrawer({
 
             <div className="flex flex-col gap-2">
               <span className="text-xs uppercase tracking-widest text-primary">
-                {t("history.drawer-window", { days })}
+                {t("history.drawer-bars")}
               </span>
               <UptimeBarRow buckets={provider.buckets} scale="row" showAxis />
               {/* One legend, below both bar rows' worth of colour: the component
