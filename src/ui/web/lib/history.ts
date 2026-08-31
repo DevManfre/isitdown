@@ -13,3 +13,15 @@ import type { HistorySummary, ProviderHistory } from "./types.ts";
 export function summaryProviders(value: HistorySummary | ProviderHistory | undefined): ProviderHistory[] {
   return value !== undefined && "providers" in value ? value.providers : [];
 }
+
+/**
+ * The provider figure matching the requested window.
+ *
+ * The same rule the server applies in `uptimeKey` — mirrored rather than
+ * recomputed, because the three numbers themselves still come from the server.
+ * The list shows one of them, not all three: five unlabelled monospace numbers
+ * in a row is a table nobody can read.
+ */
+export function uptimeForRange(provider: ProviderHistory, days: number): number {
+  return days <= 7 ? provider.uptime7 : days <= 30 ? provider.uptime30 : provider.uptime90;
+}

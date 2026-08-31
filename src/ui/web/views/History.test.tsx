@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
@@ -42,6 +42,76 @@ const summary = {
 const fixtures = {
   history: summary,
   status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+};
+
+/**
+ * A second provider, worse than GitHub over every window this view offers, so
+ * the order the list puts them in is observable rather than incidental.
+ */
+const cloudflare = {
+  providerId: "cloudflare",
+  buckets: [{ day: "2026-08-20", status: "degraded" }],
+  dailySeries: [
+    { day: "2026-08-18", uptime: 80 },
+    { day: "2026-08-19", uptime: 70 },
+    { day: "2026-08-20", uptime: 75.33 },
+  ],
+  previousUptime: 85.1,
+  uptime7: 100,
+  uptime30: 78.09,
+  uptime90: 75.33,
+  sampleCount: 400,
+  incidentCount: 63,
+  downtimeMinutes: 8661,
+};
+
+const twoProviders = {
+  ...fixtures,
+  history: { ...summary, providers: [...summary.providers, cloudflare] },
+  status: {
+    providers: [
+      providerFixture(),
+      // A real component selection on this one, so "no component rows in the
+      // list" is a statement about the list rather than about a provider that
+      // had nothing to break down in the first place.
+      providerFixture({
+        id: "cloudflare",
+        name: "Cloudflare",
+        overallStatus: "degraded",
+        componentSelection: [{ id: "fco", name: "Rome, Italy - (FCO)" }],
+        components: [{ id: "fco", name: "Rome, Italy - (FCO)", status: "operational" }],
+      }),
+    ],
+    pollIntervalMinutes: 5,
+    lastPollAt: null,
+    nextPollAt: null,
+  },
+};
+
+/**
+ * The drawer asks for `/history?days=90&provider=cloudflare`, which the harness
+ * routes to the same `history` key as the summary — so this fixture answers per
+ * request path: the provider's own history when one is named, the fleet summary
+ * otherwise.
+ */
+const withDrawer = {
+  ...twoProviders,
+  history: (path: string) => (path.includes("provider=cloudflare") ? cloudflare : twoProviders.history),
+  componentHistory: {
+    provider: "cloudflare",
+    days: 90,
+    components: [
+      {
+        componentId: "fco",
+        name: "Rome, Italy - (FCO)",
+        buckets: [{ day: "2026-08-20", status: "operational" }],
+        uptime7: 100,
+        uptime30: 100,
+        uptime90: 100,
+        sampleCount: 90,
+      },
+    ],
+  },
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -130,7 +200,10 @@ describe("History", () => {
 // covered. These give a provider an actual selection so it does.
 describe("a provider's component breakdown (ComponentRows)", () => {
   const withSelection = (extra: { componentHistory?: unknown; errors?: Record<string, number> }) => ({
-    history: summary,
+    // The breakdown lives in the drawer now, and the drawer asks for
+    // `/history?days=90&provider=github` — which the harness routes to this
+    // same key as the summary. So the fixture answers per request path.
+    history: (path: string) => (path.includes("provider=github") ? summary.providers[0] : summary),
     status: {
       providers: [
         providerFixture({
@@ -159,6 +232,18 @@ describe("a provider's component breakdown (ComponentRows)", () => {
   const statusOfDot = (name: string): string | null => {
     const row = screen.getByText(name).closest("div");
     return row?.querySelector("[data-status]")?.getAttribute("data-status") ?? null;
+  };
+
+  /**
+   * The breakdown is one click away now, so every case here opens the drawer
+   * first: that click is what mounts `ComponentRows` and fires its request at
+   * all, which is the whole point of moving it off the list.
+   */
+  const openDrawer = async (): Promise<HTMLElement> => {
+    await userEvent.click(
+      await screen.findByRole("button", { name: i18n.t("history.open-detail", { name: "GitHub" }) }),
+    );
+    return screen.findByRole("dialog");
   };
 
   it("marks a never-measured component and shows the live status dot, distinct from a measured one", async () => {
@@ -191,6 +276,7 @@ describe("a provider's component breakdown (ComponentRows)", () => {
         },
       }),
     );
+    await openDrawer();
 
     expect(await screen.findByText("Component One")).toBeInTheDocument();
     expect(await screen.findByText("Component Two")).toBeInTheDocument();
@@ -207,6 +293,7 @@ describe("a provider's component breakdown (ComponentRows)", () => {
       <History />,
       withSelection({ componentHistory: { provider: "github", days: 90, components: [] } }),
     );
+    await openDrawer();
 
     expect(await screen.findByText(i18n.t("components.rows-title"))).toBeInTheDocument();
     expect(await screen.findByText(i18n.t("components.unsupported"))).toBeInTheDocument();
@@ -225,8 +312,91 @@ describe("a provider's component breakdown (ComponentRows)", () => {
     expect(await screen.findByText(i18n.t("history.month-no-data"))).toBeInTheDocument();
     expect(await screen.findByText("GitHub")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: i18n.t("history.download", { days: 90 }) })).toBeInTheDocument();
+
+    // Asserted before the drawer opens on purpose: a modal sheet marks the rest
+    // of the page `aria-hidden`, which takes it out of every `*ByRole` query.
+    const drawer = await openDrawer();
     // Only this provider's component breakdown is missing — absent, not blanked.
-    expect(screen.queryByText(i18n.t("components.rows-title"))).toBeNull();
+    expect(within(drawer).queryByText(i18n.t("components.rows-title"))).toBeNull();
     expect(screen.queryByText(/Could not load this view/)).toBeNull();
+  });
+});
+
+describe("the provider list", () => {
+  it("orders providers worst first for the active range", async () => {
+    renderWithProviders(<History />, twoProviders);
+
+    const rows = await screen.findAllByRole("button", { name: /Cloudflare|GitHub/ });
+    expect(rows[0]).toHaveAccessibleName(/Cloudflare/);
+  });
+
+  it("labels its columns instead of running five bare numbers together", async () => {
+    renderWithProviders(<History />, twoProviders);
+
+    expect(await screen.findByText(i18n.t("history.col-uptime", { days: 90 }))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("history.col-incidents"))).toBeInTheDocument();
+  });
+
+  it("shows one uptime figure per provider, for the active range only", async () => {
+    renderWithProviders(<History />, twoProviders);
+
+    expect(await screen.findByText(/75[.,]33/)).toBeInTheDocument();
+    expect(screen.queryByText(/78[.,]09/)).not.toBeInTheDocument();
+  });
+
+  it("keeps component rows out of the list", async () => {
+    renderWithProviders(<History />, twoProviders);
+
+    await screen.findAllByRole("button", { name: /Cloudflare/ });
+    expect(screen.queryByText(i18n.t("components.rows-title"))).not.toBeInTheDocument();
+  });
+});
+
+describe("a provider's detail drawer", () => {
+  const openCloudflare = async (): Promise<HTMLElement> => {
+    await userEvent.click(await screen.findByRole("button", { name: /Cloudflare/ }));
+    return screen.findByRole("dialog");
+  };
+
+  it("opens a provider's detail in a drawer, with the three windows under labels", async () => {
+    renderWithProviders(<History />, withDrawer);
+
+    const drawer = await openCloudflare();
+
+    // The 30-day figure, absent from the list. `findByText` rather than
+    // `toHaveTextContent`: the sheet mounts before its own per-provider
+    // request lands, so the content has to be waited for, not sampled.
+    expect(await within(drawer).findByText(/78[.,]09/)).toBeInTheDocument();
+    expect(await within(drawer).findByText(i18n.t("components.rows-title"))).toBeInTheDocument();
+  });
+
+  it("gives the daily bars a colour legend they never had", async () => {
+    renderWithProviders(<History />, withDrawer);
+
+    const drawer = await openCloudflare();
+
+    expect(await within(drawer).findByText(i18n.t("status.operational"))).toBeInTheDocument();
+    expect(within(drawer).getByText(i18n.t("status.major-outage"))).toBeInTheDocument();
+  });
+
+  it("fires no per-provider request until a row is opened", async () => {
+    renderWithProviders(<History />, withDrawer);
+    await screen.findAllByRole("button", { name: /Cloudflare/ });
+
+    const urls = () => (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
+    expect(urls().some((url) => url.includes("provider=cloudflare"))).toBe(false);
+
+    await openCloudflare();
+
+    expect(urls().some((url) => url.includes("provider=cloudflare"))).toBe(true);
+  });
+
+  it("closes again without leaving the drawer behind", async () => {
+    renderWithProviders(<History />, withDrawer);
+
+    const drawer = await openCloudflare();
+    await userEvent.click(within(drawer).getByRole("button", { name: i18n.t("action.close") }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
