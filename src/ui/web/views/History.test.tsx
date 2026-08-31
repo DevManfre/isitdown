@@ -350,6 +350,15 @@ describe("the provider list", () => {
     await screen.findAllByRole("button", { name: /Cloudflare/ });
     expect(screen.queryByText(i18n.t("components.rows-title"))).not.toBeInTheDocument();
   });
+
+  it("shows a compact delta on the row, not the full sentence the header already carries", async () => {
+    renderWithProviders(<History />, twoProviders);
+
+    const row = await screen.findByRole("button", { name: /Cloudflare/ });
+    // -9.77 = 75.33 (uptime90) - 85.1 (previousUptime), rounded to 2dp.
+    expect(within(row).getByText(i18n.t("history.delta-short", { value: "-9.77" }))).toBeInTheDocument();
+    expect(within(row).queryByText(/vs previous/i)).not.toBeInTheDocument();
+  });
 });
 
 describe("a provider's detail drawer", () => {
@@ -377,6 +386,17 @@ describe("a provider's detail drawer", () => {
 
     expect(await within(drawer).findByText(i18n.t("status.operational"))).toBeInTheDocument();
     expect(within(drawer).getByText(i18n.t("status.major-outage"))).toBeInTheDocument();
+  });
+
+  it("labels the daily bars by what they are, instead of repeating the window label above them", async () => {
+    renderWithProviders(<History />, withDrawer);
+
+    const drawer = await openCloudflare();
+
+    expect(await within(drawer).findByText(i18n.t("history.drawer-bars"))).toBeInTheDocument();
+    // The 90-day range `dt` above already reads "Last 90 days" — the bar
+    // row's own heading must not repeat it verbatim, at the default range.
+    expect(within(drawer).queryAllByText(i18n.t("column.range", { days: 90 }))).toHaveLength(1);
   });
 
   it("fires no per-provider request until a row is opened", async () => {
