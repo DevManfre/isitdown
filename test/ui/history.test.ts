@@ -303,3 +303,72 @@ test("component histories are gap-filled and windowed like the provider's", asyn
   assert.equal(histories[1]?.buckets.every((bucket) => bucket.status === "unknown"), true);
   await store.close();
 });
+
+test("dailySeries carries one entry per day, oldest first, gap-filled with null", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(2), "operational");
+  await sample(store, "github", daysAgo(0), "operational");
+
+  const { dailySeries } = await history.getProviderHistory("github", 3, 3);
+
+  assert.deepEqual(
+    dailySeries.map((entry) => entry.uptime),
+    [100, null, 100],
+    "the middle day was never sampled: null, never 0, which would draw a full-day outage",
+  );
+  assert.deepEqual(
+    dailySeries.map((entry) => entry.day),
+    [daysAgo(2).slice(0, 10), daysAgo(1).slice(0, 10), daysAgo(0).slice(0, 10)],
+  );
+  await store.close();
+});
+
+test("a day's uptime is its own ok/total ratio, not its worst status", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(1, 1), "operational");
+  await sample(store, "github", daysAgo(1, 2), "major_outage");
+  await sample(store, "github", daysAgo(1, 3), "operational");
+  await sample(store, "github", daysAgo(0), "operational");
+
+  const { dailySeries, buckets } = await history.getProviderHistory("github", 2, 3);
+
+  assert.equal(buckets[0]?.status, "major_outage", "the status bar still shows the worst sample");
+  assert.equal(dailySeries[0]?.uptime, 66.67, "two of three samples were ok");
+  await store.close();
+});
+
+test("previousUptime reads the window immediately before the one requested", async () => {
+  const { store, history } = await harness();
+  // Requested window: days 0-1. The window before it: days 2-3.
+  await sample(store, "github", daysAgo(0), "operational");
+  await sample(store, "github", daysAgo(1), "operational");
+  await sample(store, "github", daysAgo(2), "major_outage");
+  await sample(store, "github", daysAgo(3), "operational");
+
+  const { previousUptime } = await history.getProviderHistory("github", 2, 3);
+
+  assert.equal(previousUptime, 50, "one of the two previous days was down");
+  await store.close();
+});
+
+test("previousUptime is null when nothing was sampled before the window", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(0), "operational");
+
+  const { previousUptime } = await history.getProviderHistory("github", 2, 3);
+
+  assert.equal(previousUptime, null, "a fresh install has not fallen from zero");
+  await store.close();
+});
+
+test("a 90-day window is compared against the 90 days before it", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(10), "operational");
+  await sample(store, "github", daysAgo(120), "major_outage");
+  await sample(store, "github", daysAgo(121), "operational");
+
+  const { previousUptime } = await history.getProviderHistory("github", 90, 3);
+
+  assert.equal(previousUptime, 50, "days 90-179 must be read, which needs a 180-day bucket window");
+  await store.close();
+});
