@@ -66,6 +66,18 @@ export interface ComponentHistory {
 
 export interface HistorySummary {
   aggregateUptime: number;
+  /**
+   * Fleet uptime per day: the unweighted mean across the providers measured
+   * that day, `null` on a day none were.
+   *
+   * Unweighted on purpose — the same one-provider-one-vote rule
+   * `aggregateUptime` already uses. A sample-weighted mean would let the line
+   * and the figure printed beside it disagree, and the operator would have no
+   * way to tell which of the two to trust.
+   */
+  dailyUptime: DayUptime[];
+  /** The mean of the providers' own `previousUptime`. null = no comparison. */
+  previousAggregate: number | null;
   /** `uptime` is null for a month with no samples: 0% would read as an outage. */
   months: { month: string; uptime: number | null }[];
   providers: ProviderHistory[];
@@ -158,6 +170,35 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     return total === 0 ? null : round2((ok / total) * 100);
   }
 
+  /**
+   * The fleet's own daily series, keyed by day rather than by array index:
+   * every `getProviderHistory` call reads `now()` for itself, so positional
+   * alignment between two providers' series is an assumption, not a
+   * guarantee. A day is `null` when no provider measured it.
+   */
+  function aggregateDaily(providers: ProviderHistory[], days: number, today: Date): DayUptime[] {
+    const byProvider = providers.map(
+      (provider) => new Map(provider.dailySeries.map((entry) => [entry.day, entry.uptime])),
+    );
+    const series: DayUptime[] = [];
+    for (let offset = days - 1; offset >= 0; offset -= 1) {
+      const day = dayKey(new Date(today.getTime() - offset * DAY_MS));
+      const measured: number[] = [];
+      for (const provider of byProvider) {
+        const uptime = provider.get(day);
+        if (uptime !== undefined && uptime !== null) measured.push(uptime);
+      }
+      series.push({
+        day,
+        uptime:
+          measured.length === 0
+            ? null
+            : round2(measured.reduce((sum, value) => sum + value, 0) / measured.length),
+      });
+    }
+    return series;
+  }
+
   async function getProviderHistory(
     providerId: string,
     days: number,
@@ -247,6 +288,9 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     // was fully down was measured, and averaging it out would let the headline
     // claim 100% while a month below it reports real downtime.
     const measured = providers.filter((provider) => provider.sampleCount > 0);
+    const comparable = providers
+      .map((provider) => provider.previousUptime)
+      .filter((uptime): uptime is number => uptime !== null);
     return {
       aggregateUptime:
         measured.length === 0
@@ -254,6 +298,11 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
           : round2(
               measured.reduce((sum, provider) => sum + uptimeKey(provider, days), 0) / measured.length,
             ),
+      dailyUptime: aggregateDaily(providers, days, today),
+      previousAggregate:
+        comparable.length === 0
+          ? null
+          : round2(comparable.reduce((sum, uptime) => sum + uptime, 0) / comparable.length),
       months: [...monthTotals.entries()].map(([month, totals]) => ({
         month,
         uptime: totals.total === 0 ? null : round2((totals.ok / totals.total) * 100),

@@ -490,3 +490,21 @@ test("an incident's action log shows only that provider's notifications", async 
     await app.close();
   }
 });
+
+test("history carries the trend series the dashboard charts", async () => {
+  const app = await api();
+  try {
+    await save(app.runtime, "github", "operational", at(0));
+    const { status, body } = await app.get("/history?days=7");
+    const summary = body as {
+      dailyUptime: { day: string; uptime: number | null }[];
+      previousAggregate: number | null;
+    };
+    assert.equal(status, 200);
+    assert.equal(summary.dailyUptime.length, 7, "one entry per day in the window");
+    assert.equal(summary.dailyUptime.at(-1)?.uptime, 100, "today was sampled, and github was up");
+    assert.equal(summary.previousAggregate, null, "nothing was sampled in the week before");
+  } finally {
+    await app.close();
+  }
+});
