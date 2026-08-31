@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ChartContainer } from "@/components/ui/chart.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { chartConfigFor } from "@/lib/chartConfig.ts";
+import { stagger } from "@/lib/stagger.ts";
 
 /**
  * Four calendar months of aggregate uptime. A month with no samples is drawn at
@@ -56,7 +57,7 @@ export function MonthColumns({
           <ChartContainer
             config={chartConfigFor()}
             className="anim-bar anim-bar-month month-bar h-16 w-full"
-            style={{ animationDelay: `${index * 90}ms` }}
+            style={{ animationDelay: stagger(index, { base: 90, step: 38, cap: 380 }) }}
           >
             <BarChart data={[data[index]]} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
               <YAxis domain={[0, 100]} hide />

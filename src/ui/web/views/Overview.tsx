@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { FleetGroups } from "@/components/FleetGroups.tsx";
 import { FleetRings } from "@/components/FleetRings.tsx";
-import { FleetRows } from "@/components/FleetRows.tsx";
+import { FLEET_ROW_STAGGER, FleetRows } from "@/components/FleetRows.tsx";
 import { FleetSummary } from "@/components/FleetSummary.tsx";
 import { GeoCard } from "@/components/GeoCard.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
@@ -13,6 +13,7 @@ import { worstTier } from "@/lib/chartConfig.ts";
 import { formatRelative } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
 import { overviewShape } from "@/lib/overviewShape.ts";
+import { stagger } from "@/lib/stagger.ts";
 import { cn } from "@/lib/utils.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
 
@@ -72,7 +73,7 @@ export function Overview() {
       {/* The beacon shares the headline's line rather than sitting above
           it: the two say the same thing, and splitting them reads as two
           separate claims. */}
-      <div className="anim-rise anim-rise-hero flex items-center gap-3" style={{ animationDelay: "60ms" }}>
+      <div className="anim-rise anim-rise-hero flex items-center gap-3" style={{ animationDelay: "50ms" }}>
         <StatusBeacon tier={worstTier(providers.map((p) => p.overallStatus))} />
         <h2 className="text-3xl font-medium">
           {allDisabled
@@ -98,7 +99,7 @@ export function Overview() {
       {!allDisabled && (
         <p
           className="anim-rise anim-rise-hero max-w-[68ch] text-muted-foreground"
-          style={{ animationDelay: "130ms" }}
+          style={{ animationDelay: "100ms" }}
         >
           {down.length === 0 ? (
             <Trans
@@ -114,7 +115,7 @@ export function Overview() {
           )}
         </p>
       )}
-      <div className="anim-rise anim-rise-hero flex gap-2" style={{ animationDelay: "200ms" }}>
+      <div className="anim-rise anim-rise-hero flex gap-2" style={{ animationDelay: "150ms" }}>
         {withIncident !== undefined && (
           <Button
             type="button"
@@ -166,7 +167,7 @@ export function Overview() {
 
       <div className="overview-rows flex flex-col gap-4">
         {/* The rule sweeps in under the hero, before the rows arrive. */}
-        <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "220ms" }} />
+        <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "170ms" }} />
 
         {/* A summary belongs above the detail. The card renders nothing at all
             when `mapView` is `off`, which is the default, so the Overview's
@@ -186,7 +187,7 @@ export function Overview() {
             )}
             <div
               className="anim-fade text-sm text-muted-foreground"
-              style={{ animationDelay: `${providers.length * 70}ms` }}
+              style={{ animationDelay: stagger(providers.length, FLEET_ROW_STAGGER) }}
             >
               <Trans
                 i18nKey="overview.uptime-window"

@@ -2,6 +2,7 @@ import { Outlet, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Rail } from "@/components/Rail.tsx";
 import { Header } from "@/components/Header.tsx";
+import { ViewFrame } from "@/components/ViewFrame.tsx";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
 import { usePreferenceSync } from "@/hooks/usePreferenceSync.tsx";
@@ -13,6 +14,10 @@ import { usePreferenceSync } from "@/hooks/usePreferenceSync.tsx";
  * the start. Anything else — a poll tick, a write the operator just made — is a
  * re-render under the same key, and CSS animations do not restart on a
  * re-render. That is the whole mechanism: no reflow hack, no per-node silencing.
+ *
+ * *When* they replay is `ViewFrame`'s call, not this key's: a remounted view
+ * holds its cascade until its first data has landed, so the page enters once
+ * rather than once per query.
  */
 export const viewKey = (view: string, params: string, locale: string, theme: string) =>
   [view, params, locale, theme].join("|");
@@ -30,8 +35,10 @@ export function App() {
   const { mode } = useTheme();
   // Seeds theme and locale from the server on a browser that has no stored
   // choice of its own. Mounted here, in the shell, so it runs once per session
-  // rather than once per view.
-  usePreferenceSync();
+  // rather than once per view. A seed that lands changes `viewKey` and remounts
+  // the view, so the frame below waits for it rather than cascading once in the
+  // default theme and again in the operator's.
+  const seeded = usePreferenceSync();
 
   const paramString = [params["providerId"], params["incidentId"]].filter(Boolean).join("/");
   const view = currentView(location.pathname, paramString !== "");
@@ -48,14 +55,13 @@ export function App() {
           --gradient-page, and an opaque fill here would paint over it. */}
       <SidebarInset className="min-w-0 bg-transparent">
         <Header view={view} />
-        <div
-          id="view"
+        <ViewFrame
           key={viewKey(view, paramString, i18n.language, mode)}
-          data-animate={view}
-          className="min-w-0 flex-1 px-8 py-6"
+          view={view}
+          hold={!seeded}
         >
           <Outlet />
-        </div>
+        </ViewFrame>
       </SidebarInset>
     </SidebarProvider>
   );
