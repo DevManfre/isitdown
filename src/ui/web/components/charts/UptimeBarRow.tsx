@@ -16,8 +16,8 @@ const HEIGHT: Record<BarScale, number> = { row: 44, compact: 22, poll: 26 };
  * the double-play bug this port is meant to end.
  */
 export function UptimeBarRow({
-  buckets, scale = "row", className,
-}: { buckets: HistoryBucket[]; scale?: BarScale; className?: string }) {
+  buckets, scale = "row", className, showAxis = false,
+}: { buckets: HistoryBucket[]; scale?: BarScale; className?: string; showAxis?: boolean }) {
   const { t, i18n } = useTranslation();
   const data = buckets.map((bucket) => ({
     day: bucket.day,
@@ -32,10 +32,22 @@ export function UptimeBarRow({
       // never applied it to the compact bar row, only to uptimeStrip(). Every
       // UptimeBarRow scale (row, compact, poll) keeps the base 0.5s `anim-bar`.
       className={cn("anim-bar w-full", className)}
-      style={{ height: HEIGHT[scale] }}
+      // The tick row is extra height, not a slice out of the bars': without the
+      // 22px the axis would draw over the shortest of them.
+      style={{ height: HEIGHT[scale] + (showAxis ? 22 : 0) }}
     >
       <BarChart data={data} barCategoryGap={1} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-        <XAxis dataKey="day" hide />
+        {/* Opt-in, defaulting to off: `FleetRows` renders this at
+            `scale="compact"` (22px), where a tick row would be taller than the
+            bars it labels. Only the drawer, which has the room, asks for it. */}
+        <XAxis
+          dataKey="day"
+          hide={!showAxis}
+          tickLine={false}
+          axisLine={false}
+          minTickGap={48}
+          tickFormatter={(day: string) => formatDay(i18n.language, day)}
+        />
         <YAxis domain={[0, 100]} hide />
         <ChartTooltip
           // Recharts tweens the tooltip wrapper's own transform over 400ms, so

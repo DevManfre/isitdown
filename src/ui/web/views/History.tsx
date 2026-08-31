@@ -3,20 +3,17 @@ import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
-import { ComponentRows } from "@/components/ComponentRows.tsx";
 import { DeltaChip } from "@/components/DeltaChip.tsx";
+import { ProviderHistoryDrawer } from "@/components/ProviderHistoryDrawer.tsx";
+import { ProviderTrendRow } from "@/components/ProviderTrendRow.tsx";
 import { MonthColumns } from "@/components/charts/MonthColumns.tsx";
-import { StatusDot } from "@/components/charts/StatusDot.tsx";
-import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
 import { UptimeTrendChart } from "@/components/charts/UptimeTrendChart.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
+import { uptimeForRange } from "@/lib/history.ts";
 import { stagger } from "@/lib/stagger.ts";
-import type { ComponentStatus, HistorySummary, OverallStatus, ProviderHistory } from "@/lib/types.ts";
+import type { HistorySummary, ProviderHistory } from "@/lib/types.ts";
 
 const RANGES = [7, 30, 90] as const;
-
-const SEVERITY: Record<string, number> = { operational: 1, unknown: 0, degraded: 2, partial_outage: 3, major_outage: 4 };
-const severity = (status: string) => SEVERITY[status] ?? 0;
 
 const monthLabel = (locale: string, month: string) =>
   new Intl.DateTimeFormat(locale, { month: "short" }).format(new Date(`${month}-01T00:00:00Z`));
@@ -41,78 +38,12 @@ function downloadHistoryJson(summary: HistorySummary, days: number): void {
   URL.revokeObjectURL(url);
 }
 
-function ProviderBlock({
-  provider, name, days, delay, selection, current,
-}: {
-  provider: ProviderHistory;
-  name: string;
-  days: number;
-  delay: string;
-  selection: { id: string; name: string }[];
-  current: ComponentStatus[];
-}) {
-  const { t, i18n } = useTranslation();
-  const worst = provider.buckets.reduce<OverallStatus>(
-    (acc, bucket) => (severity(bucket.status) > severity(acc) ? bucket.status : acc),
-    "operational",
-  );
-
-  return (
-    <div className="history-row anim-rise flex flex-col gap-2" style={{ animationDelay: delay }}>
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <StatusDot status={worst} />
-          <span className="provider-name text-sm">{name}</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-muted-foreground">
-          <span>
-            {"7d "}
-            <NumberTicker locale={i18n.language} value={provider.uptime7} decimalPlaces={2} suffix="%" />
-          </span>
-          <span>
-            {"30d "}
-            <NumberTicker locale={i18n.language} value={provider.uptime30} decimalPlaces={2} suffix="%" />
-          </span>
-          <span style={{ color: "var(--color-neutral-300)" }}>
-            {"90d "}
-            <NumberTicker locale={i18n.language} value={provider.uptime90} decimalPlaces={2} suffix="%" />
-          </span>
-          <span>
-            <Trans
-              i18nKey="history.incidents"
-              count={provider.incidentCount}
-              values={{ count: provider.incidentCount }}
-              components={[<NumberTicker locale={i18n.language} value={provider.incidentCount} />]}
-            />
-            {" · "}
-            <span>
-              <Trans
-                i18nKey="history.downtime"
-                values={{ minutes: provider.downtimeMinutes }}
-                components={[<NumberTicker locale={i18n.language} value={provider.downtimeMinutes} />]}
-              />
-            </span>
-          </span>
-        </div>
-      </div>
-      <UptimeBarRow buckets={provider.buckets} scale="row" />
-      {selection.length > 0 && (
-        <ComponentRows
-          providerId={provider.providerId}
-          days={days}
-          current={current}
-          heading={t("components.rows-title")}
-        />
-      )}
-    </div>
-  );
-}
-
 /**
  * A trend view: the daily-uptime area chart is the hero, with the headline
  * percentage, its delta against the previous window of equal length, and the
- * month columns underneath — then one block per provider carrying its
- * 7/30/90-day figures and daily bar row.
+ * month columns underneath — then one labelled row per provider, worst first,
+ * carrying a sparkline and a single figure. Everything else a provider has to
+ * say is a click away in `ProviderHistoryDrawer`.
  *
  * The range control re-requests `/history` instead of re-slicing what is
  * already loaded, so the server stays the only place uptime is computed —
@@ -121,6 +52,7 @@ function ProviderBlock({
 export function History() {
   const { t, i18n } = useTranslation();
   const [days, setDays] = useState<number>(90);
+  const [open, setOpen] = useState<string | null>(null);
   const { data } = useHistory(days);
   const { data: status } = useStatus();
 
@@ -131,6 +63,14 @@ export function History() {
   const summary = data;
 
   const statusById = new Map((status?.providers ?? []).map((provider) => [provider.id, provider]));
+
+  // Worst first. Alphabetical order buries the two providers this page exists to
+  // show: on a fleet where five sit at 100%, it puts the interesting rows last.
+  const ordered = [...summary.providers].sort(
+    (left, right) =>
+      uptimeForRange(left, days) - uptimeForRange(right, days) ||
+      left.providerId.localeCompare(right.providerId),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -200,23 +140,47 @@ export function History() {
       {summary.providers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("empty.no-data")}</p>
       ) : (
-        <div className="history-list flex flex-col gap-5">
-          {summary.providers.map((provider, index) => {
+        // One grid for the whole list, with the header and every row as a
+        // `subgrid` inside it. A grid per row (which is what a `flex-col` list
+        // of self-contained grids gives) sizes its `auto` tracks from its own
+        // content, so every row put its figure at a different x and the header
+        // labelled nothing — the exact defect this list was rebuilt to fix. A
+        // delta cell is also empty whenever a provider has no previous window,
+        // and only shared tracks keep the columns straight through that.
+        <div className="history-list grid grid-cols-[minmax(8rem,1fr)_minmax(6rem,2fr)_auto_auto_auto] items-center gap-x-4">
+          <div className="col-span-full grid grid-cols-subgrid items-center px-2 text-xs uppercase tracking-widest text-muted-foreground">
+            <span>{t("history.col-provider")}</span>
+            <span>{t("history.col-trend")}</span>
+            <span>{t("history.col-uptime", { days })}</span>
+            <span>{t("history.col-delta")}</span>
+            <span>{t("history.col-incidents")}</span>
+          </div>
+          {ordered.map((provider, index) => {
             const live = statusById.get(provider.providerId);
             return (
-              <ProviderBlock
+              <ProviderTrendRow
                 key={provider.providerId}
                 provider={provider}
                 name={live?.name ?? provider.providerId}
+                status={live?.overallStatus ?? "unknown"}
                 days={days}
                 delay={stagger(index, { base: 180, step: 36, cap: 420 })}
-                selection={live?.componentSelection ?? []}
-                current={live?.components ?? []}
+                onOpen={() => setOpen(provider.providerId)}
               />
             );
           })}
         </div>
       )}
+
+      <ProviderHistoryDrawer
+        providerId={open}
+        name={open === null ? "" : (statusById.get(open)?.name ?? open)}
+        status={open === null ? "unknown" : (statusById.get(open)?.overallStatus ?? "unknown")}
+        components={open === null ? [] : (statusById.get(open)?.components ?? [])}
+        selection={open === null ? [] : (statusById.get(open)?.componentSelection ?? [])}
+        days={days}
+        onClose={() => setOpen(null)}
+      />
     </div>
   );
 }
