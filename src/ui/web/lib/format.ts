@@ -66,3 +66,18 @@ export const hostOf = (baseUrl: string): string => {
     return baseUrl;
   }
 };
+
+/**
+ * A percentage at axis precision. `formatPercent`'s two decimals are right
+ * beside a headline figure and far too wide for a stack of Y-axis ticks.
+ */
+export const formatPercentShort = (locale: string, value: number) =>
+  new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value) + "%";
+
+/**
+ * A signed number in the locale's own notation, e.g. "+1,4" / "-1,4". The sign
+ * is the whole point of a delta, so it is shown even where `Intl` would drop
+ * it — but not on an exact zero, which has no direction.
+ */
+export const formatSigned = (locale: string, value: number) =>
+  new Intl.NumberFormat(locale, { signDisplay: "exceptZero", maximumFractionDigits: 2 }).format(value);

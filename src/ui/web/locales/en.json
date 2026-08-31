@@ -129,8 +129,10 @@
   "history.downtime": "<0>{minutes}</0> min down",
   "history.months-title": "By month",
   "history.month-no-data": "—",
-  "history.export": "Served by",
-  "history.export-aria": "Download the raw history JSON for the last {days} days",
+  "history.trend-title": "Daily uptime",
+  "history.delta": "{value} pp vs previous {days} days",
+  "history.range-active": "Last {days} days",
+  "history.download": "Download JSON, last {days} days",
 
   "settings.polling": "Polling",
   "settings.services": "Monitored services",

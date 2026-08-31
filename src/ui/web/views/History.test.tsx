@@ -7,6 +7,12 @@ import { History } from "./History.tsx";
 
 const summary = {
   aggregateUptime: 99.42,
+  dailyUptime: [
+    { day: "2026-08-18", uptime: 99.9 },
+    { day: "2026-08-19", uptime: null },
+    { day: "2026-08-20", uptime: 98.2 },
+  ],
+  previousAggregate: 98.02,
   months: [
     { month: "2026-05", uptime: 99.9 },
     { month: "2026-06", uptime: null },
@@ -17,6 +23,12 @@ const summary = {
     {
       providerId: "github",
       buckets: [{ day: "2026-08-20", status: "operational" }],
+      dailySeries: [
+        { day: "2026-08-18", uptime: 100 },
+        { day: "2026-08-19", uptime: null },
+        { day: "2026-08-20", uptime: 99.8 },
+      ],
+      previousUptime: 97.1,
       uptime7: 100,
       uptime30: 99.8,
       uptime90: 99.9,
@@ -75,6 +87,41 @@ describe("History", () => {
     expect(await screen.findByText("min down", { exact: false })).toHaveTextContent(
       sentence("history.downtime", { minutes: 35 }),
     );
+  });
+
+  it("states the delta against the previous window in percentage points", async () => {
+    renderWithProviders(<History />, fixtures);
+
+    // 99.42 - 98.02 = +1.40, rendered with the locale's own sign and separator.
+    expect(await screen.findByText(/\+1[.,]4/)).toBeInTheDocument();
+  });
+
+  it("claims no delta when there is no previous window to compare against", async () => {
+    renderWithProviders(<History />, {
+      ...fixtures,
+      history: {
+        ...summary,
+        previousAggregate: null,
+        providers: summary.providers.map((provider) => ({ ...provider, previousUptime: null })),
+      },
+    });
+
+    expect(await screen.findByText(/99[.,]42/)).toBeInTheDocument();
+    expect(screen.queryByText(/pp/)).not.toBeInTheDocument();
+  });
+
+  it("spells out the active range beside the compact toggle", async () => {
+    renderWithProviders(<History />, fixtures);
+
+    expect(await screen.findByText(i18n.t("history.range-active", { days: 90 }))).toBeInTheDocument();
+  });
+
+  it("offers the history download as a labelled control, not as a raw URL", async () => {
+    renderWithProviders(<History />, fixtures);
+
+    expect(await screen.findByRole("button", { name: i18n.t("history.download", { days: 90 }) }))
+      .toBeInTheDocument();
+    expect(screen.queryByText(/GET \/history/)).not.toBeInTheDocument();
   });
 });
 
@@ -177,7 +224,7 @@ describe("a provider's component breakdown (ComponentRows)", () => {
     expect(await screen.findByText(/99[.,]42/)).toBeInTheDocument();
     expect(await screen.findByText(i18n.t("history.month-no-data"))).toBeInTheDocument();
     expect(await screen.findByText("GitHub")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "GET /history?days=90" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: i18n.t("history.download", { days: 90 }) })).toBeInTheDocument();
     // Only this provider's component breakdown is missing — absent, not blanked.
     expect(screen.queryByText(i18n.t("components.rows-title"))).toBeNull();
     expect(screen.queryByText(/Could not load this view/)).toBeNull();

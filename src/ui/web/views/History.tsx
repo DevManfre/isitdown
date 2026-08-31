@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentRows } from "@/components/ComponentRows.tsx";
+import { DeltaChip } from "@/components/DeltaChip.tsx";
 import { MonthColumns } from "@/components/charts/MonthColumns.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
+import { UptimeTrendChart } from "@/components/charts/UptimeTrendChart.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { ComponentStatus, HistorySummary, OverallStatus, ProviderHistory } from "@/lib/types.ts";
@@ -107,9 +109,10 @@ function ProviderBlock({
 }
 
 /**
- * Design 3a's History view: aggregate uptime figure plus four month columns,
- * then one block per provider carrying its 7/30/90-day figures and daily bar
- * row. Straight port of src/ui/public/js/views/history.js.
+ * A trend view: the daily-uptime area chart is the hero, with the headline
+ * percentage, its delta against the previous window of equal length, and the
+ * month columns underneath — then one block per provider carrying its
+ * 7/30/90-day figures and daily bar row.
  *
  * The range control re-requests `/history` instead of re-slicing what is
  * already loaded, so the server stays the only place uptime is computed —
@@ -131,52 +134,65 @@ export function History() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-6">
-        <div className="anim-rise anim-rise-column flex flex-col gap-2" style={{ animationDelay: "0ms" }}>
-          <span className="text-xs uppercase tracking-widest text-primary">{t("history.kicker")}</span>
-          <span className="font-mono text-3xl font-medium">
-            <NumberTicker locale={i18n.language} value={summary.aggregateUptime} decimalPlaces={2} suffix="%" />
-          </span>
-          <span className="text-sm text-muted-foreground">
-            <Trans
-              i18nKey="history.subtitle"
-              values={{ count: summary.providers.length, days }}
-              components={[<NumberTicker locale={i18n.language} value={summary.providers.length} />]}
-            />
-          </span>
+      <div className="anim-rise anim-rise-column flex flex-col gap-4" style={{ animationDelay: "0ms" }}>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-col gap-2">
+            <span className="text-xs uppercase tracking-widest text-primary">{t("history.kicker")}</span>
+            <span className="font-mono text-3xl font-medium">
+              <NumberTicker locale={i18n.language} value={summary.aggregateUptime} decimalPlaces={2} suffix="%" />
+            </span>
+            <div className="flex flex-wrap items-baseline gap-3">
+              <span className="text-sm text-muted-foreground">
+                <Trans
+                  i18nKey="history.subtitle"
+                  values={{ count: summary.providers.length, days }}
+                  components={[<NumberTicker locale={i18n.language} value={summary.providers.length} />]}
+                />
+              </span>
+              <DeltaChip current={summary.aggregateUptime} previous={summary.previousAggregate} days={days} />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs text-muted-foreground">{t("history.range-active", { days })}</span>
+            <ToggleGroup
+              type="single"
+              value={String(days)}
+              onValueChange={(next) => {
+                if (next === "") return;
+                setDays(Number(next));
+              }}
+            >
+              {/* The visible label stays the prototype's compact "7d" pill; the
+                  accessible name is the spelled-out translated range, so a
+                  screen reader hears "Last 7 days" rather than the bare token.
+                  The sighted operator now reads the active range from the label
+                  beside the group instead of inferring it from the pressed pill. */}
+              {RANGES.map((range) => (
+                <ToggleGroupItem key={range} value={String(range)} aria-label={t("column.range", { days: range })}>
+                  {`${range}d`}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => downloadHistoryJson(summary, days)}
+            >
+              {t("history.download", { days })}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex flex-col items-end gap-3">
-          <ToggleGroup
-            type="single"
-            value={String(days)}
-            onValueChange={(next) => {
-              if (next === "") return;
-              setDays(Number(next));
-            }}
-          >
-            {/* The visible label stays the prototype's compact "7d" pill (design
-                3a sets it at 11px / 3px 9px, and a row of "Last 30 days" does
-                not fit that control). The accessible name is the spelled-out,
-                translated range, so a screen reader hears "Last 7 days" rather
-                than the bare token "7d". */}
-            {RANGES.map((range) => (
-              <ToggleGroupItem
-                key={range}
-                value={String(range)}
-                aria-label={t("column.range", { days: range })}
-              >
-                {`${range}d`}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          <MonthColumns
-            months={summary.months}
-            labelFor={(month) => monthLabel(i18n.language, month)}
-            noDataLabel={t("history.month-no-data")}
-            heading={t("history.months-title")}
-          />
-        </div>
+        <UptimeTrendChart series={summary.dailyUptime} label={t("history.trend-title")} />
+
+        <MonthColumns
+          months={summary.months}
+          labelFor={(month) => monthLabel(i18n.language, month)}
+          noDataLabel={t("history.month-no-data")}
+          heading={t("history.months-title")}
+        />
       </div>
 
       <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "200ms" }} />
@@ -201,20 +217,6 @@ export function History() {
           })}
         </div>
       )}
-
-      <div className="header-actions flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">{t("history.export")}</span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="font-mono text-xs"
-          title={t("history.export-aria", { days })}
-          onClick={() => downloadHistoryJson(summary, days)}
-        >
-          {`GET /history?days=${days}`}
-        </Button>
-      </div>
     </div>
   );
 }
