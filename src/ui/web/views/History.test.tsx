@@ -12,7 +12,7 @@ const summary = {
     { day: "2026-08-19", uptime: null },
     { day: "2026-08-20", uptime: 98.2 },
   ],
-  previousAggregate: 98.02,
+  aggregateDelta: 1.4,
   months: [
     { month: "2026-05", uptime: 99.9 },
     { month: "2026-06", uptime: null },
@@ -159,19 +159,21 @@ describe("History", () => {
     );
   });
 
-  it("states the delta against the previous window in percentage points", async () => {
+  it("renders the server's aggregateDelta directly, without deriving one", async () => {
     renderWithProviders(<History />, fixtures);
 
-    // 99.42 - 98.02 = +1.40, rendered with the locale's own sign and separator.
+    // The fixture's aggregateDelta is +1.4 — the header must show exactly
+    // that figure, rendered with the locale's own sign and separator, never
+    // a value it computed itself from aggregateUptime.
     expect(await screen.findByText(/\+1[.,]4/)).toBeInTheDocument();
   });
 
-  it("claims no delta when there is no previous window to compare against", async () => {
+  it("claims no delta when aggregateDelta is null", async () => {
     renderWithProviders(<History />, {
       ...fixtures,
       history: {
         ...summary,
-        previousAggregate: null,
+        aggregateDelta: null,
         providers: summary.providers.map((provider) => ({ ...provider, previousUptime: null })),
       },
     });

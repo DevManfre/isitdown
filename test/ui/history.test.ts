@@ -399,7 +399,7 @@ test("a day no provider was measured is null, not zero", async () => {
   await store.close();
 });
 
-test("previousAggregate averages the providers that have a previous window", async () => {
+test("aggregateDelta is the current-vs-previous mean over providers present in both windows", async () => {
   const { store, history } = await harness(["github", "cloudflare"]);
   // Requested window: days 0-1. The window before it: days 2-3.
   await sample(store, "github", daysAgo(0), "operational");
@@ -407,18 +407,47 @@ test("previousAggregate averages the providers that have a previous window", asy
   await sample(store, "cloudflare", daysAgo(0), "operational");
   await sample(store, "cloudflare", daysAgo(3), "operational");
 
-  const { previousAggregate } = await history.getSummary(2, 3);
+  const summary = await history.getSummary(2, 3);
 
-  assert.equal(previousAggregate, 50, "github was down (0), cloudflare was up (100)");
+  // github: uptime7 50 (1 of 2 samples ok), previousUptime 0 (down on day 2).
+  // cloudflare: uptime7 100, previousUptime 100. Both providers are present in
+  // both windows, so both count: mean(50, 100) - mean(0, 100) = 75 - 50 = 25.
+  assert.equal(summary.aggregateDelta, 25);
   await store.close();
 });
 
-test("previousAggregate is null when no provider has anything before the window", async () => {
+test("aggregateDelta compares only providers with samples in both windows, ignoring one with samples only in the current window", async () => {
+  const { store, history } = await harness(["github", "newcomer"]);
+  // github: sampled in the current window (day 0) and the previous one (day
+  // 2) — flat at 100% in both, so it contributes no change.
+  await sample(store, "github", daysAgo(0), "operational");
+  await sample(store, "github", daysAgo(2), "operational");
+  // newcomer: sampled only in the current window, and badly. This is a
+  // provider just added to the fleet, not one that fell — it must not be
+  // read as a fall.
+  await sample(store, "newcomer", daysAgo(0), "major_outage");
+
+  const summary = await history.getSummary(2, 3);
+
+  assert.equal(
+    summary.aggregateUptime,
+    50,
+    "aggregateUptime still averages every provider with current samples, newcomer included",
+  );
+  assert.equal(
+    summary.aggregateDelta,
+    0,
+    "newcomer has no previous window and must be excluded from the delta entirely — github alone is flat, so the honest delta is zero, not the roughly -50 a naive aggregateUptime-minus-previousAggregate would print",
+  );
+  await store.close();
+});
+
+test("aggregateDelta is null when no provider has both a current and a previous sample", async () => {
   const { store, history } = await harness();
   await sample(store, "github", daysAgo(0), "operational");
 
-  const { previousAggregate } = await history.getSummary(2, 3);
+  const { aggregateDelta } = await history.getSummary(2, 3);
 
-  assert.equal(previousAggregate, null, "no comparison exists, so none is claimed");
+  assert.equal(aggregateDelta, null, "no comparison exists, so none is claimed");
   await store.close();
 });

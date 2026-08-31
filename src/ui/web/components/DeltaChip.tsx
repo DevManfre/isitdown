@@ -4,11 +4,15 @@ import { formatSigned } from "@/lib/format.ts";
 
 /**
  * The change against the previous window of equal length, in percentage
- * points.
+ * points. Purely a rendering component: the delta itself arrives already
+ * computed — see `HistorySummary.aggregateDelta` in `src/ui/history.ts` for
+ * why that subtraction has to happen on the server rather than here (the
+ * short version: two means over different sets of providers don't subtract
+ * into a meaningful change).
  *
  * Renders nothing at all when there is no previous window. A fresh install
  * has not fallen from zero, and "0,00 pp" would claim it measured a flat one —
- * which is why the server sends `null` here rather than a number.
+ * which is why callers pass `null` here rather than a number.
  *
  * Shared by the headline and by every provider row, so the rule about what an
  * absent comparison looks like is stated once.
@@ -20,17 +24,15 @@ import { formatSigned } from "@/lib/format.ts";
  * outgrows the column.
  */
 export function DeltaChip({
-  current, previous, days, compact = false,
+  delta, days, compact = false,
 }: {
-  current: number;
-  previous: number | null;
+  delta: number | null;
   days: number;
   compact?: boolean;
 }) {
   const { t, i18n } = useTranslation();
-  if (previous === null) return null;
+  if (delta === null) return null;
 
-  const delta = Math.round((current - previous) * 100) / 100;
   const colour = delta > 0 ? TREND_CHART.rise : delta < 0 ? TREND_CHART.fall : undefined;
   const value = formatSigned(i18n.language, delta);
 

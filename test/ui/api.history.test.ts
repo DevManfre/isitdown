@@ -498,12 +498,12 @@ test("history carries the trend series the dashboard charts", async () => {
     const { status, body } = await app.get("/history?days=7");
     const summary = body as {
       dailyUptime: { day: string; uptime: number | null }[];
-      previousAggregate: number | null;
+      aggregateDelta: number | null;
     };
     assert.equal(status, 200);
     assert.equal(summary.dailyUptime.length, 7, "one entry per day in the window");
     assert.equal(summary.dailyUptime.at(-1)?.uptime, 100, "today was sampled, and github was up");
-    assert.equal(summary.previousAggregate, null, "nothing was sampled in the week before");
+    assert.equal(summary.aggregateDelta, null, "nothing was sampled in the week before, so no comparison exists");
   } finally {
     await app.close();
   }

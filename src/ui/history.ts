@@ -76,8 +76,24 @@ export interface HistorySummary {
    * way to tell which of the two to trust.
    */
   dailyUptime: DayUptime[];
-  /** The mean of the providers' own `previousUptime`. null = no comparison. */
-  previousAggregate: number | null;
+  /**
+   * The fleet's change against the previous window of equal length, in
+   * percentage points. `null` when nothing exists to compare.
+   *
+   * Computed here, over the providers with samples in BOTH windows — never
+   * by having the client subtract `aggregateUptime` from a published
+   * "previous aggregate". `aggregateUptime` averages every provider with
+   * samples now; a previous-window aggregate published alongside it would
+   * only ever average the providers that already existed that far back —
+   * usually a smaller set. A mean over seven providers minus a mean over
+   * four is not a change in anything, it is an artifact of which providers
+   * happen to be new. This file's own rule is that the dashboard never
+   * re-derives a figure from other figures it was sent (see the module
+   * doc comment); the aggregate delta is exactly that kind of figure, so it
+   * is computed once, here, and shipped as a single number the client only
+   * paints.
+   */
+  aggregateDelta: number | null;
   /** `uptime` is null for a month with no samples: 0% would read as an outage. */
   months: { month: string; uptime: number | null }[];
   providers: ProviderHistory[];
@@ -288,9 +304,16 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     // was fully down was measured, and averaging it out would let the headline
     // claim 100% while a month below it reports real downtime.
     const measured = providers.filter((provider) => provider.sampleCount > 0);
-    const comparable = providers
-      .map((provider) => provider.previousUptime)
-      .filter((uptime): uptime is number => uptime !== null);
+    // The delta's own set: providers measured in *both* windows. Deliberately
+    // not `measured` (current window only) and not "has previousUptime" alone
+    // (previous window only) — either one lets a provider that is missing from
+    // the other window distort the comparison. See the `aggregateDelta` doc
+    // comment on `HistorySummary` for why this can't instead be `aggregateUptime`
+    // minus a published previous-window mean.
+    const comparable = measured.filter(
+      (provider): provider is typeof provider & { previousUptime: number } =>
+        provider.previousUptime !== null,
+    );
     return {
       aggregateUptime:
         measured.length === 0
@@ -299,10 +322,13 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
               measured.reduce((sum, provider) => sum + uptimeKey(provider, days), 0) / measured.length,
             ),
       dailyUptime: aggregateDaily(providers, days, today),
-      previousAggregate:
+      aggregateDelta:
         comparable.length === 0
           ? null
-          : round2(comparable.reduce((sum, uptime) => sum + uptime, 0) / comparable.length),
+          : round2(
+              comparable.reduce((sum, provider) => sum + uptimeKey(provider, days), 0) / comparable.length -
+                comparable.reduce((sum, provider) => sum + provider.previousUptime, 0) / comparable.length,
+            ),
       months: [...monthTotals.entries()].map(([month, totals]) => ({
         month,
         uptime: totals.total === 0 ? null : round2((totals.ok / totals.total) * 100),

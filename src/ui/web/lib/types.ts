@@ -106,8 +106,13 @@ export interface HistorySummary {
   aggregateUptime: number;
   /** Fleet uptime per day: unweighted mean across the providers measured. */
   dailyUptime: DayUptime[];
-  /** The equal-length window before this one. null = no comparison exists. */
-  previousAggregate: number | null;
+  /**
+   * The fleet's change against the previous window of equal length, in
+   * percentage points. Computed server-side over the providers with samples
+   * in both windows — see `HistorySummary` in `src/ui/history.ts` for why.
+   * null = no comparison exists.
+   */
+  aggregateDelta: number | null;
   /** `uptime` null for a month with no samples: 0% would read as an outage. */
   months: { month: string; uptime: number | null }[];
   providers: ProviderHistory[];
