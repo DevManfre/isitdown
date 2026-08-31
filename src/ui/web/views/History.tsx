@@ -174,6 +174,7 @@ export function History() {
             months={summary.months}
             labelFor={(month) => monthLabel(i18n.language, month)}
             noDataLabel={t("history.month-no-data")}
+            heading={t("history.months-title")}
           />
         </div>
       </div>
