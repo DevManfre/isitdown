@@ -129,8 +129,10 @@
   "history.downtime": "<0>{minutes}</0> min di down",
   "history.months-title": "Per mese",
   "history.month-no-data": "—",
-  "history.export": "Servito da",
-  "history.export-aria": "Scarica il JSON dello storico per gli ultimi {days} giorni",
+  "history.trend-title": "Uptime giornaliero",
+  "history.delta": "{value} pp rispetto ai {days} giorni prima",
+  "history.range-active": "Ultimi {days} giorni",
+  "history.download": "Scarica JSON, ultimi {days} giorni",
 
   "settings.polling": "Polling",
   "settings.services": "Servizi monitorati",
