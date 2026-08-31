@@ -640,7 +640,7 @@ curl -s -X POST localhost:3000/poll | jq '{changes}'        # {"changes": 2} →
 
 docker compose --profile ui restart
 curl -s -X POST localhost:3000/poll | jq '{changes}'        # {"changes": 0} — nothing re-notified
-curl -s localhost:3000/incidents | jq '.closed[] | {incidentId, startedAt, resolvedAt}'
+curl -s 'localhost:3000/incidents?state=resolved' | jq '.page.items[] | {incidentId, startedAt, resolvedAt}'
 ```
 
 The same flow works on the Light edition: add the fake provider to `config.yml`,
@@ -718,7 +718,7 @@ back reports a parse failure instead of the real problem.
 | `GET` | `/health` | Liveness. `{ status, providers, lastCycleAt }`. |
 | `GET` | `/status` | Current status of every provider, plus last and next poll. A pure database read — safe to poll every 30s, which the dashboard does. Never reaches upstream. |
 | `GET` | `/history?provider=&days=` | Pre-aggregated daily buckets, 7/30/90-day uptime, month columns. `days` accepts `7`, `30` or `90`; anything else is a 400 naming them. Without `provider`, a summary across all of them. |
-| `GET` | `/incidents?provider=` | `{ active, closed }`. |
+| `GET` | `/incidents?provider=&state=&page=&pageSize=` | One page of the incident list: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` is `all` (default), `active` or `resolved`; `pageSize` defaults to 20 and is capped at 100. A nonsense `page`, `pageSize` or `state` falls back to the first page of everything rather than a 400. `counts` carries all three states whatever the filter, and `active` is the open list the dashboard's hero card shows on every page. |
 | `GET` | `/incidents/:providerId/:incidentId` | Detail: the incident, the observed timeline, the action log of what was sent, the provider's other open incidents, and the last 24 polls. |
 | `GET` | `/notifications?limit=` | What was actually sent, newest first. Capped at 200. |
 | `GET` | `/config` | Services, polling settings, channels. Channel credentials appear as variable **names** with an `isSet` flag — never values. |

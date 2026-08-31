@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, type Query } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type Query } from "@tanstack/react-query";
 import * as api from "@/lib/api.ts";
 import { msUntilNextPoll, REFRESH_MS, statusRefetchDelay } from "@/lib/statusRefetch.ts";
 import type { StatusResponse } from "@/lib/types.ts";
@@ -134,11 +134,23 @@ export const useComponentHistory = (provider: string, days: number) => {
   });
 };
 
-export const useIncidents = (provider?: string) => {
+/**
+ * One page of the incident list. `keepPreviousData` is what makes the pager
+ * usable: without it, every page change unmounts the rows for the length of a
+ * request and the list flashes its empty state between pages.
+ */
+export const useIncidents = (query: api.IncidentListQuery = {}) => {
   const busy = useBusy();
   return useQuery({
-    queryKey: ["incidents", provider ?? null],
-    queryFn: () => api.getIncidents(provider),
+    queryKey: [
+      "incidents",
+      query.provider ?? null,
+      query.state ?? "all",
+      query.page ?? 1,
+      query.pageSize ?? null,
+    ],
+    queryFn: () => api.getIncidents(query),
+    placeholderData: keepPreviousData,
     refetchInterval: busy ? false : REFRESH_MS,
   });
 };

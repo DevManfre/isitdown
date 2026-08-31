@@ -3,6 +3,7 @@ import type {
   ComponentPreview,
   IncidentDetail,
   IncidentsResponse,
+  IncidentState,
   MapResponse,
   OverallStatus,
   Preferences,
@@ -73,11 +74,26 @@ export const getComponentHistory = (provider: string, days: number) =>
     `/history/components?days=${days}&provider=${encodeURIComponent(provider)}`,
   );
 
-export const getIncidents = (provider?: string) =>
-  request<IncidentsResponse>(
-    "GET",
-    `/incidents${provider === undefined ? "" : `?provider=${encodeURIComponent(provider)}`}`,
-  );
+export interface IncidentListQuery {
+  provider?: string | undefined;
+  state?: IncidentState | undefined;
+  page?: number | undefined;
+  pageSize?: number | undefined;
+}
+
+/**
+ * An object rather than four positional arguments: the server defaults every
+ * one of them, so a call site that only moves the page must not have to restate
+ * the rest in the right order.
+ */
+export const getIncidents = (query: IncidentListQuery = {}) => {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) params.set(key, String(value));
+  }
+  const search = params.toString();
+  return request<IncidentsResponse>("GET", `/incidents${search === "" ? "" : `?${search}`}`);
+};
 
 export const getIncident = (providerId: string, incidentId: string) =>
   request<IncidentDetail>(

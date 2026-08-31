@@ -277,7 +277,7 @@ test("migrating to v4 creates the map tables", async () => {
   assert.ok(tables.includes("map_geo_state"), "map_geo_state missing");
 
   const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
-  assert.equal(version?.user_version, 4);
+  assert.equal(version?.user_version, SCHEMA_VERSION);
   db.close();
 });
 
@@ -322,11 +322,44 @@ test("deleting a service clears its map rows", async () => {
   db.close();
 });
 
-test("migrate is idempotent at v4", async () => {
+test("migrate is idempotent at the current version", async () => {
   const db = await freshDb();
   migrate(db);
   migrate(db);
   const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
-  assert.equal(version?.user_version, 4);
+  assert.equal(version?.user_version, SCHEMA_VERSION);
+  db.close();
+});
+
+/**
+ * The paged incident list's plan, not its result — the result is covered in
+ * sqliteStateStore.test.ts. A page is fetched on every filter switch and every
+ * poll tick, and without an index covering `started_at DESC, incident_id DESC`
+ * SQLite sorts the whole table into a temp b-tree before it can skip to the
+ * requested offset, on each of those requests.
+ */
+const plan = (db: DatabaseSync, sql: string): string =>
+  (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all() as { detail: string }[])
+    .map((row) => row.detail)
+    .join(" | ");
+
+const PAGE_ORDER = "ORDER BY started_at DESC, incident_id DESC LIMIT 20 OFFSET 40";
+
+test("every incident page is served by an index instead of a temp b-tree sort", async () => {
+  const db = await freshDb();
+  migrate(db);
+
+  for (const [label, sql] of [
+    ["all", `SELECT * FROM incidents ${PAGE_ORDER}`],
+    ["active", `SELECT * FROM incidents WHERE resolved_at IS NULL ${PAGE_ORDER}`],
+    ["resolved", `SELECT * FROM incidents WHERE resolved_at IS NOT NULL ${PAGE_ORDER}`],
+  ] as const) {
+    const detail = plan(db, sql);
+    assert.ok(
+      !detail.includes("TEMP B-TREE"),
+      `the ${label} page sorts in a temp b-tree: ${detail}`,
+    );
+    assert.match(detail, /INDEX idx_incidents/, `the ${label} page uses no incident index: ${detail}`);
+  }
   db.close();
 });

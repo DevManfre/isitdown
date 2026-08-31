@@ -76,7 +76,11 @@ export function stubApi(fixtures: Fixtures): void {
       if (errorStatus !== undefined) {
         return { ok: false, status: errorStatus, text: async () => "" };
       }
-      const body = fixtures[key];
+      // A fixture may be a function of the request path instead of a fixed
+      // body, for an endpoint whose answer depends on its query string — a
+      // paged, filtered list cannot be represented by one constant response.
+      const fixture = fixtures[key];
+      const body = typeof fixture === "function" ? (fixture as (path: string) => unknown)(path) : fixture;
       return { ok: true, status: 200, text: async () => JSON.stringify(body ?? {}) };
     }),
   );

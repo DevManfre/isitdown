@@ -116,9 +116,23 @@ export interface IncidentRow {
   resolvedAt: string | null;
 }
 
+/** Which slice of the incident list the view is asking for. */
+export type IncidentState = "all" | "active" | "resolved";
+
+export interface IncidentPage {
+  items: IncidentRow[];
+  page: number;
+  pageSize: number;
+  /** Rows matching the requested state, not the page's length. */
+  total: number;
+}
+
 export interface IncidentsResponse {
+  /** The hero card's own rows: on screen under every filter, on every page. */
   active: IncidentRow[];
-  closed: IncidentRow[];
+  page: IncidentPage;
+  /** Every state's count, whichever one the page is showing. */
+  counts: Record<IncidentState, number>;
 }
 
 export interface TimelineEntry {

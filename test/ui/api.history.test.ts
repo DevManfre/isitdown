@@ -179,7 +179,33 @@ test("component history rejects a window it does not serve", async () => {
   }
 });
 
-test("incidents are split into active and closed", async () => {
+/**
+ * The shape the paged incident list reads. `active` stays alongside the page for
+ * the view's hero card: that card shows the open incident whatever the filter
+ * and whichever page the operator is on, so it cannot be carved out of the page.
+ */
+interface IncidentsPayload {
+  active: { incidentId: string }[];
+  page: { items: { incidentId: string }[]; page: number; pageSize: number; total: number };
+  counts: { all: number; active: number; resolved: number };
+}
+
+/** `count` resolved incidents, newest first: r1 is the newest. */
+const seedResolved = (app: Api, provider: string, count: number) =>
+  app.runtime.store.applyBackfill(provider, {
+    samples: [],
+    incidents: Array.from({ length: count }, (_unused, index) => ({
+      id: `r${index + 1}`,
+      name: "Elevated error rates",
+      impact: "minor",
+      status: "resolved",
+      startedAt: at(index + 2),
+      resolvedAt: at(index + 2, 13),
+      updatedAt: at(index + 2, 13),
+    })),
+  });
+
+test("the incident list comes back as one page with the totals beside it", async () => {
   const app = await api();
   try {
     await save(app.runtime, "github", "degraded", at(2), [incident({ id: "closed" })]);
@@ -187,15 +213,93 @@ test("incidents are split into active and closed", async () => {
 
     const { status, body } = await app.get("/incidents");
     assert.equal(status, 200);
-    const payload = body as { active: { incidentId: string }[]; closed: { incidentId: string }[] };
+    const payload = body as IncidentsPayload;
+
     assert.deepEqual(
       payload.active.map((row) => row.incidentId),
       ["open"],
     );
+    // Newest first, open and resolved in one list — the pager is the same
+    // control under every filter, so the unfiltered list holds both states.
     assert.deepEqual(
-      payload.closed.map((row) => row.incidentId),
-      ["closed"],
+      payload.page.items.map((row) => row.incidentId),
+      ["open", "closed"],
     );
+    assert.equal(payload.page.page, 1);
+    assert.equal(payload.page.pageSize, 20);
+    assert.equal(payload.page.total, 2);
+    assert.deepEqual(payload.counts, { all: 2, active: 1, resolved: 1 });
+  } finally {
+    await app.close();
+  }
+});
+
+test("a later page returns the next slice, never a row the previous page held", async () => {
+  const app = await api();
+  try {
+    await seedResolved(app, "github", 5);
+
+    const first = ((await app.get("/incidents?pageSize=2&page=1")).body as IncidentsPayload).page;
+    const second = ((await app.get("/incidents?pageSize=2&page=2")).body as IncidentsPayload).page;
+    const third = ((await app.get("/incidents?pageSize=2&page=3")).body as IncidentsPayload).page;
+
+    assert.deepEqual(first.items.map((row) => row.incidentId), ["r1", "r2"]);
+    assert.deepEqual(second.items.map((row) => row.incidentId), ["r3", "r4"]);
+    assert.deepEqual(third.items.map((row) => row.incidentId), ["r5"]);
+    assert.equal(second.total, 5, "the total counts the whole list, not the page");
+  } finally {
+    await app.close();
+  }
+});
+
+test("the page follows the state filter while the counts stay whole", async () => {
+  const app = await api();
+  try {
+    await seedResolved(app, "github", 3);
+    await save(app.runtime, "github", "degraded", at(0), [incident({ id: "open" })]);
+
+    const resolved = (await app.get("/incidents?state=resolved&pageSize=2")).body as IncidentsPayload;
+    const active = (await app.get("/incidents?state=active")).body as IncidentsPayload;
+
+    assert.deepEqual(resolved.page.items.map((row) => row.incidentId), ["r1", "r2"]);
+    assert.equal(resolved.page.total, 3, "a filtered total counts that state, not the page");
+    assert.deepEqual(active.page.items.map((row) => row.incidentId), ["open"]);
+    assert.equal(active.page.total, 1);
+    // The filter pills show every state's count whichever one is selected.
+    assert.deepEqual(resolved.counts, { all: 4, active: 1, resolved: 3 });
+    assert.deepEqual(active.counts, resolved.counts);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a nonsense page, size or state falls back instead of failing the request", async () => {
+  const app = await api();
+  try {
+    await seedResolved(app, "github", 3);
+
+    for (const query of ["page=0", "page=-4", "page=abc", "state=sideways"]) {
+      const { status, body } = await app.get(`/incidents?${query}`);
+      assert.equal(status, 200, query);
+      const payload = body as IncidentsPayload;
+      assert.equal(payload.page.page, 1, query);
+      assert.equal(payload.page.total, 3, query);
+    }
+
+    const huge = (await app.get("/incidents?pageSize=9999")).body as IncidentsPayload;
+    assert.equal(huge.page.pageSize, 100, "an unbounded page size would defeat paging");
+  } finally {
+    await app.close();
+  }
+});
+
+test("a page past the end is empty but still reports the total", async () => {
+  const app = await api();
+  try {
+    await seedResolved(app, "github", 3);
+    const { page } = (await app.get("/incidents?pageSize=2&page=9")).body as IncidentsPayload;
+    assert.deepEqual(page.items, []);
+    assert.equal(page.total, 3);
   } finally {
     await app.close();
   }
@@ -208,11 +312,18 @@ test("incidents can be filtered by provider", async () => {
     await save(app.runtime, "cloudflare", "degraded", at(1), [incident({ id: "cf" })]);
 
     const { body } = await app.get("/incidents?provider=cloudflare");
-    const payload = body as { active: { incidentId: string }[] };
+    const payload = body as IncidentsPayload;
     assert.deepEqual(
       payload.active.map((row) => row.incidentId),
       ["cf"],
     );
+    // The page and the pill counts are scoped too — a provider-scoped list that
+    // paged over every provider's rows would page past its own end.
+    assert.deepEqual(
+      payload.page.items.map((row) => row.incidentId),
+      ["cf"],
+    );
+    assert.deepEqual(payload.counts, { all: 1, active: 1, resolved: 0 });
   } finally {
     await app.close();
   }

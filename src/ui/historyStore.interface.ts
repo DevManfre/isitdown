@@ -30,6 +30,15 @@ export interface IncidentFilter {
   state?: "active" | "resolved" | undefined;
   days?: number | undefined;
   limit?: number | undefined;
+  /** Rows to skip before the page starts. Honoured with or without a `limit`. */
+  offset?: number | undefined;
+}
+
+/** How many incidents match a filter, split by state — the paged list's totals. */
+export interface IncidentCounts {
+  all: number;
+  active: number;
+  resolved: number;
 }
 
 export interface DailyBucket {
@@ -51,6 +60,13 @@ export interface HistoryStore extends StateStore {
   recordNotification(record: SentRecord): Promise<void>;
   listNotifications(limit: number): Promise<SentRecord[]>;
   listIncidents(filter: IncidentFilter): Promise<IncidentRow[]>;
+  /**
+   * The counts behind the incident list's pager and its filter pills. One
+   * statement for all three numbers: a paged list cannot derive them from the
+   * rows it loaded, and three COUNT queries would scan the same index three
+   * times. `state` is ignored — counting every state at once is the point.
+   */
+  countIncidents(filter: Omit<IncidentFilter, "state" | "limit" | "offset">): Promise<IncidentCounts>;
   getIncident(providerId: string, incidentId: string): Promise<IncidentRow | null>;
   /** Newest first, for the incident view's poll strip. */
   getRecentSamples(providerId: string, limit: number): Promise<SampleRow[]>;
