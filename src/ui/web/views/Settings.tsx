@@ -107,20 +107,24 @@ function ChannelCard({ channel }: { channel: DescribedChannel }) {
   const { t } = useTranslation();
   const fieldProps = useFieldProps();
   const { patch, test } = useChannelMutations();
-  const [envValues, setEnvValues] = useState<Record<string, string>>(
-    Object.fromEntries(channel.fields.map((field) => [field.name, field.envVar])),
-  );
+  // Only what is being *changed* lives here: each field renders empty with the
+  // stored variable name as its placeholder, so the hint can never be mistaken
+  // for something the operator typed.
+  const [envValues, setEnvValues] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
 
   const save = (): void => {
-    patch.mutate({
-      id: channel.id,
-      patch: {
-        fields: Object.fromEntries(
-          Object.entries(envValues).map(([name, value]) => [`${name}Env`, value.trim()]),
-        ),
-      },
-    });
+    const fields = Object.fromEntries(
+      Object.entries(envValues)
+        .map(([name, value]) => [`${name}Env`, value.trim()] as const)
+        .filter(([, value]) => value !== ""),
+    );
+    // An untouched card is not an instruction to blank every reference.
+    if (Object.keys(fields).length === 0) return;
+    patch.mutate(
+      { id: channel.id, patch: { fields } },
+      { onSuccess: () => setEnvValues({}) },
+    );
   };
 
   const sendTest = async (): Promise<void> => {
@@ -170,6 +174,7 @@ function ChannelCard({ channel }: { channel: DescribedChannel }) {
             <Input
               id={inputId}
               className="font-mono"
+              placeholder={field.envVar}
               value={envValues[field.name] ?? ""}
               onChange={(event) => setEnvValues((prev) => ({ ...prev, [field.name]: event.target.value }))}
               {...fieldProps}
