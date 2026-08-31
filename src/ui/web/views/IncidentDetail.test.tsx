@@ -26,6 +26,20 @@ const mount = () =>
     status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
   }, "/incidents/:providerId/:incidentId");
 
+/** The same fixture, plus the map snapshot and the preference that reveals it. */
+const mountWithMap = () =>
+  renderWithProviders(<IncidentDetail />, {
+    incident: detail,
+    status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+    map: {
+      points: [{ providerId: "github", providerName: "GitHub", componentId: "github/api",
+                 name: "Ashburn", lat: 39.02, lon: -77.46, status: "operational", source: "iata" }],
+      unlocated: [],
+      generatedAt: "2026-08-21T09:30:00Z",
+    },
+    preferences: { theme: "dark", uiLocale: "en", notificationLocale: "en", mapView: "map" },
+  }, "/incidents/:providerId/:incidentId");
+
 /** Same fixture, with actionLog swapped out — for the empty-state case. */
 const mountWithActionLog = (actionLog: typeof detail.actionLog) =>
   renderWithProviders(<IncidentDetail />, {
@@ -58,8 +72,14 @@ describe("IncidentDetail", () => {
   it("renders the status meta row as two elements, matching vanilla's service-row", async () => {
     mount();
     const kicker = await screen.findByText(i18n.t("column.status"));
-    const row = kicker.nextElementSibling;
-    if (!(row instanceof HTMLElement)) throw new Error("expected a status row element next to its kicker");
+    // Located through the tile that carries the kicker, not by DOM adjacency
+    // to it: the bento wraps every kicker in the tile's own header row
+    // (BentoTile.tsx), so `nextElementSibling` is that header's end, not the
+    // row. What this test is about is the row's *shape*, below — the way it is
+    // found is scaffolding.
+    const tile = kicker.closest('[data-slot="card"]');
+    const row = tile?.querySelector(".service-row");
+    if (!(row instanceof HTMLElement)) throw new Error("expected a status row inside the status tile");
     // Exactly two children: a bare status span and a "mono muted" timestamp
     // span (incident.js:217-220) — not one span carrying both, whatever
     // separator joins them.
@@ -109,5 +129,20 @@ describe("IncidentDetail", () => {
   it("offers a way back to the list", async () => {
     mount();
     expect(await screen.findByRole("link", { name: i18n.t("action.back") })).toBeInTheDocument();
+  });
+
+  it("gives the incident's provider a map tile once the operator has turned the map on", async () => {
+    mountWithMap();
+    expect(
+      await screen.findByText(i18n.t("incident.map.title", { name: "GitHub" })),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the map tile out entirely while the preference is off", async () => {
+    mount();
+    // Awaited on something the view always renders, so the absence below is
+    // read after the view has actually rendered rather than before it.
+    await screen.findByText("API errors");
+    expect(screen.queryByText(i18n.t("incident.map.title", { name: "GitHub" }))).toBeNull();
   });
 });

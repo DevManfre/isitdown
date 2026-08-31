@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { BentoTile } from "@/components/BentoTile.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
 import {
   useChannelMutations,
@@ -21,7 +22,6 @@ import {
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { hostOf } from "@/lib/format.ts";
 import { stagger } from "@/lib/stagger.ts";
-import { cn } from "@/lib/utils.ts";
 import type { DescribedChannel, MapView, ServiceDefinition } from "@/lib/types.ts";
 
 /**
@@ -200,46 +200,6 @@ function ChannelCard({ channel }: { channel: DescribedChannel }) {
   );
 }
 
-/**
- * One tile of the Settings bento: the kicker, an optional action beside it, the
- * controls, and last the sentence that explains them.
- *
- * The four blocks each used to carry their own shape — two wrapped in a `Card`,
- * two bare, each with its own idea of where the explanation and the Save button
- * belonged — which is what made the page read as a pile rather than a form. The
- * shape is decided here once; how wide a tile is, is the grid's business below,
- * not the block's. `mt-auto` on the note is what keeps the two notes in a row
- * on the same baseline when the tiles beside them stretch to equal height.
- */
-function SettingsTile({
-  title,
-  action,
-  note,
-  delay,
-  className,
-  children,
-}: {
-  title: string;
-  action?: ReactNode;
-  note?: ReactNode;
-  delay: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Card className={cn("anim-rise gap-4 px-4", className)} style={{ animationDelay: delay }}>
-      {/* `min-h-8` so a header without an action lines up with one that has a
-          small Button in it, instead of sitting 8px higher. */}
-      <div className="flex min-h-8 items-center justify-between gap-3">
-        <span className="text-xs uppercase tracking-widest text-primary">{title}</span>
-        {action}
-      </div>
-      {children}
-      {note !== undefined && <span className="mt-auto text-xs text-muted-foreground">{note}</span>}
-    </Card>
-  );
-}
-
 /** The tiles enter in reading order, after the view's own frame has landed. */
 const TILE_CASCADE = { base: 60, step: 60 };
 
@@ -284,7 +244,7 @@ export function Settings() {
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
-      <SettingsTile
+      <BentoTile
         title={t("settings.polling")}
         note={t("settings.jitter-note")}
         delay={stagger(0, TILE_CASCADE)}
@@ -331,9 +291,9 @@ export function Settings() {
           </Button>
           <span className="text-xs text-muted-foreground">{pollingMessage ?? t("settings.hot-note")}</span>
         </div>
-      </SettingsTile>
+      </BentoTile>
 
-      <SettingsTile
+      <BentoTile
         title={t("settings.map-view")}
         note={t("settings.map-view.hint")}
         delay={stagger(1, TILE_CASCADE)}
@@ -355,9 +315,9 @@ export function Settings() {
             </SelectContent>
           </Select>
         </div>
-      </SettingsTile>
+      </BentoTile>
 
-      <SettingsTile
+      <BentoTile
         title={t("settings.services")}
         action={
           <ServiceDialog mode="add" trigger={<Button type="button" size="sm">{t("action.add-service")}</Button>} />
@@ -430,12 +390,12 @@ export function Settings() {
             ))}
           </div>
         )}
-      </SettingsTile>
+      </BentoTile>
 
       {/* The note the channel panels used to repeat one apiece is said once
           here: it is the same sentence about the same environment, and three
           channels made it three claims. */}
-      <SettingsTile
+      <BentoTile
         title={t("settings.channels")}
         note={t("settings.secret-note")}
         delay={stagger(3, TILE_CASCADE)}
@@ -450,7 +410,7 @@ export function Settings() {
             ))}
           </div>
         )}
-      </SettingsTile>
+      </BentoTile>
     </div>
   );
 }

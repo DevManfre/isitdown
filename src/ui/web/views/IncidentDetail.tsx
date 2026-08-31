@@ -4,7 +4,8 @@ import { Trans, useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
-import { Card } from "@/components/ui/card.tsx";
+import { BentoTile } from "@/components/BentoTile.tsx";
+import { IncidentMap } from "@/components/IncidentMap.tsx";
 import { PollStrip } from "@/components/charts/PollStrip.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { useIncident, useStatus } from "@/hooks/queries.ts";
@@ -22,6 +23,9 @@ const STEPS: readonly string[] = INCIDENT_STEPS;
 /** How long the copy-payload confirmation stays up — incident.js:238. */
 const TOAST_MS = 2500;
 
+/** The tiles enter in reading order, after the hero and the stepper have landed. */
+const TILE_CASCADE = { base: 240, step: 60 };
+
 const durationSince = (locale: string, from: string): string =>
   formatDuration(locale, (Date.now() - Date.parse(from)) / 60_000);
 
@@ -31,7 +35,14 @@ const durationBetween = (locale: string, from: string, to: string): string =>
 /**
  * Design 3a's incident detail: the status stepper, the timeline of what
  * IsItDown observed, the action log of what it actually sent, the
- * provider's other open incidents, and the strip of recent polls.
+ * provider's other open incidents, the strip of recent polls, and where the
+ * provider physically runs.
+ *
+ * Laid out as a bento of uniform tiles on the same `BentoTile` Settings uses —
+ * the blocks below used to be bare labelled stacks in a `2fr_1fr` split, which
+ * gave the page two competing column rhythms and no shared tile shape. The hero
+ * and the stepper stay full-width bands above the grid: both are read left to
+ * right across the whole page, and boxing them would break that.
  *
  * The timeline is our own observations, not the provider's update feed — the
  * adapter does not normalise those, and inventing them would be worse than
@@ -156,122 +167,152 @@ export function IncidentDetail() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[2fr_1fr]">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("incident.timeline")}</span>
-            {timeline.map((entry, index) => (
+      {/* Six columns, same grid as Settings: what IsItDown observed and what it
+          sent share the top row, the poll strip and the current status the
+          middle one, the provider's other incidents and its geography the last.
+          The map is the only tile that can be absent (the operator's `mapView`
+          preference is off by default), which is why it is placed last — its
+          absence leaves the trailing edge of the grid short rather than a hole
+          in the middle of the page. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
+        <BentoTile
+          title={t("incident.timeline")}
+          delay={stagger(0, TILE_CASCADE)}
+          className="md:col-span-2"
+        >
+          {timeline.map((entry, index) => (
+            <div
+              key={`${entry.at}-${entry.label}`}
+              className="anim-rise grid grid-cols-[70px_1fr] gap-3"
+              style={{ animationDelay: stagger(index, { base: 170, step: 38, cap: 420 }) }}
+            >
+              <span className="font-mono text-xs text-muted-foreground">
+                {formatTime(i18n.language, entry.at)}
+              </span>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                  {t(`incident.timeline.${entry.label}`)}
+                </span>
+                {entry.status !== undefined && <span className="text-sm">{t(incidentStatusKey(entry.status))}</span>}
+              </div>
+            </div>
+          ))}
+        </BentoTile>
+
+        {/* The one tinted tile: what IsItDown *did* is the only block on this
+            page that is about us rather than the provider, and the tint is what
+            told them apart before every block became a tile. */}
+        <BentoTile
+          title={t("incident.what-we-did")}
+          delay={stagger(1, TILE_CASCADE)}
+          className="border-primary/40 bg-primary/5 md:col-span-4"
+        >
+          {actionLog.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("incidents.empty-notifications")}</p>
+          ) : (
+            actionLog.map((record, index) => (
               <div
-                key={`${entry.at}-${entry.label}`}
-                className="anim-rise grid grid-cols-[70px_1fr] gap-3"
-                style={{ animationDelay: stagger(index, { base: 170, step: 38, cap: 420 }) }}
+                key={`${record.providerId}-${record.sentAt}-${index}`}
+                className="anim-fade grid grid-cols-[70px_1fr] items-baseline gap-3"
+                style={{ animationDelay: stagger(index, { base: 200, step: 30, cap: 420 }) }}
               >
                 <span className="font-mono text-xs text-muted-foreground">
-                  {formatTime(i18n.language, entry.at)}
+                  {formatTime(i18n.language, record.sentAt)}
                 </span>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                    {t(`incident.timeline.${entry.label}`)}
-                  </span>
-                  {entry.status !== undefined && <span className="text-sm">{t(incidentStatusKey(entry.status))}</span>}
-                </div>
+                <span className="font-mono text-[11px]">
+                  <span>{record.channel}</span>
+                  {": "}
+                  <span>{record.text.split("\n")[0]}</span>
+                  {!record.ok && record.error !== undefined && (
+                    <span className="text-destructive"> — {record.error}</span>
+                  )}
+                </span>
               </div>
-            ))}
-          </div>
+            ))
+          )}
+        </BentoTile>
 
-          <div className="flex flex-col gap-3">
-            <span className="text-xs uppercase tracking-widest text-primary">{t("incident.what-we-did")}</span>
-            <Card className="flex flex-col gap-2 border-primary/40 bg-primary/5 p-4">
-              {actionLog.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("incidents.empty-notifications")}</p>
-              ) : (
-                actionLog.map((record, index) => (
-                  <div
-                    key={`${record.providerId}-${record.sentAt}-${index}`}
-                    className="anim-fade grid grid-cols-[70px_1fr] items-baseline gap-3"
-                    style={{ animationDelay: stagger(index, { base: 200, step: 30, cap: 420 }) }}
-                  >
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {formatTime(i18n.language, record.sentAt)}
-                    </span>
-                    <span className="font-mono text-[11px]">
-                      <span>{record.channel}</span>
-                      {": "}
-                      <span>{record.text.split("\n")[0]}</span>
-                      {!record.ok && record.error !== undefined && (
-                        <span className="text-destructive"> — {record.error}</span>
-                      )}
-                    </span>
-                  </div>
-                ))
-              )}
-            </Card>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {t("incident.other-active")}
-            </span>
-            {otherActiveIncidents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("incident.no-other-active")}</p>
-            ) : (
-              otherActiveIncidents.map((other, index) => (
-                <Link
-                  key={`${other.providerId}/${other.incidentId}`}
-                  to={`/incidents/${other.providerId}/${other.incidentId}`}
-                  className="service-row anim-rise anim-rise-row flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-                  style={{ animationDelay: stagger(index, { base: 160, step: 32, cap: 420 }) }}
-                >
-                  <span className="flex items-center gap-2 text-sm">
-                    <StatusDot status={impactStatus(other.impact)} />
-                    {other.name}
-                  </span>
-                  <span className="font-mono text-[10.5px]" style={{ color: impactColor(other.impact) }}>
-                    {t(incidentStatusKey(other.status))}
-                  </span>
-                </Link>
-              ))
-            )}
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              <Trans
-                i18nKey="incident.last-polls"
-                count={polls.length}
-                values={{ count: polls.length }}
-                components={[<NumberTicker locale={i18n.language} value={polls.length} />]}
-              />
-            </span>
-            <PollStrip samples={polls} />
-            {first !== undefined && last !== undefined && (
-              <span className="font-mono text-xs text-muted-foreground">
+        <BentoTile
+          title={
+            <Trans
+              i18nKey="incident.last-polls"
+              count={polls.length}
+              values={{ count: polls.length }}
+              components={[<NumberTicker locale={i18n.language} value={polls.length} />]}
+            />
+          }
+          note={
+            first !== undefined && last !== undefined ? (
+              <span className="font-mono">
                 {formatTime(i18n.language, first.observedAt)} → {formatTime(i18n.language, last.observedAt)} ·{" "}
                 {nameOf(incident.providerId)}
               </span>
-            )}
-          </div>
+            ) : undefined
+          }
+          delay={stagger(2, TILE_CASCADE)}
+          className="md:col-span-4"
+        >
+          <PollStrip samples={polls} />
+        </BentoTile>
 
-          <div className="flex flex-col gap-3">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("column.status")}</span>
-            {/* incident.js:214-221 — .service-row with exactly two children:
-                a bare status span and a "mono muted" timestamp span. Kept
-                verbatim; a Testing Library query that collided with the
-                stepper's own label is a defect in the query, not a reason
-                to reshape this row (see IncidentDetail.test.tsx). */}
-            <div
-              className="service-row anim-rise anim-rise-row flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-              style={{ animationDelay: "200ms" }}
-            >
-              <span className="text-sm">{t(incidentStatusKey(incident.status))}</span>
-              <span className="font-mono text-xs text-muted-foreground">
-                {formatDateTime(i18n.language, incident.updatedAt)}
-              </span>
-            </div>
+        <BentoTile
+          title={t("column.status")}
+          delay={stagger(3, TILE_CASCADE)}
+          className="md:col-span-2"
+        >
+          {/* incident.js:214-221 — .service-row with exactly two children:
+              a bare status span and a "mono muted" timestamp span. Kept
+              verbatim; a Testing Library query that collided with the
+              stepper's own label is a defect in the query, not a reason
+              to reshape this row (see IncidentDetail.test.tsx). */}
+          <div
+            className="service-row anim-rise anim-rise-row flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+            style={{ animationDelay: "200ms" }}
+          >
+            <span className="text-sm">{t(incidentStatusKey(incident.status))}</span>
+            <span className="font-mono text-xs text-muted-foreground">
+              {formatDateTime(i18n.language, incident.updatedAt)}
+            </span>
           </div>
-        </div>
+        </BentoTile>
+
+        {/* `self-start`, alone on this page: this is the one tile whose row
+            partner is the map, which is as tall as its own 2:1 aspect makes it.
+            Stretching a two-word empty state ("None.") to 430px is the hole the
+            grid was supposed to remove. */}
+        <BentoTile
+          title={t("incident.other-active")}
+          delay={stagger(4, TILE_CASCADE)}
+          className="md:col-span-3 md:self-start"
+        >
+          {otherActiveIncidents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("incident.no-other-active")}</p>
+          ) : (
+            otherActiveIncidents.map((other, index) => (
+              <Link
+                key={`${other.providerId}/${other.incidentId}`}
+                to={`/incidents/${other.providerId}/${other.incidentId}`}
+                className="service-row anim-rise anim-rise-row flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+                style={{ animationDelay: stagger(index, { base: 160, step: 32, cap: 420 }) }}
+              >
+                <span className="flex items-center gap-2 text-sm">
+                  <StatusDot status={impactStatus(other.impact)} />
+                  {other.name}
+                </span>
+                <span className="font-mono text-[10.5px]" style={{ color: impactColor(other.impact) }}>
+                  {t(incidentStatusKey(other.status))}
+                </span>
+              </Link>
+            ))
+          )}
+        </BentoTile>
+
+        <IncidentMap
+          providerId={incident.providerId}
+          providerName={nameOf(incident.providerId)}
+          delay={stagger(5, TILE_CASCADE)}
+          className="md:col-span-3"
+        />
       </div>
     </div>
   );
