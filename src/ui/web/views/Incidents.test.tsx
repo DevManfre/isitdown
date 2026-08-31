@@ -1,8 +1,9 @@
-import { act, screen } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders, stubApi } from "@/test/harness.tsx";
+import type { IncidentRow } from "@/lib/types.ts";
 import { Incidents } from "./Incidents.tsx";
 
 /**
@@ -18,18 +19,79 @@ const radioNamed = (label: string) => ({
   name: (accessibleName: string) => accessibleName.startsWith(label),
 });
 
-const incidents = {
-  active: [{ providerId: "github", incidentId: "i1", name: "API errors", impact: "major",
-             status: "investigating", startedAt: "2026-08-21T09:00:00Z",
-             updatedAt: "2026-08-21T09:30:00Z", resolvedAt: null }],
-  closed: [{ providerId: "github", incidentId: "i0", name: "Old blip", impact: "minor",
-             status: "resolved", startedAt: "2026-08-01T09:00:00Z",
-             updatedAt: "2026-08-01T10:00:00Z", resolvedAt: "2026-08-01T10:00:00Z" }],
+/**
+ * The open incident shows twice by design — once in the hero card, once as a
+ * row of the list, which holds every state under the `all` filter. So a
+ * query for a row is scoped to the list's own region rather than the page,
+ * which would match the hero too.
+ */
+const list = () => within(screen.getByRole("region", { name: i18n.t("incidents.list") }));
+
+const open: IncidentRow = {
+  providerId: "github", incidentId: "i1", name: "API errors", impact: "major",
+  status: "investigating", startedAt: "2026-08-21T09:00:00Z",
+  updatedAt: "2026-08-21T09:30:00Z", resolvedAt: null,
 };
+const resolved: IncidentRow = {
+  providerId: "github", incidentId: "i0", name: "Old blip", impact: "minor",
+  status: "resolved", startedAt: "2026-08-01T09:00:00Z",
+  updatedAt: "2026-08-01T10:00:00Z", resolvedAt: "2026-08-01T10:00:00Z",
+};
+
+const incidents = {
+  active: [open],
+  page: { items: [open, resolved], page: 1, pageSize: 20, total: 2 },
+  counts: { all: 2, active: 1, resolved: 1 },
+};
+
 const fixtures = {
   incidents,
   status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
   notifications: { notifications: [] },
+};
+
+/** `count` open rows named "Outage N". */
+const manyOpen = (count: number): IncidentRow[] =>
+  Array.from({ length: count }, (_unused, index) => ({
+    ...open,
+    incidentId: `o${index + 1}`,
+    name: `Outage ${index + 1}`,
+  }));
+
+/** `count` resolved rows named "Blip N", newest first. */
+const many = (count: number, from = 1): IncidentRow[] =>
+  Array.from({ length: count }, (_unused, index) => ({
+    ...resolved,
+    incidentId: `r${from + index}`,
+    name: `Blip ${from + index}`,
+  }));
+
+/**
+ * Serves the incident endpoint the way the server does: a page of `total`
+ * rows sliced by the request's own `page` and `state`, so a test can click
+ * the pager and the filter and see what an operator would.
+ */
+const pagedIncidents = (rows: IncidentRow[], pageSize = 2) => (path: string) => {
+  const query = new URLSearchParams(path.split("?")[1] ?? "");
+  const state = query.get("state") ?? "all";
+  const page = Number(query.get("page") ?? 1);
+  const matching = rows.filter((row) =>
+    state === "active" ? row.resolvedAt === null : state === "resolved" ? row.resolvedAt !== null : true,
+  );
+  return {
+    active: rows.filter((row) => row.resolvedAt === null),
+    page: {
+      items: matching.slice((page - 1) * pageSize, page * pageSize),
+      page,
+      pageSize,
+      total: matching.length,
+    },
+    counts: {
+      all: rows.length,
+      active: rows.filter((row) => row.resolvedAt === null).length,
+      resolved: rows.filter((row) => row.resolvedAt !== null).length,
+    },
+  };
 };
 
 afterEach(() => {
@@ -51,7 +113,10 @@ describe("Incidents", () => {
   it("surfaces a new incident on the next poll, with the view still mounted", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
-      renderWithProviders(<Incidents />, { ...fixtures, incidents: { active: [], closed: [] } });
+      renderWithProviders(<Incidents />, {
+        ...fixtures,
+        incidents: { active: [], page: { items: [], page: 1, pageSize: 20, total: 0 }, counts: { all: 0, active: 0, resolved: 0 } },
+      });
       expect(await screen.findByText(i18n.t("incidents.empty-active"))).toBeInTheDocument();
       expect(screen.queryByText("API errors")).toBeNull();
 
@@ -61,36 +126,89 @@ describe("Incidents", () => {
         await vi.advanceTimersByTimeAsync(30_000);
       });
 
-      expect(await screen.findByText("API errors")).toBeInTheDocument();
+      expect(await screen.findAllByText("API errors")).not.toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("lists an active incident and a closed one under the all filter", async () => {
+  it("lists an open incident and a resolved one under the all filter", async () => {
     renderWithProviders(<Incidents />, fixtures);
-    expect(await screen.findByText("API errors")).toBeInTheDocument();
     expect(await screen.findByText("Old blip")).toBeInTheDocument();
+    expect(list().getByText("API errors")).toBeInTheDocument();
+    expect(list().getByText("Old blip")).toBeInTheDocument();
   });
 
-  it("hides closed incidents under the active filter", async () => {
-    renderWithProviders(<Incidents />, fixtures);
-    await userEvent.click(await screen.findByRole("radio", radioNamed(i18n.t("filter.active"))));
-    expect(screen.queryByText("Old blip")).toBeNull();
-    expect(screen.getByText("API errors")).toBeInTheDocument();
-  });
-
-  it("hides active incidents under the resolved filter", async () => {
-    renderWithProviders(<Incidents />, fixtures);
+  it("asks the server for one state when the filter narrows, and lists only that", async () => {
+    renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents([open, ...many(3)]) });
     await userEvent.click(await screen.findByRole("radio", radioNamed(i18n.t("filter.resolved"))));
-    expect(screen.queryByText("API errors")).toBeNull();
-    expect(screen.getByText("Old blip")).toBeInTheDocument();
+
+    expect(await screen.findByText("Blip 1")).toBeInTheDocument();
+    expect(list().queryByText("API errors")).toBeNull();
+    // The hero card is the active incident's, so the resolved filter drops it.
+    expect(screen.queryByText(i18n.t("incidents.active"))).toBeNull();
+  });
+
+  it("counts every state on the pills, not the rows the page happens to hold", async () => {
+    renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents([open, ...many(5)]) });
+    // The pills render before the first response lands, showing 0 — wait for a
+    // row, so this asserts the loaded counts rather than the empty ones.
+    expect(await screen.findByText("Blip 1")).toBeInTheDocument();
+    // Six incidents, two per page: a count read off the page would say 2.
+    expect(screen.getByRole("radio", radioNamed(i18n.t("filter.all")))).toHaveTextContent("6");
+  });
+
+  it("pages the list under every filter, not just the unfiltered one", async () => {
+    // Every state has to overflow a page of its own, or a missing pager would
+    // only mean "this filter's list is short".
+    renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents([...manyOpen(3), ...many(5)]) });
+    expect(await screen.findByRole("navigation", { name: i18n.t("pagination.label") })).toBeInTheDocument();
+
+    for (const filter of ["active", "resolved", "all"] as const) {
+      await userEvent.click(screen.getByRole("radio", radioNamed(i18n.t(`filter.${filter}`))));
+      expect(
+        await screen.findByRole("navigation", { name: i18n.t("pagination.label") }),
+        `the ${filter} filter lost its pager`,
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("moves to the next page and renders that page's rows", async () => {
+    renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents(many(5)) });
+    expect(await screen.findByText("Blip 1")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("pagination.next") }));
+
+    expect(await screen.findByText("Blip 3")).toBeInTheDocument();
+    expect(screen.queryByText("Blip 1")).toBeNull();
+  });
+
+  it("goes back to the first page when the filter changes", async () => {
+    renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents(many(5)) });
+    await userEvent.click(await screen.findByRole("button", { name: i18n.t("pagination.next") }));
+    expect(await screen.findByText("Blip 3")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("radio", radioNamed(i18n.t("filter.resolved"))));
+
+    // Page 2 of the previous filter is not page 2 of this one — an operator
+    // switching filters is starting a new list, and page 2 can be past its end.
+    expect(await screen.findByText("Blip 1")).toBeInTheDocument();
+    expect(screen.queryByText("Blip 3")).toBeNull();
+  });
+
+  it("shows no pager when the whole list fits on one page", async () => {
+    renderWithProviders(<Incidents />, fixtures);
+    expect(await screen.findByText("Old blip")).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: i18n.t("pagination.label") })).toBeNull();
   });
 
   it("keeps a keyed empty state per section rather than a blank panel", async () => {
-    renderWithProviders(<Incidents />, { ...fixtures, incidents: { active: [], closed: [] } });
+    renderWithProviders(<Incidents />, {
+      ...fixtures,
+      incidents: { active: [], page: { items: [], page: 1, pageSize: 20, total: 0 }, counts: { all: 0, active: 0, resolved: 0 } },
+    });
     expect(await screen.findByText(i18n.t("incidents.empty-active"))).toBeInTheDocument();
-    expect(await screen.findByText(i18n.t("incidents.empty-closed"))).toBeInTheDocument();
+    expect(await screen.findByText(i18n.t("incidents.empty-list"))).toBeInTheDocument();
   });
 
   it("names the provider, not just its id", async () => {

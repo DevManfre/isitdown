@@ -448,3 +448,65 @@ test("pruning removes old component samples", async () => {
   assert.deepEqual(await store.getComponentDailyBuckets("github", "c1", 365), []);
   await store.close();
 });
+
+/** Six resolved incidents, newest first: h6 … h1, an hour apart. */
+async function seedIncidents(store: HistoryStore, provider = "github"): Promise<void> {
+  await store.applyBackfill(provider, {
+    samples: [],
+    incidents: Array.from({ length: 6 }, (_unused, index) => {
+      const started = new Date(Date.UTC(2026, 7, 10, 10 + index)).toISOString();
+      return histIncident({
+        id: `h${index + 1}`,
+        startedAt: started,
+        resolvedAt: new Date(Date.UTC(2026, 7, 10, 11 + index)).toISOString(),
+        updatedAt: started,
+      });
+    }),
+  });
+}
+
+test("listIncidents pages with limit and offset, newest first and without overlap", async () => {
+  const { store } = await harness();
+  await seedIncidents(store);
+
+  const first = await store.listIncidents({ limit: 2, offset: 0 });
+  const second = await store.listIncidents({ limit: 2, offset: 2 });
+  const last = await store.listIncidents({ limit: 2, offset: 4 });
+
+  assert.deepEqual(first.map((row) => row.incidentId), ["h6", "h5"]);
+  assert.deepEqual(second.map((row) => row.incidentId), ["h4", "h3"]);
+  assert.deepEqual(last.map((row) => row.incidentId), ["h2", "h1"]);
+  assert.deepEqual(await store.listIncidents({ limit: 2, offset: 6 }), []);
+  await store.close();
+});
+
+test("listIncidents pages a state-filtered list independently of the unfiltered one", async () => {
+  const { store } = await harness();
+  await seedIncidents(store);
+  await store.saveStatus(snap());
+
+  const openPage = await store.listIncidents({ state: "active", limit: 2, offset: 0 });
+  const resolvedPage = await store.listIncidents({ state: "resolved", limit: 2, offset: 2 });
+
+  assert.deepEqual(openPage.map((row) => row.incidentId), ["i1"]);
+  assert.deepEqual(resolvedPage.map((row) => row.incidentId), ["h4", "h3"]);
+  await store.close();
+});
+
+test("countIncidents totals every incident and the open ones, scoped by provider", async () => {
+  const { store } = await harness(["cloudflare"]);
+  await seedIncidents(store);
+  await seedIncidents(store, "cloudflare");
+  await store.saveStatus(snap());
+
+  assert.deepEqual(await store.countIncidents({}), { all: 13, active: 1, resolved: 12 });
+  assert.deepEqual(await store.countIncidents({ providerId: "github" }), { all: 7, active: 1, resolved: 6 });
+  assert.deepEqual(await store.countIncidents({ providerId: "cloudflare" }), { all: 6, active: 0, resolved: 6 });
+  await store.close();
+});
+
+test("countIncidents is all zeroes on an empty table", async () => {
+  const { store } = await harness();
+  assert.deepEqual(await store.countIncidents({}), { all: 0, active: 0, resolved: 0 });
+  await store.close();
+});

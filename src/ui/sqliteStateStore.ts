@@ -7,6 +7,7 @@ import { z } from "zod";
 import type {
   DailyBucket,
   HistoryStore,
+  IncidentCounts,
   IncidentFilter,
   IncidentRow,
   SampleRow,
@@ -46,6 +47,12 @@ const incidentRowSchema = z.object({
   started_at: z.string(),
   updated_at: z.string(),
   resolved_at: z.string().nullable(),
+});
+
+/** `SUM(...)` is NULL, not 0, when no row matches the WHERE clause. */
+const incidentCountsSchema = z.object({
+  all_count: z.number(),
+  active_count: z.number().nullable().transform((value) => value ?? 0),
 });
 
 const notificationRowSchema = z.object({
@@ -337,17 +344,43 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
         params.push(new Date(Date.now() - filter.days * 24 * 3600 * 1000).toISOString());
       }
       const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
-      const limit = filter.limit === undefined ? "" : "LIMIT ?";
-      if (filter.limit !== undefined) params.push(filter.limit);
+      // SQLite has no bare OFFSET: skipping rows without a page size means asking
+      // for every remaining one, which is what `LIMIT -1` spells.
+      const window = filter.limit === undefined && filter.offset === undefined ? "" : "LIMIT ? OFFSET ?";
+      if (window !== "") params.push(filter.limit ?? -1, filter.offset ?? 0);
 
       const rows = db
         .prepare(
           `SELECT provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at
-           FROM incidents ${where} ORDER BY started_at DESC, incident_id DESC ${limit}`,
+           FROM incidents ${where} ORDER BY started_at DESC, incident_id DESC ${window}`,
         )
         .all(...params)
         .map((raw) => incidentRowSchema.parse(raw));
       return rows.map(toIncidentRow);
+    },
+
+    async countIncidents(filter: Omit<IncidentFilter, "state" | "limit" | "offset">): Promise<IncidentCounts> {
+      const clauses: string[] = [];
+      const params: (string | number)[] = [];
+      if (filter.providerId !== undefined) {
+        clauses.push("provider_id = ?");
+        params.push(filter.providerId);
+      }
+      if (filter.days !== undefined) {
+        clauses.push("started_at >= ?");
+        params.push(new Date(Date.now() - filter.days * 24 * 3600 * 1000).toISOString());
+      }
+      const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
+
+      const row = db
+        .prepare(
+          `SELECT COUNT(*) AS all_count,
+                  SUM(CASE WHEN resolved_at IS NULL THEN 1 ELSE 0 END) AS active_count
+           FROM incidents ${where}`,
+        )
+        .get(...params);
+      const { all_count, active_count } = incidentCountsSchema.parse(row);
+      return { all: all_count, active: active_count, resolved: all_count - active_count };
     },
 
     async getIncident(providerId: string, incidentId: string): Promise<IncidentRow | null> {

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import en from "@/locales/en.json";
 import {
-  impactColor, impactFill, impactKey, impactStatus, incidentStatusKey, INCIDENT_STEPS,
+  impactColor, impactFill, impactKey, impactStatus, incidentStatusKey, INCIDENT_STEPS, pageWindow,
 } from "./incidents.ts";
 
 const tokens = readFileSync(new URL("../css/tokens.css", import.meta.url), "utf8");
@@ -45,5 +45,26 @@ describe("impact mapping", () => {
 
   it("keys postmortem too, which is not a step but is a real status", () => {
     expect(en).toHaveProperty(incidentStatusKey("postmortem"));
+  });
+});
+
+describe("pageWindow", () => {
+  it("lists every page while they still fit", () => {
+    expect(pageWindow(1, 1)).toEqual([1]);
+    expect(pageWindow(3, 7)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it("keeps the first, the last and the current page's neighbours, gapping the rest", () => {
+    expect(pageWindow(1, 20)).toEqual([1, 2, "gap", 20]);
+    expect(pageWindow(10, 20)).toEqual([1, "gap", 9, 10, 11, "gap", 20]);
+    expect(pageWindow(20, 20)).toEqual([1, "gap", 19, 20]);
+  });
+
+  it("never gaps a single hidden page — the number is shorter than the ellipsis", () => {
+    expect(pageWindow(4, 8)).toEqual([1, 2, 3, 4, 5, "gap", 8]);
+  });
+
+  it("has no pages to list when there are none", () => {
+    expect(pageWindow(1, 0)).toEqual([]);
   });
 });

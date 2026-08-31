@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -81,6 +81,17 @@ export function migrate(db: DatabaseSync): void {
       ON status_samples (provider_id, observed_at);
     CREATE INDEX IF NOT EXISTS idx_incidents_provider_started
       ON incidents (provider_id, started_at);
+    -- The incident list is paged, and its order is the page's identity: without
+    -- these three, every page sorts the whole table into a temp b-tree before it
+    -- can skip to the requested offset. The two partial indexes cover the
+    -- state-filtered pages, so a filtered page reads only the rows it returns
+    -- instead of testing resolved_at over all of them.
+    CREATE INDEX IF NOT EXISTS idx_incidents_started
+      ON incidents (started_at, incident_id);
+    CREATE INDEX IF NOT EXISTS idx_incidents_open_started
+      ON incidents (started_at, incident_id) WHERE resolved_at IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_incidents_closed_started
+      ON incidents (started_at, incident_id) WHERE resolved_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_notifications_sent
       ON notifications (sent_at);
   `);
