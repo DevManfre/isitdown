@@ -391,6 +391,35 @@ describe("a provider's detail drawer", () => {
     expect(urls().some((url) => url.includes("provider=cloudflare"))).toBe(true);
   });
 
+  it("keeps the view standing when a provider's own history fails", async () => {
+    renderWithProviders(<History />, {
+      ...withDrawer,
+      // The harness keys its `errors` fixture by category, and both `/history`
+      // paths share the `history` key — so `errors: { history: 500 }` would fail
+      // the summary too and prove nothing. Throwing from the fixture function
+      // rejects only the request that named a provider.
+      history: (path: string) => {
+        if (path.includes("provider=")) throw new Error("provider history is down");
+        return twoProviders.history;
+      },
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /Cloudflare/ }));
+
+    // The headline, the month strip and the list are the summary query's, and
+    // it succeeded. A drawer's own detail failing must not take them with it —
+    // which is what the default `throwOnError` does to any query whose first
+    // load fails in this tree.
+    expect(await screen.findByText(/99[.,]42/)).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("history.month-no-data"))).toBeInTheDocument();
+    // The list, by its column header and by the row of the provider that is
+    // *not* open — "Cloudflare" itself now reads twice, once in the row and
+    // once as the open sheet's title.
+    expect(screen.getByText(i18n.t("history.col-uptime", { days: 90 }))).toBeInTheDocument();
+    expect(screen.getByText("GitHub")).toBeInTheDocument();
+    expect(screen.queryByText(/Could not load this view/)).toBeNull();
+  });
+
   it("closes again without leaving the drawer behind", async () => {
     renderWithProviders(<History />, withDrawer);
 
