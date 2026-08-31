@@ -104,6 +104,10 @@ export interface ComponentHistory {
 
 export interface HistorySummary {
   aggregateUptime: number;
+  /** Fleet uptime per day: unweighted mean across the providers measured. */
+  dailyUptime: DayUptime[];
+  /** The equal-length window before this one. null = no comparison exists. */
+  previousAggregate: number | null;
   /** `uptime` null for a month with no samples: 0% would read as an outage. */
   months: { month: string; uptime: number | null }[];
   providers: ProviderHistory[];

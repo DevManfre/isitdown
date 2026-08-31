@@ -372,3 +372,53 @@ test("a 90-day window is compared against the 90 days before it", async () => {
   assert.equal(previousUptime, 50, "days 90-179 must be read, which needs a 180-day bucket window");
   await store.close();
 });
+
+test("fleet daily uptime is the unweighted mean of the providers measured that day", async () => {
+  const { store, history } = await harness(["github", "cloudflare"]);
+  // Yesterday: github 1 of 2 samples ok (50), cloudflare 1 of 1 (100).
+  await sample(store, "github", daysAgo(1, 1), "operational");
+  await sample(store, "github", daysAgo(1, 2), "major_outage");
+  await sample(store, "cloudflare", daysAgo(1, 1), "operational");
+  // Today: only cloudflare was measured, and it was down.
+  await sample(store, "cloudflare", daysAgo(0), "major_outage");
+
+  const { dailyUptime } = await history.getSummary(2, 3);
+
+  assert.equal(dailyUptime[0]?.uptime, 75, "(50 + 100) / 2 — one provider, one vote");
+  assert.equal(dailyUptime[1]?.uptime, 0, "a measured 0 is a real outage, and stays 0");
+  await store.close();
+});
+
+test("a day no provider was measured is null, not zero", async () => {
+  const { store, history } = await harness(["github", "cloudflare"]);
+  await sample(store, "github", daysAgo(0), "operational");
+
+  const { dailyUptime } = await history.getSummary(3, 3);
+
+  assert.deepEqual(dailyUptime.map((entry) => entry.uptime), [null, null, 100]);
+  await store.close();
+});
+
+test("previousAggregate averages the providers that have a previous window", async () => {
+  const { store, history } = await harness(["github", "cloudflare"]);
+  // Requested window: days 0-1. The window before it: days 2-3.
+  await sample(store, "github", daysAgo(0), "operational");
+  await sample(store, "github", daysAgo(2), "major_outage");
+  await sample(store, "cloudflare", daysAgo(0), "operational");
+  await sample(store, "cloudflare", daysAgo(3), "operational");
+
+  const { previousAggregate } = await history.getSummary(2, 3);
+
+  assert.equal(previousAggregate, 50, "github was down (0), cloudflare was up (100)");
+  await store.close();
+});
+
+test("previousAggregate is null when no provider has anything before the window", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(0), "operational");
+
+  const { previousAggregate } = await history.getSummary(2, 3);
+
+  assert.equal(previousAggregate, null, "no comparison exists, so none is claimed");
+  await store.close();
+});
