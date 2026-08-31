@@ -86,9 +86,12 @@ describe("Settings", () => {
     expect(await screen.findByRole("button", { name: i18n.t("action.remove") })).toBeInTheDocument();
   });
 
-  it("shows a channel's env var NAME and never a secret value", async () => {
+  it("shows a channel's env var NAME as the field's placeholder, never a secret value", async () => {
     renderWithProviders(<Settings />, fixtures);
-    expect(await screen.findByDisplayValue("TELEGRAM_BOT_TOKEN")).toBeInTheDocument();
+    // The stored name is a hint, not something the operator typed: the field
+    // starts empty and only carries what is being changed right now.
+    const input = await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN");
+    expect(input).toHaveValue("");
     expect(await screen.findByText(i18n.t("settings.secret-note"))).toBeInTheDocument();
     expect(screen.queryByLabelText(/token value/i)).toBeNull();
   });
@@ -304,9 +307,8 @@ describe("Settings", () => {
       renderWithProviders(<Settings />, fixtures);
       const calls = interceptWrites({ "PATCH /config/channels/telegram": {} });
 
-      const input = await screen.findByDisplayValue("TELEGRAM_BOT_TOKEN");
+      const input = await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN");
       const card = input.closest('[data-slot="card"]') as HTMLElement;
-      await userEvent.clear(input);
       await userEvent.type(input, "TELEGRAM_BOT_TOKEN_V2");
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.save") }));
 
@@ -318,10 +320,23 @@ describe("Settings", () => {
       });
     });
 
+    it("saving a channel whose fields were left untouched writes nothing", async () => {
+      renderWithProviders(<Settings />, fixtures);
+      const calls = interceptWrites({ "PATCH /config/channels/telegram": {} });
+
+      const input = await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN");
+      const card = input.closest('[data-slot="card"]') as HTMLElement;
+      await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.save") }));
+
+      await waitFor(() => {
+        expect(calls).toEqual([]);
+      });
+    });
+
     it("send-test reports success and shows channel.test-ok", async () => {
       renderWithProviders(<Settings />, fixtures);
       const calls = interceptWrites({ "POST /config/channels/telegram/test": { ok: true } });
-      const input = await screen.findByDisplayValue("TELEGRAM_BOT_TOKEN");
+      const input = await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN");
       const card = input.closest('[data-slot="card"]') as HTMLElement;
 
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.send-test") }));
@@ -335,7 +350,7 @@ describe("Settings", () => {
     it("send-test reports failure and shows channel.test-failed with the error", async () => {
       renderWithProviders(<Settings />, fixtures);
       interceptWrites({ "POST /config/channels/telegram/test": { ok: false, error: "timeout" } });
-      const input = await screen.findByDisplayValue("TELEGRAM_BOT_TOKEN");
+      const input = await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN");
       const card = input.closest('[data-slot="card"]') as HTMLElement;
 
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.send-test") }));
