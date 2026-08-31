@@ -89,7 +89,7 @@ export function History() {
                   components={[<NumberTicker locale={i18n.language} value={summary.providers.length} />]}
                 />
               </span>
-              <DeltaChip current={summary.aggregateUptime} previous={summary.previousAggregate} days={days} />
+              <DeltaChip delta={summary.aggregateDelta} days={days} />
             </div>
           </div>
 
