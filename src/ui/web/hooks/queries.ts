@@ -106,11 +106,47 @@ export function useConfigChrome() {
  * stays at its default `false`, so this costs nothing for a view nobody is
  * looking at or a tab nobody has in front of them.
  */
-export const useHistory = (days: number, provider?: string) => {
+export const useHistory = (days: number) => {
   const busy = useBusy();
   return useQuery({
-    queryKey: ["history", days, provider ?? null],
-    queryFn: () => api.getHistory(days, provider),
+    queryKey: ["history", days, null],
+    queryFn: () => api.getHistory(days),
+    refetchInterval: busy ? false : REFRESH_MS,
+  });
+};
+
+/**
+ * One provider's own history, for the History view's detail drawer. Never
+ * throws — and the asymmetry with {@link useHistory} above is the point.
+ *
+ * Same shape of reasoning as {@link useStatusChrome} and
+ * {@link useComponentHistory}, one endpoint up. This query mounts in the same
+ * React tree as the summary that drew the page, so under the client's default
+ * `throwOnError` (`queryClient.ts`: throw when there is nothing to show yet) a
+ * 500 on the *first* open of one drawer throws during render, reaches
+ * routes.tsx's `errorElement`, and replaces the trend chart, the month columns
+ * and the whole provider list with `ViewError` — a page destroyed by a detail
+ * nobody had looked at a moment earlier.
+ *
+ * `useHistory` must keep throwing: an initial-load failure of the page's own
+ * data is exactly what that boundary exists for. A drawer's detail is not the
+ * page's data. That distinction is a property of these two queries, not of the
+ * call sites that happen to use them today, so it lives here rather than as a
+ * `throwOnError` override in `ProviderHistoryDrawer.tsx` — and `provider` is
+ * off `useHistory` entirely, so there is no second, throwing way to ask for one
+ * provider's history.
+ *
+ * `enabled` is what makes "no provider, no request" a property of the hook too:
+ * the drawer mounts closed, with `provider === null`, and must not fetch for a
+ * provider nobody opened.
+ */
+export const useProviderHistory = (provider: string | null, days: number) => {
+  const busy = useBusy();
+  return useQuery({
+    queryKey: ["history", days, provider],
+    queryFn: () => api.getHistory(days, provider ?? undefined),
+    throwOnError: false,
+    enabled: provider !== null,
     refetchInterval: busy ? false : REFRESH_MS,
   });
 };
@@ -256,4 +292,17 @@ export function usePreferencesMutation() {
     mutationFn: api.patchPreferences,
     onSuccess: (next) => client.setQueryData(["preferences"], next),
   });
+}
+
+export function usePushDevices() {
+  return useQuery({ queryKey: ["push-devices"], queryFn: api.getPushDevices });
+}
+
+export function usePushMutations() {
+  const client = useQueryClient();
+  const invalidate = () => client.invalidateQueries({ queryKey: ["push-devices"] });
+  return {
+    add: useMutation({ mutationFn: api.addPushDevice, onSuccess: invalidate }),
+    remove: useMutation({ mutationFn: api.removePushDevice, onSuccess: invalidate }),
+  };
 }

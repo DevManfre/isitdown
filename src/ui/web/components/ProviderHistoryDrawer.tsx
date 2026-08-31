@@ -5,7 +5,7 @@ import { ComponentRows } from "@/components/ComponentRows.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { StatusLegend } from "@/components/charts/StatusLegend.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
-import { useHistory } from "@/hooks/queries.ts";
+import { useProviderHistory } from "@/hooks/queries.ts";
 import type { ComponentStatus, ProviderHistory } from "@/lib/types.ts";
 
 /**
@@ -17,8 +17,10 @@ import type { ComponentStatus, ProviderHistory } from "@/lib/types.ts";
  * and it costs a click rather than 1400px of always-open component rows.
  *
  * The per-provider request is the reason this is a component and not inline
- * markup: `useHistory(days, providerId)` must mount and unmount with the
- * drawer, so nothing is fetched for a provider nobody opened.
+ * markup: `useProviderHistory(providerId, days)` must mount and unmount with
+ * the drawer, so nothing is fetched for a provider nobody opened. That hook
+ * also never throws — see its doc comment: this detail failing must not take
+ * the page that opened it down with it.
  */
 export function ProviderHistoryDrawer({
   providerId, name, status, components, selection, days, onClose,
@@ -32,7 +34,7 @@ export function ProviderHistoryDrawer({
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const { data } = useHistory(days, providerId ?? undefined);
+  const { data } = useProviderHistory(providerId, days);
   const provider = data !== undefined && "providerId" in data ? (data as ProviderHistory) : undefined;
 
   return (
