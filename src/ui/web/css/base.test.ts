@@ -25,4 +25,19 @@ describe("base.css", () => {
   it("hides the bar without clipping the scroll", () => {
     expect(code).not.toMatch(/\*\s*\{[^}]*overflow:\s*hidden/);
   });
+
+  // Tailwind v4's Preflight sets `cursor: default` on every button, where v3
+  // set pointer — which is every action on this dashboard, since each one is a
+  // button or a Radix primitive that renders as one. A pointer on a disabled
+  // button would be the opposite lie, so the rule has to exclude it.
+  it("puts a pointer on what can be clicked, and only while it can be", () => {
+    expect(code).toMatch(/button:not\(:disabled\)[^{]*\{[^}]*cursor:\s*pointer/);
+  });
+
+  // A role selector here would be dead code: shadcn's select options and menu
+  // items carry a `cursor-default` utility, and a utility outranks the base
+  // layer regardless of specificity. They are fixed in the primitives.
+  it("does not pretend to cover the role-based clickables", () => {
+    expect(code).not.toMatch(/\[role="(option|menuitem)"\]/);
+  });
 });
