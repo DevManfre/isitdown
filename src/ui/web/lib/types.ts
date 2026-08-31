@@ -66,6 +66,12 @@ export interface HistoryBucket {
   status: OverallStatus;
 }
 
+export interface DayUptime {
+  day: string;
+  /** null = nothing sampled that day. Never 0, which would mean a full outage. */
+  uptime: number | null;
+}
+
 export interface ProviderHistory {
   providerId: string;
   /** Exactly `days` entries, oldest first, gap-filled with `unknown`. */
@@ -80,6 +86,10 @@ export interface ProviderHistory {
   sampleCount: number;
   incidentCount: number;
   downtimeMinutes: number;
+  /** Exactly `days` entries, oldest first, gap-filled with `uptime: null`. */
+  dailySeries: DayUptime[];
+  /** The equal-length window before this one. null = nothing measured then. */
+  previousUptime: number | null;
 }
 
 export interface ComponentHistory {

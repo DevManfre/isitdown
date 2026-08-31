@@ -2,13 +2,26 @@ import type { DailyBucket, HistoryStore } from "./historyStore.interface.ts";
 import type { OverallStatus } from "../core/types.ts";
 
 const DAY_MS = 24 * 3600 * 1000;
-/** Enough days to cover both a 90-day view and four calendar months. */
-const WINDOW_DAYS = 120;
+/**
+ * Enough days to cover a 90-day view, the 90-day window it is compared
+ * against, and four calendar months.
+ */
+const WINDOW_DAYS = 180;
 const MONTHS_SHOWN = 4;
 
 export interface HistoryBucket {
   day: string;
   status: OverallStatus;
+}
+
+/**
+ * One day's uptime as a percentage, or `null` when nothing was sampled that
+ * day. `null` rather than 0 because the trend chart has to break its line at
+ * an unmeasured day: a 0 would draw a full-day outage that never happened.
+ */
+export interface DayUptime {
+  day: string;
+  uptime: number | null;
 }
 
 export interface ProviderHistory {
@@ -25,6 +38,19 @@ export interface ProviderHistory {
   sampleCount: number;
   incidentCount: number;
   downtimeMinutes: number;
+  /**
+   * Exactly `days` entries, oldest first, gap-filled with `uptime: null`.
+   * `buckets` answers "what status was that day"; this answers "how much of
+   * it was up", which a worst-status cannot: one bad sample out of ninety
+   * colours the bar exactly like ninety bad ones.
+   */
+  dailySeries: DayUptime[];
+  /**
+   * The same-length window immediately before this one, for the delta the
+   * dashboard prints beside its headline. `null` when that window holds no
+   * samples.
+   */
+  previousUptime: number | null;
 }
 
 export interface ComponentHistory {
@@ -90,6 +116,48 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     return filled;
   }
 
+  /**
+   * Per-day uptime over the same gap-filled window `fill` walks. Deliberately
+   * not folded into `fill`: a bucket's `worstStatus` and its ok/total ratio
+   * answer different questions, and on an unmeasured day one is `"unknown"`
+   * while the other is `null`.
+   */
+  function dailySeriesOf(buckets: DailyBucket[], days: number, today: Date): DayUptime[] {
+    const byDay = new Map(buckets.map((bucket) => [bucket.day, bucket]));
+    const series: DayUptime[] = [];
+    for (let offset = days - 1; offset >= 0; offset -= 1) {
+      const day = dayKey(new Date(today.getTime() - offset * DAY_MS));
+      const bucket = byDay.get(day);
+      series.push({
+        day,
+        uptime:
+          bucket === undefined || bucket.totalSamples === 0
+            ? null
+            : round2((bucket.okSamples / bucket.totalSamples) * 100),
+      });
+    }
+    return series;
+  }
+
+  /**
+   * Uptime over an explicit day range, `null` when the range holds no samples.
+   *
+   * `uptimeOver` answers 0 for an unmeasured window, which is right for the
+   * headline figures it feeds — they sit beside a `sampleCount` that says as
+   * much. A delta cannot use that answer: it would print a 92-point fall on a
+   * dashboard that has simply not been running long enough.
+   */
+  function uptimeBetween(buckets: DailyBucket[], fromDay: string, toDay: string): number | null {
+    let ok = 0;
+    let total = 0;
+    for (const bucket of buckets) {
+      if (bucket.day < fromDay || bucket.day > toDay) continue;
+      ok += bucket.okSamples;
+      total += bucket.totalSamples;
+    }
+    return total === 0 ? null : round2((ok / total) * 100);
+  }
+
   async function getProviderHistory(
     providerId: string,
     days: number,
@@ -117,6 +185,12 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
       sampleCount,
       incidentCount: incidents.length,
       downtimeMinutes: notOk * intervalMinutes,
+      dailySeries: dailySeriesOf(buckets, days, today),
+      previousUptime: uptimeBetween(
+        buckets,
+        dayKey(new Date(today.getTime() - (2 * days - 1) * DAY_MS)),
+        dayKey(new Date(today.getTime() - days * DAY_MS)),
+      ),
     };
   }
 
