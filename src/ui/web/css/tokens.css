@@ -150,6 +150,13 @@
   --radius-lg: 14px;
 
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Entries settle rather than stop: an ease-out-expo covers most of its travel
+     early and coasts into place, so a staggered cascade reads as one movement
+     instead of a run of separate arrivals. --ease-out keeps the hover and press
+     transitions, where that long tail would feel unresponsive. Carried by every
+     theme block for the same reason --ease-out is: the palettes are asserted to
+     declare exactly the same token names. */
+  --ease-entry: cubic-bezier(0.16, 1, 0.3, 1);
 
   --rail-width: 196px;
 
@@ -297,6 +304,7 @@
   --radius-lg: 14px;
 
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-entry: cubic-bezier(0.16, 1, 0.3, 1);
 
   --rail-width: 196px;
 
@@ -442,6 +450,7 @@
     --radius-lg: 14px;
 
     --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --ease-entry: cubic-bezier(0.16, 1, 0.3, 1);
 
     --rail-width: 196px;
 

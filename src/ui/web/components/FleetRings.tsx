@@ -1,4 +1,5 @@
 import { UptimeRing } from "@/components/charts/UptimeRing.tsx";
+import { stagger } from "@/lib/stagger.ts";
 import type { ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -14,8 +15,10 @@ import { cn } from "@/lib/utils.ts";
  * `overviewShape` mentions columns. `auto-fit`, not `auto-fill`: the latter
  * keeps its empty tracks, which put the dead space back on the right.
  *
- * Entry delays step at 80ms in compact and 40ms in band — same cascade, but
- * fourteen tiles at 80ms would still be arriving a second after the hero.
+ * Entry delays step at 45ms in compact and 28ms in band — the same cascade at
+ * two densities. Both start after the hero's own lines rather than alongside
+ * them, and both are capped, because fourteen tiles at the old 80ms step were
+ * still arriving a second after the page they belong to.
  */
 export function FleetRings({
   providers, shape,
@@ -39,7 +42,7 @@ export function FleetRings({
           key={provider.id}
           provider={provider}
           size={compact ? 80 : 56}
-          delay={`${120 + index * (compact ? 80 : 40)}ms`}
+          delay={stagger(index, { base: 110, step: compact ? 45 : 28, cap: 400 })}
         />
       ))}
     </div>

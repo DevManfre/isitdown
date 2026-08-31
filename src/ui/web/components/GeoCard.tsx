@@ -48,7 +48,7 @@ export function GeoCard() {
   };
 
   return (
-    <Card className="anim-fade flex flex-col gap-3 p-4" style={{ animationDelay: "260ms" }}>
+    <Card className="anim-fade flex flex-col gap-3 p-4" style={{ animationDelay: "200ms" }}>
       <div className="flex items-baseline justify-between">
         <h3 className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
           {t("map.title")}

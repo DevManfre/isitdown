@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders } from "@/test/harness.tsx";
+import { stagger } from "@/lib/stagger.ts";
 import { Providers } from "./Providers.tsx";
 
 const status = {
@@ -92,17 +93,23 @@ describe("Providers", () => {
     expect(await screen.findByText("87.65%")).toBeInTheDocument();
   });
 
-  // providers.js:113 staggers each row with stagger(index, 60) — 60ms apart,
-  // not 45. Pinned literally so a regression on the delay value is caught,
-  // not just "some animation exists".
-  it("staggers table rows 60ms apart, matching providers.js's stagger(index, 60)", async () => {
+  // The table follows the intro above it rather than starting at zero
+  // alongside it, then steps 30ms a row. Pinned literally so a regression on
+  // the delay value is caught, not just "some animation exists".
+  it("starts the table after the intro and steps each row 30ms further", async () => {
     renderWithProviders(<Providers />, { status, history });
     const first = (await screen.findByText("GitHub")).closest("tr");
     const second = (await screen.findByText("Cloudflare")).closest("tr");
     expect(first).not.toBeNull();
     expect(second).not.toBeNull();
-    expect(first).toHaveStyle({ animationDelay: "0ms" });
-    expect(second).toHaveStyle({ animationDelay: "60ms" });
+    expect(first).toHaveStyle({ animationDelay: "90ms" });
+    expect(second).toHaveStyle({ animationDelay: "120ms" });
+  });
+
+  // A fleet of fifty must not still be arriving a second and a half after the
+  // page: past the cap the tail lands together.
+  it("caps the row cascade instead of growing it with the fleet", () => {
+    expect(stagger(200, { base: 90, step: 30, cap: 400 })).toBe("400ms");
   });
 
   // providers.js:119-123 renders hostOf(provider.baseUrl) as a muted mono

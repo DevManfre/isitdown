@@ -24,6 +24,7 @@ import { severity, statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { hostOf } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
 import { isReorder, rowShifts } from "@/lib/rowShift.ts";
+import { stagger } from "@/lib/stagger.ts";
 import type { ComponentStatus, HistoryBucket, OverallStatus, ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -454,7 +455,11 @@ export function Providers() {
                       !row.original.enabled && "opacity-55",
                     )}
                     // A row on its way out goes at once; only arrivals stagger.
-                    style={{ animationDelay: isLeaving ? "0ms" : `${index * 60}ms` }}
+                    style={{
+                      animationDelay: isLeaving
+                        ? "0ms"
+                        : stagger(index, { base: 90, step: 30, cap: 400 }),
+                    }}
                   >
                     {row.getAllCells().map((cell) => (
                       <TableCell key={cell.id}>

@@ -12,6 +12,7 @@ import { formatDateTime, formatDuration, formatTime } from "@/lib/format.ts";
 import {
   impactColor, impactKey, impactStatus, incidentStatusKey, INCIDENT_STEPS,
 } from "@/lib/incidents.ts";
+import { stagger } from "@/lib/stagger.ts";
 import { cn } from "@/lib/utils.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
 
@@ -163,7 +164,7 @@ export function IncidentDetail() {
               <div
                 key={`${entry.at}-${entry.label}`}
                 className="anim-rise grid grid-cols-[70px_1fr] gap-3"
-                style={{ animationDelay: `${index * 90 + 80}ms` }}
+                style={{ animationDelay: stagger(index, { base: 170, step: 38, cap: 420 }) }}
               >
                 <span className="font-mono text-xs text-muted-foreground">
                   {formatTime(i18n.language, entry.at)}
@@ -188,7 +189,7 @@ export function IncidentDetail() {
                   <div
                     key={`${record.providerId}-${record.sentAt}-${index}`}
                     className="anim-fade grid grid-cols-[70px_1fr] items-baseline gap-3"
-                    style={{ animationDelay: `${index * 80 + 120}ms` }}
+                    style={{ animationDelay: stagger(index, { base: 200, step: 30, cap: 420 }) }}
                   >
                     <span className="font-mono text-xs text-muted-foreground">
                       {formatTime(i18n.language, record.sentAt)}
@@ -221,7 +222,7 @@ export function IncidentDetail() {
                   key={`${other.providerId}/${other.incidentId}`}
                   to={`/incidents/${other.providerId}/${other.incidentId}`}
                   className="service-row anim-rise anim-rise-row flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-                  style={{ animationDelay: `${index * 70 + 60}ms` }}
+                  style={{ animationDelay: stagger(index, { base: 160, step: 32, cap: 420 }) }}
                 >
                   <span className="flex items-center gap-2 text-sm">
                     <StatusDot status={impactStatus(other.impact)} />

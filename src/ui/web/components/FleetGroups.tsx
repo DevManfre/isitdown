@@ -8,6 +8,7 @@ import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ProviderRow } from "@/components/FleetRows.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
+import { stagger } from "@/lib/stagger.ts";
 import type { HistoryBucket, ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -132,7 +133,7 @@ export function FleetGroups({
                     key={provider.id}
                     provider={provider}
                     buckets={buckets.get(provider.id) ?? []}
-                    delay={`${index * 70}ms`}
+                    delay={stagger(index, { step: 32, cap: 340 })}
                   />
                 ))}
               </div>
@@ -156,7 +157,7 @@ export function FleetGroups({
                   key={provider.id}
                   provider={provider}
                   buckets={buckets.get(provider.id) ?? []}
-                  delay={`${index * 40}ms`}
+                  delay={stagger(index, { step: 26, cap: 340 })}
                 />
               ))}
             </div>

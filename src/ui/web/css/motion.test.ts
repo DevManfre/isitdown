@@ -38,6 +38,25 @@ describe("motion.css after the react port", () => {
     expect(rule?.[1], "the row's own background fade must survive it").toMatch(/\bbackground\s+[\d.]+s/);
   });
 
+  // ViewFrame withholds `data-animate` until the view's first data has landed,
+  // so the gate is also what holds the page still. Without this rule the view
+  // would simply render un-animated during that stretch — visible, then
+  // suddenly animating from nothing.
+  it("holds a view that has not been stamped yet", () => {
+    const rule = /#view:not\(\[data-animate\]\)\s*\{([^}]*)\}/.exec(code);
+    expect(rule, "no hold rule for a view with nothing to show yet").not.toBeNull();
+    expect(rule?.[1]).toMatch(/visibility:\s*hidden/);
+  });
+
+  // Entries share one curve so a staggered cascade reads as a single movement;
+  // hover and press keep --ease-out, where a long tail feels unresponsive.
+  it("runs every entry animation on the entry curve", () => {
+    for (const frame of ["view-in", "rise", "fade", "sweep", "ring-in", "bar-grow"]) {
+      const rule = new RegExp(`animation: ${frame} [\\d.]+s var\\(--ease-entry\\)`);
+      expect(code, `${frame} is an entry animation`).toMatch(rule);
+    }
+  });
+
   it("drops the vanilla repaint hack", () => {
     expect(code).not.toContain("anim-quiet");
   });

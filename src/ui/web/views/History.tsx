@@ -8,6 +8,7 @@ import { MonthColumns } from "@/components/charts/MonthColumns.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
+import { stagger } from "@/lib/stagger.ts";
 import type { ComponentStatus, HistorySummary, OverallStatus, ProviderHistory } from "@/lib/types.ts";
 
 const RANGES = [7, 30, 90] as const;
@@ -44,7 +45,7 @@ function ProviderBlock({
   provider: ProviderHistory;
   name: string;
   days: number;
-  delay: number;
+  delay: string;
   selection: { id: string; name: string }[];
   current: ComponentStatus[];
 }) {
@@ -55,7 +56,7 @@ function ProviderBlock({
   );
 
   return (
-    <div className="history-row anim-rise flex flex-col gap-2" style={{ animationDelay: `${delay}ms` }}>
+    <div className="history-row anim-rise flex flex-col gap-2" style={{ animationDelay: delay }}>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="flex items-center gap-2">
           <StatusDot status={worst} />
@@ -191,7 +192,7 @@ export function History() {
                 provider={provider}
                 name={live?.name ?? provider.providerId}
                 days={days}
-                delay={index * 80}
+                delay={stagger(index, { base: 180, step: 36, cap: 420 })}
                 selection={live?.componentSelection ?? []}
                 current={live?.components ?? []}
               />

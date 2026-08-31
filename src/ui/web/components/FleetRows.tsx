@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
+import { stagger } from "@/lib/stagger.ts";
 import type { HistoryBucket, ProviderStatus } from "@/lib/types.ts";
 
 /**
@@ -47,7 +48,15 @@ export function ProviderRow({
   );
 }
 
-/** The whole fleet as one flat list — the `compact` and `band` shapes. */
+/**
+ * The whole fleet as one flat list — the `compact` and `band` shapes.
+ *
+ * The cascade starts at 200ms, after the hero and the rule above it. It used
+ * to start at 0ms, so the bottom of the page arrived at the same instant as
+ * the top and neither read as leading the other.
+ */
+export const FLEET_ROW_STAGGER = { base: 200, step: 32, cap: 420 } as const;
+
 export function FleetRows({
   providers, buckets,
 }: {
@@ -61,7 +70,7 @@ export function FleetRows({
           key={provider.id}
           provider={provider}
           buckets={buckets.get(provider.id) ?? []}
-          delay={`${index * 70}ms`}
+          delay={stagger(index, FLEET_ROW_STAGGER)}
         />
       ))}
     </div>

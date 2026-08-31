@@ -4,12 +4,18 @@
 
    The prototype restarts every entry animation whenever the view, the language
    or the theme changes, and never on a data refresh. Here that remount key is
-   `data-animate` on #view: the shell re-stamps it when the key changes, and a
+   `data-animate` on #view: ViewFrame re-stamps it when the key changes, and a
    background refresh that leaves the key untouched plays no animation at all
    — React's own `key` remount replaces the DOM outright, so there is no
    separate repaint left to hold still for. Every entry animation is therefore
    written as a descendant of #view[data-animate]; looping motion (a pulsing
    dot) and the transitions live outside that gate.
+
+   The attribute is also *when*: ViewFrame withholds it until the view's first
+   data has landed, so the whole page cascades from one origin instead of the
+   hero playing against an empty fleet and each query's rows arriving in a wave
+   of their own. The rule below holds the view invisible for that stretch —
+   held, not unmounted, because the queries live inside it.
 
    Stagger delays are set inline by the views — a per-item delay is data, not a
    style. Durations and curves stay here.
@@ -182,49 +188,57 @@
 }
 
 /* — entry animations — */
+/* A view with nothing to show yet. `visibility` rather than `opacity` so the
+   controls it has already laid out cannot be tabbed into or read aloud before
+   they are on screen, and unlike `display` it leaves the box measurable — the
+   charts inside size themselves off their container while it is still held. */
+#view:not([data-animate]) {
+  visibility: hidden;
+}
+
 #view[data-animate] {
-  animation: view-in 0.42s var(--ease-out) both;
+  animation: view-in 0.36s var(--ease-entry) both;
 }
 /* The incident detail enters a touch slower; it is a page, not a panel. */
 #view[data-animate="incident"] {
-  animation-duration: 0.45s;
+  animation-duration: 0.4s;
 }
 
 #view[data-animate] .anim-rise {
-  animation: rise 0.5s var(--ease-out) both;
+  animation: rise 0.42s var(--ease-entry) both;
 }
 #view[data-animate] .anim-rise-hero {
-  animation-duration: 0.58s;
+  animation-duration: 0.5s;
 }
 #view[data-animate] .anim-rise-column {
-  animation-duration: 0.55s;
-}
-#view[data-animate] .anim-rise-row {
   animation-duration: 0.48s;
 }
+#view[data-animate] .anim-rise-row {
+  animation-duration: 0.4s;
+}
 #view[data-animate] .anim-rise-table-row {
-  animation-duration: 0.46s;
+  animation-duration: 0.38s;
 }
 #view[data-animate] .anim-fade {
-  animation: fade 0.5s ease both;
+  animation: fade 0.42s var(--ease-entry) both;
 }
 #view[data-animate] .anim-sweep {
-  animation: sweep 0.7s var(--ease-out) both;
+  animation: sweep 0.55s var(--ease-entry) both;
 }
 #view[data-animate] .anim-sweep-step {
-  animation-duration: 0.55s;
-}
-#view[data-animate] .anim-ring {
-  animation: ring-in 0.7s var(--ease-out) both;
-}
-#view[data-animate] .anim-bar {
-  animation: bar-grow 0.5s var(--ease-out) both;
-}
-#view[data-animate] .anim-bar-strip {
   animation-duration: 0.45s;
 }
+#view[data-animate] .anim-ring {
+  animation: ring-in 0.55s var(--ease-entry) both;
+}
+#view[data-animate] .anim-bar {
+  animation: bar-grow 0.42s var(--ease-entry) both;
+}
+#view[data-animate] .anim-bar-strip {
+  animation-duration: 0.38s;
+}
 #view[data-animate] .anim-bar-month {
-  animation-duration: 0.65s;
+  animation-duration: 0.5s;
 }
 
 /* — exit animations — */
@@ -250,7 +264,7 @@
 .anim-unfold {
   display: grid;
   grid-template-rows: 1fr;
-  animation: unfold 0.28s var(--ease-out) both;
+  animation: unfold 0.28s var(--ease-entry) both;
 }
 /* And closing again. The panel used to be cut away in the frame the chevron
    was clicked, with the rows beneath it jumping up its full height after it;
@@ -306,7 +320,7 @@
   backdrop-filter: blur(3px);
 }
 [data-slot="dialog-content"][data-state="open"] {
-  animation: modal-in 0.42s var(--ease-out) 40ms both;
+  animation: modal-in 0.42s var(--ease-entry) 40ms both;
 }
 [data-slot="dialog-overlay"][data-state="closed"] {
   animation: fade-out 0.22s ease both;
