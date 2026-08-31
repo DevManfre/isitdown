@@ -17,6 +17,30 @@
   }
 }
 
+/* Tailwind v4's Preflight sets `cursor: default` on `button` and on the
+   `type=button|reset|submit` inputs, where v3 set `pointer`. On this dashboard
+   that is every action there is: the shadcn Button, and every Radix primitive
+   that renders as a button under it — SelectTrigger, Switch, ToggleGroupItem,
+   even PaginationLink, which is a `<button>` here and not an anchor. So the
+   whole console pointed like static text.
+
+   `:not(:disabled)` because a disabled button is not clickable, and a pointer
+   over one is the same lie in the other direction. `<a href>` is left alone:
+   the UA stylesheet already points it, and Preflight never touched it.
+
+   The clickables that are *not* buttons — Radix's select options and menu
+   items, which are divs carrying a role — cannot be reached from here: shadcn
+   ships them with a `cursor-default` utility, and a utility beats the base
+   layer whatever its selector. Those are fixed in the primitives themselves
+   (components/ui/select.tsx, dropdown-menu.tsx); a `[role="option"]` rule
+   here would look like it covered them and never fire. */
+@layer base {
+  button:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+}
+
 /* The viewer's own ground shows through a transparent body.
 
    `background-color` and `background-image` are set separately on purpose:
