@@ -119,6 +119,8 @@
   "incident.timeline.observed": "osservato",
   "incident.timeline.resolved": "risolto",
   "incident.payload-copied": "Payload copiato",
+  "incident.map.title": "Dove si trova {name}",
+  "incident.map.empty": "Nessuna posizione nota per {name}.",
 
   "history.kicker": "Uptime aggregato",
   "history.subtitle": "media su <0>{count}</0> provider, ultimi {days} giorni",

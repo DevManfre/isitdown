@@ -119,6 +119,8 @@
   "incident.timeline.observed": "observed",
   "incident.timeline.resolved": "resolved",
   "incident.payload-copied": "Payload copied",
+  "incident.map.title": "Where {name} runs",
+  "incident.map.empty": "No known location for {name}.",
 
   "history.kicker": "Aggregate uptime",
   "history.subtitle": "average across <0>{count}</0> providers, last {days} days",
