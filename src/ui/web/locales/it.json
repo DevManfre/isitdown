@@ -125,6 +125,7 @@
   "history.incidents_one": "<0>{count}</0> incidente",
   "history.incidents_other": "<0>{count}</0> incidenti",
   "history.downtime": "<0>{minutes}</0> min di down",
+  "history.months-title": "Per mese",
   "history.month-no-data": "—",
   "history.export": "Servito da",
   "history.export-aria": "Scarica il JSON dello storico per gli ultimi {days} giorni",

@@ -125,6 +125,7 @@
   "history.incidents_one": "<0>{count}</0> incident",
   "history.incidents_other": "<0>{count}</0> incidents",
   "history.downtime": "<0>{minutes}</0> min down",
+  "history.months-title": "By month",
   "history.month-no-data": "—",
   "history.export": "Served by",
   "history.export-aria": "Download the raw history JSON for the last {days} days",

@@ -195,3 +195,46 @@ export function chartConfigFor(
  * test importing a list helper from a favicon module is how that stays hidden.
  */
 export const trimToLatest = <T>(list: T[], size: number): T[] => list.slice(0, size);
+
+/**
+ * The Y domain for anything that plots an uptime percentage — the month
+ * columns and the trend chart both.
+ *
+ * `[0, 100]` is what made every month column draw the same height: on a fleet
+ * that lives between 92% and 100%, eight points of real variation occupied
+ * eight percent of the box. So the domain starts one point below the lowest
+ * measured value. It collapses to `[99, 100]` when everything is at or near
+ * 100 — equal values must draw equal, not be stretched apart by a domain that
+ * has nothing to bound it — and never goes below 0, because a real 0% outage
+ * has to stay on the axis.
+ *
+ * `null` entries are skipped: an unmeasured day has no value to bound an axis
+ * with.
+ */
+export function uptimeDomain(uptimes: (number | null)[]): [number, number] {
+  const measured = uptimes.filter((value): value is number => value !== null);
+  if (measured.length === 0) return [99, 100];
+  return [Math.max(0, Math.min(Math.floor(Math.min(...measured)) - 1, 99)), 100];
+}
+
+/**
+ * The trend layer's colours.
+ *
+ * An *average* is not a status. Painting a fleet mean operational-green would
+ * claim "all good" over a line that may be falling, so the trend marks take
+ * the accent ramp instead — the same reasoning `MonthColumns` already
+ * documents for its own bars, now stated once here rather than inlined there.
+ *
+ * `rise`/`fall` colour a delta's direction. They borrow the status tokens
+ * deliberately: a rise is not "operational", but on this dashboard it reads
+ * with it, and inventing a second green would be a token nobody guards.
+ */
+export const TREND_CHART = {
+  /** Gradient stops for the header chart's filled area. */
+  areaFrom: "var(--color-accent-400)",
+  areaTo: "var(--color-accent-700)",
+  /** Solid stroke: a 28px sparkline is too short for a gradient to read. */
+  stroke: "var(--color-accent-500)",
+  rise: "var(--status-operational)",
+  fall: "var(--status-major-outage)",
+} as const;
