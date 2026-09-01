@@ -92,8 +92,20 @@ export function ComponentPicker({
     }
   };
 
-  const selectAllVisible = (): void => {
-    const additions = visible
+  // Every visible component already picked → the action has nothing left to
+  // add, so it flips to its inverse instead of sitting there inert.
+  const allVisibleSelected =
+    visible.length > 0 && visible.every((component) => selectedIds.has(component.id));
+
+  // Same add/remove rule, over any subset: the flat action passes every
+  // visible component, a group header passes its own members.
+  const toggleSubset = (subset: ComponentPickerEntry[], allSelected: boolean): void => {
+    if (allSelected) {
+      const subsetIds = new Set(subset.map((component) => component.id));
+      onChange(value.filter((entry) => !subsetIds.has(entry.id)));
+      return;
+    }
+    const additions = subset
       .filter((component) => !selectedIds.has(component.id))
       .map((component) => ({ id: component.id, name: component.name }));
     if (additions.length === 0) return;
@@ -121,8 +133,8 @@ export function ComponentPicker({
               components={[<NumberTicker locale={i18n.language} value={value.length} />]}
             />
           </span>
-          <Button type="button" variant="ghost" size="sm" onClick={selectAllVisible}>
-            {t("components.select-all")}
+          <Button type="button" variant="ghost" size="sm" onClick={() => toggleSubset(visible, allVisibleSelected)}>
+            {t(allVisibleSelected ? "components.deselect-all" : "components.select-all")}
           </Button>
         </div>
       </div>
@@ -130,7 +142,35 @@ export function ComponentPicker({
       <div className="component-picker-list flex max-h-64 flex-col gap-3 overflow-y-auto overscroll-contain">
         {[...groups.entries()].map(([label, members]) => (
           <div key={label} className="flex flex-col gap-1.5">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">{label}</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                {label}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto px-1.5 py-0.5 text-xs font-normal"
+                aria-label={t(
+                  members.every((component) => selectedIds.has(component.id))
+                    ? "components.deselect-group"
+                    : "components.select-group",
+                  { group: label },
+                )}
+                onClick={() =>
+                  toggleSubset(
+                    members,
+                    members.every((component) => selectedIds.has(component.id)),
+                  )
+                }
+              >
+                {t(
+                  members.every((component) => selectedIds.has(component.id))
+                    ? "components.deselect-group-short"
+                    : "components.select-group-short",
+                )}
+              </Button>
+            </div>
             {members.map((component) => (
               <label key={component.id} className="flex items-center gap-2 text-sm">
                 <input
