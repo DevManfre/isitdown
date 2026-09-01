@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -172,97 +172,98 @@ export function ServiceDialog({
     <Dialog open={open} onOpenChange={(next) => (next ? openDialog() : close())}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
-        <form className="flex flex-col gap-4" onSubmit={(event) => void save(event)}>
+        <form className="flex min-h-0 flex-1 flex-col gap-4" onSubmit={(event) => void save(event)}>
           <DialogHeader>
             <DialogTitle>{mode === "add" ? t("add.title") : name}</DialogTitle>
             {mode === "add" && <DialogDescription>{t("add.subtitle")}</DialogDescription>}
           </DialogHeader>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="service-name">{t("field.name")}</Label>
-              <Input id="service-name" value={name} onChange={(event) => setName(event.target.value)} {...fieldProps} />
+          <DialogBody>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="service-name">{t("field.name")}</Label>
+                <Input id="service-name" value={name} onChange={(event) => setName(event.target.value)} {...fieldProps} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="service-id">{t("field.id")}</Label>
+                {mode === "add" ? (
+                  <Input
+                    id="service-id"
+                    className="font-mono"
+                    value={id}
+                    onChange={(event) => setId(event.target.value)}
+                    {...fieldProps}
+                  />
+                ) : (
+                  <Input id="service-id" className="font-mono" value={service?.id ?? ""} readOnly />
+                )}
+              </div>
             </div>
+
+            {mode === "add" && (
+              <div className="flex flex-col gap-1.5">
+                <Label>{t("field.adapter")}</Label>
+                <ToggleGroup
+                  type="single"
+                  value={adapter}
+                  onValueChange={(next) => {
+                    if (next !== "") setAdapter(next);
+                  }}
+                >
+                  {ADAPTERS.map((option) => (
+                    <ToggleGroupItem key={option} value={option}>
+                      {option}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="service-id">{t("field.id")}</Label>
-              {mode === "add" ? (
-                <Input
-                  id="service-id"
-                  className="font-mono"
-                  value={id}
-                  onChange={(event) => setId(event.target.value)}
-                  {...fieldProps}
+              <Label htmlFor="service-base-url">{t("field.base-url")}</Label>
+              <Input
+                id="service-base-url"
+                className="font-mono"
+                value={baseUrl}
+                onChange={(event) => setBaseUrl(event.target.value)}
+                {...fieldProps}
+              />
+              {mode === "add" && <span className="font-mono text-xs text-muted-foreground">{t("add.note")}</span>}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label>{t("components.field")}</Label>
+                <Button type="button" variant="ghost" size="sm" disabled={previewLoading} onClick={() => void loadPreview()}>
+                  {t("components.load")}
+                </Button>
+              </div>
+              {preview !== undefined && (
+                <ComponentPicker
+                  available={preview.components}
+                  supported={preview.supported}
+                  value={selection}
+                  onChange={setSelection}
+                  loading={previewLoading}
+                  scopeToComponents={scopeToComponents}
+                  onScopeChange={setScopeToComponents}
                 />
-              ) : (
-                <Input id="service-id" className="font-mono" value={service?.id ?? ""} readOnly />
               )}
             </div>
-          </div>
 
-          {mode === "add" && (
-            <div className="flex flex-col gap-1.5">
-              <Label>{t("field.adapter")}</Label>
-              <ToggleGroup
-                type="single"
-                value={adapter}
-                onValueChange={(next) => {
-                  if (next !== "") setAdapter(next);
-                }}
-              >
-                {ADAPTERS.map((option) => (
-                  <ToggleGroupItem key={option} value={option}>
-                    {option}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="service-base-url">{t("field.base-url")}</Label>
-            <Input
-              id="service-base-url"
-              className="font-mono"
-              value={baseUrl}
-              onChange={(event) => setBaseUrl(event.target.value)}
-              {...fieldProps}
-            />
-            {mode === "add" && <span className="font-mono text-xs text-muted-foreground">{t("add.note")}</span>}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label>{t("components.field")}</Label>
-              <Button type="button" variant="ghost" size="sm" disabled={previewLoading} onClick={() => void loadPreview()}>
-                {t("components.load")}
-              </Button>
-            </div>
-            {preview !== undefined && (
-              <ComponentPicker
-                available={preview.components}
-                supported={preview.supported}
-                value={selection}
-                onChange={setSelection}
-                loading={previewLoading}
-                scopeToComponents={scopeToComponents}
-                onScopeChange={setScopeToComponents}
-              />
+            {mode === "edit" && (
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="ghost" size="sm" disabled={test.isPending} onClick={() => void runConnectionTest()}>
+                  {t("action.test-connection")}
+                </Button>
+              </div>
             )}
-          </div>
 
-          {mode === "edit" && (
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="ghost" size="sm" disabled={test.isPending} onClick={() => void runConnectionTest()}>
-                {t("action.test-connection")}
-              </Button>
-            </div>
-          )}
-
-          {message !== undefined && (
-            <p className={message.tone === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
-              {message.text}
-            </p>
-          )}
+            {message !== undefined && (
+              <p className={message.tone === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
+                {message.text}
+              </p>
+            )}
+          </DialogBody>
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={close}>
