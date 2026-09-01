@@ -198,6 +198,8 @@
   "push.registered-channel-off": "This browser is registered, but the channel is off — enable it above to actually receive notifications.",
   "push.denied": "Notifications are blocked for this site in the browser's settings.",
   "push.failed": "Could not enable notifications: {error}",
+  "push.push-service-brave": "Brave blocked the registration with its push service, which it disables by default. Open brave://settings/privacy, turn on \u201cUse Google services for push messaging\u201d, restart Brave, then enable this browser again.",
+  "push.push-service": "The browser could not register with its push service. It is usually turned off in the browser's own settings (Brave and some Chromium builds ship it off) or blocked upstream by a firewall, VPN or DNS filter \u2014 allow it, restart the browser, then try again.",
   "push.unsupported": "This browser cannot receive push notifications here. Open the dashboard on localhost or over HTTPS.",
   "push.no-devices": "No browser registered yet.",
   "push.devices": "Registered browsers",

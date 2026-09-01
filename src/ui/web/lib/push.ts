@@ -65,6 +65,45 @@ export const encode = (buffer: ArrayBuffer | null): string =>
         .replace(/\//g, "_")
         .replace(/=+$/, "");
 
+/** Brave is the only engine that exposes `navigator.brave`. */
+export function braveBrowser(): boolean {
+  return "brave" in navigator;
+}
+
+/**
+ * Chromium reports a refusal from its own push service as a DOMException the
+ * operator cannot act on ("Registration failed - push service error"), so it
+ * becomes a reason code the card can explain instead. Brave disables that
+ * service by default and is worth its own wording; on any other Chromium a
+ * firewall, VPN or DNS filter in front of the push endpoints is the usual
+ * cause. Anything else passes through with its own message.
+ */
+export function subscribeFailureReason(error: unknown, brave: boolean): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!/push service/i.test(message)) return message;
+  return brave ? "push-service-brave" : "push-service";
+}
+
+/**
+ * A service worker holds at most one push subscription, bound for life to the
+ * applicationServerKey it was created with: subscribing again under a different
+ * key fails with "A subscription with a different applicationServerKey (or
+ * gcm_sender_id) already exists". Every browser that subscribed while the VAPID
+ * pair still came from the environment is in exactly that state now that the
+ * server generates its own, and the browser's own advice — unsubscribe, then
+ * resubscribe — is something this button can simply do.
+ *
+ * Only a subscription under a *different* key is dropped: unsubscribing the
+ * current one would hand the server a new endpoint on every click and leave the
+ * device list growing rows for one browser.
+ */
+async function dropStaleSubscription(registration: ServiceWorkerRegistration, publicKey: string): Promise<void> {
+  const existing = await registration.pushManager.getSubscription();
+  if (existing === null) return;
+  if (encode(existing.options.applicationServerKey) === publicKey) return;
+  await existing.unsubscribe();
+}
+
 /**
  * Registers the service worker, asks for permission, and returns the body the
  * API expects. Throws with a translatable reason so the card can explain itself.
@@ -74,10 +113,17 @@ export async function subscribeThisBrowser(publicKey: string): Promise<PushSubsc
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error("denied");
 
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: applicationServerKey(publicKey),
-  });
+  await dropStaleSubscription(registration, publicKey);
+
+  let subscription: PushSubscription;
+  try {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: applicationServerKey(publicKey),
+    });
+  } catch (error) {
+    throw new Error(subscribeFailureReason(error, braveBrowser()));
+  }
 
   return {
     endpoint: subscription.endpoint,

@@ -14,6 +14,7 @@ import {
   writeSettings,
 } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
+import { ensureVapidKeys } from "../vapidKeys.ts";
 
 const servicePatchSchema = serviceDefinitionSchema.partial().omit({ id: true });
 const previewComponentsSchema = serviceDefinitionSchema.pick({ adapter: true, baseUrl: true });
@@ -33,21 +34,6 @@ const subscriptionSchema = z.object({
   }),
   label: z.string().min(1).max(80),
 });
-
-// A VAPID public key is an uncompressed P-256 point: base64url-decode it and
-// it must be exactly 65 bytes starting with 0x04. This is the last line of
-// defense in GET /config/push below: even if a stored *Env name were somehow
-// pointed at the wrong variable, only a value that actually decodes to a
-// public key of this shape is ever handed back. A regex over the encoded
-// text (length + character set) was tried here before and was not enough —
-// any long base64url-looking secret in an unreferenced variable passed a
-// pattern match; decoding and checking the real structure is what closes
-// that gap, so anything that fails to decode this way reads as unset.
-function isVapidPublicKey(value: string): boolean {
-  if (value === "") return false;
-  const bytes = Buffer.from(value, "base64url");
-  return bytes.length === 65 && bytes[0] === 0x04;
-}
 
 const issues = (error: z.ZodError): string =>
   error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
@@ -229,32 +215,13 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
 
   /**
    * The VAPID public key is public by construction — the browser needs it to
-   * subscribe. Only the name of the private key's variable is ever stored, and
-   * its value never leaves the process.
-   *
-   * `updateChannel` refuses a patch that aliases two `*Env` fields — of this
-   * channel or any other — onto one variable name, but a row can still reach
-   * a bad state from before that guard existed or from a direct DB edit, so
-   * this route defends itself twice over rather than trusting the database:
-   * first by name (do `publicKeyEnv` and `privateKeyEnv` agree?), then by the
-   * shape of the value itself, below.
+   * subscribe. Its private half is generated alongside it and stays in the
+   * process; neither is an operator credential, so nothing here reads the
+   * environment and the channel has no fields to configure (see
+   * src/ui/vapidKeys.ts).
    */
   router.get("/config/push", (_req, res) => {
-    const channel = listChannels(db).find((entry) => entry.id === "webpush");
-    const publicKeyName = channel?.config["publicKeyEnv"] ?? "";
-    const privateKeyName = channel?.config["privateKeyEnv"] ?? "";
-    if (publicKeyName !== "" && publicKeyName === privateKeyName) {
-      res.json({ publicKey: "" });
-      return;
-    }
-    const value = runtime.env[publicKeyName] ?? "";
-    // Belt and braces: whatever variable the stored name resolves to, only
-    // hand it back once it decodes to an actual VAPID public key (see
-    // isVapidPublicKey above). This is the last line that stops the server
-    // echoing an arbitrary environment variable to a browser if a name ever
-    // points somewhere it shouldn't — including one holding some other long
-    // secret that merely looks base64url-shaped.
-    res.json({ publicKey: isVapidPublicKey(value) ? value : "" });
+    res.json({ publicKey: ensureVapidKeys(db, runtime.logger).publicKey });
   });
 
   router.get("/config/push/subscriptions", (_req, res) => {

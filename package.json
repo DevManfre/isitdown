@@ -16,8 +16,7 @@
     "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
     "test": "node --test \"test/**/*.test.ts\" && vitest run",
     "test:integration": "node --test \"test/**/*.itest.ts\"",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit",
-    "vapid:keys": "node scripts/vapidKeys.ts"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {
     "cobe": "^2.0.1",

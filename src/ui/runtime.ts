@@ -22,6 +22,7 @@ import { createMapLane, type MapLane } from "./mapLane.ts";
 import { createMapStore, type MapStore } from "./mapStore.ts";
 import { createSqlitePushSubscriptionStore, type SqlitePushSubscriptionStore } from "./sqlitePushSubscriptionStore.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
+import { ensureVapidKeys } from "./vapidKeys.ts";
 
 /** Kept a month beyond the 90-day view so a full window is always available. */
 const RETENTION_DAYS = 120;
@@ -101,7 +102,9 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
    */
   const buildAllNotifiers = (channels: ChannelConfig[]): Notifier[] =>
     buildNotifiers(channels, {
-      webpush: (settings) => createWebPushNotifier({ settings, store: pushSubscriptions }),
+      // The settings argument carries nothing for this channel: its VAPID pair
+      // is this server's own, generated on first use and read from SQLite.
+      webpush: () => createWebPushNotifier({ keys: ensureVapidKeys(db, logger), store: pushSubscriptions }),
     });
 
   const mapStore = createMapStore(db);
