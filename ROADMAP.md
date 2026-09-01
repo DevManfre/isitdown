@@ -20,6 +20,41 @@ geographic map/globe; SQLite history with 120-day retention; `en` + `it`.
 
 ---
 
+## 0. Phase 0 — make it installable (do this first)
+
+Everything below this section assumes strangers can already run IsItDown. Today they
+cannot: the images are local-build only, nothing is tagged, and the quick start starts
+with `git clone`. This section is the exception to "nothing here is committed" — it is
+**blocking**, ordered, and it absorbs items 6.1–6.4 and 6.8, which stay listed there for
+context but should be planned from here.
+
+Repository: `github.com/DevManfre/isitdown` → registry namespace
+`ghcr.io/devmanfre/isitdown` (GHCR forces lowercase; the tag prefixes `light-` / `ui-`
+already planned in `README.md` stay as they are).
+
+| # | Item | Size | Notes |
+|---|---|---|---|
+| 0.1 | **`.github/workflows/ci.yml`** | S | On pull request and on push to `dev` / `main`: Node 24 from `.nvmrc`, `npm ci`, `npm run typecheck`, `npm test`, `npm run test:integration`, then `npm run build` as a smoke check. Nothing else in Phase 0 is safe to automate before this exists. |
+| 0.2 | **Version discipline** | S | `package.json` is `0.1.0` and `private: true`. Keep it private (no npm publish is planned) but make the version the single source of truth: `npm version <patch\|minor\|major>` creates the commit and the `v0.2.0` tag, and the release job reads the version back out of `package.json` rather than parsing the tag twice. |
+| 0.3 | **`.github/workflows/release.yml` — build and push to GHCR** | M | Trigger on `v*` tags. `docker/login-action` with the automatic `GITHUB_TOKEN` (needs `permissions: packages: write`), `docker/setup-buildx-action`, then one `docker/build-push-action` per target: `target: light` → `:light-latest`, `:light-vX.Y.Z`; `target: ui` → `:ui-latest`, `:ui-vX.Y.Z`. The `ui` stage is `FROM light` inside the same Dockerfile, so a single buildx invocation per target is enough — there is no cross-image dependency to resolve. |
+| 0.4 | **Multi-arch (`linux/amd64` + `linux/arm64`)** | S | Same job as 0.3, `platforms:` on the build step. The audience is Raspberry Pi and ARM VPS owners, and storage is `node:sqlite` rather than `better-sqlite3`, so there is no native module to cross-compile. Cache with `cache-from`/`cache-to: type=gha` or the arm64 leg roughly doubles the release time. |
+| 0.5 | **Generated release notes** | S | `softprops/action-gh-release` (or `gh release create --generate-notes`) at the end of the release job. The commit format (`<emoji> <TITLE> - <description>`) is machine-parseable, so grouping by `<TITLE>` produces a genuinely readable changelog rather than a commit dump. |
+| 0.6 | **Distributable `docker-compose.yml`** | S | Add `image: ghcr.io/devmanfre/isitdown:ui-latest` (and `light-latest`) alongside the existing `build:` blocks. A plain `docker compose --profile ui up -d` then pulls; contributors keep getting a local build with `--build`. The UI service must keep the named volume for `/app/data` — that file is the whole state. |
+| 0.7 | **Quick start without a clone** | S | `README.md` §2 and `README.it.md` currently open with `git clone` + `--build`. Add a first path for operators: `curl -O https://raw.githubusercontent.com/DevManfre/isitdown/main/docker-compose.yml` then `docker compose --profile ui up -d`. This is the Unraid / Portainer / Synology path and it is the difference between "a repo" and "a product". Keep the clone path below it for the Light edition, which still needs `config.yml`. |
+| 0.8 | **Repository settings** (not code) | S | Make the repo public; after the first release push, flip the two GHCR packages to public in Settings → Packages, or every `docker pull` returns `denied`. Add a branch protection rule on `main` requiring the 0.1 CI check. |
+| 0.9 | **SBOM + signed images** | S | `sbom: true` / `provenance: true` on the build-push step, plus `cosign sign` keyless with the workflow's OIDC token. Cheap while the release job is being written, annoying to retrofit. Not strictly blocking — ship 0.1–0.8 first if it slows the first release. |
+
+Two repository-specific traps, both from the branch layout in `README.md` §11:
+
+- `.claude/`, `CLAUDE.md`, `scripts/`, `.githooks/` and `.mergeexclude` exist on `dev`
+  only and are stripped by `git mergeclean` on the way to `main`. A workflow that calls
+  anything under `scripts/` will pass on `dev` and fail on `main`. `.github/` is *not*
+  in `.mergeexclude`, so the workflows themselves travel normally — keep it that way.
+- Tags are cut from `main`. Releasing from a `dev` tag would publish an image built from
+  a tree that includes the Claude tooling.
+
+---
+
 ## 1. Adapters — what can be monitored
 
 The single biggest lever: today one adapter covers everything, and everything it
@@ -123,14 +158,14 @@ is additive and independently shippable.
 
 | # | Item | Size | Notes |
 |---|---|---|---|
-| 6.1 | **CI: typecheck, tests, build on every push** | S | The conventions here are strict and currently enforced only by discipline. This is the highest-value item in the section. |
-| 6.2 | **Multi-arch images (arm64)** | S | The target audience runs Raspberry Pis and ARM VPSs. `docker buildx` in CI. |
-| 6.3 | **Publish to GHCR with semver tags** | S | Right now the images are local-build only. Nobody can `docker run` this without cloning. |
-| 6.4 | **Release automation + changelog** | M | Tag → build → publish → release notes from commit messages. The commit format is machine-parseable already, which makes generated notes actually good. |
+| 6.1 | **CI: typecheck, tests, build on every push** | S | Planned as **0.1**. The conventions here are strict and currently enforced only by discipline. This is the highest-value item in the section. |
+| 6.2 | **Multi-arch images (arm64)** | S | Planned as **0.4**. The target audience runs Raspberry Pis and ARM VPSs. `docker buildx` in CI. |
+| 6.3 | **Publish to GHCR with semver tags** | S | Planned as **0.3**. Right now the images are local-build only. Nobody can `docker run` this without cloning. |
+| 6.4 | **Release automation + changelog** | M | Planned as **0.5**. Tag → build → publish → release notes from commit messages. The commit format is machine-parseable already, which makes generated notes actually good. |
 | 6.5 | **Helm chart / k8s manifests** | M | Both editions, with a PVC for the SQLite file. |
 | 6.6 | **Unraid template / Home Assistant add-on** | S each | Distribution, not features. Reaches the exact audience. |
 | 6.7 | **Single-binary build (Node SEA)** | M | For people who want neither Docker nor a Node install. Light edition only, realistically. |
-| 6.8 | **SBOM + signed images** | S | `cosign` + syft in the release job. |
+| 6.8 | **SBOM + signed images** | S | Planned as **0.9**. `cosign` + syft in the release job. |
 | 6.9 | **Split readiness and liveness probes** | S | The current healthcheck conflates "the process is alive" with "polling is working". |
 | 6.10 | **OpenTelemetry traces** | M ⚠️ | Useful for debugging a slow cycle, but it adds a runtime dependency to a project whose whole pitch is three of them. Probably a no. |
 | 6.11 | **Log to file with rotation** | S | Today logs go to stdout only, which is right for Docker and wrong for a bare-metal install. |
@@ -168,7 +203,8 @@ not re-invented from scratch later.
 If the list has to collapse to one quarter's worth, the highest ratio of value to
 effort is roughly:
 
-1. **6.1 CI** — everything else is safer after it.
+0. **All of section 0** — until it lands, the project is source code rather than software anyone can install.
+1. **6.1 CI** (= 0.1) — everything else is safer after it.
 2. **1.11 + 1.12 adapter contract kit and fixture recorder** — makes section 1 cheap.
 3. **1.4 Slack or 1.5 RSS adapter** — proves the adapter seam on something that is not Statuspage.
 4. **4.1 Prometheus `/metrics`** — a day of work, a large audience.
