@@ -1,8 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import type { AddressInfo } from "node:net";
 import {
   parseSummary,
   parseIncidentHistory,
@@ -11,6 +9,8 @@ import {
 } from "../../src/adapters/statuspage.adapter.ts";
 import { getAdapter } from "../../src/adapters/index.ts";
 import type { ServiceRef } from "../../src/core/adapter.interface.ts";
+import { withServer } from "../helpers/localServer.ts";
+import { runAdapterContract } from "./adapter.contract.ts";
 
 const service: ServiceRef = {
   id: "github",
@@ -21,20 +21,23 @@ const service: ServiceRef = {
 const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(new URL(`../fixtures/statuspage/${name}.json`, import.meta.url), "utf8"));
 
-/** Local stand-in for a provider. Never a live endpoint. */
-async function withServer(
-  handler: (req: IncomingMessage, res: ServerResponse) => void,
-  run: (baseUrl: string, server: Server) => Promise<void>,
-): Promise<void> {
-  const server = createServer(handler);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address() as AddressInfo;
-  try {
-    await run(`http://127.0.0.1:${port}`, server);
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-}
+const fixtureText = (name: string): string =>
+  readFileSync(new URL(`../fixtures/statuspage/${name}.json`, import.meta.url), "utf8");
+
+runAdapterContract("statuspage", () => ({
+  adapter: statuspageAdapter,
+  service: (baseUrl) => ({ ...service, baseUrl }),
+  ok: {
+    "/api/v2/summary.json": fixtureText("incident-minor"),
+    "/api/v2/incidents.json": fixtureText("incidents-history"),
+  },
+  // Every field Statuspage marks optional, gone: only the two keys the shape is
+  // recognised by survive.
+  degraded: {
+    "/api/v2/summary.json": JSON.stringify({ status: {}, incidents: [{ id: "i1" }], components: [{ id: "c1" }] }),
+    "/api/v2/incidents.json": JSON.stringify({ incidents: [{ id: "h1", created_at: "2026-01-01T00:00:00.000Z" }] }),
+  },
+}));
 
 test("an operational summary maps to operational with no incidents", () => {
   const status = parseSummary(fixture("operational"), service);
