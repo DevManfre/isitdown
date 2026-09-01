@@ -16,11 +16,15 @@ import {
   useConfig,
   usePreferences,
   usePreferencesMutation,
+  usePushDevices,
+  usePushMutations,
   useServiceMutations,
   useSettingsMutation,
 } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
+import { getPushKey } from "@/lib/api.ts";
 import { hostOf } from "@/lib/format.ts";
+import { pushSupported, subscribeThisBrowser } from "@/lib/push.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { DescribedChannel, MapView, ServiceDefinition } from "@/lib/types.ts";
 
@@ -95,6 +99,59 @@ export function RemoveServiceDialog({ service, trigger }: { service: ServiceDefi
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Browser push is the one channel whose target is the machine looking at the
+ * dashboard, so enabling it needs a click *here* — the env vars alone cannot
+ * deliver anything until a browser has subscribed.
+ */
+function PushDevices({ channelEnabled }: { channelEnabled: boolean }) {
+  const { t } = useTranslation();
+  const devices = usePushDevices();
+  const { add, remove } = usePushMutations();
+  const [message, setMessage] = useState<string | undefined>(undefined);
+  const supported = pushSupported();
+
+  const enable = async (): Promise<void> => {
+    try {
+      const { publicKey } = await getPushKey();
+      add.mutate(await subscribeThisBrowser(publicKey), {
+        // The seeded webpush channel is disabled: registering a device while
+        // the channel is off is the likeliest first run (set the two env
+        // vars, click this button, never touch the switch), and it must not
+        // promise delivery that will not happen.
+        onSuccess: () => setMessage(channelEnabled ? t("push.enabled") : t("push.registered-channel-off")),
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      setMessage(reason === "denied" ? t("push.denied") : t("push.failed", { error: reason }));
+    }
+  };
+
+  if (!supported) return <p className="text-xs text-muted-foreground">{t("push.unsupported")}</p>;
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-border pt-3">
+      <Button type="button" size="sm" variant="secondary" disabled={add.isPending} onClick={() => void enable()}>
+        {t("push.enable")}
+      </Button>
+      {message !== undefined && <span className="text-xs text-muted-foreground">{message}</span>}
+      <span className="text-xs text-muted-foreground">{t("push.devices")}</span>
+      {(devices.data?.devices ?? []).length === 0 ? (
+        <span className="text-xs text-muted-foreground">{t("push.no-devices")}</span>
+      ) : (
+        (devices.data?.devices ?? []).map((device) => (
+          <div key={device.id} className="flex items-center justify-between gap-2">
+            <span className="font-mono text-xs">{device.label}</span>
+            <Button type="button" size="sm" variant="ghost" onClick={() => remove.mutate(device.id)}>
+              {t("action.remove")}
+            </Button>
+          </div>
+        ))
+      )}
+    </div>
   );
 }
 
@@ -196,6 +253,8 @@ function ChannelCard({ channel }: { channel: DescribedChannel }) {
           </span>
         )}
       </div>
+
+      {channel.id === "webpush" && <PushDevices channelEnabled={channel.enabled} />}
     </Card>
   );
 }

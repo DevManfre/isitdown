@@ -214,14 +214,57 @@ export function updateChannel(db: DatabaseSync, id: string, patch: ChannelPatch)
 
   let config = current.config;
   if (patch.fields !== undefined) {
-    for (const key of Object.keys(patch.fields)) {
+    for (const [key, value] of Object.entries(patch.fields)) {
       if (!key.endsWith(ENV_SUFFIX)) {
         throw new Error(
           `channel ${id}: only environment variable references may be stored, so "${key}" must be named "${key}${ENV_SUFFIX}" and hold a variable name`,
         );
       }
+      // A blank reference is not "unconfigured", it is a hole: emptying one
+      // *Env field first and then pointing a second field at the variable the
+      // first used to name is how a same-value alias sneaks past the
+      // collision check below in two separate, individually-legal-looking
+      // requests. There is no legitimate reason to store an empty variable
+      // name, so refuse it outright.
+      if (value === "") {
+        throw new Error(`channel ${id}: "${key}" must name an environment variable, so it cannot be blank`);
+      }
     }
     config = { ...config, ...patch.fields };
+
+    // Two different *Env fields must never end up naming the same variable, and
+    // this has to hold across every channel, not only the one being patched —
+    // otherwise a field on one channel (say webpush's "public" key) can be
+    // aliased onto a variable another channel already uses for a real secret
+    // (say Telegram's bot token). A name stored here decides which environment
+    // variable's *value* a route later hands back (see GET /config/push), and
+    // this dashboard has no authentication in front of this PATCH, so that
+    // alias is a live credential-disclosure path, not just a config mistake.
+    // Check every channel's merged config (existing fields plus this patch),
+    // not just the patch, so a one-field patch that collides with an
+    // already-stored field — in this channel or another — is caught too.
+    //
+    // Scoped to patch.fields !== undefined: an enabled-only toggle touches no
+    // *Env field at all, so it cannot introduce a collision, and running this
+    // scan unconditionally meant a database that already had two *Env fields
+    // sharing a variable name (from before this guard existed, or a direct
+    // edit) locked the operator out of toggling *any* channel with a 400 about
+    // a field they never touched.
+    const merged = listChannels(db).map((channel) => (channel.id === id ? { ...channel, config } : channel));
+    const byVariable = new Map<string, string>();
+    for (const channel of merged) {
+      for (const [key, value] of Object.entries(channel.config)) {
+        if (!key.endsWith(ENV_SUFFIX) || value === "") continue;
+        const identity = `${channel.id}.${key}`;
+        const collidingIdentity = byVariable.get(value);
+        if (collidingIdentity !== undefined) {
+          throw new Error(
+            `channel ${id}: patching would leave "${identity}" and "${collidingIdentity}" both referencing "${value}" — two different secrets cannot share one environment variable`,
+          );
+        }
+        byVariable.set(value, identity);
+      }
+    }
   }
 
   db.prepare("UPDATE channels SET enabled = ?, config = ? WHERE id = ?").run(

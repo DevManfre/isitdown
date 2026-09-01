@@ -65,6 +65,25 @@ const config = {
   ],
 };
 
+/**
+ * A `webpush` channel, per Task 6/7's shape: seeded disabled, with env fields
+ * `publicKey`/`privateKey`. Scoped to its own fixture set (below) rather than
+ * folded into the shared `config` above: every other test in this file
+ * asserts on exactly the calls the telegram-only card makes (down to "no
+ * calls at all" for an untouched save), and a second card's
+ * `usePushDevices()` firing its own `GET /config/push/subscriptions` on
+ * mount would land in those recordings and fail them for a reason that has
+ * nothing to do with what they're testing.
+ */
+const webpushChannel = {
+  id: "webpush",
+  enabled: false,
+  fields: [
+    { name: "publicKey", envVar: "VAPID_PUBLIC_KEY", isSet: true },
+    { name: "privateKey", envVar: "VAPID_PRIVATE_KEY", isSet: true },
+  ],
+};
+
 const fixtures = {
   config,
   status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
@@ -358,6 +377,129 @@ describe("Settings", () => {
       expect(
         await within(card).findByText(i18n.t("channel.test-failed", { error: "timeout" })),
       ).toBeInTheDocument();
+    });
+  });
+
+  // Task 7: desktop push (Web Push) notifications, offered from the webpush
+  // channel card. `navigator` is mutated in place with `Object.defineProperty`
+  // rather than replaced with `vi.stubGlobal("navigator", { ...navigator, ... })`:
+  // happy-dom defines every Navigator property (userAgent, serviceWorker, …) as
+  // a non-enumerable getter on `Navigator.prototype`, so `{ ...navigator }`
+  // captures none of them — `Object.keys({ ...navigator })` is `[]`. A stub
+  // built that way would still happen to pass this particular test (it only
+  // reads the two overridden keys), but it silently hands the rest of the
+  // render a `navigator` with nothing else on it. Defining the two properties
+  // directly on the real object leaves everything else untouched.
+  describe("desktop push notifications", () => {
+    afterEach(() => {
+      delete (navigator as { serviceWorker?: unknown }).serviceWorker;
+      delete (navigator as { userAgent?: unknown }).userAgent;
+    });
+
+    // Merge webpushChannel in locally rather than into the shared `config`
+    // above: these two tests need a webpush ChannelCard to render `PushDevices`
+    // at all, but every other test in this file must keep asserting on exactly
+    // the telegram-only card's calls.
+    const pushFixtures = { ...fixtures, config: { ...config, channels: [...config.channels, webpushChannel] } };
+
+    it("offers to enable desktop notifications on this browser and lists the device", async () => {
+      // Two different, known byte sequences per key: `getKey` differentiates
+      // by name (as the real PushSubscription does), so the assertion below
+      // can check `p256dh` and `auth` landed in the right fields rather than
+      // just "some string arrived in each". `usePushDevices()`'s own mount-time
+      // `GET /config/push/subscriptions` returns `devices: []` regardless of
+      // when it lands, so it cannot produce a POST and cannot satisfy the
+      // method+path+body assertion below the way a bare path check could.
+      const subscribe = vi.fn().mockResolvedValue({
+        endpoint: "https://push.example/abc",
+        getKey: (name: string) => (name === "p256dh" ? new Uint8Array([1, 2, 3]).buffer : new Uint8Array([4, 5]).buffer),
+      });
+      vi.stubGlobal("Notification", { requestPermission: vi.fn().mockResolvedValue("granted") });
+      Object.defineProperty(navigator, "userAgent", {
+        configurable: true,
+        value: "Mozilla/5.0 (Windows NT 10.0) Chrome/141.0 Safari/537.36",
+      });
+      Object.defineProperty(navigator, "serviceWorker", {
+        configurable: true,
+        value: { register: vi.fn().mockResolvedValue({ pushManager: { subscribe } }) },
+      });
+      vi.stubGlobal("PushManager", class {});
+
+      renderWithProviders(<Settings />, pushFixtures);
+      // `stubApi`'s fixture router has no dedicated bucket for `/config/push`
+      // (it falls under the same prefix as `/config`, the whole-config
+      // fixture), so the key this card actually needs — `publicKey` — is
+      // supplied here rather than left to fall through to that bucket, which
+      // carries no such field.
+      const calls = interceptWrites({
+        "GET /config/push": { publicKey: "dGVzdC12YXBpZC1wdWJsaWMta2V5LTEyMzQ1Njc4OTA" },
+        "POST /config/push/subscriptions": { devices: [] },
+      });
+
+      await userEvent.click(await screen.findByRole("button", { name: i18n.t("push.enable") }));
+
+      // Method AND path, not path alone: `usePushDevices()`'s mount-time GET
+      // to this same `/config/push/subscriptions` path already satisfies a
+      // path-only check before the click ever happens. Asserting the body too
+      // proves it is the click's POST, carrying what `subscribeThisBrowser`
+      // actually produced — the stubbed endpoint, both base64url-encoded
+      // keys, and a label derived from the stubbed `userAgent`.
+      await waitFor(() => {
+        expect(calls).toContainEqual({
+          method: "POST",
+          path: "/config/push/subscriptions",
+          body: {
+            endpoint: "https://push.example/abc",
+            keys: { p256dh: "AQID", auth: "BAU" },
+            label: "Chrome · Windows",
+          },
+        });
+      });
+
+      // Review finding 3: `webpushChannel` above is seeded disabled, which is
+      // also the likeliest first run (set the two env vars, click this
+      // button, never touch the switch). Reporting `push.enabled` regardless
+      // of the channel's own state would promise delivery that never
+      // happens; the card must say the channel is still off instead.
+      expect(await screen.findByText(i18n.t("push.registered-channel-off"))).toBeInTheDocument();
+      expect(screen.queryByText(i18n.t("push.enabled"))).toBeNull();
+    });
+
+    it("promises delivery only once the channel is actually enabled", async () => {
+      const subscribe = vi.fn().mockResolvedValue({
+        endpoint: "https://push.example/xyz",
+        getKey: () => new Uint8Array([9]).buffer,
+      });
+      vi.stubGlobal("Notification", { requestPermission: vi.fn().mockResolvedValue("granted") });
+      Object.defineProperty(navigator, "userAgent", {
+        configurable: true,
+        value: "Mozilla/5.0 (Windows NT 10.0) Chrome/141.0 Safari/537.36",
+      });
+      Object.defineProperty(navigator, "serviceWorker", {
+        configurable: true,
+        value: { register: vi.fn().mockResolvedValue({ pushManager: { subscribe } }) },
+      });
+      vi.stubGlobal("PushManager", class {});
+
+      const enabledFixtures = {
+        ...fixtures,
+        config: { ...config, channels: [...config.channels, { ...webpushChannel, enabled: true }] },
+      };
+      renderWithProviders(<Settings />, enabledFixtures);
+      interceptWrites({
+        "GET /config/push": { publicKey: "dGVzdC12YXBpZC1wdWJsaWMta2V5LTEyMzQ1Njc4OTA" },
+        "POST /config/push/subscriptions": { devices: [] },
+      });
+
+      await userEvent.click(await screen.findByRole("button", { name: i18n.t("push.enable") }));
+
+      expect(await screen.findByText(i18n.t("push.enabled"))).toBeInTheDocument();
+    });
+
+    it("explains itself instead of offering a button the browser cannot honour", async () => {
+      Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: undefined });
+      renderWithProviders(<Settings />, pushFixtures);
+      expect(await screen.findByText(i18n.t("push.unsupported"))).toBeInTheDocument();
     });
   });
 

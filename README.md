@@ -350,6 +350,11 @@ For a provider that is not on Statuspage, add an adapter under `src/adapters/`.
 |---|---|---|
 | Telegram Bot API | `telegram` | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
 | Generic webhook | `webhook` | `WEBHOOK_URL` |
+| Desktop (Web Push) | `webpush` | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` |
+
+`VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` are a matched key pair, not two values
+you invent separately — generate them with `npm run vapid:keys`, which prints
+both ready to paste into `.env`.
 
 The webhook POSTs `{ change, service, message }`, so a consumer can either display
 the rendered text or route on the structured fields:
@@ -367,6 +372,9 @@ the rendered text or route on the structured fields:
   "message": "🔴 Cloudflare — MAJOR OUTAGE\n\nStatus changed from Operational to Major outage.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.cloudflarestatus.com"
 }
 ```
+
+Desktop (Web Push) is UI edition only, and the browser Push API refuses to
+register a service worker unless the dashboard is served over localhost or HTTPS.
 
 Discord and Slack are webhook-shaped and slot in behind the same `Notifier`
 interface; they are not implemented yet.

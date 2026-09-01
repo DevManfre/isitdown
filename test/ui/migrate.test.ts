@@ -31,6 +31,7 @@ test("migrate creates every table the dashboard reads", async () => {
     "map_points",
     "notifications",
     "provider_state",
+    "push_subscriptions",
     "services",
     "settings",
     "status_samples",
@@ -193,7 +194,7 @@ test("seedDefaults registers both channels, disabled, referencing environment va
   }[];
   assert.deepEqual(
     rows.map((row) => row.id),
-    ["telegram", "webhook"],
+    ["telegram", "webhook", "webpush"],
   );
   assert.ok(rows.every((row) => row.enabled === 0), "a seeded channel must start disabled");
 
@@ -201,6 +202,8 @@ test("seedDefaults registers both channels, disabled, referencing environment va
   assert.deepEqual(telegram, { botTokenEnv: "TELEGRAM_BOT_TOKEN", chatIdEnv: "TELEGRAM_CHAT_ID" });
   const webhook = JSON.parse(rows[1]?.config ?? "{}") as Record<string, string>;
   assert.deepEqual(webhook, { urlEnv: "WEBHOOK_URL" });
+  const webpush = JSON.parse(rows[2]?.config ?? "{}") as Record<string, string>;
+  assert.deepEqual(webpush, { publicKeyEnv: "VAPID_PUBLIC_KEY", privateKeyEnv: "VAPID_PRIVATE_KEY" });
 
   // Every stored key names a variable; none holds a value.
   for (const row of rows) {
@@ -237,7 +240,7 @@ test("seedDefaults run twice does not duplicate anything", async () => {
   const [services] = db.prepare("SELECT COUNT(*) AS n FROM services").all() as { n: number }[];
   const [channels] = db.prepare("SELECT COUNT(*) AS n FROM channels").all() as { n: number }[];
   assert.equal(services?.n, 3);
-  assert.equal(channels?.n, 2);
+  assert.equal(channels?.n, 3);
   db.close();
 });
 
@@ -275,6 +278,44 @@ test("migrating to v4 creates the map tables", async () => {
     .map((row) => row.name);
   assert.ok(tables.includes("map_points"), "map_points missing");
   assert.ok(tables.includes("map_geo_state"), "map_geo_state missing");
+
+  const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
+  assert.equal(version?.user_version, SCHEMA_VERSION);
+  db.close();
+});
+
+test("migrating to v6 creates the push_subscriptions table", async () => {
+  const db = await freshDb();
+  migrate(db);
+
+  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[])
+    .map((row) => row.name);
+  assert.ok(tables.includes("push_subscriptions"), "push_subscriptions missing");
+
+  const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
+  assert.equal(version?.user_version, SCHEMA_VERSION);
+  db.close();
+});
+
+test("migrating from schema 5 adds push_subscriptions without touching existing data", async () => {
+  const db = await freshDb();
+  migrate(db);
+  // Roll the database back to how it looked before this task: every table
+  // this task's migration didn't touch, minus the one it adds.
+  db.exec("DROP TABLE push_subscriptions");
+  db.exec("PRAGMA user_version = 5");
+  db.prepare(
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).run("github", "GitHub", "statuspage", "https://www.githubstatus.com", null, 1, "2026-08-19T00:00:00.000Z");
+
+  migrate(db);
+
+  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[])
+    .map((row) => row.name);
+  assert.ok(tables.includes("push_subscriptions"), "push_subscriptions missing after upgrade from schema 5");
+
+  const rows = db.prepare("SELECT id FROM services").all() as { id: string }[];
+  assert.deepEqual(rows.map((row) => row.id), ["github"], "an upgrade must not touch existing rows");
 
   const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
   assert.equal(version?.user_version, SCHEMA_VERSION);

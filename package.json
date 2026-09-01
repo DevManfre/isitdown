@@ -16,11 +16,13 @@
     "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
     "test": "node --test \"test/**/*.test.ts\" && vitest run",
     "test:integration": "node --test \"test/**/*.itest.ts\"",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "vapid:keys": "node scripts/vapidKeys.ts"
   },
   "dependencies": {
     "cobe": "^2.0.1",
     "express": "^5.2.1",
+    "web-push": "^3.6.7",
     "yaml": "^2.5.0",
     "zod": "^3.25.0"
   },
@@ -35,6 +37,7 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^6.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

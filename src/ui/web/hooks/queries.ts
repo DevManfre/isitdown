@@ -293,3 +293,16 @@ export function usePreferencesMutation() {
     onSuccess: (next) => client.setQueryData(["preferences"], next),
   });
 }
+
+export function usePushDevices() {
+  return useQuery({ queryKey: ["push-devices"], queryFn: api.getPushDevices });
+}
+
+export function usePushMutations() {
+  const client = useQueryClient();
+  const invalidate = () => client.invalidateQueries({ queryKey: ["push-devices"] });
+  return {
+    add: useMutation({ mutationFn: api.addPushDevice, onSuccess: invalidate }),
+    remove: useMutation({ mutationFn: api.removePushDevice, onSuccess: invalidate }),
+  };
+}

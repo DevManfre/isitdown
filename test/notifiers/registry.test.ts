@@ -37,3 +37,24 @@ test("an unknown channel id is reported by name", () => {
 test("a disabled channel with unusable settings is still skipped, not validated", () => {
   assert.doesNotThrow(() => buildNotifiers([{ id: "telegram", enabled: false, settings: {} }]));
 });
+
+test("an edition can supply a factory the shared registry does not know", () => {
+  const built = buildNotifiers([{ id: "webpush", enabled: true, settings: {} }], {
+    webpush: () => ({ id: "webpush", send: async () => {} }),
+  });
+  assert.deepEqual(
+    built.map((notifier) => notifier.id),
+    ["webpush"],
+  );
+});
+
+test("an extra factory does not leak into a build that did not pass it", () => {
+  assert.throws(() => buildNotifiers([{ id: "webpush", enabled: true, settings: {} }]), /webpush/);
+});
+
+test("an extra factory cannot shadow a built-in channel", () => {
+  assert.throws(
+    () => buildNotifiers([telegram], { telegram: () => ({ id: "telegram", send: async () => {} }) }),
+    /telegram/,
+  );
+});
