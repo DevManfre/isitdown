@@ -27,6 +27,14 @@ export interface SampleRow {
 
 export interface IncidentFilter {
   providerId?: string | undefined;
+  /**
+   * The only providers whose rows may be returned — how a disabled provider
+   * leaves the dashboard's lists. It has to be applied in SQL rather than by
+   * the caller: the list is paged and counted server-side, so dropping rows
+   * from a page in hand would page and count the disabled ones anyway. An
+   * empty array means no provider qualifies, and matches nothing.
+   */
+  providerIds?: string[] | undefined;
   state?: "active" | "resolved" | undefined;
   days?: number | undefined;
   limit?: number | undefined;
@@ -58,7 +66,12 @@ export interface HistoryStore extends StateStore {
   /** Every configured provider, enabled or not: its history is real either way. */
   listProviderIds(): Promise<string[]>;
   recordNotification(record: SentRecord): Promise<void>;
-  listNotifications(limit: number): Promise<SentRecord[]>;
+  /**
+   * Newest first. `providerIds` narrows the feed the same way it narrows the
+   * incident list, and for the same reason: the limit is applied by the query,
+   * so filtering afterwards would return fewer rows than were asked for.
+   */
+  listNotifications(limit: number, providerIds?: string[] | undefined): Promise<SentRecord[]>;
   listIncidents(filter: IncidentFilter): Promise<IncidentRow[]>;
   /**
    * The counts behind the incident list's pager and its filter pills. One

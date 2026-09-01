@@ -66,6 +66,12 @@ export interface UiRuntimeCore {
   logger: Logger;
   /** Every configured provider, including disabled ones — the dashboard shows both. */
   listAllServices(): ServiceDefinition[];
+  /**
+   * Just the ids of the enabled ones. The history, incident and notification
+   * views are about what IsItDown is watching, so they scope their queries to
+   * this; the config and settings surfaces keep using `listAllServices`.
+   */
+  enabledProviderIds(): string[];
   providerCount(): number;
   lastCycleAt(): string | null;
   notificationFeedLimit: number;
@@ -163,6 +169,10 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     mapLane,
     logger,
     listAllServices: () => listServices(db),
+    enabledProviderIds: () =>
+      listServices(db)
+        .filter((service) => service.enabled)
+        .map((service) => service.id),
     providerCount: () => listServices(db).length,
     lastCycleAt: () => lastCycle?.finishedAt ?? null,
     notificationFeedLimit: NOTIFICATION_FEED_LIMIT,

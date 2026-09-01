@@ -62,16 +62,22 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
     const state = stateSchema.parse(req.query["state"] ?? undefined);
     const page = pageSchema.parse(req.query["page"] ?? undefined);
     const pageSize = pageSizeSchema.parse(req.query["pageSize"] ?? undefined);
+    // A disabled provider is not being watched, so its incidents are not news:
+    // the allow-list goes into the query rather than over the answer, because
+    // the page, the pager's total and the pills' counts all come from the
+    // server and would otherwise still be counting it.
+    const providerIds = runtime.enabledProviderIds();
 
     const [active, items, counts] = await Promise.all([
-      runtime.store.listIncidents({ ...scope, state: "active" }),
+      runtime.store.listIncidents({ ...scope, providerIds, state: "active" }),
       runtime.store.listIncidents({
         ...scope,
+        providerIds,
         ...(state === "all" ? {} : { state }),
         limit: pageSize,
         offset: (page - 1) * pageSize,
       }),
-      runtime.store.countIncidents(scope),
+      runtime.store.countIncidents({ ...scope, providerIds }),
     ]);
 
     res.json({ active, page: { items, page, pageSize, total: counts[state] }, counts });

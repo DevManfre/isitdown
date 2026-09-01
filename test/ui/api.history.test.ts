@@ -508,3 +508,27 @@ test("history carries the trend series the dashboard charts", async () => {
     await app.close();
   }
 });
+
+test("the history summary leaves out a disabled provider", async () => {
+  const app = await api();
+  try {
+    for (const service of app.runtime.listAllServices()) {
+      await save(app.runtime, service.id, "operational", at(1));
+    }
+    const all = ((await app.get("/history?days=30")).body as { providers: unknown[] }).providers.length;
+
+    const [off] = app.runtime.listAllServices();
+    updateService(app.runtime.db, (off as { id: string }).id, { enabled: false });
+
+    const { status, body } = await app.get("/history?days=30");
+    assert.equal(status, 200);
+    const summary = body as { providers: { providerId: string }[] };
+    assert.equal(summary.providers.length, all - 1);
+    assert.deepEqual(
+      summary.providers.filter((provider) => provider.providerId === (off as { id: string }).id),
+      [],
+    );
+  } finally {
+    await app.close();
+  }
+});

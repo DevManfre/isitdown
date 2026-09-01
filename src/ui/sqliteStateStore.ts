@@ -142,6 +142,25 @@ const toIncidentRow = (row: IncidentDbRow): IncidentRow => ({
 });
 
 /**
+ * A `provider_id` allow-list as a clause and its parameters, or null when the
+ * caller asked for no restriction at all.
+ *
+ * An empty list becomes `1 = 0` rather than nothing: SQLite rejects `IN ()`,
+ * and "every provider is disabled" has to match no rows instead of falling
+ * through to all of them.
+ */
+function providerScope(
+  providerIds: string[] | undefined,
+): { clause: string; params: string[] } | null {
+  if (providerIds === undefined) return null;
+  if (providerIds.length === 0) return { clause: "1 = 0", params: [] };
+  return {
+    clause: `provider_id IN (${providerIds.map(() => "?").join(", ")})`,
+    params: providerIds,
+  };
+}
+
+/**
  * The UI edition's store. It satisfies the shared StateStore contract exactly as
  * the Light edition's file store does, and adds the history the dashboard reads.
  *
@@ -312,12 +331,18 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
       );
     },
 
-    async listNotifications(limit: number): Promise<SentRecord[]> {
+    async listNotifications(
+      limit: number,
+      providerIds?: string[] | undefined,
+    ): Promise<SentRecord[]> {
+      const scope = providerScope(providerIds);
+      const where = scope === null ? "" : `WHERE ${scope.clause}`;
       const rows = db
         .prepare(
-          "SELECT provider_id, channel, kind, text, sent_at, ok, error FROM notifications ORDER BY sent_at DESC, id DESC LIMIT ?",
+          `SELECT provider_id, channel, kind, text, sent_at, ok, error
+           FROM notifications ${where} ORDER BY sent_at DESC, id DESC LIMIT ?`,
         )
-        .all(limit)
+        .all(...(scope?.params ?? []), limit)
         .map((raw) => notificationRowSchema.parse(raw));
       return rows.map((row) => ({
         providerId: row.provider_id,
@@ -336,6 +361,11 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
       if (filter.providerId !== undefined) {
         clauses.push("provider_id = ?");
         params.push(filter.providerId);
+      }
+      const scope = providerScope(filter.providerIds);
+      if (scope !== null) {
+        clauses.push(scope.clause);
+        params.push(...scope.params);
       }
       if (filter.state === "active") clauses.push("resolved_at IS NULL");
       if (filter.state === "resolved") clauses.push("resolved_at IS NOT NULL");
@@ -365,6 +395,11 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
       if (filter.providerId !== undefined) {
         clauses.push("provider_id = ?");
         params.push(filter.providerId);
+      }
+      const scope = providerScope(filter.providerIds);
+      if (scope !== null) {
+        clauses.push(scope.clause);
+        params.push(...scope.params);
       }
       if (filter.days !== undefined) {
         clauses.push("started_at >= ?");

@@ -9,7 +9,7 @@ import { Providers } from "./Providers.tsx";
 const status = {
   providers: [
     providerFixture(),
-    providerFixture({ id: "cf", name: "Cloudflare", enabled: false }),
+    providerFixture({ id: "cf", name: "Cloudflare" }),
     providerFixture({ id: "discord", name: "Discord", overallStatus: "major_outage" }),
   ],
   pollIntervalMinutes: 5,
@@ -68,12 +68,21 @@ describe("Providers", () => {
     expect(await screen.findByText(i18n.t("providers.empty"))).toBeInTheDocument();
   });
 
-  it("dims a disabled provider while still listing it", async () => {
-    renderWithProviders(<Providers />, { status, history });
-    const cloudflare = await screen.findByText("Cloudflare");
-    const row = cloudflare.closest("tr");
-    expect(row).not.toBeNull();
-    expect(row).toHaveClass("opacity-55");
+  // A disabled provider is not being polled, so every figure this table carries
+  // would be frozen at whatever its last poll saw. It stays visible in Settings,
+  // which is where it is switched back on.
+  it("leaves a disabled provider out of the table", async () => {
+    renderWithProviders(<Providers />, {
+      status: {
+        ...status,
+        providers: status.providers.map((provider) =>
+          provider.id === "cf" ? { ...provider, enabled: false } : provider,
+        ),
+      },
+      history,
+    });
+    expect(await screen.findByText("GitHub")).toBeInTheDocument();
+    expect(screen.queryByText("Cloudflare")).toBeNull();
   });
 
   // No test above asserts rendered copy against anything but t() itself,
