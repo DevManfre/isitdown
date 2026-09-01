@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatDay, formatDuration, formatNumber, formatPercent, formatRelative,
+  formatDay, formatDuration, formatNumber, formatPercent, formatRelative, notificationHeadline,
 } from "./format.ts";
 
 describe("locale-aware formatting", () => {
@@ -30,5 +30,15 @@ describe("locale-aware formatting", () => {
   it("renders a past instant as relative time", () => {
     const twoHoursAgo = new Date(Date.now() - 2 * 3600_000).toISOString();
     expect(formatRelative("en", twoHoursAgo)).toMatch(/2 hours ago/);
+  });
+});
+
+describe("notificationHeadline", () => {
+  it("drops the notifier's leading status emoji", () => {
+    expect(notificationHeadline("🟢 Anthropic — operational")).toBe("Anthropic — operational");
+  });
+
+  it("keeps a headline that starts with a word, and only the first line", () => {
+    expect(notificationHeadline("Anthropic degraded\nsecond line")).toBe("Anthropic degraded");
   });
 });

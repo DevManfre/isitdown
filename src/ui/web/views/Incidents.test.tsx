@@ -220,4 +220,25 @@ describe("Incidents", () => {
     renderWithProviders(<Incidents />, fixtures);
     expect(await screen.findByText(i18n.t("incidents.empty-notifications"))).toBeInTheDocument();
   });
+
+  it("shows two notifications, then the rest behind the one CTA", async () => {
+    const sent = Array.from({ length: 5 }, (_unused, index) => ({
+      providerId: "github",
+      channel: "webhook",
+      text: `Delivery ${index + 1}`,
+      sentAt: `2026-08-21T09:0${index}:00Z`,
+      ok: true,
+    }));
+    renderWithProviders(<Incidents />, { ...fixtures, notifications: { notifications: sent } });
+
+    expect(await screen.findByText("Delivery 1")).toBeInTheDocument();
+    expect(screen.getByText("Delivery 2")).toBeInTheDocument();
+    expect(screen.queryByText("Delivery 3")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("action.show-more") }));
+
+    expect(await screen.findByText("Delivery 5")).toBeInTheDocument();
+    // One CTA only: revealing the rest leaves nothing left to expand.
+    expect(screen.queryByRole("button", { name: i18n.t("action.show-more") })).not.toBeInTheDocument();
+  });
 });

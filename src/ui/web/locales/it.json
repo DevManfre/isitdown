@@ -26,6 +26,7 @@
   "action.history-90d": "Cronologia 90 giorni",
   "action.copy-payload": "Copia payload webhook",
   "action.retry": "Riprova",
+  "action.show-more": "Mostra altro",
 
   "theme.light": "Chiaro",
   "theme.dark": "Scuro",

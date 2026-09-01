@@ -15,8 +15,9 @@ import {
 } from "@/components/ui/pagination.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
+import { ProviderIcon } from "@/components/ProviderIcon.tsx";
 import { useIncidents, useNotifications, useStatus } from "@/hooks/queries.ts";
-import { formatDateTime, formatRelative } from "@/lib/format.ts";
+import { formatDateTime, formatRelative, notificationHeadline } from "@/lib/format.ts";
 import { impactKey, impactStatus, incidentStatusKey, pageWindow } from "@/lib/incidents.ts";
 import { stagger } from "@/lib/stagger.ts";
 import { cn } from "@/lib/utils.ts";
@@ -24,6 +25,8 @@ import type { IncidentRow } from "@/lib/types.ts";
 
 /** How many recent notifications the feed panel shows — incidents.js:43. */
 const NOTIFICATIONS_SHOWN = 8;
+/** How many of those show before the operator asks for the rest. */
+const NOTIFICATIONS_COLLAPSED = 2;
 /** Rows per page of the incident list. The server caps anything larger. */
 const PAGE_SIZE = 20;
 
@@ -74,6 +77,10 @@ export function Incidents() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>(readFilter);
+  // The feed opens at two rows: it sits beside the active-incident card, and a
+  // full eight of them stretched that column far past it. The rest stay one
+  // click away rather than on another screen.
+  const [feedExpanded, setFeedExpanded] = useState(false);
   const [page, setPage] = useState(1);
   const { data: incidents } = useIncidents({ state: filter, page, pageSize: PAGE_SIZE });
   const { data: status } = useStatus();
@@ -81,6 +88,8 @@ export function Incidents() {
 
   const nameOf = (providerId: string): string =>
     status?.providers.find((provider) => provider.id === providerId)?.name ?? providerId;
+  const baseUrlOf = (providerId: string): string =>
+    status?.providers.find((provider) => provider.id === providerId)?.baseUrl ?? "";
 
   const active = incidents?.active ?? [];
   const rows = incidents?.page.items ?? [];
@@ -103,6 +112,11 @@ export function Incidents() {
   // cannot be filtered client-side without filtering one page of it and
   // reporting that as the whole result.
   const showActive = filter !== "resolved";
+
+  const notifications = sent?.notifications ?? [];
+  const shownNotifications = feedExpanded
+    ? notifications
+    : notifications.slice(0, NOTIFICATIONS_COLLAPSED);
 
   const goTo = (incident: IncidentRow): void => {
     void navigate(`/incidents/${incident.providerId}/${incident.incidentId}`);
@@ -208,26 +222,44 @@ export function Incidents() {
           <span className="text-xs uppercase tracking-widest text-muted-foreground">
             {t("incidents.notifications-sent")}
           </span>
-          {(sent?.notifications ?? []).length === 0 ? (
+          {notifications.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("incidents.empty-notifications")}</p>
           ) : (
-            (sent?.notifications ?? []).map((record, index) => (
+            shownNotifications.map((record, index) => (
               <div
                 key={`${record.providerId}-${record.sentAt}-${index}`}
                 className="anim-fade flex items-baseline gap-2 border-t border-border pt-1"
                 style={{ animationDelay: stagger(index, { base: 150, step: 28, cap: 400 }) }}
               >
-                <StatusDot status={record.ok ? "operational" : "major_outage"} size={6} />
+                <ProviderIcon
+                  name={nameOf(record.providerId)}
+                  baseUrl={baseUrlOf(record.providerId)}
+                  className="translate-y-0.5"
+                />
                 <span className="flex min-w-0 flex-col">
                   {/* The stored text is what was actually delivered — the
-                      first line only here, same as incidents.js:195. */}
-                  <span className="text-xs">{record.text.split("\n")[0]}</span>
+                      first line only here, same as incidents.js:195, minus the
+                      leading status emoji the provider icon now stands in for. */}
+                  <span className="text-xs">{notificationHeadline(record.text)}</span>
                   <span className="font-mono text-[10.5px] text-muted-foreground">
                     {record.channel} · {formatDateTime(i18n.language, record.sentAt)} · {nameOf(record.providerId)}
                   </span>
                 </span>
               </div>
             ))
+          )}
+          {/* One control, and only while it has something to reveal: expanding
+              is one-way, so the panel never grows a second "show less" twin. */}
+          {!feedExpanded && notifications.length > NOTIFICATIONS_COLLAPSED && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="self-start px-0 text-xs text-muted-foreground"
+              onClick={() => setFeedExpanded(true)}
+            >
+              {t("action.show-more")}
+            </Button>
           )}
         </Card>
       </div>

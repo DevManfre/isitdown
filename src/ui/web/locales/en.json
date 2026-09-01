@@ -26,6 +26,7 @@
   "action.history-90d": "90-day history",
   "action.copy-payload": "Copy webhook payload",
   "action.retry": "Try again",
+  "action.show-more": "Show more",
 
   "theme.light": "Light",
   "theme.dark": "Dark",
