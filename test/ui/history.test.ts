@@ -27,7 +27,7 @@ async function harness(providers: string[] = ["github"]): Promise<{
     "INSERT INTO services (id, name, adapter, base_url, options, enabled, created_at) VALUES (?, ?, 'statuspage', ?, NULL, 1, ?)",
   );
   for (const id of providers) insert.run(id, id, `https://${id}.example`, daysAgo(200));
-  const store = createSqliteStateStore(db);
+  const store = createSqliteStateStore(db, { now: () => NOW });
   return { store, history: createHistoryService(store, { now: () => NOW }) };
 }
 
