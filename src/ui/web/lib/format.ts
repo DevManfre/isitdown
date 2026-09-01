@@ -81,3 +81,15 @@ export const formatPercentShort = (locale: string, value: number) =>
  */
 export const formatSigned = (locale: string, value: number) =>
   new Intl.NumberFormat(locale, { signDisplay: "exceptZero", maximumFractionDigits: 2 }).format(value);
+
+/**
+ * The headline of a delivered notification, without the status emoji the
+ * notifiers put in front of it (🟢/🔴/⚪ — telegram.ts and friends own that
+ * formatting, and it belongs in the message they sent). In the feed the
+ * provider icon already carries the identity, so the glyph only reads as a
+ * stray dot; strip leading symbols and whitespace, keep the rest verbatim.
+ */
+export function notificationHeadline(text: string): string {
+  const [first = ""] = text.split("\n");
+  return first.replace(/^[^\p{L}\p{N}]+/u, "").trim();
+}
