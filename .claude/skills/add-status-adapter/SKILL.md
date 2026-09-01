@@ -21,32 +21,39 @@ If the endpoint 404s, redirects to an HTML page, or returns a different shape, p
 
 ## Step 2 — Scaffold the custom adapter
 
-Create `src/adapters/<provider-id>.adapter.ts` implementing the shared interface:
+Create `src/adapters/<provider-id>.adapter.ts` implementing the shared interface
+(`src/core/adapter.interface.ts` is the source of truth — read it first):
 
 ```ts
-import { Adapter, NormalizedStatus } from "../core/adapter.interface";
+import type { Adapter, FetchContext, ServiceRef } from "../core/adapter.interface.ts";
+import type { NormalizedStatus } from "../core/types.ts";
+
+/** Pure mapping from payload to internal shape, exported so the fixture tests
+ *  can exercise it with no network at all. */
+export function parseStatus(raw: unknown, service: ServiceRef): NormalizedStatus {
+  // Validate the shape with zod, then map. Throw when the body is not this
+  // provider's payload at all; degrade on a missing individual field.
+}
 
 export const <providerId>Adapter: Adapter = {
   id: "<provider-id>",
 
-  async fetchStatus(baseUrl: string): Promise<NormalizedStatus> {
-    const res = await fetch(`${baseUrl}/<status-endpoint>`, {
-      signal: AbortSignal.timeout(10_000),
+  async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
+    const response = await fetch(`${service.baseUrl}/<status-endpoint>`, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(ctx.timeoutMs),
     });
-    if (!res.ok) {
-      throw new Error(`<provider-id> status fetch failed: ${res.status}`);
+    if (!response.ok) {
+      throw new Error(`<provider-id> fetch for ${service.id} failed: HTTP ${response.status}`);
     }
-    const raw = await res.json(); // or res.text() + HTML parsing if scraping
-
-    return {
-      provider: "<provider-id>",
-      overallStatus: mapToNormalizedStatus(raw),   // implement this mapping
-      activeIncidents: mapIncidents(raw),          // implement this mapping
-      fetchedAt: new Date().toISOString(),
-    };
+    return parseStatus(await response.json(), service);
   },
 };
 ```
+
+`fetchIncidentHistory` and `listComponents` are optional: implement them only if
+the provider exposes the data, and match `statuspage.adapter.ts`'s split between
+a pure `parse*` function and the thin fetch wrapper around it.
 
 Requirements for every custom adapter:
 
@@ -59,15 +66,38 @@ Requirements for every custom adapter:
 
 Add it to `src/adapters/index.ts`'s registry map, keyed by the same `id` used in the adapter object.
 
-## Step 4 — Add test fixtures
+## Step 4 — Record test fixtures
 
-Under `test/fixtures/<provider-id>/`, add at least:
-- `operational.json` (or `.html`) — normal state
-- `incident.json` — an active incident sample
-- `resolved.json` — incident just resolved
+Record the provider's real answer instead of hand-typing one — a fixture invented
+from the docs proves nothing about the shape that actually ships:
 
-Write the adapter test against these fixtures — never call the live endpoint from a test.
+```bash
+npm run record-fixture -- https://<provider>/<status-endpoint> <provider-id> operational
+npm run record-fixture -- https://<provider>/<status-endpoint> <provider-id> incident   # while it is down
+```
 
-## Step 5 — Document
+Files land in `test/fixtures/<provider-id>/`. Record at least `operational`,
+`incident` and `resolved`. Re-recording an existing name needs `--force`.
+
+## Step 5 — Run the adapter contract
+
+Every adapter must pass the shared suite in `test/adapters/adapter.contract.ts` —
+it pins the behaviour the poller depends on (throws on a non-2xx, on an
+unparseable body and on an unreachable provider; degrades on a missing optional
+field; never returns an unvalidated shape; honours `ctx.timeoutMs`). Add it at
+the top of `test/adapters/<provider-id>.test.ts`, then write that provider's own
+mapping tests below it:
+
+```ts
+runAdapterContract("<provider-id>", () => ({
+  adapter: <providerId>Adapter,
+  service: (baseUrl) => ({ id: "<provider-id>", name: "<Provider>", baseUrl }),
+  ok: { "/<status-endpoint>": fixtureText("operational") },
+  // The same endpoints with every optional field stripped.
+  degraded: { "/<status-endpoint>": JSON.stringify({ /* only the required keys */ }) },
+}));
+```
+
+## Step 6 — Document
 
 Add a one-line entry to `README.md`'s list of supported providers, noting whether it uses the generic Statuspage adapter or a custom one.
