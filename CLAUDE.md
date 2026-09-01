@@ -6,8 +6,8 @@ Guidance for Claude (and Claude Code) when working in this repository. See `READ
 
 IsItDown is a Dockerized service that polls the public status pages of third-party providers (GitHub, Anthropic, Cloudflare, etc.) and sends a notification when their status changes. It ships as two editions from the same codebase:
 
-- **Light**: polling + notifications only, config via `config.yml`, no HTTP server. Image: `isitdown:light`.
-- **UI**: adds a local web dashboard (status grid, uptime charts, incident timeline) and runtime configuration via SQLite instead of a static file. Image: `isitdown:ui`.
+- **Light**: polling + notifications only, config via `config.yml`, no HTTP server. Image: `ghcr.io/devmanfre/isitdown:light-latest`.
+- **UI**: adds a local web dashboard (status grid, uptime charts, incident timeline) and runtime configuration via SQLite instead of a static file. Image: `ghcr.io/devmanfre/isitdown:ui-latest`.
 
 Full architecture, data flow, and rationale live in `README.md` — read it before making structural changes.
 
@@ -67,7 +67,8 @@ it is done when the running instance shows it. Every time:
 
 1. Find how it is running: `docker ps --filter name=isitdown`, otherwise a local
    `node dist/…` process. `docker inspect -f '{{.Config.Image}}' isitdown-ui`
-   says which mode — `isitdown:ui` is a built image, `isitdown:dev` is
+   says which mode — `ghcr.io/devmanfre/isitdown:ui-latest` is a built image
+   (`isitdown:ui` for one built before the GHCR rename), `isitdown:dev` is
    `dev:docker`'s override image (see Build & run). `docker inspect -f
    '{{.Config.Cmd}}' isitdown-ui` corroborates: `node dist/ui/server.js` for a
    built image, a `vite build --watch & … node --watch src/ui/server.ts` shell

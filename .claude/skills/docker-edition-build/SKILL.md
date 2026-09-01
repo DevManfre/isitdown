@@ -94,10 +94,10 @@ Sanity checklist before declaring a build "done":
 Use semantic, edition-qualified tags — never a bare `latest` that doesn't indicate edition:
 
 ```
-isitdown:light-v1.0.0
-isitdown:ui-v1.0.0
-isitdown:light-latest
-isitdown:ui-latest
+ghcr.io/devmanfre/isitdown:light-v1.0.0
+ghcr.io/devmanfre/isitdown:ui-v1.0.0
+ghcr.io/devmanfre/isitdown:light-latest
+ghcr.io/devmanfre/isitdown:ui-latest
 ```
 
 When publishing to a registry, push both edition tags for every release — don't ship a Light release without also cutting the corresponding UI tag (or explicitly note in the changelog that the UI edition is unchanged).

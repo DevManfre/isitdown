@@ -1,6 +1,7 @@
 # IsItDown
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)](package.json)
+[![Release](https://img.shields.io/github/v/release/DevManfre/isitdown?style=flat-square)](https://github.com/DevManfre/isitdown/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/DevManfre/isitdown/ci.yml?branch=main&style=flat-square&label=CI)](.github/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A5%2024-5FA04E?style=flat-square&logo=node.js&logoColor=white)](.nvmrc)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](tsconfig.json)
@@ -66,6 +67,7 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
   - [9.3 Live development](#93-live-development)
   - [9.4 Tests and checks](#94-tests-and-checks)
   - [9.5 Conventions](#95-conventions)
+  - [9.6 Releasing](#96-releasing)
 - [10. Roadmap](#10-roadmap)
 - [11. Branch layout and merge policy](#11-branch-layout-and-merge-policy)
   - [Setup, once per clone](#setup-once-per-clone)
@@ -105,7 +107,7 @@ Anthropic       operational    ████████████████�
 
 |  | Light | UI |
 |---|---|---|
-| Image | `isitdown:light` | `isitdown:ui` (built `FROM` light) |
+| Image | `ghcr.io/devmanfre/isitdown:light-latest` | `…:ui-latest` (built `FROM` light) |
 | Poller · Adapters · Diff Engine · Notifiers | shared | shared |
 | Configuration | `config.yml`, re-read every cycle | SQLite, edited in the dashboard |
 | State store | JSON file, atomic writes | SQLite (also carries history) |
@@ -124,27 +126,44 @@ into it: where configuration comes from, and where state is kept.
 
 ### 2.1 With Docker
 
-```bash
-git clone <this repo> && cd isitdown
-cp .env.example .env                # only fill in the channels you will enable
-```
-
-**Light edition** — polling and notifications, nothing listening:
+**UI edition, without a clone** — one file, two commands. The images are
+published to GHCR for `linux/amd64` and `linux/arm64`, so this is also the
+Raspberry Pi, Unraid, Portainer and Synology path:
 
 ```bash
-cp config.example.yml config.yml    # edit: providers, interval, channels
-docker compose --profile light up -d --build
-docker logs -f isitdown-light
-```
-
-**UI edition** — the dashboard on :3000, no `config.yml` needed:
-
-```bash
-docker compose --profile ui up -d --build
+curl -O https://raw.githubusercontent.com/DevManfre/isitdown/main/docker-compose.yml
+docker compose --profile ui up -d
 # then visit http://localhost:3000
 ```
 
+Everything the UI edition needs is configured in the dashboard, except secrets,
+which come from the environment only. Put them in a `.env` next to the compose
+file — it is optional, and read if present:
+
+```bash
+printf 'TELEGRAM_BOT_TOKEN=...\nTELEGRAM_CHAT_ID=...\n' > .env
+docker compose --profile ui up -d      # recreates the container with the tokens
+```
+
+**Light edition** — polling and notifications, nothing listening. This one needs
+a `config.yml` to mount, so start from a clone:
+
+```bash
+git clone https://github.com/DevManfre/isitdown.git && cd isitdown
+cp .env.example .env                # only fill in the channels you will enable
+cp config.example.yml config.yml    # edit: providers, interval, channels
+docker compose --profile light up -d
+docker logs -f isitdown-light
+```
+
 Both can run at once; they use separate data volumes.
+
+Contributors building from the source tree add `--build`, which overrides the
+pull and builds the image locally instead:
+
+```bash
+docker compose --profile ui up -d --build
+```
 
 ### 2.2 Without Docker
 
@@ -425,21 +444,38 @@ docker build --target ui    -t isitdown:ui    .
 Measured: 12 of the UI image's 14 layers are byte-identical to the Light image.
 
 Tag releases per edition rather than with a bare `latest`, which would not say
-which edition it is:
+which edition it is. `.github/workflows/release.yml` pushes four tags per
+release to GHCR, each a multi-arch manifest covering `linux/amd64` and
+`linux/arm64`:
 
 ```
-isitdown:light-v1.0.0   isitdown:light-latest
-isitdown:ui-v1.0.0      isitdown:ui-latest
+ghcr.io/devmanfre/isitdown:light-v1.0.0   ghcr.io/devmanfre/isitdown:light-latest
+ghcr.io/devmanfre/isitdown:ui-v1.0.0      ghcr.io/devmanfre/isitdown:ui-latest
 ```
+
+Every pushed image carries an SBOM and SLSA provenance, and is signed keylessly
+with `cosign`, so what built it is verifiable rather than merely asserted:
+
+```bash
+cosign verify ghcr.io/devmanfre/isitdown:ui-latest \
+  --certificate-identity-regexp '^https://github.com/DevManfre/isitdown/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+See [9.6](#96-releasing) for how a release is cut.
 
 ### 4.2 Compose profiles
 
 ```bash
-docker compose --profile light up -d --build   # mounts ./config.yml (ro) + a data volume
-docker compose --profile ui    up -d --build   # data volume only, publishes :3000
+docker compose --profile light up -d           # mounts ./config.yml (ro) + a data volume
+docker compose --profile ui    up -d           # data volume only, publishes :3000
 docker compose --profile light --profile ui up -d      # both
 docker compose --profile light --profile ui down       # stop; volumes survive
 ```
+
+Both services declare a published `image:` and `pull_policy: missing`, so a
+plain `up` pulls from GHCR and the file works with no source tree around it.
+Adding `--build` builds the same target from this `Dockerfile` instead.
 
 A third file, `docker-compose.dev.yml`, layers on top of the `ui` profile and runs
 the edition straight from the source tree, rebuilding the dashboard bundle in the
@@ -1207,7 +1243,8 @@ is the one that ships: shipping still goes out the normal way,
 docker compose --profile ui up -d --build   # back to the built image
 ```
 
-To tell a running container's mode apart: `docker compose ps` shows `isitdown:ui`
+To tell a running container's mode apart: `docker compose ps` shows
+`ghcr.io/devmanfre/isitdown:ui-latest`
 for the built image and `isitdown:dev` for dev mode; `docker inspect -f
 '{{.Config.Cmd}}' isitdown-ui` shows `node dist/ui/server.js` for the built image,
 and `sh -c "npx vite build --watch & exec node --watch src/ui/server.ts"` for dev
@@ -1273,6 +1310,38 @@ to what they cover.
   classes, rather than writing a new component class.
 - Colours reach a chart only through `chartConfig`, never as a literal and never
   as a runtime-built token name.
+
+### 9.6 Releasing
+
+Two workflows, and the version lives in exactly one place.
+
+`.github/workflows/ci.yml` runs on every pull request and on every push to `dev`
+or `main`: Node from `.nvmrc`, `npm ci`, then the same four commands a
+contributor runs locally — `typecheck`, `test`, `test:integration`, `build`.
+
+A release is a tag. `package.json` stays `private` (nothing is published to
+npm) but its `version` is the single source of truth:
+
+```bash
+npm version minor          # preversion runs typecheck + both test suites first,
+                           # then the commit and the vX.Y.Z tag are created
+git push --follow-tags
+```
+
+Pushing the tag runs `.github/workflows/release.yml`, which re-runs the checks
+(a tag push does not trigger CI), refuses to continue if the tag and
+`package.json` disagree, builds both targets for `linux/amd64` and
+`linux/arm64`, pushes the four GHCR tags with an SBOM and provenance, signs both
+digests with keyless `cosign`, and creates the GitHub release.
+
+The release notes are generated from the log by `tools/release-notes.mjs`, which
+leans on the commit convention: `<emoji> <TITLE> - <description>` parses, so the
+changelog is grouped by surface (`POLLER`, `UI`, `DOCKER`, …) rather than being a
+commit dump. Preview it for any range before tagging:
+
+```bash
+npm run release-notes -- v0.1.0 HEAD
+```
 - Commits: `<emoji> <TITLE> - <description>`, English, gitmoji.
 
 ---
@@ -1283,14 +1352,14 @@ Delivered:
 
 - **v1 — Light edition**: polling, the diff engine, Telegram and generic-webhook
   notifications, `config.yml` with environment-referenced secrets, a JSON state store
-  with atomic writes, `isitdown:light`.
+  with atomic writes, `ghcr.io/devmanfre/isitdown:light-latest`.
 - **v1.1 — UI prototyping**: the dashboard explored in Claude Design and kept in
   `design/claude-design-prototypes/`. Option `3a`, the navigable console, is the
   implementation reference; the dark palette and the longer Italian label lengths were
   validated there rather than discovered later.
 - **v1.2 — UI edition**: that design as an Express + vanilla-ES-module dashboard over
   SQLite, with configuration managed at runtime and applied on the next cycle without
-  a restart. `isitdown:ui`, built `FROM` the Light image.
+  a restart. `ghcr.io/devmanfre/isitdown:ui-latest`, built `FROM` the Light image.
 - **v1.3 — history**: per-provider uptime and incident history with status-page daily
   bars and 7/30/90-day views, aggregated server-side and served from `/history`.
 - **v1.4 — dark mode and i18n**: token-based light/dark/system theming with a
