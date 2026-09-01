@@ -5,27 +5,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import webpush from "web-push";
 import { buildUiRuntime, type UiRuntime } from "../../src/ui/runtime.ts";
+import { isVapidPublicKey } from "../../src/ui/vapidKeys.ts";
 import { createLogger } from "../../src/core/logger.ts";
 
 const silent = createLogger("error", () => {});
-
-// An uncompressed P-256 public key, base64url-encoded, is 87 characters — use
-// a realistic-length stand-in so GET /config/push's decode guard does not
-// itself blank out the value in tests that expect to see it returned intact.
-// (This particular stand-in happens to decode to a valid-shaped 65-byte,
-// 0x04-prefixed point too, but the tests that actually need a genuine key —
-// round-tripping it unchanged, and the exploit-replay regression — use a
-// real generated pair below instead of relying on that coincidence.)
-const REALISTIC_VAPID_PUBLIC_KEY = "B".repeat(87);
-
-// A real key pair, so the tests that must reflect genuine VAPID shapes don't
-// depend on a placeholder that happens to decode correctly, or on a private
-// key fixture too short to ever have passed the decode guard in the first
-// place (which would mask whether the earlier write-time guards are doing
-// anything).
-const { publicKey: REAL_VAPID_PUBLIC_KEY, privateKey: REAL_VAPID_PRIVATE_KEY } = webpush.generateVAPIDKeys();
 
 interface Api {
   runtime: UiRuntime;
@@ -63,20 +47,51 @@ async function startApi(env: NodeJS.ProcessEnv = {}): Promise<Api> {
   };
 }
 
-test("the public key is exposed and the private key is not", async () => {
-  const api = await startApi({ VAPID_PUBLIC_KEY: REALISTIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY: "kPriv" });
+test("the public key is served and the private key never leaves the process", async () => {
+  const api = await startApi();
   try {
     const response = await api.request("GET", "/config/push");
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { publicKey: REALISTIC_VAPID_PUBLIC_KEY });
-    assert.doesNotMatch(JSON.stringify(response.body), /kPriv/);
+    const { publicKey } = response.body as { publicKey: string };
+    // Generated on first use, so the route answers with a key a browser can
+    // actually subscribe with even though nothing was ever configured.
+    assert.ok(isVapidPublicKey(publicKey), `not a VAPID public key: ${publicKey}`);
+
+    // The stored private half is the one thing that must never appear on the
+    // wire — compare against the real row, not a fixture.
+    const privateKey = (
+      api.runtime.db.prepare("SELECT value FROM settings WHERE key = 'vapidPrivateKey'").get() as {
+        value: string;
+      }
+    ).value;
+    assert.notEqual(privateKey, "");
+    assert.doesNotMatch(JSON.stringify(response.body), new RegExp(privateKey.replace(/[-_]/gu, ".")));
+
+    // Stable across calls: a key that rotated per request would invalidate
+    // every browser that had already subscribed.
+    assert.deepEqual((await api.request("GET", "/config/push")).body, { publicKey });
+  } finally {
+    await api.close();
+  }
+});
+
+test("the webpush channel is described with no fields to configure", async () => {
+  const api = await startApi();
+  try {
+    const response = await api.request("GET", "/config");
+    const channels = (response.body as { channels: { id: string; fields: unknown[] }[] }).channels;
+    const webpush = channels.find((channel) => channel.id === "webpush");
+    assert.ok(webpush);
+    // The two VAPID variables were the only fields this channel ever had; the
+    // dashboard now shows a switch and the per-browser button, nothing else.
+    assert.deepEqual(webpush.fields, []);
   } finally {
     await api.close();
   }
 });
 
 test("a browser subscribes, appears as a device, and can be unregistered", async () => {
-  const api = await startApi({ VAPID_PUBLIC_KEY: "BPub", VAPID_PRIVATE_KEY: "kPriv" });
+  const api = await startApi();
   try {
     const created = await api.request("POST", "/config/push/subscriptions", {
       endpoint: "https://push.example/abc",
@@ -100,7 +115,7 @@ test("a browser subscribes, appears as a device, and can be unregistered", async
 });
 
 test("a malformed subscription is refused", async () => {
-  const api = await startApi({ VAPID_PUBLIC_KEY: "BPub", VAPID_PRIVATE_KEY: "kPriv" });
+  const api = await startApi();
   try {
     const response = await api.request("POST", "/config/push/subscriptions", { endpoint: "not-a-url" });
     assert.equal(response.status, 400);
@@ -110,7 +125,7 @@ test("a malformed subscription is refused", async () => {
 });
 
 test("an otherwise well-formed subscription with only its endpoint malformed is refused", async () => {
-  const api = await startApi({ VAPID_PUBLIC_KEY: "BPub", VAPID_PRIVATE_KEY: "kPriv" });
+  const api = await startApi();
   try {
     const response = await api.request("POST", "/config/push/subscriptions", {
       endpoint: "not-a-url",
@@ -124,7 +139,7 @@ test("an otherwise well-formed subscription with only its endpoint malformed is 
 });
 
 test("a subscription with a non-https endpoint is refused", async () => {
-  const api = await startApi({ VAPID_PUBLIC_KEY: "BPub", VAPID_PRIVATE_KEY: "kPriv" });
+  const api = await startApi();
   try {
     const response = await api.request("POST", "/config/push/subscriptions", {
       endpoint: "http://push.example/abc",
@@ -138,7 +153,7 @@ test("a subscription with a non-https endpoint is refused", async () => {
 });
 
 test("unregistering a device that is not there is a 404", async () => {
-  const api = await startApi({ VAPID_PUBLIC_KEY: "BPub", VAPID_PRIVATE_KEY: "kPriv" });
+  const api = await startApi();
   try {
     // Register a real device first so a 404 here proves the route matched and
     // looked the id up, rather than passing vacuously because the route did
@@ -154,180 +169,50 @@ test("unregistering a device that is not there is a 404", async () => {
   }
 });
 
-test("a channel whose public and private key variables collide never leaks the private value", async () => {
-  const api = await startApi({ VAPID_PUBLIC_KEY: "BPub", VAPID_PRIVATE_KEY: "kPriv" });
-  try {
-    // Simulate a row already in this bad state (e.g. from before the
-    // updateChannel guard existed, or a direct DB edit) by bypassing
-    // updateChannel and writing the colliding config straight into the table.
-    api.runtime.db
-      .prepare("UPDATE channels SET config = ? WHERE id = 'webpush'")
-      .run(JSON.stringify({ publicKeyEnv: "VAPID_PRIVATE_KEY", privateKeyEnv: "VAPID_PRIVATE_KEY" }));
-
-    const response = await api.request("GET", "/config/push");
-    assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { publicKey: "" });
-    assert.doesNotMatch(JSON.stringify(response.body), /kPriv/);
-  } finally {
-    await api.close();
-  }
-});
-
-test("patching a channel to alias two secrets onto the same variable is refused", async () => {
-  const api = await startApi({ VAPID_PUBLIC_KEY: REALISTIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY: "kPriv" });
-  try {
-    const response = await api.request("PATCH", "/config/channels/webpush", {
-      fields: { publicKeyEnv: "VAPID_PRIVATE_KEY" },
-    });
-    assert.equal(response.status, 400);
-    assert.match(
-      (response.body as { error: { message: string } }).error.message,
-      /VAPID_PRIVATE_KEY/,
-    );
-
-    // The collision was refused, so the public key still resolves to the
-    // actual public value rather than the private one.
-    const push = await api.request("GET", "/config/push");
-    assert.deepEqual(push.body, { publicKey: REALISTIC_VAPID_PUBLIC_KEY });
-  } finally {
-    await api.close();
-  }
-});
-
+// The `*Env` write guards below no longer have webpush to defend — that
+// channel stores no variable names at all — but they still protect telegram
+// and webhook, whose values a route never returns and must never start
+// returning by way of an alias.
 test("blanking a channel's env field is refused rather than accepted as unconfigured", async () => {
-  const api = await startApi({ VAPID_PUBLIC_KEY: REALISTIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY: "kPriv" });
+  const api = await startApi();
   try {
-    const response = await api.request("PATCH", "/config/channels/webpush", {
-      fields: { privateKeyEnv: "" },
-    });
+    const response = await api.request("PATCH", "/config/channels/telegram", { fields: { botTokenEnv: "" } });
     assert.equal(response.status, 400);
-    assert.match((response.body as { error: { message: string } }).error.message, /privateKeyEnv/);
+    assert.match((response.body as { error: { message: string } }).error.message, /cannot be blank/u);
   } finally {
     await api.close();
   }
 });
 
 test("aliasing a channel's env field onto a different channel's variable is refused", async () => {
-  // telegram.botTokenEnv is seeded to TELEGRAM_BOT_TOKEN by default — pointing
-  // webpush's public key at that same variable would let GET /config/push
-  // echo the Telegram bot token back to any page that can reach this
-  // dashboard, so the collision check must span every channel, not just the
-  // one being patched.
-  const api = await startApi({
-    VAPID_PUBLIC_KEY: REALISTIC_VAPID_PUBLIC_KEY,
-    VAPID_PRIVATE_KEY: "kPriv",
-    TELEGRAM_BOT_TOKEN: "123:ABC",
-  });
+  const api = await startApi();
   try {
-    const response = await api.request("PATCH", "/config/channels/webpush", {
-      fields: { publicKeyEnv: "TELEGRAM_BOT_TOKEN" },
+    const response = await api.request("PATCH", "/config/channels/telegram", {
+      fields: { botTokenEnv: "WEBHOOK_URL" },
     });
     assert.equal(response.status, 400);
-    assert.match((response.body as { error: { message: string } }).error.message, /TELEGRAM_BOT_TOKEN/);
-
-    const push = await api.request("GET", "/config/push");
-    assert.deepEqual(push.body, { publicKey: REALISTIC_VAPID_PUBLIC_KEY });
+    assert.match((response.body as { error: { message: string } }).error.message, /WEBHOOK_URL/u);
   } finally {
     await api.close();
   }
 });
 
-test("a public key variable that resolves to a short value is treated as unset", async () => {
-  const api = await startApi({
-    VAPID_PUBLIC_KEY: REALISTIC_VAPID_PUBLIC_KEY,
-    VAPID_PRIVATE_KEY: "kPriv",
-    SHORT_SECRET: "not-a-real-vapid-key",
-  });
+test("the webpush channel has no env field to patch in the first place", async () => {
+  const api = await startApi({ TELEGRAM_BOT_TOKEN: "123:ABC" });
   try {
-    // No name collision here (SHORT_SECRET is not used by any other channel
-    // field), so the patch itself succeeds — it is the route's shape guard,
-    // not the name-collision guard, doing the work in this test.
-    const patch = await api.request("PATCH", "/config/channels/webpush", {
-      fields: { publicKeyEnv: "SHORT_SECRET" },
-    });
-    assert.equal(patch.status, 200);
+    // The old shape of this attack — point webpush's `publicKeyEnv` at a
+    // variable holding someone else's secret, then read it back from
+    // GET /config/push — has no surface left: the route reads the generated
+    // key from SQLite and never touches the environment, so even a config
+    // forced straight into the table changes nothing it serves.
+    api.runtime.db
+      .prepare("UPDATE channels SET config = ? WHERE id = 'webpush'")
+      .run(JSON.stringify({ publicKeyEnv: "TELEGRAM_BOT_TOKEN" }));
 
-    const response = await api.request("GET", "/config/push");
-    assert.deepEqual(response.body, { publicKey: "" });
-  } finally {
-    await api.close();
-  }
-});
-
-test("the reported exploit sequence (blank the private key, then alias) never exposes its value", async () => {
-  // A realistic 43-character private key is used here deliberately: it is
-  // long and shaped enough that it would sail through the route's decode
-  // guard if that guard were the only thing standing in the exploit's way.
-  // So this test genuinely depends on the write-time guards in updateChannel
-  // (refusing the blank, then refusing the alias) rather than being saved by
-  // a fixture too short to have passed the decode guard anyway.
-  const api = await startApi({
-    VAPID_PUBLIC_KEY: REALISTIC_VAPID_PUBLIC_KEY,
-    VAPID_PRIVATE_KEY: REAL_VAPID_PRIVATE_KEY,
-  });
-  try {
-    const step1 = await api.request("PATCH", "/config/channels/webpush", {
-      fields: { privateKeyEnv: "" },
-    });
-    assert.equal(step1.status, 400, "blanking the private key's variable name must itself be refused");
-
-    const step2 = await api.request("PATCH", "/config/channels/webpush", {
-      fields: { publicKeyEnv: "VAPID_PRIVATE_KEY" },
-    });
-    assert.equal(
-      step2.status,
-      400,
-      "aliasing onto the same variable must be refused even if the blank step had somehow gone through",
-    );
-
-    const push = await api.request("GET", "/config/push");
-    assert.notDeepEqual(push.body, { publicKey: REAL_VAPID_PRIVATE_KEY });
-    assert.doesNotMatch(JSON.stringify(push.body), new RegExp(REAL_VAPID_PRIVATE_KEY));
-    // Both patches were refused, so the channel's config never changed — the
-    // real public key still resolves normally.
-    assert.deepEqual(push.body, { publicKey: REALISTIC_VAPID_PUBLIC_KEY });
-  } finally {
-    await api.close();
-  }
-});
-
-test("a genuine VAPID public key decodes correctly and round-trips unchanged", async () => {
-  const api = await startApi({
-    VAPID_PUBLIC_KEY: REAL_VAPID_PUBLIC_KEY,
-    VAPID_PRIVATE_KEY: REAL_VAPID_PRIVATE_KEY,
-  });
-  try {
     const response = await api.request("GET", "/config/push");
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { publicKey: REAL_VAPID_PUBLIC_KEY });
-  } finally {
-    await api.close();
-  }
-});
-
-test("a long base64url run that only looks key-shaped is treated as unset", async () => {
-  // The re-reviewer's finding: an 80+ character base64url string passed the
-  // old regex-only shape guard regardless of what it actually decoded to.
-  // 90 "A" characters is exactly such a string — long and legally
-  // base64url-shaped, but it decodes to 67 bytes starting with 0x00, not the
-  // 65 bytes starting with 0x04 a real VAPID public key requires.
-  const api = await startApi({
-    VAPID_PUBLIC_KEY: REALISTIC_VAPID_PUBLIC_KEY,
-    VAPID_PRIVATE_KEY: REAL_VAPID_PRIVATE_KEY,
-    UNREFERENCED_SECRET: "A".repeat(90),
-  });
-  try {
-    // Nothing else references UNREFERENCED_SECRET, so the cross-channel
-    // collision guard has no name to object to — the patch itself succeeds.
-    // It is the route's decode guard, not a write-time guard, being
-    // exercised here.
-    const patch = await api.request("PATCH", "/config/channels/webpush", {
-      fields: { publicKeyEnv: "UNREFERENCED_SECRET" },
-    });
-    assert.equal(patch.status, 200);
-
-    const response = await api.request("GET", "/config/push");
-    assert.deepEqual(response.body, { publicKey: "" });
+    assert.ok(isVapidPublicKey((response.body as { publicKey: string }).publicKey));
+    assert.doesNotMatch(JSON.stringify(response.body), /123:ABC/u);
   } finally {
     await api.close();
   }

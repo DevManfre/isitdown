@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -165,7 +165,7 @@ export function migrate(db: DatabaseSync): void {
   if (from < 6) {
     // A push subscription is a delivery address the browser hands out, not an
     // operator credential: it is useless without the VAPID private key, which
-    // stays in the environment. `id` hashes the endpoint so re-subscribing the
+    // never leaves this process. `id` hashes the endpoint so re-subscribing the
     // same browser replaces the row instead of adding a second toast target.
     db.exec(`
       CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -177,6 +177,30 @@ export function migrate(db: DatabaseSync): void {
         created_at TEXT NOT NULL
       );
     `);
+  }
+
+  if (from < 7) {
+    // The VAPID pair is generated and stored by src/ui/vapidKeys.ts now, so the
+    // webpush row's two `*Env` references — the only reason the channel ever
+    // showed environment-variable fields in the dashboard — are dropped. A
+    // stale reference left here would still be described to the UI and would
+    // still be checked against the environment for a value nothing reads.
+    const row = db.prepare("SELECT config FROM channels WHERE id = 'webpush'").get() as
+      | { config?: string }
+      | undefined;
+    if (row?.config !== undefined) {
+      const config = JSON.parse(row.config) as Record<string, string>;
+      delete config["publicKeyEnv"];
+      delete config["privateKeyEnv"];
+      db.prepare("UPDATE channels SET config = ? WHERE id = 'webpush'").run(JSON.stringify(config));
+    }
+    // Every existing subscription was registered against the key pair that used
+    // to come from the environment, and the server now signs with one of its
+    // own: those endpoints would reject each push (403, not the 410 that prunes
+    // a device) and the operator would watch a device list that can no longer
+    // receive anything. Clearing them makes the one working repair — press
+    // "enable on this browser" again — the obvious one.
+    db.exec("DELETE FROM push_subscriptions");
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

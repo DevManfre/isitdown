@@ -5,10 +5,30 @@ import type { PushSubscription, PushSubscriptionStore } from "../core/pushSubscr
 import type { NotificationPayload } from "../core/types.ts";
 import { renderMessage } from "./formatting.ts";
 
-const settingsSchema = z.object({
-  publicKey: z.string().min(1, "publicKey is required for the webpush channel"),
-  privateKey: z.string().min(1, "privateKey is required for the webpush channel"),
+const keysSchema = z.object({
+  publicKey: z.string().min(1, "the webpush channel needs a VAPID public key"),
+  privateKey: z.string().min(1, "the webpush channel needs a VAPID private key"),
 });
+
+/**
+ * The toast's icon. A provider's own `/favicon.ico` is frequently absent on a
+ * Statuspage-hosted page (the real icon hides behind a `<link rel="icon">` on a
+ * CDN), and a service worker gets no `onerror` retry across candidates the way
+ * the dashboard's ring does — one URL is all a notification gets. So it uses
+ * the same icon service the ring falls back to, which always answers with an
+ * image. Empty when the status URL does not parse: the toast then shows the
+ * browser's own default rather than a broken square.
+ *
+ * Kept in step with src/ui/web/lib/favicon.ts, which resolves the same icon for
+ * the dashboard.
+ */
+export function providerIcon(statusUrl: string): string {
+  try {
+    return `https://icons.duckduckgo.com/ip3/${new URL(statusUrl).host}.ico`;
+  } catch {
+    return "";
+  }
+}
 
 /**
  * Required by the Web Push protocol as a contact for the push service. It is
@@ -88,11 +108,12 @@ const messageOf = (error: unknown): string => (error instanceof Error ? error.me
  * device is gone for good, so it is dropped rather than retried forever.
  */
 export function createWebPushNotifier(deps: {
-  settings: Record<string, string>;
+  /** Generated and stored by the edition, never asked of the operator. */
+  keys: { publicKey: string; privateKey: string };
   store: PushSubscriptionStore;
   push?: PushTransport | undefined;
 }): Notifier {
-  const { publicKey, privateKey } = settingsSchema.parse(deps.settings);
+  const { publicKey, privateKey } = keysSchema.parse(deps.keys);
   const push = deps.push ?? defaultTransport;
   const vapid: VapidDetails = { subject: VAPID_SUBJECT, publicKey, privateKey };
 
@@ -108,11 +129,15 @@ export function createWebPushNotifier(deps: {
       // channels from drifting apart in wording.
       const message = renderMessage(payload);
       const [emoji = "", ...rest] = message.split(" ");
+      const icon = providerIcon(payload.service.statusUrl);
       const body = JSON.stringify({
         title: `${emoji} ${payload.service.name}`,
         body: rest.join(" "),
         url: "/",
         providerId: payload.change.providerId,
+        // The provider being reported, not IsItDown: a toast stack shows which
+        // service is down before a word of it is read.
+        ...(icon === "" ? {} : { icon }),
       });
 
       let delivered = 0;

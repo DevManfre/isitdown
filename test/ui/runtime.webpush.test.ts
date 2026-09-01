@@ -12,19 +12,21 @@ async function runtime() {
   const dir = await mkdtemp(join(tmpdir(), "isitdown-webpush-"));
   return buildUiRuntime({
     dbPath: join(dir, "test.db"),
-    env: { VAPID_PUBLIC_KEY: "BPub", VAPID_PRIVATE_KEY: "kPriv" },
+    env: {},
     logger: silent,
   });
 }
 
-test("the webpush channel is seeded, disabled, carrying only variable names", async () => {
+test("the webpush channel is seeded disabled and carries no settings of its own", async () => {
   const ui = await runtime();
   try {
     const config = await ui.configSource.load();
     const channel = config.channels.find((entry) => entry.id === "webpush");
     assert.ok(channel);
     assert.equal(channel.enabled, false);
-    assert.deepEqual(channel.settings, { publicKey: "BPub", privateKey: "kPriv" });
+    // Nothing to resolve from the environment any more: the key pair is the
+    // server's own and is read straight from SQLite when the notifier is built.
+    assert.deepEqual(channel.settings, {});
   } finally {
     await ui.close();
   }
@@ -33,13 +35,27 @@ test("the webpush channel is seeded, disabled, carrying only variable names", as
 test("the runtime's builder can construct the webpush channel the shared registry cannot", async () => {
   const ui = await runtime();
   try {
-    const built = ui.buildNotifiers([
-      { id: "webpush", enabled: true, settings: { publicKey: "BPub", privateKey: "kPriv" } },
-    ]);
+    const built = ui.buildNotifiers([{ id: "webpush", enabled: true, settings: {} }]);
     assert.deepEqual(
       built.map((notifier) => notifier.id),
       ["webpush"],
     );
+  } finally {
+    await ui.close();
+  }
+});
+
+test("enabling the channel needs no configuration: the key pair is generated on first build", async () => {
+  const ui = await runtime();
+  try {
+    // The whole point of dropping the two VAPID variables: a channel switched
+    // on in the dashboard, with an empty environment, still builds a notifier
+    // that can sign a push.
+    assert.doesNotThrow(() => ui.buildNotifiers([{ id: "webpush", enabled: true, settings: {} }]));
+    const stored = ui.db.prepare("SELECT value FROM settings WHERE key = 'vapidPrivateKey'").get() as {
+      value: string;
+    };
+    assert.notEqual(stored.value, "");
   } finally {
     await ui.close();
   }

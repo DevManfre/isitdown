@@ -7,6 +7,16 @@ self.addEventListener("push", (event) => {
       body: data.body || "",
       // One provider replaces its own previous toast instead of stacking five.
       tag: data.providerId || "isitdown",
+      // Replacing a tagged notification is silent by default: the second
+      // status change for the same provider would slip straight into the
+      // notification centre with no banner and no sound, which reads as "push
+      // is broken". `renotify` re-alerts on every replacement, and needs the
+      // `tag` above to be set at all.
+      renotify: true,
+      // The provider's own icon when the notifier resolved one; omitted rather
+      // than empty, so the browser falls back to its default instead of trying
+      // to load "".
+      ...(data.icon ? { icon: data.icon } : {}),
       data: { url: data.url || "/" },
     }),
   );

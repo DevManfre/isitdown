@@ -198,6 +198,8 @@
   "push.registered-channel-off": "Questo browser è registrato, ma il canale è disattivato: attivalo qui sopra per ricevere davvero le notifiche.",
   "push.denied": "Le notifiche sono bloccate per questo sito nelle impostazioni del browser.",
   "push.failed": "Attivazione non riuscita: {error}",
+  "push.push-service-brave": "Brave ha bloccato la registrazione al suo servizio push, che disattiva per impostazione predefinita. Apri brave://settings/privacy, attiva \u201cUsa i servizi Google per la messaggistica push\u201d, riavvia Brave, poi attiva di nuovo questo browser.",
+  "push.push-service": "Il browser non \u00e8 riuscito a registrarsi al suo servizio push. Di solito \u00e8 disattivato nelle impostazioni del browser (Brave e alcune build di Chromium lo distribuiscono spento) oppure bloccato a monte da firewall, VPN o filtro DNS: consentilo, riavvia il browser e riprova.",
   "push.unsupported": "Questo browser non può ricevere notifiche push qui. Apri la dashboard su localhost o in HTTPS.",
   "push.no-devices": "Nessun browser registrato.",
   "push.devices": "Browser registrati",

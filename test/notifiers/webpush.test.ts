@@ -4,7 +4,7 @@ import { createWebPushNotifier } from "../../src/notifiers/webpush.notifier.ts";
 import type { PushSubscription, PushSubscriptionStore } from "../../src/core/pushSubscriptionStore.interface.ts";
 import type { NotificationPayload } from "../../src/core/types.ts";
 
-const settings = { publicKey: "BPub", privateKey: "kPriv" };
+const keys = { publicKey: "BPub", privateKey: "kPriv" };
 
 const device = (n: number): PushSubscription => ({
   endpoint: `https://push.example/${n}`,
@@ -38,7 +38,7 @@ test("every registered device receives the rendered change, split into a title a
   const sent: { endpoint: string; payload: string }[] = [];
   const store = fakeStore([device(1), device(2)]);
   const notifier = createWebPushNotifier({
-    settings,
+    keys,
     store,
     push: async (subscription, payload) => {
       sent.push({ endpoint: subscription.endpoint, payload });
@@ -58,6 +58,8 @@ test("every registered device receives the rendered change, split into a title a
   assert.match(body["title"]!, /^🟡 GitHub$/u);
   assert.match(body["body"]!, /GitHub/u);
   assert.doesNotMatch(body["body"]!, /^🟡/u);
+  // The toast wears the provider's own icon, not IsItDown's.
+  assert.equal(body["icon"], "https://icons.duckduckgo.com/ip3/www.githubstatus.com.ico");
   assert.equal(body["providerId"], "github");
   assert.equal(body["url"], "/");
 });
@@ -65,7 +67,7 @@ test("every registered device receives the rendered change, split into a title a
 test("a device the push service reports as gone is pruned, and the rest still count as delivered", async () => {
   const store = fakeStore([device(1), device(2)]);
   const notifier = createWebPushNotifier({
-    settings,
+    keys,
     store,
     push: async (subscription) => {
       if (subscription.endpoint.endsWith("/1")) {
@@ -82,7 +84,7 @@ test("a device the push service reports as gone is pruned, and the rest still co
 test("any other push failure is reported so the dispatcher records it", async () => {
   const store = fakeStore([device(1)]);
   const notifier = createWebPushNotifier({
-    settings,
+    keys,
     store,
     push: async () => {
       throw Object.assign(new Error("Service Unavailable"), { statusCode: 503 });
@@ -99,7 +101,7 @@ test("any other push failure is reported so the dispatcher records it", async ()
 test("a transport failure with no HTTP status reports the underlying error instead of 'HTTP unknown'", async () => {
   const store = fakeStore([device(1)]);
   const notifier = createWebPushNotifier({
-    settings,
+    keys,
     store,
     push: async () => {
       throw new Error("ECONNREFUSED: connection refused");
@@ -123,7 +125,7 @@ test("a transport failure with no HTTP status reports the underlying error inste
 test("a partial fan-out reports how many devices still got the message, not only the failure", async () => {
   const store = fakeStore([device(1), device(2), device(3)]);
   const notifier = createWebPushNotifier({
-    settings,
+    keys,
     store,
     push: async (subscription) => {
       if (subscription.endpoint.endsWith("/3")) {
@@ -150,7 +152,7 @@ test("a transport that never resolves cannot hang send() past its own timeout", 
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const store = fakeStore([device(1)]);
   const notifier = createWebPushNotifier({
-    settings,
+    keys,
     store,
     push: () => new Promise<void>(() => {}),
   });
@@ -169,7 +171,7 @@ test("a transport that never resolves cannot hang send() past its own timeout", 
 test("the payload sent to the push service carries no unused kind field", async () => {
   const sent: string[] = [];
   const notifier = createWebPushNotifier({
-    settings,
+    keys,
     store: fakeStore([device(1)]),
     push: async (_subscription, payload) => {
       sent.push(payload);
@@ -183,14 +185,14 @@ test("the payload sent to the push service carries no unused kind field", async 
 });
 
 test("with no device registered the send fails loudly rather than reporting a silent success", async () => {
-  const notifier = createWebPushNotifier({ settings, store: fakeStore([]), push: async () => {} });
+  const notifier = createWebPushNotifier({ keys, store: fakeStore([]), push: async () => {} });
   await assert.rejects(() => notifier.send(degraded), /webpush: no device registered/u);
 });
 
 test("every device being pruned in one send is still a failure", async () => {
   const store = fakeStore([device(1)]);
   const notifier = createWebPushNotifier({
-    settings,
+    keys,
     store,
     push: async () => {
       throw Object.assign(new Error("Gone"), { statusCode: 410 });
@@ -201,6 +203,23 @@ test("every device being pruned in one send is still a failure", async () => {
   assert.deepEqual(store.pruned, ["https://push.example/1"]);
 });
 
-test("missing VAPID keys are refused when the channel is built", () => {
-  assert.throws(() => createWebPushNotifier({ settings: {}, store: fakeStore([]), push: async () => {} }));
+test("an empty VAPID pair is refused when the channel is built", () => {
+  assert.throws(() => createWebPushNotifier({ keys: { publicKey: "", privateKey: "" }, store: fakeStore([]), push: async () => {} }));
+});
+
+test("a status URL that does not parse leaves the toast without an icon", async () => {
+  const sent: string[] = [];
+  const notifier = createWebPushNotifier({
+    keys,
+    store: fakeStore([device(1)]),
+    push: async (_subscription, payload) => {
+      sent.push(payload);
+    },
+  });
+
+  await notifier.send({ ...degraded, service: { ...degraded.service, statusUrl: "not a url" } });
+
+  // Omitted rather than empty: an empty `icon` is a broken image, no `icon` is
+  // the browser's own default.
+  assert.ok(!Object.hasOwn(JSON.parse(sent[0]!) as Record<string, unknown>, "icon"));
 });

@@ -102,6 +102,14 @@ export function RemoveServiceDialog({ service, trigger }: { service: ServiceDefi
   );
 }
 
+// Reason codes `subscribeThisBrowser` throws, mapped to copy that says what to
+// do about them; anything else falls back to push.failed with the raw text.
+const PUSH_FAILURE_KEYS: Record<string, string> = {
+  denied: "push.denied",
+  "push-service": "push.push-service",
+  "push-service-brave": "push.push-service-brave",
+};
+
 /**
  * Browser push is the one channel whose target is the machine looking at the
  * dashboard, so enabling it needs a click *here* — the env vars alone cannot
@@ -126,31 +134,44 @@ function PushDevices({ channelEnabled }: { channelEnabled: boolean }) {
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      setMessage(reason === "denied" ? t("push.denied") : t("push.failed", { error: reason }));
+      const key = PUSH_FAILURE_KEYS[reason];
+      setMessage(key !== undefined ? t(key) : t("push.failed", { error: reason }));
     }
   };
 
   if (!supported) return <p className="text-xs text-muted-foreground">{t("push.unsupported")}</p>;
 
+  const registered = devices.data?.devices ?? [];
+
   return (
-    <div className="flex flex-col gap-2 border-t border-border pt-3">
-      <Button type="button" size="sm" variant="secondary" disabled={add.isPending} onClick={() => void enable()}>
-        {t("push.enable")}
-      </Button>
-      {message !== undefined && <span className="text-xs text-muted-foreground">{message}</span>}
-      <span className="text-xs text-muted-foreground">{t("push.devices")}</span>
-      {(devices.data?.devices ?? []).length === 0 ? (
-        <span className="text-xs text-muted-foreground">{t("push.no-devices")}</span>
-      ) : (
-        (devices.data?.devices ?? []).map((device) => (
-          <div key={device.id} className="flex items-center justify-between gap-2">
-            <span className="font-mono text-xs">{device.label}</span>
-            <Button type="button" size="sm" variant="ghost" onClick={() => remove.mutate(device.id)}>
-              {t("action.remove")}
-            </Button>
+    <div className="flex flex-col gap-3 border-t border-border pt-3">
+      <div className="flex flex-col gap-1.5">
+        <Button type="button" size="sm" variant="secondary" disabled={add.isPending} onClick={() => void enable()}>
+          {t("push.enable")}
+        </Button>
+        {message !== undefined && <p className="text-xs leading-relaxed text-muted-foreground">{message}</p>}
+      </div>
+
+      {/* The heading was a muted line of the same size as the device rows it
+          labels, so the two read as one flat list. Kicker styling plus a
+          bordered list gives the rows something to sit inside. */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("push.devices")}</span>
+        {registered.length === 0 ? (
+          <span className="text-xs text-muted-foreground">{t("push.no-devices")}</span>
+        ) : (
+          <div className="divide-y divide-border rounded-md border border-border">
+            {registered.map((device) => (
+              <div key={device.id} className="flex items-center justify-between gap-2 py-1 pl-3 pr-1">
+                <span className="font-mono text-xs">{device.label}</span>
+                <Button type="button" size="sm" variant="ghost" onClick={() => remove.mutate(device.id)}>
+                  {t("action.remove")}
+                </Button>
+              </div>
+            ))}
           </div>
-        ))
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -169,6 +190,7 @@ function ChannelCard({ channel }: { channel: DescribedChannel }) {
   // for something the operator typed.
   const [envValues, setEnvValues] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
+  const fieldless = channel.fields.length === 0;
 
   const save = (): void => {
     const fields = Object.fromEntries(
@@ -240,11 +262,25 @@ function ChannelCard({ channel }: { channel: DescribedChannel }) {
         );
       })}
 
-      <div className="flex items-center gap-2">
-        <Button type="button" size="sm" disabled={patch.isPending} onClick={save}>
-          {t("action.save")}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" disabled={test.isPending} onClick={() => void sendTest()}>
+      {/* A channel with no environment-variable fields — webpush, whose key pair
+          the server owns — has nothing to save, so its card is a column of
+          full-width actions that line up with the per-browser button below the
+          divider. A channel that does have fields keeps the inline
+          Save / Send test row next to its inputs. */}
+      <div className={fieldless ? "flex flex-col gap-1.5" : "flex items-center gap-2"}>
+        {!fieldless && (
+          <Button type="button" size="sm" disabled={patch.isPending} onClick={save}>
+            {t("action.save")}
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant={fieldless ? "secondary" : "ghost"}
+          size="sm"
+          className={fieldless ? "w-full" : undefined}
+          disabled={test.isPending}
+          onClick={() => void sendTest()}
+        >
           {t("action.send-test")}
         </Button>
         {message !== undefined && (

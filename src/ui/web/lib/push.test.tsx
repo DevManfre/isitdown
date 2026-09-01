@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deviceLabel, encode } from "./push.ts";
+import { deviceLabel, encode, subscribeFailureReason } from "./push.ts";
 
 describe("deviceLabel", () => {
   it("names the browser and the platform so two devices are told apart", () => {
@@ -32,5 +32,23 @@ describe("encode", () => {
 
   it("returns an empty string for a missing key", () => {
     expect(encode(null)).toBe("");
+  });
+});
+
+describe("subscribeFailureReason", () => {
+  // Chromium's own wording, verbatim: the operator cannot do anything with it,
+  // so it must be turned into a code the card has actionable copy for.
+  const pushServiceError = new Error("Registration failed - push service error");
+
+  it("names Brave, whose push service is off by default", () => {
+    expect(subscribeFailureReason(pushServiceError, true)).toBe("push-service-brave");
+  });
+
+  it("keeps the generic push-service code on any other engine", () => {
+    expect(subscribeFailureReason(pushServiceError, false)).toBe("push-service");
+  });
+
+  it("passes an unrelated failure through with its own message", () => {
+    expect(subscribeFailureReason(new Error("boom"), true)).toBe("boom");
   });
 });

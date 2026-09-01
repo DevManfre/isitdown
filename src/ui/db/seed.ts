@@ -29,7 +29,8 @@ const DEFAULT_SETTINGS: Record<string, string> = {
 const DEFAULT_CHANNELS = [
   { id: "telegram", config: { botTokenEnv: "TELEGRAM_BOT_TOKEN", chatIdEnv: "TELEGRAM_CHAT_ID" } },
   { id: "webhook", config: { urlEnv: "WEBHOOK_URL" } },
-  { id: "webpush", config: { publicKeyEnv: "VAPID_PUBLIC_KEY", privateKeyEnv: "VAPID_PRIVATE_KEY" } },
+  // No `*Env` fields: the VAPID pair is generated on first use (src/ui/vapidKeys.ts).
+  { id: "webpush", config: {} },
 ];
 
 export function seedDefaults(db: DatabaseSync): void {

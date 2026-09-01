@@ -96,14 +96,43 @@ describe("service worker (sw.js)", () => {
       dispatch("push", { data: { json: () => payload }, waitUntil });
       await settle();
 
+      // `renotify` is asserted here rather than in a test of its own: without
+      // it a replacement for the same tag is delivered silently, so the second
+      // change for a provider is only ever found by opening the notification
+      // centre.
       expect(self.registration.showNotification).toHaveBeenCalledWith("🟡 GitHub", {
         body: "GitHub is now degraded.",
         tag: "github",
+        renotify: true,
         data: { url: "/" },
       });
     });
 
-    it("falls back to defaults when the push carries no data", async () => {
+    it("wears the provider's own icon when the notifier resolved one", async () => {
+    const { self, dispatch } = loadServiceWorker();
+    const { waitUntil, settle } = capture();
+
+    dispatch("push", {
+      data: {
+        json: () => ({
+          title: "🟡 GitHub",
+          body: "GitHub is now degraded.",
+          url: "/",
+          providerId: "github",
+          icon: "https://icons.duckduckgo.com/ip3/www.githubstatus.com.ico",
+        }),
+      },
+      waitUntil,
+    });
+    await settle();
+
+    expect(self.registration.showNotification).toHaveBeenCalledWith(
+      "🟡 GitHub",
+      expect.objectContaining({ icon: "https://icons.duckduckgo.com/ip3/www.githubstatus.com.ico" }),
+    );
+  });
+
+  it("falls back to defaults when the push carries no data", async () => {
       const { self, dispatch } = loadServiceWorker();
       const { waitUntil, settle } = capture();
 
@@ -113,6 +142,7 @@ describe("service worker (sw.js)", () => {
       expect(self.registration.showNotification).toHaveBeenCalledWith("IsItDown", {
         body: "",
         tag: "isitdown",
+        renotify: true,
         data: { url: "/" },
       });
     });
