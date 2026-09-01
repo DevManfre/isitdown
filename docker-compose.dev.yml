@@ -17,7 +17,8 @@
 # a dependency change; everything else is live.
 #
 # Three overrides stop this container from passing itself off as production:
-# its own `image:` tag, so a dev build never overwrites `isitdown:ui`; no
+# its own `image:` tag, so a dev build never overwrites the published
+# `ghcr.io/devmanfre/isitdown:ui-latest`; no
 # restart policy, so it cannot come back after a reboot as the thing listening
 # on :3000; and no volume over `/app/dist`, so Vite's output lives and dies
 # with the container instead of outliving the image it came from. The service
