@@ -1,0 +1,79 @@
+@import "tailwindcss";
+@import "./tokens.css";
+@import "./motion.css";
+
+/* Tailwind v4 defaults an un-coloured `border` to `currentColor`, and the
+   shadcn primitives under components/ui/ are written for the base layer that
+   ships with the upstream preset and was never brought across: `border` with
+   no `border-border` beside it. Card, dialog, select and dropdown were
+   therefore outlining themselves in --color-text — a full-contrast box drawn
+   around a surface whose separation is supposed to come from a hairline and a
+   shadow. Everything that wants an outline in the text colour asks for it by
+   name (`border-current`), so this only reaches the ones that never named a
+   colour at all. */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+}
+
+/* Tailwind v4's Preflight sets `cursor: default` on `button` and on the
+   `type=button|reset|submit` inputs, where v3 set `pointer`. On this dashboard
+   that is every action there is: the shadcn Button, and every Radix primitive
+   that renders as a button under it — SelectTrigger, Switch, ToggleGroupItem,
+   even PaginationLink, which is a `<button>` here and not an anchor. So the
+   whole console pointed like static text.
+
+   `:not(:disabled)` because a disabled button is not clickable, and a pointer
+   over one is the same lie in the other direction. `<a href>` is left alone:
+   the UA stylesheet already points it, and Preflight never touched it.
+
+   The clickables that are *not* buttons — Radix's select options and menu
+   items, which are divs carrying a role — cannot be reached from here: shadcn
+   ships them with a `cursor-default` utility, and a utility beats the base
+   layer whatever its selector. Those are fixed in the primitives themselves
+   (components/ui/select.tsx, dropdown-menu.tsx); a `[role="option"]` rule
+   here would look like it covered them and never fire. */
+@layer base {
+  button:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+}
+
+/* The viewer's own ground shows through a transparent body.
+
+   `background-color` and `background-image` are set separately on purpose:
+   --gradient-page is `none` in dark, and the shorthand would then reset the
+   colour along with it. Fixed attachment keeps the two blooms anchored to the
+   viewport rather than sliding up a long Cronologia page, which is the
+   difference between a lit room and a painted backdrop scrolling past. */
+body {
+  background-color: var(--color-bg);
+  background-image: var(--gradient-page);
+  background-attachment: fixed;
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+/* The rail's own plane, painted over the `bg-sidebar` fill the primitive
+   carries. `Sidebar` paints that fill on its inner element, one level below the
+   container `.rail` lands on, so the wash has to go on the inner or the fill
+   would cover it. `none` in dark leaves the fill showing, untouched. */
+.rail [data-slot="sidebar-inner"] {
+  background-image: var(--gradient-rail);
+}
+
+/* No scrollbar gutter, anywhere: this is one operator's console, every
+   scrollable surface on it is short, and a permanent grey track down the side
+   of a dark dashboard is the loudest thing on the page. Scrolling itself is
+   untouched — wheel, trackpad, keys and touch all still work; only the bar
+   that draws it goes. Both properties are needed: `scrollbar-width` is the
+   standard one (Firefox), the pseudo-element is what Chromium and Safari
+   listen to. */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}

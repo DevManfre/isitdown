@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/core/**/*.ts",
+    "src/adapters/**/*.ts",
+    "src/notifiers/**/*.ts",
+    "src/light/**/*.ts"
+  ]
+}

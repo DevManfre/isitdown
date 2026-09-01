@@ -1,0 +1,13 @@
+{
+  "page": { "id": "fixture", "name": "Fixture", "url": "https://status.example.com" },
+  "status": { "indicator": "minor", "description": "Minor issues" },
+  "components": [
+    { "id": "grp1", "name": "Core Services", "status": "operational", "position": 1, "group": true, "group_id": null, "showcase": false },
+    { "id": "cmp1", "name": "API", "status": "operational", "position": 1, "group": false, "group_id": "grp1", "showcase": true },
+    { "id": "cmp2", "name": "Dashboard", "status": "degraded_performance", "position": 2, "group": false, "group_id": "grp1", "showcase": true },
+    { "id": "cmp3", "name": "Webhooks", "status": "partial_outage", "position": 3, "group": false, "group_id": null, "showcase": false },
+    { "id": "cmp4", "name": "Batch Jobs", "status": "under_maintenance", "position": 4, "group": false, "group_id": null, "showcase": false },
+    { "id": "cmp5", "name": "Edge Cache", "status": "totally_new_word", "position": 5, "group": false, "group_id": null, "showcase": false }
+  ],
+  "incidents": []
+}

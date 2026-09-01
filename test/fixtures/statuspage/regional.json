@@ -1,0 +1,93 @@
+{
+  "page": {
+    "id": "fixture",
+    "name": "Fixture",
+    "url": "https://status.example.com"
+  },
+  "status": {
+    "indicator": "minor",
+    "description": "Minor Service Outage"
+  },
+  "components": [
+    {
+      "id": "grp-eu",
+      "name": "Europe",
+      "status": "operational",
+      "position": 1,
+      "group": true,
+      "group_id": null,
+      "showcase": false
+    },
+    {
+      "id": "ams",
+      "name": "Amsterdam, Netherlands - (AMS)",
+      "status": "operational",
+      "position": 2,
+      "group": false,
+      "group_id": "grp-eu",
+      "showcase": false
+    },
+    {
+      "id": "grp-asia",
+      "name": "Asia",
+      "status": "degraded_performance",
+      "position": 3,
+      "group": true,
+      "group_id": null,
+      "showcase": false
+    },
+    {
+      "id": "sin",
+      "name": "Singapore - (SIN)",
+      "status": "partial_outage",
+      "position": 4,
+      "group": false,
+      "group_id": "grp-asia",
+      "showcase": false
+    }
+  ],
+  "incidents": [
+    {
+      "id": "inc-asia",
+      "name": "Network congestion in Singapore",
+      "impact": "minor",
+      "status": "investigating",
+      "created_at": "2026-08-19T09:00:00.000Z",
+      "updated_at": "2026-08-19T09:30:00.000Z",
+      "components": [
+        {
+          "id": "sin",
+          "name": "Singapore - (SIN)",
+          "status": "partial_outage",
+          "group": false,
+          "group_id": "grp-asia"
+        }
+      ]
+    },
+    {
+      "id": "inc-europe",
+      "name": "Packet loss in Amsterdam",
+      "impact": "minor",
+      "status": "identified",
+      "created_at": "2026-08-19T10:00:00.000Z",
+      "updated_at": "2026-08-19T10:15:00.000Z",
+      "components": [
+        {
+          "id": "ams",
+          "name": "Amsterdam, Netherlands - (AMS)",
+          "status": "degraded_performance",
+          "group": false,
+          "group_id": "grp-eu"
+        }
+      ]
+    },
+    {
+      "id": "inc-page",
+      "name": "Status page maintenance",
+      "impact": "none",
+      "status": "investigating",
+      "created_at": "2026-08-19T11:00:00.000Z",
+      "updated_at": "2026-08-19T11:05:00.000Z"
+    }
+  ]
+}

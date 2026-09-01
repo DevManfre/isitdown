@@ -1,0 +1,12 @@
+node_modules
+dist
+data
+.git
+.gitignore
+.env
+config.yml
+test
+docs
+design
+*.db
+*.md
