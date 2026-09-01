@@ -1,0 +1,44 @@
+# Development override: run the UI edition straight from the source tree.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d
+#   (or: npm run dev:docker)
+#
+# Node 24 strips the TypeScript types at load time, so the server needs no
+# build step: `src` is mounted read-only and `node --watch` restarts it when a
+# `.ts` file changes. The React dashboard still has a build step — Vite
+# watches `src/ui/web` and rewrites `dist/ui/public` on every save, served at
+# `/` by the express server. `WEB_DIR` has to be set explicitly here: its
+# default (`./public/` next to app.ts, i.e. `src/ui/public`) no longer exists
+# on disk at all, so without this the container would 404 on every asset.
+#
+# The `dev` build target (not `light`/`ui`) is required for this: it keeps the
+# devDependencies (Vite) and the full source tree that the production image's
+# `npm ci --omit=dev` deliberately drops. Rebuild the image (`--build`) after
+# a dependency change; everything else is live.
+#
+# Three overrides stop this container from passing itself off as production:
+# its own `image:` tag, so a dev build never overwrites the published
+# `ghcr.io/devmanfre/isitdown:ui-latest`; no
+# restart policy, so it cannot come back after a reboot as the thing listening
+# on :3000; and no volume over `/app/dist`, so Vite's output lives and dies
+# with the container instead of outliving the image it came from. The service
+# keeps the base file's `container_name` and data volume on purpose — that is
+# what makes dev and production mutually exclusive, so the two can never both
+# hold the port or write the same SQLite file.
+services:
+  isitdown-ui:
+    build:
+      target: dev
+    image: isitdown:dev
+    restart: "no"
+    environment:
+      NODE_ENV: development
+      WEB_DIR: /app/dist/ui/public
+    volumes:
+      - ./src:/app/src:ro
+      - ./vite.config.ts:/app/vite.config.ts:ro
+      - ./tsconfig.web.json:/app/tsconfig.web.json:ro
+    command:
+      - sh
+      - -c
+      - "npx vite build --watch & exec node --watch src/ui/server.ts"

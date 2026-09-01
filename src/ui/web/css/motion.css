@@ -1,0 +1,504 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Motion, from design 3a: the entry animations of a view and the hover/press
+   states of everything you can click.
+
+   The prototype restarts every entry animation whenever the view, the language
+   or the theme changes, and never on a data refresh. Here that remount key is
+   `data-animate` on #view: ViewFrame re-stamps it when the key changes, and a
+   background refresh that leaves the key untouched plays no animation at all
+   — React's own `key` remount replaces the DOM outright, so there is no
+   separate repaint left to hold still for. Every entry animation is therefore
+   written as a descendant of #view[data-animate]; looping motion (a pulsing
+   dot) and the transitions live outside that gate.
+
+   The attribute is also *when*: ViewFrame withholds it until the view's first
+   data has landed, so the whole page cascades from one origin instead of the
+   hero playing against an empty fleet and each query's rows arriving in a wave
+   of their own. The rule below holds the view invisible for that stretch —
+   held, not unmounted, because the queries live inside it.
+
+   Stagger delays are set inline by the views — a per-item delay is data, not a
+   style. Durations and curves stay here.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* — keyframes — */
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes unfold {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+/* The mirror of `unfold`, for an accordion panel closing instead of opening. */
+@keyframes fold {
+  from {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* A bar grows out of its baseline, which is why every bar sets transform-origin. */
+@keyframes bar-grow {
+  from {
+    opacity: 0.2;
+    transform: scaleY(0.06);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+@keyframes sweep {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+@keyframes ring-in {
+  from {
+    opacity: 0;
+    transform: rotate(-70deg) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+/* The mirror of `rise`, for a row leaving the page instead of arriving on it. */
+@keyframes sink {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes modal-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+/* The ring expands in the dot's own colour: currentColor, set beside background. */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  70% {
+    opacity: 0.85;
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* The beacon's calm state: nothing to attend to, so it only breathes. Scale
+   rather than the dot's expanding ring — an icon has a silhouette, and growing
+   a box-shadow around one draws a square halo. */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+/* The theme glyph arriving after a click: a quarter turn out of the button and
+   a fade, so a mode change reads as one mark replacing another rather than a
+   flicker. Rides `rotate`, not `transform`, so a Tailwind transform utility on
+   the icon would compose with it instead of being overwritten. */
+@keyframes theme-swap {
+  from {
+    opacity: 0;
+    rotate: -90deg;
+  }
+  to {
+    opacity: 1;
+    rotate: none;
+  }
+}
+
+/* — entry animations — */
+/* A view with nothing to show yet. `visibility` rather than `opacity` so the
+   controls it has already laid out cannot be tabbed into or read aloud before
+   they are on screen, and unlike `display` it leaves the box measurable — the
+   charts inside size themselves off their container while it is still held. */
+#view:not([data-animate]) {
+  visibility: hidden;
+}
+
+#view[data-animate] {
+  animation: view-in 0.36s var(--ease-entry) both;
+}
+/* The incident detail enters a touch slower; it is a page, not a panel. */
+#view[data-animate="incident"] {
+  animation-duration: 0.4s;
+}
+
+#view[data-animate] .anim-rise {
+  animation: rise 0.42s var(--ease-entry) both;
+}
+#view[data-animate] .anim-rise-hero {
+  animation-duration: 0.5s;
+}
+#view[data-animate] .anim-rise-column {
+  animation-duration: 0.48s;
+}
+#view[data-animate] .anim-rise-row {
+  animation-duration: 0.4s;
+}
+#view[data-animate] .anim-rise-table-row {
+  animation-duration: 0.38s;
+}
+#view[data-animate] .anim-fade {
+  animation: fade 0.42s var(--ease-entry) both;
+}
+#view[data-animate] .anim-sweep {
+  animation: sweep 0.55s var(--ease-entry) both;
+}
+#view[data-animate] .anim-sweep-step {
+  animation-duration: 0.45s;
+}
+#view[data-animate] .anim-ring {
+  animation: ring-in 0.55s var(--ease-entry) both;
+}
+#view[data-animate] .anim-bar {
+  animation: bar-grow 0.42s var(--ease-entry) both;
+}
+#view[data-animate] .anim-bar-strip {
+  animation-duration: 0.38s;
+}
+#view[data-animate] .anim-bar-month {
+  animation-duration: 0.5s;
+}
+
+/* — exit animations — */
+/* A row the filter has just dropped leaves the way the dialog does: the entry
+   run backwards and faster, because leaving should not be a wait. Deliberately
+   outside the #view[data-animate] gate — an exit is not an entry, and it is
+   driven by a class swap on a row already on the page, never by a remount.
+   Keep the duration in step with EXIT_MS in Providers.tsx, which is what holds
+   the row mounted long enough to play it. */
+.anim-sink {
+  animation: sink 0.22s ease both;
+}
+
+/* An accordion row unfolding open. Outside the #view[data-animate] gate for
+   the same reason .anim-sink is: the panel mounts into a view that is already
+   on the page, so gating it on a remount would mean it never ran. The row
+   grows out of nothing rather than appearing at full height — a `1fr` track
+   resolves to the panel's own height, which no keyframe can hardcode — so the
+   single grid child clips whatever has not been revealed yet. That child has
+   to be a bare box: an `fr` track is never flexed below its content's base
+   size, so padding on the clipped element itself floors the track at that
+   padding and the travel stops there. The panel's own padding sits inside it. */
+.anim-unfold {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: unfold 0.28s var(--ease-entry) both;
+}
+/* And closing again. The panel used to be cut away in the frame the chevron
+   was clicked, with the rows beneath it jumping up its full height after it;
+   it now leaves the way the dialog does, the entry run backwards and faster.
+   Keep the duration in step with FOLD_MS in Providers.tsx, which is what holds
+   the panel mounted long enough to play it. */
+.anim-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  animation: fold 0.22s ease both;
+}
+.anim-unfold > *,
+.anim-fold > * {
+  overflow: hidden;
+}
+
+.anim-sweep {
+  transform-origin: left;
+}
+/* A chart grows out of its baseline, so the wrapper — not the SVG rects, which
+   Recharts owns — carries the origin. */
+#view[data-animate] .anim-bar,
+#view[data-animate] .anim-bar-strip,
+#view[data-animate] .anim-bar-month {
+  transform-origin: bottom;
+}
+
+/* An open incident keeps pulsing: it is the one thing on the page still moving. */
+.dot-pulse {
+  animation: pulse 2.4s ease-out infinite;
+}
+
+/* The Overview beacon. Motion graded to the news: a settled estate breathes, a
+   fault pulses on the dot's own 2.4s, and a major outage runs it at half that
+   — fast enough to catch an eye crossing the room. */
+.beacon-breathe {
+  animation: breathe 3.6s ease-in-out infinite;
+}
+.beacon-pulse {
+  animation: pulse 2.4s ease-out infinite;
+  border-radius: 50%;
+}
+.beacon-urgent {
+  animation-duration: 1.2s;
+}
+
+/* — dialog — */
+/* Radix drives data-state on the overlay and the content; the keyframes are the
+   prototype's own. Closing runs the entry in reverse and faster: leaving should
+   not be a wait. */
+[data-slot="dialog-overlay"][data-state="open"] {
+  animation: fade 0.28s ease both;
+  backdrop-filter: blur(3px);
+}
+[data-slot="dialog-content"][data-state="open"] {
+  animation: modal-in 0.42s var(--ease-entry) 40ms both;
+}
+[data-slot="dialog-overlay"][data-state="closed"] {
+  animation: fade-out 0.22s ease both;
+  pointer-events: none;
+}
+[data-slot="dialog-content"][data-state="closed"] {
+  animation: modal-out 0.22s ease both;
+}
+
+/* — rail — */
+/* Hovering nudges the label 4px further in, pressing settles at 2px.
+
+   `SidebarMenuButton` supplies the row's fill and its active state, so the
+   only things left here are the accent edge the prototype gives the active
+   row — which no shadcn variant draws — and the nudge. The base padding is
+   set here too: the hand-rolled row carried Tailwind's `pl-6` (24px) while
+   these rules nudged to `--space-6 + 4px` (20.8px), so hovering pulled the
+   label *left*. One origin, one unit, and the nudge goes the way it reads. */
+[data-slot="sidebar-menu-button"] {
+  padding-left: var(--space-6);
+  border-left: 2px solid transparent;
+  transition:
+    background 0.22s var(--ease-out),
+    color 0.22s ease,
+    border-color 0.22s ease,
+    padding-left 0.22s var(--ease-out);
+}
+[data-slot="sidebar-menu-button"][data-active="true"] {
+  border-left-color: var(--color-primary);
+}
+[data-slot="sidebar-menu-button"]:hover {
+  padding-left: calc(var(--space-6) + 4px);
+}
+[data-slot="sidebar-menu-button"]:active {
+  padding-left: calc(var(--space-6) + 2px);
+}
+
+/* — header controls — */
+.lang-opt {
+  transition:
+    color 0.2s ease,
+    background 0.24s var(--ease-out);
+}
+.lang-opt:hover {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.theme-btn {
+  transition: background 0.24s ease;
+}
+/* Each mode mounts its own glyph, so there is no single element left to
+   transition the way the prototype's dot spun between two modes. Header.tsx
+   keys the icon on the mode; the remount plays this instead. */
+.theme-icon {
+  animation: theme-swap 0.34s var(--ease-out) both;
+}
+
+/* — buttons — */
+/* The prototype's primary action gains an accent bloom on hover and dips on
+   press. The bloom is the glow only: the prototype's button is a tinted outline
+   whose label is --color-text, so its 16%-tint hover reads fine there, but this
+   one is a solid fill whose label is --primary-foreground. Swapping the fill for
+   a tint left that label floating on the page colour at 1.05:1, so the fill
+   stays solid and moves to --primary-hover instead. */
+[data-slot="button"] {
+  transition:
+    background 0.22s ease,
+    border-color 0.22s ease,
+    color 0.2s ease,
+    /* .btn-ghost transitioned opacity; the merged rule must keep it or a
+       dim-by-default ghost button snaps to full brightness instead of fading. */
+    opacity 0.2s ease,
+    transform 0.18s var(--ease-out),
+    box-shadow 0.24s ease;
+}
+[data-slot="button"]:active {
+  transform: scale(0.96);
+}
+[data-slot="button"][data-variant="default"]:hover {
+  background: var(--primary-hover);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+[data-slot="button"][data-variant="destructive"]:hover {
+  box-shadow: 0 0 18px var(--status-outage-tint);
+}
+
+.back-link {
+  transition:
+    color 0.2s ease,
+    transform 0.22s var(--ease-out);
+}
+.back-link:hover {
+  color: var(--color-accent);
+  transform: translateX(-3px);
+}
+
+/* — segmented controls, badges and table rows — */
+[data-slot="toggle-group-item"] {
+  transition:
+    background 0.22s ease,
+    color 0.2s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+[data-slot="badge"] {
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.16s ease;
+}
+[data-slot="badge"]:hover {
+  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
+  color: var(--color-text);
+}
+[data-slot="badge"]:active {
+  transform: scale(0.95);
+}
+/* `translate` carries the ranks closing over a dropped row (useRowShift in
+   Providers.tsx). It has to be its own property rather than a transform: the
+   entry animation fills `transform` forever, and an animation outranks the
+   inline style the shift is set through. Slower than the 0.22s dissolve that
+   precedes it, so the gap closes as a settle rather than a second snap. */
+[data-slot="table-row"] {
+  transition:
+    background 0.2s ease,
+    translate 0.28s var(--ease-out);
+}
+[data-slot="table-cell"] {
+  transition: color 0.2s ease;
+}
+
+/* — rows, tiles and panels — */
+.incident-row {
+  transition: background 0.2s ease;
+}
+.ring-tile {
+  transition:
+    border-color 0.24s ease,
+    transform 0.24s var(--ease-out);
+}
+.ring-tile:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
+}
+.service-row {
+  transition:
+    border-color 0.22s ease,
+    transform 0.22s var(--ease-out);
+}
+.service-row:hover {
+  border-color: var(--color-accent);
+  transform: translateX(3px);
+}
+.panel-channel {
+  transition: border-color 0.24s ease;
+}
+.panel-channel:hover {
+  border-color: var(--color-accent);
+}
+
+/* Reduced motion keeps every state change, and none of the travel. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .ring-tile:hover,
+  .service-row:hover,
+  .back-link:hover,
+  [data-slot="button"]:active,
+  [data-slot="badge"]:active {
+    transform: none;
+  }
+  [data-slot="sidebar-menu-button"]:hover,
+  [data-slot="sidebar-menu-button"]:active {
+    padding-left: var(--space-6);
+  }
+}

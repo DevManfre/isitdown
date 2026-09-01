@@ -1,0 +1,51 @@
+# IsItDown — Light edition configuration.
+#
+# Copy this file to config.yml and edit it. In the container it is mounted at
+# /app/config/config.yml, so it can be changed without rebuilding the image.
+#
+# Secrets are NEVER written here. Use ${ENV_VAR} references; the values come
+# from the environment (see .env.example).
+
+pollIntervalMinutes: 3      # how often to poll every provider
+requestTimeoutSeconds: 8    # per-request timeout
+maxRetries: 3               # attempts per provider per cycle, with backoff
+failureThreshold: 5         # consecutive failures before a "monitoring degraded" warning
+locale: en                  # language for notification messages: en | it (falls back to en)
+
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+
+  - name: Cloudflare
+    id: cloudflare
+    adapter: statuspage
+    baseUrl: https://www.cloudflarestatus.com
+    # Optional: watch only part of a provider. Component ids come from
+    # <baseUrl>/api/v2/summary.json, where Cloudflare groups its data centres by
+    # region. With scopeToComponents an incident attributed only to components
+    # outside this list is ignored, and the reported status is the worst of these
+    # components rather than the page-wide indicator. A notice the provider
+    # attaches to no component at all is page-wide and always reported.
+    scopeToComponents: true
+    components:
+      - id: 57ctn3f2qsyj
+        name: Amsterdam, Netherlands - (AMS)
+      - id: k8q1kmz4gfms
+        name: Milan, Italy - (MXP)
+
+  - name: Anthropic
+    id: anthropic
+    adapter: statuspage
+    # status.anthropic.com 301-redirects here; the canonical host avoids the hop
+    baseUrl: https://status.claude.com
+
+notifications:
+  telegram:
+    enabled: true
+    botToken: "${TELEGRAM_BOT_TOKEN}"
+    chatId: "${TELEGRAM_CHAT_ID}"
+  webhook:
+    enabled: false
+    url: "${WEBHOOK_URL}"

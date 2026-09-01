@@ -1,0 +1,577 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   IsItDown — colour, type, spacing and elevation tokens.
+
+   This is the ONLY file in the dashboard allowed to contain a colour literal;
+   a test enforces that. Everything else references var(--…).
+
+   Palette: Nocturne (design/claude-design-prototypes). Nocturne is a dark
+   system, and the prototype's own light mode reads the same tonal ramps from the
+   other end. The dark block is the prototype's, value for value. The light one
+   started there too and no longer is: read from the other end, the inversion
+   put cards *under* the page, doubled two steps of the neutral ramp back on
+   themselves, and left the hero's accent bloom six units off the ground it was
+   painted on. The light block is re-derived on exactly those points, and each
+   departure carries the reason for it in a comment beside it; everything the
+   inversion got right — the severity hues, the two-tier fill/text split — is
+   still the prototype's.
+
+   Structure follows the spec: the light palette on bare :root, overridden in
+   :root[data-theme="dark"] for an explicit choice, and mirrored under
+   prefers-color-scheme for "system". The three blocks declare identical token
+   sets, so no component can end up with a token that exists in one theme only.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Light is no longer an inversion of Nocturne, and no longer tries to be.
+     Nocturne is a dark, violet-tinted system; read from the other end it gave
+     a lavender ground, three painted washes and a slate-blue rail, and the
+     page came back cold and flat — white cards floating on a tinted ground,
+     grey-blue secondary copy, a rail that never separated from either. This
+     block is a neutral console instead: one unpainted near-white ground, white
+     planes above it, a monotonic dark→light zinc ramp, and the indigo kept for
+     the things that are the product's colour — primary button, active rail
+     row, focus ring. The dark palette below is the prototype's, untouched. */
+  --color-bg: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-text: #18181b;
+  /* A real hairline, not a wash. With the ground this close to the card fill,
+     the border is what separates the planes and the shadow only hints depth;
+     the tinted ground used to do that job and no longer exists. */
+  --color-divider: color-mix(in srgb, #18181b 12%, transparent);
+
+  /* Zinc, not slate: every step is a true neutral, so nothing on the page
+     picks up the blue cast the old ramp gave secondary copy, dividers and
+     disabled fills. Runs monotonically dark→light like the old one did. */
+  --color-neutral-100: #09090b;
+  --color-neutral-200: #18181b;
+  --color-neutral-300: #27272a;
+  --color-neutral-400: #3f3f46;
+  /* --muted-foreground lands here: 7.7:1 on the card, where the old #5f6479
+     over a tinted ground was the main reason secondary copy read washed. */
+  --color-neutral-500: #52525b;
+  --color-neutral-600: #71717a;
+  --color-neutral-700: #a1a1aa;
+  --color-neutral-800: #e4e4e7;
+  --color-neutral-900: #f4f4f5;
+
+  /* The one hue left. It carries the primary button, the active rail row and
+     the focus ring, and nothing else — with the ground neutral it no longer
+     has to shout over a lavender page. White clears AA on it at 6.3:1. */
+  --color-accent: #5a4fc4;
+  --color-accent-100: #221d4e;
+  --color-accent-200: #342c76;
+  --color-accent-300: #473c9e;
+  --color-accent-400: #5a4fc4;
+  --color-accent-500: #7466dc;
+  --color-accent-600: #9084ea;
+  --color-accent-700: #aea4f4;
+  --color-accent-800: #cbc5fa;
+  --color-accent-900: #e7e4fd;
+
+  /* Severity, written. Each clears 4.5:1 on the card and on the ground. The
+     desaturated set these replace (#2f6b4f / #8a6420 / #9c3f2a) sat inside
+     1.24:1 of each other and read as one muddy slab down a status column.
+     Partial and major no longer share a hue either — orange and red separate
+     them at a glance, where before only bar height and the label did. */
+  --status-operational: #15803d;
+  --status-degraded: #a16207;
+  --status-partial-outage: #c2410c;
+  --status-major-outage: #b91c1c;
+  --status-unknown: #71717a;
+
+  /* Follows --color-accent one step down, so an accent-tinted chip and an
+     accent button do not read as two different indigos. */
+  --status-accent: #473c9e;
+
+  /* The same severities painted, not written: a bar, ring or dot is a graphic
+     (3:1), not text (4.5:1), so these sit one step brighter than the written
+     set — light enough to stay apart from each other, dark enough to clear
+     3:1 on white and on the ground. */
+  --status-operational-fill: #16a34a;
+  --status-degraded-fill: #bd8404;
+  --status-partial-outage-fill: #ea580c;
+  --status-major-outage-fill: #dc2626;
+  --status-unknown-fill: #8e8e96;
+
+  /* Washes of the written set, over a white card. */
+  --status-operational-tint: rgba(21, 128, 61, 0.10);
+  --status-degraded-tint: rgba(161, 98, 7, 0.12);
+  --status-outage-tint: rgba(185, 28, 28, 0.10);
+  --status-accent-tint: rgba(71, 60, 158, 0.10);
+
+  --status-operational-border: rgba(21, 128, 61, 0.32);
+  --status-degraded-border: rgba(161, 98, 7, 0.36);
+  --status-outage-border: rgba(185, 28, 28, 0.34);
+  --status-accent-border: rgba(71, 60, 158, 0.34);
+
+  --scrim: rgba(24, 24, 27, 0.5);
+
+  /* Neutral drops, and softer than the tinted ground needed: the hairline in
+     --color-divider carries the edge now, so the shadow only has to say which
+     plane is on top. Each step still ships its own ring, so a surface keeps an
+     outline wherever the drop is too faint to see. */
+  --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.04), 0 0 0 1px rgba(24, 24, 27, 0.06);
+  --shadow-md: 0 1px 3px rgba(24, 24, 27, 0.05), 0 6px 16px rgba(24, 24, 27, 0.06),
+    0 0 0 1px rgba(24, 24, 27, 0.06);
+  --shadow-lg: 0 4px 10px rgba(24, 24, 27, 0.06), 0 18px 40px rgba(24, 24, 27, 0.12),
+    0 0 0 1px rgba(24, 24, 27, 0.07);
+
+  /* ── grounds ──────────────────────────────────────────────────────────────
+     Two of the three painted grounds are gone. --color-bg is one flat fill and
+     the rail is plain --color-surface, which is what separates them: a white
+     rail and white cards on a near-white ground, told apart by the hairline
+     and the shadow rather than by three lavender washes that read as haze. The
+     hero bloom stays — it is the only place the accent touches the ground, and
+     it is the page's one piece of colour identity — but pulled to a tint that
+     sits ~7/255 off the ground instead of the old #ded8fb slab. */
+  --gradient-page: none;
+  --gradient-rail: none;
+  --gradient-hero: radial-gradient(110% 70% at 8% 0%, #eeecfa 0%, transparent 62%);
+
+  --font-heading: "Inter", system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --space-1: 2.8px;
+  --space-2: 5.6px;
+  --space-3: 8.4px;
+  --space-4: 11.2px;
+  --space-6: 16.8px;
+  --space-8: 22.4px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Entries settle rather than stop: an ease-out-expo covers most of its travel
+     early and coasts into place, so a staggered cascade reads as one movement
+     instead of a run of separate arrivals. --ease-out keeps the hover and press
+     transitions, where that long tail would feel unresponsive. Carried by every
+     theme block for the same reason --ease-out is: the palettes are asserted to
+     declare exactly the same token names. */
+  --ease-entry: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --rail-width: 196px;
+
+  --ring-icon-bg: #ffffff;
+  --rail-width-collapsed: 30px;
+
+  /* ── shadcn semantic contract ─────────────────────────────────────────────
+     shadcn components address colour through these names. Mapping them onto
+     the Nocturne palette here is what makes a stock shadcn component inherit
+     this design system instead of shipping its own defaults. No literal may
+     appear on the right-hand side. */
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
+  --primary: var(--color-accent);
+  /* Hover keeps a solid fill and steps the accent one stop *away* from
+     --primary-foreground: darker on the light ground, brighter on the dark
+     one. Fading the fill towards the page drags it under the label. */
+  --primary-hover: var(--color-accent-200);
+  --primary-foreground: var(--color-surface);
+  --secondary: var(--color-neutral-800);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-neutral-800);
+  --muted-foreground: var(--color-neutral-500);
+  /* A wash of the accent over whatever ground it lands on — the value the
+     prototype uses for the rail's active row. A ramp step cannot work here:
+     accent-200 is the dark end in light mode and the light end in dark mode,
+     while --accent-foreground is --color-text in both, so the pair inverted
+     itself into 1.02:1 in dark and 1.38:1 in light. A tint keeps the text
+     colour readable on either ground. Light carries a heavier mix than dark:
+     the rail is a white plane now rather than a washed blue-grey one, and 14%
+     of the accent over white was too faint to mark the active row on it. */
+  --accent: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--status-major-outage);
+  --destructive-foreground: var(--color-surface);
+  --border: var(--color-divider);
+  --input: var(--color-divider);
+  --ring: var(--color-accent);
+  --radius: var(--radius-md);
+
+  /* ── shadcn sidebar contract ──────────────────────────────────────────────
+     The sidebar primitive addresses colour and width through its own family of
+     names, separate from the semantic contract above, so a dashboard can give
+     its rail a plane of its own without touching --card. Here it is the same
+     plane: the rail is a surface, and base.css paints --gradient-rail over it.
+
+     The two widths are why the CLI's own inline defaults were cut out of
+     sidebar.tsx (see the note at the top of that file). Stock shadcn writes
+     16rem/3rem onto the provider's wrapper as a style prop, and an inline
+     declaration outranks every stylesheet — motion.css could never have
+     widened the collapsed strip on hover against it. Declared here, the peek
+     is one --sidebar-width-icon override on the sidebar element itself. */
+  --sidebar: var(--color-surface);
+  --sidebar-foreground: var(--color-text);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--color-divider);
+  --sidebar-ring: var(--color-accent);
+  --sidebar-width: var(--rail-width);
+  --sidebar-width-icon: var(--rail-width-collapsed);
+  --sidebar-width-mobile: var(--rail-width);
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #161826;
+  --color-surface: #232532;
+  --color-text: #e9e9ed;
+  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+
+  --color-neutral-100: #f3f5fe;
+  --color-neutral-200: #e4e7f5;
+  --color-neutral-300: #cfd3e5;
+  --color-neutral-400: #b2b6ca;
+  --color-neutral-500: #9397ab;
+  --color-neutral-600: #75798c;
+  --color-neutral-700: #595d6c;
+  --color-neutral-800: #3f424d;
+  --color-neutral-900: #292b31;
+
+  --color-accent: #9184d9;
+  --color-accent-100: #f5f4ff;
+  --color-accent-200: #e7e5fe;
+  --color-accent-300: #d2cefd;
+  --color-accent-400: #b5abfc;
+  --color-accent-500: #968ae0;
+  --color-accent-600: #796cbf;
+  --color-accent-700: #5d5294;
+  --color-accent-800: #423a6a;
+  --color-accent-900: #2b2741;
+
+  --status-operational: #56a37f;
+  --status-degraded: #d8a34a;
+  --status-partial-outage: #d2694f;
+  --status-major-outage: #d2694f;
+  --status-unknown: #2a2d3c;
+  --status-accent: #9184d9;
+
+  --status-operational-fill: #56a37f;
+  --status-degraded-fill: #d8a34a;
+  --status-partial-outage-fill: #d2694f;
+  --status-major-outage-fill: #d2694f;
+  --status-unknown-fill: #2a2d3c;
+
+  --status-operational-tint: rgba(86, 163, 122, 0.1);
+  --status-degraded-tint: rgba(216, 163, 74, 0.12);
+  --status-outage-tint: rgba(210, 105, 79, 0.12);
+  --status-accent-tint: rgba(145, 132, 217, 0.12);
+
+  --status-operational-border: rgba(86, 163, 122, 0.35);
+  --status-degraded-border: rgba(216, 163, 74, 0.4);
+  --status-outage-border: rgba(210, 105, 79, 0.4);
+  --status-accent-border: rgba(145, 132, 217, 0.4);
+
+  --scrim: rgba(10, 11, 18, 0.72);
+
+  /* The ring is what separates a surface from the page here; the drop on `sm`
+     only replaces the one Tailwind's stock shadow used to supply, now that
+     these tokens are what `shadow-sm` resolves to. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px #3f424d;
+  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+
+  /* Dark already separates its planes by value, so the page and the rail take
+     no wash. The hero keeps the bloom it has always had. */
+  --gradient-page: none;
+  --gradient-rail: none;
+  --gradient-hero: radial-gradient(110% 70% at 8% 0%, var(--color-accent-900), transparent 60%);
+
+  --font-heading: "Inter", system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --space-1: 2.8px;
+  --space-2: 5.6px;
+  --space-3: 8.4px;
+  --space-4: 11.2px;
+  --space-6: 16.8px;
+  --space-8: 22.4px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-entry: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --rail-width: 196px;
+
+  --ring-icon-bg: #ffffff;
+  --rail-width-collapsed: 30px;
+
+  /* ── shadcn semantic contract ─────────────────────────────────────────────
+     shadcn components address colour through these names. Mapping them onto
+     the Nocturne palette here is what makes a stock shadcn component inherit
+     this design system instead of shipping its own defaults. No literal may
+     appear on the right-hand side. */
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
+  --primary: var(--color-accent);
+  /* Hover keeps a solid fill and steps the accent one stop *away* from
+     --primary-foreground: darker on the light ground, brighter on the dark
+     one. Fading the fill towards the page drags it under the label. */
+  --primary-hover: var(--color-accent-400);
+  --primary-foreground: var(--color-surface);
+  --secondary: var(--color-neutral-800);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-neutral-800);
+  --muted-foreground: var(--color-neutral-500);
+  /* A wash of the accent over whatever ground it lands on — the value the
+     prototype uses for the rail's active row. A ramp step cannot work here:
+     accent-200 is the dark end in light mode and the light end in dark mode,
+     while --accent-foreground is --color-text in both, so the pair inverted
+     itself into 1.02:1 in dark and 1.38:1 in light. A tint keeps the text
+     colour readable on either ground. */
+  --accent: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--status-major-outage);
+  --destructive-foreground: var(--color-surface);
+  --border: var(--color-divider);
+  --input: var(--color-divider);
+  --ring: var(--color-accent);
+  --radius: var(--radius-md);
+
+  /* ── shadcn sidebar contract ──────────────────────────────────────────────
+     The sidebar primitive addresses colour and width through its own family of
+     names, separate from the semantic contract above, so a dashboard can give
+     its rail a plane of its own without touching --card. Here it is the same
+     plane: the rail is a surface, and base.css paints --gradient-rail over it.
+
+     The two widths are why the CLI's own inline defaults were cut out of
+     sidebar.tsx (see the note at the top of that file). Stock shadcn writes
+     16rem/3rem onto the provider's wrapper as a style prop, and an inline
+     declaration outranks every stylesheet — motion.css could never have
+     widened the collapsed strip on hover against it. Declared here, the peek
+     is one --sidebar-width-icon override on the sidebar element itself. */
+  --sidebar: var(--color-surface);
+  --sidebar-foreground: var(--color-text);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--color-divider);
+  --sidebar-ring: var(--color-accent);
+  --sidebar-width: var(--rail-width);
+  --sidebar-width-icon: var(--rail-width-collapsed);
+  --sidebar-width-mobile: var(--rail-width);
+}
+
+/* "System" is the default: no data-theme attribute is set, so the OS decides.
+   Guarded so an explicit light choice still wins on a dark desktop. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #161826;
+    --color-surface: #232532;
+    --color-text: #e9e9ed;
+    --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+
+    --color-neutral-100: #f3f5fe;
+    --color-neutral-200: #e4e7f5;
+    --color-neutral-300: #cfd3e5;
+    --color-neutral-400: #b2b6ca;
+    --color-neutral-500: #9397ab;
+    --color-neutral-600: #75798c;
+    --color-neutral-700: #595d6c;
+    --color-neutral-800: #3f424d;
+    --color-neutral-900: #292b31;
+
+    --color-accent: #9184d9;
+    --color-accent-100: #f5f4ff;
+    --color-accent-200: #e7e5fe;
+    --color-accent-300: #d2cefd;
+    --color-accent-400: #b5abfc;
+    --color-accent-500: #968ae0;
+    --color-accent-600: #796cbf;
+    --color-accent-700: #5d5294;
+    --color-accent-800: #423a6a;
+    --color-accent-900: #2b2741;
+
+    --status-operational: #56a37f;
+    --status-degraded: #d8a34a;
+    --status-partial-outage: #d2694f;
+    --status-major-outage: #d2694f;
+    --status-unknown: #2a2d3c;
+    --status-accent: #9184d9;
+
+    --status-operational-fill: #56a37f;
+    --status-degraded-fill: #d8a34a;
+    --status-partial-outage-fill: #d2694f;
+    --status-major-outage-fill: #d2694f;
+    --status-unknown-fill: #2a2d3c;
+
+    --status-operational-tint: rgba(86, 163, 122, 0.1);
+    --status-degraded-tint: rgba(216, 163, 74, 0.12);
+    --status-outage-tint: rgba(210, 105, 79, 0.12);
+    --status-accent-tint: rgba(145, 132, 217, 0.12);
+
+    --status-operational-border: rgba(86, 163, 122, 0.35);
+    --status-degraded-border: rgba(216, 163, 74, 0.4);
+    --status-outage-border: rgba(210, 105, 79, 0.4);
+    --status-accent-border: rgba(145, 132, 217, 0.4);
+
+    --scrim: rgba(10, 11, 18, 0.72);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px #3f424d;
+    --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+
+    --gradient-page: none;
+    --gradient-rail: none;
+    --gradient-hero: radial-gradient(110% 70% at 8% 0%, var(--color-accent-900), transparent 60%);
+
+    --font-heading: "Inter", system-ui, sans-serif;
+    --font-heading-weight: 500;
+    --font-body: "Inter", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+    --space-1: 2.8px;
+    --space-2: 5.6px;
+    --space-3: 8.4px;
+    --space-4: 11.2px;
+    --space-6: 16.8px;
+    --space-8: 22.4px;
+
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 14px;
+
+    --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --ease-entry: cubic-bezier(0.16, 1, 0.3, 1);
+
+    --rail-width: 196px;
+
+    --ring-icon-bg: #ffffff;
+    --rail-width-collapsed: 30px;
+
+    /* ── shadcn semantic contract ───────────────────────────────────────────
+       shadcn components address colour through these names. Mapping them onto
+       the Nocturne palette here is what makes a stock shadcn component inherit
+       this design system instead of shipping its own defaults. No literal may
+       appear on the right-hand side. */
+    --background: var(--color-bg);
+    --foreground: var(--color-text);
+    --card: var(--color-surface);
+    --card-foreground: var(--color-text);
+    --popover: var(--color-surface);
+    --popover-foreground: var(--color-text);
+    --primary: var(--color-accent);
+    /* Hover keeps a solid fill and steps the accent one stop *away* from
+       --primary-foreground: darker on the light ground, brighter on the dark
+       one. Fading the fill towards the page drags it under the label. */
+    --primary-hover: var(--color-accent-400);
+    --primary-foreground: var(--color-surface);
+    --secondary: var(--color-neutral-800);
+    --secondary-foreground: var(--color-text);
+    --muted: var(--color-neutral-800);
+    --muted-foreground: var(--color-neutral-500);
+    /* A wash of the accent over whatever ground it lands on — the value the
+       prototype uses for the rail's active row. A ramp step cannot work here:
+       accent-200 is the dark end in light mode and the light end in dark mode,
+       while --accent-foreground is --color-text in both, so the pair inverted
+       itself into 1.02:1 in dark and 1.38:1 in light. A tint keeps the text
+       colour readable on either ground. */
+    --accent: color-mix(in srgb, var(--color-accent) 14%, transparent);
+    --accent-foreground: var(--color-text);
+    --destructive: var(--status-major-outage);
+    --destructive-foreground: var(--color-surface);
+    --border: var(--color-divider);
+    --input: var(--color-divider);
+    --ring: var(--color-accent);
+    --radius: var(--radius-md);
+
+    /* ── shadcn sidebar contract ──────────────────────────────────────────────
+       The sidebar primitive addresses colour and width through its own family of
+       names, separate from the semantic contract above, so a dashboard can give
+       its rail a plane of its own without touching --card. Here it is the same
+       plane: the rail is a surface, and base.css paints --gradient-rail over it.
+
+       The two widths are why the CLI's own inline defaults were cut out of
+       sidebar.tsx (see the note at the top of that file). Stock shadcn writes
+       16rem/3rem onto the provider's wrapper as a style prop, and an inline
+       declaration outranks every stylesheet — motion.css could never have
+       widened the collapsed strip on hover against it. Declared here, the peek
+       is one --sidebar-width-icon override on the sidebar element itself. */
+    --sidebar: var(--color-surface);
+    --sidebar-foreground: var(--color-text);
+    --sidebar-accent: var(--accent);
+    --sidebar-accent-foreground: var(--accent-foreground);
+    --sidebar-border: var(--color-divider);
+    --sidebar-ring: var(--color-accent);
+    --sidebar-width: var(--rail-width);
+    --sidebar-width-icon: var(--rail-width-collapsed);
+    --sidebar-width-mobile: var(--rail-width);
+  }
+}
+
+/* Tailwind's `dark:` prefix must follow this repo's attribute, not shadcn's
+   default `.dark` class: the pre-paint script in index.html stamps
+   data-theme, and "system" stamps nothing at all so the media query decides. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Palette tokens exposed as Tailwind utilities: bg-background, text-foreground,
+   border-border, text-status-operational, font-mono, rounded-lg, … */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  /* The dialog scrim. It carries its own alpha per theme, so `bg-scrim`
+     takes no opacity modifier. */
+  --color-scrim: var(--scrim);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-status-operational: var(--status-operational);
+  --color-status-degraded: var(--status-degraded);
+  --color-status-partial-outage: var(--status-partial-outage);
+  --color-status-major-outage: var(--status-major-outage);
+  --color-status-unknown: var(--status-unknown);
+
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  /* Until now `shadow-sm`, `shadow-md` and `shadow-lg` on a shadcn primitive
+     resolved to Tailwind's stock black-alpha drops and the ramp declared above
+     was never read by anything. Mapped here — same self-referential form as
+     the radii — a card's elevation comes from the palette in both themes,
+     which is what lets light carry depth the value separation cannot. */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}

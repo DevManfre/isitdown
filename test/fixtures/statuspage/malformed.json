@@ -1,0 +1,16 @@
+{
+  "page": {
+    "id": "abc",
+    "name": "Acme"
+  },
+  "components": "not an array at all",
+  "incidents": [
+    {
+      "id": "x1",
+      "status": "investigating"
+    }
+  ],
+  "status": {
+    "indicator": "minor"
+  }
+}

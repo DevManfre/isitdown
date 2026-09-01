@@ -1,0 +1,47 @@
+# Every push to a long-lived branch and every pull request must pass exactly
+# what a contributor runs locally: typecheck, unit tests, integration tests,
+# then a build as a smoke check. Nothing in the release workflow is trusted
+# unless this one is green first.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+# A new push to the same branch or PR makes the previous run irrelevant.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # node-version-file keeps .nvmrc the single source of truth for the
+      # runtime, exactly as it is for a local checkout.
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck (server + dashboard)
+        run: npm run typecheck
+
+      - name: Unit tests (node:test + Vitest)
+        run: npm test
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      # Builds every edition once: a compile or bundling error must fail here,
+      # not at release time.
+      - name: Build (smoke check)
+        run: npm run build

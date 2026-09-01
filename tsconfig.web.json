@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "types": ["vite/client", "vitest/globals"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "resolveJsonModule": true,
+    // No `baseUrl`: deprecated, and gone in TypeScript 7. Since TS 4.1 `paths`
+    // resolves relative to the config file that declares it on its own.
+    "paths": { "@/*": ["./src/ui/web/*"] },
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/ui/web/**/*.ts", "src/ui/web/**/*.tsx", "src/ui/routePaths.ts", "vite.config.ts"]
+}

@@ -1,0 +1,18 @@
+# Claude files
+design
+docs/superpowers
+specs
+.superpowers
+
+# Node / build output
+node_modules/
+dist/
+
+# Runtime state and operator config
+data/
+config.yml
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
