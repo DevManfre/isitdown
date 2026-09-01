@@ -11,10 +11,10 @@ const all = [
   { id: "c", name: "Webhooks", group: "Core" },
 ];
 
-const mount = (onChange = vi.fn()) =>
+const mount = (onChange = vi.fn(), value: { id: string; name: string }[] = []) =>
   render(
     <I18nextProvider i18n={i18n}>
-      <ComponentPicker available={all} supported value={[]} onChange={onChange} loading={false} />
+      <ComponentPicker available={all} supported value={value} onChange={onChange} loading={false} />
     </I18nextProvider>,
   );
 
@@ -50,6 +50,60 @@ describe("ComponentPicker", () => {
     await userEvent.click(screen.getByRole("button", { name: i18n.t("components.select-all") }));
     expect(onChange).toHaveBeenCalledWith([{ id: "c", name: "Webhooks" }]);
     expect(onChange).not.toHaveBeenCalledWith(all.map(({ id, name }) => ({ id, name })));
+  });
+
+  it("flips the action to deselect once every visible component is selected", async () => {
+    const onChange = vi.fn();
+    mount(
+      onChange,
+      all.map(({ id, name }) => ({ id, name })),
+    );
+    expect(screen.queryByRole("button", { name: i18n.t("components.select-all") })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("components.deselect-all") }));
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("deselects only what's visible, keeping selections hidden behind the search", async () => {
+    const onChange = vi.fn();
+    mount(
+      onChange,
+      all.map(({ id, name }) => ({ id, name })),
+    );
+    await userEvent.type(screen.getByRole("searchbox"), "web");
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("components.deselect-all") }));
+    expect(onChange).toHaveBeenCalledWith([
+      { id: "a", name: "Actions" },
+      { id: "b", name: "API Requests" },
+    ]);
+  });
+
+  it("selects a whole group from its header, leaving other groups alone", async () => {
+    const onChange = vi.fn();
+    mount(onChange);
+    await userEvent.click(
+      screen.getByRole("button", { name: i18n.t("components.select-group", { group: "Core" }) }),
+    );
+    expect(onChange).toHaveBeenCalledWith([
+      { id: "b", name: "API Requests" },
+      { id: "c", name: "Webhooks" },
+    ]);
+  });
+
+  it("flips a group header to deselect once the whole group is selected", async () => {
+    const onChange = vi.fn();
+    mount(onChange, [
+      { id: "b", name: "API Requests" },
+      { id: "c", name: "Webhooks" },
+    ]);
+    expect(
+      screen.queryByRole("button", {
+        name: i18n.t("components.select-group", { group: "Core" }),
+      }),
+    ).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: i18n.t("components.deselect-group", { group: "Core" }) }),
+    );
+    expect(onChange).toHaveBeenCalledWith([]);
   });
 
   it("says the adapter can't list components when it's unsupported", () => {
