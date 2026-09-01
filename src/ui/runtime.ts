@@ -1,11 +1,13 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Express } from "express";
 import { getAdapter } from "../adapters/index.ts";
-import type { ConfigSource, ServiceDefinition } from "../core/configSource.interface.ts";
+import type { ChannelConfig, ConfigSource, ServiceDefinition } from "../core/configSource.interface.ts";
 import { createLogger, parseLogLevel, type Logger } from "../core/logger.ts";
 import { createDispatcher, type Dispatcher } from "../core/notificationDispatcher.ts";
+import type { Notifier } from "../core/notifier.interface.ts";
 import { createPoller, type CycleResult } from "../core/poller.ts";
 import { createScheduler, type Scheduler } from "../core/scheduler.ts";
+import { createWebPushNotifier } from "../notifiers/webpush.notifier.ts";
 import { buildNotifiers } from "../notifiers/index.ts";
 import { createApp } from "./app.ts";
 import { createBackfillService, type BackfillService } from "./backfill.ts";
@@ -18,6 +20,7 @@ import { createHistoryService } from "./history.ts";
 import type { HistoryStore } from "./historyStore.interface.ts";
 import { createMapLane, type MapLane } from "./mapLane.ts";
 import { createMapStore, type MapStore } from "./mapStore.ts";
+import { createSqlitePushSubscriptionStore, type SqlitePushSubscriptionStore } from "./sqlitePushSubscriptionStore.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
 
 /** Kept a month beyond the 90-day view so a full window is always available. */
@@ -47,6 +50,13 @@ export interface UiRuntimeCore {
   /** Built here, run by the server at boot — never by the runtime builder, so tests stay offline. */
   backfill: BackfillService;
   mapStore: MapStore;
+  pushSubscriptions: SqlitePushSubscriptionStore;
+  /**
+   * The shared registry cannot build `webpush` on its own: that channel needs the
+   * device list, which only this edition has. Composed once here so the scheduler
+   * and the "send test" route build exactly the same set of channels.
+   */
+  buildNotifiers: (channels: ChannelConfig[]) => Notifier[];
   /**
    * Started by the server, like the scheduler — never by the runtime builder,
    * so tests stay offline and can drive `refresh()` explicitly.
@@ -83,6 +93,17 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   const history = createHistoryService(store);
   const configSource = createDbConfigSource(db, options.env, logger);
 
+  const pushSubscriptions = createSqlitePushSubscriptionStore(db);
+  /**
+   * The shared registry cannot build `webpush` on its own: that channel needs the
+   * device list, which only this edition has. Composed once here so the scheduler
+   * and the "send test" route build exactly the same set of channels.
+   */
+  const buildAllNotifiers = (channels: ChannelConfig[]): Notifier[] =>
+    buildNotifiers(channels, {
+      webpush: (settings) => createWebPushNotifier({ settings, store: pushSubscriptions }),
+    });
+
   const mapStore = createMapStore(db);
   const mapLane = createMapLane({
     store: mapStore,
@@ -105,7 +126,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     configSource,
     poller,
     dispatcher,
-    buildNotifiers,
+    buildNotifiers: buildAllNotifiers,
     logger,
     onCycle: (result) => {
       lastCycle = result;
@@ -134,6 +155,8 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     scheduler,
     backfill,
     mapStore,
+    pushSubscriptions,
+    buildNotifiers: buildAllNotifiers,
     mapLane,
     logger,
     listAllServices: () => listServices(db),

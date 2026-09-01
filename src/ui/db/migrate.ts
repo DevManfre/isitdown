@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -158,6 +158,23 @@ export function migrate(db: DatabaseSync): void {
         located     INTEGER NOT NULL,
         total       INTEGER NOT NULL,
         checked_at  TEXT NOT NULL
+      );
+    `);
+  }
+
+  if (from < 6) {
+    // A push subscription is a delivery address the browser hands out, not an
+    // operator credential: it is useless without the VAPID private key, which
+    // stays in the environment. `id` hashes the endpoint so re-subscribing the
+    // same browser replaces the row instead of adding a second toast target.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id         TEXT PRIMARY KEY,
+        endpoint   TEXT NOT NULL UNIQUE,
+        p256dh     TEXT NOT NULL,
+        auth       TEXT NOT NULL,
+        label      TEXT NOT NULL,
+        created_at TEXT NOT NULL
       );
     `);
   }

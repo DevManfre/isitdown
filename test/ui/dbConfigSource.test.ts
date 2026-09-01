@@ -278,3 +278,32 @@ test("a channel's environment variable name can be changed but a value cannot be
   );
   db.close();
 });
+
+// Review finding 6: the cross-channel collision scan used to run on every
+// patch, including an enabled-only toggle that touches no *Env field at all.
+// An existing database that already has two *Env fields sharing a variable
+// name (from before the guard existed, or a direct edit) would then lock the
+// operator out of toggling *any* channel with a 400 about a field they never
+// touched. The scan must run only when the patch actually carries `fields`.
+test("an enabled-only patch succeeds even when a pre-existing collision is present in the database", async () => {
+  const db = await freshDb();
+  // Force a pre-existing collision directly, bypassing updateChannel's own
+  // write-time guard — the scenario this guards against is a database that
+  // reached this state before the guard existed, or via a direct edit.
+  db.prepare("UPDATE channels SET config = ? WHERE id = ?").run(
+    JSON.stringify({ publicKeyEnv: "SHARED_VAR", privateKeyEnv: "VAPID_PRIVATE_KEY" }),
+    "webpush",
+  );
+  db.prepare("UPDATE channels SET config = ? WHERE id = ?").run(
+    JSON.stringify({ urlEnv: "SHARED_VAR" }),
+    "webhook",
+  );
+
+  // Toggling telegram — a channel with no part in the collision at all — must
+  // not be blocked by a collision that lives entirely between two other rows.
+  const ok = updateChannel(db, "telegram", { enabled: true });
+
+  assert.equal(ok, true);
+  assert.equal(listChannels(db).find((channel) => channel.id === "telegram")?.enabled, true);
+  db.close();
+});

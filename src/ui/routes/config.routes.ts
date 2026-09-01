@@ -2,7 +2,6 @@ import { Router } from "express";
 import { z } from "zod";
 import { getAdapter } from "../../adapters/index.ts";
 import { pollingSchema, serviceDefinitionSchema } from "../../core/config.schema.ts";
-import { buildNotifiers } from "../../notifiers/index.ts";
 import {
   deleteService,
   describeChannels,
@@ -23,6 +22,32 @@ const channelPatchSchema = z.object({
   enabled: z.boolean().optional(),
   fields: z.record(z.string()).optional(),
 });
+// Push endpoints are https by protocol (no browser issues a plain-http one),
+// and none of these fields has any business being large — a browser-supplied
+// body should not be able to push arbitrary-length strings into SQLite.
+const subscriptionSchema = z.object({
+  endpoint: z.string().max(2048).url().startsWith("https://"),
+  keys: z.object({
+    p256dh: z.string().min(1).max(256),
+    auth: z.string().min(1).max(256),
+  }),
+  label: z.string().min(1).max(80),
+});
+
+// A VAPID public key is an uncompressed P-256 point: base64url-decode it and
+// it must be exactly 65 bytes starting with 0x04. This is the last line of
+// defense in GET /config/push below: even if a stored *Env name were somehow
+// pointed at the wrong variable, only a value that actually decodes to a
+// public key of this shape is ever handed back. A regex over the encoded
+// text (length + character set) was tried here before and was not enough —
+// any long base64url-looking secret in an unreferenced variable passed a
+// pattern match; decoding and checking the real structure is what closes
+// that gap, so anything that fails to decode this way reads as unset.
+function isVapidPublicKey(value: string): boolean {
+  if (value === "") return false;
+  const bytes = Buffer.from(value, "base64url");
+  return bytes.length === 65 && bytes[0] === 0x04;
+}
 
 const issues = (error: z.ZodError): string =>
   error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
@@ -202,6 +227,59 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     }
   });
 
+  /**
+   * The VAPID public key is public by construction — the browser needs it to
+   * subscribe. Only the name of the private key's variable is ever stored, and
+   * its value never leaves the process.
+   *
+   * `updateChannel` refuses a patch that aliases two `*Env` fields — of this
+   * channel or any other — onto one variable name, but a row can still reach
+   * a bad state from before that guard existed or from a direct DB edit, so
+   * this route defends itself twice over rather than trusting the database:
+   * first by name (do `publicKeyEnv` and `privateKeyEnv` agree?), then by the
+   * shape of the value itself, below.
+   */
+  router.get("/config/push", (_req, res) => {
+    const channel = listChannels(db).find((entry) => entry.id === "webpush");
+    const publicKeyName = channel?.config["publicKeyEnv"] ?? "";
+    const privateKeyName = channel?.config["privateKeyEnv"] ?? "";
+    if (publicKeyName !== "" && publicKeyName === privateKeyName) {
+      res.json({ publicKey: "" });
+      return;
+    }
+    const value = runtime.env[publicKeyName] ?? "";
+    // Belt and braces: whatever variable the stored name resolves to, only
+    // hand it back once it decodes to an actual VAPID public key (see
+    // isVapidPublicKey above). This is the last line that stops the server
+    // echoing an arbitrary environment variable to a browser if a name ever
+    // points somewhere it shouldn't — including one holding some other long
+    // secret that merely looks base64url-shaped.
+    res.json({ publicKey: isVapidPublicKey(value) ? value : "" });
+  });
+
+  router.get("/config/push/subscriptions", (_req, res) => {
+    res.json({ devices: runtime.pushSubscriptions.listDevices() });
+  });
+
+  router.post("/config/push/subscriptions", (req, res) => {
+    const parsed = subscriptionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+    const { endpoint, keys, label } = parsed.data;
+    runtime.pushSubscriptions.save({ endpoint, keys }, label);
+    res.status(201).json({ devices: runtime.pushSubscriptions.listDevices() });
+  });
+
+  router.delete("/config/push/subscriptions/:id", (req, res) => {
+    if (!runtime.pushSubscriptions.remove(req.params.id)) {
+      res.status(404).json({ error: { message: `unknown device: ${req.params.id}` } });
+      return;
+    }
+    res.status(204).end();
+  });
+
   router.post("/config/channels/:id/test", async (req, res) => {
     const stored = listChannels(db).find((channel) => channel.id === req.params.id);
     if (stored === undefined) {
@@ -221,7 +299,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       return;
     }
 
-    const [notifier] = buildNotifiers([{ ...resolved, enabled: true }]);
+    const [notifier] = runtime.buildNotifiers([{ ...resolved, enabled: true }]);
     if (notifier === undefined) {
       res.json({ ok: false, error: `channel ${req.params.id} could not be built` });
       return;

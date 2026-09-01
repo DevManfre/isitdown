@@ -13,6 +13,7 @@ import type {
   SentRecord,
   StatusResponse,
 } from "./types.ts";
+import type { PushSubscriptionBody } from "./push.ts";
 
 /**
  * One thin wrapper per endpoint. Every failure surfaces the server's own
@@ -132,3 +133,11 @@ export const getMap = () => request<MapResponse>("GET", "/map");
 export const getPreferences = () => request<Preferences>("GET", "/api/preferences");
 export const patchPreferences = (patch: Partial<Preferences>) =>
   request<Preferences>("PATCH", "/api/preferences", patch);
+
+export const getPushKey = () => request<{ publicKey: string }>("GET", "/config/push");
+export const getPushDevices = () =>
+  request<{ devices: { id: string; label: string; createdAt: string }[] }>("GET", "/config/push/subscriptions");
+export const addPushDevice = (body: PushSubscriptionBody) =>
+  request<unknown>("POST", "/config/push/subscriptions", body);
+export const removePushDevice = (id: string) =>
+  request<unknown>("DELETE", `/config/push/subscriptions/${encodeURIComponent(id)}`);
