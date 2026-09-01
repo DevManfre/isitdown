@@ -1,19 +1,33 @@
 # Run whichever edition you need:
-#   docker compose --profile light up -d --build
-#   docker compose --profile ui    up -d --build
+#   docker compose --profile light up -d
+#   docker compose --profile ui    up -d
 #
-# Both build the same Dockerfile, each selecting its own target.
+# This file is meant to be usable on its own, without a clone:
+#
+#   curl -O https://raw.githubusercontent.com/DevManfre/isitdown/main/docker-compose.yml
+#   docker compose --profile ui up -d
+#
+# So each service names a published GHCR image and `pull_policy: missing`,
+# which makes Compose pull it instead of building from a source tree the
+# operator may not have. Contributors keep the local build: `--build` on the
+# command line overrides the policy, and both services still point at this
+# repository's Dockerfile, each selecting its own target.
 
 services:
   isitdown-light:
+    # `.env` is optional: the distributable path starts with no file but this
+    # one, and a channel's secrets are added later.
     build:
       context: .
       dockerfile: Dockerfile
       target: light
-    image: isitdown:light
+    image: ghcr.io/devmanfre/isitdown:light-latest
+    pull_policy: missing
     container_name: isitdown-light
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - ./config.yml:/app/config/config.yml:ro
       - isitdown-light-data:/app/data
@@ -24,10 +38,13 @@ services:
       context: .
       dockerfile: Dockerfile
       target: ui
-    image: isitdown:ui
+    image: ghcr.io/devmanfre/isitdown:ui-latest
+    pull_policy: missing
     container_name: isitdown-ui
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     ports:
       - "3000:3000"
     # No config.yml: the UI edition keeps its configuration in SQLite.
