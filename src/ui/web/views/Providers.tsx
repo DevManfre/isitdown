@@ -63,7 +63,6 @@ interface ProviderRow {
   uptime: number;
   incidents: number;
   buckets: HistoryBucket[];
-  enabled: boolean;
   /**
    * The components this provider actually monitors, and the live status of
    * each. A provider with an empty selection watches only the overall status,
@@ -252,7 +251,14 @@ export function Providers() {
   const { data: summary } = useHistory(WINDOW_DAYS);
   const [filter, setFilter] = useState<Filter>("all");
 
-  const providers = status?.providers ?? NO_PROVIDERS;
+  // Enabled providers only. A disabled one is not being polled, so every figure
+  // this table carries — status, uptime, the 90-day strip — would be frozen at
+  // whatever its last poll saw. It is switched back on from Settings, which is
+  // where the disabled ones stay visible. Memoised because the row model is
+  // rebuilt from this array's identity: a fresh filter each render would rebuild
+  // it every render, which is what NO_PROVIDERS exists to avoid.
+  const all = status?.providers ?? NO_PROVIDERS;
+  const providers = useMemo(() => all.filter((provider) => provider.enabled), [all]);
 
   // providers.js:64-67 — showIssuesOnly filters client-side to the providers
   // with an open issue; "all" is otherwise the fleet in its configured order.
@@ -281,7 +287,6 @@ export function Providers() {
           uptime: history?.uptime90 ?? provider.uptime90,
           incidents: history?.incidentCount ?? 0,
           buckets: history?.buckets ?? [],
-          enabled: provider.enabled,
           monitored: provider.componentSelection,
           components: provider.components,
         };
@@ -448,12 +453,7 @@ export function Providers() {
                     // What useRowShift measures each row by; a key is React's
                     // own bookkeeping and never reaches the DOM.
                     data-row-id={row.id}
-                    // A disabled provider is still listed, only dimmed: its
-                    // history is real either way.
-                    className={cn(
-                      isLeaving ? "anim-sink" : "anim-rise anim-rise-table-row",
-                      !row.original.enabled && "opacity-55",
-                    )}
+                    className={cn(isLeaving ? "anim-sink" : "anim-rise anim-rise-table-row")}
                     // A row on its way out goes at once; only arrivals stagger.
                     style={{
                       animationDelay: isLeaving

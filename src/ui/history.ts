@@ -279,9 +279,21 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     );
   }
 
-  async function getSummary(days: number, intervalMinutes: number): Promise<HistorySummary> {
+  /**
+   * `only` narrows the summary to a caller-supplied set of providers — how the
+   * history page drops a disabled one. The store still keeps every provider's
+   * samples, so an omitted provider is hidden rather than forgotten, and it
+   * comes back with its whole history when it is re-enabled. Omitting `only`
+   * summarises everything the store knows.
+   */
+  async function getSummary(
+    days: number,
+    intervalMinutes: number,
+    only?: string[] | undefined,
+  ): Promise<HistorySummary> {
     const today = now();
-    const providerIds = await store.listProviderIds();
+    const stored = await store.listProviderIds();
+    const providerIds = only === undefined ? stored : stored.filter((id) => only.includes(id));
     const providers = await Promise.all(
       providerIds.map((providerId) => getProviderHistory(providerId, days, intervalMinutes)),
     );

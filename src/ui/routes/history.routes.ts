@@ -69,7 +69,10 @@ export function historyRoutes(runtime: UiRuntimeCore): Router {
       return;
     }
 
-    res.json(await runtime.history.getSummary(days, intervalMinutes));
+    // The fleet-wide view of what is being watched: a disabled provider leaves
+    // the table and stops moving the aggregate, but keeps its stored history for
+    // the day it is switched back on.
+    res.json(await runtime.history.getSummary(days, intervalMinutes, runtime.enabledProviderIds()));
   });
 
   return router;

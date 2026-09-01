@@ -29,9 +29,16 @@ export function Rail() {
 
   const badgeFor = (name: RouteName): number | undefined => {
     if (status === undefined) return undefined;
-    if (name === "providers") return status.providers.length;
+    // Both badges count the enabled providers only, because that is what the
+    // views behind them list now.
+    if (name === "providers") return status.providers.filter((p) => p.enabled).length;
     if (name === "incidents") {
-      const open = status.providers.reduce((total, p) => total + p.activeIncidents.length, 0);
+      // Enabled providers only, the way the incident list itself counts: a
+      // disabled provider stops being polled, so the incidents its last poll
+      // left behind never resolve and would pin the badge open for good.
+      const open = status.providers
+        .filter((p) => p.enabled)
+        .reduce((total, p) => total + p.activeIncidents.length, 0);
       return open === 0 ? undefined : open;
     }
     return undefined;

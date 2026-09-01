@@ -9,8 +9,8 @@ import { Rail } from "./Rail.tsx";
 
 const status = {
   providers: [
-    { id: "github", name: "GitHub", overallStatus: "operational", activeIncidents: [], uptime90: 99.9 },
-    { id: "cf", name: "Cloudflare", overallStatus: "major_outage",
+    { id: "github", name: "GitHub", enabled: true, overallStatus: "operational", activeIncidents: [], uptime90: 99.9 },
+    { id: "cf", name: "Cloudflare", enabled: true, overallStatus: "major_outage",
       activeIncidents: [{ id: "i1", name: "down", impact: "major", status: "investigating", updatedAt: "2026-08-21T00:00:00Z" }],
       uptime90: 90 },
   ],
@@ -66,6 +66,29 @@ describe("Rail", () => {
     mount();
     expect(await screen.findByText("2")).toBeInTheDocument();  // providers
     expect(await screen.findByText("1")).toBeInTheDocument();  // open incidents
+  });
+
+  // A disabled provider stops being polled, so the incidents its last poll left
+  // behind never resolve: counting them would pin the badge open for good.
+  it("leaves a disabled provider out of both badges", async () => {
+    // Cloudflare is the one carrying the open incident.
+    const disabled = {
+      ...status,
+      providers: status.providers.map((provider) =>
+        provider.id === "cf" ? { ...provider, enabled: false } : provider,
+      ),
+    };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+      ok: true, status: 200,
+      text: async () => JSON.stringify(url.includes("/config") ? config : disabled),
+    })));
+    mount();
+
+    // One provider badge instead of two, which is also the proof that the
+    // status response has landed before the incident badge's absence is read.
+    expect(await screen.findByText("1")).toBeInTheDocument();
+    const incidents = screen.getByText(i18n.t("nav.incidents")).closest("a");
+    expect(incidents?.textContent).toBe(i18n.t("nav.incidents"));
   });
 
   // The rail is pinned open, so it carries no control of its own: every
