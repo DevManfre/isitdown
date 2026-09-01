@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/img/social-preview.png" alt="IsItDown" width="880">
+</p>
+
 # IsItDown
 
 [![Release](https://img.shields.io/github/v/release/DevManfre/isitdown?style=flat-square)](https://github.com/DevManfre/isitdown/releases)
