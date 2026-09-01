@@ -11,6 +11,9 @@ import { CONTRACT_PROVIDER_IDS, runStateStoreContract } from "../core/stateStore
 import type { HistoryStore } from "../../src/ui/historyStore.interface.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus } from "../../src/core/types.ts";
 
+/** Fixed "today" so a day or retention window never depends on when the suite runs. */
+const NOW = new Date("2026-08-20T18:00:00.000Z");
+
 function seedServices(db: DatabaseSync, ids: readonly string[]): void {
   const insert = db.prepare(
     "INSERT OR IGNORE INTO services (id, name, adapter, base_url, options, enabled, created_at) VALUES (?, ?, 'statuspage', ?, NULL, 1, ?)",
@@ -28,7 +31,7 @@ async function harness(extraIds: readonly string[] = []): Promise<{
   const db = openDatabase(path);
   migrate(db);
   seedServices(db, [...CONTRACT_PROVIDER_IDS, ...extraIds]);
-  return { db, store: createSqliteStateStore(db), path };
+  return { db, store: createSqliteStateStore(db, { now: () => NOW }), path };
 }
 
 const inc = (over: Partial<Incident> = {}): Incident => ({

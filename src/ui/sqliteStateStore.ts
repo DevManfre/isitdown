@@ -174,7 +174,13 @@ function providerScope(
  * A failed poll writes no sample: a failure of our own monitoring is reported as
  * `monitoring_degraded`, not as the provider's downtime.
  */
-export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
+export interface SqliteStateStoreDeps {
+  /** Injected so a day or retention window does not depend on when a test runs. */
+  now?: (() => Date) | undefined;
+}
+
+export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreDeps = {}): HistoryStore {
+  const now = deps.now ?? ((): Date => new Date());
   const selectState = db.prepare(
     "SELECT overall_status, active_incidents, components, fetched_at, failure_count, degraded_notified FROM provider_state WHERE provider_id = ?",
   );
@@ -371,7 +377,7 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
       if (filter.state === "resolved") clauses.push("resolved_at IS NOT NULL");
       if (filter.days !== undefined) {
         clauses.push("started_at >= ?");
-        params.push(new Date(Date.now() - filter.days * 24 * 3600 * 1000).toISOString());
+        params.push(new Date(now().getTime() - filter.days * 24 * 3600 * 1000).toISOString());
       }
       const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
       // SQLite has no bare OFFSET: skipping rows without a page size means asking
@@ -403,7 +409,7 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
       }
       if (filter.days !== undefined) {
         clauses.push("started_at >= ?");
-        params.push(new Date(Date.now() - filter.days * 24 * 3600 * 1000).toISOString());
+        params.push(new Date(now().getTime() - filter.days * 24 * 3600 * 1000).toISOString());
       }
       const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
 
@@ -429,7 +435,7 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
     },
 
     async getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]> {
-      const from = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+      const from = new Date(now().getTime() - days * 24 * 3600 * 1000).toISOString();
       const rows = db
         .prepare(
           `SELECT date(observed_at) AS day,
@@ -453,7 +459,7 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
     },
 
     async getComponentDailyBuckets(providerId: string, componentId: string, days: number): Promise<DailyBucket[]> {
-      const from = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+      const from = new Date(now().getTime() - days * 24 * 3600 * 1000).toISOString();
       const rows = db
         .prepare(
           `SELECT date(observed_at) AS day,
@@ -498,7 +504,7 @@ export function createSqliteStateStore(db: DatabaseSync): HistoryStore {
     },
 
     async pruneOlderThan(days: number): Promise<void> {
-      const cutoff = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+      const cutoff = new Date(now().getTime() - days * 24 * 3600 * 1000).toISOString();
       db.prepare("DELETE FROM status_samples WHERE observed_at < ?").run(cutoff);
       db.prepare("DELETE FROM component_samples WHERE observed_at < ?").run(cutoff);
       db.prepare("DELETE FROM notifications WHERE sent_at < ?").run(cutoff);
