@@ -1,4 +1,7 @@
-import { defineConfig } from "vite";
+// `vitest/config` re-exports Vite's own `defineConfig` with the `test` block
+// added to the config type. Importing it from "vite" instead type-errors on
+// `test` — invisibly, until this file was pulled into tsconfig.web.json.
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
