@@ -22,37 +22,41 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* The prototype's light mode is a mechanical inversion of Nocturne's dark
-     ramp, and two of its consequences do not survive contact with a real page:
-     the surface came out *darker* than the ground, so every card, rail and
-     input read as a sunken grey slab, and the ramp doubled back on itself
-     (400 repeated 200, 500 repeated 300), which collapsed --muted-foreground
-     onto --color-text and left secondary copy with no hierarchy. The light
-     block below is re-derived on those two points — cards are raised above a
-     tinted ground and the ramp runs monotonically dark→light — and the depth
-     the prototype got for free from dark values is carried here by the shadow
-     ramp and the gradients instead. Dark is untouched. */
-  --color-bg: #eef1fb;
+  /* Light is no longer an inversion of Nocturne, and no longer tries to be.
+     Nocturne is a dark, violet-tinted system; read from the other end it gave
+     a lavender ground, three painted washes and a slate-blue rail, and the
+     page came back cold and flat — white cards floating on a tinted ground,
+     grey-blue secondary copy, a rail that never separated from either. This
+     block is a neutral console instead: one unpainted near-white ground, white
+     planes above it, a monotonic dark→light zinc ramp, and the indigo kept for
+     the things that are the product's colour — primary button, active rail
+     row, focus ring. The dark palette below is the prototype's, untouched. */
+  --color-bg: #f7f7f8;
   --color-surface: #ffffff;
-  --color-text: #23252c;
-  /* A hairline is enough now that a card also casts a shadow; at the
-     prototype's 18% the same line boxed every surface in grey. */
-  --color-divider: color-mix(in srgb, #23252c 12%, transparent);
+  --color-text: #18181b;
+  /* A real hairline, not a wash. With the ground this close to the card fill,
+     the border is what separates the planes and the shadow only hints depth;
+     the tinted ground used to do that job and no longer exists. */
+  --color-divider: color-mix(in srgb, #18181b 12%, transparent);
 
-  --color-neutral-100: #161826;
-  --color-neutral-200: #23252c;
-  --color-neutral-300: #343843;
-  --color-neutral-400: #474b5c;
-  --color-neutral-500: #5f6479;
-  --color-neutral-600: #838aa1;
-  --color-neutral-700: #aeb4c9;
-  --color-neutral-800: #dde2f1;
-  --color-neutral-900: #eef1fb;
+  /* Zinc, not slate: every step is a true neutral, so nothing on the page
+     picks up the blue cast the old ramp gave secondary copy, dividers and
+     disabled fills. Runs monotonically dark→light like the old one did. */
+  --color-neutral-100: #09090b;
+  --color-neutral-200: #18181b;
+  --color-neutral-300: #27272a;
+  --color-neutral-400: #3f3f46;
+  /* --muted-foreground lands here: 7.7:1 on the card, where the old #5f6479
+     over a tinted ground was the main reason secondary copy read washed. */
+  --color-neutral-500: #52525b;
+  --color-neutral-600: #71717a;
+  --color-neutral-700: #a1a1aa;
+  --color-neutral-800: #e4e4e7;
+  --color-neutral-900: #f4f4f5;
 
-  /* One step off the prototype's #5d5294, which sat so close to grey on a
-     light ground that the primary button, the active rail row and every link
-     read as slate rather than as the product's colour. Same indigo hue, more
-     chroma; white still clears AA on it at 6.3:1. */
+  /* The one hue left. It carries the primary button, the active rail row and
+     the focus ring, and nothing else — with the ground neutral it no longer
+     has to shout over a lavender page. White clears AA on it at 6.3:1. */
   --color-accent: #5a4fc4;
   --color-accent-100: #221d4e;
   --color-accent-200: #342c76;
@@ -64,74 +68,65 @@
   --color-accent-800: #cbc5fa;
   --color-accent-900: #e7e4fd;
 
-  /* Severity. Partial and major share a hue and are told apart by bar height
-     and label, exactly as the prototype draws them. */
-  --status-operational: #2f6b4f;
-  --status-degraded: #8a6420;
-  --status-partial-outage: #9c3f2a;
-  --status-major-outage: #9c3f2a;
-  --status-unknown: #cfd3e5;
+  /* Severity, written. Each clears 4.5:1 on the card and on the ground. The
+     desaturated set these replace (#2f6b4f / #8a6420 / #9c3f2a) sat inside
+     1.24:1 of each other and read as one muddy slab down a status column.
+     Partial and major no longer share a hue either — orange and red separate
+     them at a glance, where before only bar height and the label did. */
+  --status-operational: #15803d;
+  --status-degraded: #a16207;
+  --status-partial-outage: #c2410c;
+  --status-major-outage: #b91c1c;
+  --status-unknown: #71717a;
+
   /* Follows --color-accent one step down, so an accent-tinted chip and an
-     accent button read as the same colour rather than as two indigos. */
+     accent button do not read as two different indigos. */
   --status-accent: #473c9e;
 
-  /* The same severities as they are painted, not written. A bar, a ring or a dot
-     is a graphic (3:1) while a label is text (4.5:1). On a light ground the set
-     above has to go dark enough to clear the text ratio, which lands all three
-     hues within 1.24:1 of each other — a 90-bar wall then reads as one slab
-     instead of green, amber and red. These sit at the graphic ratio instead, so
-     the hues stay apart. Dark mode has room for one value, so there the two
-     sets are identical. */
-  --status-operational-fill: #3b9c6d;
-  --status-degraded-fill: #b87f1c;
-  --status-partial-outage-fill: #ca5a3a;
-  --status-major-outage-fill: #ca5a3a;
-  --status-unknown-fill: #cfd3e5;
+  /* The same severities painted, not written: a bar, ring or dot is a graphic
+     (3:1), not text (4.5:1), so these sit one step brighter than the written
+     set — light enough to stay apart from each other, dark enough to clear
+     3:1 on white and on the ground. */
+  --status-operational-fill: #16a34a;
+  --status-degraded-fill: #bd8404;
+  --status-partial-outage-fill: #ea580c;
+  --status-major-outage-fill: #dc2626;
+  --status-unknown-fill: #8e8e96;
 
-  /* Each a step up on the prototype's alphas: these used to be laid over the
-     #e4e7f5 surface and now land on white, which eats the same wash. */
-  --status-operational-tint: rgba(47, 107, 79, 0.12);
-  --status-degraded-tint: rgba(138, 100, 32, 0.14);
-  --status-outage-tint: rgba(156, 63, 42, 0.14);
-  --status-accent-tint: rgba(71, 60, 158, 0.13);
+  /* Washes of the written set, over a white card. */
+  --status-operational-tint: rgba(21, 128, 61, 0.10);
+  --status-degraded-tint: rgba(161, 98, 7, 0.12);
+  --status-outage-tint: rgba(185, 28, 28, 0.10);
+  --status-accent-tint: rgba(71, 60, 158, 0.10);
 
-  --status-operational-border: rgba(47, 107, 79, 0.35);
-  --status-degraded-border: rgba(138, 100, 32, 0.4);
-  --status-outage-border: rgba(156, 63, 42, 0.4);
-  --status-accent-border: rgba(71, 60, 158, 0.4);
+  --status-operational-border: rgba(21, 128, 61, 0.32);
+  --status-degraded-border: rgba(161, 98, 7, 0.36);
+  --status-outage-border: rgba(185, 28, 28, 0.34);
+  --status-accent-border: rgba(71, 60, 158, 0.34);
 
-  --scrim: rgba(35, 37, 44, 0.5);
+  --scrim: rgba(24, 24, 27, 0.5);
 
-  /* A ring alone cannot lift anything off a light page — value separation is
-     what did the work in dark mode, and there is barely any left between a
-     white card and this ground. Each step here is a real drop shadow plus the
-     ring, so the elevation ladder is legible on light. */
-  --shadow-sm: 0 1px 2px rgba(35, 37, 44, 0.05), 0 0 0 1px rgba(35, 37, 44, 0.05);
-  --shadow-md: 0 2px 4px rgba(35, 37, 44, 0.04), 0 8px 20px rgba(35, 37, 44, 0.08),
-    0 0 0 1px rgba(35, 37, 44, 0.05);
-  --shadow-lg: 0 4px 10px rgba(35, 37, 44, 0.06), 0 20px 48px rgba(35, 37, 44, 0.16),
-    0 0 0 1px rgba(35, 37, 44, 0.07);
+  /* Neutral drops, and softer than the tinted ground needed: the hairline in
+     --color-divider carries the edge now, so the shadow only has to say which
+     plane is on top. Each step still ships its own ring, so a surface keeps an
+     outline wherever the drop is too faint to see. */
+  --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.04), 0 0 0 1px rgba(24, 24, 27, 0.06);
+  --shadow-md: 0 1px 3px rgba(24, 24, 27, 0.05), 0 6px 16px rgba(24, 24, 27, 0.06),
+    0 0 0 1px rgba(24, 24, 27, 0.06);
+  --shadow-lg: 0 4px 10px rgba(24, 24, 27, 0.06), 0 18px 40px rgba(24, 24, 27, 0.12),
+    0 0 0 1px rgba(24, 24, 27, 0.07);
 
   /* ── grounds ──────────────────────────────────────────────────────────────
-     Three painted grounds, one per plane, so a light page is not one flat
-     fill. Each is a full `background-image` value — declared here because a
-     gradient is a colour statement and this is the only file allowed to make
-     one — and each is `none` in dark, where value separation already does
-     the job and a wash would only muddy it.
-
-     The band is deliberately narrow: every stop stays between #f4f6ff and
-     #e9edf9, so the status fills painted on top of it keep their 3:1 graphic
-     ratio wherever on the page they land. */
-  --gradient-page: radial-gradient(1100px 620px at 8% -12%, #f4f2ff 0%, transparent 58%),
-    radial-gradient(900px 520px at 96% 0%, #eaf1fd 0%, transparent 52%),
-    linear-gradient(180deg, #f2f4fe 0%, #e9edf9 100%);
-  /* The rail is its own plane and reads as one: a wash off the top edge, the
-     prototype's own idea for it, at values that are actually visible here. */
-  --gradient-rail: linear-gradient(180deg, #e4e9f8 0%, #edf0fb 42%, #f0f3fd 100%);
-  /* --color-accent-900 is what dark uses for this bloom; on light it lands
-     within 6/255 of the ground and the hero simply has no glow. This is the
-     same shape, deep enough to read. */
-  --gradient-hero: radial-gradient(110% 70% at 8% 0%, #ded8fb 0%, transparent 62%);
+     Two of the three painted grounds are gone. --color-bg is one flat fill and
+     the rail is plain --color-surface, which is what separates them: a white
+     rail and white cards on a near-white ground, told apart by the hairline
+     and the shadow rather than by three lavender washes that read as haze. The
+     hero bloom stays — it is the only place the accent touches the ground, and
+     it is the page's one piece of colour identity — but pulled to a tint that
+     sits ~7/255 off the ground instead of the old #ded8fb slab. */
+  --gradient-page: none;
+  --gradient-rail: none;
+  --gradient-hero: radial-gradient(110% 70% at 8% 0%, #eeecfa 0%, transparent 62%);
 
   --font-heading: "Inter", system-ui, sans-serif;
   --font-heading-weight: 500;
@@ -189,8 +184,10 @@
      accent-200 is the dark end in light mode and the light end in dark mode,
      while --accent-foreground is --color-text in both, so the pair inverted
      itself into 1.02:1 in dark and 1.38:1 in light. A tint keeps the text
-     colour readable on either ground. */
-  --accent: color-mix(in srgb, var(--color-accent) 14%, transparent);
+     colour readable on either ground. Light carries a heavier mix than dark:
+     the rail is a white plane now rather than a washed blue-grey one, and 14%
+     of the accent over white was too faint to mark the active row on it. */
+  --accent: color-mix(in srgb, var(--color-accent) 18%, transparent);
   --accent-foreground: var(--color-text);
   --destructive: var(--status-major-outage);
   --destructive-foreground: var(--color-surface);
