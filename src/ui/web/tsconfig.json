@@ -1,0 +1,11 @@
+{
+  // Editors resolve a file against the *nearest* tsconfig.json, and the root
+  // one excludes this directory — so without this file the dashboard tree
+  // lands in an inferred project with neither `jsx` nor the `@/*` paths, and
+  // every aliased import reports ts(2307) in the editor while
+  // `npm run typecheck` (which names tsconfig.web.json explicitly) passes.
+  // Relative paths in an extended config resolve against the file that
+  // declared them, so `baseUrl`, `paths`, and `include` still point at the
+  // repo root. Nothing to configure here beyond the pointer itself.
+  "extends": "../../../tsconfig.web.json"
+}
