@@ -127,7 +127,7 @@ export function ComponentPicker({
         </div>
       </div>
 
-      <div className="component-picker-list flex max-h-64 flex-col gap-3 overflow-y-auto">
+      <div className="component-picker-list flex max-h-64 flex-col gap-3 overflow-y-auto overscroll-contain">
         {[...groups.entries()].map(([label, members]) => (
           <div key={label} className="flex flex-col gap-1.5">
             <span className="text-xs uppercase tracking-widest text-muted-foreground">{label}</span>
