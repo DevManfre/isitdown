@@ -47,12 +47,29 @@ export interface ComponentStatus {
   status: OverallStatus;
 }
 
+/** A maintenance window a provider declared on its own status page. */
+export interface MaintenanceWindow {
+  id: string;
+  /** Provider's own title. Empty string when the provider omits it. */
+  name: string;
+  /** Provider's own lifecycle word, e.g. "in_progress". Not normalised. */
+  status: string;
+  /** ISO 8601, UTC. */
+  startsAt: string;
+  /** ISO 8601, UTC. Null when the provider declares no end. */
+  endsAt: string | null;
+  /** Components the provider attributed it to; empty means page-wide. */
+  componentIds: string[];
+}
+
 export interface NormalizedStatus {
   provider: string;
   overallStatus: OverallStatus;
   activeIncidents: Incident[];
   /** Selected components only; empty when the service selects none. */
   components: ComponentStatus[];
+  /** Declared windows that are running or still to come; completed ones are dropped. */
+  maintenances: MaintenanceWindow[];
   /** ISO 8601, UTC. When the poll that produced this completed. */
   fetchedAt: string;
 }

@@ -205,6 +205,8 @@ export function parseSummary(raw: unknown, service: ServiceRef): NormalizedStatu
     overallStatus: scope === null ? mapIndicator(parsed.status?.indicator) : worstOf(components),
     activeIncidents,
     components,
+    // Parsed by Task 2; this adapter does not populate maintenances yet.
+    maintenances: [],
     fetchedAt,
   };
 }
