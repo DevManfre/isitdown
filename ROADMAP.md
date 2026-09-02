@@ -86,7 +86,7 @@ is additive and independently shippable.
 
 | # | Item | Size | Notes |
 |---|---|---|---|
-| 4.1 | **Prometheus `/metrics`** | S | `isitdown_provider_up`, `isitdown_poll_duration_seconds`, `isitdown_notifications_total`. Tiny to build, and it plugs IsItDown into every self-hosted Grafana on the planet. Best effort-to-reach ratio in this document. |
+| 4.1 ✅ | **Prometheus `/metrics`** | S | `isitdown_provider_up`, `isitdown_poll_duration_seconds`, `isitdown_notifications_total`. Tiny to build, and it plugs IsItDown into every self-hosted Grafana on the planet. Best effort-to-reach ratio in this document. |
 | 4.2 | **SSE or WebSocket live updates** | M | Replaces the dashboard's 30-second poll with a push. Instant reaction on a manual `/poll`, less idle work, and it makes the poll indicator honest. |
 | 4.3 | **Config export / import** | M | `GET /config/export` → a `config.yml` the Light edition can eat, and the reverse for seeding UI from a file. Makes the two editions genuinely interchangeable, which today they only are in principle. |
 | 4.4 | **Backup / restore of the SQLite file from the UI** | S | Download the DB, upload to restore. The whole state is one file — not exposing that is a missed trick. |
@@ -171,7 +171,7 @@ effort is roughly:
 
 1. ✅ **1.11 + 1.12 adapter contract kit and fixture recorder** — makes section 1 cheap.
 2. ✅ **1.5 RSS adapter** — proves the adapter seam on something that is not Statuspage. (1.4 Slack still open.)
-3. **4.1 Prometheus `/metrics`** — a day of work, a large audience.
+3. ✅ **4.1 Prometheus `/metrics`** — a day of work, a large audience.
 4. **2.1 scheduled maintenance** — removes the most annoying class of false alert.
 5. **3.1 + 3.2 Discord and Slack channels** — both nearly free behind the existing interface.
 6. **3.10 routing rules** — the notification feature people actually hit the ceiling on.
