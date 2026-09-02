@@ -74,15 +74,25 @@ export interface NormalizedStatus {
   fetchedAt: string;
 }
 
-export type StatusChangeKind =
-  | "status_change"
-  | "component_status_change"
-  | "incident_opened"
-  | "incident_updated"
-  | "incident_resolved"
-  | "maintenance_started"
-  | "maintenance_ended"
-  | "monitoring_degraded";
+/**
+ * The single source of truth for the diff engine's vocabulary. Read-side
+ * validators (the SQLite notification-row schema) build their zod enum from
+ * this same tuple, so a kind added here cannot silently drift out of sync
+ * with what a stored notification is allowed to read back as — the gap that
+ * took down every notification-listing view mid-branch.
+ */
+export const STATUS_CHANGE_KINDS = [
+  "status_change",
+  "component_status_change",
+  "incident_opened",
+  "incident_updated",
+  "incident_resolved",
+  "maintenance_started",
+  "maintenance_ended",
+  "monitoring_degraded",
+] as const;
+
+export type StatusChangeKind = (typeof STATUS_CHANGE_KINDS)[number];
 
 /**
  * A transition worth telling the operator about. Produced only by the diff
