@@ -163,6 +163,8 @@ export function parseFeedStatus(xml: string, service: ServiceRef, now: Date = ne
     // A feed has no components; the picker is told so by the missing
     // `listComponents`, and a selection made elsewhere cannot be honoured here.
     components: [],
+    // A feed has no structured maintenance data either.
+    maintenances: [],
     fetchedAt,
   };
 }

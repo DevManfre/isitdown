@@ -20,11 +20,21 @@ export const componentStatusSchema = z.object({
   status: z.enum(["operational", "degraded", "partial_outage", "major_outage", "unknown"]),
 });
 
+export const maintenanceWindowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: z.string(),
+  startsAt: z.string(),
+  endsAt: z.string().nullable(),
+  componentIds: z.array(z.string()).default([]),
+});
+
 export const normalizedStatusSchema = z.object({
   provider: z.string(),
   overallStatus: z.enum(["operational", "degraded", "partial_outage", "major_outage", "unknown"]),
   activeIncidents: z.array(incidentSchema),
   components: z.array(componentStatusSchema).default([]),
+  maintenances: z.array(maintenanceWindowSchema).default([]),
   fetchedAt: z.string(),
 });
 
