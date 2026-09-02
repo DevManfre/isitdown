@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -201,6 +201,30 @@ export function migrate(db: DatabaseSync): void {
     // receive anything. Clearing them makes the one working repair — press
     // "enable on this browser" again — the obvious one.
     db.exec("DELETE FROM push_subscriptions");
+  }
+
+  if (from < 8) {
+    const stateColumns = (db.prepare("PRAGMA table_info(provider_state)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!stateColumns.includes("maintenances")) {
+      db.exec("ALTER TABLE provider_state ADD COLUMN maintenances TEXT NOT NULL DEFAULT '[]'");
+    }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS maintenances (
+        provider_id    TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        maintenance_id TEXT NOT NULL,
+        name           TEXT NOT NULL,
+        status         TEXT NOT NULL,
+        starts_at      TEXT NOT NULL,
+        ends_at        TEXT,
+        component_ids  TEXT NOT NULL,
+        first_seen_at  TEXT NOT NULL,
+        last_seen_at   TEXT NOT NULL,
+        PRIMARY KEY (provider_id, maintenance_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_maintenances_provider_start ON maintenances (provider_id, starts_at);
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

@@ -86,6 +86,7 @@ test("stored state drives the provider gauges", async () => {
         { id: "i1", name: "Down", impact: "critical", status: "investigating", updatedAt: "2026-01-01T00:00:00.000Z" },
       ],
       components: [],
+      maintenances: [],
       fetchedAt: "2026-01-01T00:00:00.000Z",
     });
 
@@ -111,6 +112,7 @@ test("an operational provider is up", async () => {
       overallStatus: "operational",
       activeIncidents: [],
       components: [],
+      maintenances: [],
       fetchedAt: "2026-01-01T00:00:00.000Z",
     });
 

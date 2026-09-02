@@ -200,6 +200,7 @@ test("deleting a service removes it and its history", async () => {
       overallStatus: "operational",
       activeIncidents: [],
       components: [],
+      maintenances: [],
       fetchedAt: new Date().toISOString(),
     });
     assert.equal((await app.runtime.store.getRecentSamples("github", 5)).length, 1);
