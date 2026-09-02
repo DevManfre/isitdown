@@ -16,6 +16,10 @@ const EMOJI: Record<OverallStatus, string> = {
   unknown: "⚪",
 };
 
+// A declared maintenance window is its own affordance, not a severity: it
+// never borrows the colour of the status it interrupts (or leaves behind).
+const MAINTENANCE_EMOJI = "⚙️";
+
 const STATUS_KEY: Record<OverallStatus, string> = {
   operational: "status.operational",
   degraded: "status.degraded",
@@ -71,9 +75,13 @@ export function renderMessage(payload: NotificationPayload): string {
     severity: heading,
     previous: change.previousStatus === undefined ? "" : statusLabel(change.previousStatus, locale),
     current: statusLabel(change.currentStatus, locale),
-    title: change.incident?.name ?? "",
+    title: change.incident?.name ?? change.maintenance?.name ?? "",
     status: incidentStatusLabel(change.incident?.status ?? "", locale),
-    count: change.failureCount ?? 0,
+    count: change.failureCount ?? change.openIncidents ?? 0,
+    endsAt:
+      change.maintenance?.endsAt === null || change.maintenance?.endsAt === undefined
+        ? t(locale, "maintenance.no-end")
+        : formatUtc(change.maintenance.endsAt),
     lastStatus: statusLabel(change.currentStatus, locale),
     component: change.component?.name ?? "",
     updatedAt,
@@ -81,7 +89,14 @@ export function renderMessage(payload: NotificationPayload): string {
   });
 
   // A monitoring warning is about our own fetching, not the provider's state, so
-  // it never borrows the provider's colour.
-  const emoji = change.kind === "monitoring_degraded" ? EMOJI.unknown : emojiFor(change.currentStatus);
+  // it never borrows the provider's colour. A maintenance window is not a
+  // severity either, so it gets its own fixed emoji instead of the current
+  // status's.
+  const emoji =
+    change.kind === "monitoring_degraded"
+      ? EMOJI.unknown
+      : change.kind === "maintenance_started" || change.kind === "maintenance_ended"
+        ? MAINTENANCE_EMOJI
+        : emojiFor(change.currentStatus);
   return `${emoji} ${body}`;
 }
