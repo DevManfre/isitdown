@@ -9,7 +9,13 @@ import { migrate } from "../../src/ui/db/migrate.ts";
 import { createSqliteStateStore } from "../../src/ui/sqliteStateStore.ts";
 import { CONTRACT_PROVIDER_IDS, runStateStoreContract } from "../core/stateStore.contract.ts";
 import type { HistoryStore } from "../../src/ui/historyStore.interface.ts";
-import type { HistoricalIncident, Incident, MaintenanceWindow, NormalizedStatus } from "../../src/core/types.ts";
+import {
+  STATUS_CHANGE_KINDS,
+  type HistoricalIncident,
+  type Incident,
+  type MaintenanceWindow,
+  type NormalizedStatus,
+} from "../../src/core/types.ts";
 
 /** Fixed "today" so a day or retention window never depends on when the suite runs. */
 const NOW = new Date("2026-08-20T18:00:00.000Z");
@@ -259,6 +265,35 @@ test("reads back a maintenance notification, kind and all", async () => {
   assert.deepEqual(
     rows.map((row) => row.kind).sort(),
     ["maintenance_ended", "maintenance_started"],
+  );
+  await store.close();
+});
+
+test("every StatusChangeKind the diff engine can raise round-trips through the store", async () => {
+  // The read-side `kind` enum used to be hand-mirrored from StatusChangeKind,
+  // which is exactly the mechanism that took down every notification-listing
+  // view mid-branch when it fell one kind behind. Driving this test off the
+  // same STATUS_CHANGE_KINDS tuple the store's schema is now built from means
+  // a ninth kind added to core fails this test immediately rather than only
+  // at runtime, on whichever kind happened to be missing.
+  const { store } = await harness();
+  let index = 0;
+  for (const kind of STATUS_CHANGE_KINDS) {
+    await store.recordNotification({
+      providerId: "github",
+      channel: "telegram",
+      kind,
+      text: kind,
+      sentAt: `2026-08-19T14:${String(index).padStart(2, "0")}:00.000Z`,
+      ok: true,
+    });
+    index += 1;
+  }
+
+  const rows = await store.listNotifications(STATUS_CHANGE_KINDS.length);
+  assert.deepEqual(
+    rows.map((row) => row.kind).sort(),
+    [...STATUS_CHANGE_KINDS].sort(),
   );
   await store.close();
 });
