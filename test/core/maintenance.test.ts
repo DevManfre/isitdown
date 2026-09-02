@@ -42,6 +42,24 @@ const cases: { name: string; window: MaintenanceWindow; at: string; expected: bo
     at: "2026-09-02T00:00:00.000Z",
     expected: false,
   },
+  {
+    name: "unparseable at is not active",
+    window: window(),
+    at: "not-a-date",
+    expected: false,
+  },
+  {
+    name: "unparseable startsAt is not active",
+    window: window({ startsAt: "not-a-date" }),
+    at: "2026-09-02T02:00:00.000Z",
+    expected: false,
+  },
+  {
+    name: "declared endsAt unparseable does not fall back to the lifecycle word",
+    window: window({ endsAt: "not-a-date", status: "in_progress" }),
+    at: "2026-09-02T02:00:00.000Z",
+    expected: false,
+  },
 ];
 
 for (const row of cases) {
