@@ -802,10 +802,11 @@ back reports a parse failure instead of the real problem.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/health` | Liveness. `{ status, providers, lastCycleAt }`. |
-| `GET` | `/status` | Current status of every provider, plus last and next poll. A pure database read — safe to poll every 30s, which the dashboard does. Never reaches upstream. |
+| `GET` | `/status` | Current status of every provider, plus last and next poll, plus `maintenance: { active, upcoming }` — windows running now and windows whose `startsAt` is still in the future; a window that has already ended but is still in the stored payload appears in neither list. A pure database read — safe to poll every 30s, which the dashboard does. Never reaches upstream. |
 | `GET` | `/history?provider=&days=` | Pre-aggregated daily buckets, 7/30/90-day uptime, month columns. `days` accepts `7`, `30` or `90`; anything else is a 400 naming them. Without `provider`, a summary across all of them. |
 | `GET` | `/incidents?provider=&state=&page=&pageSize=` | One page of the incident list: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` is `all` (default), `active` or `resolved`; `pageSize` defaults to 20 and is capped at 100. A nonsense `page`, `pageSize` or `state` falls back to the first page of everything rather than a 400. `counts` carries all three states whatever the filter, and `active` is the open list the dashboard's hero card shows on every page. |
 | `GET` | `/incidents/:providerId/:incidentId` | Detail: the incident, the observed timeline, the action log of what was sent, the provider's other open incidents, and the last 24 polls. |
+| `GET` | `/maintenances?provider=&days=` | Declared maintenance windows — running, upcoming and past — as `{ maintenances }`. `days` bounds how far back a closed window is still returned (default 90, max 365); `provider` narrows to one. Without `provider`, every enabled provider. |
 | `GET` | `/notifications?limit=` | What was actually sent, newest first. Capped at 200. |
 | `GET` | `/config` | Services, polling settings, channels. Channel credentials appear as variable **names** with an `isSet` flag — never values. |
 | `POST` | `/config/services` | Add a service. `201`, or `409` on a duplicate id, or `400` naming the invalid field. |
@@ -1004,6 +1005,24 @@ cases get added as rows rather than as one-off tests.
 | `unknown` | anything | **no** `status_change` — there is no real baseline to compare |
 | anything | `unknown` | **no** `status_change` — a transition *into* "we don't know" is not news |
 | N consecutive failed cycles | | yes, **once** — `monitoring_degraded`, and not again until a success clears it |
+| no window running | a declared window starts | yes — `maintenance_started` |
+| a window running | the same window ends | yes — `maintenance_ended`, naming the status the provider came out in |
+| a window running | anything else changes upstream (status, components, incidents) | **no** — suppressed until the window ends |
+
+**Suppression rule**: while any maintenance window a provider declared is
+running, nothing else about that provider is news — a status change, a new or
+updated incident, a component flip, all of it stays quiet until the window
+closes. The only exception is the window's own start and end. This means an
+incident that opens *inside* a window and is still open when the window closes
+never gets its own `incident_opened` message — the only announcement for it is
+the open-incident count carried on `maintenance_ended`. If it is still open
+once the window is long gone, nothing chases it further; check the dashboard.
+
+Two things this does *not* change: maintenance rows are merged into the
+dashboard's incident timeline, but only on the timeline's first page — older
+maintenance history is available from `/maintenances`, not the timeline.
+Uptime percentages are also unchanged — a sample taken while a window is
+running counts exactly as it does today, maintenance or not.
 
 A restart notifies nothing: state is reloaded from the store, and reloaded state
 compares equal to what produced it. Both store implementations are tested for this.
