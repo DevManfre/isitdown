@@ -816,6 +816,7 @@ back reports a parse failure instead of the real problem.
 | `POST` | `/config/channels/:id/test` | One test notification, through the dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
 | `POST` | `/poll` | Run a cycle now, through the scheduler. Returns the cycle summary. |
+| `GET` | `/metrics` | Prometheus exposition. The one non-JSON endpoint — see [6.2](#62-prometheus-metrics). |
 | `GET` | `/` | The dashboard. |
 
 ### 6.1 History backfill
@@ -832,6 +833,57 @@ most recent incidents, so coverage varies per provider; days older than the
 feed's reach stay grey ("no data") and are excluded from the uptime
 percentages. Backfill never triggers notifications and never overwrites
 observed samples.
+
+### 6.2 Prometheus metrics
+
+`GET /metrics` answers in the Prometheus text exposition format
+(`text/plain; version=0.0.4`), so any Prometheus can scrape IsItDown with no
+adapter in between:
+
+```yaml
+scrape_configs:
+  - job_name: isitdown
+    static_configs:
+      - targets: ["isitdown-ui:3000"]
+```
+
+Like `/status`, a scrape is a pure read of stored state and never reaches a
+provider, so scraping every 15 seconds costs nothing upstream. Only enabled
+providers are exported: a disabled one has rows in the database but no cycle
+will ever refresh them, and an alert on a frozen gauge is worse than no series.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `isitdown_providers_total` | gauge | — | Providers currently being polled. |
+| `isitdown_provider_up` | gauge | `provider`, `name` | `1` when the provider reports itself fully operational, `0` otherwise — including before its first poll. |
+| `isitdown_provider_status` | gauge | `provider`, `status` | `1` on the current normalised status, `0` on the other four. Tells `degraded` apart from `major_outage`, which `_up` cannot. |
+| `isitdown_provider_active_incidents` | gauge | `provider` | Open incidents on that provider's status page. |
+| `isitdown_provider_failure_count` | gauge | `provider` | Consecutive failed poll cycles. Non-zero means *our own* view is degraded, not that the provider is down. |
+| `isitdown_provider_last_fetch_timestamp_seconds` | gauge | `provider` | When its status was last read successfully. Absent until the first success. |
+| `isitdown_poll_duration_seconds` | gauge | `provider` | How long its last poll took, retries included. |
+| `isitdown_polls_total` | counter | `provider`, `outcome` | Polls attempted since start, `outcome` being `success` or `failure`. |
+| `isitdown_notifications_total` | counter | `channel`, `outcome` | Delivery attempts since start, `outcome` being `sent` or `failed`. |
+| `isitdown_last_cycle_timestamp_seconds` | gauge | — | When the last cycle finished. Absent until this process has run one. |
+
+The counters are per process, not per database: they start at zero on restart —
+which is what Prometheus expects of a counter — rather than being derived from
+the `notifications` table, which is pruned with the rest of the history and
+would make a counter go backwards.
+
+Two alerts worth having, and neither is "provider is down":
+
+```yaml
+groups:
+  - name: isitdown
+    rules:
+      # The provider says it is down, and has for ten minutes.
+      - alert: ProviderDown
+        expr: isitdown_provider_up == 0
+        for: 10m
+      # Our own monitoring is blind — no successful cycle in fifteen minutes.
+      - alert: IsItDownStalled
+        expr: time() - isitdown_last_cycle_timestamp_seconds > 900
+```
 
 There is no authentication: this is a local, single-operator dashboard. Do not
 publish port 3000 to a network you do not trust.
@@ -1143,11 +1195,12 @@ isitdown/
 │       ├── history.ts                  uptime and incident aggregation
 │       ├── backfill.ts                 reconstructs 90 days of history from a provider's incidents on first boot
 │       ├── dbConfigSource.ts           config from SQLite; resolves secrets by variable name
+│       ├── metrics.ts                  the Prometheus scrape surface: gauges from the store, counters in memory
 │       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
 │       ├── geo/                        resolveLocation.ts + the IATA/cloud-region lookup tables it resolves against
 │       ├── db/                         open.ts, migrate.ts, seed.ts
-│       ├── routes/                     status, history, incidents, notifications, config, preferences, map
+│       ├── routes/                     status, history, incidents, notifications, config, preferences, map, metrics
 │       └── web/                        the dashboard: react, vite, shadcn/ui
 │           ├── index.html              pre-paint theme script, fonts, #root
 │           ├── main.tsx                provider tree: i18n, query, theme, router
