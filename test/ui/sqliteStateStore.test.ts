@@ -239,6 +239,30 @@ test("notifications are recorded and read back newest first", async () => {
   await store.close();
 });
 
+test("reads back a maintenance notification, kind and all", async () => {
+  // The row schema's `kind` enum has to hold every StatusChangeKind the diff
+  // engine can raise; a missing one fails validation on read, which takes down
+  // every view that lists notifications, not just the maintenance row.
+  const { store } = await harness();
+  for (const kind of ["maintenance_started", "maintenance_ended"] as const) {
+    await store.recordNotification({
+      providerId: "github",
+      channel: "telegram",
+      kind,
+      text: kind,
+      sentAt: "2026-08-19T14:00:00.000Z",
+      ok: true,
+    });
+  }
+
+  const rows = await store.listNotifications(10);
+  assert.deepEqual(
+    rows.map((row) => row.kind).sort(),
+    ["maintenance_ended", "maintenance_started"],
+  );
+  await store.close();
+});
+
 test("listNotifications respects its limit", async () => {
   const { store } = await harness();
   for (let i = 0; i < 5; i += 1) {
