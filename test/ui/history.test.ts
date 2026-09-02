@@ -32,7 +32,7 @@ async function harness(providers: string[] = ["github"]): Promise<{
 }
 
 const sample = (store: HistoryStore, provider: string, at: string, status: OverallStatus) =>
-  store.saveStatus({ provider, overallStatus: status, activeIncidents: [], components: [], fetchedAt: at });
+  store.saveStatus({ provider, overallStatus: status, activeIncidents: [], components: [], maintenances: [], fetchedAt: at });
 
 test("a week of operational samples is a hundred percent uptime with one bucket per day", async () => {
   const { store, history } = await harness();
@@ -141,6 +141,7 @@ test("the incident count is the incidents that started inside the window", async
       { id: "recent", name: "x", impact: "minor", status: "investigating", updatedAt: daysAgo(3) },
     ],
     components: [],
+    maintenances: [],
     fetchedAt: daysAgo(3),
   });
   await store.saveStatus({
@@ -150,6 +151,7 @@ test("the incident count is the incidents that started inside the window", async
       { id: "old", name: "y", impact: "minor", status: "investigating", updatedAt: daysAgo(80) },
     ],
     components: [],
+    maintenances: [],
     fetchedAt: daysAgo(80),
   });
 
@@ -269,6 +271,7 @@ test("component histories are gap-filled and windowed like the provider's", asyn
       overallStatus: "operational",
       activeIncidents: [],
       components: [{ id: "c1", name: "Actions", status: "operational" }],
+      maintenances: [],
       fetchedAt: daysAgo(0, hour),
     });
   }
@@ -278,6 +281,7 @@ test("component histories are gap-filled and windowed like the provider's", asyn
       overallStatus: "operational",
       activeIncidents: [],
       components: [{ id: "c1", name: "Actions", status: "degraded" }],
+      maintenances: [],
       fetchedAt: daysAgo(0, hour),
     });
   }

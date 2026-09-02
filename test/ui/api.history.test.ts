@@ -55,6 +55,7 @@ const save = (
     overallStatus: status,
     activeIncidents: incidents,
     components: [],
+    maintenances: [],
     fetchedAt: when,
   });
 
@@ -145,6 +146,7 @@ test("component history returns one entry per selected component", async () => {
       overallStatus: "operational",
       activeIncidents: [],
       components: [{ id: "c1", name: "Actions", status: "operational" }],
+      maintenances: [],
       fetchedAt: at(0),
     });
 

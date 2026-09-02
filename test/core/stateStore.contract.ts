@@ -30,7 +30,16 @@ const snap = (provider: string, overallStatus: OverallStatus): NormalizedStatus 
     },
   ],
   components: [],
-  maintenances: [],
+  maintenances: [
+    {
+      id: "m1",
+      name: "Database maintenance",
+      status: "scheduled",
+      startsAt: "2026-08-20T02:00:00.000Z",
+      endsAt: "2026-08-20T04:00:00.000Z",
+      componentIds: ["c1"],
+    },
+  ],
   fetchedAt: "2026-08-19T14:05:00.000Z",
 });
 

@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { ProviderRuntimeState } from "../core/stateStore.interface.ts";
-import { componentStatusSchema, incidentSchema } from "../core/status.schema.ts";
+import { componentStatusSchema, incidentSchema, maintenanceWindowSchema } from "../core/status.schema.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { z } from "zod";
 import type {
@@ -10,11 +10,14 @@ import type {
   IncidentCounts,
   IncidentFilter,
   IncidentRow,
+  MaintenanceFilter,
+  MaintenanceRow,
   SampleRow,
 } from "./historyStore.interface.ts";
 
 const incidentsColumnSchema = z.array(incidentSchema);
 const componentsColumnSchema = z.array(componentStatusSchema);
+const maintenancesColumnSchema = z.array(maintenanceWindowSchema);
 
 /**
  * Rows come back from SQLite untyped, and a column read is external input like a
@@ -33,6 +36,7 @@ const stateRowSchema = z.object({
   overall_status: overallStatusSchema,
   active_incidents: z.string(),
   components: z.string(),
+  maintenances: z.string(),
   fetched_at: z.string(),
   failure_count: z.number(),
   degraded_notified: z.number(),
@@ -47,6 +51,18 @@ const incidentRowSchema = z.object({
   started_at: z.string(),
   updated_at: z.string(),
   resolved_at: z.string().nullable(),
+});
+
+const maintenanceRowSchema = z.object({
+  provider_id: z.string(),
+  maintenance_id: z.string(),
+  name: z.string(),
+  status: z.string(),
+  starts_at: z.string(),
+  ends_at: z.string().nullable(),
+  component_ids: z.string(),
+  first_seen_at: z.string(),
+  last_seen_at: z.string(),
 });
 
 /** `SUM(...)` is NULL, not 0, when no row matches the WHERE clause. */
@@ -86,6 +102,7 @@ const sampleRowSchema = z.object({
 });
 
 type IncidentDbRow = z.infer<typeof incidentRowSchema>;
+type MaintenanceDbRow = z.infer<typeof maintenanceRowSchema>;
 
 /**
  * Severity rank used to pick a day's bucket. `unknown` ranks lowest on purpose:
@@ -141,6 +158,18 @@ const toIncidentRow = (row: IncidentDbRow): IncidentRow => ({
   resolvedAt: row.resolved_at,
 });
 
+const toMaintenanceRow = (row: MaintenanceDbRow): MaintenanceRow => ({
+  providerId: row.provider_id,
+  id: row.maintenance_id,
+  name: row.name,
+  status: row.status,
+  startsAt: row.starts_at,
+  endsAt: row.ends_at,
+  componentIds: z.array(z.string()).parse(JSON.parse(row.component_ids)),
+  firstSeenAt: row.first_seen_at,
+  lastSeenAt: row.last_seen_at,
+});
+
 /**
  * A `provider_id` allow-list as a clause and its parameters, or null when the
  * caller asked for no restriction at all.
@@ -182,26 +211,27 @@ export interface SqliteStateStoreDeps {
 export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreDeps = {}): HistoryStore {
   const now = deps.now ?? ((): Date => new Date());
   const selectState = db.prepare(
-    "SELECT overall_status, active_incidents, components, fetched_at, failure_count, degraded_notified FROM provider_state WHERE provider_id = ?",
+    "SELECT overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified FROM provider_state WHERE provider_id = ?",
   );
   const upsertState = db.prepare(`
-    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, fetched_at, failure_count, degraded_notified)
-    VALUES (?, ?, ?, ?, ?, 0, 0)
+    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified)
+    VALUES (?, ?, ?, ?, ?, ?, 0, 0)
     ON CONFLICT (provider_id) DO UPDATE SET
       overall_status = excluded.overall_status,
       active_incidents = excluded.active_incidents,
       components = excluded.components,
+      maintenances = excluded.maintenances,
       fetched_at = excluded.fetched_at
   `);
   const bumpFailure = db.prepare(`
-    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, fetched_at, failure_count, degraded_notified)
-    VALUES (?, 'unknown', '[]', '[]', ?, 1, 0)
+    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified)
+    VALUES (?, 'unknown', '[]', '[]', '[]', ?, 1, 0)
     ON CONFLICT (provider_id) DO UPDATE SET failure_count = failure_count + 1
   `);
   const clearFailure = db.prepare("UPDATE provider_state SET failure_count = 0 WHERE provider_id = ?");
   const setDegraded = db.prepare(`
-    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, fetched_at, failure_count, degraded_notified)
-    VALUES (?, 'unknown', '[]', '[]', ?, 0, ?)
+    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified)
+    VALUES (?, 'unknown', '[]', '[]', '[]', ?, 0, ?)
     ON CONFLICT (provider_id) DO UPDATE SET degraded_notified = excluded.degraded_notified
   `);
   const insertSample = db.prepare(
@@ -234,6 +264,17 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (provider_id, incident_id) DO NOTHING
   `);
+  const upsertMaintenance = db.prepare(`
+    INSERT INTO maintenances (provider_id, maintenance_id, name, status, starts_at, ends_at, component_ids, first_seen_at, last_seen_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (provider_id, maintenance_id) DO UPDATE SET
+      name = excluded.name,
+      status = excluded.status,
+      starts_at = excluded.starts_at,
+      ends_at = excluded.ends_at,
+      component_ids = excluded.component_ids,
+      last_seen_at = excluded.last_seen_at
+  `);
 
   function readIncidents(json: string): Incident[] {
     return incidentsColumnSchema.parse(JSON.parse(json));
@@ -253,8 +294,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
                 overallStatus: row.overall_status,
                 activeIncidents: readIncidents(row.active_incidents),
                 components: componentsColumnSchema.parse(JSON.parse(row.components)),
-                // Not yet persisted; Task 5 adds a column for this.
-                maintenances: [],
+                maintenances: maintenancesColumnSchema.parse(JSON.parse(row.maintenances)),
                 fetchedAt: row.fetched_at,
               },
         failureCount: row.failure_count,
@@ -270,6 +310,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
           status.overallStatus,
           JSON.stringify(status.activeIncidents),
           JSON.stringify(status.components),
+          JSON.stringify(status.maintenances),
           status.fetchedAt,
         );
         insertSample.run(
@@ -304,6 +345,20 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
             incident.status,
             startedAt(incident.updatedAt, status.fetchedAt),
             incident.updatedAt,
+          );
+        }
+
+        for (const maintenance of status.maintenances) {
+          upsertMaintenance.run(
+            status.provider,
+            maintenance.id,
+            maintenance.name,
+            maintenance.status,
+            maintenance.startsAt,
+            maintenance.endsAt,
+            JSON.stringify(maintenance.componentIds),
+            status.fetchedAt,
+            status.fetchedAt,
           );
         }
         db.exec("COMMIT");
@@ -436,6 +491,40 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       return row === undefined ? null : toIncidentRow(incidentRowSchema.parse(row));
     },
 
+    async listMaintenances(filter: MaintenanceFilter): Promise<MaintenanceRow[]> {
+      const clauses: string[] = [];
+      const params: (string | number)[] = [];
+      if (filter.providerId !== undefined) {
+        clauses.push("provider_id = ?");
+        params.push(filter.providerId);
+      }
+      const scope = providerScope(filter.providerIds);
+      if (scope !== null) {
+        clauses.push(scope.clause);
+        params.push(...scope.params);
+      }
+      if (filter.days !== undefined) {
+        clauses.push("starts_at >= ?");
+        params.push(new Date(now().getTime() - filter.days * 24 * 3600 * 1000).toISOString());
+      }
+      if (filter.includeUpcoming === false) {
+        clauses.push("starts_at <= ?");
+        params.push(now().toISOString());
+      }
+      const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
+      const limit = filter.limit;
+      if (limit !== undefined) params.push(limit);
+
+      const rows = db
+        .prepare(
+          `SELECT provider_id, maintenance_id, name, status, starts_at, ends_at, component_ids, first_seen_at, last_seen_at
+           FROM maintenances ${where} ORDER BY starts_at DESC ${limit === undefined ? "" : "LIMIT ?"}`,
+        )
+        .all(...params)
+        .map((raw) => maintenanceRowSchema.parse(raw));
+      return rows.map(toMaintenanceRow);
+    },
+
     async getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]> {
       const from = new Date(now().getTime() - days * 24 * 3600 * 1000).toISOString();
       const rows = db
@@ -511,6 +600,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       db.prepare("DELETE FROM component_samples WHERE observed_at < ?").run(cutoff);
       db.prepare("DELETE FROM notifications WHERE sent_at < ?").run(cutoff);
       db.prepare("DELETE FROM incidents WHERE resolved_at IS NOT NULL AND resolved_at < ?").run(cutoff);
+      db.prepare("DELETE FROM maintenances WHERE ends_at IS NOT NULL AND ends_at < ?").run(cutoff);
     },
 
     async getEarliestSampleTime(providerId: string): Promise<string | null> {

@@ -27,6 +27,7 @@ test("migrate creates every table the dashboard reads", async () => {
     "channels",
     "component_samples",
     "incidents",
+    "maintenances",
     "map_geo_state",
     "map_points",
     "notifications",
@@ -316,6 +317,46 @@ test("migrating from schema 5 adds push_subscriptions without touching existing 
   const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[])
     .map((row) => row.name);
   assert.ok(tables.includes("push_subscriptions"), "push_subscriptions missing after upgrade from schema 5");
+
+  const rows = db.prepare("SELECT id FROM services").all() as { id: string }[];
+  assert.deepEqual(rows.map((row) => row.id), ["github"], "an upgrade must not touch existing rows");
+
+  const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
+  assert.equal(version?.user_version, SCHEMA_VERSION);
+  db.close();
+});
+
+test("migrating from schema 7 adds the maintenances column and table without losing rows", async () => {
+  const db = await freshDb();
+  migrate(db);
+  db.prepare(
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).run("github", "GitHub", "statuspage", "https://www.githubstatus.com", null, 1, "2026-08-19T00:00:00.000Z");
+  db.prepare(
+    "INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at) VALUES (?, ?, ?, ?, ?, ?)",
+  ).run("github", "operational", "[]", "[]", "[]", "2026-08-19T00:00:00.000Z");
+  // Roll the database back to how it looked before this task: drop the table
+  // this task adds and the column it adds to provider_state.
+  db.exec("DROP TABLE maintenances");
+  db.exec("ALTER TABLE provider_state DROP COLUMN maintenances");
+  db.exec("PRAGMA user_version = 7");
+
+  migrate(db);
+
+  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[])
+    .map((row) => row.name);
+  assert.ok(tables.includes("maintenances"), "maintenances table missing after upgrade from schema 7");
+
+  const stateColumns = (db.prepare("PRAGMA table_info(provider_state)").all() as { name: string }[]).map(
+    (column) => column.name,
+  );
+  assert.ok(stateColumns.includes("maintenances"), "provider_state.maintenances missing after upgrade from schema 7");
+
+  const state = db.prepare("SELECT overall_status, maintenances FROM provider_state WHERE provider_id = ?").get(
+    "github",
+  ) as { overall_status: string; maintenances: string } | undefined;
+  assert.equal(state?.overall_status, "operational", "an upgrade must not touch existing rows");
+  assert.equal(state?.maintenances, "[]", "a row written before the migration reads back as an empty array");
 
   const rows = db.prepare("SELECT id FROM services").all() as { id: string }[];
   assert.deepEqual(rows.map((row) => row.id), ["github"], "an upgrade must not touch existing rows");
