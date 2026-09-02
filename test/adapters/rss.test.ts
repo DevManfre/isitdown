@@ -189,7 +189,9 @@ test("fetchStatus reads the base url itself as the feed and asks for a feed body
       assert.equal(req.url, "/history.rss");
       assert.match(req.headers.accept ?? "", /xml/);
       res.writeHead(200, { "content-type": "application/rss+xml" });
-      res.end(fixture("incident"));
+      // Dated against the real clock: fetchStatus takes no `now`, so a fixture's
+      // fixed date would age out of the active window and stop being an incident.
+      res.end(feedWith(entry("Major outage affecting the API", new Date(Date.now() - 3_600_000).toUTCString())));
     },
     async (baseUrl) => {
       const status = await rssAdapter.fetchStatus(
