@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { ProviderRuntimeState } from "../core/stateStore.interface.ts";
 import { componentStatusSchema, incidentSchema, maintenanceWindowSchema } from "../core/status.schema.ts";
+import { STATUS_CHANGE_KINDS } from "../core/types.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { z } from "zod";
 import type {
@@ -74,16 +75,10 @@ const incidentCountsSchema = z.object({
 const notificationRowSchema = z.object({
   provider_id: z.string(),
   channel: z.string(),
-  kind: z.enum([
-    "status_change",
-    "component_status_change",
-    "incident_opened",
-    "incident_updated",
-    "incident_resolved",
-    "maintenance_started",
-    "maintenance_ended",
-    "monitoring_degraded",
-  ]),
+  // Built from the same tuple StatusChangeKind is derived from, not
+  // hand-mirrored: a hand-mirrored copy is exactly what fell one kind behind
+  // and took down every notification-listing view mid-branch.
+  kind: z.enum(STATUS_CHANGE_KINDS),
   text: z.string(),
   sent_at: z.string(),
   ok: z.number(),
