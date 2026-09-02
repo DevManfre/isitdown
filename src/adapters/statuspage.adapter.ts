@@ -211,18 +211,34 @@ export function parseSummary(raw: unknown, service: ServiceRef): NormalizedStatu
   // the provider is telling us its whole page is under work.
   const maintenances: MaintenanceWindow[] = (parsed.scheduled_maintenances ?? []).flatMap((entry) => {
     const id = entry.id;
-    const startsAt = entry.scheduled_for;
+    const scheduledFor = entry.scheduled_for;
     // A window we cannot place on a clock cannot suppress anything, and a window
     // without an id cannot be told apart from the next one.
-    if (id === undefined || startsAt === undefined) return [];
+    if (id === undefined || scheduledFor === undefined) return [];
     if (CLOSED_MAINTENANCE.has(entry.status ?? "")) return [];
+
+    // Statuspage renders these timestamps in the page's own configured
+    // timezone, not always UTC, but `MaintenanceWindow.startsAt`/`endsAt`
+    // are documented ISO 8601 UTC. Normalising here, where the field enters
+    // the model, keeps every downstream string comparison (isActive, the
+    // history store's SQL range, the dashboard's own sort) correct.
+    const startsAtMs = Date.parse(scheduledFor);
+    if (Number.isNaN(startsAtMs)) return [];
+    const scheduledUntil = entry.scheduled_until;
+    let endsAt: string | null = null;
+    if (scheduledUntil != null) {
+      const endsAtMs = Date.parse(scheduledUntil);
+      if (Number.isNaN(endsAtMs)) return [];
+      endsAt = new Date(endsAtMs).toISOString();
+    }
+
     return [
       {
         id,
         name: entry.name ?? "",
         status: entry.status ?? "",
-        startsAt,
-        endsAt: entry.scheduled_until ?? null,
+        startsAt: new Date(startsAtMs).toISOString(),
+        endsAt,
         componentIds: (entry.components ?? []).flatMap((component) =>
           component.id === undefined ? [] : [component.id],
         ),
