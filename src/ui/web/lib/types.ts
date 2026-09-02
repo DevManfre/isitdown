@@ -204,6 +204,8 @@ export type StatusChangeKind =
   | "incident_opened"
   | "incident_updated"
   | "incident_resolved"
+  | "maintenance_started"
+  | "maintenance_ended"
   | "monitoring_degraded";
 
 /**
