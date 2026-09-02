@@ -23,6 +23,14 @@ const STEPS: readonly string[] = INCIDENT_STEPS;
 /** How long the copy-payload confirmation stays up — incident.js:238. */
 const TOAST_MS = 2500;
 
+/**
+ * How many action-log rows show before the operator asks for the rest. A
+ * long-running incident logs dozens of deliveries, and every one of them used
+ * to set this tile's height — and the page's with it — before anyone asked to
+ * read them.
+ */
+const ACTION_LOG_COLLAPSED = 6;
+
 /** The tiles enter in reading order, after the hero and the stepper have landed. */
 const TILE_CASCADE = { base: 240, step: 60 };
 
@@ -57,6 +65,7 @@ export function IncidentDetail() {
   const { data: status } = useStatus();
 
   const [copiedMessage, setCopiedMessage] = useState<string | undefined>(undefined);
+  const [actionLogExpanded, setActionLogExpanded] = useState(false);
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => {
     if (toastTimeout.current !== undefined) clearTimeout(toastTimeout.current);
@@ -69,6 +78,7 @@ export function IncidentDetail() {
   if (detail === undefined) return null;
 
   const { incident, timeline, actionLog, polls, otherActiveIncidents } = detail;
+  const shownActionLog = actionLogExpanded ? actionLog : actionLog.slice(0, ACTION_LOG_COLLAPSED);
   const reached = incident.resolvedAt === null ? STEPS.indexOf(incident.status) : STEPS.length - 1;
 
   const elapsed =
@@ -210,7 +220,7 @@ export function IncidentDetail() {
           {actionLog.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("incidents.empty-notifications")}</p>
           ) : (
-            actionLog.map((record, index) => (
+            shownActionLog.map((record, index) => (
               <div
                 key={`${record.providerId}-${record.sentAt}-${index}`}
                 className="anim-fade grid grid-cols-[70px_1fr] items-baseline gap-3"
@@ -229,6 +239,19 @@ export function IncidentDetail() {
                 </span>
               </div>
             ))
+          )}
+          {/* One control, and only while it has something left to reveal:
+              expanding is one-way, same as the Incidents feed panel. */}
+          {!actionLogExpanded && actionLog.length > ACTION_LOG_COLLAPSED && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="self-start px-0 text-xs text-muted-foreground"
+              onClick={() => setActionLogExpanded(true)}
+            >
+              {t("action.show-more")}
+            </Button>
           )}
         </BentoTile>
 
