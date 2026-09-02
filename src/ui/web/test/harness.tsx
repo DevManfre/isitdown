@@ -20,7 +20,8 @@ type FixtureKey =
   | "notifications"
   | "componentHistory"
   | "map"
-  | "preferences";
+  | "preferences"
+  | "maintenances";
 
 export interface Fixtures {
   status?: unknown;
@@ -32,6 +33,7 @@ export interface Fixtures {
   componentHistory?: unknown;
   map?: unknown;
   preferences?: unknown;
+  maintenances?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -63,15 +65,17 @@ export function stubApi(fixtures: Fixtures): void {
             ? "incident"
             : path.startsWith("/incidents")
               ? "incidents"
-              : path.startsWith("/notifications")
-                ? "notifications"
-                : path.startsWith("/config")
-                  ? "config"
-                  : path.startsWith("/map")
-                    ? "map"
-                    : path.startsWith("/api/preferences")
-                      ? "preferences"
-                      : "status";
+              : path.startsWith("/maintenances")
+                ? "maintenances"
+                : path.startsWith("/notifications")
+                  ? "notifications"
+                  : path.startsWith("/config")
+                    ? "config"
+                    : path.startsWith("/map")
+                      ? "map"
+                      : path.startsWith("/api/preferences")
+                        ? "preferences"
+                        : "status";
       const errorStatus = fixtures.errors?.[key];
       if (errorStatus !== undefined) {
         return { ok: false, status: errorStatus, text: async () => "" };
@@ -150,5 +154,6 @@ export const providerFixture = (over: Partial<ProviderStatus> = {}): ProviderSta
   fetchedAt: "2026-08-21T10:00:00Z",
   failureCount: 0,
   uptime90: 99.9,
+  maintenance: { active: [], upcoming: [] },
   ...over,
 });

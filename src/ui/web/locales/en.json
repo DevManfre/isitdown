@@ -90,6 +90,7 @@
   "providers.empty": "No providers configured yet — add one in Settings.",
   "providers.components-toggle": "Show monitored components",
   "providers.remove-confirm": "Remove {name}? Its uptime history and incidents go with it.",
+  "provider.maintenance.badge": "Maintenance",
 
   "incidents.filter.label": "Incident filter",
   "incidents.active": "Active incident",
@@ -107,6 +108,7 @@
   "pagination.next": "Next",
   "pagination.more-pages": "More pages",
   "incidents.impact-line": "Impact: {impact} · Status: {status}",
+  "incidents.maintenance.label": "Maintenance",
 
   "incident.kicker": "Incident",
   "incident.elapsed": "open for {duration}",

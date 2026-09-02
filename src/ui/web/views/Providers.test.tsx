@@ -85,6 +85,78 @@ describe("Providers", () => {
     expect(screen.queryByText("Cloudflare")).toBeNull();
   });
 
+  // A window is "running" the moment the badge should appear — the drawer's
+  // upcoming-window line is a separate surface, not this table's job.
+  it("marks a provider with a running maintenance window", async () => {
+    renderWithProviders(<Providers />, {
+      status: {
+        providers: [
+          providerFixture({
+            maintenance: {
+              active: [
+                {
+                  id: "mw-1",
+                  name: "Database upgrade",
+                  status: "in_progress",
+                  startsAt: "2026-08-21T09:00:00Z",
+                  endsAt: null,
+                  componentIds: [],
+                },
+              ],
+              upcoming: [],
+            },
+          }),
+          providerFixture({ id: "cf", name: "Cloudflare" }),
+        ],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
+      history,
+    });
+
+    const githubRow = (await screen.findByText("GitHub")).closest("tr");
+    expect(githubRow).not.toBeNull();
+    expect(within(githubRow!).getByText(i18n.t("provider.maintenance.badge"))).toBeInTheDocument();
+
+    const cfRow = (await screen.findByText("Cloudflare")).closest("tr");
+    expect(cfRow).not.toBeNull();
+    expect(within(cfRow!).queryByText(i18n.t("provider.maintenance.badge"))).toBeNull();
+  });
+
+  // An upcoming window is not running yet — the badge says "running now",
+  // so a provider with only a future window earns no badge here.
+  it("does not badge a provider whose maintenance window is only upcoming", async () => {
+    renderWithProviders(<Providers />, {
+      status: {
+        providers: [
+          providerFixture({
+            maintenance: {
+              active: [],
+              upcoming: [
+                {
+                  id: "mw-2",
+                  name: "Network maintenance",
+                  status: "scheduled",
+                  startsAt: "2026-09-10T09:00:00Z",
+                  endsAt: "2026-09-10T11:00:00Z",
+                  componentIds: [],
+                },
+              ],
+            },
+          }),
+        ],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
+      history,
+    });
+
+    await screen.findByText("GitHub");
+    expect(screen.queryByText(i18n.t("provider.maintenance.badge"))).toBeNull();
+  });
+
   // No test above asserts rendered copy against anything but t() itself,
   // which passes whether or not a template's placeholders were satisfied.
   // This pins the actual uptime percentage text an operator reads, using a
