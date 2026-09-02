@@ -482,24 +482,44 @@ test("parseComponentList maps an unrecognised status word to major_outage", () =
   assert.equal(list[0]?.status, "major_outage");
 });
 
-test("a declared maintenance window is normalised onto the status", () => {
+test("a declared maintenance window is normalised onto the status, field for field", () => {
+  // maintenance-scheduled.json is a trimmed recording of a real Cloudflare
+  // summary (10 real scheduled_maintenances, kept verbatim), so this pins the
+  // shape Cloudflare actually ships rather than an invented one.
+  const parsed = parseSummary(fixture("maintenance-scheduled"), service);
+  assert.equal(parsed.maintenances.length, 10);
+
+  const bna = parsed.maintenances.find((maintenance) => maintenance.id === "wsfjj8q5sxm2");
+  assert.deepEqual(bna, {
+    id: "wsfjj8q5sxm2",
+    name: "BNA (Nashville) on 2026-09-02",
+    status: "scheduled",
+    startsAt: "2026-09-02T13:00:00.000Z",
+    endsAt: "2026-09-04T00:00:00.000Z",
+    componentIds: ["vwctw131s16t"],
+  });
+});
+
+test("an in-progress window keeps its real lifecycle status", () => {
   const parsed = parseSummary(fixture("maintenance-scheduled"), service);
 
-  assert.deepEqual(parsed.maintenances, [
-    {
-      id: "mw1",
-      name: "Scheduled database maintenance",
-      status: "scheduled",
-      startsAt: "2026-09-02T01:00:00.000Z",
-      endsAt: "2026-09-02T03:00:00.000Z",
-      componentIds: ["c1"],
-    },
-  ]);
+  const sjc = parsed.maintenances.find((maintenance) => maintenance.id === "2c2lf7y51xcb");
+  assert.deepEqual(sjc, {
+    id: "2c2lf7y51xcb",
+    name: "SJC (San Jose) on 2026-09-02",
+    status: "in_progress",
+    startsAt: "2026-09-02T09:00:00.000Z",
+    endsAt: "2026-09-02T13:00:00.000Z",
+    componentIds: ["4xvd68d7k70c"],
+  });
 });
 
 test("a completed window is not carried forward", () => {
-  const raw = fixture("maintenance-scheduled") as { scheduled_maintenances: { status: string }[] };
-  raw.scheduled_maintenances[0]!.status = "completed";
+  const raw = {
+    status: { indicator: "none" },
+    incidents: [],
+    scheduled_maintenances: [{ id: "mw1", name: "Past maintenance", status: "completed", scheduled_for: "2026-08-01T00:00:00.000Z" }],
+  };
 
   assert.deepEqual(parseSummary(raw, service).maintenances, []);
 });
