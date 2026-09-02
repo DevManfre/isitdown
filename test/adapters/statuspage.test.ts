@@ -533,3 +533,55 @@ test("a window without an id or a start time is dropped, not crashed on", () => 
 test("a summary with no maintenance key reports an empty list", () => {
   assert.deepEqual(parseSummary(fixture("operational"), service).maintenances, []);
 });
+
+test("a window timestamp with a non-UTC offset is normalised to UTC", () => {
+  // Statuspage renders scheduled_for/scheduled_until in the page's own
+  // configured timezone, not always UTC — the documented "ISO 8601, UTC"
+  // contract on MaintenanceWindow only holds if the adapter normalises at
+  // the boundary.
+  const raw = {
+    status: { indicator: "none" },
+    incidents: [],
+    scheduled_maintenances: [
+      {
+        id: "mw1",
+        name: "Offset window",
+        status: "scheduled",
+        scheduled_for: "2026-09-02T06:00:00-07:00",
+        scheduled_until: "2026-09-02T09:00:00-07:00",
+      },
+    ],
+  };
+
+  const [window] = parseSummary(raw, service).maintenances;
+  assert.equal(window?.startsAt, "2026-09-02T13:00:00.000Z");
+  assert.equal(window?.endsAt, "2026-09-02T16:00:00.000Z");
+});
+
+test("a window whose start cannot be parsed as a clock time is dropped", () => {
+  const raw = {
+    status: { indicator: "none" },
+    incidents: [],
+    scheduled_maintenances: [{ id: "mw1", name: "Bad start", status: "scheduled", scheduled_for: "not-a-date" }],
+  };
+
+  assert.deepEqual(parseSummary(raw, service).maintenances, []);
+});
+
+test("a window whose declared end cannot be parsed as a clock time is dropped", () => {
+  const raw = {
+    status: { indicator: "none" },
+    incidents: [],
+    scheduled_maintenances: [
+      {
+        id: "mw1",
+        name: "Bad end",
+        status: "scheduled",
+        scheduled_for: "2026-09-02T06:00:00-07:00",
+        scheduled_until: "not-a-date",
+      },
+    ],
+  };
+
+  assert.deepEqual(parseSummary(raw, service).maintenances, []);
+});
