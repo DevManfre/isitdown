@@ -51,6 +51,8 @@ const window = (over: Partial<MaintenanceWindow> = {}): MaintenanceWindow => ({
 });
 
 const running = window();
+const windowA = window({ id: "mwA" });
+const windowB = window({ id: "mwB" });
 
 const cases: {
   name: string;
@@ -184,6 +186,15 @@ const cases: {
     previous: snap("operational", [], [comp()]),
     next: snap("degraded", [], [comp({ status: "degraded" })]),
     expect: ["status_change", "component_status_change"],
+  },
+  {
+    // Cloudflare's own fixture shows overlapping windows are the normal
+    // shape, not an edge case: one ends mid-cycle while another keeps
+    // running. Only the one that ended is news.
+    name: "one window ends while another stays active — only the ended one is reported",
+    previous: snap("operational", [], [], [windowA, windowB]),
+    next: snap("operational", [], [], [windowB]),
+    expect: ["maintenance_ended"],
   },
 ];
 
