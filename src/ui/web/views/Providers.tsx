@@ -333,9 +333,7 @@ export function Providers() {
                 <span className="flex items-center gap-1.5">
                   {row.original.name}
                   {row.original.maintenanceActive && (
-                    <Badge variant="outline" className="border-transparent bg-muted text-muted-foreground">
-                      {t("provider.maintenance.badge")}
-                    </Badge>
+                    <Badge variant="muted">{t("provider.maintenance.badge")}</Badge>
                   )}
                 </span>
                 <span className="font-mono text-[10px] text-muted-foreground">{row.original.host}</span>

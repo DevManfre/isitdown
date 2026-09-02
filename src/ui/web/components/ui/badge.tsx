@@ -11,6 +11,14 @@ import { cn } from "@/lib/utils"
  * token tokens.css declares in all three theme blocks), where stock shadcn
  * hardcodes Tailwind's plain white. A literal colour ignores the theme — see
  * test/ui/theme.test.ts, which scans this directory for exactly that.
+ *
+ * `muted` is a second hand-added variant: a quiet, borderless pill for a
+ * declarative label rather than an interactive or status-carrying one (a
+ * provider's maintenance badge, a maintenance timeline entry, the drawer's
+ * "next maintenance" block). Introduced once three call sites had all
+ * hand-repeated the same `outline` + `border-transparent bg-muted
+ * text-muted-foreground` combination — the third repetition is what earned
+ * the variant, not the first.
  */
 const badgeVariants = cva(
   "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3",
@@ -24,6 +32,7 @@ const badgeVariants = cva(
           "bg-destructive text-destructive-foreground focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40 [a&]:hover:bg-destructive/90",
         outline:
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+        muted: "border-transparent bg-muted text-muted-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
       },

@@ -143,6 +143,8 @@
   "history.col-delta": "Variazione",
   "history.col-incidents": "Incidenti",
   "history.open-detail": "Apri il dettaglio storico di {name}",
+  "history.next-maintenance.kicker": "Prossima manutenzione",
+  "history.next-maintenance.badge": "In programma",
   "history.drawer-bars": "Stato giornaliero",
   "history.legend-title": "Legenda colori",
 
