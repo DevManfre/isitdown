@@ -481,3 +481,35 @@ test("parseComponentList maps an unrecognised status word to major_outage", () =
   );
   assert.equal(list[0]?.status, "major_outage");
 });
+
+test("a declared maintenance window is normalised onto the status", () => {
+  const parsed = parseSummary(fixture("maintenance-scheduled"), service);
+
+  assert.deepEqual(parsed.maintenances, [
+    {
+      id: "mw1",
+      name: "Scheduled database maintenance",
+      status: "scheduled",
+      startsAt: "2026-09-02T01:00:00.000Z",
+      endsAt: "2026-09-02T03:00:00.000Z",
+      componentIds: ["c1"],
+    },
+  ]);
+});
+
+test("a completed window is not carried forward", () => {
+  const raw = fixture("maintenance-scheduled") as { scheduled_maintenances: { status: string }[] };
+  raw.scheduled_maintenances[0]!.status = "completed";
+
+  assert.deepEqual(parseSummary(raw, service).maintenances, []);
+});
+
+test("a window without an id or a start time is dropped, not crashed on", () => {
+  const raw = { status: { indicator: "none" }, incidents: [], scheduled_maintenances: [{ name: "nameless" }] };
+
+  assert.deepEqual(parseSummary(raw, service).maintenances, []);
+});
+
+test("a summary with no maintenance key reports an empty list", () => {
+  assert.deepEqual(parseSummary(fixture("operational"), service).maintenances, []);
+});
