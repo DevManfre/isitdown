@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { isActive } from "../../core/maintenance.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 
 /**
@@ -23,6 +24,10 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
   router.get("/status", async (_req, res) => {
     const config = await runtime.configSource.load();
     const services = runtime.listAllServices();
+    // Computed once and reused below for the response's own `serverNow` field,
+    // so the active/upcoming split and the timestamp it was split against can
+    // never disagree.
+    const serverNow = new Date().toISOString();
 
     const providers = await Promise.all(
       services.map(async (service) => {
@@ -46,6 +51,10 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
           fetchedAt: state.last?.fetchedAt ?? null,
           failureCount: state.failureCount,
           uptime90: history.uptime90,
+          maintenance: {
+            active: (state.last?.maintenances ?? []).filter((window) => isActive(window, serverNow)),
+            upcoming: (state.last?.maintenances ?? []).filter((window) => window.startsAt > serverNow),
+          },
         };
       }),
     );
@@ -62,7 +71,7 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
       // offset from this rather than assuming the browser and the container
       // agree — they drift apart across a host suspend, and a browser running
       // even minutes ahead reads every deadline as already expired.
-      serverNow: new Date().toISOString(),
+      serverNow,
     });
   });
 
