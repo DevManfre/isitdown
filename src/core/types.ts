@@ -80,6 +80,8 @@ export type StatusChangeKind =
   | "incident_opened"
   | "incident_updated"
   | "incident_resolved"
+  | "maintenance_started"
+  | "maintenance_ended"
   | "monitoring_degraded";
 
 /**
@@ -98,6 +100,10 @@ export interface StatusChange {
   component?: { id: string; name: string } | undefined;
   /** Present for monitoring_degraded only. */
   failureCount?: number | undefined;
+  /** Present on both maintenance_* kinds. */
+  maintenance?: MaintenanceWindow | undefined;
+  /** Present on maintenance_ended only: incidents still open as it closed. */
+  openIncidents?: number | undefined;
   /** ISO 8601, UTC. */
   at: string;
 }
