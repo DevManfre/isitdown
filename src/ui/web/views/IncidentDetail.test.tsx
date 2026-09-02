@@ -1,4 +1,5 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders } from "@/test/harness.tsx";
@@ -113,6 +114,32 @@ describe("IncidentDetail", () => {
     mount();
     expect(await screen.findByText("GitHub — MAJOR OUTAGE")).toBeInTheDocument();
     expect(await screen.findByText(/telegram/)).toBeInTheDocument();
+  });
+
+  it("shows a first batch of deliveries, then the rest behind the one CTA", async () => {
+    // A long-running incident's action log is the tallest thing on this page —
+    // 30 rows of it used to set the tile's height before the operator asked
+    // for any of them.
+    mountWithActionLog(
+      Array.from({ length: 12 }, (_unused, index) => ({
+        providerId: "github",
+        channel: "webhook" as const,
+        kind: "incident_opened" as const,
+        text: `Delivery ${index + 1}`,
+        sentAt: `2026-08-21T09:${String(index).padStart(2, "0")}:00Z`,
+        ok: true,
+      })) as unknown as typeof detail.actionLog,
+    );
+
+    expect(await screen.findByText("Delivery 1")).toBeInTheDocument();
+    expect(screen.getByText("Delivery 6")).toBeInTheDocument();
+    expect(screen.queryByText("Delivery 7")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("action.show-more") }));
+
+    expect(await screen.findByText("Delivery 12")).toBeInTheDocument();
+    // One CTA only: revealing the rest leaves nothing left to expand.
+    expect(screen.queryByRole("button", { name: i18n.t("action.show-more") })).not.toBeInTheDocument();
   });
 
   it("keeps a keyed empty state when nothing has been sent for this incident yet", async () => {
