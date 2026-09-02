@@ -103,6 +103,44 @@ describe("the service dialog's keyboard contract", () => {
   });
 });
 
+describe("the service dialog's adapter choice", () => {
+  it("offers the feed adapter alongside the Statuspage one", async () => {
+    const { dialog } = await openAdd();
+    expect(within(dialog).getByRole("radio", { name: "rss" })).toBeInTheDocument();
+  });
+
+  it("says what the base URL means for the adapter that is selected", async () => {
+    const { dialog } = await openAdd();
+    expect(within(dialog).getByText(i18n.t("add.note.statuspage"))).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("radio", { name: "rss" }));
+
+    expect(within(dialog).getByText(i18n.t("add.note.rss"))).toBeInTheDocument();
+    expect(within(dialog).queryByText(i18n.t("add.note.statuspage"))).toBeNull();
+  });
+
+  it("submits the adapter the operator picked", async () => {
+    const { dialog } = await openAdd();
+    const calls = interceptWrites({
+      "POST /config/services": {},
+      "POST /config/services/feedsvc/test": { ok: true, overallStatus: "operational" },
+    });
+
+    await userEvent.click(within(dialog).getByRole("radio", { name: "rss" }));
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "Feed Service");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.id")), "feedsvc");
+    await userEvent.type(
+      within(dialog).getByLabelText(i18n.t("field.base-url")),
+      "https://status.example.com/history.rss",
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const addCall = calls.find((call) => call.method === "POST" && call.path === "/config/services");
+    expect(addCall?.body).toMatchObject({ id: "feedsvc", adapter: "rss" });
+  });
+});
+
 describe("the service dialog's write path", () => {
   it("a successful add calls the mutation with the expected body, component selection included", async () => {
     const { dialog } = await openAdd();

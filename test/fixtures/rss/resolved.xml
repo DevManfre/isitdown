@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example Status</title>
+    <link>https://status.example.com</link>
+    <description>Incident history for Example</description>
+    <item>
+      <title>Resolved: Major outage affecting the API</title>
+      <link>https://status.example.com/incidents/ghi789</link>
+      <guid isPermaLink="false">ghi789</guid>
+      <pubDate>Tue, 01 Sep 2026 10:45:00 +0000</pubDate>
+      <description><![CDATA[<p>Service has been restored. The incident is resolved.</p>]]></description>
+    </item>
+  </channel>
+</rss>
