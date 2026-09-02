@@ -57,6 +57,7 @@ async function openIncidents(runtime: UiRuntime): Promise<string[]> {
       overallStatus: "major_outage",
       activeIncidents: [incident(`${id}-1`)],
       components: [],
+      maintenances: [],
       fetchedAt: new Date().toISOString(),
     });
     await runtime.store.recordNotification({

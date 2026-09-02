@@ -239,6 +239,7 @@ test("backfill stops at the earliest real sample and never overlaps it", async (
     overallStatus: "operational",
     activeIncidents: [],
     components: [],
+    maintenances: [],
     fetchedAt: realAt,
   });
   await createBackfillService({
