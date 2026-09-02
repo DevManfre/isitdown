@@ -80,6 +80,7 @@ test("status lists every enabled provider with its current state", async () => {
         },
       ],
       components: [],
+      maintenances: [],
       fetchedAt: "2026-08-19T14:05:00.000Z",
     });
 
@@ -121,6 +122,7 @@ test("status carries current component statuses and the selection", async () => 
       overallStatus: "operational",
       activeIncidents: [],
       components: [{ id: "c1", name: "Actions", status: "operational" }],
+      maintenances: [],
       fetchedAt: "2026-08-19T14:05:00.000Z",
     });
 
@@ -220,6 +222,7 @@ test("samples older than the retention window are pruned at boot", async () => {
     overallStatus: "operational",
     activeIncidents: [],
     components: [],
+    maintenances: [],
     fetchedAt: ancient,
   });
   await first.close();

@@ -1,6 +1,6 @@
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { StateStore } from "../core/stateStore.interface.ts";
-import type { HistoricalIncident, OverallStatus } from "../core/types.ts";
+import type { HistoricalIncident, MaintenanceWindow, OverallStatus } from "../core/types.ts";
 
 /**
  * What the UI edition needs on top of the shared StateStore: the history the
@@ -49,6 +49,24 @@ export interface IncidentCounts {
   resolved: number;
 }
 
+export interface MaintenanceFilter {
+  providerId?: string | undefined;
+  /** Same semantics as `IncidentFilter.providerIds`: an empty array matches nothing. */
+  providerIds?: string[] | undefined;
+  days?: number | undefined;
+  /** `false` excludes windows whose `startsAt` is still in the future. */
+  includeUpcoming?: boolean | undefined;
+  limit?: number | undefined;
+}
+
+export type MaintenanceRow = MaintenanceWindow & {
+  providerId: string;
+  /** When we first saw this window, regardless of what the provider's own timestamps say. */
+  firstSeenAt: string;
+  /** When we most recently saw this window. */
+  lastSeenAt: string;
+};
+
 export interface DailyBucket {
   /** UTC calendar day, `YYYY-MM-DD`. */
   day: string;
@@ -81,6 +99,8 @@ export interface HistoryStore extends StateStore {
    */
   countIncidents(filter: Omit<IncidentFilter, "state" | "limit" | "offset">): Promise<IncidentCounts>;
   getIncident(providerId: string, incidentId: string): Promise<IncidentRow | null>;
+  /** Newest first by `startsAt`. */
+  listMaintenances(filter: MaintenanceFilter): Promise<MaintenanceRow[]>;
   /** Newest first, for the incident view's poll strip. */
   getRecentSamples(providerId: string, limit: number): Promise<SampleRow[]>;
   pruneOlderThan(days: number): Promise<void>;

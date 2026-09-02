@@ -9,7 +9,7 @@ import { migrate } from "../../src/ui/db/migrate.ts";
 import { createSqliteStateStore } from "../../src/ui/sqliteStateStore.ts";
 import { CONTRACT_PROVIDER_IDS, runStateStoreContract } from "../core/stateStore.contract.ts";
 import type { HistoryStore } from "../../src/ui/historyStore.interface.ts";
-import type { HistoricalIncident, Incident, NormalizedStatus } from "../../src/core/types.ts";
+import type { HistoricalIncident, Incident, MaintenanceWindow, NormalizedStatus } from "../../src/core/types.ts";
 
 /** Fixed "today" so a day or retention window never depends on when the suite runs. */
 const NOW = new Date("2026-08-20T18:00:00.000Z");
@@ -33,6 +33,16 @@ async function harness(extraIds: readonly string[] = []): Promise<{
   seedServices(db, [...CONTRACT_PROVIDER_IDS, ...extraIds]);
   return { db, store: createSqliteStateStore(db, { now: () => NOW }), path };
 }
+
+const mw = (over: Partial<MaintenanceWindow> = {}): MaintenanceWindow => ({
+  id: "m1",
+  name: "Database maintenance",
+  status: "scheduled",
+  startsAt: "2026-08-20T02:00:00.000Z",
+  endsAt: "2026-08-20T04:00:00.000Z",
+  componentIds: ["c1"],
+  ...over,
+});
 
 const inc = (over: Partial<Incident> = {}): Incident => ({
   id: "i1",
@@ -305,6 +315,7 @@ test("a provider timestamp ahead of our clock cannot start an incident in the fu
     overallStatus: "major_outage",
     activeIncidents: [inc({ updatedAt: "2099-01-01T00:00:00.000Z" })],
     components: [],
+    maintenances: [],
     fetchedAt: "2026-08-19T14:05:00.000Z",
   });
 
@@ -317,6 +328,7 @@ test("a provider timestamp ahead of our clock cannot start an incident in the fu
     overallStatus: "operational",
     activeIncidents: [],
     components: [],
+    maintenances: [],
     fetchedAt: "2026-08-19T15:00:00.000Z",
   });
   const [resolved] = await store.listIncidents({ providerId: "github" });
@@ -334,6 +346,7 @@ test("a normal past provider timestamp is kept as the start time", async () => {
     overallStatus: "degraded",
     activeIncidents: [inc({ updatedAt: "2026-08-19T13:30:00.000Z" })],
     components: [],
+    maintenances: [],
     fetchedAt: "2026-08-19T14:05:00.000Z",
   });
   const [row] = await store.listIncidents({ providerId: "github" });
@@ -410,6 +423,7 @@ test("saveStatus persists component state and appends component samples", async 
       { id: "c1", name: "Actions", status: "degraded" },
       { id: "c2", name: "Pages", status: "operational" },
     ],
+    maintenances: [],
     fetchedAt: "2026-08-20T10:00:00.000Z",
   });
   const state = await store.getState("github");
@@ -432,6 +446,7 @@ test("an unknown component status writes no sample", async () => {
     overallStatus: "operational",
     activeIncidents: [],
     components: [{ id: "c1", name: "Actions", status: "unknown" }],
+    maintenances: [],
     fetchedAt: "2026-08-20T10:00:00.000Z",
   });
   assert.deepEqual(await store.getComponentDailyBuckets("github", "c1", 7), []);
@@ -446,6 +461,7 @@ test("pruning removes old component samples", async () => {
     overallStatus: "operational",
     activeIncidents: [],
     components: [{ id: "c1", name: "Actions", status: "degraded" }],
+    maintenances: [],
     fetchedAt: old,
   });
   await store.pruneOlderThan(30);
@@ -512,5 +528,94 @@ test("countIncidents totals every incident and the open ones, scoped by provider
 test("countIncidents is all zeroes on an empty table", async () => {
   const { store } = await harness();
   assert.deepEqual(await store.countIncidents({}), { all: 0, active: 0, resolved: 0 });
+  await store.close();
+});
+
+test("a window is remembered after it ends, and pruned when it ages out", async () => {
+  const { store } = await harness();
+  await store.saveStatus(snap({ maintenances: [mw()] }));
+  // The provider stops declaring it once it has ended; the history row must
+  // survive that even though the live NormalizedStatus no longer mentions it.
+  await store.saveStatus({ ...snap({ maintenances: [] }), fetchedAt: "2026-08-20T05:00:00.000Z" });
+
+  const [row] = await store.listMaintenances({ providerId: "github" });
+  assert.equal(row?.id, "m1");
+  assert.equal(row?.status, "scheduled");
+  assert.equal(row?.endsAt, "2026-08-20T04:00:00.000Z");
+
+  // Aged out: it ended two days before "now", pruneOlderThan(1) drops it.
+  await store.saveStatus({
+    ...snap({
+      maintenances: [
+        mw({
+          id: "old",
+          startsAt: "2026-08-18T02:00:00.000Z",
+          endsAt: new Date(NOW.getTime() - 2 * 24 * 3600 * 1000).toISOString(),
+        }),
+      ],
+    }),
+    fetchedAt: "2026-08-18T05:00:00.000Z",
+  });
+  await store.pruneOlderThan(1);
+
+  const remaining = (await store.listMaintenances({ providerId: "github" })).map((r) => r.id);
+  assert.deepEqual(remaining, ["m1"], "the window that ended within the retention window must survive pruning");
+  await store.close();
+});
+
+test("first_seen_at is fixed at insert; last_seen_at moves on every later save", async () => {
+  const { store } = await harness();
+  await store.saveStatus(snap({ maintenances: [mw()] }));
+  const first = (await store.listMaintenances({ providerId: "github" }))[0];
+  assert.equal(first?.firstSeenAt, "2026-08-19T14:05:00.000Z");
+  assert.equal(first?.lastSeenAt, "2026-08-19T14:05:00.000Z");
+
+  await store.saveStatus({
+    ...snap({ maintenances: [mw({ status: "in_progress" })] }),
+    fetchedAt: "2026-08-20T02:30:00.000Z",
+  });
+  const second = (await store.listMaintenances({ providerId: "github" }))[0];
+  assert.equal(second?.status, "in_progress", "the row keeps up with the provider's own lifecycle word");
+  assert.equal(second?.firstSeenAt, "2026-08-19T14:05:00.000Z", "first_seen_at never moves once set");
+  assert.equal(second?.lastSeenAt, "2026-08-20T02:30:00.000Z");
+  await store.close();
+});
+
+test("listMaintenances is newest first by starts_at and honours providerIds, days and includeUpcoming", async () => {
+  const { store } = await harness(["cloudflare"]);
+  await store.saveStatus(snap({ provider: "github", maintenances: [mw({ id: "past", startsAt: "2026-08-10T00:00:00.000Z", endsAt: "2026-08-10T01:00:00.000Z" })] }));
+  await store.saveStatus(
+    snap({
+      provider: "cloudflare",
+      maintenances: [
+        mw({ id: "upcoming", startsAt: "2026-08-25T00:00:00.000Z", endsAt: null }),
+      ],
+    }),
+  );
+
+  assert.deepEqual(
+    (await store.listMaintenances({})).map((row) => row.id),
+    ["upcoming", "past"],
+    "newest starts_at first",
+  );
+  assert.deepEqual(
+    (await store.listMaintenances({ providerIds: ["cloudflare"] })).map((row) => row.id),
+    ["upcoming"],
+  );
+  assert.deepEqual(
+    await store.listMaintenances({ providerIds: [] }),
+    [],
+    "an empty allow-list matches nothing",
+  );
+  assert.deepEqual(
+    (await store.listMaintenances({ includeUpcoming: false })).map((row) => row.id),
+    ["past"],
+    "a window starting after now is excluded",
+  );
+  assert.deepEqual(
+    (await store.listMaintenances({ days: 5 })).map((row) => row.id),
+    ["upcoming"],
+    "days is measured against starts_at",
+  );
   await store.close();
 });
