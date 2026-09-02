@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
+import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
@@ -16,12 +17,12 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { ProviderIcon } from "@/components/ProviderIcon.tsx";
-import { useIncidents, useNotifications, useStatus } from "@/hooks/queries.ts";
+import { useIncidents, useMaintenances, useNotifications, useStatus } from "@/hooks/queries.ts";
 import { formatDateTime, formatRelative, notificationHeadline } from "@/lib/format.ts";
 import { impactKey, impactStatus, incidentStatusKey, pageWindow } from "@/lib/incidents.ts";
 import { stagger } from "@/lib/stagger.ts";
 import { cn } from "@/lib/utils.ts";
-import type { IncidentRow } from "@/lib/types.ts";
+import type { IncidentRow, MaintenanceRow } from "@/lib/types.ts";
 
 /** How many recent notifications the feed panel shows — incidents.js:43. */
 const NOTIFICATIONS_SHOWN = 8;
@@ -37,6 +38,11 @@ const FILTERS = [
 ] as const;
 
 type Filter = (typeof FILTERS)[number]["value"];
+
+/** One row of the merged timeline: an incident the list already knew, or a declared maintenance window. */
+type TimelineListEntry =
+  | { kind: "incident"; at: string; incident: IncidentRow }
+  | { kind: "maintenance"; at: string; maintenance: MaintenanceRow };
 
 /** Chosen filter survives reload, the way the rail's collapsed state does. */
 const FILTER_STORAGE_KEY = "isitdown.incidentFilter";
@@ -83,6 +89,7 @@ export function Incidents() {
   const [feedExpanded, setFeedExpanded] = useState(false);
   const [page, setPage] = useState(1);
   const { data: incidents } = useIncidents({ state: filter, page, pageSize: PAGE_SIZE });
+  const { data: maintenances } = useMaintenances();
   const { data: status } = useStatus();
   const { data: sent } = useNotifications(NOTIFICATIONS_SHOWN);
 
@@ -93,6 +100,16 @@ export function Incidents() {
 
   const active = incidents?.active ?? [];
   const rows = incidents?.page.items ?? [];
+  const maintenanceRows = maintenances?.maintenances ?? [];
+  // The current page's incidents plus every declared maintenance window,
+  // interleaved by when each started — newest first, same order the
+  // incident-only list already read in. Maintenance carries no incident
+  // state, so it rides along under every filter rather than vanishing
+  // the moment an operator narrows to "active" or "resolved".
+  const timelineEntries: TimelineListEntry[] = [
+    ...rows.map((incident) => ({ kind: "incident" as const, at: incident.startedAt, incident })),
+    ...maintenanceRows.map((maintenance) => ({ kind: "maintenance" as const, at: maintenance.startsAt, maintenance })),
+  ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   // Every state's count, from the server: the page holds at most PAGE_SIZE rows,
   // so counting the ones in hand would put the page size on the pills.
   const counts = incidents?.counts ?? { all: 0, active: 0, resolved: 0 };
@@ -275,37 +292,59 @@ export function Incidents() {
           {filterControl}
         </div>
 
-        {rows.length === 0 ? (
+        {timelineEntries.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("incidents.empty-list")}</p>
         ) : (
-          rows.map((incident, index) => (
-            <button
-              key={`${incident.providerId}/${incident.incidentId}`}
-              type="button"
-              className="incident-row anim-rise anim-rise-row flex items-center gap-3 rounded-md border border-border px-3 py-2 text-left"
-              style={{ animationDelay: stagger(index, { base: 170, step: 32, cap: 420 }) }}
-              onClick={() => goTo(incident)}
-            >
-              <span className="font-mono text-xs text-muted-foreground">
-                {formatDateTime(i18n.language, incident.startedAt)}
-              </span>
-              <StatusDot status={impactStatus(incident.impact)} />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm">
-                  <span>{nameOf(incident.providerId)}</span> — <span>{incident.name}</span>
+          timelineEntries.map((entry, index) =>
+            entry.kind === "incident" ? (
+              <button
+                key={`${entry.incident.providerId}/${entry.incident.incidentId}`}
+                type="button"
+                className="incident-row anim-rise anim-rise-row flex items-center gap-3 rounded-md border border-border px-3 py-2 text-left"
+                style={{ animationDelay: stagger(index, { base: 170, step: 32, cap: 420 }) }}
+                onClick={() => goTo(entry.incident)}
+              >
+                <span className="font-mono text-xs text-muted-foreground">
+                  {formatDateTime(i18n.language, entry.incident.startedAt)}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {t("incidents.impact-line", {
-                    impact: t(impactKey(incident.impact)),
-                    status: t(incidentStatusKey(incident.status)),
-                  })}
+                <StatusDot status={impactStatus(entry.incident.impact)} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm">
+                    <span>{nameOf(entry.incident.providerId)}</span> — <span>{entry.incident.name}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {t("incidents.impact-line", {
+                      impact: t(impactKey(entry.incident.impact)),
+                      status: t(incidentStatusKey(entry.incident.status)),
+                    })}
+                  </span>
                 </span>
-              </span>
-              <span className="ml-auto rounded border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground">
-                {t(incident.resolvedAt === null ? "incidents.state.open" : "incidents.state.resolved")}
-              </span>
-            </button>
-          ))
+                <span className="ml-auto rounded border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground">
+                  {t(entry.incident.resolvedAt === null ? "incidents.state.open" : "incidents.state.resolved")}
+                </span>
+              </button>
+            ) : (
+              // Not a `<button>`: a maintenance window has no detail route to
+              // navigate to, unlike an incident row alongside it.
+              <div
+                key={`${entry.maintenance.providerId}/${entry.maintenance.id}`}
+                className="incident-row anim-rise anim-rise-row flex items-center gap-3 rounded-md border border-border px-3 py-2 text-left"
+                style={{ animationDelay: stagger(index, { base: 170, step: 32, cap: 420 }) }}
+              >
+                <span className="font-mono text-xs text-muted-foreground">
+                  {formatDateTime(i18n.language, entry.maintenance.startsAt)}
+                </span>
+                <Badge variant="outline" className="border-transparent bg-muted text-muted-foreground">
+                  {t("incidents.maintenance.label")}
+                </Badge>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm">
+                    <span>{nameOf(entry.maintenance.providerId)}</span> — <span>{entry.maintenance.name}</span>
+                  </span>
+                </span>
+              </div>
+            ),
+          )
         )}
 
         {pages > 1 && (

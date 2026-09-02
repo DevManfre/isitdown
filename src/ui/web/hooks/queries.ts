@@ -200,6 +200,16 @@ export const useIncident = (providerId: string, incidentId: string) => {
   });
 };
 
+/** Newest first by `startsAt`, scoped to enabled providers server-side. */
+export const useMaintenances = (query: api.MaintenanceListQuery = {}) => {
+  const busy = useBusy();
+  return useQuery({
+    queryKey: ["maintenances", query.provider ?? null, query.days ?? null],
+    queryFn: () => api.getMaintenances(query),
+    refetchInterval: busy ? false : REFRESH_MS,
+  });
+};
+
 export const useNotifications = (limit = 20) => {
   const busy = useBusy();
   return useQuery({
@@ -243,7 +253,15 @@ export const usePreferences = () =>
   useQuery({ queryKey: ["preferences"], queryFn: api.getPreferences, throwOnError: false });
 
 /** Everything a write can invalidate. A config write moves the status grid too. */
-const WRITE_KEYS = [["status"], ["config"], ["history"], ["incidents"], ["incident"], ["notifications"]];
+const WRITE_KEYS = [
+  ["status"],
+  ["config"],
+  ["history"],
+  ["incidents"],
+  ["incident"],
+  ["notifications"],
+  ["maintenances"],
+];
 
 function useInvalidateAll() {
   const client = useQueryClient();
