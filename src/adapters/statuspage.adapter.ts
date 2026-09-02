@@ -6,7 +6,14 @@ import type {
   IncidentHistoryResult,
   ServiceRef,
 } from "../core/adapter.interface.ts";
-import type { ComponentStatus, HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
+import type {
+  ComponentStatus,
+  HistoricalIncident,
+  Incident,
+  MaintenanceWindow,
+  NormalizedStatus,
+  OverallStatus,
+} from "../core/types.ts";
 
 /**
  * The generic adapter for Atlassian Statuspage, which most providers run on —
@@ -64,6 +71,19 @@ const summarySchema = z.object({
   // components list (wrong shape entirely) must degrade to "no components
   // reported this cycle", not throw and drop the whole poll.
   components: z.array(componentSchema).optional().catch(undefined),
+  scheduled_maintenances: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        name: z.string().optional(),
+        status: z.string().optional(),
+        scheduled_for: z.string().optional(),
+        scheduled_until: z.string().nullable().optional(),
+        components: attributionSchema,
+      }),
+    )
+    .optional()
+    .catch(undefined),
 });
 
 const historySchema = z.object({
@@ -90,6 +110,9 @@ const INDICATORS: Record<string, OverallStatus> = {
 
 /** Statuspage lifecycle words that mean the incident is over. */
 const CLOSED_STATUSES = new Set(["resolved", "postmortem"]);
+
+/** Windows in this lifecycle are over; only their history is interesting. */
+const CLOSED_MAINTENANCE = new Set(["completed"]);
 
 function mapIndicator(indicator: string | undefined): OverallStatus {
   if (indicator === undefined) return "unknown";
@@ -154,8 +177,7 @@ function scopeOf(service: ServiceRef): Set<string> | null {
  * fixture suite can exercise it without any network.
  *
  * Throws when the body is not a Statuspage summary at all — the poller's retry
- * and failure accounting depend on that. Scheduled maintenances are ignored:
- * the normalised model has no maintenance state.
+ * and failure accounting depend on that.
  */
 export function parseSummary(raw: unknown, service: ServiceRef): NormalizedStatus {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
@@ -184,6 +206,30 @@ export function parseSummary(raw: unknown, service: ServiceRef): NormalizedStatu
     ];
   });
 
+  // The component-scope rule deliberately does not apply here: a page-wide
+  // window on a component-scoped provider still lands in maintenances, because
+  // the provider is telling us its whole page is under work.
+  const maintenances: MaintenanceWindow[] = (parsed.scheduled_maintenances ?? []).flatMap((entry) => {
+    const id = entry.id;
+    const startsAt = entry.scheduled_for;
+    // A window we cannot place on a clock cannot suppress anything, and a window
+    // without an id cannot be told apart from the next one.
+    if (id === undefined || startsAt === undefined) return [];
+    if (CLOSED_MAINTENANCE.has(entry.status ?? "")) return [];
+    return [
+      {
+        id,
+        name: entry.name ?? "",
+        status: entry.status ?? "",
+        startsAt,
+        endsAt: entry.scheduled_until ?? null,
+        componentIds: (entry.components ?? []).flatMap((component) =>
+          component.id === undefined ? [] : [component.id],
+        ),
+      },
+    ];
+  });
+
   const byId = new Map(
     (parsed.components ?? [])
       .filter((component) => component.id !== undefined && component.group !== true)
@@ -205,8 +251,7 @@ export function parseSummary(raw: unknown, service: ServiceRef): NormalizedStatu
     overallStatus: scope === null ? mapIndicator(parsed.status?.indicator) : worstOf(components),
     activeIncidents,
     components,
-    // Parsed by Task 2; this adapter does not populate maintenances yet.
-    maintenances: [],
+    maintenances,
     fetchedAt,
   };
 }
