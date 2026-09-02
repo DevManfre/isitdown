@@ -19,6 +19,15 @@ const incident = {
   updatedAt: "2026-08-19T14:32:07.000Z",
 };
 
+const window = {
+  id: "m1",
+  name: "Scheduled database maintenance",
+  status: "in_progress",
+  startsAt: "2026-08-19T14:00:00.000Z",
+  endsAt: "2026-08-19T16:00:00.000Z",
+  componentIds: [],
+};
+
 test("each status has its own emoji and none is reused", () => {
   const emojis = (["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const).map(
     emojiFor,
@@ -141,6 +150,65 @@ test("no rendered message leaves an unfilled placeholder", () => {
       assert.ok(!/\{\w+\}/.test(message), `${locale} ${change.kind}: ${message}`);
     }
   }
+});
+
+test("a starting window names the window and the provider", () => {
+  const text = renderMessage(
+    payloadFor({
+      kind: "maintenance_started",
+      providerId: "github",
+      currentStatus: "operational",
+      maintenance: window,
+      at: window.startsAt,
+    }),
+  );
+  assert.match(text, /Scheduled database maintenance/);
+  assert.match(text, /GitHub/);
+});
+
+test("a window that ended clean says so", () => {
+  const text = renderMessage(
+    payloadFor({
+      kind: "maintenance_ended",
+      providerId: "github",
+      currentStatus: "operational",
+      maintenance: window,
+      openIncidents: 0,
+      at: window.endsAt,
+    }),
+  );
+  assert.match(text, /Operational/);
+});
+
+test("a window that ended badly reports the state it left behind", () => {
+  const text = renderMessage(
+    payloadFor({
+      kind: "maintenance_ended",
+      providerId: "github",
+      currentStatus: "major_outage",
+      maintenance: window,
+      openIncidents: 2,
+      at: window.endsAt,
+    }),
+  );
+  assert.match(text, /Major outage/);
+  assert.match(text, /2/);
+});
+
+test("both maintenance kinds render in italian too", () => {
+  const text = renderMessage(
+    payloadFor(
+      {
+        kind: "maintenance_started",
+        providerId: "github",
+        currentStatus: "operational",
+        maintenance: window,
+        at: window.startsAt,
+      },
+      "it",
+    ),
+  );
+  assert.doesNotMatch(text, /notification\.maintenance/, "a missing key must not leak as a key");
 });
 
 test("the italian rendering differs from the english one but keeps the same data", () => {

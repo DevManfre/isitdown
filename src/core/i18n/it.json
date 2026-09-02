@@ -11,10 +11,14 @@
   "incident.status.resolved": "Risolto",
   "incident.status.postmortem": "Postmortem",
 
+  "maintenance.no-end": "non dichiarata",
+
   "notification.status.changed": "{provider} — {severity}\n\nStato passato da {previous} a {current}.\nAggiornato: {updatedAt}\n\n{url}",
   "notification.component.changed": "{provider} — {severity}\n\nIl componente {component} è passato da {previous} a {current}.\nAggiornato: {updatedAt}\n\n{url}",
   "notification.incident.opened": "{provider} — {severity}\n\nIncidente: {title}\nStato: {status}\nAggiornato: {updatedAt}\n\n{url}",
   "notification.incident.updated": "{provider} — {severity}\n\nIncidente: {title}\nStato: {status}\nAggiornato: {updatedAt}\n\n{url}",
   "notification.incident.resolved": "{provider} — {severity}\n\nL'incidente \"{title}\" è stato risolto.\nAggiornato: {updatedAt}\n\n{url}",
-  "notification.monitoring.degraded": "{provider} — monitoraggio degradato\n\n{count} richieste consecutive non riuscite. Ultimo stato noto: {lastStatus}.\nAggiornato: {updatedAt}"
+  "notification.monitoring.degraded": "{provider} — monitoraggio degradato\n\n{count} richieste consecutive non riuscite. Ultimo stato noto: {lastStatus}.\nAggiornato: {updatedAt}",
+  "notification.maintenance.started": "{provider} — manutenzione\n\nÈ iniziata una manutenzione programmata: {title}\nFine prevista: {endsAt}\nGli avvisi per questo provider sono sospesi fino al termine.\n\n{url}",
+  "notification.maintenance.ended": "{provider} — manutenzione conclusa\n\n{title} è terminata.\nStato attuale: {current} — {count} incidente/i aperto/i.\nAggiornato: {updatedAt}\n\n{url}"
 }
