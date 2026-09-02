@@ -11,9 +11,21 @@ import { ComponentPicker, type ComponentPickerEntry, type ComponentPickerSelecti
 import { useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { previewComponents } from "@/lib/api.ts";
+import { slugify } from "@/lib/slugify.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
 
-const ADAPTERS = ["statuspage", "custom"] as const;
+const ADAPTERS = ["statuspage", "rss", "custom"] as const;
+
+/**
+ * What the base URL means differs per adapter — Statuspage appends a path to
+ * it, the feed adapter reads it verbatim — so the hint is keyed per adapter
+ * rather than built from the adapter id at render time.
+ */
+const ADAPTER_NOTES: Record<string, string> = {
+  statuspage: "add.note.statuspage",
+  rss: "add.note.rss",
+  custom: "add.note.custom",
+};
 
 /**
  * Add/edit dialog for a monitored service, on shadcn's Radix `Dialog`. Port of
@@ -29,10 +41,11 @@ const ADAPTERS = ["statuspage", "custom"] as const;
  * a button that merely toggles an external prop rather than sitting inside
  * this `Dialog` never gets focus back — Radix silently no-ops instead.
  *
- * `id` is immutable once a service exists: shown, never editable, in edit
- * mode — vanilla's own edit dialog does not even offer the field, but the
- * brief for this port asks that it stay visible, just disabled, so an
- * operator can always see which id they are editing.
+ * `id` is never typed by hand: in add mode it is derived from the name
+ * (`slugify`), in edit mode it is immutable. Either way the field is shown
+ * read-only — vanilla's own edit dialog does not even offer it, but the brief
+ * for this port asks that it stay visible so an operator can always see which
+ * id they are adding or editing.
  */
 export function ServiceDialog({
   mode, service, trigger,
@@ -48,7 +61,6 @@ export function ServiceDialog({
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(service?.name ?? "");
-  const [id, setId] = useState(service?.id ?? "");
   const [adapter, setAdapter] = useState<string>(ADAPTERS[0]);
   const [baseUrl, setBaseUrl] = useState(service?.baseUrl ?? "");
   const [selection, setSelection] = useState<ComponentPickerSelection[]>(service?.components ?? []);
@@ -59,6 +71,12 @@ export function ServiceDialog({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+
+  // Hand-typing the id was busywork with a failure mode: the schema only
+  // accepts `/^[a-z0-9][a-z0-9-]*$/`, so anything an operator typed naturally
+  // ("Google Cloud") came back as a rejected write. Derive it from the name
+  // instead — one field to fill, and the value is valid by construction.
+  const id = mode === "add" ? slugify(name) : (service?.id ?? "");
 
   // Claim-it-release-it: every close path above releases the busy state this
   // dialog claimed on open, but an unmount is not a close path — it runs no
@@ -82,7 +100,6 @@ export function ServiceDialog({
   // half-typed field would still be sitting there next time.
   const resetForm = (): void => {
     setName(service?.name ?? "");
-    setId(service?.id ?? "");
     setAdapter(ADAPTERS[0]);
     setBaseUrl(service?.baseUrl ?? "");
     setSelection(service?.components ?? []);
@@ -185,17 +202,7 @@ export function ServiceDialog({
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="service-id">{t("field.id")}</Label>
-                {mode === "add" ? (
-                  <Input
-                    id="service-id"
-                    className="font-mono"
-                    value={id}
-                    onChange={(event) => setId(event.target.value)}
-                    {...fieldProps}
-                  />
-                ) : (
-                  <Input id="service-id" className="font-mono" value={service?.id ?? ""} readOnly />
-                )}
+                <Input id="service-id" className="font-mono" value={id} readOnly />
               </div>
             </div>
 
@@ -227,7 +234,7 @@ export function ServiceDialog({
                 onChange={(event) => setBaseUrl(event.target.value)}
                 {...fieldProps}
               />
-              {mode === "add" && <span className="font-mono text-xs text-muted-foreground">{t("add.note")}</span>}
+              {mode === "add" && <span className="font-mono text-xs text-muted-foreground">{t(ADAPTER_NOTES[adapter] ?? "add.note.custom")}</span>}
             </div>
 
             <div className="flex flex-col gap-2">

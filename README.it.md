@@ -1,4 +1,6 @@
-# IsItDown
+<p align="center">
+  <img src="docs/img/social-preview.png" alt="IsItDown" width="880">
+</p>
 
 [![Release](https://img.shields.io/github/v/release/DevManfre/isitdown?style=flat-square)](https://github.com/DevManfre/isitdown/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/DevManfre/isitdown/ci.yml?branch=main&style=flat-square&label=CI)](.github/workflows/ci.yml)
@@ -238,7 +240,7 @@ notifications:
 | `failureThreshold` | `5` | Cicli falliti consecutivi prima di **un** avviso "monitoring degraded". |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian. |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `rss` legge qualunque feed RSS o Atom di incidenti. |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 
 Qualunque cosa non valida ferma il container all'avvio indicando motivo e percorso:
@@ -366,7 +368,42 @@ quella selezione:
 Ogni intestazione di gruppo nel picker ha la propria casella, quindi un'intera
 regione è un solo clic.
 
-Per un provider che non sta su Statuspage, aggiungi un adapter sotto `src/adapters/`.
+#### L'adapter RSS / Atom
+
+Una lunga coda di status page pubblica un feed e nient'altro. `adapter: rss` li
+legge tutti, senza una riga di codice per provider:
+
+```yaml
+  - id: example
+    name: Example
+    adapter: rss
+    baseUrl: https://status.example.com/history.rss
+```
+
+`baseUrl` **è l'URL del feed**: questo adapter non ci accoda niente.
+
+Un feed annuncia incidenti, non dichiara mai uno stato complessivo, quindi lo
+stato viene dedotto — e la deduzione è volutamente pessimista: una voce che non
+si riesce a datare o a classificare vale come problema, mai come rientro.
+
+| Voce del feed | Lettura |
+|---|---|
+| Pubblicata nelle ultime 24 ore, senza parola di chiusura | Incidente aperto |
+| Dice `resolved`, `completed`, `restored`, `closed` | Chiusa, qualunque altra cosa dica |
+| Più vecchia di 24 ore | Non più attuale |
+| Senza data | Considerata attuale |
+| Senza `guid`, `id` o `link` | Scartata: manca una chiave stabile per l'incidente |
+
+La severità viene dalle parole del provider: `partial` → disservizio parziale;
+`outage`, `down`, `offline`, `unavailable`, `unreachable` → disservizio grave;
+qualunque altra cosa il provider abbia ritenuto di annunciare → degradato.
+
+Due conseguenze da sapere prima di affidarcisi: l'adapter non elenca componenti,
+perché un feed non ne ha; e la sua cronologia incidenti non dichiara mai di
+essere completa, perché un feed è una finestra su una storia, non la storia.
+
+Per un provider che non sta né su Statuspage né su un feed, aggiungi un adapter
+sotto `src/adapters/`.
 
 ### 3.6 Canali di notifica
 
@@ -1094,6 +1131,7 @@ isitdown/
 │   │       └── it.json
 │   ├── adapters/                      (condiviso)
 │   │   ├── statuspage.adapter.ts      adapter generico Atlassian Statuspage
+│   │   ├── rss.adapter.ts             adapter generico per feed RSS / Atom
 │   │   └── index.ts                   registro per id di adapter
 │   ├── notifiers/                     (condiviso)
 │   │   ├── formatting.ts              emoji, etichette di severità, composizione del messaggio

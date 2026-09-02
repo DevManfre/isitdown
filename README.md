@@ -1,4 +1,6 @@
-# IsItDown
+<p align="center">
+  <img src="docs/img/social-preview.png" alt="IsItDown" width="880">
+</p>
 
 [![Release](https://img.shields.io/github/v/release/DevManfre/isitdown?style=flat-square)](https://github.com/DevManfre/isitdown/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/DevManfre/isitdown/ci.yml?branch=main&style=flat-square&label=CI)](.github/workflows/ci.yml)
@@ -237,7 +239,7 @@ notifications:
 | `failureThreshold` | `5` | Consecutive failed cycles before one "monitoring degraded" warning. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page. |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `rss` reads any RSS or Atom incident feed. |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 
 Anything invalid stops the container at boot with the reason and the offending
@@ -361,7 +363,43 @@ edition's `config.yml` — to narrow the whole provider to that selection:
 Each group header in the picker carries its own checkbox, so a whole region is one
 click.
 
-For a provider that is not on Statuspage, add an adapter under `src/adapters/`.
+#### The RSS / Atom adapter
+
+A large tail of status pages publish a feed and nothing else. `adapter: rss`
+reads any of them, with no code per provider:
+
+```yaml
+  - id: example
+    name: Example
+    adapter: rss
+    baseUrl: https://status.example.com/history.rss
+```
+
+`baseUrl` **is the feed URL** — this adapter appends nothing to it.
+
+A feed announces incidents; it never states an overall status, so the status is
+derived, and the derivation is deliberately pessimistic — an entry that cannot be
+dated or classified reads as trouble, never as recovery:
+
+| Feed entry | Reading |
+|---|---|
+| Published in the last 24 hours, no closing word | An open incident |
+| Says `resolved`, `completed`, `restored`, `closed` | Closed, whatever else it says |
+| Older than 24 hours | No longer current |
+| No date at all | Treated as current |
+| No `guid`, `id` or `link` | Dropped: nothing stable to key the incident on |
+
+Severity comes from the provider's own wording — `partial` → partial outage;
+`outage`, `down`, `offline`, `unavailable`, `unreachable` → major outage;
+anything else the provider bothered to announce → degraded.
+
+Two consequences worth knowing before relying on it: the adapter offers no
+component listing, because a feed has no components; and its incident history
+never claims to be complete, because a feed is a window onto a history rather
+than the history itself.
+
+For a provider on neither Statuspage nor a feed, add an adapter under
+`src/adapters/`.
 
 ### 3.6 Notification channels
 
@@ -1079,6 +1117,7 @@ isitdown/
 │   │       └── it.json
 │   ├── adapters/                      (shared)
 │   │   ├── statuspage.adapter.ts       generic Atlassian Statuspage adapter
+│   │   ├── rss.adapter.ts              generic RSS / Atom incident-feed adapter
 │   │   └── index.ts                    registry keyed by adapter id
 │   ├── notifiers/                     (shared)
 │   │   ├── formatting.ts               emoji, severity labels, message assembly

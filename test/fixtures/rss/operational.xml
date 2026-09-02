@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example Status</title>
+    <link>https://status.example.com</link>
+    <description>Incident history for Example</description>
+    <item>
+      <title>Resolved: Elevated error rates on the API</title>
+      <link>https://status.example.com/incidents/abc123</link>
+      <guid isPermaLink="false">abc123</guid>
+      <pubDate>Tue, 15 Jul 2025 09:12:00 +0000</pubDate>
+      <description><![CDATA[<p>The incident has been resolved and all systems are operating normally.</p>]]></description>
+    </item>
+    <item>
+      <title>Scheduled maintenance completed</title>
+      <link>https://status.example.com/incidents/def456</link>
+      <guid isPermaLink="false">def456</guid>
+      <pubDate>Mon, 02 Jun 2025 22:00:00 +0000</pubDate>
+      <description>Maintenance finished ahead of schedule.</description>
+    </item>
+  </channel>
+</rss>

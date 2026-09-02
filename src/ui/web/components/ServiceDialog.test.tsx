@@ -95,11 +95,58 @@ describe("the service dialog's keyboard contract", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it("derives the id from the name instead of asking for it", async () => {
+    const { dialog } = await openAdd();
+    const idField = within(dialog).getByLabelText(i18n.t("field.id"));
+
+    expect(idField).toHaveAttribute("readonly");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "Città Cloud & Co.");
+
+    expect(idField).toHaveValue("citta-cloud-co");
+  });
+
   it("refuses to edit the id of an existing service", async () => {
     renderWithProviders(<Settings />, fixtures);
     await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.edit") }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByLabelText(i18n.t("field.id"))).toHaveAttribute("readonly");
+  });
+});
+
+describe("the service dialog's adapter choice", () => {
+  it("offers the feed adapter alongside the Statuspage one", async () => {
+    const { dialog } = await openAdd();
+    expect(within(dialog).getByRole("radio", { name: "rss" })).toBeInTheDocument();
+  });
+
+  it("says what the base URL means for the adapter that is selected", async () => {
+    const { dialog } = await openAdd();
+    expect(within(dialog).getByText(i18n.t("add.note.statuspage"))).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("radio", { name: "rss" }));
+
+    expect(within(dialog).getByText(i18n.t("add.note.rss"))).toBeInTheDocument();
+    expect(within(dialog).queryByText(i18n.t("add.note.statuspage"))).toBeNull();
+  });
+
+  it("submits the adapter the operator picked", async () => {
+    const { dialog } = await openAdd();
+    const calls = interceptWrites({
+      "POST /config/services": {},
+      "POST /config/services/feed-service/test": { ok: true, overallStatus: "operational" },
+    });
+
+    await userEvent.click(within(dialog).getByRole("radio", { name: "rss" }));
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "Feed Service");
+    await userEvent.type(
+      within(dialog).getByLabelText(i18n.t("field.base-url")),
+      "https://status.example.com/history.rss",
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const addCall = calls.find((call) => call.method === "POST" && call.path === "/config/services");
+    expect(addCall?.body).toMatchObject({ id: "feed-service", adapter: "rss" });
   });
 });
 
@@ -112,11 +159,10 @@ describe("the service dialog's write path", () => {
         components: [{ id: "c1", name: "Component One", group: null }],
       },
       "POST /config/services": {},
-      "POST /config/services/newsvc/test": { ok: true, overallStatus: "operational" },
+      "POST /config/services/new-service/test": { ok: true, overallStatus: "operational" },
     });
 
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "New Service");
-    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.id")), "newsvc");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://example.com");
     await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("components.load") }));
     await userEvent.click(await within(dialog).findByLabelText("Component One"));
@@ -126,7 +172,7 @@ describe("the service dialog's write path", () => {
 
     const addCall = calls.find((call) => call.method === "POST" && call.path === "/config/services");
     expect(addCall?.body).toEqual({
-      id: "newsvc",
+      id: "new-service",
       name: "New Service",
       adapter: "statuspage",
       baseUrl: "https://example.com",
@@ -165,11 +211,10 @@ describe("the service dialog's write path", () => {
     const { dialog } = await openAdd();
     interceptWrites({
       "POST /config/services": {},
-      "POST /config/services/newsvc/test": { ok: false, error: "connection refused" },
+      "POST /config/services/new-service/test": { ok: false, error: "connection refused" },
     });
 
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "New Service");
-    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.id")), "newsvc");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://example.com");
     await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
 

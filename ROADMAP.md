@@ -15,7 +15,7 @@ Legend:
   needs a deliberate decision before it is planned, not just prioritised.
 - ✅ — shipped; kept listed so the phase reads as a whole.
 
-Current state for reference: Statuspage adapter only; Telegram, webhook and web
+Current state for reference: Statuspage and generic RSS/Atom adapters; Telegram, webhook and web
 push channels; UI edition with overview, providers, incidents, history, settings,
 geographic map/globe; SQLite history with 120-day retention; `en` + `it`.
 
@@ -32,14 +32,14 @@ does not cover is invisible.
 | 1.2 | **Google Cloud adapter** | M | `status.cloud.google.com/incidents.json` — flat incident list, no overall status field, so severity has to be derived. |
 | 1.3 | **Azure Status adapter** | M | RSS/Atom plus an HTML page; the messiest of the three hyperscalers. |
 | 1.4 | **Slack adapter** | S | `status.slack.com/api/v2.0.0/current` — small, well-shaped, good first non-Statuspage adapter to prove the interface holds. |
-| 1.5 | **Generic RSS/Atom adapter** | M | A large tail of status pages publish a feed and nothing else. One adapter, configured by feed URL, unlocks dozens of providers with no new code per provider. High leverage. |
+| 1.5 ✅ | **Generic RSS/Atom adapter** | M | A large tail of status pages publish a feed and nothing else. One adapter, configured by feed URL, unlocks dozens of providers with no new code per provider. High leverage. |
 | 1.6 | **Generic HTML-scrape adapter** | M | CSS selector + a status-word mapping in `options`. Fragile by nature; would need an explicit "this can break silently" warning in the UI. |
 | 1.7 | **Instatus / Better Stack / Sorry™ adapters** | S each | The three most common Statuspage competitors. Each is a small, stable JSON shape. |
 | 1.8 | **Direct HTTP probe** ("is *my* thing up") | L ⚠️ | GET a URL, expect a status code / body match, record latency. Turns IsItDown from a status-page aggregator into an uptime monitor. Huge scope expansion, and it makes the tool useful to people who monitor nothing third-party at all. Decide the product identity before building. |
 | 1.9 | **TCP / DNS / TLS-expiry probes** | M ⚠️ | Only meaningful if 1.8 lands. Cert-expiry in particular is a cheap, high-value alert. |
 | 1.10 | **Silent-outage cross-check** | M ⚠️ | Needs 1.8. Provider's page says operational, our own probe of their API fails → flag it. Genuinely novel: it monitors the *status page's honesty*, which nothing else in this category does. |
-| 1.11 | **Adapter contract test kit** | S | Mirror `test/core/stateStore.contract.ts`: one suite every adapter must pass (throws on non-2xx, degrades on missing optional field, never returns an unvalidated shape). Makes every item above cheaper and safer. Should land *before* 1.1. |
-| 1.12 | **Fixture recorder script** | S | `node tools/record-fixture.mjs <url> <provider>` — fetch once, save under `test/fixtures/`. Removes the main friction in adding an adapter. |
+| 1.11 ✅ | **Adapter contract test kit** | S | Mirror `test/core/stateStore.contract.ts`: one suite every adapter must pass (throws on non-2xx, degrades on missing optional field, never returns an unvalidated shape). Makes every item above cheaper and safer. Should land *before* 1.1. |
+| 1.12 ✅ | **Fixture recorder script** | S | `node tools/record-fixture.mjs <url> <provider>` — fetch once, save under `test/fixtures/`. Removes the main friction in adding an adapter. |
 | 1.13 | **Plugin adapters from a directory** | L | Drop a `.js` into `/plugins` and it registers itself. Lets people add a provider without forking. Security and validation implications: a plugin runs with full process privileges. |
 
 ## 2. Polling and the diff engine
@@ -169,8 +169,8 @@ not re-invented from scratch later.
 If the list has to collapse to one quarter's worth, the highest ratio of value to
 effort is roughly:
 
-1. **1.11 + 1.12 adapter contract kit and fixture recorder** — makes section 1 cheap.
-2. **1.4 Slack or 1.5 RSS adapter** — proves the adapter seam on something that is not Statuspage.
+1. ✅ **1.11 + 1.12 adapter contract kit and fixture recorder** — makes section 1 cheap.
+2. ✅ **1.5 RSS adapter** — proves the adapter seam on something that is not Statuspage. (1.4 Slack still open.)
 3. **4.1 Prometheus `/metrics`** — a day of work, a large audience.
 4. **2.1 scheduled maintenance** — removes the most annoying class of false alert.
 5. **3.1 + 3.2 Discord and Slack channels** — both nearly free behind the existing interface.
