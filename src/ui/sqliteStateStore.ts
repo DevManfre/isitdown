@@ -253,6 +253,8 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
                 overallStatus: row.overall_status,
                 activeIncidents: readIncidents(row.active_incidents),
                 components: componentsColumnSchema.parse(JSON.parse(row.components)),
+                // Not yet persisted; Task 5 adds a column for this.
+                maintenances: [],
                 fetchedAt: row.fetched_at,
               },
         failureCount: row.failure_count,
