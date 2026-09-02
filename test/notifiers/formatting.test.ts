@@ -28,6 +28,8 @@ const window = {
   componentIds: [],
 };
 
+const openEndedWindow = { ...window, endsAt: null };
+
 test("each status has its own emoji and none is reused", () => {
   const emojis = (["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const).map(
     emojiFor,
@@ -143,6 +145,9 @@ test("no rendered message leaves an unfilled placeholder", () => {
     { kind: "incident_updated", providerId: "github", currentStatus: "degraded", incident, at: incident.updatedAt },
     { kind: "incident_resolved", providerId: "github", currentStatus: "operational", incident, at: incident.updatedAt },
     { kind: "monitoring_degraded", providerId: "github", currentStatus: "unknown", failureCount: 7, at: incident.updatedAt },
+    { kind: "maintenance_started", providerId: "github", currentStatus: "operational", maintenance: window, at: window.startsAt },
+    { kind: "maintenance_started", providerId: "github", currentStatus: "operational", maintenance: openEndedWindow, at: openEndedWindow.startsAt },
+    { kind: "maintenance_ended", providerId: "github", currentStatus: "major_outage", maintenance: window, openIncidents: 2, at: window.endsAt as string },
   ];
   for (const locale of ["en", "it"]) {
     for (const change of changes) {
@@ -164,6 +169,19 @@ test("a starting window names the window and the provider", () => {
   );
   assert.match(text, /Scheduled database maintenance/);
   assert.match(text, /GitHub/);
+});
+
+test("a starting window with no declared end says so instead of rendering nothing", () => {
+  const text = renderMessage(
+    payloadFor({
+      kind: "maintenance_started",
+      providerId: "github",
+      currentStatus: "operational",
+      maintenance: openEndedWindow,
+      at: openEndedWindow.startsAt,
+    }),
+  );
+  assert.match(text, /Ends: not stated/);
 });
 
 test("a window that ended clean says so", () => {
@@ -191,12 +209,11 @@ test("a window that ended badly reports the state it left behind", () => {
       at: window.endsAt,
     }),
   );
-  assert.match(text, /Major outage/);
-  assert.match(text, /2/);
+  assert.match(text, /Major outage — 2 open incident\(s\)/);
 });
 
 test("both maintenance kinds render in italian too", () => {
-  const text = renderMessage(
+  const started = renderMessage(
     payloadFor(
       {
         kind: "maintenance_started",
@@ -208,7 +225,24 @@ test("both maintenance kinds render in italian too", () => {
       "it",
     ),
   );
-  assert.doesNotMatch(text, /notification\.maintenance/, "a missing key must not leak as a key");
+  assert.doesNotMatch(started, /notification\.maintenance/, "a missing key must not leak as a key");
+  assert.match(started, /È iniziata una manutenzione programmata: Scheduled database maintenance/);
+
+  const ended = renderMessage(
+    payloadFor(
+      {
+        kind: "maintenance_ended",
+        providerId: "github",
+        currentStatus: "major_outage",
+        maintenance: window,
+        openIncidents: 2,
+        at: window.endsAt,
+      },
+      "it",
+    ),
+  );
+  assert.doesNotMatch(ended, /notification\.maintenance/, "a missing key must not leak as a key");
+  assert.match(ended, /Interruzione grave — 2 incidente\/i aperto\/i/);
 });
 
 test("the italian rendering differs from the english one but keeps the same data", () => {
