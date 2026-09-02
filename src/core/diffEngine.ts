@@ -1,3 +1,4 @@
+import { activeWindows } from "./maintenance.ts";
 import type { NormalizedStatus, StatusChange } from "./types.ts";
 
 /**
@@ -5,18 +6,52 @@ import type { NormalizedStatus, StatusChange } from "./types.ts";
  * no I/O, no logging, no locale awareness — it emits structured changes and the
  * notifier decides how to word them.
  *
- * Two rules carry most of the value:
+ * Three rules carry most of the value:
  *  - a null `previous` is a baseline, never news, so a fresh container or a new
  *    provider cannot produce a burst of alerts;
  *  - `unknown` on either side is not a comparable status, so a failed or
  *    unrecognised poll can never be reported as a transition — in particular
- *    never as a false recovery.
+ *    never as a false recovery;
+ *  - a declared maintenance window running at `next.fetchedAt` swallows every
+ *    other change for that poll — the operator already knows, so nothing else
+ *    about the provider is news until the window ends.
  */
 export function diff(previous: NormalizedStatus | null, next: NormalizedStatus): StatusChange[] {
   if (previous === null) return [];
 
-  const changes: StatusChange[] = [];
   const base = { providerId: next.provider, at: next.fetchedAt };
+
+  const runningBefore = new Map(activeWindows(previous).map((window) => [window.id, window]));
+  const runningNow = new Map(activeWindows(next).map((window) => [window.id, window]));
+
+  const maintenanceChanges: StatusChange[] = [];
+  for (const [id, window] of runningNow) {
+    if (runningBefore.has(id)) continue;
+    maintenanceChanges.push({
+      ...base,
+      kind: "maintenance_started",
+      currentStatus: next.overallStatus,
+      maintenance: window,
+    });
+  }
+  for (const [id, window] of runningBefore) {
+    if (runningNow.has(id)) continue;
+    maintenanceChanges.push({
+      ...base,
+      kind: "maintenance_ended",
+      currentStatus: next.overallStatus,
+      maintenance: window,
+      openIncidents: next.activeIncidents.length,
+    });
+  }
+
+  // A declared window is the operator's answer to "is this expected?" — while one
+  // runs, nothing else about this provider is news. The reconciliation is
+  // `maintenance_ended`, which carries the state the provider came out in, so a
+  // real outage that began inside the window is announced rather than lost.
+  if (runningNow.size > 0) return maintenanceChanges;
+
+  const changes: StatusChange[] = [...maintenanceChanges];
 
   const comparable = previous.overallStatus !== "unknown" && next.overallStatus !== "unknown";
   if (comparable && previous.overallStatus !== next.overallStatus) {
