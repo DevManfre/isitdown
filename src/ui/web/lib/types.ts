@@ -32,6 +32,21 @@ export interface ComponentStatus {
   status: OverallStatus;
 }
 
+/** A maintenance window a provider declared on its own status page. */
+export interface MaintenanceWindow {
+  id: string;
+  /** Provider's own title. Empty string when the provider omits it. */
+  name: string;
+  /** Provider's own lifecycle word, e.g. "in_progress". Not normalised. */
+  status: string;
+  /** ISO 8601, UTC. */
+  startsAt: string;
+  /** ISO 8601, UTC. Null when the provider declares no end. */
+  endsAt: string | null;
+  /** Components the provider attributed it to; empty means page-wide. */
+  componentIds: string[];
+}
+
 export interface ProviderStatus {
   id: string;
   name: string;
@@ -46,6 +61,8 @@ export interface ProviderStatus {
   fetchedAt: string | null;
   failureCount: number;
   uptime90: number;
+  /** Running now, and windows still to come — a window that has already ended appears in neither. */
+  maintenance: { active: MaintenanceWindow[]; upcoming: MaintenanceWindow[] };
 }
 
 export interface StatusResponse {
@@ -152,6 +169,20 @@ export interface IncidentsResponse {
   page: IncidentPage;
   /** Every state's count, whichever one the page is showing. */
   counts: Record<IncidentState, number>;
+}
+
+/** A declared maintenance window, plus which provider and when we first/last saw it. */
+export type MaintenanceRow = MaintenanceWindow & {
+  providerId: string;
+  /** ISO 8601, UTC. When we first saw the window, regardless of what the provider's own timestamps say. */
+  firstSeenAt: string;
+  /** ISO 8601, UTC. */
+  lastSeenAt: string;
+};
+
+export interface MaintenancesResponse {
+  /** Newest first by `startsAt`. */
+  maintenances: MaintenanceRow[];
 }
 
 export interface TimelineEntry {

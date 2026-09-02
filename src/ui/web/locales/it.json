@@ -90,6 +90,7 @@
   "providers.empty": "Nessun provider configurato — aggiungine uno nelle Impostazioni.",
   "providers.components-toggle": "Mostra i componenti monitorati",
   "providers.remove-confirm": "Rimuovere {name}? Anche la sua cronologia di uptime e i suoi incidenti verranno eliminati.",
+  "provider.maintenance.badge": "Manutenzione",
 
   "incidents.filter.label": "Filtro incidenti",
   "incidents.active": "Incidente attivo",
@@ -107,6 +108,7 @@
   "pagination.next": "Successiva",
   "pagination.more-pages": "Altre pagine",
   "incidents.impact-line": "Impatto: {impact} · Stato: {status}",
+  "incidents.maintenance.label": "Manutenzione",
 
   "incident.kicker": "Incidente",
   "incident.elapsed": "aperto da {duration}",

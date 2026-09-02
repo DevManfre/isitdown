@@ -9,7 +9,7 @@ const provider = (over: Partial<ProviderStatus> = {}): ProviderStatus => ({
   id: "github", name: "GitHub", adapter: "statuspage", baseUrl: "https://www.githubstatus.com",
   enabled: true, overallStatus: "operational", activeIncidents: [], components: [],
   componentSelection: [], scopeToComponents: false, fetchedAt: null, failureCount: 0,
-  uptime90: 99.9, ...over,
+  uptime90: 99.9, maintenance: { active: [], upcoming: [] }, ...over,
 });
 
 const mount = (p: ProviderStatus) =>
