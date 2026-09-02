@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Status</title>
+  <updated>2026-09-01T09:00:00Z</updated>
+  <entry>
+    <id>tag:status.example.com,2026:incident/777</id>
+    <title>Degraded performance on background jobs</title>
+    <link rel="alternate" href="https://status.example.com/incidents/777"/>
+    <updated>2026-09-01T09:00:00Z</updated>
+    <published>2026-09-01T08:55:00Z</published>
+    <summary type="html">&lt;p&gt;Jobs are running slowly.&lt;/p&gt;</summary>
+  </entry>
+</feed>

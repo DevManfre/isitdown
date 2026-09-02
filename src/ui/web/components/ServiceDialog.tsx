@@ -13,7 +13,18 @@ import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { previewComponents } from "@/lib/api.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
 
-const ADAPTERS = ["statuspage", "custom"] as const;
+const ADAPTERS = ["statuspage", "rss", "custom"] as const;
+
+/**
+ * What the base URL means differs per adapter — Statuspage appends a path to
+ * it, the feed adapter reads it verbatim — so the hint is keyed per adapter
+ * rather than built from the adapter id at render time.
+ */
+const ADAPTER_NOTES: Record<string, string> = {
+  statuspage: "add.note.statuspage",
+  rss: "add.note.rss",
+  custom: "add.note.custom",
+};
 
 /**
  * Add/edit dialog for a monitored service, on shadcn's Radix `Dialog`. Port of
@@ -227,7 +238,7 @@ export function ServiceDialog({
                 onChange={(event) => setBaseUrl(event.target.value)}
                 {...fieldProps}
               />
-              {mode === "add" && <span className="font-mono text-xs text-muted-foreground">{t("add.note")}</span>}
+              {mode === "add" && <span className="font-mono text-xs text-muted-foreground">{t(ADAPTER_NOTES[adapter] ?? "add.note.custom")}</span>}
             </div>
 
             <div className="flex flex-col gap-2">
