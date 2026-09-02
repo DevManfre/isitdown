@@ -20,6 +20,7 @@ import { createHistoryService } from "./history.ts";
 import type { HistoryStore } from "./historyStore.interface.ts";
 import { createMapLane, type MapLane } from "./mapLane.ts";
 import { createMapStore, type MapStore } from "./mapStore.ts";
+import { createMetricsRegistry, type MetricsRegistry } from "./metrics.ts";
 import { createSqlitePushSubscriptionStore, type SqlitePushSubscriptionStore } from "./sqlitePushSubscriptionStore.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
 import { ensureVapidKeys } from "./vapidKeys.ts";
@@ -51,6 +52,8 @@ export interface UiRuntimeCore {
   /** Built here, run by the server at boot — never by the runtime builder, so tests stay offline. */
   backfill: BackfillService;
   mapStore: MapStore;
+  /** The Prometheus scrape surface, fed by the dispatcher and the scheduler. */
+  metrics: MetricsRegistry;
   pushSubscriptions: SqlitePushSubscriptionStore;
   /**
    * The shared registry cannot build `webpush` on its own: that channel needs the
@@ -124,10 +127,18 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   });
 
   const poller = createPoller({ getAdapter, store, logger });
+  const metrics = createMetricsRegistry({
+    store,
+    listEnabledServices: () => listServices(db).filter((service) => service.enabled),
+  });
   const dispatcher = createDispatcher({
     logger,
-    // What the dashboard's notification feed is built from.
-    onSent: (record) => store.recordNotification(record),
+    // What the dashboard's notification feed is built from, and — since every
+    // outbound message passes here — what the delivery counters count.
+    onSent: (record) => {
+      metrics.recordSent(record);
+      return store.recordNotification(record);
+    },
   });
 
   let lastCycle: CycleResult | undefined;
@@ -139,6 +150,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     logger,
     onCycle: (result) => {
       lastCycle = result;
+      metrics.recordCycle(result);
     },
   });
 
@@ -164,6 +176,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     scheduler,
     backfill,
     mapStore,
+    metrics,
     pushSubscriptions,
     buildNotifiers: buildAllNotifiers,
     mapLane,

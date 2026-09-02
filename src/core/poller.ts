@@ -14,6 +14,8 @@ export interface ProviderResult {
   ok: boolean;
   status?: NormalizedStatus | undefined;
   attempts: number;
+  /** Wall-clock time the fetch took, retries included, stagger excluded. */
+  durationMs: number;
   error?: string | undefined;
 }
 
@@ -105,6 +107,7 @@ export function createPoller(deps: PollerDeps): Poller {
 
     const before = await store.getState(service.id);
 
+    const startedAt = Date.now();
     let outcome: { status: NormalizedStatus; attempts: number };
     try {
       outcome = await attemptFetch(service, config);
@@ -135,6 +138,7 @@ export function createPoller(deps: PollerDeps): Poller {
           providerId: service.id,
           ok: false,
           attempts: config.polling.maxRetries,
+          durationMs: Date.now() - startedAt,
           error: message,
         },
         changes,
@@ -153,6 +157,7 @@ export function createPoller(deps: PollerDeps): Poller {
         ok: true,
         status: outcome.status,
         attempts: outcome.attempts,
+        durationMs: Date.now() - startedAt,
       },
       changes,
     };
@@ -188,6 +193,7 @@ export function createPoller(deps: PollerDeps): Poller {
           providerId: service?.id ?? "unknown",
           ok: false,
           attempts: 0,
+          durationMs: 0,
           error: message,
         });
       }
