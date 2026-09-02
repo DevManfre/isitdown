@@ -15,6 +15,7 @@
     "dev:ui": "concurrently -n server,vite -c blue,magenta \"DB_PATH=./data/isitdown.db WEB_DIR=./dist/ui/public node --watch --env-file-if-exists=.env src/ui/server.ts\" \"vite\"",
     "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
     "preversion": "npm run typecheck && npm test && npm run test:integration",
+    "record-fixture": "node tools/record-fixture.mjs",
     "release-notes": "node tools/release-notes.mjs",
     "test": "node --test \"test/**/*.test.ts\" && vitest run",
     "test:integration": "node --test \"test/**/*.itest.ts\"",
