@@ -30,6 +30,8 @@ const TEMPLATE: Record<StatusChangeKind, string> = {
   incident_opened: "notification.incident.opened",
   incident_updated: "notification.incident.updated",
   incident_resolved: "notification.incident.resolved",
+  maintenance_started: "notification.maintenance.started",
+  maintenance_ended: "notification.maintenance.ended",
   monitoring_degraded: "notification.monitoring.degraded",
 };
 

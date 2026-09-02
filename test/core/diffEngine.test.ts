@@ -4,6 +4,7 @@ import { diff } from "../../src/core/diffEngine.ts";
 import type {
   ComponentStatus,
   Incident,
+  MaintenanceWindow,
   NormalizedStatus,
   OverallStatus,
   StatusChangeKind,
@@ -22,12 +23,13 @@ const snap = (
   overallStatus: OverallStatus,
   activeIncidents: Incident[] = [],
   components: ComponentStatus[] = [],
+  maintenances: MaintenanceWindow[] = [],
 ): NormalizedStatus => ({
   provider: "github",
   overallStatus,
   activeIncidents,
   components,
-  maintenances: [],
+  maintenances,
   fetchedAt: "2026-08-19T14:05:00.000Z",
 });
 
@@ -37,6 +39,18 @@ const comp = (over: Partial<ComponentStatus> = {}): ComponentStatus => ({
   status: "operational",
   ...over,
 });
+
+const window = (over: Partial<MaintenanceWindow> = {}): MaintenanceWindow => ({
+  id: "mw1",
+  name: "Scheduled database upgrade",
+  status: "in_progress",
+  startsAt: "2026-08-19T14:00:00.000Z",
+  endsAt: "2026-08-19T15:00:00.000Z",
+  componentIds: [],
+  ...over,
+});
+
+const running = window();
 
 const cases: {
   name: string;
@@ -228,4 +242,70 @@ test("a component change carries the component and its own statuses", () => {
       at: "2026-08-19T14:05:00.000Z",
     },
   ]);
+});
+
+test("a window that has just started is announced", () => {
+  const previous = snap("operational", [], [], []);
+  const next = snap("operational", [], [], [running]);
+
+  const changes = diff(previous, next);
+
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0]?.kind, "maintenance_started");
+  assert.equal(changes[0]?.maintenance?.id, "mw1");
+});
+
+test("an active window swallows a status change", () => {
+  const previous = snap("operational", [], [], [running]);
+  const next = snap("major_outage", [], [], [running]);
+
+  assert.deepEqual(diff(previous, next), []);
+});
+
+test("an active window swallows a newly opened incident", () => {
+  const previous = snap("operational", [], [], [running]);
+  const next = snap("operational", [inc({ id: "i9" })], [], [running]);
+
+  assert.deepEqual(diff(previous, next), []);
+});
+
+test("an active window swallows a component change", () => {
+  const previous = snap("operational", [], [comp({ id: "c1", status: "operational" })], [running]);
+  const next = snap("operational", [], [comp({ id: "c1", status: "major_outage" })], [running]);
+
+  assert.deepEqual(diff(previous, next), []);
+});
+
+test("a window that ends with the provider recovered reports it as over", () => {
+  const previous = snap("operational", [], [], [running]);
+  const next = snap("operational", [], [], []);
+
+  const changes = diff(previous, next);
+
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0]?.kind, "maintenance_ended");
+  assert.equal(changes[0]?.currentStatus, "operational");
+  assert.equal(changes[0]?.openIncidents, 0);
+});
+
+test("a window that ends with the provider still down carries the held-back state", () => {
+  const previous = snap("operational", [], [], [running]);
+  const next = snap("major_outage", [inc({ id: "i9" })], [], []);
+
+  const changes = diff(previous, next);
+  const ended = changes.find((change) => change.kind === "maintenance_ended");
+
+  assert.equal(ended?.currentStatus, "major_outage");
+  assert.equal(ended?.openIncidents, 1);
+});
+
+test("a first poll landing inside a window announces nothing", () => {
+  assert.deepEqual(diff(null, snap("operational", [], [], [running])), []);
+});
+
+test("monitoring keeps reporting normally once the window is over", () => {
+  const previous = snap("operational", [], [], []);
+  const next = snap("degraded", [], [], []);
+
+  assert.equal(diff(previous, next)[0]?.kind, "status_change");
 });
