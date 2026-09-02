@@ -450,4 +450,51 @@ describe("a provider's detail drawer", () => {
 
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  // The operator-approved prototype: an "upcoming" window earns its own block
+  // above the daily bars, distinct from the status badge on the title (which
+  // means "running now" — `active` — where this means "coming up").
+  it("shows the next declared maintenance window when one is upcoming", async () => {
+    renderWithProviders(<History />, {
+      ...withDrawer,
+      status: {
+        ...withDrawer.status,
+        providers: withDrawer.status.providers.map((provider) =>
+          provider.id === "cloudflare"
+            ? {
+                ...provider,
+                maintenance: {
+                  active: [],
+                  upcoming: [
+                    {
+                      id: "mw-1",
+                      name: "Network maintenance",
+                      status: "scheduled",
+                      startsAt: "2026-09-10T09:00:00Z",
+                      endsAt: "2026-09-10T11:00:00Z",
+                      componentIds: [],
+                    },
+                  ],
+                },
+              }
+            : provider,
+        ),
+      },
+    });
+
+    const drawer = await openCloudflare();
+
+    expect(await within(drawer).findByText(i18n.t("history.next-maintenance.kicker"))).toBeInTheDocument();
+    expect(within(drawer).getByText(i18n.t("history.next-maintenance.badge"))).toBeInTheDocument();
+    expect(within(drawer).getByText("Network maintenance")).toBeInTheDocument();
+  });
+
+  it("renders nothing where the block would go when nothing is upcoming", async () => {
+    renderWithProviders(<History />, withDrawer);
+
+    const drawer = await openCloudflare();
+    await within(drawer).findByText(i18n.t("components.rows-title"));
+
+    expect(screen.queryByText(i18n.t("history.next-maintenance.kicker"))).toBeNull();
+  });
 });

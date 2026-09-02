@@ -1,4 +1,5 @@
 import { Trans, useTranslation } from "react-i18next";
+import { Badge } from "@/components/ui/badge.tsx";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ComponentRows } from "@/components/ComponentRows.tsx";
@@ -6,7 +7,18 @@ import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { StatusLegend } from "@/components/charts/StatusLegend.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
 import { useProviderHistory } from "@/hooks/queries.ts";
-import type { ComponentStatus, ProviderHistory } from "@/lib/types.ts";
+import { formatDateTime, formatTime } from "@/lib/format.ts";
+import type { ComponentStatus, MaintenanceWindow, ProviderHistory } from "@/lib/types.ts";
+
+/**
+ * The soonest-starting window in `upcoming`, or `undefined` when nothing is
+ * declared. `upcoming` arrives in whatever order the server's array holds it
+ * in — this is the one place that imposes "next" as a meaning.
+ */
+function nextOf(upcoming: readonly MaintenanceWindow[]): MaintenanceWindow | undefined {
+  if (upcoming.length === 0) return undefined;
+  return [...upcoming].sort((a, b) => (a.startsAt < b.startsAt ? -1 : a.startsAt > b.startsAt ? 1 : 0))[0];
+}
 
 /**
  * One provider's history in full: the three windows, the daily status bars with
@@ -23,7 +35,7 @@ import type { ComponentStatus, ProviderHistory } from "@/lib/types.ts";
  * the page that opened it down with it.
  */
 export function ProviderHistoryDrawer({
-  providerId, name, status, components, selection, days, onClose,
+  providerId, name, status, components, selection, days, upcoming, onClose,
 }: {
   providerId: string | null;
   name: string;
@@ -31,11 +43,14 @@ export function ProviderHistoryDrawer({
   components: ComponentStatus[];
   selection: { id: string; name: string }[];
   days: number;
+  /** Declared windows that haven't started yet — `ProviderStatus.maintenance.upcoming`. */
+  upcoming: MaintenanceWindow[];
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const { data } = useProviderHistory(providerId, days);
   const provider = data !== undefined && "providerId" in data ? (data as ProviderHistory) : undefined;
+  const nextMaintenance = nextOf(upcoming);
 
   return (
     <Sheet open={providerId !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -71,6 +86,28 @@ export function ProviderHistoryDrawer({
                 </div>
               ))}
             </dl>
+
+            {/* Omitted entirely when nothing is upcoming, rather than an empty
+                state — an operator with no maintenance declared should see the
+                same drawer as before this shipped, not a new empty panel. Not a
+                `Card`: every other block here sits directly on the Sheet's own
+                surface, and a nested elevation would read as one more thing to
+                notice rather than a continuation of the stats above it. */}
+            {nextMaintenance !== undefined && (
+              <div className="flex flex-col gap-1 rounded-md border border-border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs uppercase tracking-widest text-primary">
+                    {t("history.next-maintenance.kicker")}
+                  </span>
+                  <Badge variant="muted">{t("history.next-maintenance.badge")}</Badge>
+                </div>
+                <span className="text-sm">{nextMaintenance.name}</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {formatDateTime(i18n.language, nextMaintenance.startsAt)}
+                  {nextMaintenance.endsAt !== null && `–${formatTime(i18n.language, nextMaintenance.endsAt)}`}
+                </span>
+              </div>
+            )}
 
             <div className="flex flex-col gap-2">
               <span className="text-xs uppercase tracking-widest text-primary">

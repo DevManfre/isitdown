@@ -100,7 +100,14 @@ export function Incidents() {
 
   const active = incidents?.active ?? [];
   const rows = incidents?.page.items ?? [];
-  const maintenanceRows = maintenances?.maintenances ?? [];
+  // Maintenance rides along on the first page only: `useMaintenances()` fetches
+  // the whole set, unpaged, and the pager below counts incidents alone (the
+  // server-side `pages`/`total` never learn about maintenance rows). Merging
+  // the full set into every page would repeat the same windows on page 2, 3,
+  // ... and could push a page past PAGE_SIZE rows. Page 1 is where a newest-
+  // first list reads "what's going on right now" anyway, so that is the one
+  // page maintenance belongs on.
+  const maintenanceRows = page === 1 ? (maintenances?.maintenances ?? []) : [];
   // The current page's incidents plus every declared maintenance window,
   // interleaved by when each started — newest first, same order the
   // incident-only list already read in. Maintenance carries no incident
@@ -334,9 +341,7 @@ export function Incidents() {
                 <span className="font-mono text-xs text-muted-foreground">
                   {formatDateTime(i18n.language, entry.maintenance.startsAt)}
                 </span>
-                <Badge variant="outline" className="border-transparent bg-muted text-muted-foreground">
-                  {t("incidents.maintenance.label")}
-                </Badge>
+                <Badge variant="muted">{t("incidents.maintenance.label")}</Badge>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm">
                     <span>{nameOf(entry.maintenance.providerId)}</span> — <span>{entry.maintenance.name}</span>
