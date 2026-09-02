@@ -46,7 +46,7 @@ does not cover is invisible.
 
 | # | Item | Size | Notes |
 |---|---|---|---|
-| 2.1 | **Scheduled-maintenance awareness** | M | Already on the README's open list. Statuspage exposes `scheduled_maintenances`; today it is dropped. Add a `maintenance` state, show it on the timeline, and *suppress* incident alerts inside a declared window — a planned outage waking someone at 03:00 is the classic false positive. |
+| 2.1 ✅ | **Scheduled-maintenance awareness** | M | Already on the README's open list. Statuspage exposes `scheduled_maintenances`; today it is dropped. Add a `maintenance` state, show it on the timeline, and *suppress* incident alerts inside a declared window — a planned outage waking someone at 03:00 is the classic false positive. |
 | 2.2 | **Per-provider poll interval** | S | `intervalMinutes` is global. A provider that publishes every 5 minutes and one that updates twice a year do not deserve the same cadence. Small change to `ServiceDefinition` + poller. |
 | 2.3 | **Adaptive polling** | M | Poll every minute while an incident is open on that provider, back off to the configured interval when clear. Better signal, less traffic — the two usually trade off, here they do not. |
 | 2.4 | **Conditional requests (ETag / If-Modified-Since)** | S | Store the ETag per provider, send it back. Most cycles become a 304. Cheap, polite, and reduces the chance of being rate-limited. |
@@ -172,7 +172,7 @@ effort is roughly:
 1. ✅ **1.11 + 1.12 adapter contract kit and fixture recorder** — makes section 1 cheap.
 2. ✅ **1.5 RSS adapter** — proves the adapter seam on something that is not Statuspage. (1.4 Slack still open.)
 3. ✅ **4.1 Prometheus `/metrics`** — a day of work, a large audience.
-4. **2.1 scheduled maintenance** — removes the most annoying class of false alert.
+4. ✅ **2.1 scheduled maintenance** — removes the most annoying class of false alert.
 5. **3.1 + 3.2 Discord and Slack channels** — both nearly free behind the existing interface.
 6. **3.10 routing rules** — the notification feature people actually hit the ceiling on.
 7. **5.12 undo / safer delete** — a data-loss footgun that exists today.
