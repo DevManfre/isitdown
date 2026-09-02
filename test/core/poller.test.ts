@@ -447,3 +447,37 @@ test("the poller hands the component selection to the adapter", async () => {
     await store.close();
   }
 });
+
+test("every result carries how long its fetch took, success or failure", async () => {
+  const healthy = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const broken = await fakeProvider((_req, res) => {
+    res.writeHead(500);
+    res.end("nope");
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+
+  try {
+    const cycle = await poller.runCycle(
+      config([service("github", healthy.baseUrl), service("broken", broken.baseUrl)]),
+    );
+
+    const ok = cycle.results.find((result) => result.providerId === "github");
+    const failed = cycle.results.find((result) => result.providerId === "broken");
+    assert.equal(ok?.ok, true);
+    assert.equal(failed?.ok, false);
+    for (const result of [ok, failed]) {
+      assert.equal(typeof result?.durationMs, "number");
+      assert.ok((result?.durationMs ?? -1) >= 0, "a duration is never negative");
+      assert.ok(Number.isFinite(result?.durationMs), "a duration is always finite");
+    }
+  } finally {
+    await store.close();
+    await healthy.close();
+    await broken.close();
+  }
+});
