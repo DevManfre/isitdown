@@ -813,6 +813,7 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `POST` | `/config/channels/:id/test` | Una notifica di test, attraverso il dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
 | `POST` | `/poll` | Esegue subito un ciclo, tramite lo scheduler. Restituisce il riepilogo del ciclo. |
+| `GET` | `/metrics` | Esposizione Prometheus. L'unico endpoint non JSON — vedi [6.2](#62-metriche-prometheus). |
 | `GET` | `/` | La dashboard. |
 
 ### 6.1 Backfill dello storico
@@ -830,6 +831,58 @@ restituisce al massimo i 50 incidenti più recenti, quindi la copertura varia
 per provider; i giorni oltre la portata del feed restano grigi ("nessun
 dato") ed esclusi dalle percentuali di uptime. Il backfill non genera mai
 notifiche e non sovrascrive mai campioni osservati.
+
+### 6.2 Metriche Prometheus
+
+`GET /metrics` risponde nel formato di esposizione testuale di Prometheus
+(`text/plain; version=0.0.4`), così qualsiasi Prometheus può fare scrape di
+IsItDown senza adattatori in mezzo:
+
+```yaml
+scrape_configs:
+  - job_name: isitdown
+    static_configs:
+      - targets: ["isitdown-ui:3000"]
+```
+
+Come `/status`, uno scrape è una lettura pura dello stato salvato e non
+raggiunge mai un provider: farlo ogni 15 secondi non costa nulla a monte.
+Vengono esportati solo i provider abilitati: uno disabilitato ha righe nel
+database ma nessun ciclo le aggiornerà più, e un alert su una gauge congelata
+è peggio di una serie assente.
+
+| Metrica | Tipo | Etichette | Significato |
+|---|---|---|---|
+| `isitdown_providers_total` | gauge | — | Provider attualmente sotto polling. |
+| `isitdown_provider_up` | gauge | `provider`, `name` | `1` quando il provider si dichiara pienamente operativo, `0` altrimenti — anche prima del primo poll. |
+| `isitdown_provider_status` | gauge | `provider`, `status` | `1` sullo stato normalizzato corrente, `0` sugli altri quattro. Distingue `degraded` da `major_outage`, cosa che `_up` non può fare. |
+| `isitdown_provider_active_incidents` | gauge | `provider` | Incidenti aperti sulla status page di quel provider. |
+| `isitdown_provider_failure_count` | gauge | `provider` | Cicli di poll falliti consecutivi. Diverso da zero significa che è degradata *la nostra* visuale, non che il provider è down. |
+| `isitdown_provider_last_fetch_timestamp_seconds` | gauge | `provider` | Quando il suo stato è stato letto con successo l'ultima volta. Assente fino al primo successo. |
+| `isitdown_poll_duration_seconds` | gauge | `provider` | Quanto è durato il suo ultimo poll, retry inclusi. |
+| `isitdown_polls_total` | counter | `provider`, `outcome` | Poll tentati dall'avvio, con `outcome` `success` o `failure`. |
+| `isitdown_notifications_total` | counter | `channel`, `outcome` | Tentativi di invio dall'avvio, con `outcome` `sent` o `failed`. |
+| `isitdown_last_cycle_timestamp_seconds` | gauge | — | Quando è finito l'ultimo ciclo. Assente finché questo processo non ne ha eseguito uno. |
+
+I counter sono per processo, non per database: ripartono da zero al riavvio —
+che è ciò che Prometheus si aspetta da un counter — invece di essere derivati
+dalla tabella `notifications`, che viene potata insieme al resto dello storico
+e farebbe tornare indietro un counter.
+
+Due alert che vale la pena avere, e nessuno dei due è "il provider è down":
+
+```yaml
+groups:
+  - name: isitdown
+    rules:
+      # Il provider si dichiara down, e lo fa da dieci minuti.
+      - alert: ProviderDown
+        expr: isitdown_provider_up == 0
+        for: 10m
+      # Il nostro monitoraggio è cieco — nessun ciclo riuscito da quindici minuti.
+      - alert: IsItDownStalled
+        expr: time() - isitdown_last_cycle_timestamp_seconds > 900
+```
 
 Non c'è autenticazione: questa è una dashboard locale per un singolo operatore. Non
 pubblicare la porta 3000 su una rete di cui non ti fidi.
@@ -1157,8 +1210,9 @@ isitdown/
 │       ├── history.ts                 aggregazione di uptime e incidenti
 │       ├── backfill.ts                ricostruisce 90 giorni di storico dagli incidenti di un provider al primo avvio
 │       ├── dbConfigSource.ts          configurazione da SQLite; risolve i segreti per nome di variabile
+│       ├── metrics.ts                  la superficie di scrape Prometheus: gauge dallo store, counter in memoria
 │       ├── db/                        open.ts, migrate.ts, seed.ts
-│       ├── routes/                    status, history, incidents, notifications, config, preferences
+│       ├── routes/                    status, history, incidents, notifications, config, preferences, metrics
 │       └── web/                       la dashboard: react, vite, shadcn/ui
 │           ├── index.html             script del tema pre-paint, font, #root
 │           ├── main.tsx               albero dei provider: i18n, query, tema, router
