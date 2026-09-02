@@ -48,6 +48,7 @@ const snap = (over: Partial<NormalizedStatus> = {}): NormalizedStatus => ({
   overallStatus: "degraded",
   activeIncidents: [inc()],
   components: [],
+  maintenances: [],
   fetchedAt: "2026-08-19T14:05:00.000Z",
   ...over,
 });

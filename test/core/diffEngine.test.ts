@@ -27,6 +27,7 @@ const snap = (
   overallStatus,
   activeIncidents,
   components,
+  maintenances: [],
   fetchedAt: "2026-08-19T14:05:00.000Z",
 });
 
