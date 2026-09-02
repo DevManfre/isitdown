@@ -799,10 +799,11 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | Metodo | Percorso | Scopo |
 |---|---|---|
 | `GET` | `/health` | Liveness. `{ status, providers, lastCycleAt }`. |
-| `GET` | `/status` | Stato corrente di ogni provider, più ultimo e prossimo poll. Pura lettura dal database — si può interrogare ogni 30s, come fa la dashboard. Non raggiunge mai l'upstream. |
+| `GET` | `/status` | Stato corrente di ogni provider, più ultimo e prossimo poll, più `maintenance: { active, upcoming }` — le finestre in corso adesso e quelle il cui `startsAt` è ancora nel futuro; una finestra già terminata ma ancora presente nel payload salvato non compare in nessuna delle due liste. Pura lettura dal database — si può interrogare ogni 30s, come fa la dashboard. Non raggiunge mai l'upstream. |
 | `GET` | `/history?provider=&days=` | Bucket giornalieri pre-aggregati, uptime a 7/30/90 giorni, colonne dei mesi. `days` accetta `7`, `30` o `90`; altro è un 400 che li elenca. Senza `provider`, un riepilogo su tutti. |
 | `GET` | `/incidents?provider=` | `{ active, closed }`. |
 | `GET` | `/incidents/:providerId/:incidentId` | Dettaglio: l'incidente, la cronologia osservata, il log di ciò che è stato inviato, gli altri incidenti aperti del provider e gli ultimi 24 poll. |
+| `GET` | `/maintenances?provider=&days=` | Le finestre di manutenzione dichiarate — in corso, future e passate — come `{ maintenances }`. `days` limita quanto indietro nel tempo resta visibile una finestra chiusa (default 90, massimo 365); `provider` restringe a uno solo. Senza `provider`, ogni provider abilitato. |
 | `GET` | `/notifications?limit=` | Ciò che è stato inviato davvero, dal più recente. Massimo 200. |
 | `GET` | `/config` | Servizi, impostazioni di polling, canali. Le credenziali dei canali appaiono come **nomi** di variabili con un flag `isSet`, mai come valori. |
 | `POST` | `/config/services` | Aggiunge un servizio. `201`, oppure `409` su id duplicato, oppure `400` col nome del campo non valido. |
@@ -1005,6 +1006,27 @@ casi limite si aggiungono come righe invece che come test isolati.
 | `unknown` | qualunque cosa | **nessun** `status_change` — non c'è una baseline reale da confrontare |
 | qualunque | `unknown` | **nessun** `status_change` — una transizione *verso* "non lo sappiamo" non è una novità |
 | N cicli falliti consecutivi | | sì, **una volta** — `monitoring_degraded`, e non di nuovo finché un successo non lo azzera |
+| nessuna finestra in corso | inizia una finestra dichiarata | sì — `maintenance_started` |
+| una finestra in corso | la stessa finestra termina | sì — `maintenance_ended`, con lo stato in cui il provider è uscito |
+| una finestra in corso | qualunque altra cosa cambia a monte (stato, componenti, incidenti) | **no** — soppressa finché la finestra non termina |
+
+**Regola di soppressione**: finché una finestra di manutenzione dichiarata da
+un provider è in corso, nient'altro riguardo quel provider è una novità — un
+cambio di stato, un incidente nuovo o aggiornato, un flip di componente,
+tutto resta silenzioso finché la finestra non si chiude. L'unica eccezione è
+l'inizio e la fine della finestra stessa. Questo significa che un incidente
+aperto *durante* una finestra e ancora aperto quando questa termina non
+genera mai un proprio `incident_opened` — l'unico annuncio per esso è il
+conteggio degli incidenti aperti riportato in `maintenance_ended`. Se resta
+aperto molto dopo che la finestra è finita, nulla lo rincorre oltre: si
+controlla dalla dashboard.
+
+Due cose che questo *non* cambia: le righe di manutenzione vengono unite alla
+timeline degli incidenti della dashboard, ma solo nella prima pagina della
+timeline — lo storico di manutenzione più vecchio è disponibile da
+`/maintenances`, non dalla timeline. Anche le percentuali di uptime restano
+invariate — un campione rilevato mentre una finestra è in corso conta
+esattamente come oggi, manutenzione o no.
 
 Un restart non notifica nulla: lo stato viene ricaricato dallo store, e lo stato
 ricaricato risulta uguale a quello che lo ha prodotto. Entrambe le implementazioni
