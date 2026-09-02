@@ -178,6 +178,7 @@ export function History() {
         status={open === null ? "unknown" : (statusById.get(open)?.overallStatus ?? "unknown")}
         components={open === null ? [] : (statusById.get(open)?.components ?? [])}
         selection={open === null ? [] : (statusById.get(open)?.componentSelection ?? [])}
+        upcoming={open === null ? [] : (statusById.get(open)?.maintenance.upcoming ?? [])}
         days={days}
         onClose={() => setOpen(null)}
       />
