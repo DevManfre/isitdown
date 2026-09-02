@@ -11,10 +11,14 @@
   "incident.status.resolved": "Resolved",
   "incident.status.postmortem": "Postmortem",
 
+  "maintenance.no-end": "not stated",
+
   "notification.status.changed": "{provider} — {severity}\n\nStatus changed from {previous} to {current}.\nUpdated: {updatedAt}\n\n{url}",
   "notification.component.changed": "{provider} — {severity}\n\nComponent {component} changed from {previous} to {current}.\nUpdated: {updatedAt}\n\n{url}",
   "notification.incident.opened": "{provider} — {severity}\n\nIncident: {title}\nStatus: {status}\nUpdated: {updatedAt}\n\n{url}",
   "notification.incident.updated": "{provider} — {severity}\n\nIncident: {title}\nStatus: {status}\nUpdated: {updatedAt}\n\n{url}",
   "notification.incident.resolved": "{provider} — {severity}\n\nIncident \"{title}\" has been resolved.\nUpdated: {updatedAt}\n\n{url}",
-  "notification.monitoring.degraded": "{provider} — monitoring degraded\n\n{count} consecutive fetches failed. Last known status: {lastStatus}.\nUpdated: {updatedAt}"
+  "notification.monitoring.degraded": "{provider} — monitoring degraded\n\n{count} consecutive fetches failed. Last known status: {lastStatus}.\nUpdated: {updatedAt}",
+  "notification.maintenance.started": "{provider} — maintenance\n\nScheduled maintenance has started: {title}\nEnds: {endsAt}\nAlerts for this provider are paused until it is over.\n\n{url}",
+  "notification.maintenance.ended": "{provider} — maintenance over\n\n{title} has finished.\nStatus now: {current} — {count} open incident(s).\nUpdated: {updatedAt}\n\n{url}"
 }
