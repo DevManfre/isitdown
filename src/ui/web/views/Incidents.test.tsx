@@ -166,7 +166,42 @@ describe("Incidents", () => {
     expect(list().getByText(i18n.t("incidents.maintenance.label"))).toBeInTheDocument();
   });
 
-  // useMaintenances() fetches the whole unpaged set, and the pager below only
+  // The view asks the server for a bounded, historical slice — not the
+  // whole 90-day set with upcoming windows included, which used to drown a
+  // 20-row incident page in 100+ maintenance rows, sorted with unstarted
+  // windows on top of what claims to be a history timeline.
+  it("asks the server for a bounded, historical maintenance slice, and never shows a window that hasn't started", async () => {
+    const manyMaintenances = (path: string) => {
+      const query = new URLSearchParams(path.split("?")[1] ?? "");
+      const includeUpcoming = query.get("includeUpcoming");
+      const limit = Number(query.get("limit") ?? Number.POSITIVE_INFINITY);
+      const rows = Array.from({ length: 30 }, (_unused, index) => ({
+        id: `mw-${index}`,
+        providerId: "github",
+        name: `Window ${index}`,
+        status: index === 0 ? "scheduled" : "completed",
+        startsAt: index === 0 ? "2099-01-01T00:00:00Z" : `2026-08-${String(15 - (index % 14)).padStart(2, "0")}T09:00:00Z`,
+        endsAt: index === 0 ? null : "2026-08-15T11:00:00Z",
+        componentIds: [],
+        firstSeenAt: "2026-08-15T09:00:00Z",
+        lastSeenAt: "2026-08-15T11:05:00Z",
+      }));
+      const filtered = includeUpcoming === "false" ? rows.filter((row) => row.startsAt < "2099-01-01T00:00:00Z") : rows;
+      return { maintenances: filtered.slice(0, limit) };
+    };
+
+    renderWithProviders(<Incidents />, { ...fixtures, maintenances: manyMaintenances });
+
+    expect(await screen.findByText("Window 1")).toBeInTheDocument();
+    // The future window (index 0, starting in 2099) must never render on
+    // what is meant to be a history timeline.
+    expect(screen.queryByText("Window 0")).toBeNull();
+    // Bounded: the incident page holds PAGE_SIZE (20) rows plus at most a
+    // page-size-sized slice of maintenance, not the full 29-row remainder.
+    expect(list().queryByText("Window 25")).toBeNull();
+  });
+
+  // useMaintenances() fetches page 1's bounded slice, and the pager below only
   // ever counts incidents — so merging maintenance into every page would
   // repeat the same windows on page 2 onward, and could push a page's row
   // count past PAGE_SIZE. Confirmed ruling: maintenance rides along on page 1

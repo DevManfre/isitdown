@@ -165,6 +165,65 @@ test("maintenances filters by provider", async () => {
   }
 });
 
+test("maintenances honours a limit query param", async () => {
+  const app = await api();
+  try {
+    for (let index = 0; index < 5; index += 1) {
+      await app.runtime.store.saveStatus({
+        provider: "github",
+        overallStatus: "operational",
+        activeIncidents: [],
+        components: [],
+        maintenances: [
+          window(`gh-${index}`, {
+            startsAt: new Date(Date.now() - (index + 1) * 3600 * 1000).toISOString(),
+            endsAt: new Date(Date.now() - index * 3600 * 1000).toISOString(),
+          }),
+        ],
+        fetchedAt: new Date().toISOString(),
+      });
+    }
+
+    const { status, body } = await app.get("/maintenances?limit=2");
+    assert.equal(status, 200);
+    const payload = body as MaintenancesBody;
+    assert.equal(payload.maintenances.length, 2);
+  } finally {
+    await app.close();
+  }
+});
+
+test("maintenances excludes upcoming windows when includeUpcoming=false", async () => {
+  const app = await api();
+  try {
+    const tomorrow = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+    await app.runtime.store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [],
+      maintenances: [
+        window("past", {
+          startsAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+          endsAt: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
+        }),
+        window("future", { startsAt: tomorrow, endsAt: null }),
+      ],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    const { status, body } = await app.get("/maintenances?includeUpcoming=false");
+    assert.equal(status, 200);
+    const payload = body as MaintenancesBody;
+    assert.deepEqual(
+      payload.maintenances.map((row) => row.id),
+      ["past"],
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("maintenances excludes a disabled provider's rows exactly as /incidents does", async () => {
   const app = await api();
   try {
