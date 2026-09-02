@@ -106,6 +106,8 @@ export const getIncident = (providerId: string, incidentId: string) =>
 export interface MaintenanceListQuery {
   provider?: string | undefined;
   days?: number | undefined;
+  limit?: number | undefined;
+  includeUpcoming?: boolean | undefined;
 }
 
 export const getMaintenances = (query: MaintenanceListQuery = {}) => {

@@ -89,7 +89,12 @@ export function Incidents() {
   const [feedExpanded, setFeedExpanded] = useState(false);
   const [page, setPage] = useState(1);
   const { data: incidents } = useIncidents({ state: filter, page, pageSize: PAGE_SIZE });
-  const { data: maintenances } = useMaintenances();
+  // Bounded and historical: a 90-day, upcoming-included set (the route's own
+  // defaults) merged 100+ Cloudflare-shaped rows onto page 1 alone, sorted
+  // with windows that haven't started yet on top of what claims to be a
+  // history timeline. Upcoming windows belong to the drawer's "next
+  // maintenance" block, which reads them from `/status` instead.
+  const { data: maintenances } = useMaintenances({ includeUpcoming: false, limit: PAGE_SIZE });
   const { data: status } = useStatus();
   const { data: sent } = useNotifications(NOTIFICATIONS_SHOWN);
 
@@ -101,12 +106,12 @@ export function Incidents() {
   const active = incidents?.active ?? [];
   const rows = incidents?.page.items ?? [];
   // Maintenance rides along on the first page only: `useMaintenances()` fetches
-  // the whole set, unpaged, and the pager below counts incidents alone (the
-  // server-side `pages`/`total` never learn about maintenance rows). Merging
-  // the full set into every page would repeat the same windows on page 2, 3,
-  // ... and could push a page past PAGE_SIZE rows. Page 1 is where a newest-
-  // first list reads "what's going on right now" anyway, so that is the one
-  // page maintenance belongs on.
+  // a bounded, historical slice (server-side `limit`, no upcoming windows),
+  // and the pager below counts incidents alone (the server-side `pages`/`total`
+  // never learn about maintenance rows). Merging it into every page would
+  // repeat the same windows on page 2, 3, ... and could push a page past
+  // PAGE_SIZE rows. Page 1 is where a newest-first list reads "what's going on
+  // right now" anyway, so that is the one page maintenance belongs on.
   const maintenanceRows = page === 1 ? (maintenances?.maintenances ?? []) : [];
   // The current page's incidents plus every declared maintenance window,
   // interleaved by when each started — newest first, same order the

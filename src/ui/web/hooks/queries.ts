@@ -204,7 +204,13 @@ export const useIncident = (providerId: string, incidentId: string) => {
 export const useMaintenances = (query: api.MaintenanceListQuery = {}) => {
   const busy = useBusy();
   return useQuery({
-    queryKey: ["maintenances", query.provider ?? null, query.days ?? null],
+    queryKey: [
+      "maintenances",
+      query.provider ?? null,
+      query.days ?? null,
+      query.limit ?? null,
+      query.includeUpcoming ?? null,
+    ],
     queryFn: () => api.getMaintenances(query),
     refetchInterval: busy ? false : REFRESH_MS,
   });
