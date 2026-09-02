@@ -139,6 +139,33 @@ describe("Incidents", () => {
     expect(list().getByText("Old blip")).toBeInTheDocument();
   });
 
+  // The timeline is incidents plus declared maintenance windows, merged —
+  // but a maintenance window is not an incident, so it must carry its own
+  // label rather than borrow the impact/state wording an incident gets.
+  it("merges a maintenance window into the list, labelled distinctly from an incident", async () => {
+    renderWithProviders(<Incidents />, {
+      ...fixtures,
+      maintenances: {
+        maintenances: [
+          {
+            id: "mw-1",
+            providerId: "github",
+            name: "Database upgrade",
+            status: "completed",
+            startsAt: "2026-08-15T09:00:00Z",
+            endsAt: "2026-08-15T11:00:00Z",
+            componentIds: [],
+            firstSeenAt: "2026-08-15T09:00:00Z",
+            lastSeenAt: "2026-08-15T11:05:00Z",
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("Database upgrade")).toBeInTheDocument();
+    expect(list().getByText(i18n.t("incidents.maintenance.label"))).toBeInTheDocument();
+  });
+
   it("asks the server for one state when the filter narrows, and lists only that", async () => {
     renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents([open, ...many(3)]) });
     await userEvent.click(await screen.findByRole("radio", radioNamed(i18n.t("filter.resolved"))));

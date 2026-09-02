@@ -4,6 +4,7 @@ import type {
   IncidentDetail,
   IncidentsResponse,
   IncidentState,
+  MaintenancesResponse,
   MapResponse,
   OverallStatus,
   Preferences,
@@ -101,6 +102,20 @@ export const getIncident = (providerId: string, incidentId: string) =>
     "GET",
     `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}`,
   );
+
+export interface MaintenanceListQuery {
+  provider?: string | undefined;
+  days?: number | undefined;
+}
+
+export const getMaintenances = (query: MaintenanceListQuery = {}) => {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) params.set(key, String(value));
+  }
+  const search = params.toString();
+  return request<MaintenancesResponse>("GET", `/maintenances${search === "" ? "" : `?${search}`}`);
+};
 
 export const getNotifications = (limit = 20) =>
   request<{ notifications: SentRecord[] }>("GET", `/notifications?limit=${limit}`);

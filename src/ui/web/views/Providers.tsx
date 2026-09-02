@@ -12,6 +12,7 @@ import {
 } from "@tanstack/react-table";
 import type { SortDirection } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ChevronRight, ChevronsUpDown } from "lucide-react";
+import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
@@ -70,6 +71,8 @@ interface ProviderRow {
    */
   monitored: { id: string; name: string }[];
   components: ComponentStatus[];
+  /** A declared window is running right now — an upcoming one is not this table's job. */
+  maintenanceActive: boolean;
 }
 
 /**
@@ -289,6 +292,7 @@ export function Providers() {
           buckets: history?.buckets ?? [],
           monitored: provider.componentSelection,
           components: provider.components,
+          maintenanceActive: provider.maintenance.active.length > 0,
         };
       });
   }, [providers, summary, filter, leaving]);
@@ -326,7 +330,14 @@ export function Providers() {
             <span className="flex items-center gap-2">
               <StatusDot status={row.original.status} glow={8} />
               <span className="flex flex-col">
-                <span>{row.original.name}</span>
+                <span className="flex items-center gap-1.5">
+                  {row.original.name}
+                  {row.original.maintenanceActive && (
+                    <Badge variant="outline" className="border-transparent bg-muted text-muted-foreground">
+                      {t("provider.maintenance.badge")}
+                    </Badge>
+                  )}
+                </span>
                 <span className="font-mono text-[10px] text-muted-foreground">{row.original.host}</span>
               </span>
             </span>
