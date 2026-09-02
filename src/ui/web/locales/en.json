@@ -143,6 +143,8 @@
   "history.col-delta": "Change",
   "history.col-incidents": "Incidents",
   "history.open-detail": "Open {name} history detail",
+  "history.next-maintenance.kicker": "Next maintenance",
+  "history.next-maintenance.badge": "Upcoming",
   "history.drawer-bars": "Daily status",
   "history.legend-title": "Colour key",
 

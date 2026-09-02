@@ -166,6 +166,73 @@ describe("Incidents", () => {
     expect(list().getByText(i18n.t("incidents.maintenance.label"))).toBeInTheDocument();
   });
 
+  // useMaintenances() fetches the whole unpaged set, and the pager below only
+  // ever counts incidents — so merging maintenance into every page would
+  // repeat the same windows on page 2 onward, and could push a page's row
+  // count past PAGE_SIZE. Confirmed ruling: maintenance rides along on page 1
+  // only.
+  it("shows a maintenance window on page 1 but not once the list moves to page 2", async () => {
+    renderWithProviders(<Incidents />, {
+      ...fixtures,
+      incidents: pagedIncidents(many(5)),
+      maintenances: {
+        maintenances: [
+          {
+            id: "mw-1",
+            providerId: "github",
+            name: "Database upgrade",
+            status: "completed",
+            startsAt: "2026-08-15T09:00:00Z",
+            endsAt: "2026-08-15T11:00:00Z",
+            componentIds: [],
+            firstSeenAt: "2026-08-15T09:00:00Z",
+            lastSeenAt: "2026-08-15T11:05:00Z",
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("Blip 1")).toBeInTheDocument();
+    expect(list().getByText("Database upgrade")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("pagination.next") }));
+
+    expect(await screen.findByText("Blip 3")).toBeInTheDocument();
+    expect(list().queryByText("Database upgrade")).toBeNull();
+  });
+
+  // Maintenance carries no incident state, so it should ride along under
+  // every filter rather than vanish the moment an operator narrows to
+  // "active" or "resolved".
+  it("keeps the maintenance row visible under every filter", async () => {
+    renderWithProviders(<Incidents />, {
+      ...fixtures,
+      maintenances: {
+        maintenances: [
+          {
+            id: "mw-1",
+            providerId: "github",
+            name: "Database upgrade",
+            status: "completed",
+            startsAt: "2026-08-15T09:00:00Z",
+            endsAt: "2026-08-15T11:00:00Z",
+            componentIds: [],
+            firstSeenAt: "2026-08-15T09:00:00Z",
+            lastSeenAt: "2026-08-15T11:05:00Z",
+          },
+        ],
+      },
+    });
+
+    for (const filter of ["all", "active", "resolved"] as const) {
+      await userEvent.click(await screen.findByRole("radio", radioNamed(i18n.t(`filter.${filter}`))));
+      expect(
+        await list().findByText("Database upgrade"),
+        `the ${filter} filter dropped the maintenance row`,
+      ).toBeInTheDocument();
+    }
+  });
+
   it("asks the server for one state when the filter narrows, and lists only that", async () => {
     renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents([open, ...many(3)]) });
     await userEvent.click(await screen.findByRole("radio", radioNamed(i18n.t("filter.resolved"))));
