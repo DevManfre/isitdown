@@ -6,6 +6,7 @@ import type { CycleResult, Poller } from "../../src/core/poller.ts";
 import type { ChannelConfig, ConfigSource, RuntimeConfig } from "../../src/core/configSource.interface.ts";
 import type { Dispatcher, SentRecord } from "../../src/core/notificationDispatcher.ts";
 import type { StatusChange } from "../../src/core/types.ts";
+import { CATCH_ALL_RULE } from "../../src/core/routing.ts";
 
 const silent = createLogger("error", () => {});
 
@@ -22,6 +23,7 @@ const baseConfig = (over: Partial<RuntimeConfig> = {}): RuntimeConfig => ({
     },
   ],
   channels: [],
+  rules: [CATCH_ALL_RULE],
   ...over,
 });
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EVENT_CLASSES, SEVERITY_FLOORS } from "./routing.ts";
 
 /**
  * Validation for the parts of the configuration both editions share. The Light
@@ -63,3 +64,19 @@ export const localeSchema = z
   .string()
   .regex(/^[a-z]{2}(-[a-z0-9]+)*$/, "must be a lowercase locale tag such as en or pt-br")
   .default("en");
+
+/**
+ * One routing rule, shared by the Light edition's `routing:` block and the UI
+ * edition's `routing_rules` rows, so the two editions cannot disagree about
+ * what a valid rule is. Order is the array's order — there is no position
+ * field to contradict it.
+ */
+export const routingRuleSchema = z.object({
+  provider: z.union([z.literal("*"), slug]),
+  classes: z.array(z.enum(EVENT_CLASSES)).default([...EVENT_CLASSES]),
+  minSeverity: z.enum(SEVERITY_FLOORS).default("any"),
+  /** `["*"]` means every enabled channel; `[]` mutes. */
+  channels: z.array(z.union([z.literal("*"), slug])).default(["*"]),
+});
+
+export const routingRulesSchema = z.array(routingRuleSchema);
