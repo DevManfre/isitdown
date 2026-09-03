@@ -15,9 +15,12 @@ Legend:
   needs a deliberate decision before it is planned, not just prioritised.
 - ✅ — shipped; kept listed so the phase reads as a whole.
 
-Current state for reference: Statuspage and generic RSS/Atom adapters; Telegram, webhook and web
-push channels; UI edition with overview, providers, incidents, history, settings,
-geographic map/globe; SQLite history with 120-day retention; `en` + `it`.
+Current state for reference (v1.2.0): Statuspage and generic RSS/Atom adapters, both
+covered by the shared adapter contract suite; Telegram, webhook, Discord, Slack and web
+push channels; scheduled-maintenance awareness (windows silence the diff engine and
+show on the dashboard and timeline); Prometheus `/metrics`; UI edition with overview,
+providers, incidents, history, settings, geographic map/globe; SQLite history with 120-day
+retention; `en` + `it`.
 
 ---
 
@@ -63,8 +66,8 @@ is additive and independently shippable.
 
 | # | Item | Size | Notes |
 |---|---|---|---|
-| 3.1 | **Discord** | S | Webhook-shaped, rich embeds. On the README's open list. |
-| 3.2 | **Slack** | S | Incoming webhook + Block Kit. Same. |
+| 3.1 ✅ | **Discord** | S | Webhook-shaped, rich embeds. On the README's open list. |
+| 3.2 ✅ | **Slack** | S | Incoming webhook + Block Kit. Same. |
 | 3.3 | **Email (SMTP)** | M | The most-asked-for channel in self-hosted tools, and the only one that adds a real runtime dependency (an SMTP client) to a project that currently has three. Weigh that against the principle. |
 | 3.4 | **ntfy / Gotify** | S each | Self-hosted push, exactly this project's audience. ntfy in particular is a single POST. |
 | 3.5 | **Pushover** | S | Paid but trivially simple; popular. |
@@ -173,7 +176,7 @@ effort is roughly:
 2. ✅ **1.5 RSS adapter** — proves the adapter seam on something that is not Statuspage. (1.4 Slack still open.)
 3. ✅ **4.1 Prometheus `/metrics`** — a day of work, a large audience.
 4. ✅ **2.1 scheduled maintenance** — removes the most annoying class of false alert.
-5. **3.1 + 3.2 Discord and Slack channels** — both nearly free behind the existing interface.
+5. ✅ **3.1 + 3.2 Discord and Slack channels** — both nearly free behind the existing interface.
 6. **3.10 routing rules** — the notification feature people actually hit the ceiling on.
 7. **5.12 undo / safer delete** — a data-loss footgun that exists today.
 

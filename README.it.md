@@ -230,6 +230,12 @@ notifications:
   webhook:
     enabled: false
     url: "${WEBHOOK_URL}"
+  discord:
+    enabled: false
+    webhookUrl: "${DISCORD_WEBHOOK_URL}"
+  slack:
+    enabled: false
+    webhookUrl: "${SLACK_WEBHOOK_URL}"
 ```
 
 | Chiave | Default | Note |
@@ -273,6 +279,8 @@ tua lista non viene più sovrascritta in seguito.
 | `TELEGRAM_BOT_TOKEN` | entrambe | — | Token del bot Telegram. Obbligatoria se il canale Telegram è attivo. |
 | `TELEGRAM_CHAT_ID` | entrambe | — | Chat di destinazione. Obbligatoria con la precedente. |
 | `WEBHOOK_URL` | entrambe | — | Dove il webhook generico fa POST. Obbligatoria se quel canale è attivo. |
+| `DISCORD_WEBHOOK_URL` | entrambe | — | Webhook in entrata di Discord. Obbligatoria se il canale Discord è attivo. |
+| `SLACK_WEBHOOK_URL` | entrambe | — | Webhook in entrata di Slack. Obbligatoria se il canale Slack è attivo. |
 | `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Dove leggere `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Dove tenere il file di stato. |
@@ -341,8 +349,8 @@ Lo `status.indicator` del provider viene mappato sul modello di severità intern
 | assente | `unknown` |
 
 Un incidente è *attivo* a meno che il suo stato sia `resolved` o `postmortem`.
-`scheduled_maintenances` viene ignorato: il modello di severità non ha uno stato di
-manutenzione.
+`scheduled_maintenances` viene letto a parte: una finestra dichiarata non è una
+severità, silenzia gli avvisi del provider mentre è in corso.
 
 Attenzione: un provider può riportare `degraded` con **zero** incidenti aperti —
 Statuspage deriva l'indicator anche dallo stato dei componenti. Una griglia degradata
@@ -411,6 +419,8 @@ sotto `src/adapters/`.
 |---|---|---|
 | Telegram Bot API | `telegram` | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
 | Webhook generico | `webhook` | `WEBHOOK_URL` |
+| Discord | `discord` | `DISCORD_WEBHOOK_URL` |
+| Slack | `slack` | `SLACK_WEBHOOK_URL` |
 
 Il webhook fa POST di `{ change, service, message }`, così chi lo consuma può
 mostrare il testo già formattato oppure fare routing sui campi strutturati:
@@ -429,8 +439,15 @@ mostrare il testo già formattato oppure fare routing sui campi strutturati:
 }
 ```
 
-Discord e Slack hanno la stessa forma di un webhook e si innestano dietro la stessa
-interfaccia `Notifier`; non sono ancora implementati.
+Discord e Slack sono entrambi webhook in entrata: creane uno nel server o nel
+workspace di destinazione, metti l'URL in `DISCORD_WEBHOOK_URL` o
+`SLACK_WEBHOOK_URL` e attiva il canale. Entrambi riportano le stesse parole che
+manda ogni altro canale, disposte in modo nativo: Discord come un embed il cui
+titolo porta la severità e rimanda alla status page del provider, colorato per
+severità; Slack come una sezione Block Kit più un pulsante "Apri la pagina di
+stato", con l'intestazione ripetuta come testo di anteprima della notifica.
+Nessuno dei due URL finisce mai in un log o nella dashboard: un invio rifiutato
+riporta lo stato HTTP e la ragione del servizio stesso.
 
 ---
 
@@ -919,7 +936,7 @@ pubblicare la porta 3000 su una rete di cui non ti fidi.
                         │   Dispatcher   │  l'unico chiamante di Notifier.send
                         └───────┬────────┘
                                 ▼
-                        Telegram · webhook
+                   Telegram · webhook · Discord · Slack
 
    Solo edizione UI: un server Express nello stesso processo serve dashboard e API
    dallo stesso StateStore, e può chiedere allo scheduler un ciclo immediato.
@@ -982,9 +999,11 @@ differiscono solo per il `ConfigSource` e lo `StateStore` che iniettano.
    un altro cambiamento. I notifier vengono ricostruiti dalla configurazione a ogni
    ciclo, ed è per questo che attivare un canale non richiede restart.
 
-7. **Notifier** — Telegram e webhook generico. La composizione del messaggio è
-   condivisa (`src/notifiers/formatting.ts`), così i canali non possono divergere su
-   ciò che riportano; cambia solo il trasporto. Emoji e impaginazione stanno nel
+7. **Notifier** — Telegram, webhook generico, Discord e Slack. La composizione del
+   messaggio è condivisa (`src/notifiers/formatting.ts`), così i canali non possono
+   divergere su ciò che riportano; cambia solo il trasporto. Un canale con un
+   formato nativo strutturato chiede lo stesso messaggio a pezzi (`renderParts`)
+   invece di comporne uno proprio. Emoji, colore e impaginazione stanno nel
    notifier, le parole arrivano dai cataloghi condivisi.
 
 ### 7.3 Quando scatta una notifica
@@ -1209,7 +1228,8 @@ isitdown/
 │   │   ├── rss.adapter.ts             adapter generico per feed RSS / Atom
 │   │   └── index.ts                   registro per id di adapter
 │   ├── notifiers/                     (condiviso)
-│   │   ├── formatting.ts              emoji, etichette di severità, composizione del messaggio
+│   │   ├── formatting.ts              emoji, colori, etichette di severità, composizione del messaggio
+│   │   ├── settings.ts                validazione condivisa per i canali configurati con un solo URL
 │   │   ├── telegram.notifier.ts
 │   │   ├── webhook.notifier.ts
 │   │   └── index.ts                   registro per id di canale
@@ -1507,12 +1527,7 @@ Consegnato:
 Ancora aperto:
 
 - Adapter per provider che non stanno su Atlassian Statuspage.
-- Canali Discord e Slack con rich embed: hanno entrambi la forma di un webhook, quindi
-  si innestano dietro l'interfaccia `Notifier` esistente.
 - Routing multi-destinatario: canali diversi per provider o per severità.
-- Consapevolezza delle manutenzioni programmate. L'adapter ignora
-  `scheduled_maintenances` di Statuspage, e il modello di severità non ha uno stato di
-  manutenzione.
 - Una revisione madrelingua delle stringhe italiane.
 
 Non-obiettivi espliciti: autenticazione multi-utente (questa è una dashboard locale per
