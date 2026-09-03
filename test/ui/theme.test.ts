@@ -243,6 +243,10 @@ const NON_TOKEN_PROPERTIES: Record<string, string> = {
   // Nothing in this repo declares them and nothing should.
   "--radix-select-trigger-height": "set by Radix's Select popper at runtime",
   "--radix-select-trigger-width": "set by Radix's Select popper at runtime",
+  // Radix's Collapsible measures its panel and writes this onto the content
+  // element, which is what lets the channel row's unfold keyframe travel to a
+  // height no stylesheet can know.
+  "--radix-collapsible-content-height": "set by Radix's Collapsible at runtime",
   // toggle-group.tsx declares this itself, inline, one line above the `var()`
   // that reads it: `style={{ "--gap": spacing }}`. A component-local variable
   // passing a prop into a utility class, not a palette entry.
