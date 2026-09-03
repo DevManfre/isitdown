@@ -854,4 +854,22 @@ describe("Settings", () => {
     expect(within(trigger).getByText(i18n.t("settings.map-view.globe"))).toBeInTheDocument();
     expect(within(trigger).queryByText(i18n.t("settings.map-view.off"))).toBeNull();
   });
+
+  // Task 7: the notifications section states how many routing rules exist
+  // right in its row — the rule count is readable without opening the editor,
+  // which is now behind RoutingRulesDialog's own trigger button.
+  it("says how many routing rules there are without opening the editor", async () => {
+    renderWithProviders(<Settings />, {
+      ...fixtures,
+      config: {
+        ...config,
+        routing: {
+          rules: [{ provider: "github", classes: ["status"], minSeverity: "any", channels: ["telegram"] }],
+          invalidRules: 0,
+        },
+      },
+    });
+
+    expect(await screen.findByText(i18n.t("settings.routing.count", { count: 1 }))).toBeInTheDocument();
+  });
 });
