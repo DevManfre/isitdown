@@ -102,8 +102,10 @@ Anthropic       operational    ████████████████�
   degraded, degraded → outage, outage → resolved. A restart notifies nothing.
 - **Provider-agnostic.** Most providers run Atlassian Statuspage and need no code
   at all; anything else gets a small adapter.
-- **Secrets from the environment only.** No token is ever written to a config
-  file, a database, an API response or a log line.
+- **Secrets from the environment only.** A token is read from an environment
+  variable, never written to a config file, a database, an API response or a log
+  line. The UI edition can save one to a `0600` file beside its database, still
+  as a variable, so the dashboard can set a credential without a restart.
 
 ### The two editions
 
@@ -138,9 +140,10 @@ docker compose --profile ui up -d
 # then visit http://localhost:3000
 ```
 
-Everything the UI edition needs is configured in the dashboard, except secrets,
-which come from the environment only. Put them in a `.env` next to the compose
-file — it is optional, and read if present:
+Everything the UI edition needs is configured in the dashboard, credentials
+included: **Settings → a channel → Value → Salva** applies at once. Put them in a
+`.env` next to the compose file instead if you would rather the container own
+them — it is optional, and read if present:
 
 ```bash
 printf 'TELEGRAM_BOT_TOKEN=...\nTELEGRAM_CHAT_ID=...\n' > .env
@@ -262,8 +265,8 @@ Everything lives in SQLite at `/app/data/isitdown.db` and is edited from
 
 - polling interval, request timeout, retries
 - the service list — add, edit, remove
-- which notification channels are enabled, and which environment variable carries
-  each credential
+- which notification channels are enabled, which environment variable carries
+  each credential, and — write-only — the credential itself
 - theme, dashboard language, notification language
 
 Writes take effect on the **next poll cycle**, with no restart, because the
@@ -304,20 +307,32 @@ but TELEGRAM_BOT_TOKEN is not set in the environment
 
 **UI.** The `channels` table stores the *name* of the variable
 (`botTokenEnv: "TELEGRAM_BOT_TOKEN"`), never a value, and the name is resolved at
-load. Consequences worth knowing:
+load. A value can be *set* from the dashboard, which writes it to
+`secrets.env` beside the database — mode `0600`, in the data volume, one
+`NAME=value` per line — and into the server's own environment, so the channel
+starts working on the next request with nothing to restart. Consequences worth
+knowing:
 
-- Settings shows the variable name and whether it currently resolves. The **name**
-  is editable; the value is not, and there is no field in which to type one.
-- `PATCH /config/channels/:id` **refuses** a request carrying a literal secret, so
-  the database is never offered one in the first place.
+- Settings shows the variable name, whether it currently resolves, and a
+  write-only value field. The field always renders empty and `Clear` forgets a
+  saved value; nothing reads one back.
+- `PATCH /config/channels/:id` still **refuses** a request carrying a literal
+  secret: values go to `PUT /config/channels/:id/secrets`, and the database is
+  never offered one.
+- A saved value overrides the same variable coming from `env_file` — it is the
+  later, explicit instruction — and every takeover is logged at boot.
+- `DELETE /config/channels/:id/secrets/:field` only forgets what the file itself
+  holds; a variable the container supplied answers `409` rather than pretending.
+  Forgetting an entry that had overridden an `env_file` value falls back to that
+  value rather than leaving the channel with nothing.
 - No API response, DOM node, log line or error message contains a resolved secret.
   Tests assert this.
 - A channel enabled in the database whose variable is unset is skipped for that
   cycle with a warning, rather than crashing the dashboard — unlike Light, there
   is a UI in which an operator can see and fix it.
 
-This is a deliberate departure from the design prototype, which drew editable
-credential fields.
+The dashboard therefore accepts a credential, as the design prototype drew, but
+only one way: in.
 
 ### 3.5 Monitored providers
 
@@ -774,14 +789,25 @@ real. Create a bot with [@BotFather](https://t.me/botfather), send it a message,
 then read your chat id from
 `https://api.telegram.org/bot<TOKEN>/getUpdates`.
 
+In the UI edition, both values can be saved from **Settings → Telegram**, or
+through the API — either way no restart is involved:
+
 ```bash
-sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=123456:AA...|' .env
-sed -i 's|^TELEGRAM_CHAT_ID=.*|TELEGRAM_CHAT_ID=-1001234567890|' .env
-docker compose --profile ui up -d --force-recreate
+curl -s -X PUT localhost:3000/config/channels/telegram/secrets \
+  -H 'content-type: application/json' \
+  -d '{"fields":{"botToken":"123456:AA...","chatId":"-1001234567890"}}'
 
 curl -s -X PATCH localhost:3000/config/channels/telegram \
   -H 'content-type: application/json' -d '{"enabled":true}'
 curl -s -X POST localhost:3000/config/channels/telegram/test    # {"ok":true}
+```
+
+Through `env_file` instead, the container has to be recreated for it to read them:
+
+```bash
+sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=123456:AA...|' .env
+sed -i 's|^TELEGRAM_CHAT_ID=.*|TELEGRAM_CHAT_ID=-1001234567890|' .env
+docker compose --profile ui up -d --force-recreate
 ```
 
 A failure comes back as `{"ok":false,"error":"telegram notification failed: HTTP 400 (chat not found)"}` —
@@ -831,6 +857,8 @@ back reports a parse failure instead of the real problem.
 | `PATCH` `DELETE` | `/config/services/:id` | Edit or remove. Deleting cascades to that provider's samples, incidents and state, so nothing orphaned survives. |
 | `PATCH` | `/config/settings` | Polling settings. |
 | `PATCH` | `/config/channels/:id` | Enable/disable, and set variable names. **Refuses** a literal secret. |
+| `PUT` | `/config/channels/:id/secrets` | Save credential **values** — `{"fields":{"<field>":"<value>"}}`. Write-only: the value goes to `secrets.env` beside the database and into the process environment, effective immediately, and the response is the usual names-and-`isSet` shape. `400` for an unknown field or an unusable value. |
+| `DELETE` | `/config/channels/:id/secrets/:field` | Forget a saved value. `409` if the variable came from the container's environment instead. |
 | `POST` | `/config/services/:id/test` | One live fetch against that provider. Records nothing. |
 | `POST` | `/config/channels/:id/test` | One test notification, through the dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
@@ -1237,6 +1265,7 @@ isitdown/
 │       ├── history.ts                  uptime and incident aggregation
 │       ├── backfill.ts                 reconstructs 90 days of history from a provider's incidents on first boot
 │       ├── dbConfigSource.ts           config from SQLite; resolves secrets by variable name
+│       ├── secretsFile.ts              credentials saved from the dashboard: 0600 file beside the database, applied to the environment
 │       ├── metrics.ts                  the Prometheus scrape surface: gauges from the store, counters in memory
 │       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
@@ -1438,7 +1467,8 @@ to what they cover.
 - Notification-sending logic lives only on the diff engine → dispatcher path.
 - Any string a human reads is a catalog key, written in English first.
 - Secrets from environment variables only — never a config file, never a database,
-  never a log line.
+  never a log line. The UI edition's `secretsFile.ts` is the one writer, and it
+  writes variables, not config.
 - New dashboard surfaces get prototyped in `design/` before implementation.
 - A shadcn component exists for most surfaces — use it, and `cn()` for conditional
   classes, rather than writing a new component class.
