@@ -130,7 +130,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     },
 
     async dispatch(changes: StatusChange[], ctx: DispatchContext): Promise<SentRecord[]> {
-      if (changes.length === 0 || ctx.notifiers.length === 0) return [];
+      if (changes.length === 0) return [];
 
       const byId = new Map(ctx.services.map((service) => [service.id, service]));
       const attempts: Promise<SentRecord>[] = [];
