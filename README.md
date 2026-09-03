@@ -229,6 +229,12 @@ notifications:
   webhook:
     enabled: false
     url: "${WEBHOOK_URL}"
+  discord:
+    enabled: false
+    webhookUrl: "${DISCORD_WEBHOOK_URL}"
+  slack:
+    enabled: false
+    webhookUrl: "${SLACK_WEBHOOK_URL}"
 ```
 
 | Key | Default | Notes |
@@ -272,6 +278,8 @@ list is never overwritten afterwards.
 | `TELEGRAM_BOT_TOKEN` | both | — | Telegram bot token. Required if the Telegram channel is enabled. |
 | `TELEGRAM_CHAT_ID` | both | — | Target chat. Required with the above. |
 | `WEBHOOK_URL` | both | — | Where the generic webhook POSTs. Required if that channel is enabled. |
+| `DISCORD_WEBHOOK_URL` | both | — | Discord incoming webhook. Required if the Discord channel is enabled. |
+| `SLACK_WEBHOOK_URL` | both | — | Slack incoming webhook. Required if the Slack channel is enabled. |
 | `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Where to read `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Where to keep the state file. |
@@ -338,7 +346,8 @@ The provider's own `status.indicator` maps onto the internal severity model:
 | absent | `unknown` |
 
 An incident is *active* unless its status is `resolved` or `postmortem`.
-`scheduled_maintenances` is ignored: the severity model has no maintenance state.
+`scheduled_maintenances` is read separately: a declared window is not a severity,
+it silences the provider's alerts while it runs.
 
 Note that a provider can report `degraded` with **zero** open incidents — Statuspage
 derives the indicator from component state too. A degraded status grid alongside an
@@ -407,6 +416,8 @@ For a provider on neither Statuspage nor a feed, add an adapter under
 |---|---|---|
 | Telegram Bot API | `telegram` | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
 | Generic webhook | `webhook` | `WEBHOOK_URL` |
+| Discord | `discord` | `DISCORD_WEBHOOK_URL` |
+| Slack | `slack` | `SLACK_WEBHOOK_URL` |
 | Desktop (Web Push) | `webpush` | none |
 
 Desktop push needs nothing configured: the server generates its own VAPID key
@@ -437,8 +448,15 @@ register a service worker unless the dashboard is served over localhost or HTTPS
 A toast carries the affected provider's own icon, so a stack of them is readable
 at a glance.
 
-Discord and Slack are webhook-shaped and slot in behind the same `Notifier`
-interface; they are not implemented yet.
+Discord and Slack are both incoming webhooks: create one in the target
+server/workspace, put its URL in `DISCORD_WEBHOOK_URL` or `SLACK_WEBHOOK_URL`,
+and enable the channel. Both render the same words every other channel sends,
+arranged natively — Discord as one embed whose title carries the severity and
+links to the provider's status page, coloured by that severity; Slack as a
+Block Kit section plus an "Open status page" button, with the heading repeated
+as the notification preview text. Neither URL is ever logged or shown in the
+dashboard: a rejected send reports the HTTP status and the service's own
+reason.
 
 ---
 
@@ -920,7 +938,7 @@ publish port 3000 to a network you do not trust.
                         │   Dispatcher   │  the only caller of Notifier.send
                         └───────┬────────┘
                                 ▼
-                        Telegram · webhook
+                   Telegram · webhook · Discord · Slack
 
    UI edition only: an Express server in the same process serves the dashboard and
    the API from the same StateStore, and can ask the scheduler for a cycle now.
@@ -981,10 +999,12 @@ in the `ConfigSource` and `StateStore` they inject.
    Notifiers are rebuilt from the configuration every cycle, which is why enabling a
    channel needs no restart.
 
-7. **Notifiers** — Telegram and generic webhook. Message assembly is shared
+7. **Notifiers** — Telegram, generic webhook, Discord and Slack. Message assembly is shared
    (`src/notifiers/formatting.ts`), so channels cannot drift apart in what they
-   report; only the transport differs. Emoji and layout live in the notifier, the
-   words come from the shared catalogs.
+   report; only the transport differs. A channel with a structured native format
+   asks for the same message in pieces (`renderParts`) rather than composing its
+   own. Emoji, colour and layout live in the notifier, the words come from the
+   shared catalogs.
 
 ### 7.3 When a notification fires
 
@@ -1191,9 +1211,12 @@ isitdown/
 │   │   ├── rss.adapter.ts              generic RSS / Atom incident-feed adapter
 │   │   └── index.ts                    registry keyed by adapter id
 │   ├── notifiers/                     (shared)
-│   │   ├── formatting.ts               emoji, severity labels, message assembly
+│   │   ├── formatting.ts               emoji, colours, severity labels, message assembly
+│   │   ├── settings.ts                 shared validation for URL-only channel settings
 │   │   ├── telegram.notifier.ts
 │   │   ├── webhook.notifier.ts
+│   │   ├── discord.notifier.ts         incoming webhook, one embed per change
+│   │   ├── slack.notifier.ts           incoming webhook, Block Kit section + button
 │   │   └── index.ts                    registry keyed by channel id
 │   ├── light/                         (Light edition only)
 │   │   ├── index.ts                    entrypoint
@@ -1480,11 +1503,7 @@ Delivered:
 Still open:
 
 - Adapters for providers not on Atlassian Statuspage.
-- Discord and Slack channels with rich embeds — both webhook-shaped, so they slot in
-  behind the existing `Notifier` interface.
 - Multi-recipient routing: different channels per provider or per severity.
-- Scheduled-maintenance awareness. The adapter ignores Statuspage's
-  `scheduled_maintenances`, and the severity model has no maintenance state.
 - A native review of the Italian strings.
 
 Explicit non-goals: multi-user auth (this is a local, single-operator dashboard),
