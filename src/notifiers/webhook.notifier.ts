@@ -2,25 +2,12 @@ import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
 import { renderMessage } from "./formatting.ts";
+import { httpUrlSetting } from "./settings.ts";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
 const settingsSchema = z.object({
-  url: z
-    .string()
-    .min(1, "url is required for the webhook channel")
-    .refine(
-      (value) => {
-        let parsed: URL;
-        try {
-          parsed = new URL(value);
-        } catch {
-          return false;
-        }
-        return parsed.protocol === "http:" || parsed.protocol === "https:";
-      },
-      { message: "url must be an http or https URL for the webhook channel" },
-    ),
+  url: httpUrlSetting("url", "webhook"),
 });
 
 /**

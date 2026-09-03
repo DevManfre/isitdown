@@ -49,3 +49,11 @@ notifications:
   webhook:
     enabled: false
     url: "${WEBHOOK_URL}"
+  discord:
+    enabled: false
+    # Server settings → Integrations → Webhooks → Copy Webhook URL
+    webhookUrl: "${DISCORD_WEBHOOK_URL}"
+  slack:
+    enabled: false
+    # An incoming webhook of a Slack app installed in the target channel
+    webhookUrl: "${SLACK_WEBHOOK_URL}"

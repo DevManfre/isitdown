@@ -14,6 +14,17 @@ const webhook: ChannelConfig = {
   settings: { url: "https://hooks.example/x" },
 };
 
+const discord: ChannelConfig = {
+  id: "discord",
+  enabled: true,
+  settings: { webhookUrl: "https://discord.com/api/webhooks/1/abc" },
+};
+const slack: ChannelConfig = {
+  id: "slack",
+  enabled: true,
+  settings: { webhookUrl: "https://hooks.slack.com/services/T0/B0/x" },
+};
+
 test("only enabled channels are built", () => {
   const built = buildNotifiers([telegram, { ...webhook, enabled: false }]);
   assert.deepEqual(
@@ -22,8 +33,11 @@ test("only enabled channels are built", () => {
   );
 });
 
-test("both channels can be built together", () => {
-  assert.equal(buildNotifiers([telegram, webhook]).length, 2);
+test("every built-in channel can be built together", () => {
+  assert.deepEqual(
+    buildNotifiers([telegram, webhook, discord, slack]).map((notifier) => notifier.id),
+    ["telegram", "webhook", "discord", "slack"],
+  );
 });
 
 test("no channels means no notifiers rather than an error", () => {
