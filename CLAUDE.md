@@ -171,6 +171,7 @@ This repo ships with Claude Code skills under `.claude/skills/` tailored to recu
 - `shadcn-components` — add or modify a shadcn/ui primitive and wire it into the theme correctly.
 - `i18n-strings` — every user-facing string goes in an English source catalog and gets translated; no literals in code.
 - `git-commit-style` — write commit messages in the required `<emoji> <TITLE> - <description>` format.
+- `release-flow` — ship a release: push `dev`, gate on CI, bump the version, `mergeclean` into `main`, tag, verify the published images.
 - `writing-code` — write or modify production code (read neighbours first, exact scope, match conventions).
 - `testing-discipline` — general testing discipline: red-green, behaviour over internals, never weaken a failing test.
 
