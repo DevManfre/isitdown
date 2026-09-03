@@ -39,6 +39,29 @@ describe("RoutingRules", () => {
     expect(within(rows[1]!).getByText("2")).toBeInTheDocument();
   });
 
+  // Pins the layout fix: on a narrow viewport the row (five columns, a
+  // four-item toggle-group, a channel multi-select, three action buttons) is
+  // wider than the tile can be, so the table must sit in its own horizontally
+  // scrolling container rather than relying on the tile's width. jsdom can't
+  // measure layout, so this only checks the container exists and actually
+  // contains the table — not pixel widths.
+  it("wraps the rule table in its own horizontally scrolling container", () => {
+    mount(
+      <RoutingRules
+        routing={{
+          rules: [{ provider: "*", classes: ["status"], minSeverity: "any", channels: ["slack"] }],
+          invalidRules: 0,
+        }}
+        channels={channels}
+        services={services}
+      />,
+    );
+
+    const scrollContainer = screen.getByTestId("routing-table-scroll");
+    expect(scrollContainer.className).toMatch(/overflow-x-auto/);
+    expect(within(scrollContainer).getByRole("table")).toBeInTheDocument();
+  });
+
   it("marks a rule that can never be evaluated", () => {
     mount(
       <RoutingRules
