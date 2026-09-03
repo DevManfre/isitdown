@@ -473,6 +473,38 @@ as the notification preview text. Neither URL is ever logged or shown in the
 dashboard: a rejected send reports the HTTP status and the service's own
 reason.
 
+### 3.7 Notification routing
+
+An ordered table of rules decides which enabled channels hear about a given
+change. Each rule has four parts:
+
+```yaml
+routing:
+  - provider: "*"            # a service id, or "*" for every provider
+    classes: [status, incident]  # any of: status, incident, maintenance, monitoring
+    minSeverity: major_outage  # any | degraded | partial_outage | major_outage
+    channels: [telegram]       # channel ids, or "*" for every enabled channel; [] mutes
+```
+
+Rules are evaluated top to bottom and the **first one that matches wins** —
+later rules are never consulted for that change, so a narrow provider-specific
+rule placed above a catch-all can mute or redirect it. A rule matches when the
+change's provider, event class and severity all clear what it asks for; an
+empty `channels: []` is a valid, deliberate way to silence a match rather than
+an oversight. Severity is judged on the *worse* of where a change came from
+and where it landed — a recovery from a major outage still carries the outage
+floor, so a rule gating on `major_outage` still fires for the all-clear rather
+than letting it slip through unrouted. An installation with no rules at all
+behaves exactly as if one catch-all rule existed: every class, any severity,
+every enabled channel — the behaviour both editions had before routing
+existed, so upgrading never goes silent by accident.
+
+The Light edition configures the table as the `routing` list in `config.yml`,
+shown above; the UI edition edits it from **Settings**, where a routing rules
+editor also offers a dry run — pick a provider and a canned event and it names
+which rule would win and which ones were never reached, evaluated against the
+rules you currently have saved, not a hypothetical set.
+
 ---
 
 ## 4. Docker
@@ -1533,7 +1565,6 @@ Delivered:
 Still open:
 
 - Adapters for providers not on Atlassian Statuspage.
-- Multi-recipient routing: different channels per provider or per severity.
 - A native review of the Italian strings.
 
 Explicit non-goals: multi-user auth (this is a local, single-operator dashboard),
