@@ -13,6 +13,7 @@ import type {
   ServiceDefinition,
 } from "../core/configSource.interface.ts";
 import type { Logger } from "../core/logger.ts";
+import { CATCH_ALL_RULE } from "../core/routing.ts";
 
 /**
  * The UI edition's configuration lives in SQLite and is read afresh every poll
@@ -347,6 +348,7 @@ export function createDbConfigSource(
         locale: settings.notificationLocale,
         services,
         channels,
+        rules: [CATCH_ALL_RULE],
       };
     },
   };

@@ -12,6 +12,7 @@ import { createFileStateStore } from "../../src/light/fileStateStore.ts";
 import type { RuntimeConfig, ServiceDefinition } from "../../src/core/configSource.interface.ts";
 import type { StateStore } from "../../src/core/stateStore.interface.ts";
 import type { ServiceRef } from "../../src/core/adapter.interface.ts";
+import { CATCH_ALL_RULE } from "../../src/core/routing.ts";
 
 const silent = createLogger("error", () => {});
 
@@ -67,6 +68,7 @@ const config = (services: ServiceDefinition[], over: Partial<RuntimeConfig["poll
   locale: "en",
   services,
   channels: [],
+  rules: [CATCH_ALL_RULE],
 });
 
 /** Records requested delays instead of waiting, so backoff is asserted not endured. */

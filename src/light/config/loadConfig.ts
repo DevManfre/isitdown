@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { parse } from "yaml";
 import { pollingSchema } from "../../core/config.schema.ts";
 import type { ChannelConfig, ConfigSource, RuntimeConfig } from "../../core/configSource.interface.ts";
+import { CATCH_ALL_RULE } from "../../core/routing.ts";
 import { fileConfigSchema, REQUIRED_CHANNEL_SETTINGS } from "./schema.ts";
 
 const ENV_REFERENCE = /\$\{([A-Z0-9_]+)\}/g;
@@ -72,6 +73,7 @@ export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<
     locale: file.locale ?? "en",
     services: file.services,
     channels,
+    rules: [CATCH_ALL_RULE],
   };
 }
 

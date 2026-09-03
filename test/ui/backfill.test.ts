@@ -140,6 +140,7 @@ import { createLogger } from "../../src/core/logger.ts";
 import type { Adapter } from "../../src/core/adapter.interface.ts";
 import type { ConfigSource, ServiceDefinition } from "../../src/core/configSource.interface.ts";
 import type { HistoryStore } from "../../src/ui/historyStore.interface.ts";
+import { CATCH_ALL_RULE } from "../../src/core/routing.ts";
 
 const silent = createLogger("error", () => {});
 const NOW = new Date("2026-08-19T12:00:00.000Z");
@@ -158,6 +159,7 @@ const configSourceFor = (...services: ServiceDefinition[]): ConfigSource => ({
     locale: "en",
     services,
     channels: [],
+    rules: [CATCH_ALL_RULE],
   }),
 });
 
