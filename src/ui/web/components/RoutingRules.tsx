@@ -32,6 +32,12 @@ import type { StatusChange, StatusChangeKind } from "../../../core/types.ts";
 function shadowedBy(rules: RoutingRule[], index: number): number | undefined {
   const rule = rules[index];
   if (rule === undefined) return undefined;
+  // `[].every(...)` is vacuously true, which would otherwise claim any rule
+  // above "shadows" a rule with no event classes selected — the wrong
+  // reason. A rule with no classes can never win a match regardless of what
+  // (if anything) is above it, so it is dead on its own, not shadowed; see
+  // `hasNoClasses` for the warning that actually applies to it.
+  if (rule.classes.length === 0) return undefined;
 
   for (let above = 0; above < index; above += 1) {
     const earlier = rules[above];
@@ -42,6 +48,11 @@ function shadowedBy(rules: RoutingRule[], index: number): number | undefined {
     return above;
   }
   return undefined;
+}
+
+/** A rule with no event classes selected matches no change, ever — dead regardless of position. */
+function hasNoClasses(rule: RoutingRule): boolean {
+  return rule.classes.length === 0;
 }
 
 /**
@@ -66,6 +77,14 @@ const DRYRUN_EVENTS: { id: string; change: Omit<StatusChange, "providerId" | "at
     id: "monitoring",
     change: { kind: "monitoring_degraded" as StatusChangeKind, currentStatus: "unknown" },
   },
+  {
+    id: "incident",
+    change: {
+      kind: "incident_opened" as StatusChangeKind,
+      currentStatus: "partial_outage",
+      incident: { id: "dryrun", name: "Dry run incident", impact: "minor", status: "investigating", updatedAt: new Date().toISOString() },
+    },
+  },
 ];
 
 function DryRun({
@@ -89,17 +108,23 @@ function DryRun({
   const result = explain(change, rules, enabledChannelIds);
 
   const won = result.winner === null ? undefined : rules[result.winner];
+  // Delivery, not the rule's raw wildcard: `result.targets` is `explain`'s own
+  // expansion (never a second copy of it — see the header comment), and it is
+  // further intersected with the enabled channels here because the
+  // dispatcher only ever sends through `ctx.notifiers`, which `buildNotifiers`
+  // filters on `enabled`. A rule naming a disabled channel by id must render
+  // as nobody receiving it, exactly like the server.
+  const enabledSet = new Set(enabledChannelIds);
+  const delivered = result.targets.filter((id) => enabledSet.has(id));
   let verdict: string;
   if (won === undefined) {
     verdict = t("routing.dryrun.none");
   } else if (won.channels.length === 0) {
     verdict = t("routing.dryrun.muted", { rule: result.winner! + 1 });
+  } else if (delivered.length === 0) {
+    verdict = t("routing.dryrun.nobody");
   } else {
-    verdict = won.channels
-      .flatMap((channel) => (channel === "*" ? enabledChannelIds : [channel]))
-      .filter((id, at, all) => all.indexOf(id) === at)
-      .map((id) => t(`channel.name.${id}`))
-      .join(" · ");
+    verdict = delivered.map((id) => t(`channel.name.${id}`)).join(" · ");
   }
 
   return (
@@ -183,11 +208,22 @@ export function RoutingRules({
   channels,
   services,
   onSave,
+  saving = false,
 }: {
   routing: RoutingResponse;
   channels: DescribedChannel[];
   services: { id: string; name: string }[];
   onSave?: (rules: RoutingRule[]) => void | Promise<unknown>;
+  /**
+   * True between a click and the refetch that follows it. The panel is fully
+   * controlled from server state and every edit rebuilds the whole list from
+   * `rules`, which is stale for that whole window — a second click in it
+   * would compute its patch from the state the first click already made
+   * obsolete, and silently lose the first edit. Disabling the row's controls
+   * for that window is the cheap mitigation; an optimistic update is the
+   * real fix and a follow-up.
+   */
+  saving?: boolean;
 }) {
   const { t } = useTranslation();
   const rules = routing.rules;
@@ -250,15 +286,20 @@ export function RoutingRules({
           <TableBody>
             {rules.map((rule, index) => {
               const shadow = shadowedBy(rules, index);
+              const deadNoClasses = hasNoClasses(rule);
               return (
-                <TableRow key={index} className={shadow === undefined ? undefined : "opacity-60"}>
+                <TableRow key={index} className={shadow === undefined && !deadNoClasses ? undefined : "opacity-60"}>
                   {/* Rendered, not merely visual: the operator has to be able to
                       say "rule 2" when reasoning about what shadows what. */}
                   <TableCell>{index + 1}</TableCell>
 
                   <TableCell>
-                    <Select value={rule.provider} onValueChange={(provider) => patch(index, { provider })}>
-                      <SelectTrigger className="w-24">
+                    <Select
+                      value={rule.provider}
+                      disabled={saving}
+                      onValueChange={(provider) => patch(index, { provider })}
+                    >
+                      <SelectTrigger className="w-32">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -282,6 +323,7 @@ export function RoutingRules({
                       value={rule.classes}
                       onValueChange={(classes: string[]) => patch(index, { classes: classes as EventClass[] })}
                       className="flex-wrap"
+                      disabled={saving}
                     >
                       {EVENT_CLASSES.map((eventClass) => (
                         <ToggleGroupItem key={eventClass} value={eventClass}>
@@ -294,6 +336,7 @@ export function RoutingRules({
                   <TableCell>
                     <Select
                       value={rule.minSeverity}
+                      disabled={saving}
                       onValueChange={(minSeverity) =>
                         patch(index, { minSeverity: minSeverity as SeverityFloor })
                       }
@@ -321,6 +364,7 @@ export function RoutingRules({
                       value={rule.channels}
                       onValueChange={(next: string[]) => patch(index, { channels: next })}
                       className="flex-wrap"
+                      disabled={saving}
                     >
                       {/* The wildcard is an option rather than a computed state:
                           a rule that says "every channel" must keep meaning that
@@ -344,7 +388,7 @@ export function RoutingRules({
                         variant="secondary"
                         size="icon-sm"
                         aria-label={t("routing.move-up")}
-                        disabled={index === 0}
+                        disabled={saving || index === 0}
                         onClick={() => move(index, -1)}
                       >
                         ↑
@@ -354,7 +398,7 @@ export function RoutingRules({
                         variant="secondary"
                         size="icon-sm"
                         aria-label={t("routing.move-down")}
-                        disabled={index === rules.length - 1}
+                        disabled={saving || index === rules.length - 1}
                         onClick={() => move(index, 1)}
                       >
                         ↓
@@ -364,6 +408,7 @@ export function RoutingRules({
                         variant="destructive"
                         size="sm"
                         aria-label={t("action.remove")}
+                        disabled={saving}
                         onClick={() => save(rules.filter((_, at) => at !== index))}
                       >
                         {t("action.remove")}
@@ -376,6 +421,9 @@ export function RoutingRules({
                       <p className="mt-1 text-sm text-muted-foreground">
                         {t("routing.shadowed", { rule: shadow + 1 })}
                       </p>
+                    )}
+                    {deadNoClasses && (
+                      <p className="mt-1 text-sm text-muted-foreground">{t("routing.no-classes")}</p>
                     )}
                   </TableCell>
                 </TableRow>
@@ -391,6 +439,7 @@ export function RoutingRules({
           type="button"
           variant="secondary"
           size="sm"
+          disabled={saving}
           onClick={() =>
             save([...rules, { provider: "*", classes: [...EVENT_CLASSES], minSeverity: "any", channels: ["*"] }])
           }

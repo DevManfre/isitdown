@@ -767,6 +767,7 @@ export function Settings() {
           channels={config.channels}
           services={config.services}
           onSave={(rules) => routing.save.mutateAsync(rules)}
+          saving={routing.save.isPending}
         />
       </BentoTile>
     </div>
