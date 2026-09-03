@@ -189,6 +189,26 @@ notifications:
   ]);
 });
 
+test("an explicitly empty routing list gets one catch-all rule, same as an absent block", async () => {
+  const path = await configFile(`
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+notifications:
+  telegram:
+    enabled: true
+    botToken: t
+    chatId: c
+routing: []
+`);
+  const config = await loadConfig(path, {});
+  assert.deepEqual(config.rules, [
+    { provider: "*", classes: ["status", "incident", "maintenance", "monitoring"], minSeverity: "any", channels: ["*"] },
+  ]);
+});
+
 test("routing rules from the file keep their order and defaults", async () => {
   const path = await configFile(`
 services:
