@@ -1,11 +1,8 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Bell, ChevronRight, Hash, MessagesSquare, MonitorSmartphone, Send, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
@@ -13,6 +10,7 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { BentoTile } from "@/components/BentoTile.tsx";
 import { RoutingRules } from "@/components/RoutingRules.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
+import { RemoveServiceDialog } from "@/components/settings/RemoveServiceDialog.tsx";
 import {
   useChannelMutations,
   useConfig,
@@ -24,87 +22,13 @@ import {
   useServiceMutations,
   useSettingsMutation,
 } from "@/hooks/queries.ts";
-import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
+import { useFieldProps } from "@/hooks/useBusy.tsx";
 import { getPushKey } from "@/lib/api.ts";
 import { hostOf } from "@/lib/format.ts";
 import { pushSupported, subscribeThisBrowser } from "@/lib/push.ts";
 import { stagger } from "@/lib/stagger.ts";
 import { cn } from "@/lib/utils.ts";
-import type { DescribedChannel, MapView, ServiceDefinition } from "@/lib/types.ts";
-
-/**
- * A small yes/no dialog for removing a service, on the same `Dialog` the
- * service form uses — a port of `confirmModal` (modal.js), never the
- * browser's own `window.confirm`.
- *
- * Owns its own trigger (the row's Remove button) inside the same `Dialog`,
- * same reason as `ServiceDialog`: Radix only returns focus to a real
- * `DialogTrigger` it rendered, never to an arbitrary button elsewhere that
- * merely flips an externally-lifted open flag.
- */
-export function RemoveServiceDialog({ service, trigger }: { service: ServiceDefinition; trigger: ReactNode }) {
-  const { t } = useTranslation();
-  const { setDialogOpen } = useBusyControls();
-  const [open, setOpen] = useState(false);
-  const remove = useServiceMutations().remove;
-
-  // Same defect class as ServiceDialog's close paths: `onOpenChange` only
-  // fires from Radix's own wrapped setter (Escape, outside-click), never
-  // from Cancel or the mutation's own `onSuccess` calling `setOpen` directly
-  // — either of which would otherwise strand `dialogOpen` at `true` and hold
-  // the poll forever. One `close()`, used by every path, closes that gap.
-  const close = (): void => {
-    setOpen(false);
-    setDialogOpen(false);
-  };
-
-  // Claim-it-release-it, same as ServiceDialog: an unmount runs no click
-  // handler and fires neither `onOpenChange` nor `remove`'s `onSuccess`, so
-  // navigating away via the Rail while this dialog is open would otherwise
-  // strand `dialogOpen` `true` for the rest of the session.
-  useEffect(() => {
-    return () => {
-      setDialogOpen(false);
-    };
-  }, [setDialogOpen]);
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (next) {
-          setOpen(true);
-          setDialogOpen(true);
-        } else {
-          close();
-        }
-      }}
-    >
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("action.remove")}</DialogTitle>
-          <DialogDescription>{t("providers.remove-confirm", { name: service.name })}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={close}>
-            {t("action.cancel")}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={remove.isPending}
-            onClick={() => {
-              remove.mutate(service.id, { onSuccess: close });
-            }}
-          >
-            {t("action.remove")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+import type { DescribedChannel, MapView } from "@/lib/types.ts";
 
 // Reason codes `subscribeThisBrowser` throws, mapped to copy that says what to
 // do about them; anything else falls back to push.failed with the raw text.

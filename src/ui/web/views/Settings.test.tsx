@@ -10,7 +10,8 @@ import { providerFixture, renderWithProviders, stubApi, type Fixtures } from "@/
 import { createQueryClient } from "@/lib/queryClient.ts";
 import { BusyProvider, useBusy } from "@/hooks/useBusy.tsx";
 import { ThemeProvider } from "@/hooks/useTheme.tsx";
-import { RemoveServiceDialog, Settings } from "./Settings.tsx";
+import { RemoveServiceDialog } from "@/components/settings/RemoveServiceDialog.tsx";
+import { Settings } from "./Settings.tsx";
 
 /**
  * Review Finding 2's third required write-path case: a channel's Switch
