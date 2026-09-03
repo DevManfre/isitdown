@@ -8,6 +8,11 @@ import type { DatabaseSync } from "node:sqlite";
  * Channels are seeded disabled and carry the *name* of the environment variable
  * holding each credential — never a value. That is the whole secret model of the
  * UI edition: the database stores references, the environment holds secrets.
+ *
+ * Unlike the provider list, channels are seeded on every boot rather than only
+ * into an empty table (`INSERT OR IGNORE`), so a channel added in a later
+ * version shows up in an existing installation's dashboard, disabled, with no
+ * migration of its own.
  */
 
 const DEFAULT_SERVICES = [
@@ -29,6 +34,8 @@ const DEFAULT_SETTINGS: Record<string, string> = {
 const DEFAULT_CHANNELS = [
   { id: "telegram", config: { botTokenEnv: "TELEGRAM_BOT_TOKEN", chatIdEnv: "TELEGRAM_CHAT_ID" } },
   { id: "webhook", config: { urlEnv: "WEBHOOK_URL" } },
+  { id: "discord", config: { webhookUrlEnv: "DISCORD_WEBHOOK_URL" } },
+  { id: "slack", config: { webhookUrlEnv: "SLACK_WEBHOOK_URL" } },
   // No `*Env` fields: the VAPID pair is generated on first use (src/ui/vapidKeys.ts).
   { id: "webpush", config: {} },
 ];

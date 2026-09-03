@@ -1,5 +1,10 @@
 import { formatUtc, t } from "../core/i18n/index.ts";
-import type { NotificationPayload, OverallStatus, StatusChangeKind } from "../core/types.ts";
+import type {
+  NotificationPayload,
+  OverallStatus,
+  StatusChange,
+  StatusChangeKind,
+} from "../core/types.ts";
 
 /**
  * Message assembly shared by every channel. Emoji and layout are formatting and
@@ -19,6 +24,23 @@ const EMOJI: Record<OverallStatus, string> = {
 // A declared maintenance window is its own affordance, not a severity: it
 // never borrows the colour of the status it interrupts (or leaves behind).
 const MAINTENANCE_EMOJI = "⚙️";
+
+/**
+ * The same severities the dashboard paints, for the channels that render a
+ * coloured block rather than plain text. Mirrors the written set in
+ * `src/ui/web/css/tokens.css` (`--status-*`, light theme): a Discord embed sits
+ * on the reader's own background, so the darker written value reads on both.
+ */
+const COLOR: Record<OverallStatus, number> = {
+  operational: 0x15803d,
+  degraded: 0xa16207,
+  partial_outage: 0xc2410c,
+  major_outage: 0xb91c1c,
+  unknown: 0x71717a,
+};
+
+// `--status-accent`: maintenance is planned work, not a severity.
+const MAINTENANCE_COLOR = 0x473c9e;
 
 const STATUS_KEY: Record<OverallStatus, string> = {
   operational: "status.operational",
@@ -43,6 +65,27 @@ export function emojiFor(status: OverallStatus): string {
   return EMOJI[status];
 }
 
+/**
+ * A monitoring warning is about our own fetching, not the provider's state, so
+ * it never borrows the provider's colour. A maintenance window is not a
+ * severity either, so it gets its own fixed pair instead of the current
+ * status's. Emoji and colour are decided here together so a channel that shows
+ * both can never disagree with one that shows only the emoji.
+ */
+function accentFor(change: StatusChange): { emoji: string; color: number } {
+  if (change.kind === "monitoring_degraded") {
+    return { emoji: EMOJI.unknown, color: COLOR.unknown };
+  }
+  if (change.kind === "maintenance_started" || change.kind === "maintenance_ended") {
+    return { emoji: MAINTENANCE_EMOJI, color: MAINTENANCE_COLOR };
+  }
+  return { emoji: emojiFor(change.currentStatus), color: COLOR[change.currentStatus] };
+}
+
+export function colorFor(change: StatusChange): number {
+  return accentFor(change).color;
+}
+
 export function statusLabel(status: OverallStatus, locale: string): string {
   return t(locale, STATUS_KEY[status]);
 }
@@ -59,7 +102,44 @@ function incidentStatusLabel(providerStatus: string, locale: string): string {
   return translated === key ? providerStatus : translated;
 }
 
+export interface MessageParts {
+  /** One line, emoji included: "🔴 GitHub — MAJOR OUTAGE". */
+  heading: string;
+  /** Everything below it, with no link — the channel renders that itself. */
+  detail: string;
+  /** The provider's status page, for a channel that links it as an affordance. */
+  url: string;
+  color: number;
+}
+
+/**
+ * The same message, handed over in pieces, for a channel whose native format is
+ * structured — a Discord embed title, a Slack section plus a link button. The
+ * words still come from one catalog template per kind, so a rich channel can
+ * never drift from a plain one; only the arrangement differs.
+ *
+ * Every template is written as "heading, blank line, detail", which is what the
+ * split below relies on — `formatting.test.ts` holds every kind and locale to
+ * that shape.
+ */
+export function renderParts(payload: NotificationPayload): MessageParts {
+  const rendered = render(payload, { omitUrl: true });
+  const separator = rendered.indexOf("\n\n");
+  const heading = separator === -1 ? rendered : rendered.slice(0, separator);
+  const detail = separator === -1 ? "" : rendered.slice(separator + 2).trim();
+  return {
+    heading,
+    detail,
+    url: payload.service.statusUrl,
+    color: colorFor(payload.change),
+  };
+}
+
 export function renderMessage(payload: NotificationPayload): string {
+  return render(payload, { omitUrl: false });
+}
+
+function render(payload: NotificationPayload, options: { omitUrl: boolean }): string {
   const { change, service, locale } = payload;
   const updatedAt = formatUtc(change.incident?.updatedAt ?? change.at);
 
@@ -85,18 +165,10 @@ export function renderMessage(payload: NotificationPayload): string {
     lastStatus: statusLabel(change.currentStatus, locale),
     component: change.component?.name ?? "",
     updatedAt,
-    url: service.statusUrl,
+    // Dropped rather than templated away: a channel that links the status page
+    // itself would otherwise print it twice.
+    url: options.omitUrl ? "" : service.statusUrl,
   });
 
-  // A monitoring warning is about our own fetching, not the provider's state, so
-  // it never borrows the provider's colour. A maintenance window is not a
-  // severity either, so it gets its own fixed emoji instead of the current
-  // status's.
-  const emoji =
-    change.kind === "monitoring_degraded"
-      ? EMOJI.unknown
-      : change.kind === "maintenance_started" || change.kind === "maintenance_ended"
-        ? MAINTENANCE_EMOJI
-        : emojiFor(change.currentStatus);
-  return `${emoji} ${body}`;
+  return `${accentFor(change).emoji} ${body}`.trimEnd();
 }

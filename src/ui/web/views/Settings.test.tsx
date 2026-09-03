@@ -78,6 +78,20 @@ const config = {
  */
 const webpushChannel = { id: "webpush", enabled: false, fields: [] };
 
+/** Just the writes: a successful mutation invalidates the queries, so refetching GETs follow it. */
+const writesIn = (calls: RecordedCall[]): RecordedCall[] => calls.filter((call) => call.method !== "GET");
+
+/**
+ * Channel rows ship collapsed, so anything below the row — the env-var fields,
+ * Save, Send test, the browser list — needs its row opened first, exactly as an
+ * operator would.
+ */
+async function openChannel(label: string): Promise<HTMLElement> {
+  const row = (await screen.findByText(label)).closest(".panel-channel") as HTMLElement;
+  await userEvent.click(within(row).getByText(label));
+  return row;
+}
+
 const fixtures = {
   config,
   status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
@@ -99,14 +113,19 @@ describe("Settings", () => {
     expect(await screen.findByRole("button", { name: i18n.t("action.remove") })).toBeInTheDocument();
   });
 
-  it("shows a channel's env var NAME as the field's placeholder, never a secret value", async () => {
+  it("shows one box per channel field — the credential, write-only", async () => {
     renderWithProviders(<Settings />, fixtures);
-    // The stored name is a hint, not something the operator typed: the field
-    // starts empty and only carries what is being changed right now.
-    const input = await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN");
-    expect(input).toHaveValue("");
+    const card = await openChannel(i18n.t("channel.name.telegram"));
+    // Write-only: the box renders empty for a field that is already set,
+    // because no route ever sends a credential back.
+    const value = await screen.findByLabelText("botToken");
+    expect(value).toHaveValue("");
+    expect(value).toHaveAttribute("type", "password");
     expect(await screen.findByText(i18n.t("settings.secret-note"))).toBeInTheDocument();
-    expect(screen.queryByLabelText(/token value/i)).toBeNull();
+    // The variable name is a detail, so it is behind the row's own toggle.
+    expect(screen.queryByPlaceholderText("TELEGRAM_BOT_TOKEN")).toBeNull();
+    await userEvent.click(within(card).getByRole("button", { name: i18n.t("channel.env-var-toggle") }));
+    expect(await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN")).toHaveValue("");
   });
 
   it("holds the poll while any dialog is open, and releases it on every close path", async () => {
@@ -295,7 +314,7 @@ describe("Settings", () => {
 
   it("a channel toggle issues its patch", async () => {
     renderWithProviders(<Settings />, fixtures);
-    const toggle = await screen.findByRole("switch", { name: "telegram — enabled" });
+    const toggle = await screen.findByRole("switch", { name: "Telegram — enabled" });
     const calls = interceptWrites({ "PATCH /config/channels/telegram": {} });
 
     await userEvent.click(toggle);
@@ -313,6 +332,86 @@ describe("Settings", () => {
     expect(await screen.findByText(i18n.t("settings.hot-note"))).toBeInTheDocument();
   });
 
+  // The panel is a list of collapsed rows now: what it says with everything
+  // shut, and in what order, is the whole point of the rework.
+  describe("the channel list", () => {
+    // Deliberately alphabetically hostile: the one enabled channel sorts last
+    // and the fully configured one sits in the middle, so a passing order
+    // assertion cannot be alphabetical by accident.
+    const manyChannels = [
+      { id: "discord", enabled: false, fields: [{ name: "webhookUrl", envVar: "DISCORD_WEBHOOK_URL", isSet: false }] },
+      { id: "telegram", enabled: false, fields: [{ name: "botToken", envVar: "TELEGRAM_BOT_TOKEN", isSet: true }] },
+      { id: "webpush", enabled: true, fields: [] },
+    ];
+    const listFixtures = { ...fixtures, config: { ...config, channels: manyChannels } };
+
+    it("keeps every row shut until one is opened, so no credential field is on screen", async () => {
+      renderWithProviders(<Settings />, listFixtures);
+      expect(await screen.findByText(i18n.t("channel.name.discord"))).toBeInTheDocument();
+      expect(screen.queryByLabelText("webhookUrl")).toBeNull();
+
+      await openChannel(i18n.t("channel.name.discord"));
+      expect(await screen.findByLabelText("webhookUrl")).toBeInTheDocument();
+    });
+
+    it("opening one row shuts the one already open", async () => {
+      renderWithProviders(<Settings />, listFixtures);
+      await openChannel(i18n.t("channel.name.discord"));
+      expect(await screen.findByLabelText("webhookUrl")).toBeInTheDocument();
+
+      await openChannel(i18n.t("channel.name.telegram"));
+      expect(await screen.findByLabelText("botToken")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByLabelText("webhookUrl")).toBeNull();
+      });
+    });
+
+    it("orders the rows by state: active, then configured, then missing its variables", async () => {
+      renderWithProviders(<Settings />, listFixtures);
+      await screen.findByText(i18n.t("channel.name.webpush"));
+      // Scoped to the channel rows: the service list has switches too.
+      const names = Array.from(document.querySelectorAll(".panel-channel"))
+        .map((row) => row.querySelector('[role="switch"]')?.getAttribute("aria-label")?.split(" — ")[0]);
+      expect(names).toEqual([
+        i18n.t("channel.name.webpush"),
+        i18n.t("channel.name.telegram"),
+        i18n.t("channel.name.discord"),
+      ]);
+    });
+
+    it("says which of the two reasons keeps a channel from sending", async () => {
+      renderWithProviders(<Settings />, listFixtures);
+      const discord = (await screen.findByText(i18n.t("channel.name.discord"))).closest(
+        ".panel-channel",
+      ) as HTMLElement;
+      const telegram = (await screen.findByText(i18n.t("channel.name.telegram"))).closest(
+        ".panel-channel",
+      ) as HTMLElement;
+
+      // Off with its variable unset is not the same problem as off with
+      // everything in place, and with the fields hidden the row is the only
+      // thing left that can tell them apart.
+      expect(within(discord).getByText(i18n.t("channel.env-incomplete"))).toBeInTheDocument();
+      expect(within(telegram).getByText(i18n.t("channel.ready"))).toBeInTheDocument();
+    });
+
+    it("summarises what is on without the operator reading the rows", async () => {
+      renderWithProviders(<Settings />, listFixtures);
+      expect(
+        await screen.findByText(i18n.t("channel.summary.count", { active: 1, total: 3 })),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(i18n.t("channel.summary.sending", { channels: i18n.t("channel.name.webpush") })),
+      ).toBeInTheDocument();
+    });
+
+    it("says plainly when nothing is on, rather than listing nobody", async () => {
+      const channels = manyChannels.map((channel) => ({ ...channel, enabled: false }));
+      renderWithProviders(<Settings />, { ...fixtures, config: { ...config, channels } });
+      expect(await screen.findByText(i18n.t("channel.summary.none"))).toBeInTheDocument();
+    });
+  });
+
   // Review item 2: `ChannelCard`'s `save` and `send-test` had no coverage —
   // only the enable/disable Switch (above) was exercised.
   describe("a channel card's own write path", () => {
@@ -320,9 +419,9 @@ describe("Settings", () => {
       renderWithProviders(<Settings />, fixtures);
       const calls = interceptWrites({ "PATCH /config/channels/telegram": {} });
 
-      const input = await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN");
-      const card = input.closest('[data-slot="card"]') as HTMLElement;
-      await userEvent.type(input, "TELEGRAM_BOT_TOKEN_V2");
+      const card = await openChannel(i18n.t("channel.name.telegram"));
+      await userEvent.click(within(card).getByRole("button", { name: i18n.t("channel.env-var-toggle") }));
+      await userEvent.type(await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN"), "TELEGRAM_BOT_TOKEN_V2");
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.save") }));
 
       await waitFor(() => {
@@ -337,8 +436,7 @@ describe("Settings", () => {
       renderWithProviders(<Settings />, fixtures);
       const calls = interceptWrites({ "PATCH /config/channels/telegram": {} });
 
-      const input = await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN");
-      const card = input.closest('[data-slot="card"]') as HTMLElement;
+      const card = await openChannel(i18n.t("channel.name.telegram"));
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.save") }));
 
       await waitFor(() => {
@@ -346,11 +444,72 @@ describe("Settings", () => {
       });
     });
 
+    it("a typed credential is saved to the secrets route, not to the channel row", async () => {
+      renderWithProviders(<Settings />, fixtures);
+      const calls = interceptWrites({ "PUT /config/channels/telegram/secrets": config.channels[0] });
+
+      const card = await openChannel(i18n.t("channel.name.telegram"));
+      await userEvent.type(await screen.findByLabelText("botToken"), "123456:real-token");
+      await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.save") }));
+
+      expect(await within(card).findByText(i18n.t("channel.secret-saved"))).toBeInTheDocument();
+      // A successful save invalidates every query, so the GETs that follow are
+      // the refetch, not the write under test.
+      expect(writesIn(calls)).toEqual([
+        {
+          method: "PUT",
+          path: "/config/channels/telegram/secrets",
+          body: { fields: { botToken: "123456:real-token" } },
+        },
+      ]);
+      // Saved means gone from the form: nothing holds the value afterwards.
+      expect(await screen.findByLabelText("botToken")).toHaveValue("");
+    });
+
+    it("renaming the variable and filling it in one click renames first", async () => {
+      renderWithProviders(<Settings />, fixtures);
+      const calls = interceptWrites({
+        "PATCH /config/channels/telegram": {},
+        "PUT /config/channels/telegram/secrets": config.channels[0],
+      });
+
+      const card = await openChannel(i18n.t("channel.name.telegram"));
+      await userEvent.click(within(card).getByRole("button", { name: i18n.t("channel.env-var-toggle") }));
+      await userEvent.type(await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN"), "MY_OWN_TOKEN");
+      await userEvent.type(await screen.findByLabelText("botToken"), "123456:real-token");
+      await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.save") }));
+
+      await waitFor(() => {
+        expect(writesIn(calls).map((call) => `${call.method} ${call.path}`)).toEqual([
+          "PATCH /config/channels/telegram",
+          "PUT /config/channels/telegram/secrets",
+        ]);
+      });
+    });
+
+    it("clearing a set field asks the secrets route to forget it", async () => {
+      renderWithProviders(<Settings />, fixtures);
+      const calls = interceptWrites({
+        "DELETE /config/channels/telegram/secrets/botToken": {
+          id: "telegram",
+          enabled: true,
+          fields: [{ name: "botToken", envVar: "TELEGRAM_BOT_TOKEN", isSet: false }],
+        },
+      });
+
+      const card = await openChannel(i18n.t("channel.name.telegram"));
+      await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.clear") }));
+
+      expect(await within(card).findByText(i18n.t("channel.secret-cleared"))).toBeInTheDocument();
+      expect(writesIn(calls)).toEqual([
+        { method: "DELETE", path: "/config/channels/telegram/secrets/botToken", body: undefined },
+      ]);
+    });
+
     it("send-test reports success and shows channel.test-ok", async () => {
       renderWithProviders(<Settings />, fixtures);
       const calls = interceptWrites({ "POST /config/channels/telegram/test": { ok: true } });
-      const input = await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN");
-      const card = input.closest('[data-slot="card"]') as HTMLElement;
+      const card = await openChannel(i18n.t("channel.name.telegram"));
 
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.send-test") }));
 
@@ -363,8 +522,7 @@ describe("Settings", () => {
     it("send-test reports failure and shows channel.test-failed with the error", async () => {
       renderWithProviders(<Settings />, fixtures);
       interceptWrites({ "POST /config/channels/telegram/test": { ok: false, error: "timeout" } });
-      const input = await screen.findByPlaceholderText("TELEGRAM_BOT_TOKEN");
-      const card = input.closest('[data-slot="card"]') as HTMLElement;
+      const card = await openChannel(i18n.t("channel.name.telegram"));
 
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.send-test") }));
 
@@ -403,7 +561,7 @@ describe("Settings", () => {
       vi.stubGlobal("Notification", { requestPermission: vi.fn() });
       renderWithProviders(<Settings />, pushFixtures);
 
-      const card = (await screen.findByText("webpush")).closest(".panel-channel") as HTMLElement;
+      const card = await openChannel(i18n.t("channel.name.webpush"));
       // The VAPID pair is the server's own, so neither variable name is asked
       // for and there is nothing on this card a Save button could write.
       expect(within(card).queryByRole("textbox")).toBeNull();
@@ -411,8 +569,23 @@ describe("Settings", () => {
       expect(within(card).getByRole("button", { name: i18n.t("push.enable") })).toBeInTheDocument();
 
       // A channel that does have env fields keeps its Save button.
-      const telegram = (await screen.findByText("telegram")).closest(".panel-channel") as HTMLElement;
+      const telegram = await openChannel(i18n.t("channel.name.telegram"));
       expect(within(telegram).getByRole("button", { name: i18n.t("action.save") })).toBeInTheDocument();
+    });
+
+    it("offers its send-test beside the enable button, not stranded above it", async () => {
+      Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { register: vi.fn() } });
+      vi.stubGlobal("PushManager", class {});
+      vi.stubGlobal("Notification", { requestPermission: vi.fn() });
+      renderWithProviders(<Settings />, pushFixtures);
+
+      await openChannel(i18n.t("channel.name.webpush"));
+      const enable = await screen.findByRole("button", { name: i18n.t("push.enable") });
+      const actions = enable.parentElement as HTMLElement;
+      // A channel with no settings still has two things to do, and they are
+      // one row: the primary move and the secondary one, as Save / Send test
+      // are for every other channel.
+      expect(within(actions).getByRole("button", { name: i18n.t("action.send-test") })).toBeInTheDocument();
     });
 
     it("offers to enable desktop notifications on this browser and lists the device", async () => {
@@ -450,6 +623,7 @@ describe("Settings", () => {
         "POST /config/push/subscriptions": { devices: [] },
       });
 
+      await openChannel(i18n.t("channel.name.webpush"));
       await userEvent.click(await screen.findByRole("button", { name: i18n.t("push.enable") }));
 
       // Method AND path, not path alone: `usePushDevices()`'s mount-time GET
@@ -513,6 +687,7 @@ describe("Settings", () => {
         "POST /config/push/subscriptions": { devices: [] },
       });
 
+      await openChannel(i18n.t("channel.name.webpush"));
       await userEvent.click(await screen.findByRole("button", { name: i18n.t("push.enable") }));
 
       await waitFor(() => {
@@ -563,6 +738,7 @@ describe("Settings", () => {
         "POST /config/push/subscriptions": { devices: [] },
       });
 
+      await openChannel(i18n.t("channel.name.webpush"));
       await userEvent.click(await screen.findByRole("button", { name: i18n.t("push.enable") }));
 
       await waitFor(() => expect(subscribe).toHaveBeenCalled());
@@ -596,6 +772,7 @@ describe("Settings", () => {
         "POST /config/push/subscriptions": { devices: [] },
       });
 
+      await openChannel(i18n.t("channel.name.webpush"));
       await userEvent.click(await screen.findByRole("button", { name: i18n.t("push.enable") }));
 
       expect(await screen.findByText(i18n.t("push.enabled"))).toBeInTheDocument();
@@ -626,6 +803,7 @@ describe("Settings", () => {
         "POST /config/push/subscriptions": { devices: [] },
       });
 
+      await openChannel(i18n.t("channel.name.webpush"));
       await userEvent.click(await screen.findByRole("button", { name: i18n.t("push.enable") }));
 
       expect(await screen.findByText(i18n.t("push.push-service-brave"))).toBeInTheDocument();
@@ -635,6 +813,7 @@ describe("Settings", () => {
     it("explains itself instead of offering a button the browser cannot honour", async () => {
       Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: undefined });
       renderWithProviders(<Settings />, pushFixtures);
+      await openChannel(i18n.t("channel.name.webpush"));
       expect(await screen.findByText(i18n.t("push.unsupported"))).toBeInTheDocument();
     });
   });

@@ -20,10 +20,22 @@ const webhookSchema = z.object({
   url: z.string().default(""),
 });
 
+const discordSchema = z.object({
+  enabled: z.boolean().default(false),
+  webhookUrl: z.string().default(""),
+});
+
+const slackSchema = z.object({
+  enabled: z.boolean().default(false),
+  webhookUrl: z.string().default(""),
+});
+
 /** Required non-empty settings per channel, used to produce an actionable error. */
 export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   telegram: ["botToken", "chatId"],
   webhook: ["url"],
+  discord: ["webhookUrl"],
+  slack: ["webhookUrl"],
 };
 
 export const fileConfigSchema = z.object({
@@ -37,6 +49,8 @@ export const fileConfigSchema = z.object({
     .object({
       telegram: telegramSchema.optional(),
       webhook: webhookSchema.optional(),
+      discord: discordSchema.optional(),
+      slack: slackSchema.optional(),
     })
     .strict()
     .default({}),
