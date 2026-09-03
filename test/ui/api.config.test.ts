@@ -465,3 +465,85 @@ test("lowering the interval leaves the armed countdown alone rather than pushing
     await app.close();
   }
 });
+
+test("GET /config reports the routing rules and the invalid count", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.request("GET", "/config");
+    assert.equal(status, 200);
+    const config = body as { routing: { rules: unknown[]; invalidRules: number } };
+    assert.deepEqual(config.routing.rules, [
+      { provider: "*", classes: ["status", "incident", "maintenance", "monitoring"], minSeverity: "any", channels: ["*"] },
+    ]);
+    assert.equal(config.routing.invalidRules, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /config/routing replaces the list and reports it back in order", async () => {
+  const app = await api();
+  try {
+    const rules = [
+      { provider: "github", classes: ["status"], minSeverity: "any", channels: [] },
+      { provider: "*", classes: ["status", "incident"], minSeverity: "major_outage", channels: ["telegram"] },
+    ];
+
+    const { status, body } = await app.request("PUT", "/config/routing", { rules });
+
+    assert.equal(status, 200);
+    const result = body as { rules: { provider: string }[] };
+    assert.deepEqual(
+      result.rules.map((rule) => rule.provider),
+      ["github", "*"],
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /config/routing refuses an invalid list and writes nothing", async () => {
+  const app = await api();
+  try {
+    const before = ((await app.request("GET", "/config")).body as { routing: { rules: unknown[] } }).routing.rules;
+
+    const { status, body } = await app.request("PUT", "/config/routing", {
+      rules: [{ provider: "*", minSeverity: "critical" }],
+    });
+
+    assert.equal(status, 400);
+    assert.match((body as { error: { message: string } }).error.message, /minSeverity/);
+    const after = ((await app.request("GET", "/config")).body as { routing: { rules: unknown[] } }).routing.rules;
+    assert.deepEqual(after, before);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /config/routing refuses a rule naming a channel nothing knows about", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.request("PUT", "/config/routing", {
+      rules: [{ provider: "*", channels: ["pushover"] }],
+    });
+
+    assert.equal(status, 400);
+    assert.match((body as { error: { message: string } }).error.message, /pushover/);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /config/routing accepts an empty list", async () => {
+  // An operator who deletes every rule gets the catch-all back at load time,
+  // not an error at write time: the two are different questions.
+  const app = await api();
+  try {
+    const { status, body } = await app.request("PUT", "/config/routing", { rules: [] });
+
+    assert.equal(status, 200);
+    assert.deepEqual((body as { rules: unknown[] }).rules, []);
+  } finally {
+    await app.close();
+  }
+});
