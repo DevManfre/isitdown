@@ -84,7 +84,7 @@ export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<
  * failure this loader exists to refuse to start on.
  */
 function buildRules(file: FileConfig, channels: ChannelConfig[], path: string): RoutingRule[] {
-  if (file.routing === undefined) return [CATCH_ALL_RULE];
+  if (file.routing === undefined || file.routing.length === 0) return [CATCH_ALL_RULE];
 
   const knownChannels = new Set(channels.map((channel) => channel.id));
   const knownProviders = new Set(file.services.map((service) => service.id));
