@@ -139,6 +139,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       // rather than rebuilt on every iteration of the loop below.
       const byChannelId = new Map(ctx.notifiers.map((notifier) => [notifier.id, notifier]));
       const known = new Set(ctx.knownChannelIds);
+      const enabledChannelIds = [...byChannelId.keys()];
 
       for (const change of changes) {
         const service = byId.get(change.providerId);
@@ -159,7 +160,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         };
         const text = renderMessage(payload);
 
-        for (const channelId of resolveTargets(change, ctx.rules, [...byChannelId.keys()])) {
+        for (const channelId of resolveTargets(change, ctx.rules, enabledChannelIds)) {
           const notifier = byChannelId.get(channelId);
           if (notifier === undefined) {
             // A configured-but-disabled channel is the normal case and says
