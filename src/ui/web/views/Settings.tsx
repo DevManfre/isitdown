@@ -2,19 +2,18 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
-import { BentoTile } from "@/components/BentoTile.tsx";
-import { RoutingRules } from "@/components/RoutingRules.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
+import { SettingRow } from "@/components/SettingRow.tsx";
+import { SettingsSection } from "@/components/SettingsSection.tsx";
 import { ChannelRow, ChannelSummary, channelRank } from "@/components/settings/ChannelRow.tsx";
 import { RemoveServiceDialog } from "@/components/settings/RemoveServiceDialog.tsx";
+import { RoutingRulesDialog } from "@/components/settings/RoutingRulesDialog.tsx";
 import {
   useConfig,
   usePreferences,
   usePreferencesMutation,
-  useRoutingMutations,
   useServiceMutations,
   useSettingsMutation,
 } from "@/hooks/queries.ts";
@@ -23,13 +22,13 @@ import { hostOf } from "@/lib/format.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { MapView } from "@/lib/types.ts";
 
-/** The tiles enter in reading order, after the view's own frame has landed. */
-const TILE_CASCADE = { base: 60, step: 60 };
+/** Sections enter in reading order, after the view's own frame has landed. */
+const SECTION_CASCADE = { base: 60, step: 60 };
 
 /**
- * Design 3a's Settings as a bento: polling wide beside the geographic view on
- * the top row, the monitored services and the notification channels sharing the
- * one below. Port of src/ui/public/js/views/settings.js.
+ * Settings as one column of named sections — engine, monitored services,
+ * notification channels, appearance — each its own card of divided rows.
+ * Port of src/ui/public/js/views/settings.js.
  *
  * A secret can be typed here but never read back: a channel field is one box
  * for the credential, and a save sends it one way — to the secrets file beside
@@ -45,7 +44,6 @@ export function Settings() {
   const patchPreferences = usePreferencesMutation();
   const settingsMutation = useSettingsMutation();
   const servicePatch = useServiceMutations().patch;
-  const routing = useRoutingMutations();
   // Above the early return below: a hook cannot be called conditionally.
   const fieldProps = useFieldProps();
 
@@ -70,171 +68,114 @@ export function Settings() {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
-      <BentoTile
-        title={t("settings.polling")}
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs leading-relaxed text-muted-foreground">{t("settings.subtitle")}</span>
+      </div>
+
+      <SettingsSection
+        title={t("settings.section.engine")}
         note={t("settings.jitter-note")}
-        delay={stagger(0, TILE_CASCADE)}
-        className="md:col-span-4"
+        status={pollingMessage}
+        delay={stagger(0, SECTION_CASCADE)}
       >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="polling-interval">{t("field.interval")}</Label>
-            <Input
-              id="polling-interval"
-              type="number"
-              className="font-mono"
-              value={interval}
-              onChange={(event) => setInterval_(Number(event.target.value))}
-              {...fieldProps}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="polling-timeout">{t("field.timeout")}</Label>
-            <Input
-              id="polling-timeout"
-              type="number"
-              className="font-mono"
-              value={timeout}
-              onChange={(event) => setTimeout_(Number(event.target.value))}
-              {...fieldProps}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="polling-retries">{t("field.retries")}</Label>
-            <Input
-              id="polling-retries"
-              type="number"
-              className="font-mono"
-              value={maxRetries}
-              onChange={(event) => setRetries(Number(event.target.value))}
-              {...fieldProps}
-            />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+        <SettingRow label={t("field.interval")} description={t("field.interval.hint")} align="top">
+          <Input
+            id="polling-interval"
+            aria-label={t("field.interval")}
+            type="number"
+            className="w-20 text-right font-mono"
+            value={interval}
+            onChange={(event) => setInterval_(Number(event.target.value))}
+            {...fieldProps}
+          />
+          <span className="font-mono text-xs text-muted-foreground">{t("unit.minutes")}</span>
+        </SettingRow>
+        <SettingRow label={t("field.timeout")} description={t("field.timeout.hint")} align="top">
+          <Input
+            id="polling-timeout"
+            aria-label={t("field.timeout")}
+            type="number"
+            className="w-20 text-right font-mono"
+            value={timeout}
+            onChange={(event) => setTimeout_(Number(event.target.value))}
+            {...fieldProps}
+          />
+          <span className="font-mono text-xs text-muted-foreground">{t("unit.seconds")}</span>
+        </SettingRow>
+        <SettingRow label={t("field.retries")} description={t("field.retries.hint")} align="top">
+          <Input
+            id="polling-retries"
+            aria-label={t("field.retries")}
+            type="number"
+            className="w-20 text-right font-mono"
+            value={maxRetries}
+            onChange={(event) => setRetries(Number(event.target.value))}
+            {...fieldProps}
+          />
+        </SettingRow>
+        <SettingRow label={t("settings.hot-note")}>
           <Button type="button" size="sm" disabled={settingsMutation.isPending} onClick={savePolling}>
             {t("action.save")}
           </Button>
-          <span className="text-xs text-muted-foreground">{pollingMessage ?? t("settings.hot-note")}</span>
-        </div>
-      </BentoTile>
+        </SettingRow>
+      </SettingsSection>
 
-      <BentoTile
-        title={t("settings.map-view")}
-        note={t("settings.map-view.hint")}
-        delay={stagger(1, TILE_CASCADE)}
-        className="md:col-span-2"
-      >
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="map-view">{t("settings.map-view.label")}</Label>
-          <Select
-            value={preferences?.mapView ?? "off"}
-            onValueChange={(value) => patchPreferences.mutate({ mapView: value as MapView })}
-          >
-            <SelectTrigger id="map-view">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="off">{t("settings.map-view.off")}</SelectItem>
-              <SelectItem value="map">{t("settings.map-view.map")}</SelectItem>
-              <SelectItem value="globe">{t("settings.map-view.globe")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </BentoTile>
-
-      <BentoTile
-        title={t("settings.services")}
-        action={
-          <ServiceDialog mode="add" trigger={<Button type="button" size="sm">{t("action.add-service")}</Button>} />
-        }
-        delay={stagger(2, TILE_CASCADE)}
-        className="md:col-span-3"
+      <SettingsSection
+        title={t("settings.section.services")}
+        action={<ServiceDialog mode="add" trigger={<Button type="button" size="sm">{t("action.add-service")}</Button>} />}
+        delay={stagger(1, SECTION_CASCADE)}
       >
         {config.services.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("providers.empty")}</p>
+          <p className="px-4 py-3 text-sm text-muted-foreground">{t("providers.empty")}</p>
         ) : (
-          <div className="flex flex-col gap-2">
-            {config.services.map((service) => (
-              <div
-                key={service.id}
-                className="service-row flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-              >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span
-                    className="size-1.5 shrink-0 rounded-full"
-                    style={{
-                      background: service.enabled ? "var(--status-operational-fill)" : "var(--color-neutral-700)",
-                    }}
-                  />
-                  {/* The name and its state hold their width and the meta
-                      line gives way: with the toggle taking its place on the
-                      right there is no longer room for all three, and a
-                      clipped adapter reads better than a clipped provider
-                      name or a row gone to two lines. */}
-                  <span className="max-w-48 shrink-0 truncate text-sm">{service.name}</span>
-                  {/* The state word beside the dot, as a channel row carries
-                      it: colour alone does not say which of the two states a
-                      muted dot means. */}
-                  <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                    {t(service.enabled ? "service.enabled" : "service.disabled")}
-                  </span>
-                  <span className="truncate font-mono text-[10.5px] text-muted-foreground">
-                    {`${service.adapter} · ${hostOf(service.baseUrl)}`}
-                  </span>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {/* Taking a provider out of the rotation is not deleting it:
-                      the poller already skips a disabled service, and this is
-                      the only place in the dashboard that can set the flag. */}
-                  <Switch
-                    aria-label={`${service.name} — ${t(service.enabled ? "service.enabled" : "service.disabled")}`}
-                    checked={service.enabled}
-                    onCheckedChange={(next) =>
-                      servicePatch.mutate({ id: service.id, patch: { enabled: next } })
-                    }
-                  />
-                  <ServiceDialog
-                    mode="edit"
-                    service={service}
-                    trigger={
-                      <Button type="button" variant="secondary" size="sm">
-                        {t("action.edit")}
-                      </Button>
-                    }
-                  />
-                  <RemoveServiceDialog
-                    service={service}
-                    trigger={
-                      <Button type="button" variant="destructive" size="sm">
-                        {t("action.remove")}
-                      </Button>
-                    }
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          config.services.map((service) => (
+            <SettingRow
+              key={service.id}
+              className="service-row"
+              label={service.name}
+              description={`${service.adapter} · ${hostOf(service.baseUrl)}`}
+              leading={
+                <span
+                  className="size-1.5 shrink-0 rounded-full"
+                  style={{
+                    background: service.enabled ? "var(--status-operational-fill)" : "var(--color-neutral-700)",
+                  }}
+                />
+              }
+              meta={t(service.enabled ? "service.enabled" : "service.disabled")}
+            >
+              <Switch
+                aria-label={`${service.name} — ${t(service.enabled ? "service.enabled" : "service.disabled")}`}
+                checked={service.enabled}
+                onCheckedChange={(next) => servicePatch.mutate({ id: service.id, patch: { enabled: next } })}
+              />
+              {/* The variants are the ones these two buttons already carry — the
+                  row shape changes, the actions do not. */}
+              <ServiceDialog
+                mode="edit"
+                service={service}
+                trigger={<Button type="button" variant="secondary" size="sm">{t("action.edit")}</Button>}
+              />
+              <RemoveServiceDialog
+                service={service}
+                trigger={<Button type="button" variant="destructive" size="sm">{t("action.remove")}</Button>}
+              />
+            </SettingRow>
+          ))
         )}
-      </BentoTile>
+      </SettingsSection>
 
-      {/* The note the channel panels used to repeat one apiece is said once
-          here: it is the same sentence about the same environment, and three
-          channels made it three claims. */}
-      <BentoTile
-        title={t("settings.channels")}
+      <SettingsSection
+        title={t("settings.section.notifications")}
         note={t("settings.secret-note")}
-        delay={stagger(3, TILE_CASCADE)}
-        className="md:col-span-3"
+        delay={stagger(2, SECTION_CASCADE)}
       >
         {config.channels.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("empty.no-data")}</p>
+          <p className="px-4 py-3 text-sm text-muted-foreground">{t("empty.no-data")}</p>
         ) : (
-          <div className="flex flex-col">
+          <div className="flex flex-col px-4 pt-3">
             <ChannelSummary channels={config.channels} />
-            {/* One row open at a time: the panel exists to be scannable, and
-                every row expanded is the layout this replaced. */}
             <div className="divide-y divide-border border-t border-border">
               {[...config.channels]
                 .sort((a, b) => channelRank(a) - channelRank(b))
@@ -249,23 +190,37 @@ export function Settings() {
             </div>
           </div>
         )}
-      </BentoTile>
+        <SettingRow
+          label={t("settings.routing")}
+          description={t("settings.routing.hint")}
+          meta={t("settings.routing.count", { count: config.routing.rules.length })}
+          align="top"
+        >
+          <RoutingRulesDialog routing={config.routing} channels={config.channels} services={config.services} />
+        </SettingRow>
+      </SettingsSection>
 
-      {/* Immediately after the channels tile: rules are only readable with
-          the channel list in view. */}
-      <BentoTile
-        title={t("settings.routing")}
-        delay={stagger(4, TILE_CASCADE)}
-        className="md:col-span-6 min-w-0"
-      >
-        <RoutingRules
-          routing={config.routing}
-          channels={config.channels}
-          services={config.services}
-          onSave={(rules) => routing.save.mutateAsync(rules)}
-          saving={routing.save.isPending}
-        />
-      </BentoTile>
+      <SettingsSection title={t("settings.section.appearance")} delay={stagger(3, SECTION_CASCADE)}>
+        <SettingRow
+          label={t("settings.map-view.label")}
+          description={t("settings.map-view.hint")}
+          align="top"
+        >
+          <Select
+            value={preferences?.mapView ?? "off"}
+            onValueChange={(value) => patchPreferences.mutate({ mapView: value as MapView })}
+          >
+            <SelectTrigger id="map-view" className="w-42" aria-label={t("settings.map-view.label")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="off">{t("settings.map-view.off")}</SelectItem>
+              <SelectItem value="map">{t("settings.map-view.map")}</SelectItem>
+              <SelectItem value="globe">{t("settings.map-view.globe")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
+      </SettingsSection>
     </div>
   );
 }
