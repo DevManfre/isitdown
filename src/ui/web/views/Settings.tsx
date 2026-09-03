@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -26,6 +26,21 @@ import type { MapView } from "@/lib/types.ts";
 const SECTION_CASCADE = { base: 60, step: 60 };
 
 /**
+ * The bounds `pollingSchema` already enforces server-side. Checked here too,
+ * because instant-apply means a half-typed "99" retries would otherwise fire a
+ * request the server can only answer with a 400 — an error about a value the
+ * operator was still in the middle of typing.
+ */
+const POLLING_BOUNDS = {
+  intervalMinutes: { min: 1, max: 1440, labelKey: "field.interval" },
+  requestTimeoutSeconds: { min: 1, max: 120, labelKey: "field.timeout" },
+  maxRetries: { min: 1, max: 10, labelKey: "field.retries" },
+} as const;
+
+/** Long enough that a two-keystroke number is one save, short enough to feel immediate. */
+const POLLING_DEBOUNCE_MS = 600;
+
+/**
  * Settings as one column of named sections — engine, monitored services,
  * notification channels, appearance — each its own card of divided rows.
  * Port of src/ui/public/js/views/settings.js.
@@ -50,8 +65,15 @@ export function Settings() {
   const [interval_, setInterval_] = useState<number | undefined>(undefined);
   const [timeout_, setTimeout_] = useState<number | undefined>(undefined);
   const [retries, setRetries] = useState<number | undefined>(undefined);
-  const [pollingMessage, setPollingMessage] = useState<string | undefined>(undefined);
+  const [pollingStatus, setPollingStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(undefined);
+  const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [openChannel, setOpenChannel] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      if (debounce.current !== undefined) clearTimeout(debounce.current);
+    };
+  }, []);
 
   if (config === undefined) return null;
 
@@ -59,12 +81,35 @@ export function Settings() {
   const timeout = timeout_ ?? config.polling.requestTimeoutSeconds;
   const maxRetries = retries ?? config.polling.maxRetries;
 
-  const savePolling = (): void => {
-    setPollingMessage(undefined);
-    settingsMutation.mutate(
-      { intervalMinutes: interval, requestTimeoutSeconds: timeout, maxRetries },
-      { onError: (error) => setPollingMessage(error instanceof Error ? error.message : String(error)) },
-    );
+  const commitPolling = (next: {
+    intervalMinutes: number;
+    requestTimeoutSeconds: number;
+    maxRetries: number;
+  }): void => {
+    if (debounce.current !== undefined) clearTimeout(debounce.current);
+
+    for (const [key, bound] of Object.entries(POLLING_BOUNDS)) {
+      const value = next[key as keyof typeof next];
+      if (!Number.isInteger(value) || value < bound.min || value > bound.max) {
+        setPollingStatus({
+          text: t("settings.out-of-range", { field: t(bound.labelKey), min: bound.min, max: bound.max }),
+          tone: "error",
+        });
+        return;
+      }
+    }
+
+    setPollingStatus(undefined);
+    settingsMutation.mutate(next, {
+      onSuccess: () => setPollingStatus({ text: t("settings.saved"), tone: "ok" }),
+      onError: (error) =>
+        setPollingStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+    });
+  };
+
+  const schedulePolling = (next: Parameters<typeof commitPolling>[0]): void => {
+    if (debounce.current !== undefined) clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => commitPolling(next), POLLING_DEBOUNCE_MS);
   };
 
   return (
@@ -75,8 +120,14 @@ export function Settings() {
 
       <SettingsSection
         title={t("settings.section.engine")}
-        note={t("settings.jitter-note")}
-        status={pollingMessage}
+        note={t("settings.hot-note")}
+        status={
+          pollingStatus === undefined ? undefined : (
+            <span className={pollingStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}>
+              {pollingStatus.text}
+            </span>
+          )
+        }
         delay={stagger(0, SECTION_CASCADE)}
       >
         <SettingRow label={t("field.interval")} description={t("field.interval.hint")} align="top">
@@ -86,8 +137,16 @@ export function Settings() {
             type="number"
             className="w-20 text-right font-mono"
             value={interval}
-            onChange={(event) => setInterval_(Number(event.target.value))}
-            {...fieldProps}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              setInterval_(value);
+              schedulePolling({ intervalMinutes: value, requestTimeoutSeconds: timeout, maxRetries });
+            }}
+            onFocus={fieldProps.onFocus}
+            onBlur={() => {
+              fieldProps.onBlur();
+              commitPolling({ intervalMinutes: interval, requestTimeoutSeconds: timeout, maxRetries });
+            }}
           />
           <span className="font-mono text-xs text-muted-foreground">{t("unit.minutes")}</span>
         </SettingRow>
@@ -98,8 +157,16 @@ export function Settings() {
             type="number"
             className="w-20 text-right font-mono"
             value={timeout}
-            onChange={(event) => setTimeout_(Number(event.target.value))}
-            {...fieldProps}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              setTimeout_(value);
+              schedulePolling({ intervalMinutes: interval, requestTimeoutSeconds: value, maxRetries });
+            }}
+            onFocus={fieldProps.onFocus}
+            onBlur={() => {
+              fieldProps.onBlur();
+              commitPolling({ intervalMinutes: interval, requestTimeoutSeconds: timeout, maxRetries });
+            }}
           />
           <span className="font-mono text-xs text-muted-foreground">{t("unit.seconds")}</span>
         </SettingRow>
@@ -110,14 +177,17 @@ export function Settings() {
             type="number"
             className="w-20 text-right font-mono"
             value={maxRetries}
-            onChange={(event) => setRetries(Number(event.target.value))}
-            {...fieldProps}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              setRetries(value);
+              schedulePolling({ intervalMinutes: interval, requestTimeoutSeconds: timeout, maxRetries: value });
+            }}
+            onFocus={fieldProps.onFocus}
+            onBlur={() => {
+              fieldProps.onBlur();
+              commitPolling({ intervalMinutes: interval, requestTimeoutSeconds: timeout, maxRetries });
+            }}
           />
-        </SettingRow>
-        <SettingRow label={t("settings.hot-note")}>
-          <Button type="button" size="sm" disabled={settingsMutation.isPending} onClick={savePolling}>
-            {t("action.save")}
-          </Button>
         </SettingRow>
       </SettingsSection>
 
