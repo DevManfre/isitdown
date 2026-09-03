@@ -325,6 +325,25 @@ test("a rule naming a channel nothing knows about is warned about", async () => 
   assert.equal(lines.filter((line) => line.includes("pushover")).length, 1);
 });
 
+test("an unknown channel is warned about even with every channel disabled", async () => {
+  // The operator mid-reconfiguration with everything switched off is exactly
+  // who most needs this diagnostic, not the case it should go quiet for.
+  const lines: string[] = [];
+  const logger = createLogger("warn", (line) => lines.push(line));
+  const dispatcher = createDispatcher({ logger });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [],
+    rules: [{ provider: "*", classes: ["status"], minSeverity: "any", channels: ["pushover"] }],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.deepEqual(records, []);
+  assert.equal(lines.filter((line) => line.includes("pushover")).length, 1);
+});
+
 test("sendTest ignores the rules entirely", async () => {
   // A delivery test answers "is this channel configured", not "do my rules
   // permit this event". Mixing the two makes the button useless exactly when
