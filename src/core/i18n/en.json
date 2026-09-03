@@ -11,6 +11,8 @@
   "incident.status.resolved": "Resolved",
   "incident.status.postmortem": "Postmortem",
 
+  "notification.action.open-status": "Open status page",
+
   "maintenance.no-end": "not stated",
 
   "notification.status.changed": "{provider} — {severity}\n\nStatus changed from {previous} to {current}.\nUpdated: {updatedAt}\n\n{url}",
