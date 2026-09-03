@@ -1,3 +1,4 @@
+import { dirname, join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import type { Express } from "express";
 import { getAdapter } from "../adapters/index.ts";
@@ -22,6 +23,7 @@ import { createMapLane, type MapLane } from "./mapLane.ts";
 import { createMapStore, type MapStore } from "./mapStore.ts";
 import { createMetricsRegistry, type MetricsRegistry } from "./metrics.ts";
 import { createSqlitePushSubscriptionStore, type SqlitePushSubscriptionStore } from "./sqlitePushSubscriptionStore.ts";
+import { loadSecretsFile, type SecretsFile } from "./secretsFile.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
 import { ensureVapidKeys } from "./vapidKeys.ts";
 
@@ -44,6 +46,11 @@ export interface UiRuntimeCore {
   db: DatabaseSync;
   /** The process environment secrets are resolved from; never serialised. */
   env: NodeJS.ProcessEnv;
+  /**
+   * Credentials saved from the dashboard, applied to `env` on load — which is
+   * what lets a save take effect without recreating the container.
+   */
+  secrets: SecretsFile;
   dispatcher: Dispatcher;
   store: HistoryStore;
   history: ReturnType<typeof createHistoryService>;
@@ -98,6 +105,11 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   const db = openDatabase(options.dbPath);
   migrate(db);
   seedDefaults(db);
+
+  // Before anything reads the environment: an entry saved from the dashboard on
+  // a previous run has to be in place for the first cycle, exactly as it would
+  // be had the container supplied it.
+  const secrets = await loadSecretsFile(join(dirname(options.dbPath), "secrets.env"), options.env, logger);
 
   const store = createSqliteStateStore(db);
   const history = createHistoryService(store);
@@ -169,6 +181,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   const core: UiRuntimeCore = {
     db,
     env: options.env,
+    secrets,
     dispatcher,
     store,
     history,

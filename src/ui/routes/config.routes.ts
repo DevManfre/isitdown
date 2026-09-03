@@ -23,6 +23,14 @@ const channelPatchSchema = z.object({
   enabled: z.boolean().optional(),
   fields: z.record(z.string()).optional(),
 });
+// Credential *values*, unlike the patch above's variable names. At least one,
+// because an empty save is a request that would report success having done
+// nothing; the value rules themselves live in the secrets file.
+const channelSecretsSchema = z.object({
+  fields: z.record(z.string()).refine((fields) => Object.keys(fields).length > 0, {
+    message: "at least one field is required",
+  }),
+});
 // Push endpoints are https by protocol (no browser issues a plain-http one),
 // and none of these fields has any business being large — a browser-supplied
 // body should not be able to push arbitrary-length strings into SQLite.
@@ -181,6 +189,78 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       updateChannel(db, req.params.id, parsed.data);
     } catch (error) {
       res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      return;
+    }
+    res.json(describeChannels(db, runtime.env).find((channel) => channel.id === req.params.id));
+  });
+
+  /**
+   * The value behind a channel's environment variable, saved from the dashboard
+   * so the operator does not have to recreate the container to set one.
+   *
+   * Write-only by construction: it lands in the secrets file beside the database
+   * and in the process environment (see src/ui/secretsFile.ts), never in the
+   * `channels` row, and no route hands a value back — `describeChannels` still
+   * reports nothing but the variable's name and whether it resolves.
+   *
+   * Which variable a value is written to is the channel's own `*Env` reference,
+   * never something the request names: a request that could choose the variable
+   * could point one at another channel's credential, which is the same
+   * disclosure path `updateChannel`'s collision check exists to close.
+   */
+  router.put("/config/channels/:id/secrets", async (req, res) => {
+    const parsed = channelSecretsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+    const stored = listChannels(db).find((channel) => channel.id === req.params.id);
+    if (stored === undefined) {
+      res.status(404).json({ error: { message: `unknown channel: ${req.params.id}` } });
+      return;
+    }
+
+    // Every field is resolved to its variable before anything is written, so a
+    // two-field channel cannot end up with one credential saved and one refused.
+    const values: Record<string, string> = {};
+    for (const [name, value] of Object.entries(parsed.data.fields)) {
+      const envVar = stored.config[`${name}Env`];
+      if (envVar === undefined) {
+        res.status(400).json({ error: { message: `channel ${req.params.id} has no field "${name}"` } });
+        return;
+      }
+      values[envVar] = value;
+    }
+
+    try {
+      await runtime.secrets.set(values);
+    } catch (error) {
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      return;
+    }
+    res.json(describeChannels(db, runtime.env).find((channel) => channel.id === req.params.id));
+  });
+
+  /**
+   * Forgets a saved value. Only what the secrets file itself holds can be
+   * removed: a variable the container supplied is not this dashboard's to
+   * delete, and reporting that plainly beats a success that changes nothing.
+   */
+  router.delete("/config/channels/:id/secrets/:field", async (req, res) => {
+    const stored = listChannels(db).find((channel) => channel.id === req.params.id);
+    if (stored === undefined) {
+      res.status(404).json({ error: { message: `unknown channel: ${req.params.id}` } });
+      return;
+    }
+    const envVar = stored.config[`${req.params.field}Env`];
+    if (envVar === undefined) {
+      res.status(400).json({ error: { message: `channel ${req.params.id} has no field "${req.params.field}"` } });
+      return;
+    }
+    if (!(await runtime.secrets.clear(envVar))) {
+      res.status(409).json({
+        error: { message: `${envVar} was not saved here — it comes from the container's environment` },
+      });
       return;
     }
     res.json(describeChannels(db, runtime.env).find((channel) => channel.id === req.params.id));

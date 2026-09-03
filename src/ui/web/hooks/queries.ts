@@ -306,6 +306,19 @@ export function useChannelMutations() {
       mutationFn: ({ id, patch }: { id: string; patch: unknown }) => api.patchChannel(id, patch),
       onSuccess: invalidate,
     }),
+    // Two mutations rather than one: the variable *name* lives in the database
+    // (patch) and its value in the secrets file (saveSecrets), and a row that
+    // renames a reference and sets a credential in the same click has to do
+    // the rename first — see ChannelRow's save.
+    saveSecrets: useMutation({
+      mutationFn: ({ id, fields }: { id: string; fields: Record<string, string> }) =>
+        api.saveChannelSecrets(id, fields),
+      onSuccess: invalidate,
+    }),
+    clearSecret: useMutation({
+      mutationFn: ({ id, field }: { id: string; field: string }) => api.clearChannelSecret(id, field),
+      onSuccess: invalidate,
+    }),
     test: useMutation({ mutationFn: api.testChannel }),
   };
 }

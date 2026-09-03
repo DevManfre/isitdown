@@ -255,11 +255,18 @@ function ChannelRow({
 }) {
   const { t } = useTranslation();
   const fieldProps = useFieldProps();
-  const { patch, test } = useChannelMutations();
+  const { patch, saveSecrets, clearSecret, test } = useChannelMutations();
   // Only what is being *changed* lives here: each field renders empty with the
   // stored variable name as its placeholder, so the hint can never be mistaken
   // for something the operator typed.
   const [envValues, setEnvValues] = useState<Record<string, string>>({});
+  // The credential itself, held only until it is saved. Nothing reads one back
+  // — the server never sends a value — so an emptied input is the whole state
+  // an operator gets to see afterwards.
+  const [secretValues, setSecretValues] = useState<Record<string, string>>({});
+  // Which environment variable carries which credential is a detail an operator
+  // rarely touches, so it is asked for rather than shown.
+  const [showEnvVars, setShowEnvVars] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
   const fieldless = channel.fields.length === 0;
   const Icon = CHANNEL_ICONS[channel.id] ?? Bell;
@@ -267,17 +274,57 @@ function ChannelRow({
   const name = nameKey === undefined ? channel.id : t(nameKey);
   const configured = isConfigured(channel);
 
+  const failed = (error: unknown): void =>
+    setMessage({
+      text: t("channel.secret-failed", { error: error instanceof Error ? error.message : String(error) }),
+      tone: "error",
+    });
+
   const save = (): void => {
     const fields = Object.fromEntries(
       Object.entries(envValues)
         .map(([name, value]) => [`${name}Env`, value.trim()] as const)
         .filter(([, value]) => value !== ""),
     );
+    const secrets = Object.fromEntries(
+      Object.entries(secretValues)
+        .map(([name, value]) => [name, value.trim()] as const)
+        .filter(([, value]) => value !== ""),
+    );
     // An untouched row is not an instruction to blank every reference.
-    if (Object.keys(fields).length === 0) return;
+    if (Object.keys(fields).length === 0 && Object.keys(secrets).length === 0) return;
+    setMessage(undefined);
+
+    // A credential is written to whichever variable the channel names *now*, so
+    // a click that renames the reference and fills it in one go has to land the
+    // rename first or the value would go to the old variable.
+    const saveSecretValues = (): void => {
+      if (Object.keys(secrets).length === 0) return;
+      saveSecrets.mutate(
+        { id: channel.id, fields: secrets },
+        {
+          onSuccess: () => {
+            setSecretValues({});
+            setMessage({ text: t("channel.secret-saved"), tone: "info" });
+          },
+          onError: failed,
+        },
+      );
+    };
+
+    if (Object.keys(fields).length === 0) {
+      saveSecretValues();
+      return;
+    }
     patch.mutate(
       { id: channel.id, patch: { fields } },
-      { onSuccess: () => setEnvValues({}) },
+      {
+        onSuccess: () => {
+          setEnvValues({});
+          saveSecretValues();
+        },
+        onError: failed,
+      },
     );
   };
 
@@ -351,10 +398,17 @@ function ChannelRow({
         <div className="flex flex-col gap-3 pb-3 pl-6 pr-1">
         {channel.fields.map((field) => {
           const inputId = `channel-${channel.id}-${field.name}`;
+          const valueId = `${inputId}-value`;
           return (
             <div key={field.name} className="flex flex-col gap-1.5">
+              {/* The credential is the field: one box, because which variable
+                  carries it is a detail almost nobody changes. Typing here saves
+                  the value beside the database and puts it in this process's
+                  environment, so the channel is live without a restart, and the
+                  input renders empty whatever is stored — no route ever sends a
+                  credential back. */}
               <div className="flex items-center justify-between gap-2">
-                <Label htmlFor={inputId}>{`${field.name} — ${t("field.env-var")}`}</Label>
+                <Label htmlFor={valueId}>{field.name}</Label>
                 <span
                   className="font-mono text-xs"
                   style={{ color: field.isSet ? "var(--status-operational)" : "var(--status-degraded)" }}
@@ -362,24 +416,74 @@ function ChannelRow({
                   {field.isSet ? t("channel.env-set") : t("channel.env-missing")}
                 </span>
               </div>
-              <Input
-                id={inputId}
-                className="font-mono"
-                placeholder={field.envVar}
-                value={envValues[field.name] ?? ""}
-                onChange={(event) => setEnvValues((prev) => ({ ...prev, [field.name]: event.target.value }))}
-                {...fieldProps}
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  id={valueId}
+                  type="password"
+                  autoComplete="new-password"
+                  className="font-mono"
+                  value={secretValues[field.name] ?? ""}
+                  onChange={(event) => setSecretValues((prev) => ({ ...prev, [field.name]: event.target.value }))}
+                  {...fieldProps}
+                />
+                {field.isSet && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={clearSecret.isPending}
+                    onClick={() =>
+                      clearSecret.mutate(
+                        { id: channel.id, field: field.name },
+                        {
+                          onSuccess: () => setMessage({ text: t("channel.secret-cleared"), tone: "info" }),
+                          onError: failed,
+                        },
+                      )
+                    }
+                  >
+                    {t("action.clear")}
+                  </Button>
+                )}
+              </div>
+
+              {/* Which variable the value is read from: still editable, but out
+                  of the way until asked for — an operator who has never heard
+                  of it can configure a channel without meeting it. */}
+              {showEnvVars && (
+                <div className="flex flex-col gap-1.5 pt-1">
+                  <Label htmlFor={inputId} className="text-xs text-muted-foreground">
+                    {t("field.env-var")}
+                  </Label>
+                  <Input
+                    id={inputId}
+                    className="font-mono"
+                    placeholder={field.envVar}
+                    value={envValues[field.name] ?? ""}
+                    onChange={(event) => setEnvValues((prev) => ({ ...prev, [field.name]: event.target.value }))}
+                    {...fieldProps}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
 
         {!fieldless && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" disabled={patch.isPending} onClick={save}>
+            <Button type="button" size="sm" disabled={patch.isPending || saveSecrets.isPending} onClick={save}>
               {t("action.save")}
             </Button>
             {testButton}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-expanded={showEnvVars}
+              onClick={() => setShowEnvVars((previous) => !previous)}
+            >
+              {t("channel.env-var-toggle")}
+            </Button>
             {testMessage}
           </div>
         )}
@@ -429,10 +533,12 @@ const TILE_CASCADE = { base: 60, step: 60 };
  * the top row, the monitored services and the notification channels sharing the
  * one below. Port of src/ui/public/js/views/settings.js.
  *
- * A secret is never typed, stored or displayed here: a channel field shows
- * only the *name* of the environment variable that carries its credential,
- * and whether that variable currently resolves — the name is editable, the
- * value never appears, because the server never sends it.
+ * A secret can be typed here but never read back: a channel field is one box
+ * for the credential, and a save sends it one way — to the secrets file beside
+ * the database and into the server's environment, so the channel works without
+ * a restart. The value never appears again, because no route sends one. Which
+ * environment variable carries it is behind the row's own toggle, along with
+ * whether that variable currently resolves.
  */
 export function Settings() {
   const { t } = useTranslation();
