@@ -1,6 +1,7 @@
 import type {
   ComponentHistoryResponse,
   ComponentPreview,
+  DescribedChannel,
   IncidentDetail,
   IncidentsResponse,
   IncidentState,
@@ -142,6 +143,17 @@ export const testService = (id: string) =>
 export const patchSettings = (patch: unknown) => request<unknown>("PATCH", "/config/settings", patch);
 export const patchChannel = (id: string, patch: unknown) =>
   request<unknown>("PATCH", `/config/channels/${encodeURIComponent(id)}`, patch);
+/**
+ * Write-only, like the route behind it: a credential goes out, and what comes
+ * back is the channel's usual name-and-isSet shape, never the value.
+ */
+export const saveChannelSecrets = (id: string, fields: Record<string, string>) =>
+  request<DescribedChannel>("PUT", `/config/channels/${encodeURIComponent(id)}/secrets`, { fields });
+export const clearChannelSecret = (id: string, field: string) =>
+  request<DescribedChannel>(
+    "DELETE",
+    `/config/channels/${encodeURIComponent(id)}/secrets/${encodeURIComponent(field)}`,
+  );
 export const testChannel = (id: string) =>
   request<{ ok: boolean; error?: string }>("POST", `/config/channels/${encodeURIComponent(id)}/test`);
 
