@@ -109,6 +109,67 @@ describe("Settings", () => {
     expect(await screen.findByLabelText(i18n.t("field.retries"))).toHaveValue(3);
   });
 
+  it("saves a polling field when it loses focus, with no Save button in sight", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const calls = interceptWrites({
+      "PATCH /config/settings": {
+        polling: { intervalMinutes: 7, requestTimeoutSeconds: 10, maxRetries: 3, failureThreshold: 3 },
+      },
+    });
+
+    const interval = await screen.findByLabelText(i18n.t("field.interval"));
+    await userEvent.clear(interval);
+    await userEvent.type(interval, "7");
+    await userEvent.tab();
+
+    await waitFor(() => expect(writesIn(calls)).toHaveLength(1));
+    expect(writesIn(calls)[0]).toMatchObject({
+      method: "PATCH",
+      path: "/config/settings",
+      body: { intervalMinutes: 7, requestTimeoutSeconds: 10, maxRetries: 3 },
+    });
+    expect(await screen.findByText(i18n.t("settings.saved"))).toBeInTheDocument();
+  });
+
+  it("saves 600ms after typing stops, without waiting for a blur", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    renderWithProviders(<Settings />, fixtures);
+    const calls = interceptWrites({
+      "PATCH /config/settings": {
+        polling: { intervalMinutes: 5, requestTimeoutSeconds: 20, maxRetries: 3, failureThreshold: 3 },
+      },
+    });
+
+    const timeout = await screen.findByLabelText(i18n.t("field.timeout"));
+    await userEvent.clear(timeout);
+    await userEvent.type(timeout, "20");
+    expect(writesIn(calls)).toHaveLength(0);
+
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+    });
+    await waitFor(() => expect(writesIn(calls)).toHaveLength(1));
+    expect(writesIn(calls)[0]?.body).toMatchObject({ requestTimeoutSeconds: 20 });
+    vi.useRealTimers();
+  });
+
+  it("refuses an out-of-range value in the section footer and sends nothing", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const calls = interceptWrites({});
+
+    const retries = await screen.findByLabelText(i18n.t("field.retries"));
+    await userEvent.clear(retries);
+    await userEvent.type(retries, "99");
+    await userEvent.tab();
+
+    expect(
+      await screen.findByText(
+        i18n.t("settings.out-of-range", { field: i18n.t("field.retries"), min: 1, max: 10 }),
+      ),
+    ).toBeInTheDocument();
+    expect(writesIn(calls)).toHaveLength(0);
+  });
+
   it("lists the configured services with edit and remove here, not in the table", async () => {
     renderWithProviders(<Settings />, fixtures);
     expect(await screen.findByRole("button", { name: i18n.t("action.edit") })).toBeInTheDocument();
