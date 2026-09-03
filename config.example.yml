@@ -74,7 +74,7 @@ notifications:
 #
 # routing:
 #   # A provider watched out of curiosity: on the dashboard, never in a message.
-#   - provider: sentry
+#   - provider: anthropic
 #     channels: []
 #   # Real trouble, anywhere: every channel gets attention.
 #   - provider: "*"
