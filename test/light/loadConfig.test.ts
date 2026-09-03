@@ -170,6 +170,109 @@ services:
   await assert.rejects(loadConfig(path, {}), /STATUS_BASE_URL/);
 });
 
+test("a config file with no routing block gets one catch-all rule", async () => {
+  const path = await configFile(`
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+notifications:
+  telegram:
+    enabled: true
+    botToken: t
+    chatId: c
+`);
+  const config = await loadConfig(path, {});
+  assert.deepEqual(config.rules, [
+    { provider: "*", classes: ["status", "incident", "maintenance", "monitoring"], minSeverity: "any", channels: ["*"] },
+  ]);
+});
+
+test("routing rules from the file keep their order and defaults", async () => {
+  const path = await configFile(`
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+notifications:
+  telegram:
+    enabled: true
+    botToken: t
+    chatId: c
+  slack:
+    enabled: true
+    webhookUrl: https://hooks.slack.com/services/x
+routing:
+  - provider: "*"
+    classes: [status, incident]
+    minSeverity: major_outage
+    channels: [telegram]
+  - provider: "*"
+    channels: [slack]
+`);
+  const config = await loadConfig(path, {});
+  assert.equal(config.rules.length, 2);
+  assert.deepEqual(config.rules[0]?.channels, ["telegram"]);
+  assert.equal(config.rules[0]?.minSeverity, "major_outage");
+  assert.deepEqual(config.rules[1]?.classes, ["status", "incident", "maintenance", "monitoring"]);
+  assert.equal(config.rules[1]?.minSeverity, "any");
+});
+
+test("a routing rule naming a channel the file does not define is fatal", async () => {
+  const path = await configFile(`
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+notifications:
+  telegram:
+    enabled: true
+    botToken: t
+    chatId: c
+routing:
+  - provider: "*"
+    channels: [pushover]
+`);
+  await assert.rejects(() => loadConfig(path, {}), /pushover/);
+});
+
+test("a routing rule naming a provider the file does not define is fatal", async () => {
+  const path = await configFile(`
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+notifications:
+  telegram:
+    enabled: true
+    botToken: t
+    chatId: c
+routing:
+  - provider: sentry
+    channels: [telegram]
+`);
+  await assert.rejects(() => loadConfig(path, {}), /sentry/);
+});
+
+test("an invalid routing rule is fatal and names the field", async () => {
+  const path = await configFile(`
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+notifications: {}
+routing:
+  - provider: "*"
+    minSeverity: critical
+`);
+  await assert.rejects(() => loadConfig(path, {}), /minSeverity/);
+});
+
 test("the config source reads the file on every load, so an edit applies without a restart", async () => {
   const path = await configFile(MINIMAL);
   const source = createFileConfigSource(path, {});
