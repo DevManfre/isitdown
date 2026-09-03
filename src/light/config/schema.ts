@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { localeSchema, serviceDefinitionSchema } from "../../core/config.schema.ts";
+import { localeSchema, routingRuleSchema, serviceDefinitionSchema } from "../../core/config.schema.ts";
 
 /**
  * The shape of `config.yml`. Service definitions and the locale reuse the shared
@@ -54,6 +54,13 @@ export const fileConfigSchema = z.object({
     })
     .strict()
     .default({}),
+  /**
+   * Evaluation order is the file's order — first matching rule decides.
+   * Absent means "everything to every enabled channel", the edition's
+   * behaviour before routing existed, and still the default with the key
+   * left out.
+   */
+  routing: z.array(routingRuleSchema).optional(),
 });
 
 export type FileConfig = z.infer<typeof fileConfigSchema>;

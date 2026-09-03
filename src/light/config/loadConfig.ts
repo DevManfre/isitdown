@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises";
 import { parse } from "yaml";
 import { pollingSchema } from "../../core/config.schema.ts";
 import type { ChannelConfig, ConfigSource, RuntimeConfig } from "../../core/configSource.interface.ts";
-import { CATCH_ALL_RULE } from "../../core/routing.ts";
-import { fileConfigSchema, REQUIRED_CHANNEL_SETTINGS } from "./schema.ts";
+import { CATCH_ALL_RULE, type RoutingRule } from "../../core/routing.ts";
+import { fileConfigSchema, REQUIRED_CHANNEL_SETTINGS, type FileConfig } from "./schema.ts";
 
 const ENV_REFERENCE = /\$\{([A-Z0-9_]+)\}/g;
 
@@ -73,8 +73,36 @@ export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<
     locale: file.locale ?? "en",
     services: file.services,
     channels,
-    rules: [CATCH_ALL_RULE],
+    rules: buildRules(file, channels, path),
   };
+}
+
+/**
+ * The Light edition's `config.yml` is the complete truth for this edition, so a
+ * rule naming a channel or provider absent from it is a typo — and a typo in a
+ * routing rule shows up as alerts that never arrive, which is exactly the
+ * failure this loader exists to refuse to start on.
+ */
+function buildRules(file: FileConfig, channels: ChannelConfig[], path: string): RoutingRule[] {
+  if (file.routing === undefined) return [CATCH_ALL_RULE];
+
+  const knownChannels = new Set(channels.map((channel) => channel.id));
+  const knownProviders = new Set(file.services.map((service) => service.id));
+
+  return file.routing.map((rule, index) => {
+    if (rule.provider !== "*" && !knownProviders.has(rule.provider)) {
+      throw new Error(
+        `config file ${path}: routing rule ${index + 1} targets provider "${rule.provider}", which is not in services`,
+      );
+    }
+    for (const channel of rule.channels) {
+      if (channel === "*" || knownChannels.has(channel)) continue;
+      throw new Error(
+        `config file ${path}: routing rule ${index + 1} targets channel "${channel}", which is not in notifications`,
+      );
+    }
+    return rule;
+  });
 }
 
 /** Re-reads the file on every load, so editing it applies on the next cycle. */
