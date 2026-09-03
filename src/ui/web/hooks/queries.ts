@@ -299,6 +299,14 @@ export function useSettingsMutation() {
   return useMutation({ mutationFn: api.patchSettings, onSuccess: invalidate });
 }
 
+/** `["config"]` is already in `WRITE_KEYS`, so a save refreshes the routing panel like any other config write. */
+export function useRoutingMutations() {
+  const invalidate = useInvalidateAll();
+  return {
+    save: useMutation({ mutationFn: api.putRouting, onSuccess: invalidate }),
+  };
+}
+
 export function useChannelMutations() {
   const invalidate = useInvalidateAll();
   return {

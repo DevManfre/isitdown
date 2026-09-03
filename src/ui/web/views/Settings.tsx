@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { BentoTile } from "@/components/BentoTile.tsx";
+import { RoutingRules } from "@/components/RoutingRules.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
 import {
   useChannelMutations,
@@ -19,6 +20,7 @@ import {
   usePreferencesMutation,
   usePushDevices,
   usePushMutations,
+  useRoutingMutations,
   useServiceMutations,
   useSettingsMutation,
 } from "@/hooks/queries.ts";
@@ -547,6 +549,7 @@ export function Settings() {
   const patchPreferences = usePreferencesMutation();
   const settingsMutation = useSettingsMutation();
   const servicePatch = useServiceMutations().patch;
+  const routing = useRoutingMutations();
   // Above the early return below: a hook cannot be called conditionally.
   const fieldProps = useFieldProps();
 
@@ -750,6 +753,21 @@ export function Settings() {
             </div>
           </div>
         )}
+      </BentoTile>
+
+      {/* Immediately after the channels tile: rules are only readable with
+          the channel list in view. */}
+      <BentoTile
+        title={t("settings.routing")}
+        delay={stagger(4, TILE_CASCADE)}
+        className="md:col-span-3"
+      >
+        <RoutingRules
+          routing={config.routing}
+          channels={config.channels}
+          services={config.services}
+          onSave={(rules) => routing.save.mutateAsync(rules)}
+        />
       </BentoTile>
     </div>
   );
