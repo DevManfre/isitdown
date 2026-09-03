@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -75,6 +75,18 @@ export function migrate(db: DatabaseSync): void {
       id      TEXT PRIMARY KEY,
       enabled INTEGER NOT NULL DEFAULT 0,
       config  TEXT NOT NULL
+    );
+
+    -- No foreign key to services(id): "*" is not a service id, and a key here
+    -- would block deleting a provider. deleteService drops a provider's rules
+    -- explicitly instead, where it already cascades samples and incidents.
+    CREATE TABLE IF NOT EXISTS routing_rules (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      position     INTEGER NOT NULL,
+      provider     TEXT NOT NULL,
+      classes      TEXT NOT NULL,
+      min_severity TEXT NOT NULL,
+      channels     TEXT NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_status_samples_provider_time
@@ -225,6 +237,30 @@ export function migrate(db: DatabaseSync): void {
       );
       CREATE INDEX IF NOT EXISTS idx_maintenances_provider_start ON maintenances (provider_id, starts_at);
     `);
+  }
+
+  if (from < 9) {
+    // An installation upgrading here has no rules and would otherwise match
+    // nothing, which means notifying nobody. The catch-all reproduces the
+    // previous behaviour exactly, and being a real row it is visible and
+    // editable in the dashboard instead of being a special case in the matcher.
+    //
+    // It targets every channel by wildcard rather than by name so that a
+    // channel shipped in a future version is covered too. Enumerating would
+    // leave the new channel in no rule at all, and it would silently never
+    // notify — the same hazard seed.ts avoids by re-seeding channels on boot.
+    const [existing] = db.prepare("SELECT COUNT(*) AS n FROM routing_rules").all() as { n: number }[];
+    if ((existing?.n ?? 0) === 0) {
+      db.prepare(
+        "INSERT INTO routing_rules (position, provider, classes, min_severity, channels) VALUES (?, ?, ?, ?, ?)",
+      ).run(
+        0,
+        "*",
+        JSON.stringify(["status", "incident", "maintenance", "monitoring"]),
+        "any",
+        JSON.stringify(["*"]),
+      );
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

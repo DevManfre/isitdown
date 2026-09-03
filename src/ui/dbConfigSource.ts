@@ -4,6 +4,8 @@ import {
   componentSelectionSchema,
   localeSchema,
   pollingSchema,
+  routingRuleSchema,
+  routingRulesSchema,
   serviceDefinitionSchema,
 } from "../core/config.schema.ts";
 import type {
@@ -14,6 +16,7 @@ import type {
 } from "../core/configSource.interface.ts";
 import type { Logger } from "../core/logger.ts";
 import { CATCH_ALL_RULE } from "../core/routing.ts";
+import type { RoutingRule } from "../core/routing.ts";
 
 /**
  * The UI edition's configuration lives in SQLite and is read afresh every poll
@@ -188,7 +191,114 @@ export function updateService(
 }
 
 export function deleteService(db: DatabaseSync, id: string): boolean {
-  return db.prepare("DELETE FROM services WHERE id = ?").run(id).changes > 0;
+  const deleted = db.prepare("DELETE FROM services WHERE id = ?").run(id).changes > 0;
+  if (deleted) {
+    // No FK could do this: "*" is not a service id. A rule left naming a deleted
+    // provider would match nothing and quietly sit in the list forever. Only
+    // when a row actually went away — a 404 on an unknown id must not mutate.
+    db.prepare("DELETE FROM routing_rules WHERE provider = ?").run(id);
+  }
+  return deleted;
+}
+
+const routingRowSchema = z.object({
+  provider: z.string(),
+  classes: z.string(),
+  min_severity: z.string(),
+  channels: z.string(),
+});
+
+/**
+ * Rules in evaluation order. A row that cannot be read is dropped and counted
+ * rather than served: routing is the one setting where a silent drop changes
+ * behaviour in both directions — losing a muting rule resumes notifications,
+ * losing a broad rule stops them — so the count reaches the dashboard and the
+ * error reaches the log.
+ */
+export function listRoutingRules(
+  db: DatabaseSync,
+  logger: Logger,
+): { rules: RoutingRule[]; invalid: number } {
+  const rules: RoutingRule[] = [];
+  let invalid = 0;
+
+  for (const raw of db
+    .prepare("SELECT provider, classes, min_severity, channels FROM routing_rules ORDER BY position, id")
+    .all()) {
+    const row = routingRowSchema.safeParse(raw);
+    if (!row.success) {
+      invalid += 1;
+      logger.error("skipping an unreadable routing rule row", {
+        issues: row.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`),
+      });
+      continue;
+    }
+
+    let parsed;
+    try {
+      parsed = routingRuleSchema.safeParse({
+        provider: row.data.provider,
+        classes: JSON.parse(row.data.classes),
+        minSeverity: row.data.min_severity,
+        channels: JSON.parse(row.data.channels),
+      });
+    } catch (error) {
+      invalid += 1;
+      logger.error("skipping a routing rule row with unparseable JSON", {
+        provider: row.data.provider,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
+
+    if (!parsed.success) {
+      invalid += 1;
+      logger.error("skipping an invalid routing rule row", {
+        provider: row.data.provider,
+        issues: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`),
+      });
+      continue;
+    }
+    rules.push(parsed.data);
+  }
+
+  return { rules, invalid };
+}
+
+/**
+ * Rewrites the whole list in one transaction. Whole-list rather than per-row so
+ * that reordering cannot interleave: two concurrent per-row position updates
+ * settle in an order neither writer asked for, and the dashboard holds the full
+ * list anyway.
+ */
+export function replaceRoutingRules(db: DatabaseSync, rules: RoutingRule[]): void {
+  // Validated before anything is deleted: a rejected write must leave the
+  // previous rules in place, not an empty table.
+  const validated = routingRulesSchema.parse(rules);
+
+  db.exec("BEGIN");
+  try {
+    db.exec("DELETE FROM routing_rules");
+    const insert = db.prepare(
+      "INSERT INTO routing_rules (position, provider, classes, min_severity, channels) VALUES (?, ?, ?, ?, ?)",
+    );
+    validated.forEach((rule, index) => {
+      insert.run(index, rule.provider, JSON.stringify(rule.classes), rule.minSeverity, JSON.stringify(rule.channels));
+    });
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+/** The API shape, mirroring `describeChannels`. */
+export function describeRouting(
+  db: DatabaseSync,
+  logger: Logger,
+): { rules: RoutingRule[]; invalidRules: number } {
+  const { rules, invalid } = listRoutingRules(db, logger);
+  return { rules, invalidRules: invalid };
 }
 
 export function listChannels(db: DatabaseSync): StoredChannel[] {
@@ -338,6 +448,8 @@ export function createDbConfigSource(
         return { id: channel.id, enabled: channel.enabled, settings: resolved };
       });
 
+      const routing = listRoutingRules(db, logger);
+
       return {
         polling: pollingSchema.parse({
           intervalMinutes: settings.pollIntervalMinutes,
@@ -348,7 +460,10 @@ export function createDbConfigSource(
         locale: settings.notificationLocale,
         services,
         channels,
-        rules: [CATCH_ALL_RULE],
+        // An empty table can only happen if an operator deleted every rule.
+        // Falling back keeps "no rules" from meaning "no notifications", which
+        // is a state nobody chooses on purpose.
+        rules: routing.rules.length === 0 ? [CATCH_ALL_RULE] : routing.rules,
       };
     },
   };
