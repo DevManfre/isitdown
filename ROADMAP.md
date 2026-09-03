@@ -19,8 +19,9 @@ Current state for reference (v1.2.0): Statuspage and generic RSS/Atom adapters, 
 covered by the shared adapter contract suite; Telegram, webhook, Discord, Slack and web
 push channels; scheduled-maintenance awareness (windows silence the diff engine and
 show on the dashboard and timeline); Prometheus `/metrics`; UI edition with overview,
-providers, incidents, history, settings, geographic map/globe; SQLite history with 120-day
-retention; `en` + `it`.
+providers, incidents, history, settings, geographic map/globe; channel credentials
+settable from the dashboard (write-only, kept in a `0600` file beside the database and
+applied with no restart); SQLite history with 120-day retention; `en` + `it`.
 
 ---
 
@@ -92,7 +93,7 @@ is additive and independently shippable.
 | 4.1 ✅ | **Prometheus `/metrics`** | S | `isitdown_provider_up`, `isitdown_poll_duration_seconds`, `isitdown_notifications_total`. Tiny to build, and it plugs IsItDown into every self-hosted Grafana on the planet. Best effort-to-reach ratio in this document. |
 | 4.2 | **SSE or WebSocket live updates** | M | Replaces the dashboard's 30-second poll with a push. Instant reaction on a manual `/poll`, less idle work, and it makes the poll indicator honest. |
 | 4.3 | **Config export / import** | M | `GET /config/export` → a `config.yml` the Light edition can eat, and the reverse for seeding UI from a file. Makes the two editions genuinely interchangeable, which today they only are in principle. |
-| 4.4 | **Backup / restore of the SQLite file from the UI** | S | Download the DB, upload to restore. The whole state is one file — not exposing that is a missed trick. |
+| 4.4 | **Backup / restore of the SQLite file from the UI** | S | Download the DB, upload to restore. Nearly all state is one file — `secrets.env` (5.17) is the exception, and a backup that silently omits the credentials is worse than none, so the flow has to say which of the two it covers. |
 | 4.5 | **Configurable retention** | S | 120 days is hardcoded in `src/ui/runtime.ts`. Should be a setting, with the storage cost shown next to it. |
 | 4.6 | **CSV / JSON export of history and incidents** | S | Per provider, per window. Asked for by anyone who has to report uptime to someone else. |
 | 4.7 | **Monthly uptime report** | M | Generated Markdown (or print-styled HTML) summarising the month: uptime per provider, incident count, worst day. Pairs with 4.6. |
@@ -122,6 +123,7 @@ is additive and independently shippable.
 | 5.14 | **More locales** | S each | `es`, `fr`, `de`, `pt`. The i18n plumbing exists and is enforced; adding a catalog is mechanical. |
 | 5.15 | **Native review of the Italian catalog** | S | On the README's open list already. |
 | 5.16 | **Bundle-size budget** | S | The dashboard has grown Recharts, motion, cobe, dotted-map. A CI check that fails on regression keeps it from quietly becoming a megabyte. |
+| 5.17 ✅ | **Set a channel credential from the dashboard** | M | Settings took only the *name* of the environment variable, so configuring a channel meant editing `.env` and recreating the container. A value now goes to `secrets.env` beside the database (`0600`, in the data volume) and into the process environment, live on the next request; the database still stores only the variable name and no route reads a value back. |
 
 ## 6. Operations and packaging
 
