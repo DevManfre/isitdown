@@ -63,6 +63,7 @@ const config = {
       fields: [{ name: "botToken", envVar: "TELEGRAM_BOT_TOKEN", isSet: true }],
     },
   ],
+  routing: { rules: [], invalidRules: 0 },
 };
 
 /**
