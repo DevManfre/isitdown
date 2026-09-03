@@ -374,6 +374,25 @@ test("an unreadable rule row is dropped, counted and logged rather than served",
   db.close();
 });
 
+test("a routing rule row whose JSON parses but whose values are illegal is dropped, counted and logged", async () => {
+  // Sibling to the "unreadable rule row" (malformed JSON) test above: this
+  // one parses as JSON fine, but min_severity is not a legal floor, so
+  // routingRuleSchema itself rejects it — a different failure branch in
+  // listRoutingRules with its own invalid += 1 / logger.error / continue.
+  const lines: string[] = [];
+  const noisy = createLogger("error", (line) => lines.push(line));
+  const db = await freshDb();
+  db.prepare(
+    "INSERT INTO routing_rules (position, provider, classes, min_severity, channels) VALUES (?, ?, ?, ?, ?)",
+  ).run(1, "*", '["status"]', "catastrophic", '["*"]');
+
+  const { rules, invalidRules } = describeRouting(db, noisy);
+  assert.equal(rules.length, 1);
+  assert.equal(invalidRules, 1);
+  assert.equal(lines.length, 1);
+  db.close();
+});
+
 test("load falls back to the catch-all when the table is empty", async () => {
   const db = await freshDb();
   db.exec("DELETE FROM routing_rules");
