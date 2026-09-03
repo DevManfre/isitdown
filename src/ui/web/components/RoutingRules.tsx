@@ -208,7 +208,7 @@ export function RoutingRules({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-3">
       <p className="text-sm text-muted-foreground">{t("routing.note")}</p>
 
       {routing.invalidRules > 0 && (
@@ -220,17 +220,33 @@ export function RoutingRules({
       {rules.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("routing.empty")}</p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("routing.column.order")}</TableHead>
-              <TableHead>{t("routing.column.provider")}</TableHead>
-              <TableHead>{t("routing.column.classes")}</TableHead>
-              <TableHead>{t("routing.column.severity")}</TableHead>
-              <TableHead>{t("routing.column.channels")}</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
+        // A dedicated scroll container, not just BentoTile's own width: on a
+        // narrow viewport the row (five columns, a four-item toggle-group, a
+        // channel multi-select, three action buttons) is wider than any tile
+        // can be, so this is what turns "clipped with no way to reach it"
+        // into "scrolls within its own box" instead. `min-w-0` alongside it
+        // matters as much as the `overflow-x-auto` itself: without it, this
+        // flex/grid ancestry refuses to shrink below the table's natural
+        // width and the grid track blows out past the viewport instead of
+        // this container ever getting the chance to scroll.
+        <div data-testid="routing-table-scroll" className="min-w-0 overflow-x-auto">
+          {/* shadcn's Table defaults to w-full, which happily shrinks the
+              table down to fit whatever width this wrapper offers instead
+              of ever overflowing it — silently squeezing/clipping columns
+              rather than letting overflow-x-auto do its job. min-w-max pins
+              the table to its content's natural width so a narrow ancestor
+              triggers a real horizontal scrollbar instead. */}
+          <Table className="min-w-max">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">{t("routing.column.order")}</TableHead>
+                <TableHead className="w-28">{t("routing.column.provider")}</TableHead>
+                <TableHead>{t("routing.column.classes")}</TableHead>
+                <TableHead className="w-40">{t("routing.column.severity")}</TableHead>
+                <TableHead className="w-56">{t("routing.column.channels")}</TableHead>
+                <TableHead className="w-28" />
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {rules.map((rule, index) => {
               const shadow = shadowedBy(rules, index);
@@ -242,7 +258,7 @@ export function RoutingRules({
 
                   <TableCell>
                     <Select value={rule.provider} onValueChange={(provider) => patch(index, { provider })}>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-24">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -256,11 +272,16 @@ export function RoutingRules({
                     </Select>
                   </TableCell>
 
-                  <TableCell>
+                  <TableCell className="max-w-64 whitespace-normal">
+                    {/* Same reasoning as the channels column below: four
+                        event-class buttons read better wrapped over two
+                        lines than forcing this column (and the whole row)
+                        to the width of one unbroken line. */}
                     <ToggleGroup
                       type="multiple"
                       value={rule.classes}
                       onValueChange={(classes: string[]) => patch(index, { classes: classes as EventClass[] })}
+                      className="flex-wrap"
                     >
                       {EVENT_CLASSES.map((eventClass) => (
                         <ToggleGroupItem key={eventClass} value={eventClass}>
@@ -290,11 +311,16 @@ export function RoutingRules({
                     </Select>
                   </TableCell>
 
-                  <TableCell>
+                  <TableCell className="max-w-56 whitespace-normal">
+                    {/* flex-wrap, not a wider column: five-plus channel
+                        buttons plus the wildcard read better stacked over two
+                        or three short lines than forcing this column (and so
+                        the whole row) wider than the tile can ever be. */}
                     <ToggleGroup
                       type="multiple"
                       value={rule.channels}
                       onValueChange={(next: string[]) => patch(index, { channels: next })}
+                      className="flex-wrap"
                     >
                       {/* The wildcard is an option rather than a computed state:
                           a rule that says "every channel" must keep meaning that
@@ -312,11 +338,11 @@ export function RoutingRules({
                   </TableCell>
 
                   <TableCell>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5">
                       <Button
                         type="button"
                         variant="secondary"
-                        size="sm"
+                        size="icon-sm"
                         aria-label={t("routing.move-up")}
                         disabled={index === 0}
                         onClick={() => move(index, -1)}
@@ -326,7 +352,7 @@ export function RoutingRules({
                       <Button
                         type="button"
                         variant="secondary"
-                        size="sm"
+                        size="icon-sm"
                         aria-label={t("routing.move-down")}
                         disabled={index === rules.length - 1}
                         onClick={() => move(index, 1)}
@@ -356,7 +382,8 @@ export function RoutingRules({
               );
             })}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       )}
 
       <div>

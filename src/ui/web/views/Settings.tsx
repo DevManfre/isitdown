@@ -760,7 +760,7 @@ export function Settings() {
       <BentoTile
         title={t("settings.routing")}
         delay={stagger(4, TILE_CASCADE)}
-        className="md:col-span-3"
+        className="md:col-span-6 min-w-0"
       >
         <RoutingRules
           routing={config.routing}
