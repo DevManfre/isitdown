@@ -153,6 +153,10 @@ const DYNAMIC_FAMILIES: { prefix: string; reason: string }[] = [
     prefix: "routing.dryrun.event.",
     reason: "RoutingRules.tsx renders t(`routing.dryrun.event.${candidate.id}`) for each canned dry-run event",
   },
+  {
+    prefix: "channel.name.",
+    reason: "RoutingRules.tsx renders t(`channel.name.${id}`) for each channel a rule targets and for each channel option in its editor",
+  },
 ];
 
 /**

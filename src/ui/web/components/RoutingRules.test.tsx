@@ -167,13 +167,34 @@ describe("RoutingRules", () => {
       expect(screen.getByText(/no rule matches — nobody is notified/i)).toBeInTheDocument();
     });
 
-    it("the verdict's channel list always equals what resolveTargets returns for the same change and rules", () => {
+    // The verdict renders its channel list as `t("channel.name.<id>")` values
+    // joined with " · " (RoutingRules.tsx line ~102). Reading that back and
+    // sorting it lets the assertion compare an exact SET against
+    // resolveTargets's own output, rather than a per-channel getByText
+    // subset check that would still pass if the verdict listed an extra,
+    // wrong channel.
+    const verdictChannelNames = () =>
+      screen
+        .getByTestId("routing-dryrun-verdict")
+        .textContent!.split(" · ")
+        .map((name) => name.trim())
+        .filter((name) => name.length > 0)
+        .sort();
+
+    const expectedChannelNames = (change: StatusChange) =>
+      resolveTargets(change, rules, ["telegram", "slack"])
+        .map((id) => i18n.t(`channel.name.${id}`))
+        .sort();
+
+    it("the verdict's channel list always equals what resolveTargets returns for the same change and rules", async () => {
+      const user = userEvent.setup();
       mount(
         <RoutingRules routing={{ rules, invalidRules: 0 }} channels={channels} services={dryRunServices} />,
       );
 
-      // The default dry run: github provider, major-outage event, exactly the
-      // StatusChange shape the panel feeds to core's own evaluator.
+      // State 1: the default dry run — github provider, major-outage event,
+      // exactly the StatusChange shape the panel feeds to core's own
+      // evaluator. Rule 1 (github-specific) wins here.
       const majorOutage: StatusChange = {
         kind: "status_change",
         providerId: "github",
@@ -181,11 +202,17 @@ describe("RoutingRules", () => {
         currentStatus: "major_outage",
         at: new Date().toISOString(),
       };
-      const expected = resolveTargets(majorOutage, rules, ["telegram", "slack"]);
-      const verdict = screen.getByTestId("routing-dryrun-verdict");
-      for (const channelName of expected) {
-        expect(within(verdict).getByText(new RegExp(channelName, "i"))).toBeInTheDocument();
-      }
+      expect(verdictChannelNames()).toEqual(expectedChannelNames(majorOutage));
+
+      // State 2: reached by CLICKING the provider picker, not the default —
+      // switching to Sentry takes rule 1 (github-only) out of contention, so
+      // the catch-all rule ("*" channels, i.e. every enabled channel) wins
+      // instead. A wrong implementation that hardcoded rule 1's channels, or
+      // that widened the set past what explain() actually returns, would
+      // fail this exact-set comparison where the old subset check would not.
+      await user.click(screen.getByRole("button", { name: "Sentry" }));
+      const sentryMajorOutage: StatusChange = { ...majorOutage, providerId: "sentry" };
+      expect(verdictChannelNames()).toEqual(expectedChannelNames(sentryMajorOutage));
     });
   });
 });
