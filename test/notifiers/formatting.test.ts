@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { emojiFor, renderMessage, severityLabel } from "../../src/notifiers/formatting.ts";
+import { colorFor, emojiFor, renderMessage, renderParts, severityLabel } from "../../src/notifiers/formatting.ts";
 import type { NotificationPayload, StatusChange } from "../../src/core/types.ts";
 
 const service = { id: "github", name: "GitHub", statusUrl: "https://www.githubstatus.com" };
@@ -260,4 +260,77 @@ test("the italian rendering differs from the english one but keeps the same data
     assert.ok(message.includes("API requests failing"));
     assert.ok(message.includes("2026-08-19 14:32 UTC"));
   }
+});
+
+test("the parts of a message are the same words the flat rendering uses", () => {
+  const change: StatusChange = {
+    kind: "incident_opened",
+    providerId: "github",
+    currentStatus: "major_outage",
+    incident,
+    at: incident.updatedAt,
+  };
+  const parts = renderParts(payloadFor(change));
+  assert.equal(parts.heading, "🔴 GitHub — MAJOR OUTAGE");
+  assert.ok(parts.detail.startsWith("Incident: API requests failing"), parts.detail);
+  // The link is a channel-level affordance (an embed title, a Slack button), so
+  // it is not repeated inside the detail.
+  assert.ok(!parts.detail.includes(service.statusUrl), parts.detail);
+  assert.equal(parts.url, service.statusUrl);
+  assert.equal(renderMessage(payloadFor(change)).startsWith(parts.heading), true);
+});
+
+test("every change kind splits into a non-empty heading and detail", () => {
+  const kinds: StatusChange[] = [
+    { kind: "status_change", providerId: "github", previousStatus: "operational", currentStatus: "degraded", at: incident.updatedAt },
+    {
+      kind: "component_status_change",
+      providerId: "github",
+      previousStatus: "operational",
+      currentStatus: "degraded",
+      component: { id: "c1", name: "Actions" },
+      at: incident.updatedAt,
+    },
+    { kind: "incident_opened", providerId: "github", currentStatus: "major_outage", incident, at: incident.updatedAt },
+    { kind: "incident_updated", providerId: "github", currentStatus: "major_outage", incident, at: incident.updatedAt },
+    { kind: "incident_resolved", providerId: "github", currentStatus: "operational", incident, at: incident.updatedAt },
+    { kind: "maintenance_started", providerId: "github", currentStatus: "operational", maintenance: window, at: window.startsAt },
+    { kind: "maintenance_ended", providerId: "github", currentStatus: "operational", maintenance: window, openIncidents: 0, at: window.endsAt },
+    { kind: "monitoring_degraded", providerId: "github", currentStatus: "unknown", failureCount: 5, at: incident.updatedAt },
+  ];
+  for (const change of kinds) {
+    for (const locale of ["en", "it"]) {
+      const parts = renderParts(payloadFor(change, locale));
+      assert.ok(parts.heading.length > 0, `${change.kind}/${locale}: empty heading`);
+      assert.ok(parts.detail.length > 0, `${change.kind}/${locale}: empty detail`);
+      assert.ok(!parts.heading.includes("\n"), `${change.kind}/${locale}: heading is more than one line`);
+    }
+  }
+});
+
+test("a colour is defined for every status and severities never share one", () => {
+  const colors = (["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const).map(
+    (status) => colorFor({ kind: "status_change", providerId: "github", currentStatus: status, at: incident.updatedAt }),
+  );
+  assert.equal(new Set(colors).size, colors.length);
+  assert.equal(colors[3], 0xb91c1c);
+});
+
+test("maintenance and a monitoring warning do not borrow the provider's colour", () => {
+  const maintenance = colorFor({
+    kind: "maintenance_started",
+    providerId: "github",
+    currentStatus: "major_outage",
+    maintenance: window,
+    at: window.startsAt,
+  });
+  const monitoring = colorFor({
+    kind: "monitoring_degraded",
+    providerId: "github",
+    currentStatus: "major_outage",
+    failureCount: 5,
+    at: incident.updatedAt,
+  });
+  assert.notEqual(maintenance, colorFor({ kind: "status_change", providerId: "github", currentStatus: "major_outage", at: incident.updatedAt }));
+  assert.equal(monitoring, colorFor({ kind: "status_change", providerId: "github", currentStatus: "unknown", at: incident.updatedAt }));
 });

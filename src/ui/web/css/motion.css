@@ -474,11 +474,50 @@
   border-color: var(--color-accent);
   transform: translateX(3px);
 }
-.panel-channel {
-  transition: border-color 0.24s ease;
+/* A channel row is a list row now, not a card: there is no border left to
+   tint, so the hover lands on the disclosure itself — the part that is
+   clickable — rather than on the whole row including its switch. */
+.panel-channel [data-slot="collapsible-trigger"] {
+  transition: background-color 0.18s ease;
 }
-.panel-channel:hover {
-  border-color: var(--color-accent);
+.panel-channel [data-slot="collapsible-trigger"]:hover {
+  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+/* The row's panel unfolding open. Radix measures the panel and publishes the
+   height as a custom property, which is what lets a keyframe travel to a height
+   no stylesheet can know; the content stays mounted while the closing run
+   plays, so the rows below it slide up rather than jumping. Scoped to the
+   channel list: the fleet groups' own collapsibles animate their contents
+   themselves. */
+@keyframes channel-unfold {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+@keyframes channel-fold {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+.panel-channel [data-slot="collapsible-content"] {
+  overflow: hidden;
+}
+.panel-channel [data-slot="collapsible-content"][data-state="open"] {
+  animation: channel-unfold 0.26s var(--ease-entry);
+}
+.panel-channel [data-slot="collapsible-content"][data-state="closed"] {
+  animation: channel-fold 0.2s ease;
 }
 
 /* Reduced motion keeps every state change, and none of the travel. */

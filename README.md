@@ -102,8 +102,10 @@ Anthropic       operational    ████████████████�
   degraded, degraded → outage, outage → resolved. A restart notifies nothing.
 - **Provider-agnostic.** Most providers run Atlassian Statuspage and need no code
   at all; anything else gets a small adapter.
-- **Secrets from the environment only.** No token is ever written to a config
-  file, a database, an API response or a log line.
+- **Secrets from the environment only.** A token is read from an environment
+  variable, never written to a config file, a database, an API response or a log
+  line. The UI edition can save one to a `0600` file beside its database, still
+  as a variable, so the dashboard can set a credential without a restart.
 
 ### The two editions
 
@@ -138,9 +140,10 @@ docker compose --profile ui up -d
 # then visit http://localhost:3000
 ```
 
-Everything the UI edition needs is configured in the dashboard, except secrets,
-which come from the environment only. Put them in a `.env` next to the compose
-file — it is optional, and read if present:
+Everything the UI edition needs is configured in the dashboard, credentials
+included: **Settings → a channel → Value → Salva** applies at once. Put them in a
+`.env` next to the compose file instead if you would rather the container own
+them — it is optional, and read if present:
 
 ```bash
 printf 'TELEGRAM_BOT_TOKEN=...\nTELEGRAM_CHAT_ID=...\n' > .env
@@ -229,6 +232,12 @@ notifications:
   webhook:
     enabled: false
     url: "${WEBHOOK_URL}"
+  discord:
+    enabled: false
+    webhookUrl: "${DISCORD_WEBHOOK_URL}"
+  slack:
+    enabled: false
+    webhookUrl: "${SLACK_WEBHOOK_URL}"
 ```
 
 | Key | Default | Notes |
@@ -256,8 +265,8 @@ Everything lives in SQLite at `/app/data/isitdown.db` and is edited from
 
 - polling interval, request timeout, retries
 - the service list — add, edit, remove
-- which notification channels are enabled, and which environment variable carries
-  each credential
+- which notification channels are enabled, which environment variable carries
+  each credential, and — write-only — the credential itself
 - theme, dashboard language, notification language
 
 Writes take effect on the **next poll cycle**, with no restart, because the
@@ -272,6 +281,8 @@ list is never overwritten afterwards.
 | `TELEGRAM_BOT_TOKEN` | both | — | Telegram bot token. Required if the Telegram channel is enabled. |
 | `TELEGRAM_CHAT_ID` | both | — | Target chat. Required with the above. |
 | `WEBHOOK_URL` | both | — | Where the generic webhook POSTs. Required if that channel is enabled. |
+| `DISCORD_WEBHOOK_URL` | both | — | Discord incoming webhook. Required if the Discord channel is enabled. |
+| `SLACK_WEBHOOK_URL` | both | — | Slack incoming webhook. Required if the Slack channel is enabled. |
 | `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Where to read `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Where to keep the state file. |
@@ -296,20 +307,32 @@ but TELEGRAM_BOT_TOKEN is not set in the environment
 
 **UI.** The `channels` table stores the *name* of the variable
 (`botTokenEnv: "TELEGRAM_BOT_TOKEN"`), never a value, and the name is resolved at
-load. Consequences worth knowing:
+load. A value can be *set* from the dashboard, which writes it to
+`secrets.env` beside the database — mode `0600`, in the data volume, one
+`NAME=value` per line — and into the server's own environment, so the channel
+starts working on the next request with nothing to restart. Consequences worth
+knowing:
 
-- Settings shows the variable name and whether it currently resolves. The **name**
-  is editable; the value is not, and there is no field in which to type one.
-- `PATCH /config/channels/:id` **refuses** a request carrying a literal secret, so
-  the database is never offered one in the first place.
+- Settings shows the variable name, whether it currently resolves, and a
+  write-only value field. The field always renders empty and `Clear` forgets a
+  saved value; nothing reads one back.
+- `PATCH /config/channels/:id` still **refuses** a request carrying a literal
+  secret: values go to `PUT /config/channels/:id/secrets`, and the database is
+  never offered one.
+- A saved value overrides the same variable coming from `env_file` — it is the
+  later, explicit instruction — and every takeover is logged at boot.
+- `DELETE /config/channels/:id/secrets/:field` only forgets what the file itself
+  holds; a variable the container supplied answers `409` rather than pretending.
+  Forgetting an entry that had overridden an `env_file` value falls back to that
+  value rather than leaving the channel with nothing.
 - No API response, DOM node, log line or error message contains a resolved secret.
   Tests assert this.
 - A channel enabled in the database whose variable is unset is skipped for that
   cycle with a warning, rather than crashing the dashboard — unlike Light, there
   is a UI in which an operator can see and fix it.
 
-This is a deliberate departure from the design prototype, which drew editable
-credential fields.
+The dashboard therefore accepts a credential, as the design prototype drew, but
+only one way: in.
 
 ### 3.5 Monitored providers
 
@@ -338,7 +361,8 @@ The provider's own `status.indicator` maps onto the internal severity model:
 | absent | `unknown` |
 
 An incident is *active* unless its status is `resolved` or `postmortem`.
-`scheduled_maintenances` is ignored: the severity model has no maintenance state.
+`scheduled_maintenances` is read separately: a declared window is not a severity,
+it silences the provider's alerts while it runs.
 
 Note that a provider can report `degraded` with **zero** open incidents — Statuspage
 derives the indicator from component state too. A degraded status grid alongside an
@@ -407,6 +431,8 @@ For a provider on neither Statuspage nor a feed, add an adapter under
 |---|---|---|
 | Telegram Bot API | `telegram` | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
 | Generic webhook | `webhook` | `WEBHOOK_URL` |
+| Discord | `discord` | `DISCORD_WEBHOOK_URL` |
+| Slack | `slack` | `SLACK_WEBHOOK_URL` |
 | Desktop (Web Push) | `webpush` | none |
 
 Desktop push needs nothing configured: the server generates its own VAPID key
@@ -437,8 +463,15 @@ register a service worker unless the dashboard is served over localhost or HTTPS
 A toast carries the affected provider's own icon, so a stack of them is readable
 at a glance.
 
-Discord and Slack are webhook-shaped and slot in behind the same `Notifier`
-interface; they are not implemented yet.
+Discord and Slack are both incoming webhooks: create one in the target
+server/workspace, put its URL in `DISCORD_WEBHOOK_URL` or `SLACK_WEBHOOK_URL`,
+and enable the channel. Both render the same words every other channel sends,
+arranged natively — Discord as one embed whose title carries the severity and
+links to the provider's status page, coloured by that severity; Slack as a
+Block Kit section plus an "Open status page" button, with the heading repeated
+as the notification preview text. Neither URL is ever logged or shown in the
+dashboard: a rejected send reports the HTTP status and the service's own
+reason.
 
 ---
 
@@ -756,14 +789,25 @@ real. Create a bot with [@BotFather](https://t.me/botfather), send it a message,
 then read your chat id from
 `https://api.telegram.org/bot<TOKEN>/getUpdates`.
 
+In the UI edition, both values can be saved from **Settings → Telegram**, or
+through the API — either way no restart is involved:
+
 ```bash
-sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=123456:AA...|' .env
-sed -i 's|^TELEGRAM_CHAT_ID=.*|TELEGRAM_CHAT_ID=-1001234567890|' .env
-docker compose --profile ui up -d --force-recreate
+curl -s -X PUT localhost:3000/config/channels/telegram/secrets \
+  -H 'content-type: application/json' \
+  -d '{"fields":{"botToken":"123456:AA...","chatId":"-1001234567890"}}'
 
 curl -s -X PATCH localhost:3000/config/channels/telegram \
   -H 'content-type: application/json' -d '{"enabled":true}'
 curl -s -X POST localhost:3000/config/channels/telegram/test    # {"ok":true}
+```
+
+Through `env_file` instead, the container has to be recreated for it to read them:
+
+```bash
+sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=123456:AA...|' .env
+sed -i 's|^TELEGRAM_CHAT_ID=.*|TELEGRAM_CHAT_ID=-1001234567890|' .env
+docker compose --profile ui up -d --force-recreate
 ```
 
 A failure comes back as `{"ok":false,"error":"telegram notification failed: HTTP 400 (chat not found)"}` —
@@ -813,6 +857,8 @@ back reports a parse failure instead of the real problem.
 | `PATCH` `DELETE` | `/config/services/:id` | Edit or remove. Deleting cascades to that provider's samples, incidents and state, so nothing orphaned survives. |
 | `PATCH` | `/config/settings` | Polling settings. |
 | `PATCH` | `/config/channels/:id` | Enable/disable, and set variable names. **Refuses** a literal secret. |
+| `PUT` | `/config/channels/:id/secrets` | Save credential **values** — `{"fields":{"<field>":"<value>"}}`. Write-only: the value goes to `secrets.env` beside the database and into the process environment, effective immediately, and the response is the usual names-and-`isSet` shape. `400` for an unknown field or an unusable value. |
+| `DELETE` | `/config/channels/:id/secrets/:field` | Forget a saved value. `409` if the variable came from the container's environment instead. |
 | `POST` | `/config/services/:id/test` | One live fetch against that provider. Records nothing. |
 | `POST` | `/config/channels/:id/test` | One test notification, through the dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
@@ -920,7 +966,7 @@ publish port 3000 to a network you do not trust.
                         │   Dispatcher   │  the only caller of Notifier.send
                         └───────┬────────┘
                                 ▼
-                        Telegram · webhook
+                   Telegram · webhook · Discord · Slack
 
    UI edition only: an Express server in the same process serves the dashboard and
    the API from the same StateStore, and can ask the scheduler for a cycle now.
@@ -981,10 +1027,12 @@ in the `ConfigSource` and `StateStore` they inject.
    Notifiers are rebuilt from the configuration every cycle, which is why enabling a
    channel needs no restart.
 
-7. **Notifiers** — Telegram and generic webhook. Message assembly is shared
+7. **Notifiers** — Telegram, generic webhook, Discord and Slack. Message assembly is shared
    (`src/notifiers/formatting.ts`), so channels cannot drift apart in what they
-   report; only the transport differs. Emoji and layout live in the notifier, the
-   words come from the shared catalogs.
+   report; only the transport differs. A channel with a structured native format
+   asks for the same message in pieces (`renderParts`) rather than composing its
+   own. Emoji, colour and layout live in the notifier, the words come from the
+   shared catalogs.
 
 ### 7.3 When a notification fires
 
@@ -1191,9 +1239,12 @@ isitdown/
 │   │   ├── rss.adapter.ts              generic RSS / Atom incident-feed adapter
 │   │   └── index.ts                    registry keyed by adapter id
 │   ├── notifiers/                     (shared)
-│   │   ├── formatting.ts               emoji, severity labels, message assembly
+│   │   ├── formatting.ts               emoji, colours, severity labels, message assembly
+│   │   ├── settings.ts                 shared validation for URL-only channel settings
 │   │   ├── telegram.notifier.ts
 │   │   ├── webhook.notifier.ts
+│   │   ├── discord.notifier.ts         incoming webhook, one embed per change
+│   │   ├── slack.notifier.ts           incoming webhook, Block Kit section + button
 │   │   └── index.ts                    registry keyed by channel id
 │   ├── light/                         (Light edition only)
 │   │   ├── index.ts                    entrypoint
@@ -1214,6 +1265,7 @@ isitdown/
 │       ├── history.ts                  uptime and incident aggregation
 │       ├── backfill.ts                 reconstructs 90 days of history from a provider's incidents on first boot
 │       ├── dbConfigSource.ts           config from SQLite; resolves secrets by variable name
+│       ├── secretsFile.ts              credentials saved from the dashboard: 0600 file beside the database, applied to the environment
 │       ├── metrics.ts                  the Prometheus scrape surface: gauges from the store, counters in memory
 │       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
@@ -1415,7 +1467,8 @@ to what they cover.
 - Notification-sending logic lives only on the diff engine → dispatcher path.
 - Any string a human reads is a catalog key, written in English first.
 - Secrets from environment variables only — never a config file, never a database,
-  never a log line.
+  never a log line. The UI edition's `secretsFile.ts` is the one writer, and it
+  writes variables, not config.
 - New dashboard surfaces get prototyped in `design/` before implementation.
 - A shadcn component exists for most surfaces — use it, and `cn()` for conditional
   classes, rather than writing a new component class.
@@ -1480,11 +1533,7 @@ Delivered:
 Still open:
 
 - Adapters for providers not on Atlassian Statuspage.
-- Discord and Slack channels with rich embeds — both webhook-shaped, so they slot in
-  behind the existing `Notifier` interface.
 - Multi-recipient routing: different channels per provider or per severity.
-- Scheduled-maintenance awareness. The adapter ignores Statuspage's
-  `scheduled_maintenances`, and the severity model has no maintenance state.
 - A native review of the Italian strings.
 
 Explicit non-goals: multi-user auth (this is a local, single-operator dashboard),

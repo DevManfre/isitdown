@@ -102,8 +102,11 @@ Anthropic       operational    ████████████████�
   → degraded, degraded → outage, outage → resolved. Un restart non notifica nulla.
 - **Indipendente dal provider.** La maggior parte gira su Atlassian Statuspage e non
   richiede codice; per tutto il resto serve un piccolo adapter.
-- **Segreti solo dall'ambiente.** Nessun token viene mai scritto in un file di
-  configurazione, in un database, in una risposta API o in una riga di log.
+- **Segreti solo dall'ambiente.** Un token si legge da una variabile d'ambiente e
+  non viene mai scritto in un file di configurazione, in un database, in una
+  risposta API o in una riga di log. L'edizione UI può salvarne uno in un file
+  `0600` accanto al database, sempre come variabile, così la dashboard imposta
+  una credenziale senza riavvii.
 
 ### Le due edizioni
 
@@ -138,9 +141,10 @@ docker compose --profile ui up -d
 # poi apri http://localhost:3000
 ```
 
-Tutto ciò che serve all'edizione UI si configura nella dashboard, tranne i
-segreti, che arrivano solo dall'ambiente. Mettili in un `.env` accanto al file
-compose: è opzionale, e viene letto se presente.
+Tutto ciò che serve all'edizione UI si configura nella dashboard, credenziali
+comprese: **Settings → un canale → Valore → Salva** ha effetto subito. Se
+preferisci che sia il container a possederle, mettile in un `.env` accanto al
+file compose: è opzionale, e viene letto se presente.
 
 ```bash
 printf 'TELEGRAM_BOT_TOKEN=...\nTELEGRAM_CHAT_ID=...\n' > .env
@@ -230,6 +234,12 @@ notifications:
   webhook:
     enabled: false
     url: "${WEBHOOK_URL}"
+  discord:
+    enabled: false
+    webhookUrl: "${DISCORD_WEBHOOK_URL}"
+  slack:
+    enabled: false
+    webhookUrl: "${SLACK_WEBHOOK_URL}"
 ```
 
 | Chiave | Default | Note |
@@ -257,8 +267,8 @@ ignorato. Tutto vive in SQLite in `/app/data/isitdown.db` e si modifica da
 
 - intervallo di polling, timeout delle richieste, numero di tentativi
 - la lista dei servizi: aggiungi, modifica, rimuovi
-- quali canali di notifica sono attivi e quale variabile d'ambiente porta ogni
-  credenziale
+- quali canali di notifica sono attivi, quale variabile d'ambiente porta ogni
+  credenziale e — in sola scrittura — la credenziale stessa
 - tema, lingua della dashboard, lingua delle notifiche
 
 Le scritture hanno effetto al **ciclo di poll successivo**, senza restart, perché lo
@@ -273,6 +283,8 @@ tua lista non viene più sovrascritta in seguito.
 | `TELEGRAM_BOT_TOKEN` | entrambe | — | Token del bot Telegram. Obbligatoria se il canale Telegram è attivo. |
 | `TELEGRAM_CHAT_ID` | entrambe | — | Chat di destinazione. Obbligatoria con la precedente. |
 | `WEBHOOK_URL` | entrambe | — | Dove il webhook generico fa POST. Obbligatoria se quel canale è attivo. |
+| `DISCORD_WEBHOOK_URL` | entrambe | — | Webhook in entrata di Discord. Obbligatoria se il canale Discord è attivo. |
+| `SLACK_WEBHOOK_URL` | entrambe | — | Webhook in entrata di Slack. Obbligatoria se il canale Slack è attivo. |
 | `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Dove leggere `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Dove tenere il file di stato. |
@@ -299,20 +311,32 @@ but TELEGRAM_BOT_TOKEN is not set in the environment
 
 **UI.** La tabella `channels` salva il **nome** della variabile
 (`botTokenEnv: "TELEGRAM_BOT_TOKEN"`), mai un valore, e il nome viene risolto al
-caricamento. Conseguenze da conoscere:
+caricamento. Un valore si può *impostare* dalla dashboard: finisce in
+`secrets.env` accanto al database — modo `0600`, nel volume dati, un
+`NAME=value` per riga — e nell'ambiente del server, quindi il canale funziona
+dalla richiesta successiva senza riavviare nulla. Conseguenze da conoscere:
 
-- Settings mostra il nome della variabile e se al momento si risolve. Il **nome** è
-  modificabile; il valore no, e non esiste alcun campo in cui digitarlo.
-- `PATCH /config/channels/:id` **rifiuta** una richiesta che porti un segreto
-  letterale: al database non viene nemmeno offerto.
+- Settings mostra il nome della variabile, se al momento si risolve e un campo
+  valore in sola scrittura. Il campo si presenta sempre vuoto e `Cancella`
+  dimentica un valore salvato; nessuno lo rilegge.
+- `PATCH /config/channels/:id` **rifiuta** ancora una richiesta che porti un
+  segreto letterale: i valori passano da `PUT /config/channels/:id/secrets`, e al
+  database non viene mai offerto nulla.
+- Un valore salvato prevale sulla stessa variabile che arriva da `env_file` — è
+  l'istruzione più recente ed esplicita — e ogni sostituzione viene loggata
+  all'avvio.
+- `DELETE /config/channels/:id/secrets/:field` dimentica solo ciò che il file
+  stesso contiene; per una variabile fornita dal container risponde `409` invece
+  di fingere. Dimenticare una voce che aveva sostituito un valore di `env_file`
+  fa tornare in vigore quel valore, invece di lasciare il canale senza nulla.
 - Nessuna risposta API, nodo del DOM, riga di log o messaggio d'errore contiene un
   segreto risolto. I test lo verificano.
 - Un canale attivo nel database la cui variabile non è impostata viene saltato per
   quel ciclo con un warning, invece di far crashare la dashboard: a differenza di
   Light, qui esiste una UI in cui un operatore può vederlo e sistemarlo.
 
-È uno scostamento deliberato dal prototipo di design, che disegnava campi credenziali
-modificabili.
+La dashboard accetta quindi una credenziale, come disegnava il prototipo di
+design, ma in un solo verso: dentro.
 
 ### 3.5 Provider monitorati
 
@@ -341,8 +365,8 @@ Lo `status.indicator` del provider viene mappato sul modello di severità intern
 | assente | `unknown` |
 
 Un incidente è *attivo* a meno che il suo stato sia `resolved` o `postmortem`.
-`scheduled_maintenances` viene ignorato: il modello di severità non ha uno stato di
-manutenzione.
+`scheduled_maintenances` viene letto a parte: una finestra dichiarata non è una
+severità, silenzia gli avvisi del provider mentre è in corso.
 
 Attenzione: un provider può riportare `degraded` con **zero** incidenti aperti —
 Statuspage deriva l'indicator anche dallo stato dei componenti. Una griglia degradata
@@ -411,6 +435,8 @@ sotto `src/adapters/`.
 |---|---|---|
 | Telegram Bot API | `telegram` | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
 | Webhook generico | `webhook` | `WEBHOOK_URL` |
+| Discord | `discord` | `DISCORD_WEBHOOK_URL` |
+| Slack | `slack` | `SLACK_WEBHOOK_URL` |
 
 Il webhook fa POST di `{ change, service, message }`, così chi lo consuma può
 mostrare il testo già formattato oppure fare routing sui campi strutturati:
@@ -429,8 +455,15 @@ mostrare il testo già formattato oppure fare routing sui campi strutturati:
 }
 ```
 
-Discord e Slack hanno la stessa forma di un webhook e si innestano dietro la stessa
-interfaccia `Notifier`; non sono ancora implementati.
+Discord e Slack sono entrambi webhook in entrata: creane uno nel server o nel
+workspace di destinazione, metti l'URL in `DISCORD_WEBHOOK_URL` o
+`SLACK_WEBHOOK_URL` e attiva il canale. Entrambi riportano le stesse parole che
+manda ogni altro canale, disposte in modo nativo: Discord come un embed il cui
+titolo porta la severità e rimanda alla status page del provider, colorato per
+severità; Slack come una sezione Block Kit più un pulsante "Apri la pagina di
+stato", con l'intestazione ripetuta come testo di anteprima della notifica.
+Nessuno dei due URL finisce mai in un log o nella dashboard: un invio rifiutato
+riporta lo stato HTTP e la ragione del servizio stesso.
 
 ---
 
@@ -753,14 +786,25 @@ conviene fare una prova reale. Crea un bot con [@BotFather](https://t.me/botfath
 mandagli un messaggio, poi leggi il tuo chat id da
 `https://api.telegram.org/bot<TOKEN>/getUpdates`.
 
+Nell'edizione UI i due valori si salvano da **Settings → Telegram**, oppure via
+API: in ogni caso non c'è nessun riavvio di mezzo.
+
 ```bash
-sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=123456:AA...|' .env
-sed -i 's|^TELEGRAM_CHAT_ID=.*|TELEGRAM_CHAT_ID=-1001234567890|' .env
-docker compose --profile ui up -d --force-recreate
+curl -s -X PUT localhost:3000/config/channels/telegram/secrets \
+  -H 'content-type: application/json' \
+  -d '{"fields":{"botToken":"123456:AA...","chatId":"-1001234567890"}}'
 
 curl -s -X PATCH localhost:3000/config/channels/telegram \
   -H 'content-type: application/json' -d '{"enabled":true}'
 curl -s -X POST localhost:3000/config/channels/telegram/test    # {"ok":true}
+```
+
+Passando invece da `env_file`, il container va ricreato perché le legga:
+
+```bash
+sed -i 's|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=123456:AA...|' .env
+sed -i 's|^TELEGRAM_CHAT_ID=.*|TELEGRAM_CHAT_ID=-1001234567890|' .env
+docker compose --profile ui up -d --force-recreate
 ```
 
 Un fallimento torna come `{"ok":false,"error":"telegram notification failed: HTTP 400 (chat not found)"}`:
@@ -810,6 +854,8 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `PATCH` `DELETE` | `/config/services/:id` | Modifica o rimozione. La cancellazione propaga a campioni, incidenti e stato di quel provider, così non sopravvive nulla orfano. |
 | `PATCH` | `/config/settings` | Impostazioni di polling. |
 | `PATCH` | `/config/channels/:id` | Attiva/disattiva e imposta i nomi delle variabili. **Rifiuta** un segreto letterale. |
+| `PUT` | `/config/channels/:id/secrets` | Salva i **valori** delle credenziali — `{"fields":{"<campo>":"<valore>"}}`. Sola scrittura: il valore va in `secrets.env` accanto al database e nell'ambiente del processo, con effetto immediato, e la risposta è la solita forma nomi-e-`isSet`. `400` per un campo sconosciuto o un valore inutilizzabile. |
+| `DELETE` | `/config/channels/:id/secrets/:field` | Dimentica un valore salvato. `409` se la variabile arriva dall'ambiente del container. |
 | `POST` | `/config/services/:id/test` | Una fetch reale verso quel provider. Non registra nulla. |
 | `POST` | `/config/channels/:id/test` | Una notifica di test, attraverso il dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
@@ -919,7 +965,7 @@ pubblicare la porta 3000 su una rete di cui non ti fidi.
                         │   Dispatcher   │  l'unico chiamante di Notifier.send
                         └───────┬────────┘
                                 ▼
-                        Telegram · webhook
+                   Telegram · webhook · Discord · Slack
 
    Solo edizione UI: un server Express nello stesso processo serve dashboard e API
    dallo stesso StateStore, e può chiedere allo scheduler un ciclo immediato.
@@ -982,9 +1028,11 @@ differiscono solo per il `ConfigSource` e lo `StateStore` che iniettano.
    un altro cambiamento. I notifier vengono ricostruiti dalla configurazione a ogni
    ciclo, ed è per questo che attivare un canale non richiede restart.
 
-7. **Notifier** — Telegram e webhook generico. La composizione del messaggio è
-   condivisa (`src/notifiers/formatting.ts`), così i canali non possono divergere su
-   ciò che riportano; cambia solo il trasporto. Emoji e impaginazione stanno nel
+7. **Notifier** — Telegram, webhook generico, Discord e Slack. La composizione del
+   messaggio è condivisa (`src/notifiers/formatting.ts`), così i canali non possono
+   divergere su ciò che riportano; cambia solo il trasporto. Un canale con un
+   formato nativo strutturato chiede lo stesso messaggio a pezzi (`renderParts`)
+   invece di comporne uno proprio. Emoji, colore e impaginazione stanno nel
    notifier, le parole arrivano dai cataloghi condivisi.
 
 ### 7.3 Quando scatta una notifica
@@ -1209,7 +1257,8 @@ isitdown/
 │   │   ├── rss.adapter.ts             adapter generico per feed RSS / Atom
 │   │   └── index.ts                   registro per id di adapter
 │   ├── notifiers/                     (condiviso)
-│   │   ├── formatting.ts              emoji, etichette di severità, composizione del messaggio
+│   │   ├── formatting.ts              emoji, colori, etichette di severità, composizione del messaggio
+│   │   ├── settings.ts                validazione condivisa per i canali configurati con un solo URL
 │   │   ├── telegram.notifier.ts
 │   │   ├── webhook.notifier.ts
 │   │   └── index.ts                   registro per id di canale
@@ -1232,6 +1281,7 @@ isitdown/
 │       ├── history.ts                 aggregazione di uptime e incidenti
 │       ├── backfill.ts                ricostruisce 90 giorni di storico dagli incidenti di un provider al primo avvio
 │       ├── dbConfigSource.ts          configurazione da SQLite; risolve i segreti per nome di variabile
+│       ├── secretsFile.ts             credenziali salvate dalla dashboard: file 0600 accanto al database, applicate all'ambiente
 │       ├── metrics.ts                  la superficie di scrape Prometheus: gauge dallo store, counter in memoria
 │       ├── db/                        open.ts, migrate.ts, seed.ts
 │       ├── routes/                    status, history, incidents, notifications, config, preferences, metrics
@@ -1507,12 +1557,7 @@ Consegnato:
 Ancora aperto:
 
 - Adapter per provider che non stanno su Atlassian Statuspage.
-- Canali Discord e Slack con rich embed: hanno entrambi la forma di un webhook, quindi
-  si innestano dietro l'interfaccia `Notifier` esistente.
 - Routing multi-destinatario: canali diversi per provider o per severità.
-- Consapevolezza delle manutenzioni programmate. L'adapter ignora
-  `scheduled_maintenances` di Statuspage, e il modello di severità non ha uno stato di
-  manutenzione.
 - Una revisione madrelingua delle stringhe italiane.
 
 Non-obiettivi espliciti: autenticazione multi-utente (questa è una dashboard locale per

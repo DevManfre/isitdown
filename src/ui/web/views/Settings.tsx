@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Bell, ChevronRight, Hash, MessagesSquare, MonitorSmartphone, Send, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
-import { Card } from "@/components/ui/card.tsx";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog.tsx";
@@ -26,6 +27,7 @@ import { getPushKey } from "@/lib/api.ts";
 import { hostOf } from "@/lib/format.ts";
 import { pushSupported, subscribeThisBrowser } from "@/lib/push.ts";
 import { stagger } from "@/lib/stagger.ts";
+import { cn } from "@/lib/utils.ts";
 import type { DescribedChannel, MapView, ServiceDefinition } from "@/lib/types.ts";
 
 /**
@@ -115,7 +117,13 @@ const PUSH_FAILURE_KEYS: Record<string, string> = {
  * dashboard, so enabling it needs a click *here* — the env vars alone cannot
  * deliver anything until a browser has subscribed.
  */
-function PushDevices({ channelEnabled }: { channelEnabled: boolean }) {
+function PushDevices({
+  channelEnabled, testAction, testMessage,
+}: {
+  channelEnabled: boolean;
+  testAction: ReactNode;
+  testMessage: ReactNode;
+}) {
   const { t } = useTranslation();
   const devices = usePushDevices();
   const { add, remove } = usePushMutations();
@@ -139,16 +147,34 @@ function PushDevices({ channelEnabled }: { channelEnabled: boolean }) {
     }
   };
 
-  if (!supported) return <p className="text-xs text-muted-foreground">{t("push.unsupported")}</p>;
+  if (!supported) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          {testAction}
+          {testMessage}
+        </div>
+        <p className="text-xs text-muted-foreground">{t("push.unsupported")}</p>
+      </div>
+    );
+  }
 
   const registered = devices.data?.devices ?? [];
 
   return (
-    <div className="flex flex-col gap-3 border-t border-border pt-3">
+    <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <Button type="button" size="sm" variant="secondary" disabled={add.isPending} onClick={() => void enable()}>
-          {t("push.enable")}
-        </Button>
+        {/* The channel asks for no settings, so these two are its whole action
+            row: enabling this browser is the primary move, sending a test the
+            secondary one — the same pair, in the same order, a channel with
+            fields shows as Save and Send test. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" size="sm" variant="secondary" disabled={add.isPending} onClick={() => void enable()}>
+            {t("push.enable")}
+          </Button>
+          {testAction}
+          {testMessage}
+        </div>
         {message !== undefined && <p className="text-xs leading-relaxed text-muted-foreground">{message}</p>}
       </div>
 
@@ -177,20 +203,82 @@ function PushDevices({ channelEnabled }: { channelEnabled: boolean }) {
 }
 
 /**
- * One notification channel: enable switch, its env-var-name fields (never the
- * secret itself — settings.secret-note says so), and a send-test action that
- * reports inline. Port of `channelCard` (settings.js).
+ * Which icon and which name a channel shows. Keyed by channel id, exhaustively
+ * — a key built at runtime would be invisible to the catalog parity test — and
+ * both lookups fall back to the id, so a channel this dashboard has never heard
+ * of still renders a readable row instead of a blank one.
  */
-function ChannelCard({ channel }: { channel: DescribedChannel }) {
+const CHANNEL_ICONS: Record<string, typeof Bell> = {
+  discord: MessagesSquare,
+  slack: Hash,
+  telegram: Send,
+  webhook: Webhook,
+  webpush: MonitorSmartphone,
+};
+
+const CHANNEL_NAME_KEYS: Record<string, string> = {
+  discord: "channel.name.discord",
+  slack: "channel.name.slack",
+  telegram: "channel.name.telegram",
+  webhook: "channel.name.webhook",
+  webpush: "channel.name.webpush",
+};
+
+/** Configured means every environment variable the channel needs resolves. */
+const isConfigured = (channel: DescribedChannel): boolean =>
+  channel.fields.every((field) => field.isSet);
+
+/**
+ * Active first, then configured but off, then anything whose environment is
+ * incomplete. Within a band the server's order is kept, so a list does not
+ * reshuffle for reasons the operator cannot see.
+ */
+const channelRank = (channel: DescribedChannel): number =>
+  channel.enabled ? 0 : isConfigured(channel) ? 1 : 2;
+
+/**
+ * One notification channel, collapsed to a single row: dot, icon, name, a badge
+ * for the state its environment is in, and the enable switch. Everything that
+ * used to be permanently on screen — the env-var-name fields, Save, Send test,
+ * and browser push's device list — lives in the expansion.
+ *
+ * The switch sits *outside* the disclosure trigger: a control inside a button
+ * is invalid, and the two answer different questions anyway ("is it on" vs
+ * "what is it set to").
+ */
+function ChannelRow({
+  channel, open, onOpenChange,
+}: {
+  channel: DescribedChannel;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { t } = useTranslation();
   const fieldProps = useFieldProps();
-  const { patch, test } = useChannelMutations();
+  const { patch, saveSecrets, clearSecret, test } = useChannelMutations();
   // Only what is being *changed* lives here: each field renders empty with the
   // stored variable name as its placeholder, so the hint can never be mistaken
   // for something the operator typed.
   const [envValues, setEnvValues] = useState<Record<string, string>>({});
+  // The credential itself, held only until it is saved. Nothing reads one back
+  // — the server never sends a value — so an emptied input is the whole state
+  // an operator gets to see afterwards.
+  const [secretValues, setSecretValues] = useState<Record<string, string>>({});
+  // Which environment variable carries which credential is a detail an operator
+  // rarely touches, so it is asked for rather than shown.
+  const [showEnvVars, setShowEnvVars] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
   const fieldless = channel.fields.length === 0;
+  const Icon = CHANNEL_ICONS[channel.id] ?? Bell;
+  const nameKey = CHANNEL_NAME_KEYS[channel.id];
+  const name = nameKey === undefined ? channel.id : t(nameKey);
+  const configured = isConfigured(channel);
+
+  const failed = (error: unknown): void =>
+    setMessage({
+      text: t("channel.secret-failed", { error: error instanceof Error ? error.message : String(error) }),
+      tone: "error",
+    });
 
   const save = (): void => {
     const fields = Object.fromEntries(
@@ -198,11 +286,45 @@ function ChannelCard({ channel }: { channel: DescribedChannel }) {
         .map(([name, value]) => [`${name}Env`, value.trim()] as const)
         .filter(([, value]) => value !== ""),
     );
-    // An untouched card is not an instruction to blank every reference.
-    if (Object.keys(fields).length === 0) return;
+    const secrets = Object.fromEntries(
+      Object.entries(secretValues)
+        .map(([name, value]) => [name, value.trim()] as const)
+        .filter(([, value]) => value !== ""),
+    );
+    // An untouched row is not an instruction to blank every reference.
+    if (Object.keys(fields).length === 0 && Object.keys(secrets).length === 0) return;
+    setMessage(undefined);
+
+    // A credential is written to whichever variable the channel names *now*, so
+    // a click that renames the reference and fills it in one go has to land the
+    // rename first or the value would go to the old variable.
+    const saveSecretValues = (): void => {
+      if (Object.keys(secrets).length === 0) return;
+      saveSecrets.mutate(
+        { id: channel.id, fields: secrets },
+        {
+          onSuccess: () => {
+            setSecretValues({});
+            setMessage({ text: t("channel.secret-saved"), tone: "info" });
+          },
+          onError: failed,
+        },
+      );
+    };
+
+    if (Object.keys(fields).length === 0) {
+      saveSecretValues();
+      return;
+    }
     patch.mutate(
       { id: channel.id, patch: { fields } },
-      { onSuccess: () => setEnvValues({}) },
+      {
+        onSuccess: () => {
+          setEnvValues({});
+          saveSecretValues();
+        },
+        onError: failed,
+      },
     );
   };
 
@@ -215,83 +337,191 @@ function ChannelCard({ channel }: { channel: DescribedChannel }) {
     );
   };
 
+  // Built here and handed down, because browser push shows the same button in
+  // its own action row — next to "enable on this browser", where the two
+  // things an operator can do to a channel with no settings belong together.
+  const testButton = (
+    <Button type="button" variant="ghost" size="sm" disabled={test.isPending} onClick={() => void sendTest()}>
+      {t("action.send-test")}
+    </Button>
+  );
+  const testMessage =
+    message === undefined ? null : (
+      <span className={message.tone === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
+        {message.text}
+      </span>
+    );
+
   return (
-    <Card className="panel-channel gap-3 border-border bg-background px-3 py-3 shadow-none">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+    <Collapsible open={open} onOpenChange={onOpenChange} className="panel-channel">
+      <div className="flex items-center gap-2 py-2">
+        <CollapsibleTrigger className="flex flex-1 items-center gap-2.5 text-left">
+          {/* One glyph rotated, as in FleetGroups: Radix owns the state, and a
+              second icon is a second thing that can disagree with it. */}
+          <ChevronRight
+            className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
+          />
           <span
-            className="size-1.5 rounded-full"
+            className="size-1.5 shrink-0 rounded-full"
             style={{ background: channel.enabled ? "var(--status-operational-fill)" : "var(--color-neutral-700)" }}
           />
-          <span className="text-sm font-medium">{channel.id}</span>
-          {/* Vanilla's own state word (settings.js:124) next to the dot — dropped
-              when the toggle became a Switch, restored here. */}
-          <span className="font-mono text-xs text-muted-foreground">
-            {t(channel.enabled ? "channel.enabled" : "channel.disabled")}
+          <Icon className={cn("size-4 shrink-0", channel.enabled ? "text-foreground" : "text-muted-foreground")} />
+          <span className="text-sm font-medium">{name}</span>
+          {/* With the fields shut, this badge is the only thing left saying a
+              channel cannot actually send — so it says which of the two
+              reasons applies rather than repeating the switch. */}
+          <span
+            className="ml-auto font-mono text-xs"
+            style={{
+              color: channel.enabled
+                ? "var(--status-operational)"
+                : configured
+                  ? "var(--color-neutral-500)"
+                  : "var(--status-degraded)",
+            }}
+          >
+            {channel.enabled
+              ? t("channel.enabled")
+              : configured
+                ? t("channel.ready")
+                : t("channel.env-incomplete")}
           </span>
-        </div>
+        </CollapsibleTrigger>
         <Switch
-          aria-label={`${channel.id} — ${t(channel.enabled ? "channel.enabled" : "channel.disabled")}`}
+          aria-label={`${name} — ${t(channel.enabled ? "channel.enabled" : "channel.disabled")}`}
           checked={channel.enabled}
           onCheckedChange={(next) => patch.mutate({ id: channel.id, patch: { enabled: next } })}
         />
       </div>
 
-      {channel.fields.map((field) => {
-        const inputId = `channel-${channel.id}-${field.name}`;
-        return (
-          <div key={field.name} className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor={inputId}>{`${field.name} — ${t("field.env-var")}`}</Label>
-              <span
-                className="font-mono text-xs"
-                style={{ color: field.isSet ? "var(--status-operational)" : "var(--status-degraded)" }}
-              >
-                {field.isSet ? t("channel.env-set") : t("channel.env-missing")}
-              </span>
+      <CollapsibleContent>
+        <div className="flex flex-col gap-3 pb-3 pl-6 pr-1">
+        {channel.fields.map((field) => {
+          const inputId = `channel-${channel.id}-${field.name}`;
+          const valueId = `${inputId}-value`;
+          return (
+            <div key={field.name} className="flex flex-col gap-1.5">
+              {/* The credential is the field: one box, because which variable
+                  carries it is a detail almost nobody changes. Typing here saves
+                  the value beside the database and puts it in this process's
+                  environment, so the channel is live without a restart, and the
+                  input renders empty whatever is stored — no route ever sends a
+                  credential back. */}
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor={valueId}>{field.name}</Label>
+                <span
+                  className="font-mono text-xs"
+                  style={{ color: field.isSet ? "var(--status-operational)" : "var(--status-degraded)" }}
+                >
+                  {field.isSet ? t("channel.env-set") : t("channel.env-missing")}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  id={valueId}
+                  type="password"
+                  autoComplete="new-password"
+                  className="font-mono"
+                  value={secretValues[field.name] ?? ""}
+                  onChange={(event) => setSecretValues((prev) => ({ ...prev, [field.name]: event.target.value }))}
+                  {...fieldProps}
+                />
+                {field.isSet && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={clearSecret.isPending}
+                    onClick={() =>
+                      clearSecret.mutate(
+                        { id: channel.id, field: field.name },
+                        {
+                          onSuccess: () => setMessage({ text: t("channel.secret-cleared"), tone: "info" }),
+                          onError: failed,
+                        },
+                      )
+                    }
+                  >
+                    {t("action.clear")}
+                  </Button>
+                )}
+              </div>
+
+              {/* Which variable the value is read from: still editable, but out
+                  of the way until asked for — an operator who has never heard
+                  of it can configure a channel without meeting it. */}
+              {showEnvVars && (
+                <div className="flex flex-col gap-1.5 pt-1">
+                  <Label htmlFor={inputId} className="text-xs text-muted-foreground">
+                    {t("field.env-var")}
+                  </Label>
+                  <Input
+                    id={inputId}
+                    className="font-mono"
+                    placeholder={field.envVar}
+                    value={envValues[field.name] ?? ""}
+                    onChange={(event) => setEnvValues((prev) => ({ ...prev, [field.name]: event.target.value }))}
+                    {...fieldProps}
+                  />
+                </div>
+              )}
             </div>
-            <Input
-              id={inputId}
-              className="font-mono"
-              placeholder={field.envVar}
-              value={envValues[field.name] ?? ""}
-              onChange={(event) => setEnvValues((prev) => ({ ...prev, [field.name]: event.target.value }))}
-              {...fieldProps}
-            />
-          </div>
-        );
-      })}
+          );
+        })}
 
-      {/* A channel with no environment-variable fields — webpush, whose key pair
-          the server owns — has nothing to save, so its card is a column of
-          full-width actions that line up with the per-browser button below the
-          divider. A channel that does have fields keeps the inline
-          Save / Send test row next to its inputs. */}
-      <div className={fieldless ? "flex flex-col gap-1.5" : "flex items-center gap-2"}>
         {!fieldless && (
-          <Button type="button" size="sm" disabled={patch.isPending} onClick={save}>
-            {t("action.save")}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" disabled={patch.isPending || saveSecrets.isPending} onClick={save}>
+              {t("action.save")}
+            </Button>
+            {testButton}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-expanded={showEnvVars}
+              onClick={() => setShowEnvVars((previous) => !previous)}
+            >
+              {t("channel.env-var-toggle")}
+            </Button>
+            {testMessage}
+          </div>
         )}
-        <Button
-          type="button"
-          variant={fieldless ? "secondary" : "ghost"}
-          size="sm"
-          className={fieldless ? "w-full" : undefined}
-          disabled={test.isPending}
-          onClick={() => void sendTest()}
-        >
-          {t("action.send-test")}
-        </Button>
-        {message !== undefined && (
-          <span className={message.tone === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
-            {message.text}
-          </span>
-        )}
-      </div>
 
-      {channel.id === "webpush" && <PushDevices channelEnabled={channel.enabled} />}
-    </Card>
+        {channel.id === "webpush" && (
+          <PushDevices channelEnabled={channel.enabled} testAction={testButton} testMessage={testMessage} />
+        )}
+
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/**
+ * What the list would otherwise make the operator count: how many channels are
+ * on, and which. With every row shut, this is the only line that answers "would
+ * a status change reach anyone at all".
+ */
+function ChannelSummary({ channels }: { channels: DescribedChannel[] }) {
+  const { t } = useTranslation();
+  const active = channels.filter((channel) => channel.enabled);
+  const names = active.map((channel) => {
+    const key = CHANNEL_NAME_KEYS[channel.id];
+    return key === undefined ? channel.id : t(key);
+  });
+
+  return (
+    <div className="flex flex-col gap-1 pb-1">
+      <span className="font-mono text-xs text-muted-foreground">
+        {t("channel.summary.count", { active: active.length, total: channels.length })}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {active.length === 0
+          ? t("channel.summary.none")
+          : t("channel.summary.sending", { channels: names.join(" · ") })}
+      </span>
+    </div>
   );
 }
 
@@ -303,10 +533,12 @@ const TILE_CASCADE = { base: 60, step: 60 };
  * the top row, the monitored services and the notification channels sharing the
  * one below. Port of src/ui/public/js/views/settings.js.
  *
- * A secret is never typed, stored or displayed here: a channel field shows
- * only the *name* of the environment variable that carries its credential,
- * and whether that variable currently resolves — the name is editable, the
- * value never appears, because the server never sends it.
+ * A secret can be typed here but never read back: a channel field is one box
+ * for the credential, and a save sends it one way — to the secrets file beside
+ * the database and into the server's environment, so the channel works without
+ * a restart. The value never appears again, because no route sends one. Which
+ * environment variable carries it is behind the row's own toggle, along with
+ * whether that variable currently resolves.
  */
 export function Settings() {
   const { t } = useTranslation();
@@ -322,6 +554,7 @@ export function Settings() {
   const [timeout_, setTimeout_] = useState<number | undefined>(undefined);
   const [retries, setRetries] = useState<number | undefined>(undefined);
   const [pollingMessage, setPollingMessage] = useState<string | undefined>(undefined);
+  const [openChannel, setOpenChannel] = useState<string | undefined>(undefined);
 
   if (config === undefined) return null;
 
@@ -499,10 +732,22 @@ export function Settings() {
         {config.channels.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("empty.no-data")}</p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {config.channels.map((channel) => (
-              <ChannelCard key={channel.id} channel={channel} />
-            ))}
+          <div className="flex flex-col">
+            <ChannelSummary channels={config.channels} />
+            {/* One row open at a time: the panel exists to be scannable, and
+                every row expanded is the layout this replaced. */}
+            <div className="divide-y divide-border border-t border-border">
+              {[...config.channels]
+                .sort((a, b) => channelRank(a) - channelRank(b))
+                .map((channel) => (
+                  <ChannelRow
+                    key={channel.id}
+                    channel={channel}
+                    open={openChannel === channel.id}
+                    onOpenChange={(next) => setOpenChannel(next ? channel.id : undefined)}
+                  />
+                ))}
+            </div>
           </div>
         )}
       </BentoTile>
