@@ -110,6 +110,26 @@ function clears(severity: OverallStatus, floor: SeverityFloor): boolean {
 }
 
 /**
+ * Why a rule did or did not decide the change. `unreached` only ever follows
+ * a `won` rule earlier in the list — evaluation stops at the first match, so
+ * nothing after it is ever actually checked. `because` names the FIRST check
+ * that failed, in the same provider/class/severity order the loop tests them.
+ */
+export type RuleOutcome =
+  | { kind: "won" }
+  | { kind: "unreached" }
+  | { kind: "skipped"; because: "provider" | "class" | "severity" };
+
+export interface Explanation {
+  /** Index into `rules` of the rule that decided, or null when none matched. */
+  winner: number | null;
+  /** One entry per rule, in the same order. */
+  outcomes: RuleOutcome[];
+  /** Exactly what `resolveTargets` returns for the same inputs. */
+  targets: string[];
+}
+
+/**
  * First match wins: evaluation stops at the first rule that matches, which
  * lets a provider-specific rule placed above the catch-all mute it. A later
  * rule can never widen what an earlier one narrowed.
@@ -117,31 +137,64 @@ function clears(severity: OverallStatus, floor: SeverityFloor): boolean {
  * `rules` is assumed already ordered — file order for Light, `ORDER BY
  * position` for UI. Sorting here would hide a broken config at the source.
  *
- * No match and a match with no channels both yield `[]`, on purpose: the
- * dispatcher must not behave differently, and a seeded catch-all rule keeps
- * the first case from happening by accident.
+ * No match and a match with no channels both yield `[]` targets, on purpose:
+ * the dispatcher must not behave differently, and a seeded catch-all rule
+ * keeps the first case from happening by accident.
+ *
+ * The single evaluator behind both `resolveTargets` (the dispatcher's only
+ * concern: who gets notified) and the dashboard's dry run (which also needs
+ * to say WHY) — one loop, so the two views of a match can never disagree.
  */
+export function explain(
+  change: StatusChange,
+  rules: RoutingRule[],
+  enabledChannelIds: string[],
+): Explanation {
+  const severity = severityOf(change);
+  const eventClass = classOf(change.kind);
+
+  let winner: number | null = null;
+  const outcomes: RuleOutcome[] = [];
+  let targets: string[] = [];
+
+  for (let index = 0; index < rules.length; index += 1) {
+    const rule = rules[index]!;
+
+    if (winner !== null) {
+      outcomes.push({ kind: "unreached" });
+      continue;
+    }
+    if (rule.provider !== "*" && rule.provider !== change.providerId) {
+      outcomes.push({ kind: "skipped", because: "provider" });
+      continue;
+    }
+    if (!rule.classes.includes(eventClass)) {
+      outcomes.push({ kind: "skipped", because: "class" });
+      continue;
+    }
+    if (!clears(severity, rule.minSeverity)) {
+      outcomes.push({ kind: "skipped", because: "severity" });
+      continue;
+    }
+
+    winner = index;
+    outcomes.push({ kind: "won" });
+    const won: string[] = [];
+    for (const channel of rule.channels) {
+      for (const id of channel === "*" ? enabledChannelIds : [channel]) {
+        if (!won.includes(id)) won.push(id);
+      }
+    }
+    targets = won;
+  }
+
+  return { winner, outcomes, targets };
+}
+
 export function resolveTargets(
   change: StatusChange,
   rules: RoutingRule[],
   enabledChannelIds: string[],
 ): string[] {
-  const severity = severityOf(change);
-  const eventClass = classOf(change.kind);
-
-  for (const rule of rules) {
-    if (rule.provider !== "*" && rule.provider !== change.providerId) continue;
-    if (!rule.classes.includes(eventClass)) continue;
-    if (!clears(severity, rule.minSeverity)) continue;
-
-    const targets: string[] = [];
-    for (const channel of rule.channels) {
-      for (const id of channel === "*" ? enabledChannelIds : [channel]) {
-        if (!targets.includes(id)) targets.push(id);
-      }
-    }
-    return targets;
-  }
-
-  return [];
+  return explain(change, rules, enabledChannelIds).targets;
 }

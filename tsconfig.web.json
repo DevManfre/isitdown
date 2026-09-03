@@ -20,5 +20,11 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src/ui/web/**/*.ts", "src/ui/web/**/*.tsx", "src/ui/routePaths.ts", "vite.config.ts"]
+  "include": [
+    "src/ui/web/**/*.ts",
+    "src/ui/web/**/*.tsx",
+    "src/ui/routePaths.ts",
+    "src/core/routing.ts",
+    "vite.config.ts"
+  ]
 }

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   CATCH_ALL_RULE,
   classOf,
+  explain,
   resolveTargets,
   severityOf,
   type RoutingRule,
@@ -110,4 +111,48 @@ test("an explicit channel list is returned as written, wildcards expand, duplica
   // decides what to do about it, so the matcher stays a pure function of rules.
   assert.deepEqual(resolveTargets(change(), [rule({ channels: ["discord"] })], ALL), ["discord"]);
   assert.deepEqual(resolveTargets(change(), [rule({ channels: ["*", "slack"] })], ALL), ALL);
+});
+
+test("explain reports the winning rule's index and marks every later rule unreached", () => {
+  const rules = [
+    rule({ provider: "github", channels: ["slack"] }),
+    rule({ channels: ["telegram"] }),
+  ];
+  const result = explain(change(), rules, ALL);
+  assert.equal(result.winner, 0);
+  assert.deepEqual(result.outcomes, [{ kind: "won" }, { kind: "unreached" }]);
+  assert.deepEqual(result.targets, ["slack"]);
+});
+
+test("explain gives each skip its own reason, tested in provider/class/severity order", () => {
+  const providerSkip = explain(change({ providerId: "cloudflare" }), [rule({ provider: "github" })], ALL);
+  assert.deepEqual(providerSkip.outcomes, [{ kind: "skipped", because: "provider" }]);
+
+  const classSkip = explain(change({ kind: "maintenance_started" }), [rule({ classes: ["status"] })], ALL);
+  assert.deepEqual(classSkip.outcomes, [{ kind: "skipped", because: "class" }]);
+
+  const severitySkip = explain(
+    change({ currentStatus: "degraded" }),
+    [rule({ minSeverity: "major_outage" })],
+    ALL,
+  );
+  assert.deepEqual(severitySkip.outcomes, [{ kind: "skipped", because: "severity" }]);
+});
+
+test("explain reports no winner and empty targets when nothing matches", () => {
+  const result = explain(change(), [rule({ provider: "sentry" })], ALL);
+  assert.equal(result.winner, null);
+  assert.deepEqual(result.targets, []);
+});
+
+test("explain's targets always equal what resolveTargets returns for the same inputs", () => {
+  // The equality that stops the dry run and the dispatcher from drifting:
+  // both must read off the same evaluation, never a second copy of it.
+  const rules = [
+    rule({ provider: "github", channels: ["slack"] }),
+    rule({ channels: ["telegram"] }),
+  ];
+  for (const c of [change(), change({ providerId: "cloudflare" }), change({ kind: "maintenance_started" })]) {
+    assert.deepEqual(explain(c, rules, ALL).targets, resolveTargets(c, rules, ALL));
+  }
 });
