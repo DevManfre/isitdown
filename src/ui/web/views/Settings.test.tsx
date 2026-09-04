@@ -392,7 +392,7 @@ describe("Settings", () => {
 
   it("says that configuration changes need no restart", async () => {
     renderWithProviders(<Settings />, fixtures);
-    expect(await screen.findByText(i18n.t("settings.hot-note"))).toBeInTheDocument();
+    expect(await screen.findByText(i18n.t("settings.subtitle"))).toBeInTheDocument();
   });
 
   // The panel is a list of collapsed rows now: what it says with everything

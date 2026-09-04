@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { SettingRow } from "./SettingRow.tsx";
 
 describe("SettingRow", () => {
-  it("exposes the data-slot hook motion.css and tests select on", () => {
+  it("exposes a data-slot='setting-row' hook on the row element", () => {
     render(
       <SettingRow label="Poll interval">
         <input aria-label="interval" />

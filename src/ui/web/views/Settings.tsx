@@ -120,7 +120,6 @@ export function Settings() {
 
       <SettingsSection
         title={t("settings.section.engine")}
-        note={t("settings.hot-note")}
         status={
           pollingStatus === undefined ? undefined : (
             <span className={pollingStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}>
@@ -215,6 +214,9 @@ export function Settings() {
               }
               meta={t(service.enabled ? "service.enabled" : "service.disabled")}
             >
+              {/* Taking a provider out of the rotation is not deleting it:
+                  the poller already skips a disabled service, and this is
+                  the only place in the dashboard that can set the flag. */}
               <Switch
                 aria-label={`${service.name} — ${t(service.enabled ? "service.enabled" : "service.disabled")}`}
                 checked={service.enabled}
@@ -246,6 +248,8 @@ export function Settings() {
         ) : (
           <div className="flex flex-col px-4 pt-3">
             <ChannelSummary channels={config.channels} />
+            {/* One row open at a time: the panel exists to be scannable, and
+                every row expanded is the layout this replaced. */}
             <div className="divide-y divide-border border-t border-border">
               {[...config.channels]
                 .sort((a, b) => channelRank(a) - channelRank(b))
