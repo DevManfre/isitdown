@@ -74,6 +74,46 @@ test("no shared module imports from an edition", async () => {
   assert.deepEqual(offenders, []);
 });
 
+/**
+ * `src/core/routing.ts` is the first `src/core` module `tsconfig.web.json`
+ * pulls straight into the dashboard bundle (see its `include`). Nothing else
+ * stops a later edit from adding `import { createLogger } from "./logger.ts"`
+ * or a `node:` builtin to it — a reasonable-looking change to a core module —
+ * and putting Node-only code in the browser build with no test failing. This
+ * reads the include list from the config itself rather than a copy of it
+ * here, so the two cannot drift.
+ */
+test("every src/core module bundled into the dashboard stays browser-safe", async () => {
+  const BROWSER_SAFE_CORE_IMPORTS = ["./types.ts"];
+
+  const raw = await readFile("tsconfig.web.json", "utf8");
+  // tsconfig.json permits comments, which JSON.parse cannot read; strip
+  // line comments only (none of this repo's config uses block comments,
+  // and a naive block-comment strip risks eating a URL inside a string).
+  const stripped = raw.replace(/^\s*\/\/.*$/gm, "");
+  const config = JSON.parse(stripped) as { include?: string[] };
+  const include = config.include ?? [];
+
+  const coreModules = include.filter((entry) => entry.startsWith("src/core/") && !entry.includes("*"));
+  assert.ok(coreModules.length > 0, "expected at least one src/core module in tsconfig.web.json's include");
+
+  const offenders: string[] = [];
+  for (const file of coreModules) {
+    for (const specifier of importsOf(await readFile(file, "utf8"))) {
+      if (specifier.startsWith("node:")) {
+        offenders.push(`${file} imports node builtin ${specifier}`);
+        continue;
+      }
+      if (!specifier.startsWith(".")) continue;
+      const resolved = normalize(join(dirname(file), specifier)).split(sep).join("/");
+      if (resolved.startsWith("src/core/") && !BROWSER_SAFE_CORE_IMPORTS.includes(specifier)) {
+        offenders.push(`${file} imports ${specifier}, which is outside the browser-safe allowlist`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, []);
+});
+
 test("no shared module imports an edition-only dependency", async () => {
   const offenders: string[] = [];
   for (const dir of SHARED) {

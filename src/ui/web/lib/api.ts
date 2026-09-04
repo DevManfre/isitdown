@@ -11,6 +11,8 @@ import type {
   Preferences,
   ProviderHistory,
   HistorySummary,
+  RoutingResponse,
+  RoutingRule,
   RuntimeConfigResponse,
   SentRecord,
   StatusResponse,
@@ -141,6 +143,9 @@ export const testService = (id: string) =>
     `/config/services/${encodeURIComponent(id)}/test`,
   );
 export const patchSettings = (patch: unknown) => request<unknown>("PATCH", "/config/settings", patch);
+/** Every edit, add, delete and reorder saves the whole ordered list — see RoutingRules.tsx. */
+export const putRouting = (rules: RoutingRule[]) =>
+  request<RoutingResponse>("PUT", "/config/routing", { rules });
 export const patchChannel = (id: string, patch: unknown) =>
   request<unknown>("PATCH", `/config/channels/${encodeURIComponent(id)}`, patch);
 /**

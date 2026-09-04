@@ -1,3 +1,5 @@
+import type { RoutingRule } from "./routing.ts";
+
 export interface PollingConfig {
   intervalMinutes: number;
   requestTimeoutSeconds: number;
@@ -35,6 +37,13 @@ export interface RuntimeConfig {
   locale: string;
   services: ServiceDefinition[];
   channels: ChannelConfig[];
+  /**
+   * Which channels each change reaches, in evaluation order — the first
+   * matching rule decides. Never empty: both editions substitute a catch-all
+   * when the operator has configured none, so "no rules" can never mean
+   * "no notifications".
+   */
+  rules: RoutingRule[];
 }
 
 /**

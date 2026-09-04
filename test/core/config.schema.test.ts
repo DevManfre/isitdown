@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { serviceDefinitionSchema, pollingSchema, localeSchema } from "../../src/core/config.schema.ts";
+import { routingRuleSchema, routingRulesSchema } from "../../src/core/config.schema.ts";
 
 test("service definition accepts a minimal valid entry and defaults enabled to true", () => {
   const parsed = serviceDefinitionSchema.parse({
@@ -168,4 +169,34 @@ test("locale schema defaults to en and rejects a non-tag", () => {
   assert.equal(localeSchema.parse("it"), "it");
   assert.throws(() => localeSchema.parse("EN"));
   assert.throws(() => localeSchema.parse(""));
+});
+
+test("a routing rule defaults to every class, every severity and every channel", () => {
+  const parsed = routingRuleSchema.parse({ provider: "*" });
+  assert.deepEqual(parsed, {
+    provider: "*",
+    classes: ["status", "incident", "maintenance", "monitoring"],
+    minSeverity: "any",
+    channels: ["*"],
+  });
+});
+
+test("a routing rule accepts a provider slug, an empty channel list and a wildcard", () => {
+  assert.equal(routingRuleSchema.parse({ provider: "github" }).provider, "github");
+  assert.deepEqual(routingRuleSchema.parse({ provider: "github", channels: [] }).channels, []);
+  assert.deepEqual(
+    routingRuleSchema.parse({ provider: "*", channels: ["telegram", "webpush"] }).channels,
+    ["telegram", "webpush"],
+  );
+});
+
+test("a routing rule refuses an unknown class, an unknown floor and a bad provider", () => {
+  assert.equal(routingRuleSchema.safeParse({ provider: "*", classes: ["outage"] }).success, false);
+  assert.equal(routingRuleSchema.safeParse({ provider: "*", minSeverity: "critical" }).success, false);
+  assert.equal(routingRuleSchema.safeParse({ provider: "GitHub" }).success, false);
+});
+
+test("the rule list accepts an empty array and rejects a non-array", () => {
+  assert.deepEqual(routingRulesSchema.parse([]), []);
+  assert.equal(routingRulesSchema.safeParse({}).success, false);
 });

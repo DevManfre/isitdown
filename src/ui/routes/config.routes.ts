@@ -1,14 +1,16 @@
 import { Router } from "express";
 import { z } from "zod";
 import { getAdapter } from "../../adapters/index.ts";
-import { pollingSchema, serviceDefinitionSchema } from "../../core/config.schema.ts";
+import { pollingSchema, routingRulesSchema, serviceDefinitionSchema } from "../../core/config.schema.ts";
 import {
   deleteService,
   describeChannels,
+  describeRouting,
   insertService,
   listChannels,
   listServices,
   readSettings,
+  replaceRoutingRules,
   updateChannel,
   updateService,
   writeSettings,
@@ -73,6 +75,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         failureThreshold: settings.failureThreshold,
       },
       channels: describeChannels(db, runtime.env),
+      routing: describeRouting(db, runtime.logger),
     });
   });
 
@@ -291,6 +294,41 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     } catch (error) {
       res.json({ ok: false, error: error instanceof Error ? error.message : String(error) });
     }
+  });
+
+  /**
+   * The whole ordered list in one write. Per-row updates would make reordering
+   * a sequence of position rewrites that can interleave, and the dashboard
+   * holds the full list already.
+   *
+   * A rule naming a channel no registry knows is refused here rather than
+   * warned about at dispatch time: at write time there is somebody to tell.
+   */
+  router.put("/config/routing", (req, res) => {
+    const parsed = z.object({ rules: routingRulesSchema }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+
+    const known = new Set(listChannels(db).map((channel) => channel.id));
+    for (const [index, rule] of parsed.data.rules.entries()) {
+      for (const channel of rule.channels) {
+        if (channel === "*" || known.has(channel)) continue;
+        res.status(400).json({
+          error: { message: `rule ${index + 1} targets the channel "${channel}", which does not exist` },
+        });
+        return;
+      }
+    }
+
+    try {
+      replaceRoutingRules(db, parsed.data.rules);
+    } catch (error) {
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      return;
+    }
+    res.json(describeRouting(db, runtime.logger));
   });
 
   /**

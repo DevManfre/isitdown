@@ -2,11 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createDispatcher, type SentRecord } from "../../src/core/notificationDispatcher.ts";
 import { createLogger } from "../../src/core/logger.ts";
+import { CATCH_ALL_RULE } from "../../src/core/routing.ts";
 import type { Notifier } from "../../src/core/notifier.interface.ts";
 import type { ServiceDefinition } from "../../src/core/configSource.interface.ts";
 import type { NotificationPayload, StatusChange } from "../../src/core/types.ts";
 
 const silent = createLogger("error", () => {});
+
+const KNOWN = ["telegram", "slack", "webpush", "discord", "webhook"];
 
 const services: ServiceDefinition[] = [
   {
@@ -56,7 +59,13 @@ test("each change becomes one payload carrying the change, service and locale", 
   const channel = recorder("telegram");
   const dispatcher = createDispatcher({ logger: silent });
 
-  await dispatcher.dispatch([change()], { services, locale: "it", notifiers: [channel.notifier] });
+  await dispatcher.dispatch([change()], {
+    services,
+    locale: "it",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
 
   assert.equal(channel.seen.length, 1);
   const [payload] = channel.seen;
@@ -81,7 +90,13 @@ test("every change kind is dispatched with its own structured payload", async ()
     change({ kind: "incident_resolved", incident, currentStatus: "operational" }),
     change({ kind: "monitoring_degraded", failureCount: 5 }),
   ];
-  await dispatcher.dispatch(changes, { services, locale: "en", notifiers: [channel.notifier] });
+  await dispatcher.dispatch(changes, {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
 
   assert.deepEqual(
     channel.seen.map((payload) => payload.change.kind),
@@ -100,6 +115,8 @@ test("a change goes to every enabled channel", async () => {
     services,
     locale: "en",
     notifiers: [a.notifier, b.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
   });
 
   assert.equal(a.seen.length, 1);
@@ -117,6 +134,8 @@ test("one failing channel never blocks another and never rejects the dispatch", 
     services,
     locale: "en",
     notifiers: [broken.notifier, healthy.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
   });
 
   assert.equal(healthy.seen.length, 1, "the healthy channel must still be delivered to");
@@ -143,6 +162,8 @@ test("onSent is called once per change and channel, with the outcome", async () 
     services,
     locale: "en",
     notifiers: [broken.notifier, healthy.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
   });
 
   assert.equal(seen.length, 4);
@@ -159,7 +180,13 @@ test("no changes means no delivery and no records", async () => {
   const channel = recorder("telegram");
   const dispatcher = createDispatcher({ logger: silent });
   assert.deepEqual(
-    await dispatcher.dispatch([], { services, locale: "en", notifiers: [channel.notifier] }),
+    await dispatcher.dispatch([], {
+      services,
+      locale: "en",
+      notifiers: [channel.notifier],
+      rules: [CATCH_ALL_RULE],
+      knownChannelIds: KNOWN,
+    }),
     [],
   );
   assert.equal(channel.seen.length, 0);
@@ -167,7 +194,16 @@ test("no changes means no delivery and no records", async () => {
 
 test("no channels means no delivery, not a crash", async () => {
   const dispatcher = createDispatcher({ logger: silent });
-  assert.deepEqual(await dispatcher.dispatch([change()], { services, locale: "en", notifiers: [] }), []);
+  assert.deepEqual(
+    await dispatcher.dispatch([change()], {
+      services,
+      locale: "en",
+      notifiers: [],
+      rules: [CATCH_ALL_RULE],
+      knownChannelIds: KNOWN,
+    }),
+    [],
+  );
 });
 
 test("a change for a provider that is no longer configured is skipped, not thrown", async () => {
@@ -181,6 +217,8 @@ test("a change for a provider that is no longer configured is skipped, not throw
     services,
     locale: "en",
     notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
   });
 
   assert.deepEqual(records, []);
@@ -202,7 +240,119 @@ test("a throwing onSent hook does not lose the dispatch result", async () => {
     services,
     locale: "en",
     notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
   });
   assert.equal(records.length, 1);
   assert.equal(records[0]?.ok, true);
+});
+
+test("a rule naming one channel sends to that channel only", async () => {
+  const telegram = recorder("telegram");
+  const slack = recorder("slack");
+  const dispatcher = createDispatcher({ logger: silent });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier, slack.notifier],
+    rules: [{ provider: "*", classes: ["status"], minSeverity: "any", channels: ["slack"] }],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.equal(telegram.seen.length, 0);
+  assert.equal(slack.seen.length, 1);
+  assert.deepEqual(
+    records.map((record) => record.channel),
+    ["slack"],
+  );
+});
+
+test("a change no rule matches sends nothing and records nothing", async () => {
+  const telegram = recorder("telegram");
+  const dispatcher = createDispatcher({ logger: silent });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier],
+    rules: [{ provider: "sentry", classes: ["status"], minSeverity: "any", channels: ["telegram"] }],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.equal(telegram.seen.length, 0);
+  assert.deepEqual(records, []);
+});
+
+test("a rule naming a channel the operator switched off sends nothing and stays quiet", async () => {
+  // `notifiers` only ever holds enabled channels, so a disabled target simply
+  // has nothing to send through. It is expected, not a misconfiguration.
+  const lines: string[] = [];
+  const logger = createLogger("warn", (line) => lines.push(line));
+  const telegram = recorder("telegram");
+  const dispatcher = createDispatcher({ logger });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier],
+    rules: [{ provider: "*", classes: ["status"], minSeverity: "any", channels: ["slack"] }],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.deepEqual(records, []);
+  assert.equal(
+    lines.filter((line) => line.includes("unknown channel")).length,
+    0,
+    "a disabled channel must not be reported as unknown",
+  );
+});
+
+test("a rule naming a channel nothing knows about is warned about", async () => {
+  const lines: string[] = [];
+  const logger = createLogger("warn", (line) => lines.push(line));
+  const telegram = recorder("telegram");
+  const dispatcher = createDispatcher({ logger });
+
+  await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier],
+    rules: [{ provider: "*", classes: ["status"], minSeverity: "any", channels: ["pushover"] }],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.equal(lines.filter((line) => line.includes("pushover")).length, 1);
+});
+
+test("an unknown channel is warned about even with every channel disabled", async () => {
+  // The operator mid-reconfiguration with everything switched off is exactly
+  // who most needs this diagnostic, not the case it should go quiet for.
+  const lines: string[] = [];
+  const logger = createLogger("warn", (line) => lines.push(line));
+  const dispatcher = createDispatcher({ logger });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [],
+    rules: [{ provider: "*", classes: ["status"], minSeverity: "any", channels: ["pushover"] }],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.deepEqual(records, []);
+  assert.equal(lines.filter((line) => line.includes("pushover")).length, 1);
+});
+
+test("sendTest ignores the rules entirely", async () => {
+  // A delivery test answers "is this channel configured", not "do my rules
+  // permit this event". Mixing the two makes the button useless exactly when
+  // the operator needs it.
+  const slack = recorder("slack");
+  const dispatcher = createDispatcher({ logger: silent });
+
+  const record = await dispatcher.sendTest(slack.notifier, services[0]!, "en");
+
+  assert.equal(slack.seen.length, 1);
+  assert.equal(record.ok, true);
 });

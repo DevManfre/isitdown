@@ -11,15 +11,18 @@ import {
   createDbConfigSource,
   deleteService,
   describeChannels,
+  describeRouting,
   insertService,
   listChannels,
   listServices,
   readSettings,
+  replaceRoutingRules,
   updateChannel,
   updateService,
   writeSettings,
 } from "../../src/ui/dbConfigSource.ts";
 import { createLogger } from "../../src/core/logger.ts";
+import type { RoutingRule } from "../../src/core/routing.ts";
 
 const silent = createLogger("error", () => {});
 
@@ -305,5 +308,131 @@ test("an enabled-only patch succeeds even when a pre-existing collision is prese
 
   assert.equal(ok, true);
   assert.equal(listChannels(db).find((channel) => channel.id === "telegram")?.enabled, true);
+  db.close();
+});
+
+test("migration seeds one catch-all rule, so an upgraded install behaves as before", async () => {
+  const db = await freshDb();
+  const { rules, invalidRules } = describeRouting(db, silent);
+
+  assert.deepEqual(rules, [
+    { provider: "*", classes: ["status", "incident", "maintenance", "monitoring"], minSeverity: "any", channels: ["*"] },
+  ]);
+  assert.equal(invalidRules, 0);
+  db.close();
+});
+
+test("rules are read back in the order they were written", async () => {
+  const db = await freshDb();
+  replaceRoutingRules(db, [
+    { provider: "sentry", classes: ["status"], minSeverity: "any", channels: [] },
+    { provider: "*", classes: ["status", "incident"], minSeverity: "major_outage", channels: ["telegram"] },
+    { provider: "*", classes: ["maintenance", "monitoring"], minSeverity: "any", channels: ["slack"] },
+  ]);
+
+  const { rules } = describeRouting(db, silent);
+  assert.deepEqual(
+    rules.map((rule) => rule.provider),
+    ["sentry", "*", "*"],
+  );
+  assert.deepEqual(rules[0]?.channels, []);
+  db.close();
+});
+
+test("replacing the list is atomic: a rejected write leaves the previous order intact", async () => {
+  const db = await freshDb();
+  const good: RoutingRule[] = [
+    { provider: "*", classes: ["status"], minSeverity: "any", channels: ["slack"] },
+  ];
+  replaceRoutingRules(db, good);
+
+  assert.throws(() =>
+    replaceRoutingRules(db, [
+      { provider: "*", classes: ["status"], minSeverity: "any", channels: ["telegram"] },
+      { provider: "*", classes: ["nope" as never], minSeverity: "any", channels: ["slack"] },
+    ]),
+  );
+
+  assert.deepEqual(describeRouting(db, silent).rules, good);
+  db.close();
+});
+
+test("an unreadable rule row is dropped, counted and logged rather than served", async () => {
+  // Dropping a rule silently changes routing invisibly: losing a muting rule
+  // resumes notifications, losing a broad one stops them. Both must be visible.
+  const lines: string[] = [];
+  const noisy = createLogger("error", (line) => lines.push(line));
+  const db = await freshDb();
+  db.prepare(
+    "INSERT INTO routing_rules (position, provider, classes, min_severity, channels) VALUES (?, ?, ?, ?, ?)",
+  ).run(1, "*", "not json", "any", '["*"]');
+
+  const { rules, invalidRules } = describeRouting(db, noisy);
+  assert.equal(rules.length, 1);
+  assert.equal(invalidRules, 1);
+  assert.equal(lines.length, 1);
+  db.close();
+});
+
+test("a routing rule row whose JSON parses but whose values are illegal is dropped, counted and logged", async () => {
+  // Sibling to the "unreadable rule row" (malformed JSON) test above: this
+  // one parses as JSON fine, but min_severity is not a legal floor, so
+  // routingRuleSchema itself rejects it — a different failure branch in
+  // listRoutingRules with its own invalid += 1 / logger.error / continue.
+  const lines: string[] = [];
+  const noisy = createLogger("error", (line) => lines.push(line));
+  const db = await freshDb();
+  db.prepare(
+    "INSERT INTO routing_rules (position, provider, classes, min_severity, channels) VALUES (?, ?, ?, ?, ?)",
+  ).run(1, "*", '["status"]', "catastrophic", '["*"]');
+
+  const { rules, invalidRules } = describeRouting(db, noisy);
+  assert.equal(rules.length, 1);
+  assert.equal(invalidRules, 1);
+  assert.equal(lines.length, 1);
+  db.close();
+});
+
+test("load falls back to the catch-all when the table is empty", async () => {
+  const db = await freshDb();
+  db.exec("DELETE FROM routing_rules");
+
+  const config = await createDbConfigSource(db, {}, silent).load();
+  assert.deepEqual(config.rules, [
+    { provider: "*", classes: ["status", "incident", "maintenance", "monitoring"], minSeverity: "any", channels: ["*"] },
+  ]);
+  db.close();
+});
+
+test("deleting a service deletes the rules that named it and leaves the others", async () => {
+  const db = await freshDb();
+  replaceRoutingRules(db, [
+    { provider: "github", classes: ["status"], minSeverity: "any", channels: [] },
+    { provider: "*", classes: ["status"], minSeverity: "any", channels: ["slack"] },
+  ]);
+
+  assert.equal(deleteService(db, "github"), true);
+
+  assert.deepEqual(
+    describeRouting(db, silent).rules.map((rule) => rule.provider),
+    ["*"],
+  );
+  db.close();
+});
+
+test("a database at the previous schema version gains the catch-all on migration", async () => {
+  // The one test that shows nobody loses notifications by upgrading.
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-upgrade-"));
+  const db = openDatabase(join(dir, "isitdown.db"));
+  migrate(db);
+  seedDefaults(db);
+  db.exec("DELETE FROM routing_rules");
+  db.exec("PRAGMA user_version = 8");
+
+  migrate(db);
+
+  assert.deepEqual(describeRouting(db, silent).rules, [
+    { provider: "*", classes: ["status", "incident", "maintenance", "monitoring"], minSeverity: "any", channels: ["*"] },
+  ]);
   db.close();
 });

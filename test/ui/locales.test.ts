@@ -137,6 +137,26 @@ const DYNAMIC_FAMILIES: { prefix: string; reason: string }[] = [
     prefix: "incident.timeline.",
     reason: "IncidentDetail.tsx renders t(`incident.timeline.${entry.label}`) for the labels the incidents route emits",
   },
+  {
+    prefix: "routing.class.",
+    reason: "RoutingRules.tsx renders t(`routing.class.${eventClass}`) for each event class a rule can carry",
+  },
+  {
+    prefix: "routing.severity.",
+    reason: "RoutingRules.tsx renders t(`routing.severity.${floor}`) for the severity floor a rule can carry",
+  },
+  {
+    prefix: "routing.dryrun.skipped.",
+    reason: "RoutingRules.tsx renders t(`routing.dryrun.skipped.${outcome.because}`) for each trace row's skip reason",
+  },
+  {
+    prefix: "routing.dryrun.event.",
+    reason: "RoutingRules.tsx renders t(`routing.dryrun.event.${candidate.id}`) for each canned dry-run event",
+  },
+  {
+    prefix: "channel.name.",
+    reason: "RoutingRules.tsx renders t(`channel.name.${id}`) for each channel a rule targets and for each channel option in its editor",
+  },
 ];
 
 /**
