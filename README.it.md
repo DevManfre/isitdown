@@ -250,7 +250,7 @@ notifications:
 | `failureThreshold` | `5` | Cicli falliti consecutivi prima di **un** avviso "monitoring degraded". |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `rss` legge qualunque feed RSS o Atom di incidenti. |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `rss` legge qualunque feed RSS o Atom di incidenti; `slack` legge l'API di stato di Slack. |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 
 Qualunque cosa non valida ferma il container all'avvio indicando motivo e percorso:
@@ -426,8 +426,41 @@ Due conseguenze da sapere prima di affidarcisi: l'adapter non elenca componenti,
 perché un feed non ne ha; e la sua cronologia incidenti non dichiara mai di
 essere completa, perché un feed è una finestra su una storia, non la storia.
 
-Per un provider che non sta né su Statuspage né su un feed, aggiungi un adapter
-sotto `src/adapters/`.
+#### L'adapter Slack
+
+Slack pubblica una sua piccola API JSON invece di stare su Statuspage, quindi ha
+un adapter dedicato:
+
+```yaml
+  - id: slack
+    name: Slack
+    adapter: slack
+    baseUrl: https://slack-status.com
+```
+
+`baseUrl` è l'host: l'adapter accoda `/api/v2.0.0/current` per quello che è
+aperto adesso e `/api/v2.0.0/history` per la cronologia. (`https://status.slack.com`
+redirige lì e funziona ugualmente.)
+
+Il payload non porta nessun campo di severità — un incidente è un titolo, una
+parola di stato e l'elenco dei servizi coinvolti — quindi la severità viene
+dedotta dalle parole di Slack, esattamente come fa l'adapter dei feed. Cosa ne
+esce:
+
+| Payload | Lettura |
+|---|---|
+| `active_incidents` vuoto | Operativo |
+| Una voce con `type: notice` | Elencata come incidente, ma da sola non muove lo stato del provider |
+| `status: ok` in testa con una voce ancora aperta | Problema: l'elenco degli incidenti fa da indicatore, non la parola |
+| Una voce senza `id` | Scartata: manca una chiave stabile per l'incidente |
+
+Slack indica i servizi coinvolti da un incidente ma non pubblica lo stato dei
+singoli servizi, quindi l'adapter non elenca componenti; e non espone dati di
+manutenzione programmata, quindi una voce che ne annuncia una resta un incidente
+invece di diventare una finestra che silenzierebbe il provider finché resta lì.
+
+Per un provider che non sta su nessuno di questi, aggiungi un adapter sotto
+`src/adapters/`.
 
 ### 3.6 Canali di notifica
 

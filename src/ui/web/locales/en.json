@@ -244,6 +244,7 @@
   "add.subtitle": "Most providers run on Atlassian Statuspage and need no code.",
   "add.note.statuspage": "The adapter appends /api/v2/summary.json to this URL.",
   "add.note.rss": "Give the full URL of the RSS or Atom feed; the adapter reads it as given.",
+  "add.note.slack": "Use https://slack-status.com; the adapter appends /api/v2.0.0/current to it.",
   "add.note.custom": "The adapter reads this URL as given.",
   "add.test-ok": "Reachable — reported {status}.",
   "add.test-failed": "Could not reach it: {error}",

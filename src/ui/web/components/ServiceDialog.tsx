@@ -14,7 +14,7 @@ import { previewComponents } from "@/lib/api.ts";
 import { slugify } from "@/lib/slugify.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
 
-const ADAPTERS = ["statuspage", "rss", "custom"] as const;
+const ADAPTERS = ["statuspage", "rss", "slack", "custom"] as const;
 
 /**
  * What the base URL means differs per adapter — Statuspage appends a path to
@@ -24,6 +24,7 @@ const ADAPTERS = ["statuspage", "rss", "custom"] as const;
 const ADAPTER_NOTES: Record<string, string> = {
   statuspage: "add.note.statuspage",
   rss: "add.note.rss",
+  slack: "add.note.slack",
   custom: "add.note.custom",
 };
 

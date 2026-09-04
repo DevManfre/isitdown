@@ -248,7 +248,7 @@ notifications:
 | `failureThreshold` | `5` | Consecutive failed cycles before one "monitoring degraded" warning. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `rss` reads any RSS or Atom incident feed. |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `rss` reads any RSS or Atom incident feed; `slack` reads Slack's own status API. |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 
 Anything invalid stops the container at boot with the reason and the offending
@@ -422,8 +422,39 @@ component listing, because a feed has no components; and its incident history
 never claims to be complete, because a feed is a window onto a history rather
 than the history itself.
 
-For a provider on neither Statuspage nor a feed, add an adapter under
-`src/adapters/`.
+#### Slack adapter
+
+Slack publishes its own small JSON API instead of running on Statuspage, so it
+gets its own adapter:
+
+```yaml
+  - id: slack
+    name: Slack
+    adapter: slack
+    baseUrl: https://slack-status.com
+```
+
+`baseUrl` is the host; the adapter appends `/api/v2.0.0/current` for what is
+open now and `/api/v2.0.0/history` for the timeline. (`https://status.slack.com`
+redirects there and works too.)
+
+The payload carries no severity field — an incident is a title, a lifecycle word
+and a list of affected service names — so severity is read from Slack's own
+wording, exactly as the feed adapter does it. What that produces:
+
+| Payload | Reading |
+|---|---|
+| `active_incidents` empty | Operational |
+| An entry of `type: notice` | Listed as an incident, but does not move the provider's status on its own |
+| Top-level `status: ok` with an entry still open | Trouble: the incident list is the dial, not the word |
+| An entry with no `id` | Dropped: nothing stable to key the incident on |
+
+Slack names the affected services on an incident but publishes no per-service
+status list, so the adapter offers no component listing; and it exposes no
+scheduled-maintenance data, so an entry announcing one stays an incident rather
+than becoming a window that would silence the provider while it sat there.
+
+For a provider on none of these, add an adapter under `src/adapters/`.
 
 ### 3.6 Notification channels
 
@@ -1269,6 +1300,8 @@ isitdown/
 │   ├── adapters/                      (shared)
 │   │   ├── statuspage.adapter.ts       generic Atlassian Statuspage adapter
 │   │   ├── rss.adapter.ts              generic RSS / Atom incident-feed adapter
+│   │   ├── slack.adapter.ts            Slack's own status API
+│   │   ├── severity.ts                 severity read from a provider's own wording
 │   │   └── index.ts                    registry keyed by adapter id
 │   ├── notifiers/                     (shared)
 │   │   ├── formatting.ts               emoji, colours, severity labels, message assembly
@@ -1329,7 +1362,7 @@ isitdown/
 │   ├── notifiers/
 │   ├── light/
 │   ├── ui/                            store contract, aggregation, every API route, theme and locale guards
-│   ├── fixtures/statuspage/           payloads recorded from the live pages, never fetched in a test
+│   ├── fixtures/<provider>/            payloads recorded from the live pages, never fetched in a test
 │   ├── helpers/
 │   └── integration/                   *.itest.ts — fake provider and webhook receiver end to end
 ├── design/                            Claude Design prototypes (git-ignored: on disk, not in a clone)
