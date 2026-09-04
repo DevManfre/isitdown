@@ -1,5 +1,6 @@
 import type { Adapter, FetchContext, IncidentHistoryResult, ServiceRef } from "../core/adapter.interface.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
+import { severityFromWords, worstStatus } from "./severity.ts";
 
 /**
  * The generic adapter for the long tail of status pages that publish a feed and
@@ -113,19 +114,8 @@ export function parseFeed(xml: string, provider = "rss"): FeedEntry[] {
  */
 const CLOSED = /\b(resolved|completed|restored|closed)\b/i;
 
-/**
- * Severity by wording, worst first, with `partial` ahead of the outage words it
- * contains. An entry matching nothing still reads `degraded`: the provider
- * thought it worth announcing, so it is never nothing.
- */
-const SEVERITIES: [RegExp, OverallStatus][] = [
-  [/\bpartial\b/i, "partial_outage"],
-  [/\b(outage|down|offline|unavailable|unreachable|not working)\b/i, "major_outage"],
-];
-
 function severityOf(entry: FeedEntry): OverallStatus {
-  const text = `${entry.title} ${entry.body}`;
-  return SEVERITIES.find(([pattern]) => pattern.test(text))?.[1] ?? "degraded";
+  return severityFromWords(`${entry.title} ${entry.body}`);
 }
 
 /**
@@ -137,9 +127,6 @@ function isOpen(entry: FeedEntry, now: Date): boolean {
   if (entry.publishedAt === null) return true;
   return now.getTime() - Date.parse(entry.publishedAt) <= ACTIVE_WINDOW_MS;
 }
-
-/** Severity worst last, so the worst open entry decides the provider's reading. */
-const RANK: OverallStatus[] = ["operational", "degraded", "partial_outage", "major_outage"];
 
 /** Pure mapping from a feed body to a status reading, exported for the tests. */
 export function parseFeedStatus(xml: string, service: ServiceRef, now: Date = new Date()): NormalizedStatus {
@@ -154,11 +141,9 @@ export function parseFeedStatus(xml: string, service: ServiceRef, now: Date = ne
     updatedAt: entry.publishedAt ?? fetchedAt,
   }));
 
-  const worst = open.reduce((rank, entry) => Math.max(rank, RANK.indexOf(severityOf(entry))), 0);
-
   return {
     provider: service.id,
-    overallStatus: RANK[worst]!,
+    overallStatus: worstStatus(open.map(severityOf)),
     activeIncidents,
     // A feed has no components; the picker is told so by the missing
     // `listComponents`, and a selection made elsewhere cannot be honoured here.
