@@ -46,8 +46,8 @@ const durationBetween = (locale: string, from: string, to: string): string =>
  * provider's other open incidents, the strip of recent polls, and where the
  * provider physically runs.
  *
- * Laid out as a bento of uniform tiles on the same `BentoTile` Settings uses —
- * the blocks below used to be bare labelled stacks in a `2fr_1fr` split, which
+ * Laid out as a bento of uniform tiles on the same `BentoTile` IncidentMap
+ * uses — the blocks below used to be bare labelled stacks in a `2fr_1fr` split, which
  * gave the page two competing column rhythms and no shared tile shape. The hero
  * and the stepper stay full-width bands above the grid: both are read left to
  * right across the whole page, and boxing them would break that.

@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils.ts";
  * One row of a settings list: what the setting is on the left, the control
  * that changes it on the right.
  *
- * The shape is decided here once, the way `BentoTile` used to decide tile
- * shape once — five blocks each with their own idea of where a label, a hint
+ * The shape is decided here once, the way `BentoTile` decides tile shape
+ * once — five blocks each with their own idea of where a label, a hint
  * and a control belonged is what made the old grid read as a pile. The text
  * column carries `min-w-0` and the control slot `shrink-0`, so a long
  * description wraps and a control never does; `data-align="top"` is for rows
