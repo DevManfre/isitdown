@@ -150,10 +150,6 @@
   "history.drawer-bars": "Daily status",
   "history.legend-title": "Colour key",
 
-  "settings.polling": "Polling",
-  "settings.services": "Monitored services",
-  "settings.channels": "Notification channels",
-  "settings.jitter-note": "Requests are staggered and the interval carries jitter, so providers are never hit in lockstep.",
   "settings.hot-note": "Applied on the next cycle — no restart.",
   "settings.secret-note": "Type a credential and save: it is kept beside the database, applies at once, and is never shown again. Which environment variable carries it sits behind the row's own button.",
   "settings.section.engine": "Engine",
@@ -163,7 +159,6 @@
   "settings.subtitle": "Changes apply on the next poll cycle. Nothing here needs a restart.",
   "settings.saved": "Saved",
   "settings.out-of-range": "{field} must be between {min} and {max}",
-  "settings.map-view": "Geographic view",
   "settings.map-view.label": "Geographic view",
   "settings.map-view.off": "Off",
   "settings.map-view.map": "Dotted map",

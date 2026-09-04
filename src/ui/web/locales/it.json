@@ -150,10 +150,6 @@
   "history.drawer-bars": "Stato giornaliero",
   "history.legend-title": "Legenda colori",
 
-  "settings.polling": "Polling",
-  "settings.services": "Servizi monitorati",
-  "settings.channels": "Canali di notifica",
-  "settings.jitter-note": "Le richieste sono sfasate e l'intervallo ha un jitter, così i provider non vengono mai interrogati all'unisono.",
   "settings.hot-note": "Applicato al ciclo successivo, senza restart.",
   "settings.secret-note": "Scrivi una credenziale e salva: resta accanto al database, vale subito e non viene mai più mostrata. Quale variabile d'ambiente la porta sta dietro il pulsante della riga.",
   "settings.section.engine": "Motore",
@@ -163,7 +159,6 @@
   "settings.subtitle": "Le modifiche si applicano al ciclo di polling successivo. Nulla qui richiede un riavvio.",
   "settings.saved": "Salvato",
   "settings.out-of-range": "{field} deve essere tra {min} e {max}",
-  "settings.map-view": "Vista geografica",
   "settings.map-view.label": "Vista geografica",
   "settings.map-view.off": "Disattivata",
   "settings.map-view.map": "Mappa a punti",
