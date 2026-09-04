@@ -258,6 +258,22 @@ export function useMap(enabled: boolean) {
 export const usePreferences = () =>
   useQuery({ queryKey: ["preferences"], queryFn: api.getPreferences, throwOnError: false });
 
+/**
+ * What removing a provider would delete, read while the confirmation is open.
+ *
+ * `enabled` is the dialog being open: closed, the request is never issued —
+ * there is no point counting rows for a button nobody pressed. Never throws,
+ * and the dialog stays usable without it: a confirmation that a count query
+ * can block is a worse footgun than the one it documents.
+ */
+export const useServiceImpact = (id: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ["service-impact", id],
+    queryFn: () => api.getServiceImpact(id),
+    enabled,
+    throwOnError: false,
+  });
+
 /** Everything a write can invalidate. A config write moves the status grid too. */
 const WRITE_KEYS = [
   ["status"],

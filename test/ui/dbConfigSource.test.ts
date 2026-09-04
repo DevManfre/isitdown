@@ -12,6 +12,7 @@ import {
   deleteService,
   describeChannels,
   describeRouting,
+  describeServiceImpact,
   insertService,
   listChannels,
   listServices,
@@ -434,5 +435,62 @@ test("a database at the previous schema version gains the catch-all on migration
   assert.deepEqual(describeRouting(db, silent).rules, [
     { provider: "*", classes: ["status", "incident", "maintenance", "monitoring"], minSeverity: "any", channels: ["*"] },
   ]);
+  db.close();
+});
+
+test("the removal impact counts every row the cascade would take", async () => {
+  const db = await freshDb();
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  const sampleAt = (daysAgo: number): string => new Date(now - daysAgo * day).toISOString();
+  // The oldest sample sits mid-day on purpose: a part-day of history rounds up
+  // to a whole one, so 9.5 days ago is "10 days of history", not 9.
+  const sample = db.prepare(
+    "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok) VALUES (?, ?, 'operational', 1)",
+  );
+  sample.run("github", sampleAt(9.5));
+  sample.run("github", sampleAt(1));
+  sample.run("cloudflare", sampleAt(30));
+  db.prepare(
+    "INSERT INTO component_samples (provider_id, component_id, observed_at, status, ok) VALUES (?, 'api', ?, 'operational', 1)",
+  ).run("github", sampleAt(2));
+  db.prepare(
+    "INSERT INTO incidents (provider_id, incident_id, name, impact, status, started_at, updated_at) VALUES (?, 'i1', 'Outage', 'major', 'resolved', ?, ?)",
+  ).run("github", sampleAt(9), sampleAt(9));
+  db.prepare(
+    "INSERT INTO maintenances (provider_id, maintenance_id, name, status, starts_at, component_ids, first_seen_at, last_seen_at) VALUES (?, 'm1', 'Upgrade', 'scheduled', ?, '[]', ?, ?)",
+  ).run("github", sampleAt(3), sampleAt(3), sampleAt(3));
+  replaceRoutingRules(db, [
+    { provider: "github", classes: ["status"], minSeverity: "any", channels: [] },
+    { provider: "*", classes: ["status"], minSeverity: "any", channels: ["telegram"] },
+  ]);
+
+  assert.deepEqual(describeServiceImpact(db, "github"), {
+    samples: 2,
+    componentSamples: 1,
+    incidents: 1,
+    maintenances: 1,
+    routingRules: 1,
+    historyDays: 10,
+  });
+  db.close();
+});
+
+test("a provider with no history reports zeros rather than nothing", async () => {
+  const db = await freshDb();
+  assert.deepEqual(describeServiceImpact(db, "github"), {
+    samples: 0,
+    componentSamples: 0,
+    incidents: 0,
+    maintenances: 0,
+    routingRules: 0,
+    historyDays: 0,
+  });
+  db.close();
+});
+
+test("the removal impact of an unknown service is null, so the route can answer 404", async () => {
+  const db = await freshDb();
+  assert.equal(describeServiceImpact(db, "nope"), null);
   db.close();
 });

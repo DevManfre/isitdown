@@ -21,7 +21,8 @@ type FixtureKey =
   | "componentHistory"
   | "map"
   | "preferences"
-  | "maintenances";
+  | "maintenances"
+  | "serviceImpact";
 
 export interface Fixtures {
   status?: unknown;
@@ -34,6 +35,8 @@ export interface Fixtures {
   map?: unknown;
   preferences?: unknown;
   maintenances?: unknown;
+  /** `/config/services/:id/impact`, matched before `/config` — it is a nested config path. */
+  serviceImpact?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -69,13 +72,15 @@ export function stubApi(fixtures: Fixtures): void {
                 ? "maintenances"
                 : path.startsWith("/notifications")
                   ? "notifications"
-                  : path.startsWith("/config")
-                    ? "config"
-                    : path.startsWith("/map")
-                      ? "map"
-                      : path.startsWith("/api/preferences")
-                        ? "preferences"
-                        : "status";
+                  : path.endsWith("/impact")
+                    ? "serviceImpact"
+                    : path.startsWith("/config")
+                      ? "config"
+                      : path.startsWith("/map")
+                        ? "map"
+                        : path.startsWith("/api/preferences")
+                          ? "preferences"
+                          : "status";
       const errorStatus = fixtures.errors?.[key];
       if (errorStatus !== undefined) {
         return { ok: false, status: errorStatus, text: async () => "" };

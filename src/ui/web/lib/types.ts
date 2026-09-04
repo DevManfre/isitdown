@@ -244,6 +244,16 @@ export interface ServiceDefinition {
   scopeToComponents: boolean;
 }
 
+/** What removing a service would delete along with it — `GET /config/services/:id/impact`. */
+export interface ServiceImpact {
+  samples: number;
+  componentSamples: number;
+  incidents: number;
+  maintenances: number;
+  routingRules: number;
+  historyDays: number;
+}
+
 /** One credential field a channel needs: whether its env var is actually set, never its value. */
 export interface DescribedField {
   name: string;

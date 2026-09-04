@@ -15,6 +15,7 @@ import type {
   RoutingRule,
   RuntimeConfigResponse,
   SentRecord,
+  ServiceImpact,
   StatusResponse,
 } from "./types.ts";
 import type { PushSubscriptionBody } from "./push.ts";
@@ -135,6 +136,9 @@ export const previewComponents = (body: unknown) =>
   );
 export const patchService = (id: string, patch: unknown) =>
   request<unknown>("PATCH", `/config/services/${encodeURIComponent(id)}`, patch);
+/** Read before the remove, so the confirmation can name what the cascade takes. */
+export const getServiceImpact = (id: string) =>
+  request<ServiceImpact>("GET", `/config/services/${encodeURIComponent(id)}/impact`);
 export const removeService = (id: string) =>
   request<unknown>("DELETE", `/config/services/${encodeURIComponent(id)}`);
 export const testService = (id: string) =>

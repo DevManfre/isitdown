@@ -190,6 +190,52 @@ export function updateService(
   return result.changes > 0;
 }
 
+export interface ServiceImpact {
+  samples: number;
+  componentSamples: number;
+  incidents: number;
+  maintenances: number;
+  routingRules: number;
+  historyDays: number;
+}
+
+/**
+ * What `deleteService` would take with it. Read-only, and deliberately next to
+ * the delete it describes: the cascade lives in the schema, so the only way the
+ * two stay in step is for a new `ON DELETE CASCADE` table to be visible from
+ * here when it is added.
+ *
+ * Returns null for an unknown id, like `updateService` returns false, so the
+ * route can answer 404 rather than a confident row of zeros.
+ *
+ * Rules naming "*" are not counted: they survive the removal (see
+ * `deleteService`), and a confirmation that claims otherwise is worse than one
+ * that says nothing.
+ */
+export function describeServiceImpact(db: DatabaseSync, id: string): ServiceImpact | null {
+  if (!exists(db, id)) return null;
+  const count = (sql: string): number =>
+    z.object({ n: z.number() }).parse(db.prepare(sql).get(id)).n;
+  const oldest = z
+    .object({ oldest: z.string().nullable() })
+    .parse(db.prepare("SELECT MIN(observed_at) AS oldest FROM status_samples WHERE provider_id = ?").get(id))
+    .oldest;
+  const oldestMs = oldest === null ? null : Date.parse(oldest);
+  return {
+    samples: count("SELECT COUNT(*) AS n FROM status_samples WHERE provider_id = ?"),
+    componentSamples: count("SELECT COUNT(*) AS n FROM component_samples WHERE provider_id = ?"),
+    incidents: count("SELECT COUNT(*) AS n FROM incidents WHERE provider_id = ?"),
+    maintenances: count("SELECT COUNT(*) AS n FROM maintenances WHERE provider_id = ?"),
+    routingRules: count("SELECT COUNT(*) AS n FROM routing_rules WHERE provider = ?"),
+    // Rounded up: a provider polled for an hour has lost "a day of history",
+    // not zero. An unparseable timestamp counts as no history rather than NaN.
+    historyDays:
+      oldestMs === null || Number.isNaN(oldestMs)
+        ? 0
+        : Math.ceil((Date.now() - oldestMs) / 86_400_000),
+  };
+}
+
 export function deleteService(db: DatabaseSync, id: string): boolean {
   const deleted = db.prepare("DELETE FROM services WHERE id = ?").run(id).changes > 0;
   if (deleted) {
