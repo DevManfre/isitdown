@@ -192,6 +192,39 @@ test("editing a service applies and an unknown id is a 404", async () => {
   }
 });
 
+test("GET /config/services/:id/impact reports what a removal would take", async () => {
+  const app = await api();
+  try {
+    await app.runtime.store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    const { status, body } = await app.request("GET", "/config/services/github/impact");
+
+    assert.equal(status, 200);
+    assert.equal((body as { samples: number }).samples, 1);
+    assert.equal((body as { incidents: number }).incidents, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /config/services/:id/impact 404s for a service that is not there", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.request("GET", "/config/services/nope/impact");
+
+    assert.equal(status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
 test("deleting a service removes it and its history", async () => {
   const app = await api();
   try {

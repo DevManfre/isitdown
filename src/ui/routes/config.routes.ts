@@ -6,6 +6,7 @@ import {
   deleteService,
   describeChannels,
   describeRouting,
+  describeServiceImpact,
   insertService,
   listChannels,
   listServices,
@@ -139,6 +140,17 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       return;
     }
     res.json(listServices(db).find((service) => service.id === req.params.id));
+  });
+
+  // Read before the destructive write it precedes: the confirmation names what
+  // the cascade will take, so "remove" stops being a leap in the dark.
+  router.get("/config/services/:id/impact", (req, res) => {
+    const impact = describeServiceImpact(db, req.params.id);
+    if (impact === null) {
+      res.status(404).json({ error: { message: `unknown service: ${req.params.id}` } });
+      return;
+    }
+    res.json(impact);
   });
 
   router.delete("/config/services/:id", (req, res) => {
