@@ -54,6 +54,7 @@ const config = {
     },
   ],
   channels: [],
+  routing: { rules: [], invalidRules: 0 },
 };
 const fixtures = {
   config,

@@ -465,6 +465,43 @@ stato", con l'intestazione ripetuta come testo di anteprima della notifica.
 Nessuno dei due URL finisce mai in un log o nella dashboard: un invio rifiutato
 riporta lo stato HTTP e la ragione del servizio stesso.
 
+### 3.7 Instradamento delle notifiche
+
+Una tabella ordinata di regole decide quali canali abilitati vengono avvisati
+di un dato cambiamento. Ogni regola ha quattro parti:
+
+```yaml
+routing:
+  - provider: "*"            # un id di servizio, o "*" per ogni provider
+    classes: [status, incident]  # una o più tra: status, incident, maintenance, monitoring
+    minSeverity: major_outage  # any | degraded | partial_outage | major_outage
+    channels: [telegram]       # id dei canali, o "*" per ogni canale abilitato; [] silenzia
+```
+
+Le regole vengono valutate dall'alto in basso e **vince la prima che
+corrisponde** — le regole successive non vengono più consultate per quel
+cambiamento, quindi una regola specifica per un provider, messa sopra una
+regola generica, può silenziarlo o reindirizzarlo. Una regola corrisponde
+quando il provider, la classe dell'evento e la severità del cambiamento
+soddisfano tutti e tre quanto richiesto; un `channels: []` vuoto è un modo
+valido e deliberato per silenziare una corrispondenza, non una svista. La
+severità viene giudicata sul *peggiore* tra il punto di partenza e quello di
+arrivo del cambiamento — un ripristino da un'interruzione grave porta ancora
+la soglia dell'interruzione, quindi una regola che filtra su `major_outage`
+scatta comunque per il rientro, invece di lasciarlo passare senza
+instradamento. Un'installazione senza alcuna regola si comporta esattamente
+come se esistesse una regola generica: ogni classe, qualunque severità, ogni
+canale abilitato — il comportamento che entrambe le edizioni avevano prima
+dell'esistenza dell'instradamento, così l'aggiornamento non diventa mai muto
+per caso.
+
+L'edizione Light configura la tabella come l'elenco `routing` in
+`config.yml`, mostrato sopra; l'edizione UI la modifica da **Impostazioni**,
+dove l'editor delle regole di instradamento offre anche una prova a secco
+(dry run): scegli un provider e un evento campione e ti dice quale regola
+vincerebbe e quali non sono mai state raggiunte, valutate contro le regole
+che hai effettivamente salvato, non un insieme ipotetico.
+
 ---
 
 ## 4. Docker
@@ -1557,7 +1594,6 @@ Consegnato:
 Ancora aperto:
 
 - Adapter per provider che non stanno su Atlassian Statuspage.
-- Routing multi-destinatario: canali diversi per provider o per severità.
 - Una revisione madrelingua delle stringhe italiane.
 
 Non-obiettivi espliciti: autenticazione multi-utente (questa è una dashboard locale per

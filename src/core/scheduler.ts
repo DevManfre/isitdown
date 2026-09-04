@@ -70,6 +70,10 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       services: config.services,
       locale: config.locale,
       notifiers: buildNotifiers(config.channels),
+      rules: config.rules,
+      // Every channel the configuration defines, enabled or not: the UI edition
+      // seeds all of them and the Light edition lists whatever the file names.
+      knownChannelIds: config.channels.map((channel) => channel.id),
     });
     if (onCycle !== undefined) await onCycle(result);
     return result;

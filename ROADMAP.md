@@ -76,7 +76,7 @@ is additive and independently shippable.
 | 3.7 | **PagerDuty / Opsgenie Events API** | M | Moves IsItDown from "notifier" to "part of an on-call chain". Needs dedupe keys and a resolve event, which maps cleanly onto the existing incident lifecycle. |
 | 3.8 | **Microsoft Teams** | S | Webhook. Boring, widely needed. |
 | 3.9 | **Apprise bridge** | S | One notifier that speaks Apprise gets ~80 channels at once. Pragmatic shortcut — at the cost of an external binary or service. |
-| 3.10 | **Per-provider / per-severity routing** | M | On the README's open list. A channel matrix: "major outages of anything → phone; everything else → Slack". Probably the single highest-value notification feature. |
+| 3.10 ✅ | **Per-provider / per-severity routing** | M | On the README's open list. A channel matrix: "major outages of anything → phone; everything else → Slack". Probably the single highest-value notification feature. |
 | 3.11 | **Quiet hours** | M | Suppress below a severity floor between configured hours, with an override for major outages. Needs a timezone preference (5.9). |
 | 3.12 | **Digest mode** | M | Batch changes into one message every N minutes. During a big multi-provider incident the current one-message-per-change behaviour is a flood. |
 | 3.13 | **Per-provider alert cap** | S | Hard ceiling of N messages/hour/provider, with a "suppressed X more" note. Cheap insurance against a pathological provider. |
@@ -179,7 +179,7 @@ effort is roughly:
 3. ✅ **4.1 Prometheus `/metrics`** — a day of work, a large audience.
 4. ✅ **2.1 scheduled maintenance** — removes the most annoying class of false alert.
 5. ✅ **3.1 + 3.2 Discord and Slack channels** — both nearly free behind the existing interface.
-6. **3.10 routing rules** — the notification feature people actually hit the ceiling on.
+6. ✅ **3.10 routing rules** — the notification feature people actually hit the ceiling on.
 7. **5.12 undo / safer delete** — a data-loss footgun that exists today.
 
 The two items that most change *what IsItDown is*, and therefore deserve a

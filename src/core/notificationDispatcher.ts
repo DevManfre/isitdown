@@ -1,6 +1,7 @@
 import type { ServiceDefinition } from "./configSource.interface.ts";
 import type { Logger } from "./logger.ts";
 import type { Notifier } from "./notifier.interface.ts";
+import { resolveTargets, type RoutingRule } from "./routing.ts";
 import type { NotificationPayload, StatusChange, StatusChangeKind } from "./types.ts";
 import { renderMessage } from "../notifiers/formatting.ts";
 
@@ -23,6 +24,20 @@ export interface DispatchContext {
    * or disabling a channel takes effect without a restart.
    */
   notifiers: Notifier[];
+  /**
+   * Ordered by position; the dispatcher never reorders. Never empty — both
+   * config sources substitute a catch-all.
+   */
+  rules: RoutingRule[];
+  /**
+   * Every channel id this edition can build, enabled or not. It separates "the
+   * rule names a channel the operator switched off" (expected, silent) from
+   * "the rule names a channel nothing knows about" (a typo or a channel since
+   * removed, worth saying out loud). Passed in rather than read from the shared
+   * registry because the UI edition contributes `webpush` through `extra`, and
+   * a static list would warn about it on every send.
+   */
+  knownChannelIds: string[];
 }
 
 export interface Dispatcher {
@@ -115,10 +130,16 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     },
 
     async dispatch(changes: StatusChange[], ctx: DispatchContext): Promise<SentRecord[]> {
-      if (changes.length === 0 || ctx.notifiers.length === 0) return [];
+      if (changes.length === 0) return [];
 
       const byId = new Map(ctx.services.map((service) => [service.id, service]));
       const attempts: Promise<SentRecord>[] = [];
+
+      // Neither varies per change, so both are built once for the whole batch
+      // rather than rebuilt on every iteration of the loop below.
+      const byChannelId = new Map(ctx.notifiers.map((notifier) => [notifier.id, notifier]));
+      const known = new Set(ctx.knownChannelIds);
+      const enabledChannelIds = [...byChannelId.keys()];
 
       for (const change of changes) {
         const service = byId.get(change.providerId);
@@ -139,7 +160,21 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         };
         const text = renderMessage(payload);
 
-        for (const notifier of ctx.notifiers) {
+        for (const channelId of resolveTargets(change, ctx.rules, enabledChannelIds)) {
+          const notifier = byChannelId.get(channelId);
+          if (notifier === undefined) {
+            // A configured-but-disabled channel is the normal case and says
+            // nothing. A channel no registry knows is a broken rule, and a
+            // broken routing rule means missing alerts.
+            if (!known.has(channelId)) {
+              logger.warn("a routing rule names an unknown channel", {
+                channelId,
+                providerId: change.providerId,
+                kind: change.kind,
+              });
+            }
+            continue;
+          }
           attempts.push(deliver(notifier, payload, text));
         }
       }

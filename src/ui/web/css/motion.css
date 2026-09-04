@@ -467,11 +467,11 @@
 }
 .service-row {
   transition:
-    border-color 0.22s ease,
+    background-color 0.22s ease,
     transform 0.22s var(--ease-out);
 }
 .service-row:hover {
-  border-color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
   transform: translateX(3px);
 }
 /* A channel row is a list row now, not a card: there is no border left to

@@ -57,3 +57,31 @@ notifications:
     enabled: false
     # An incoming webhook of a Slack app installed in the target channel
     webhookUrl: "${SLACK_WEBHOOK_URL}"
+
+# Which channels hear about what. The first rule that matches a change decides,
+# rules below it are not consulted — put specific ones on top. Leave this
+# section out entirely and every change goes to every enabled channel, which is
+# what happens without it.
+#
+# classes: status | incident | maintenance | monitoring (default: all)
+# minSeverity: any | degraded | partial_outage | major_outage (default: any)
+# channels: channel names from `notifications` above, ["*"] for all of
+#   them, or [] to stay silent
+#
+# A rule's severity is the worse of the status a change came from and the one
+# it went to, so a recovery from a major outage reaches the same channels the
+# outage did.
+#
+# routing:
+#   # A provider watched out of curiosity: on the dashboard, never in a message.
+#   - provider: anthropic
+#     channels: []
+#   # Real trouble, anywhere: every channel gets attention.
+#   - provider: "*"
+#     classes: [status, incident]
+#     minSeverity: major_outage
+#     channels: [telegram]
+#   # Everything else, including scheduled maintenance and IsItDown's own
+#   # polling trouble: somewhere quieter.
+#   - provider: "*"
+#     channels: [slack]

@@ -271,6 +271,27 @@ export interface ComponentPreview {
   showcase: boolean;
 }
 
+/** Mirrors `src/core/routing.ts`'s own `EventClass`/`SeverityFloor`/`RoutingRule`. */
+export type EventClass = "status" | "incident" | "maintenance" | "monitoring";
+export type SeverityFloor = "any" | "degraded" | "partial_outage" | "major_outage";
+
+export interface RoutingRule {
+  provider: string;
+  classes: EventClass[];
+  minSeverity: SeverityFloor;
+  channels: string[];
+}
+
+/**
+ * `invalidRules` counts saved rules the server could not parse back out of
+ * SQLite and is dropping from evaluation — stated rather than swallowed,
+ * since either direction of drop silently changes routing.
+ */
+export interface RoutingResponse {
+  rules: RoutingRule[];
+  invalidRules: number;
+}
+
 export interface RuntimeConfigResponse {
   polling: {
     intervalMinutes: number;
@@ -280,6 +301,7 @@ export interface RuntimeConfigResponse {
   };
   services: ServiceDefinition[];
   channels: DescribedChannel[];
+  routing: RoutingResponse;
 }
 
 export interface MapPoint {
