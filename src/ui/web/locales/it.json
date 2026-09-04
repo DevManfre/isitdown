@@ -150,7 +150,6 @@
   "history.drawer-bars": "Stato giornaliero",
   "history.legend-title": "Legenda colori",
 
-  "settings.hot-note": "Applicato al ciclo successivo, senza restart.",
   "settings.secret-note": "Scrivi una credenziale e salva: resta accanto al database, vale subito e non viene mai più mostrata. Quale variabile d'ambiente la porta sta dietro il pulsante della riga.",
   "settings.section.engine": "Motore",
   "settings.section.services": "Servizi monitorati",
@@ -167,7 +166,8 @@
 
   "settings.routing": "Instradamento notifiche",
   "settings.routing.hint": "La prima regola che corrisponde a un cambiamento decide quali canali ne vengono informati.",
-  "settings.routing.count": "{count} regole",
+  "settings.routing.count_one": "{count} regola",
+  "settings.routing.count_other": "{count} regole",
   "routing.note": "La prima regola che corrisponde a un cambiamento decide quali canali ne vengono informati — le regole sottostanti non vengono consultate. Metti quelle specifiche in alto.",
   "routing.empty": "Nessuna regola — ogni cambiamento viene inviato a ogni canale attivo, come prima che l'instradamento esistesse.",
   "routing.add": "Aggiungi regola",

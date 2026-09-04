@@ -150,7 +150,6 @@
   "history.drawer-bars": "Daily status",
   "history.legend-title": "Colour key",
 
-  "settings.hot-note": "Applied on the next cycle — no restart.",
   "settings.secret-note": "Type a credential and save: it is kept beside the database, applies at once, and is never shown again. Which environment variable carries it sits behind the row's own button.",
   "settings.section.engine": "Engine",
   "settings.section.services": "Monitored services",
@@ -167,7 +166,8 @@
 
   "settings.routing": "Notification routing",
   "settings.routing.hint": "The first rule that matches a change decides which channels hear about it.",
-  "settings.routing.count": "{count} rules",
+  "settings.routing.count_one": "{count} rule",
+  "settings.routing.count_other": "{count} rules",
   "routing.note": "The first rule that matches a change decides which channels hear about it — rules below it are not consulted. Put the specific ones on top.",
   "routing.empty": "No rules — every change goes to every enabled channel, as before routing existed.",
   "routing.add": "Add rule",
