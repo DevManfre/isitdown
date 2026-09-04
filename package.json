@@ -1,6 +1,6 @@
 {
   "name": "isitdown",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Polls the public status pages of third-party providers and notifies on state transitions",
   "license": "MIT",
