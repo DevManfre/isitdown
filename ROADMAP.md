@@ -14,14 +14,18 @@ Legend:
 - ⚠️ — collides with a declared non-goal or a core principle in `README.md`;
   needs a deliberate decision before it is planned, not just prioritised.
 - ✅ — shipped; kept listed so the phase reads as a whole.
+- ◐ — partly shipped; the row's note says what is left.
 
-Current state for reference (v1.2.0): Statuspage and generic RSS/Atom adapters, both
+Current state for reference (v1.4.0): Statuspage and generic RSS/Atom adapters, both
 covered by the shared adapter contract suite; Telegram, webhook, Discord, Slack and web
-push channels; scheduled-maintenance awareness (windows silence the diff engine and
-show on the dashboard and timeline); Prometheus `/metrics`; UI edition with overview,
-providers, incidents, history, settings, geographic map/globe; channel credentials
-settable from the dashboard (write-only, kept in a `0600` file beside the database and
-applied with no restart); SQLite history with 120-day retention; `en` + `it`.
+push channels; per-provider / per-severity notification routing rules, with a dry run
+and an explain that names the winning rule; scheduled-maintenance awareness (windows
+silence the diff engine and show on the dashboard and timeline); Prometheus
+`/metrics`; UI edition with overview, providers, incidents, history, settings,
+geographic map/globe; channel credentials settable from the dashboard (write-only, kept
+in a `0600` file beside the database and applied with no restart); a provider removal
+that names the rows it will delete first; SQLite history with 120-day retention;
+`en` + `it`.
 
 ---
 
@@ -118,7 +122,7 @@ is additive and independently shippable.
 | 5.9 | **Timezone preference** | S | Everything is UTC. Correct, defensible, and mildly annoying every single day. |
 | 5.10 | **Favicon and title reflect worst status** | S | A red dot in the tab when something is down. Small, delightful, genuinely useful. |
 | 5.11 | **Provider catalog / onboarding wizard** | M | Pick "GitHub" from a bundled list instead of typing an id, a name and a base URL. First-run experience is currently a form; it should be a menu. |
-| 5.12 | **Undo for destructive actions** | S | Deleting a service cascades away its samples, incidents and state. There is no way back. At minimum a confirmation naming what will be lost; better, a soft delete with a grace period. |
+| 5.12 ◐ | **Undo for destructive actions** | S | Deleting a service cascades away its samples, incidents, maintenances and routing rules. The confirmation now counts and names those rows before the removal takes them (`GET /config/services/:id/impact`), so the footgun is at least signposted. Still no way back: a soft delete with a grace period, or an undo window, is open. |
 | 5.13 | **Accessibility pass** | M | Keyboard traversal of every view, visible focus, `prefers-reduced-motion` honoured throughout (the UI leans hard on motion), colour contrast audit in both themes, screen-reader labels on charts. |
 | 5.14 | **More locales** | S each | `es`, `fr`, `de`, `pt`. The i18n plumbing exists and is enforced; adding a catalog is mechanical. |
 | 5.15 | **Native review of the Italian catalog** | S | On the README's open list already. |
@@ -180,8 +184,16 @@ effort is roughly:
 4. ✅ **2.1 scheduled maintenance** — removes the most annoying class of false alert.
 5. ✅ **3.1 + 3.2 Discord and Slack channels** — both nearly free behind the existing interface.
 6. ✅ **3.10 routing rules** — the notification feature people actually hit the ceiling on.
-7. **5.12 undo / safer delete** — a data-loss footgun that exists today.
+7. ◐ **5.12 undo / safer delete** — a data-loss footgun that exists today. The
+   confirmation half shipped; the soft delete has not.
 
 The two items that most change *what IsItDown is*, and therefore deserve a
 decision rather than a slot in a queue, are **1.8 direct HTTP probes** and
 **5.1 the public status page**.
+
+That slice is now essentially spent. The next one, on the same value-to-effort
+reading: **1.4 Slack adapter** (first non-Statuspage JSON shape, now that 1.11 and
+1.12 make it cheap, and a rehearsal for 1.1–1.3), then **2.4 conditional requests**
+and **2.2 per-provider poll interval** (both S, both in the poller's existing seams),
+then **3.17 delivery log** (the `notifications` table is already written and has no
+view).
