@@ -16,8 +16,8 @@ Legend:
 - ✅ — shipped; kept listed so the phase reads as a whole.
 - ◐ — partly shipped; the row's note says what is left.
 
-Current state for reference (v1.4.0): Statuspage and generic RSS/Atom adapters, both
-covered by the shared adapter contract suite; Telegram, webhook, Discord, Slack and web
+Current state for reference (v1.4.0): Statuspage, generic RSS/Atom and Slack
+adapters, all covered by the shared adapter contract suite; Telegram, webhook, Discord, Slack and web
 push channels; per-provider / per-severity notification routing rules, with a dry run
 and an explain that names the winning rule; scheduled-maintenance awareness (windows
 silence the diff engine and show on the dashboard and timeline); Prometheus
@@ -39,7 +39,7 @@ does not cover is invisible.
 | 1.1 | **AWS Health adapter** | M | Not Statuspage. Public health feed is its own JSON shape, region-scoped. Most-requested provider by far in this category. |
 | 1.2 | **Google Cloud adapter** | M | `status.cloud.google.com/incidents.json` — flat incident list, no overall status field, so severity has to be derived. |
 | 1.3 | **Azure Status adapter** | M | RSS/Atom plus an HTML page; the messiest of the three hyperscalers. |
-| 1.4 | **Slack adapter** | S | `status.slack.com/api/v2.0.0/current` — small, well-shaped, good first non-Statuspage adapter to prove the interface holds. |
+| 1.4 ✅ | **Slack adapter** | S | `status.slack.com/api/v2.0.0/current` — small, well-shaped, good first non-Statuspage adapter to prove the interface holds. |
 | 1.5 ✅ | **Generic RSS/Atom adapter** | M | A large tail of status pages publish a feed and nothing else. One adapter, configured by feed URL, unlocks dozens of providers with no new code per provider. High leverage. |
 | 1.6 | **Generic HTML-scrape adapter** | M | CSS selector + a status-word mapping in `options`. Fragile by nature; would need an explicit "this can break silently" warning in the UI. |
 | 1.7 | **Instatus / Better Stack / Sorry™ adapters** | S each | The three most common Statuspage competitors. Each is a small, stable JSON shape. |
@@ -179,7 +179,7 @@ If the list has to collapse to one quarter's worth, the highest ratio of value t
 effort is roughly:
 
 1. ✅ **1.11 + 1.12 adapter contract kit and fixture recorder** — makes section 1 cheap.
-2. ✅ **1.5 RSS adapter** — proves the adapter seam on something that is not Statuspage. (1.4 Slack still open.)
+2. ✅ **1.5 RSS adapter** — proves the adapter seam on something that is not Statuspage.
 3. ✅ **4.1 Prometheus `/metrics`** — a day of work, a large audience.
 4. ✅ **2.1 scheduled maintenance** — removes the most annoying class of false alert.
 5. ✅ **3.1 + 3.2 Discord and Slack channels** — both nearly free behind the existing interface.
@@ -191,9 +191,10 @@ The two items that most change *what IsItDown is*, and therefore deserve a
 decision rather than a slot in a queue, are **1.8 direct HTTP probes** and
 **5.1 the public status page**.
 
-That slice is now essentially spent. The next one, on the same value-to-effort
-reading: **1.4 Slack adapter** (first non-Statuspage JSON shape, now that 1.11 and
-1.12 make it cheap, and a rehearsal for 1.1–1.3), then **2.4 conditional requests**
-and **2.2 per-provider poll interval** (both S, both in the poller's existing seams),
-then **3.17 delivery log** (the `notifications` table is already written and has no
-view).
+That slice is now spent, and **1.4 Slack** went with it — the first non-Statuspage
+JSON shape, which is the rehearsal 1.1–1.3 were waiting on. The next one, on the
+same value-to-effort reading: **2.4 conditional requests** and **2.2 per-provider
+poll interval** (both S, both in the poller's existing seams), then **3.17 delivery
+log** (the `notifications` table is already written and has no view), then
+**1.1–1.3**, the three hyperscalers, now that a non-Statuspage adapter has a
+precedent to copy.
