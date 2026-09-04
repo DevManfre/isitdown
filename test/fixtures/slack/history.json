@@ -1,0 +1,257 @@
+[
+  {
+    "id": 1576,
+    "title": "Trouble Accessing Historical Messages With Custom Data Retention Policies Enabled",
+    "type": "incident",
+    "status": "active",
+    "url": "https://slack-status.com/2026-08/e07b9271f0346c3b",
+    "date_created": "2026-08-13T14:21:41-07:00",
+    "date_updated": "2026-09-01T15:51:21-07:00",
+    "notes": [
+      {
+        "body": "<p>Users with custom data retention policies enabled might be unable to see or load older messages. We apologize for the trouble and we'll share more news as it becomes available.</p>",
+        "date_created": "2026-08-13T14:21:41-07:00"
+      },
+      {
+        "body": "<p>We're continuing to investigate an issue affecting a subset of channels with custom message retention settings. Our teams are working to identify the technical trigger and an appropriate fix. We'll provide an update as more news becomes available.</p>",
+        "date_created": "2026-08-13T14:49:40-07:00"
+      },
+      {
+        "body": "<p>We're continuing to investigate an issue affecting a subset of channels with custom message retention settings. Our Teams have restored functionality to the affected retention settings for known impacted customers. We are now working to identify and address any additional concerns regarding the message retention issues.</p>",
+        "date_created": "2026-08-14T12:35:56-07:00"
+      },
+      {
+        "body": "<p>After further investigation, the custom retention settings have not fully been restored yet. Our teams have identified the technical trigger and are currently developing a mitigation plan to mitigate the impact to the custom retention settings. All custom retention jobs have been put on hold as the team works to address this issue. We apologize for the confusion, and thank you for bearing with us while we work through this issue.&nbsp;</p>",
+        "date_created": "2026-08-14T13:20:26-07:00"
+      },
+      {
+        "body": "<p>We're continuing to investigate an issue affecting a subset of channels with custom message retention settings. Custom channel retention settings have been restored for affected customers. Custom retention jobs remain on hold for some customers as we work to fully resolve the underlying cause regarding the custom message retention issues.</p>",
+        "date_created": "2026-08-14T14:39:25-07:00"
+      },
+      {
+        "body": "<p>We're continuing our restoration efforts regarding this issue affecting a subset of channels with custom message retention settings. While we work to resolve this issue, data retention processing remains paused for affected customers.&nbsp;</p><p><br></p><p>We will provide another update as additional information becomes available.</p>",
+        "date_created": "2026-08-17T14:57:51-07:00"
+      },
+      {
+        "body": "<p>We're continuing to work on restoring messages, message edits, and file shares for a limited number of workspaces that were affected by an issue with custom data retention settings. We've fixed what triggered the issue and are running data recovery using backup restoration methods. Custom retention settings have been restored for impacted channels, and we're gradually re-enabling retention jobs.</p><p>We will provide another update as additional information becomes available.</p>",
+        "date_created": "2026-08-20T15:54:59-07:00"
+      },
+      {
+        "body": "<p>We\u2019re continuing our work to restore the remaining message data affected by this issue. Our teams have made progress developing and validating the recovery process for messages, message edits, and shared files. We\u2019re addressing additional technical dependencies and completing validation before proceeding with the next stages of restoration.</p><p>We\u2019ll continue to provide updates as we make progress.</p>",
+        "date_created": "2026-08-25T13:55:43-07:00"
+      },
+      {
+        "body": "<p>We\u2019re continuing our work to restore the remaining message data affected by this issue. We\u2019ve made further progress across the recovery processes for messages, message edits, and shared files. Validation of the message-edit recovery process has identified additional adjustments needed before restoration proceeds, while preparation and validation for message recovery continue. We\u2019ve also completed additional development work supporting shared-file restoration, including handling for shared channels.</p><p>Custom retention processing has been re-enabled for affected active workspaces. We\u2019ll continue to provide updates as restoration and validation progress.</p>",
+        "date_created": "2026-08-27T11:58:04-07:00"
+      },
+      {
+        "body": "<p>We continue to restore batches of messages, message edits, and shared files. Each batch requires careful planning, monitoring, and validation to ensure the affected messages are accurately restored. Custom retention processing remains re-enabled for affected active workspaces. Thank you for bearing with us while we continue to work through this complex and nuanced issue.&nbsp;</p><p>More updates will come as restoration and validation progress.</p>",
+        "date_created": "2026-09-01T15:51:21-07:00"
+      }
+    ],
+    "services": [
+      "Messaging",
+      "Workspace/Org Administration"
+    ]
+  },
+  {
+    "id": 1575,
+    "title": "Trouble Using Search Bar For Some Admins",
+    "type": "incident",
+    "status": "resolved",
+    "url": "https://slack-status.com/2026-08/1db1f200d420086a",
+    "date_created": "2026-08-06T15:22:35-07:00",
+    "date_updated": "2026-08-06T18:08:09-07:00",
+    "notes": [
+      {
+        "body": "<p>Since approximately 21:00 UTC on August 6, some admins have been unable to click or use the search bar on org dashboard pages. We are aware of this issue and are actively investigating the cause. We'll provide an update in 60 minutes or sooner if additional information becomes available.&nbsp;</p>",
+        "date_created": "2026-08-06T15:22:35-07:00"
+      },
+      {
+        "body": "<p>We have identified the cause of this issue as a recent change and have started the process of rolling back the problematic change.&nbsp;</p>",
+        "date_created": "2026-08-06T16:11:27-07:00"
+      },
+      {
+        "body": "<p>We've completed the rollback of the recent change that was the trigger of the issue. The Search bar and Admin dashboard&nbsp; is restored for all users.<br>We apologize for the inconvenience caused to you and your business.</p><p><br></p>",
+        "date_created": "2026-08-06T18:07:04-07:00"
+      }
+    ],
+    "services": [
+      "Search"
+    ]
+  },
+  {
+    "id": 1574,
+    "title": "Feature Degradation Affecting the Receipt of Emails in Slack",
+    "type": "incident",
+    "status": "resolved",
+    "url": "https://slack-status.com/2026-07/6b1014d8bfb3afc0",
+    "date_created": "2026-07-27T19:13:57-07:00",
+    "date_updated": "2026-07-28T16:09:00-07:00",
+    "notes": [
+      {
+        "body": "<p>We're currently investigating an issue affecting users' ability to receive incoming emails into Slack, caused by some issues with our email ingestion pipeline. We're sorry for any inconvenience this is causing, our team is actively working on a fix and we'll share an update as soon as we have more information.</p>",
+        "date_created": "2026-07-27T19:13:57-07:00"
+      },
+      {
+        "body": "<p>We identified the cause of the issue preventing users from receiving incoming emails. We are deploying a fix and will share a further update once deployment and verification are complete.</p>",
+        "date_created": "2026-07-27T20:25:22-07:00"
+      },
+      {
+        "body": "<p>The fix has been successfully deployed, and validation is now complete. The issue preventing users from receiving incoming emails into Slack is fully resolved, and normal service functionality has been restored.</p><p>We apologize for any disruptions to your day.</p>",
+        "date_created": "2026-07-27T20:43:47-07:00"
+      }
+    ],
+    "services": [
+      "Apps/Integrations/APIs"
+    ]
+  },
+  {
+    "id": 1573,
+    "title": "Issue sending messages to channels via certain Workflows",
+    "type": "incident",
+    "status": "resolved",
+    "url": "https://slack-status.com/2026-07/e82ee127d8bed735",
+    "date_created": "2026-07-24T01:22:54-07:00",
+    "date_updated": "2026-07-24T03:47:02-07:00",
+    "notes": [
+      {
+        "body": "<p>We\u2019re aware of an issue affecting Workflows that include 'refer to a message link'. Users with these workflows are unable to send a message to a channel, and will receive an \u2018Input Validation Error\u2019 when trying to perform this step. We\u2019re actively investigating this issue and will provide an update in 30 minutes or sooner if more information becomes available.&nbsp;</p>",
+        "date_created": "2026-07-24T01:22:54-07:00"
+      },
+      {
+        "body": "<p>We've engaged our Worklow team to assist in the investigation. Initial analysis appears to show a conflict between specific variables. We\u2019re continuing to work to understand whether this is the trigger of the issue. We\u2019ll provide an update in 30 minutes or sooner if more information becomes available.&nbsp;</p>",
+        "date_created": "2026-07-24T01:44:22-07:00"
+      },
+      {
+        "body": "<p>The Workflow team is currently analyzing whether a recent change may have resulted in the conflict between variables that has been observed. It is expected to take some time to validate whether this is the case.&nbsp;</p><p>We\u2019ll provide an update in 60 minutes or sooner if more information becomes available.&nbsp;</p><p><br><br></p>",
+        "date_created": "2026-07-24T02:08:05-07:00"
+      },
+      {
+        "body": "<p>We\u2019ve performed a test of reverting a recent change and this appears to have resolved the issue. We are in the process of performing a production wide revert of this change. This is expected to take some time to complete and we will validate that it is successful.<br><br>We\u2019ll provide an update in 2 hours or sooner if more information becomes available.&nbsp;<br><br></p>",
+        "date_created": "2026-07-24T02:42:29-07:00"
+      },
+      {
+        "body": "<p>We\u2019ve completed the revert of the recent change and have validated that this has brought customers out of impact and can now successfully send a message to a channel using Workflows that include 'refer to a message link'.<br><br>We apologize for how this incident may have affected you and your business.<br><br></p>",
+        "date_created": "2026-07-24T03:47:02-07:00"
+      }
+    ],
+    "services": [
+      "Workflows"
+    ]
+  },
+  {
+    "id": 1572,
+    "title": "Receiving reminders in Slack issue",
+    "type": "incident",
+    "status": "resolved",
+    "url": "https://slack-status.com/2026-07/df254c60ace250d9",
+    "date_created": "2026-07-23T19:18:40-07:00",
+    "date_updated": "2026-07-23T20:20:37-07:00",
+    "notes": [
+      {
+        "body": "<p>Some users are reporting issues with receiving reminders in Slack. We're aware of the issue and are actively investigating. We'll provide an update as soon as more&nbsp; information becomes available. We apologize for any inconvenience this issue is causing you.</p>",
+        "date_created": "2026-07-23T19:18:40-07:00"
+      },
+      {
+        "body": "<p>We believe we\u2019ve identified the cause of the issue impacting reminders in Slack. We\u2019ve developed a potential fix for the issue and have deployed a change. We are actively monitoring to confirm that reminders are being delivered as expected. We'll provide an update as more information becomes available.&nbsp;</p>",
+        "date_created": "2026-07-23T19:53:37-07:00"
+      },
+      {
+        "body": "<p>After a period of monitoring, we can see that reminders are now working as expected following the fix deployment. This issue has been resolved as of 03:00 UTC, July 24. We apologize for any inconvenience this issue has caused you.&nbsp;</p>",
+        "date_created": "2026-07-23T20:20:37-07:00"
+      }
+    ],
+    "services": [
+      "Notifications"
+    ]
+  },
+  {
+    "id": 1571,
+    "title": "Chat functionality unavailable on Slack Help page ",
+    "type": "incident",
+    "status": "resolved",
+    "url": "https://slack-status.com/2026-06/4e79ab0c89aa4be0",
+    "date_created": "2026-06-26T02:12:20-07:00",
+    "date_updated": "2026-06-26T03:09:39-07:00",
+    "notes": [
+      {
+        "body": "<p>We're aware of an issue affecting users ability to reach our Slack Support team via the Chat functionality on the Slack Help page. Users will be unable to click on the \u2018Chat\u2019 option and will see a \u2018Chat is temporarily unavailable. Please send us a message or check back later\u2019 error message.&nbsp;</p><p>We're working to resolve this issue and will provide an update in 30 minutes or sooner if additional information becomes available.&nbsp;</p>",
+        "date_created": "2026-06-26T02:12:20-07:00"
+      },
+      {
+        "body": "<p>Additional Slack engineers have been engaged and are investigating this issue.</p><p>As a workaround, if users require support, they can use the \u2018Send us a Message\u2019 functionality on the Slack Help Center page here: <a href=\"https://slack.com/intl/en-gb/help/requests/new\"><span style=\"text-decoration: underline;\">https://slack.com/intl/en-gb/help/requests/new</span></a> . A member of the Slack team will then be in touch.&nbsp;</p><p>We're working to resolve this issue and will provide an update in 30 minutes or sooner if additional information becomes available.</p><p><br><br></p>",
+        "date_created": "2026-06-26T02:41:18-07:00"
+      },
+      {
+        "body": "<p>We've resolved the issue and users can now use the Chat feature on the Slack Help Center. We performed a configuration change, which brought the feature back online and have validated that it's functioning as expected. &nbsp;</p><p><br></p><p>We apologize for how this incident may have affected you and your business.</p><p><br><br></p>",
+        "date_created": "2026-06-26T03:09:39-07:00"
+      }
+    ],
+    "services": []
+  },
+  {
+    "id": 1568,
+    "title": "Trouble submitting workflow forms with file attachments on Android.",
+    "type": "incident",
+    "status": "resolved",
+    "url": "https://slack-status.com/2026-06/83210c13677ffff1",
+    "date_created": "2026-06-16T08:50:09-07:00",
+    "date_updated": "2026-06-22T13:39:26-07:00",
+    "notes": [
+      {
+        "body": "<p>We are aware that some users on the Slack Android app are unable to submit workflow forms that contain a required file upload field. After a file is selected, the Submit button becomes disabled and the form cannot be completed. Users on Slack for iOS and Slack for web are not affected. We are actively investigating the issue and working to identify the root cause. We'll provide an update in 60 minutes or sooner if additional information becomes available.</p>",
+        "date_created": "2026-06-16T08:50:09-07:00"
+      },
+      {
+        "body": "<p>We have identified the cause of this issue and confirmed it affects a small subset of users on a single version of the Slack Android app. Users on other Android versions, iOS, and web are not affected. A fix is already available and will begin rolling out to Android users tomorrow. We will provide an update as soon as additional information becomes available.</p>",
+        "date_created": "2026-06-16T09:48:02-07:00"
+      },
+      {
+        "body": "<p>A fix for this issue has been delivered in a new version of the Slack Android app, and rollout has now begun. Android users will start seeing the updated app version become available in the Google Play Store as the rollout progresses.</p><p>Once updated, users who were experiencing issues submitting workflow forms containing a required file upload field will be able to do so successfully.&nbsp;</p><p>We will continue to monitor the rollout and provide another update as additional information becomes available.</p>",
+        "date_created": "2026-06-17T12:38:43-07:00"
+      },
+      {
+        "body": "<p>The rollout of the new version of the Slack Android app is ongoing and may take up to several days to fully complete. We continue to monitor the rollout and will provide another update when we have more information to share. Thank you for your patience with us while we work through this.&nbsp;</p>",
+        "date_created": "2026-06-18T15:30:57-07:00"
+      },
+      {
+        "body": "<p>We continue to monitor the rollout of the new version of Slack for Android. We'll provide another update when we have further information to share. Thank you for your continued patience.&nbsp;</p>",
+        "date_created": "2026-06-21T10:33:48-07:00"
+      },
+      {
+        "body": "<p>This issue has been resolved. Android users who were experiencing issues submitting workflow forms containing a required file upload field can now do so successfully. A fix was delivered via a new update to the Slack Android app. Users who are still experiencing this issue should update the Slack app from the Google Play Store to resolve it. No other action is required.&nbsp;<br><br>We apologize for the inconvenience and thank you for your patience.<br><br></p>",
+        "date_created": "2026-06-22T13:39:26-07:00"
+      }
+    ],
+    "services": [
+      "Workflows"
+    ]
+  },
+  {
+    "id": 1570,
+    "title": "Trouble loading SSO configuration settings for some workspace admins",
+    "type": "incident",
+    "status": "resolved",
+    "url": "https://slack-status.com/2026-06/66c001cc76d073f8",
+    "date_created": "2026-06-17T15:33:29-07:00",
+    "date_updated": "2026-06-17T21:14:39-07:00",
+    "notes": [
+      {
+        "body": "<p>Some workspace admins on standalone (non-Enterprise Grid) workspaces may be experiencing an issue where the SSO and authentication configuration page does not display current settings as expected. Admins may see a blank value for the \"Require SSO authentication for\" field on the admin SSO settings page, which does not accurately reflect the actual backend configuration \u2014 SSO settings remain intact and in effect.<br><br>We are actively investigating this issue and will provide an update as soon as we have more information to share. We apologize for the inconvenience.</p>",
+        "date_created": "2026-06-17T15:33:29-07:00"
+      },
+      {
+        "body": "<p>We have identified the trigger and developed a fix. We are currently deploying this fix and expect to resolve the issue shortly. We will provide another update once the deployment is complete.&nbsp;<br>We apologize for the inconvenience.</p>",
+        "date_created": "2026-06-17T18:49:59-07:00"
+      },
+      {
+        "body": "<p>We have successfully deployed the fix to production and the issue is resolved. <br>The Admin SSO and Authentication Configuration page for standalone workspaces should now display the correct settings. If you continue to see outdated information, refresh the SSO Admin page to load the latest changes.</p><p><br></p>",
+        "date_created": "2026-06-17T21:14:39-07:00"
+      }
+    ],
+    "services": [
+      "Login/SSO"
+    ]
+  }
+]
