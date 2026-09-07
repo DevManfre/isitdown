@@ -1,6 +1,8 @@
 import type {
   ComponentHistoryResponse,
   ComponentPreview,
+  DeliveryLogResponse,
+  DeliveryState,
   DescribedChannel,
   IncidentDetail,
   IncidentsResponse,
@@ -126,6 +128,23 @@ export const getMaintenances = (query: MaintenanceListQuery = {}) => {
 export const getNotifications = (limit = 20) =>
   request<{ notifications: SentRecord[] }>("GET", `/notifications?limit=${limit}`);
 
+export interface DeliveryLogQuery {
+  state?: DeliveryState | undefined;
+  channel?: string | undefined;
+  page?: number | undefined;
+  pageSize?: number | undefined;
+}
+
+export const getDeliveryLog = (query: DeliveryLogQuery = {}) => {
+  const params = new URLSearchParams();
+  if (query.state !== undefined && query.state !== "all") params.set("state", query.state);
+  if (query.channel !== undefined && query.channel !== "") params.set("channel", query.channel);
+  if (query.page !== undefined) params.set("page", String(query.page));
+  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  const search = params.toString();
+  return request<DeliveryLogResponse>("GET", `/notifications/log${search === "" ? "" : `?${search}`}`);
+};
+
 export const getConfig = () => request<RuntimeConfigResponse>("GET", "/config");
 export const addService = (service: unknown) => request<unknown>("POST", "/config/services", service);
 export const previewComponents = (body: unknown) =>
@@ -139,8 +158,18 @@ export const patchService = (id: string, patch: unknown) =>
 /** Read before the remove, so the confirmation can name what the cascade takes. */
 export const getServiceImpact = (id: string) =>
   request<ServiceImpact>("GET", `/config/services/${encodeURIComponent(id)}/impact`);
+/** A soft delete: the provider leaves the dashboard, its history waits out the window. */
 export const removeService = (id: string) =>
-  request<unknown>("DELETE", `/config/services/${encodeURIComponent(id)}`);
+  request<{ removed: string; removedAt: string; restoreUntil: string }>(
+    "DELETE",
+    `/config/services/${encodeURIComponent(id)}`,
+  );
+/** Undo, for as long as the window lasts. */
+export const restoreService = (id: string) =>
+  request<unknown>("POST", `/config/services/${encodeURIComponent(id)}/restore`);
+/** The destructive half, on its own path so nothing reaches it by accident. */
+export const purgeService = (id: string) =>
+  request<unknown>("DELETE", `/config/services/${encodeURIComponent(id)}/permanently`);
 export const testService = (id: string) =>
   request<{ ok: boolean; overallStatus?: OverallStatus; error?: string }>(
     "POST",

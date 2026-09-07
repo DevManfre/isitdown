@@ -13,6 +13,8 @@ import type {
   IncidentRow,
   MaintenanceFilter,
   MaintenanceRow,
+  NotificationCounts,
+  NotificationFilter,
   SampleRow,
 } from "./historyStore.interface.ts";
 
@@ -70,6 +72,12 @@ const maintenanceRowSchema = z.object({
 const incidentCountsSchema = z.object({
   all_count: z.number(),
   active_count: z.number().nullable().transform((value) => value ?? 0),
+});
+
+/** `SUM(...)` is NULL, not 0, when no send matches the WHERE clause. */
+const notificationCountsSchema = z.object({
+  all_count: z.number(),
+  sent_count: z.number().nullable().transform((value) => value ?? 0),
 });
 
 const notificationRowSchema = z.object({
@@ -175,6 +183,19 @@ const toMaintenanceRow = (row: MaintenanceDbRow): MaintenanceRow => ({
  * and "every provider is disabled" has to match no rows instead of falling
  * through to all of them.
  */
+/** One `notifications` row as the dispatcher's own record. */
+function toSentRecord(row: z.infer<typeof notificationRowSchema>): SentRecord {
+  return {
+    providerId: row.provider_id,
+    channel: row.channel,
+    kind: row.kind,
+    text: row.text,
+    sentAt: row.sent_at,
+    ok: row.ok === 1,
+    ...(row.error === null ? {} : { error: row.error }),
+  };
+}
+
 function providerScope(
   providerIds: string[] | undefined,
 ): { clause: string; params: string[] } | null {
@@ -404,15 +425,64 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         )
         .all(...(scope?.params ?? []), limit)
         .map((raw) => notificationRowSchema.parse(raw));
-      return rows.map((row) => ({
-        providerId: row.provider_id,
-        channel: row.channel,
-        kind: row.kind,
-        text: row.text,
-        sentAt: row.sent_at,
-        ok: row.ok === 1,
-        ...(row.error === null ? {} : { error: row.error }),
-      }));
+      return rows.map(toSentRecord);
+    },
+
+    async queryNotifications(filter: NotificationFilter): Promise<SentRecord[]> {
+      const clauses: string[] = [];
+      const params: (string | number)[] = [];
+      const scope = providerScope(filter.providerIds);
+      if (scope !== null) {
+        clauses.push(scope.clause);
+        params.push(...scope.params);
+      }
+      if (filter.state !== undefined) {
+        clauses.push("ok = ?");
+        params.push(filter.state === "sent" ? 1 : 0);
+      }
+      if (filter.channel !== undefined) {
+        clauses.push("channel = ?");
+        params.push(filter.channel);
+      }
+      const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
+      // SQLite has no bare OFFSET: skipping rows without a page size means
+      // asking for the remaining ones, which is what `LIMIT -1` spells.
+      const window = filter.limit === undefined && filter.offset === undefined ? "" : "LIMIT ? OFFSET ?";
+      if (window !== "") params.push(filter.limit ?? -1, filter.offset ?? 0);
+
+      return db
+        .prepare(
+          `SELECT provider_id, channel, kind, text, sent_at, ok, error
+           FROM notifications ${where} ORDER BY sent_at DESC, id DESC ${window}`,
+        )
+        .all(...params)
+        .map((raw) => notificationRowSchema.parse(raw))
+        .map(toSentRecord);
+    },
+
+    async countNotifications(
+      filter: Omit<NotificationFilter, "state" | "limit" | "offset">,
+    ): Promise<NotificationCounts> {
+      const clauses: string[] = [];
+      const params: (string | number)[] = [];
+      const scope = providerScope(filter.providerIds);
+      if (scope !== null) {
+        clauses.push(scope.clause);
+        params.push(...scope.params);
+      }
+      if (filter.channel !== undefined) {
+        clauses.push("channel = ?");
+        params.push(filter.channel);
+      }
+      const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
+      const row = db
+        .prepare(
+          `SELECT COUNT(*) AS all_count, SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END) AS sent_count
+           FROM notifications ${where}`,
+        )
+        .get(...params);
+      const { all_count, sent_count } = notificationCountsSchema.parse(row);
+      return { all: all_count, sent: sent_count, failed: all_count - sent_count };
     },
 
     async listIncidents(filter: IncidentFilter): Promise<IncidentRow[]> {

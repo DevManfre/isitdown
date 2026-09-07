@@ -11,6 +11,7 @@ export const ROUTE_PATHS = {
   incidents: "/incidents",
   incidentDetail: "/incidents/:providerId/:incidentId",
   history: "/history",
+  deliveryLog: "/delivery-log",
   settings: "/settings",
 } as const;
 
@@ -22,5 +23,6 @@ export const NAV_ROUTES: { name: RouteName; labelKey: string }[] = [
   { name: "providers", labelKey: "nav.providers" },
   { name: "incidents", labelKey: "nav.incidents" },
   { name: "history", labelKey: "nav.history" },
+  { name: "deliveryLog", labelKey: "nav.delivery-log" },
   { name: "settings", labelKey: "nav.settings" },
 ];
