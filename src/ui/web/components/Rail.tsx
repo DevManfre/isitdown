@@ -1,6 +1,7 @@
 import { matchPath, NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { NAV_ROUTES, ROUTE_PATHS, type RouteName } from "../../routePaths.ts";
+import { BrandMark } from "@/components/BrandMark.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import {
   Sidebar,
@@ -47,7 +48,7 @@ export function Rail() {
   return (
     <Sidebar role="navigation" aria-label={t("nav.views")} className="rail">
       <SidebarHeader className="rail-brand flex-row items-center gap-2 overflow-hidden px-6 py-4">
-        <span className="rail-dot size-2 shrink-0 rounded-full bg-primary" />
+        <BrandMark className="rail-mark size-5" />
         <span className="rail-name font-medium">{t("app.name")}</span>
       </SidebarHeader>
 

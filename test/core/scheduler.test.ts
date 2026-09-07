@@ -544,3 +544,76 @@ test("no cycle runs before the deadline the dashboard is counting down to", asyn
   assert.equal(poller.calls, 3);
   scheduler.stop();
 });
+
+test("the tick follows the shortest interval any provider asked for", async () => {
+  const configSource = fakeConfigSource(
+    baseConfig({
+      polling: { intervalMinutes: 30, requestTimeoutSeconds: 8, maxRetries: 3, failureThreshold: 5 },
+      services: [
+        {
+          id: "github",
+          name: "GitHub",
+          adapter: "statuspage",
+          baseUrl: "https://www.githubstatus.com",
+          enabled: true,
+        },
+        {
+          id: "cloudflare",
+          name: "Cloudflare",
+          adapter: "statuspage",
+          baseUrl: "https://www.cloudflarestatus.com",
+          enabled: true,
+          intervalMinutes: 2,
+        },
+      ],
+    }),
+  );
+  const scheduler = createScheduler({
+    configSource,
+    poller: fakePoller(),
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    random: noJitter,
+  });
+
+  await scheduler.start();
+  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - Date.now();
+  scheduler.stop();
+
+  // Two minutes, not thirty: a provider polled every two minutes needs a cycle
+  // to run that often, and the ones on the global cadence sit out the extra ticks.
+  assert.ok(armedIn > 100_000 && armedIn < 130_000, `armed in ${armedIn}ms`);
+});
+
+test("a disabled provider's short interval does not drag the tick down with it", async () => {
+  const configSource = fakeConfigSource(
+    baseConfig({
+      polling: { intervalMinutes: 30, requestTimeoutSeconds: 8, maxRetries: 3, failureThreshold: 5 },
+      services: [
+        {
+          id: "cloudflare",
+          name: "Cloudflare",
+          adapter: "statuspage",
+          baseUrl: "https://www.cloudflarestatus.com",
+          enabled: false,
+          intervalMinutes: 1,
+        },
+      ],
+    }),
+  );
+  const scheduler = createScheduler({
+    configSource,
+    poller: fakePoller(),
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    random: noJitter,
+  });
+
+  await scheduler.start();
+  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - Date.now();
+  scheduler.stop();
+
+  assert.ok(armedIn > 1_700_000, `armed in ${armedIn}ms`);
+});

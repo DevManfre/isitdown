@@ -9,14 +9,19 @@ import { migrate } from "../../src/ui/db/migrate.ts";
 import { seedDefaults } from "../../src/ui/db/seed.ts";
 import {
   createDbConfigSource,
-  deleteService,
   describeChannels,
   describeRouting,
+  describeServiceImpact,
   insertService,
   listChannels,
+  listRemovedServices,
   listServices,
+  purgeExpiredServices,
+  purgeService,
   readSettings,
   replaceRoutingRules,
+  restoreService,
+  softDeleteService,
   updateChannel,
   updateService,
   writeSettings,
@@ -182,7 +187,7 @@ test("services can be added, edited and removed through the helpers", async () =
   updateService(db, "vercel", { name: "Vercel Platform" });
   assert.equal(listServices(db).find((service) => service.id === "vercel")?.name, "Vercel Platform");
 
-  deleteService(db, "vercel");
+  purgeService(db, "vercel");
   assert.ok(!listServices(db).some((service) => service.id === "vercel"));
   db.close();
 });
@@ -204,7 +209,7 @@ test("inserting a duplicate service id is refused", async () => {
 test("updating or deleting an unknown service is reported rather than silently ignored", async () => {
   const db = await freshDb();
   assert.equal(updateService(db, "nope", { name: "x" }), false);
-  assert.equal(deleteService(db, "nope"), false);
+  assert.equal(purgeService(db, "nope"), false);
   assert.equal(updateService(db, "github", { name: "GitHub" }), true);
   db.close();
 });
@@ -404,14 +409,14 @@ test("load falls back to the catch-all when the table is empty", async () => {
   db.close();
 });
 
-test("deleting a service deletes the rules that named it and leaves the others", async () => {
+test("purging a service deletes the rules that named it and leaves the others", async () => {
   const db = await freshDb();
   replaceRoutingRules(db, [
     { provider: "github", classes: ["status"], minSeverity: "any", channels: [] },
     { provider: "*", classes: ["status"], minSeverity: "any", channels: ["slack"] },
   ]);
 
-  assert.equal(deleteService(db, "github"), true);
+  assert.equal(purgeService(db, "github"), true);
 
   assert.deepEqual(
     describeRouting(db, silent).rules.map((rule) => rule.provider),
@@ -434,5 +439,128 @@ test("a database at the previous schema version gains the catch-all on migration
   assert.deepEqual(describeRouting(db, silent).rules, [
     { provider: "*", classes: ["status", "incident", "maintenance", "monitoring"], minSeverity: "any", channels: ["*"] },
   ]);
+  db.close();
+});
+
+test("the removal impact counts every row the cascade would take", async () => {
+  const db = await freshDb();
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  const sampleAt = (daysAgo: number): string => new Date(now - daysAgo * day).toISOString();
+  // The oldest sample sits mid-day on purpose: a part-day of history rounds up
+  // to a whole one, so 9.5 days ago is "10 days of history", not 9.
+  const sample = db.prepare(
+    "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok) VALUES (?, ?, 'operational', 1)",
+  );
+  sample.run("github", sampleAt(9.5));
+  sample.run("github", sampleAt(1));
+  sample.run("cloudflare", sampleAt(30));
+  db.prepare(
+    "INSERT INTO component_samples (provider_id, component_id, observed_at, status, ok) VALUES (?, 'api', ?, 'operational', 1)",
+  ).run("github", sampleAt(2));
+  db.prepare(
+    "INSERT INTO incidents (provider_id, incident_id, name, impact, status, started_at, updated_at) VALUES (?, 'i1', 'Outage', 'major', 'resolved', ?, ?)",
+  ).run("github", sampleAt(9), sampleAt(9));
+  db.prepare(
+    "INSERT INTO maintenances (provider_id, maintenance_id, name, status, starts_at, component_ids, first_seen_at, last_seen_at) VALUES (?, 'm1', 'Upgrade', 'scheduled', ?, '[]', ?, ?)",
+  ).run("github", sampleAt(3), sampleAt(3), sampleAt(3));
+  replaceRoutingRules(db, [
+    { provider: "github", classes: ["status"], minSeverity: "any", channels: [] },
+    { provider: "*", classes: ["status"], minSeverity: "any", channels: ["telegram"] },
+  ]);
+
+  assert.deepEqual(describeServiceImpact(db, "github"), {
+    samples: 2,
+    componentSamples: 1,
+    incidents: 1,
+    maintenances: 1,
+    routingRules: 1,
+    historyDays: 10,
+  });
+  db.close();
+});
+
+test("a provider with no history reports zeros rather than nothing", async () => {
+  const db = await freshDb();
+  assert.deepEqual(describeServiceImpact(db, "github"), {
+    samples: 0,
+    componentSamples: 0,
+    incidents: 0,
+    maintenances: 0,
+    routingRules: 0,
+    historyDays: 0,
+  });
+  db.close();
+});
+
+test("the removal impact of an unknown service is null, so the route can answer 404", async () => {
+  const db = await freshDb();
+  assert.equal(describeServiceImpact(db, "nope"), null);
+  db.close();
+});
+
+test("removing a service hides it everywhere while its history waits", async () => {
+  const db = await freshDb();
+  const at = new Date("2026-09-07T10:00:00.000Z");
+
+  assert.equal(softDeleteService(db, "github", at), true);
+  assert.ok(!listServices(db).some((service) => service.id === "github"));
+  // A second removal must not restart the clock.
+  assert.equal(softDeleteService(db, "github", new Date()), false);
+
+  const [removed] = listRemovedServices(db);
+  assert.equal(removed?.id, "github");
+  assert.equal(removed?.removedAt, at.toISOString());
+  assert.equal(removed?.restoreUntil, new Date("2026-09-14T10:00:00.000Z").toISOString());
+  db.close();
+});
+
+test("restoring a removed service brings it back with its rules intact", async () => {
+  const db = await freshDb();
+  replaceRoutingRules(db, [
+    { provider: "github", classes: ["status"], minSeverity: "any", channels: [] },
+  ]);
+
+  softDeleteService(db, "github");
+  assert.equal(restoreService(db, "github"), true);
+
+  assert.ok(listServices(db).some((service) => service.id === "github"));
+  assert.deepEqual(listRemovedServices(db), []);
+  // Nothing was taken, so nothing had to be rebuilt.
+  assert.deepEqual(
+    describeRouting(db, silent).rules.map((rule) => rule.provider),
+    ["github"],
+  );
+  // A service that is not removed cannot be restored.
+  assert.equal(restoreService(db, "github"), false);
+  db.close();
+});
+
+test("only a removal past its window is purged, and the purge names what it took", async () => {
+  const db = await freshDb();
+  const [older, newer] = listServices(db).map((service) => service.id);
+
+  softDeleteService(db, older!, new Date("2026-09-01T10:00:00.000Z"));
+  softDeleteService(db, newer!, new Date("2026-09-07T10:00:00.000Z"));
+
+  // Eight days after the first removal, one day after the second.
+  const purged = purgeExpiredServices(db, new Date("2026-09-09T10:00:00.000Z"));
+
+  assert.deepEqual(purged, [older]);
+  assert.deepEqual(
+    listRemovedServices(db).map((service) => service.id),
+    [newer],
+  );
+  db.close();
+});
+
+test("a removed service's id cannot be updated or re-described", async () => {
+  const db = await freshDb();
+  softDeleteService(db, "github");
+
+  // Both answer the way they do for an id that was never there: the row is on
+  // its way out, and a route must 404 rather than edit it back into service.
+  assert.equal(updateService(db, "github", { name: "GitHub" }), false);
+  assert.equal(describeServiceImpact(db, "github"), null);
   db.close();
 });

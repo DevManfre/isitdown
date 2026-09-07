@@ -1,3 +1,4 @@
+import type { StatusPageRead } from "./http.ts";
 import type { HistoricalIncident, NormalizedStatus, OverallStatus } from "./types.ts";
 
 /**
@@ -24,6 +25,13 @@ export interface ServiceRef {
 
 export interface FetchContext {
   timeoutMs: number;
+  /**
+   * Reports each read the adapter makes over HTTP, so the caller can record how
+   * long the provider's page took to answer. Adapters forward it to
+   * `fetchConditional` and do nothing else with it; the poller is the only
+   * caller that supplies one.
+   */
+  onRead?: ((read: StatusPageRead) => void) | undefined;
 }
 
 export interface IncidentHistoryResult {

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="IsItDown">
+  <!-- The brand mark from docs/img/social-preview.html: a rounded square in the
+       accent gradient with the pulse trace on it. Kept in sync by hand with
+       components/BrandMark.tsx — a favicon has to be a static asset, so the
+       geometry cannot come from the React component that draws the same mark.
+
+       The two gradient hexes are the mark's own, not theme tokens: a logo is
+       the same colour on a light desktop as on a dark one, and this file is
+       fetched by the browser chrome, where no stylesheet of ours applies. -->
+  <defs>
+    <linearGradient id="mark" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#968ae0" />
+      <stop offset="0.7" stop-color="#5d5294" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#mark)" />
+  <g transform="translate(13.14 13.14) scale(1.5714)">
+    <path d="M2 12h4l2.5-6 3.5 12 3-8 2 2h5" fill="none" stroke="#fff" stroke-width="2.1"
+          stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>

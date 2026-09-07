@@ -1,11 +1,20 @@
 import type { Adapter } from "./adapter.interface.ts";
 import type { RuntimeConfig, ServiceDefinition } from "./configSource.interface.ts";
 import { diff } from "./diffEngine.ts";
+import type { StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
 import type { StateStore } from "./stateStore.interface.ts";
 import type { NormalizedStatus, StatusChange } from "./types.ts";
 
 const STAGGER_MS = 250;
+/**
+ * How much of a provider's own interval may still be missing and have the poll
+ * count as due. The scheduler arms with up to a tenth of an interval of jitter
+ * either way, so an exact comparison would drop every early tick — a provider
+ * asking for the same cadence as the global one would then be polled every
+ * second cycle, which is the opposite of what configuring an interval means.
+ */
+const DUE_SLACK = 0.15;
 const BACKOFF_BASE_MS = 500;
 const BACKOFF_JITTER_MS = 250;
 
@@ -26,8 +35,17 @@ export interface CycleResult {
   finishedAt: string;
 }
 
+export interface CycleOptions {
+  /**
+   * Polls every enabled provider whether its own interval has elapsed or not.
+   * A manual poll from the dashboard means "ask now", so a provider on an hourly
+   * cadence must not sit the request out.
+   */
+  ignoreSchedule?: boolean | undefined;
+}
+
 export interface Poller {
-  runCycle(config: RuntimeConfig): Promise<CycleResult>;
+  runCycle(config: RuntimeConfig, options?: CycleOptions): Promise<CycleResult>;
 }
 
 export interface PollerDeps {
@@ -36,6 +54,8 @@ export interface PollerDeps {
   logger: Logger;
   /** Injected so tests assert the backoff schedule instead of waiting it out. */
   sleep?: ((ms: number) => Promise<void>) | undefined;
+  /** Injected so a test can move a provider's interval along without waiting it out. */
+  now?: (() => number) | undefined;
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -54,11 +74,23 @@ const realSleep = (ms: number): Promise<void> =>
 export function createPoller(deps: PollerDeps): Poller {
   const { getAdapter, store, logger } = deps;
   const sleep = deps.sleep ?? realSleep;
+  const now = deps.now ?? Date.now;
+
+  /**
+   * When each provider was last reached for, attempt or not. Kept here rather
+   * than read from the stored status, because a failing provider's last status
+   * is the one from before the failure — scheduling off it would retry a broken
+   * provider on every tick regardless of the cadence it asked for.
+   *
+   * In memory on purpose: after a restart every provider is due, which is what
+   * an operator who just restarted the container expects to see.
+   */
+  const lastAttemptAt = new Map<string, number>();
 
   async function attemptFetch(
     service: ServiceDefinition,
     config: RuntimeConfig,
-  ): Promise<{ status: NormalizedStatus; attempts: number }> {
+  ): Promise<{ status: NormalizedStatus; attempts: number; latencyMs?: number | undefined }> {
     const adapter = getAdapter(service.adapter);
     const timeoutMs = config.polling.requestTimeoutSeconds * 1000;
     let lastError: unknown;
@@ -70,6 +102,9 @@ export function createPoller(deps: PollerDeps): Poller {
         const delay = BACKOFF_BASE_MS * 2 ** (attempt - 1) + Math.random() * BACKOFF_JITTER_MS;
         await sleep(Math.round(delay));
       }
+      // The read the successful attempt made; a retried attempt's own timing
+      // describes the failure, not the page we ended up reading.
+      let read: StatusPageRead | undefined;
       try {
         const status = await adapter.fetchStatus(
           {
@@ -80,9 +115,14 @@ export function createPoller(deps: PollerDeps): Poller {
             components: service.components,
             scopeToComponents: service.scopeToComponents,
           },
-          { timeoutMs },
+          {
+            timeoutMs,
+            onRead: (observed) => {
+              read = observed;
+            },
+          },
         );
-        return { status, attempts: attempt + 1 };
+        return { status, attempts: attempt + 1, latencyMs: read?.latencyMs };
       } catch (error) {
         lastError = error;
         logger.debug("poll attempt failed", {
@@ -108,7 +148,7 @@ export function createPoller(deps: PollerDeps): Poller {
     const before = await store.getState(service.id);
 
     const startedAt = Date.now();
-    let outcome: { status: NormalizedStatus; attempts: number };
+    let outcome: { status: NormalizedStatus; attempts: number; latencyMs?: number | undefined };
     try {
       outcome = await attemptFetch(service, config);
     } catch (error) {
@@ -147,7 +187,7 @@ export function createPoller(deps: PollerDeps): Poller {
 
     // Diff against the state read before this save, then persist.
     const changes = diff(before.last, outcome.status);
-    await store.saveStatus(outcome.status);
+    await store.saveStatus(outcome.status, { latencyMs: outcome.latencyMs });
     if (before.failureCount > 0) await store.clearFailures(service.id);
     if (before.degradedNotified) await store.setDegradedNotified(service.id, false);
 
@@ -163,10 +203,32 @@ export function createPoller(deps: PollerDeps): Poller {
     };
   }
 
+  /**
+   * A provider with no interval of its own is governed by the scheduler's tick,
+   * exactly as it was before intervals became per-provider — the poller only
+   * holds back the ones that asked to be polled less often than the tick runs.
+   */
+  function isDue(service: ServiceDefinition, at: number): boolean {
+    if (service.intervalMinutes === undefined) return true;
+    const last = lastAttemptAt.get(service.id);
+    if (last === undefined) return true;
+    return at - last >= service.intervalMinutes * 60_000 * (1 - DUE_SLACK);
+  }
+
   return {
-    async runCycle(config: RuntimeConfig): Promise<CycleResult> {
+    async runCycle(config: RuntimeConfig, options: CycleOptions = {}): Promise<CycleResult> {
       const startedAt = new Date().toISOString();
-      const enabled = config.services.filter((service) => service.enabled);
+      const at = now();
+      const enabled = config.services.filter(
+        (service) => service.enabled && (options.ignoreSchedule === true || isDue(service, at)),
+      );
+      for (const service of enabled) lastAttemptAt.set(service.id, at);
+      // A provider removed from the configuration must not keep its slot here,
+      // or a long-lived process accumulates one per id it has ever seen.
+      const known = new Set(config.services.map((service) => service.id));
+      for (const id of lastAttemptAt.keys()) {
+        if (!known.has(id)) lastAttemptAt.delete(id);
+      }
 
       const settled = await Promise.allSettled(
         enabled.map((service, index) => pollOne(service, index, config)),
@@ -201,6 +263,7 @@ export function createPoller(deps: PollerDeps): Poller {
       const finishedAt = new Date().toISOString();
       logger.info("poll cycle finished", {
         providers: results.length,
+        skipped: config.services.filter((service) => service.enabled).length - enabled.length,
         failed: results.filter((result) => !result.ok).length,
         changes: changes.length,
       });

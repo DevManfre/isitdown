@@ -6,7 +6,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildUiRuntime } from "../../src/ui/runtime.ts";
-import { deleteService, insertService, listServices, updateChannel } from "../../src/ui/dbConfigSource.ts";
+import { insertService, listServices, purgeService, updateChannel } from "../../src/ui/dbConfigSource.ts";
 import { createLogger } from "../../src/core/logger.ts";
 
 const silent = createLogger("error", () => {});
@@ -60,7 +60,7 @@ test("a selected component flip notifies once and builds history", async () => {
   let appServer: Server | undefined;
   try {
     // The seeded defaults point at real status pages; tests never touch those.
-    for (const service of listServices(runtime.db)) deleteService(runtime.db, service.id);
+    for (const service of listServices(runtime.db)) purgeService(runtime.db, service.id);
     insertService(runtime.db, {
       id: "fake",
       name: "Fake Provider",
@@ -170,7 +170,7 @@ test("a provider scoped to its selection ignores an incident in another region",
   });
 
   try {
-    for (const service of listServices(runtime.db)) deleteService(runtime.db, service.id);
+    for (const service of listServices(runtime.db)) purgeService(runtime.db, service.id);
     insertService(runtime.db, {
       id: "fake",
       name: "Fake Provider",

@@ -678,3 +678,16 @@ test("listMaintenances is newest first by starts_at and honours providerIds, day
   );
   await store.close();
 });
+
+test("saveStatus records the read's latency on the sample, null when none was measured", async () => {
+  const { db, store } = await harness();
+  await store.saveStatus(snap(), { latencyMs: 137 });
+  await store.saveStatus({ ...snap(), fetchedAt: "2026-08-19T14:08:00.000Z" });
+  const rows = db
+    .prepare("SELECT latency_ms FROM status_samples ORDER BY id")
+    .all() as { latency_ms: number | null }[];
+  assert.deepEqual(
+    rows.map((row) => row.latency_ms),
+    [137, null],
+  );
+});

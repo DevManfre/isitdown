@@ -1,0 +1,140 @@
+[
+  {
+    "id": "Kd7Bs2mQ1tPvY4Rn8Wc3",
+    "number": "847028556969787722",
+    "begin": "2026-09-01T14:44:00+00:00",
+    "created": "2026-09-01T16:03:12+00:00",
+    "end": null,
+    "modified": "2026-09-03T17:47:02+00:00",
+    "external_desc": "Multiple products in us-central1-b are experiencing network service degradation.",
+    "updates": [
+      {
+        "created": "2026-09-03T17:47:02+00:00",
+        "modified": "2026-09-03T17:47:02+00:00",
+        "when": "2026-09-03T17:47:02+00:00",
+        "text": "## Preliminary Incident Report\nWe sincerely apologize for the disruption this incident caused to your business. We know how much you rely on Google Cloud, and we regret the impact on your environment.",
+        "status": "AVAILABLE",
+        "affected_locations": []
+      },
+      {
+        "created": "2026-09-01T19:12:28+00:00",
+        "modified": "2026-09-03T17:47:02+00:00",
+        "when": "2026-09-01T19:12:28+00:00",
+        "text": "**Summary**\nMultiple products in us-central1-b experienced network service degradation.\n**Description**\nThe issue was affecting a portion of the us-central1-b zone. The remaining zones in the region w",
+        "status": "SERVICE_DISRUPTION",
+        "affected_locations": [
+          {
+            "title": "Iowa (us-central1)",
+            "id": "us-central1"
+          }
+        ]
+      }
+    ],
+    "most_recent_update": {
+      "created": "2026-09-03T17:47:02+00:00",
+      "modified": "2026-09-03T17:47:02+00:00",
+      "when": "2026-09-03T17:47:02+00:00",
+      "text": "## Preliminary Incident Report\nWe sincerely apologize for the disruption this incident caused to your business. We know how much you rely on Google Cloud, and we regret the impact on your environment.",
+      "status": "AVAILABLE",
+      "affected_locations": []
+    },
+    "status_impact": "SERVICE_DISRUPTION",
+    "severity": "medium",
+    "service_key": "zall",
+    "service_name": "Multiple Products",
+    "affected_products": [
+      {
+        "title": "AlloyDB for PostgreSQL",
+        "id": "fPovtKbaWN9UTepMm3kJ",
+        "current_title": "AlloyDB for PostgreSQL"
+      },
+      {
+        "title": "Apigee",
+        "id": "9Y13BNFy4fJydvjdsN3X",
+        "current_title": "Apigee"
+      },
+      {
+        "title": "Cloud Filestore",
+        "id": "jog4nyYkquiLeSK5s26q",
+        "current_title": "Cloud Filestore"
+      }
+    ],
+    "uri": "incidents/J5ia5t9p3g9Q5Wi7r8Ev",
+    "currently_affected_locations": [
+      {
+        "title": "Iowa (us-central1)",
+        "id": "us-central1"
+      }
+    ],
+    "previously_affected_locations": []
+  },
+  {
+    "id": "J5ia5t9p3g9Q5Wi7r8Ev",
+    "number": "847028556969787721",
+    "begin": "2026-09-01T14:44:00+00:00",
+    "created": "2026-09-01T16:03:12+00:00",
+    "end": "2026-09-01T18:52:00+00:00",
+    "modified": "2026-09-03T17:47:02+00:00",
+    "external_desc": "Multiple products in us-central1-b are experiencing network service degradation.",
+    "updates": [
+      {
+        "created": "2026-09-03T17:47:02+00:00",
+        "modified": "2026-09-03T17:47:02+00:00",
+        "when": "2026-09-03T17:47:02+00:00",
+        "text": "## Preliminary Incident Report\nWe sincerely apologize for the disruption this incident caused to your business. We know how much you rely on Google Cloud, and we regret the impact on your environment.",
+        "status": "AVAILABLE",
+        "affected_locations": []
+      },
+      {
+        "created": "2026-09-01T19:12:28+00:00",
+        "modified": "2026-09-03T17:47:02+00:00",
+        "when": "2026-09-01T19:12:28+00:00",
+        "text": "**Summary**\nMultiple products in us-central1-b experienced network service degradation.\n**Description**\nThe issue was affecting a portion of the us-central1-b zone. The remaining zones in the region w",
+        "status": "SERVICE_DISRUPTION",
+        "affected_locations": [
+          {
+            "title": "Iowa (us-central1)",
+            "id": "us-central1"
+          }
+        ]
+      }
+    ],
+    "most_recent_update": {
+      "created": "2026-09-03T17:47:02+00:00",
+      "modified": "2026-09-03T17:47:02+00:00",
+      "when": "2026-09-03T17:47:02+00:00",
+      "text": "## Preliminary Incident Report\nWe sincerely apologize for the disruption this incident caused to your business. We know how much you rely on Google Cloud, and we regret the impact on your environment.",
+      "status": "AVAILABLE",
+      "affected_locations": []
+    },
+    "status_impact": "SERVICE_DISRUPTION",
+    "severity": "medium",
+    "service_key": "zall",
+    "service_name": "Multiple Products",
+    "affected_products": [
+      {
+        "title": "AlloyDB for PostgreSQL",
+        "id": "fPovtKbaWN9UTepMm3kJ",
+        "current_title": "AlloyDB for PostgreSQL"
+      },
+      {
+        "title": "Apigee",
+        "id": "9Y13BNFy4fJydvjdsN3X",
+        "current_title": "Apigee"
+      },
+      {
+        "title": "Cloud Filestore",
+        "id": "jog4nyYkquiLeSK5s26q",
+        "current_title": "Cloud Filestore"
+      }
+    ],
+    "uri": "incidents/J5ia5t9p3g9Q5Wi7r8Ev",
+    "currently_affected_locations": [],
+    "previously_affected_locations": [
+      {
+        "title": "Iowa (us-central1)",
+        "id": "us-central1"
+      }
+    ]
+  }
+]

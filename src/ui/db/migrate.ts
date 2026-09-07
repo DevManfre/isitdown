@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 12;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -40,7 +40,8 @@ export function migrate(db: DatabaseSync): void {
       provider_id    TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
       observed_at    TEXT NOT NULL,
       overall_status TEXT NOT NULL,
-      ok             INTEGER NOT NULL
+      ok             INTEGER NOT NULL,
+      latency_ms     INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS incidents (
@@ -78,7 +79,7 @@ export function migrate(db: DatabaseSync): void {
     );
 
     -- No foreign key to services(id): "*" is not a service id, and a key here
-    -- would block deleting a provider. deleteService drops a provider's rules
+    -- would block deleting a provider. purgeService drops a provider's rules
     -- explicitly instead, where it already cascades samples and incidents.
     CREATE TABLE IF NOT EXISTS routing_rules (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -260,6 +261,43 @@ export function migrate(db: DatabaseSync): void {
         "any",
         JSON.stringify(["*"]),
       );
+    }
+  }
+
+  if (from < 10) {
+    // Null means "the global cadence", which is what every existing provider
+    // was on: a default here would freeze today's global interval onto every
+    // row and stop a later change to it from reaching them.
+    const serviceColumns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!serviceColumns.includes("interval_minutes")) {
+      db.exec("ALTER TABLE services ADD COLUMN interval_minutes INTEGER");
+    }
+  }
+
+  if (from < 11) {
+    // A removal is a soft delete now: the row stays, marked, for a grace period
+    // in which it can be restored, and only then does the cascade take its
+    // samples, incidents, maintenances and rules. Null is "not removed", which
+    // is what every existing row is.
+    const serviceColumns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!serviceColumns.includes("deleted_at")) {
+      db.exec("ALTER TABLE services ADD COLUMN deleted_at TEXT");
+    }
+  }
+
+  if (from < 12) {
+    // How long the provider's page took to answer the read behind the sample.
+    // Null is "not measured", which every existing row is, and which a
+    // backfilled row stays: an incident feed says nothing about response times.
+    const sampleColumns = (db.prepare("PRAGMA table_info(status_samples)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!sampleColumns.includes("latency_ms")) {
+      db.exec("ALTER TABLE status_samples ADD COLUMN latency_ms INTEGER");
     }
   }
 
