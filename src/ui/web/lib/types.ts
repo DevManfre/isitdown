@@ -60,6 +60,8 @@ export interface ProviderStatus {
   scopeToComponents: boolean;
   fetchedAt: string | null;
   failureCount: number;
+  /** ISO 8601 while the provider is muted; null when it is not. */
+  mutedUntil?: string | null;
   uptime90: number;
   /** Running now, and windows still to come — a window that has already ended appears in neither. */
   maintenance: { active: MaintenanceWindow[]; upcoming: MaintenanceWindow[] };
@@ -271,6 +273,11 @@ export interface ServiceDefinition {
   intervalMinutes?: number | null;
   components: { id: string; name: string }[];
   scopeToComponents: boolean;
+  /**
+   * ISO 8601 while the provider is muted, absent when it is not. `null` is only
+   * ever sent, on a patch, to lift a mute early.
+   */
+  mutedUntil?: string | null;
 }
 
 /** What removing a service would delete along with it — `GET /config/services/:id/impact`. */
@@ -342,6 +349,8 @@ export interface RuntimeConfigResponse {
     /** Poll a provider with an open incident on the cadence below — roadmap 2.3. */
     adaptivePolling?: boolean;
     adaptiveIntervalMinutes?: number;
+    /** Consecutive agreeing polls before a transition notifies. 1 is off. */
+    confirmSamples?: number;
   };
   /** How long history is kept before the daily prune takes it. */
   retention: { days: number };
