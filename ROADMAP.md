@@ -17,7 +17,7 @@ Legend:
 - ◐ — partly shipped; the row's note says what is left.
 
 Current state for reference (v1.4.0): Statuspage, generic RSS/Atom, Slack, AWS,
-Google Cloud and Azure adapters, all covered by the shared adapter contract suite;
+Google Cloud, Azure, Instatus and Better Stack adapters, all covered by the shared adapter contract suite;
 every provider read through one HTTP helper that revalidates with `ETag` /
 `Last-Modified`, so most cycles are a 304; a global poll cadence plus an optional
 per-provider one; Telegram, webhook, Discord, Slack and web
@@ -29,8 +29,10 @@ fallback; UI edition with overview, providers, incidents, history, delivery log,
 settings, geographic map/globe; channel credentials settable from the dashboard
 (write-only, kept in a `0600` file beside the database and applied with no restart);
 a provider removal that names the rows it will delete, then keeps them for a restore
-window it can be undone in; SQLite history with 120-day retention;
-`en` + `it`.
+window it can be undone in; SQLite history with configurable retention; adaptive
+polling that watches a provider in trouble closely and backs off when it clears;
+notification retries with a dead-letter badge in the delivery log; a browser tab
+that reflects the worst status in the fleet; `en` + `it`.
 
 ---
 
@@ -47,7 +49,7 @@ does not cover is invisible.
 | 1.4 ✅ | **Slack adapter** | S | `status.slack.com/api/v2.0.0/current` — small, well-shaped, good first non-Statuspage adapter to prove the interface holds. |
 | 1.5 ✅ | **Generic RSS/Atom adapter** | M | A large tail of status pages publish a feed and nothing else. One adapter, configured by feed URL, unlocks dozens of providers with no new code per provider. High leverage. |
 | 1.6 | **Generic HTML-scrape adapter** | M | CSS selector + a status-word mapping in `options`. Fragile by nature; would need an explicit "this can break silently" warning in the UI. |
-| 1.7 | **Instatus / Better Stack / Sorry™ adapters** | S each | The three most common Statuspage competitors. Each is a small, stable JSON shape. |
+| 1.7 ◐ | **Instatus / Better Stack / Sorry™ adapters** | S each | Instatus and Better Stack shipped: `instatus` reads `/summary.json` (plus `/v3/components.json`, only when a selection needs resolving), `betterstack` reads `/index.json` — one document carrying the aggregate state, the resources, the reports and their updates, so components, scoping and the incident history come from a single read. Sorry™ is *not* a small JSON shape after all: its public pages are HTML and its API needs a key, so it needs 1.6 rather than an adapter of its own. |
 | 1.8 | **Direct HTTP probe** ("is *my* thing up") | L ⚠️ | GET a URL, expect a status code / body match, record latency. Turns IsItDown from a status-page aggregator into an uptime monitor. Huge scope expansion, and it makes the tool useful to people who monitor nothing third-party at all. Decide the product identity before building. |
 | 1.9 | **TCP / DNS / TLS-expiry probes** | M ⚠️ | Only meaningful if 1.8 lands. Cert-expiry in particular is a cheap, high-value alert. |
 | 1.10 | **Silent-outage cross-check** | M ⚠️ | Needs 1.8. Provider's page says operational, our own probe of their API fails → flag it. Genuinely novel: it monitors the *status page's honesty*, which nothing else in this category does. |
@@ -61,7 +63,7 @@ does not cover is invisible.
 |---|---|---|---|
 | 2.1 ✅ | **Scheduled-maintenance awareness** | M | Already on the README's open list. Statuspage exposes `scheduled_maintenances`; today it is dropped. Add a `maintenance` state, show it on the timeline, and *suppress* incident alerts inside a declared window — a planned outage waking someone at 03:00 is the classic false positive. |
 | 2.2 ✅ | **Per-provider poll interval** | S | `intervalMinutes` is global. A provider that publishes every 5 minutes and one that updates twice a year do not deserve the same cadence. Small change to `ServiceDefinition` + poller. |
-| 2.3 | **Adaptive polling** | M | Poll every minute while an incident is open on that provider, back off to the configured interval when clear. Better signal, less traffic — the two usually trade off, here they do not. |
+| 2.3 ✅ | **Adaptive polling** | M | Shipped as `adaptivePolling` + `adaptiveIntervalMinutes`: while a provider has an open incident (or any status worse than operational) the poller takes the shorter of its own cadence and the adaptive one, and the scheduler asks the poller how soon to tick. `unknown` is not trouble, so a provider that has never answered is not hammered. |
 | 2.4 ✅ | **Conditional requests (ETag / If-Modified-Since)** | S | Store the ETag per provider, send it back. Most cycles become a 304. Cheap, polite, and reduces the chance of being rate-limited. |
 | 2.5 | **Flap damping** | M | Require N consecutive samples agreeing before a transition notifies. Protects against a provider's page briefly disagreeing with itself. Must be expressible as diff-engine table rows, not a special case elsewhere. |
 | 2.6 | **Provider groups / "my stack"** | M | Group providers, derive a composite status per group, alert on the group. Answers "is my deploy path healthy" rather than "is GitHub healthy". |
@@ -89,7 +91,7 @@ is additive and independently shippable.
 | 3.11 | **Quiet hours** | M | Suppress below a severity floor between configured hours, with an override for major outages. Needs a timezone preference (5.9). |
 | 3.12 | **Digest mode** | M | Batch changes into one message every N minutes. During a big multi-provider incident the current one-message-per-change behaviour is a flood. |
 | 3.13 | **Per-provider alert cap** | S | Hard ceiling of N messages/hour/provider, with a "suppressed X more" note. Cheap insurance against a pathological provider. |
-| 3.14 | **Notification retry + dead-letter** | M | A failed send is logged and dropped today. Retry with backoff, and surface permanently-failed sends in the dashboard. |
+| 3.14 ✅ | **Notification retry + dead-letter** | M | Shipped in the dispatcher: three attempts per message with jittered exponential backoff, one row per message rather than per attempt, an `attempts` column on `notifications`, and a **Dead letter** badge in the delivery log for a failure that spent them all. A delivery test still gets one attempt — the operator is waiting. |
 | 3.15 | **Customisable message templates** | L | Per-channel template with a small, safe token set. Powerful and much requested for webhooks; a real design problem to keep it from becoming a templating language, and it fights the "formatting lives in the notifier" convention. |
 | 3.16 | **HMAC signing for the generic webhook** | S | A shared secret and an `X-IsItDown-Signature` header. Lets a receiver verify the payload actually came from here. |
 | 3.17 ✅ | **Delivery log in the dashboard** | S | The `notifications` table already records what was sent; there is no view for it. Show sent/failed per channel with the payload. |
@@ -125,7 +127,7 @@ is additive and independently shippable.
 | 5.7 | **Compare two providers** | S | Overlay two uptime series. Useful when deciding between vendors. |
 | 5.8 | **Wallboard / kiosk mode** | M | Full-screen, oversized, auto-rotating, no chrome. Aimed at an office screen. Cheap given the components already exist. |
 | 5.9 | **Timezone preference** | S | Everything is UTC. Correct, defensible, and mildly annoying every single day. |
-| 5.10 | **Favicon and title reflect worst status** | S | A red dot in the tab when something is down. Small, delightful, genuinely useful. |
+| 5.10 ✅ | **Favicon and title reflect worst status** | S | Shipped as `useDocumentStatus` in the app shell: the title counts the providers in trouble and the favicon is redrawn from the brand mark with a dot in that severity's colour. A calm fleet restores the page's own icon and title, and `unknown` never counts as trouble. |
 | 5.11 | **Provider catalog / onboarding wizard** | M | Pick "GitHub" from a bundled list instead of typing an id, a name and a base URL. First-run experience is currently a form; it should be a menu. |
 | 5.12 ✅ | **Undo for destructive actions** | S | Deleting a service cascades away its samples, incidents, maintenances and routing rules. The confirmation now counts and names those rows before the removal takes them (`GET /config/services/:id/impact`), so the footgun is at least signposted. A removal is now a soft delete: the provider leaves the dashboard and the poll cycle at once, its history waits out a restore window, and `Settings → Recently removed` offers Restore or Remove now until the window closes and the cascade finally runs. |
 | 5.13 | **Accessibility pass** | M | Keyboard traversal of every view, visible focus, `prefers-reduced-motion` honoured throughout (the UI leans hard on motion), colour contrast audit in both themes, screen-reader labels on charts. |
@@ -196,18 +198,22 @@ worth:
 3. ✅ **4.5 configurable retention** — shipped as a `retentionDays` setting the
    prune reads on every run, with the cost of the chosen window measured from
    the database itself and shown beside the field.
-4. **3.14 notification retry + dead-letter** — the delivery log made a failed
-   send visible; retrying it with backoff, and surfacing what stayed dead, is
-   the obvious next move on the same table.
-5. **2.3 adaptive polling** — poll every minute while an incident is open on
-   that provider, back off when it clears. The per-provider interval has already
-   laid the seam: the poller decides per provider whether a cycle is due.
-6. **5.10 favicon and title reflect the worst status** — small, and it pairs
-   with 4.2: a pushed change can turn the tab red without the operator looking
-   at it.
-7. **1.7 Instatus / Better Stack / Sorry™** — three small, stable JSON shapes,
-   now that three non-Statuspage adapters have set the pattern and the contract
-   suite catches the mistakes.
+4. ✅ **3.14 notification retry + dead-letter** — shipped in the dispatcher:
+   three attempts with jittered backoff, one delivery-log row per message with
+   the attempts it cost, and a **Dead letter** badge for the ones that spent
+   them all.
+5. ✅ **2.3 adaptive polling** — shipped as a minimum against each provider's
+   own cadence, so it can only ever watch a provider more closely. The poller
+   now owns due-ness for every provider and tells the scheduler how soon to
+   tick, which is what keeps one provider's incident from pulling the whole
+   fleet onto a one-minute loop.
+6. ✅ **5.10 favicon and title reflect the worst status** — shipped in the app
+   shell: a count in the title, a severity dot on the mark, and a restore to the
+   page's own icon once the fleet is calm.
+7. ◐ **1.7 Instatus / Better Stack / Sorry™** — the first two shipped, both
+   through the contract suite. The third turned out not to belong in this row at
+   all: Sorry™ publishes no unauthenticated JSON, so it is 1.6's problem rather
+   than a small parser's.
 
 The two items that most change *what IsItDown is*, and therefore deserve a
 decision rather than a slot in a queue, are **1.8 direct HTTP probes** and
