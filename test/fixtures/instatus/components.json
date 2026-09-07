@@ -1,0 +1,62 @@
+{
+  "components": [
+    {
+      "id": "cm7vpd2v800iesfcpnskdkma4",
+      "name": "API",
+      "description": "",
+      "status": "OPERATIONAL",
+      "group": {
+        "id": "cm7n4hqu0003x7ds8xqkf15lm",
+        "name": "Gcore Systems",
+        "description": ""
+      }
+    },
+    {
+      "id": "cm7n4hqu0003x7ds8xqkf15lm",
+      "name": "Gcore Systems",
+      "description": "",
+      "status": "OPERATIONAL",
+      "group": null
+    },
+    {
+      "id": "cm7ngx9ia000d7tqcllmva9zx",
+      "name": "Global services",
+      "description": "Global services of Gcore CDN",
+      "status": "OPERATIONAL",
+      "group": {
+        "id": "cm7ngnsho00097tqczp6ucfep",
+        "name": "CDN",
+        "description": "Content Delivery Network Gcore"
+      }
+    },
+    {
+      "id": "cm7og2gcf0029mpifwpz7a541",
+      "name": "Advanced Analytics",
+      "description": "",
+      "status": "OPERATIONAL",
+      "group": {
+        "id": "cm7ngx9ia000d7tqcllmva9zx",
+        "name": "Global services",
+        "description": "Global services of Gcore CDN"
+      }
+    },
+    {
+      "id": "cm7vpddt100fzz6jn5ruml2lx",
+      "name": "API Documentation",
+      "description": "",
+      "status": "OPERATIONAL",
+      "group": {
+        "id": "cm7n4hqu0003x7ds8xqkf15lm",
+        "name": "Gcore Systems",
+        "description": ""
+      }
+    },
+    {
+      "id": "cm7ngnsho00097tqczp6ucfep",
+      "name": "CDN",
+      "description": "Content Delivery Network Gcore",
+      "status": "OPERATIONAL",
+      "group": null
+    }
+  ]
+}

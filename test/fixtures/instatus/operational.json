@@ -1,0 +1,27 @@
+{
+  "page": {
+    "name": "Gcore",
+    "url": "https://status.gcore.com",
+    "status": "UP"
+  },
+  "activeMaintenances": [
+    {
+      "id": "cmtlnoty400tz1bk3ehvx261c",
+      "name": "[Scheduled] Cloud | Chicago Maintenance",
+      "start": "2026-09-10T08:00:00.000Z",
+      "status": "NOTSTARTEDYET",
+      "duration": 15,
+      "url": "https://status.gcore.com/cmtlnoty400tz1bk3ehvx261c",
+      "updatedAt": "2026-09-07T08:00:00.464Z"
+    },
+    {
+      "id": "cmsdeath700px0zppe9l2xz6p",
+      "name": "[Scheduled] Cloud | Global Maintenance",
+      "start": "2026-09-14T05:00:00.000Z",
+      "status": "NOTSTARTEDYET",
+      "duration": 240,
+      "url": "https://status.gcore.com/cmsdeath700px0zppe9l2xz6p",
+      "updatedAt": "2026-08-07T09:19:45.701Z"
+    }
+  ]
+}
