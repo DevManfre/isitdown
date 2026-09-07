@@ -3,6 +3,7 @@ import { LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { usePollNow, useStatusChrome } from "@/hooks/queries.ts";
+import { useLive } from "@/hooks/useLive.tsx";
 import { msUntilNextPoll } from "@/lib/statusRefetch.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -10,6 +11,7 @@ export function PollIndicator() {
   const { t } = useTranslation();
   const { data: status, dataUpdatedAt } = useStatusChrome();
   const poll = usePollNow();
+  const live = useLive();
   // Re-renders once a second so the countdown ticks without refetching.
   const [, tick] = useState(0);
   useEffect(() => {
@@ -44,7 +46,16 @@ export function PollIndicator() {
   return (
     <div className="header-poll flex items-center gap-4">
       <div className="poll-next flex flex-col">
-        <span className="text-xs text-muted-foreground">{t("meta.next-poll-label")}</span>
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {t("meta.next-poll-label")}
+          {/* Says where the freshness comes from: with the stream connected the
+              dashboard is told about a cycle, it no longer asks on a timer. */}
+          {live && (
+            <span className="poll-live rounded-full bg-primary/15 px-1.5 text-[10px] uppercase tracking-widest text-primary">
+              {t("meta.live")}
+            </span>
+          )}
+        </span>
         <span className="flex items-center gap-1.5">
           <span
             className={cn("poll-next-dot size-1.5 rounded-full bg-primary", polling && "dot-pulse")}
