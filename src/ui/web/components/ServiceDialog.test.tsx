@@ -205,6 +205,27 @@ describe("the service dialog's write path", () => {
       baseUrl: "https://www.githubstatus.com",
       components: [],
       scopeToComponents: false,
+      // An empty interval field is the provider following the global cadence,
+      // and only a null says so on a patch.
+      intervalMinutes: null,
+    });
+  });
+
+  it("submits the poll interval the operator typed for this provider alone", async () => {
+    const { dialog } = await openAdd();
+    const calls = interceptWrites({
+      "POST /config/services": {},
+      "POST /config/services/new-service/test": { ok: true, overallStatus: "operational" },
+    });
+
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "New Service");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://example.com");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.provider-interval")), "45");
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
+
+    await waitFor(() => {
+      const post = calls.find((call) => call.method === "POST" && call.path === "/config/services");
+      expect((post?.body as { intervalMinutes?: number })?.intervalMinutes).toBe(45);
     });
   });
 

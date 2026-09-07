@@ -483,3 +483,101 @@ test("every result carries how long its fetch took, success or failure", async (
     await broken.close();
   }
 });
+
+test("a provider with its own interval is left alone until that interval has elapsed", async () => {
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const store = await freshStore();
+  let clock = Date.parse("2026-09-01T10:00:00.000Z");
+  const poller = createPoller({
+    getAdapter,
+    store,
+    logger: silent,
+    sleep: fakeSleep().sleep,
+    now: () => clock,
+  });
+  // The global cadence is what the fast provider follows; the slow one has
+  // asked for an hour.
+  const services = [
+    service("fast", provider.baseUrl),
+    service("slow", provider.baseUrl, { intervalMinutes: 60 }),
+  ];
+
+  const first = await poller.runCycle(config(services, { intervalMinutes: 3 }));
+  assert.deepEqual(
+    first.results.map((result) => result.providerId).sort(),
+    ["fast", "slow"],
+    "a provider never polled before is due",
+  );
+
+  clock += 3 * 60_000;
+  const second = await poller.runCycle(config(services, { intervalMinutes: 3 }));
+  assert.deepEqual(
+    second.results.map((result) => result.providerId),
+    ["fast"],
+    "the slow provider is not due three minutes in",
+  );
+
+  clock += 57 * 60_000;
+  const third = await poller.runCycle(config(services, { intervalMinutes: 3 }));
+  assert.deepEqual(
+    third.results.map((result) => result.providerId).sort(),
+    ["fast", "slow"],
+    "an hour in, the slow provider is due again",
+  );
+
+  await provider.close();
+});
+
+test("a cycle asked to ignore the schedule polls every provider", async () => {
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const store = await freshStore();
+  const clock = Date.parse("2026-09-01T10:00:00.000Z");
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: fakeSleep().sleep, now: () => clock });
+  const services = [service("slow", provider.baseUrl, { intervalMinutes: 60 })];
+
+  await poller.runCycle(config(services));
+  // No time has passed at all, so only the manual override can explain a poll.
+  const manual = await poller.runCycle(config(services), { ignoreSchedule: true });
+
+  assert.deepEqual(
+    manual.results.map((result) => result.providerId),
+    ["slow"],
+  );
+  await provider.close();
+});
+
+test("the jitter the scheduler arms with never costs a due provider its cycle", async () => {
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const store = await freshStore();
+  let clock = Date.parse("2026-09-01T10:00:00.000Z");
+  const poller = createPoller({
+    getAdapter,
+    store,
+    logger: silent,
+    sleep: fakeSleep().sleep,
+    now: () => clock,
+  });
+  const services = [service("github", provider.baseUrl, { intervalMinutes: 10 })];
+
+  await poller.runCycle(config(services, { intervalMinutes: 10 }));
+  // The scheduler's arming jitter is up to a tenth of an interval either way,
+  // so an early tick must still count as due — otherwise the provider silently
+  // polls every second cycle.
+  clock += Math.round(10 * 60_000 * 0.9);
+  const early = await poller.runCycle(config(services, { intervalMinutes: 10 }));
+
+  assert.deepEqual(
+    early.results.map((result) => result.providerId),
+    ["github"],
+  );
+  await provider.close();
+});

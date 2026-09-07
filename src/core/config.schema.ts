@@ -48,6 +48,8 @@ export const serviceDefinitionSchema = z.object({
   adapter: slug,
   baseUrl: httpUrl,
   enabled: z.boolean().default(true),
+  /** Omitted, not defaulted: absent has to stay distinguishable from "same as the global". */
+  intervalMinutes: z.number().int().positive().max(1440).optional(),
   options: z.record(z.string()).optional(),
   components: componentSelectionSchema.default([]),
   scopeToComponents: z.boolean().default(false),
