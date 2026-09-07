@@ -24,7 +24,8 @@ per-provider one; Telegram, webhook, Discord, Slack and web
 push channels; per-provider / per-severity notification routing rules, with a dry run
 and an explain that names the winning rule; scheduled-maintenance awareness (windows
 silence the diff engine and show on the dashboard and timeline); Prometheus
-`/metrics`; UI edition with overview, providers, incidents, history, delivery log,
+`/metrics`; live updates pushed over server-sent events, with polling as the
+fallback; UI edition with overview, providers, incidents, history, delivery log,
 settings, geographic map/globe; channel credentials settable from the dashboard
 (write-only, kept in a `0600` file beside the database and applied with no restart);
 a provider removal that names the rows it will delete, then keeps them for a restore
@@ -99,7 +100,7 @@ is additive and independently shippable.
 | # | Item | Size | Notes |
 |---|---|---|---|
 | 4.1 ✅ | **Prometheus `/metrics`** | S | `isitdown_provider_up`, `isitdown_poll_duration_seconds`, `isitdown_notifications_total`. Tiny to build, and it plugs IsItDown into every self-hosted Grafana on the planet. Best effort-to-reach ratio in this document. |
-| 4.2 | **SSE or WebSocket live updates** | M | Replaces the dashboard's 30-second poll with a push. Instant reaction on a manual `/poll`, less idle work, and it makes the poll indicator honest. |
+| 4.2 ✅ | **SSE or WebSocket live updates** | M | Replaces the dashboard's 30-second poll with a push. Instant reaction on a manual `/poll`, less idle work, and it makes the poll indicator honest. |
 | 4.3 | **Config export / import** | M | `GET /config/export` → a `config.yml` the Light edition can eat, and the reverse for seeding UI from a file. Makes the two editions genuinely interchangeable, which today they only are in principle. |
 | 4.4 | **Backup / restore of the SQLite file from the UI** | S | Download the DB, upload to restore. Nearly all state is one file — `secrets.env` (5.17) is the exception, and a backup that silently omits the credentials is worse than none, so the flow has to say which of the two it covers. |
 | 4.5 | **Configurable retention** | S | 120 days is hardcoded in `src/ui/runtime.ts`. Should be a setting, with the storage cost shown next to it. |
@@ -183,11 +184,10 @@ The three slices before this one are spent — their rows are marked ✅ in the
 tables above. On the same reading of value against effort, the next quarter's
 worth:
 
-1. **4.2 SSE or WebSocket live updates** — the dashboard still polls `/status`
-   every 30 seconds, so a manual `/poll` is felt a beat late, an idle tab keeps
-   asking, and the poll indicator counts down to a deadline it only guesses at.
-   A push makes all three honest at once, and every view already reads through
-   the same query layer, so there is one seam to change rather than six.
+1. ✅ **4.2 SSE or WebSocket live updates** — shipped as server-sent events:
+   `/events` pushes a `cycle` frame as each cycle finishes, the dashboard
+   re-reads what the frame names, and polling steps back to a two-minute safety
+   interval behind it.
 2. **2.8 fetch latency of the status page itself** — one extra column on
    `status_samples`. A status page slowing down is often the first sign of
    trouble, the conditional-request path already measures the round trip, and it
