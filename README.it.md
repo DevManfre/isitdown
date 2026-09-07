@@ -250,8 +250,9 @@ notifications:
 | `failureThreshold` | `5` | Cicli falliti consecutivi prima di **un** avviso "monitoring degraded". |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `rss` legge qualunque feed RSS o Atom di incidenti; `slack` legge l'API di stato di Slack. |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `rss` legge qualunque feed RSS o Atom di incidenti; `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider. |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
+| `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
 
 Qualunque cosa non valida ferma il container all'avvio indicando motivo e percorso:
 file mancante, YAML malformato, base URL sbagliato, id duplicato, lista di servizi
@@ -459,8 +460,82 @@ singoli servizi, quindi l'adapter non elenca componenti; e non espone dati di
 manutenzione programmata, quindi una voce che ne annuncia una resta un incidente
 invece di diventare una finestra che silenzierebbe il provider finché resta lì.
 
+#### AWS, Google Cloud e Azure
+
+I tre hyperscaler non pubblicano nulla in formato Statuspage e ognuno è strano a
+modo suo, quindi ognuno ha il proprio adapter:
+
+```yaml
+  - id: aws
+    name: AWS
+    adapter: aws
+    baseUrl: https://health.aws.amazon.com
+    options:
+      region: eu-west-1        # opzionale; omesso, guarda ogni regione
+
+  - id: gcp
+    name: Google Cloud
+    adapter: gcp
+    baseUrl: https://status.cloud.google.com
+
+  - id: azure
+    name: Azure
+    adapter: azure
+    baseUrl: https://azure.status.microsoft
+    options:
+      locale: en-us            # opzionale; il feed è pubblicato per locale
+```
+
+**AWS** — l'adapter aggiunge `/public/currentevents`, il documento degli eventi
+aperti in questo momento. Ne seguono due cose: non c'è cronologia da
+ricostruire, perché un evento risolto sparisce dal documento invece di essere
+marcato chiuso; e ogni evento riguarda una sola regione, quindi
+`options.region` restringe alla tua. Un evento globale — uno che il feed
+pubblica senza regione — è sempre riportato: restringere non deve nascondere
+proprio la classe di evento che colpisce tutto. La severità è il codice
+numerico di AWS, non un'ipotesi sulle parole:
+
+| Codice | Lettura |
+|---|---|
+| `0` | Chiuso: sparisce invece di tenere rossa una regione già rientrata |
+| `1` | Informativo: elencato come incidente, non muove lo stato |
+| `2` | Degradato |
+| `3` | Outage grave |
+| qualunque altro | Outage grave — mai declassato in silenzio |
+
+Il documento è servito in UTF-16, che il `text()` di `fetch` decodifica come
+UTF-8 rovinandolo; IsItDown decodifica secondo il charset dichiarato dalla
+risposta.
+
+**Google Cloud** — l'adapter aggiunge `/incidents.json`, una lista piatta che è
+insieme lo stato attuale e la cronologia: un incidente senza `end` è aperto e lo
+stato del provider è la somma di quelli aperti. La severità viene da
+`status_impact` (`SERVICE_INFORMATION` → un annuncio che non muove lo stato,
+`SERVICE_DISRUPTION` → outage parziale, `SERVICE_OUTAGE` → outage grave,
+qualunque valore sconosciuto → outage grave) e non dalla parola `severity`
+accanto, che lo contraddice.
+
+**Azure** — la metà leggibile da una macchina di `azure.status.microsoft` è un
+feed RSS, quindi questo adapter legge il feed su `/<locale>/status/feed/` e
+aggiunge le due cose che l'adapter generico sbaglia su Azure: sa che
+"mitigated" chiude un incidente e sa che il feed è *vuoto* quando Azure sta
+bene, quindi un feed vuoto è operativo e non sconosciuto. La sua cronologia
+arriva solo fin dove arriva il feed, che per un provider che pubblica solo le
+comunicazioni aperte non è lontano.
+
 Per un provider che non sta su nessuno di questi, aggiungi un adapter sotto
 `src/adapters/`.
+
+#### Richieste condizionali
+
+Ogni adapter legge attraverso un unico helper HTTP che ricorda l'`ETag` (o il
+`Last-Modified`) inviato dal provider e lo ripropone al ciclo successivo. Una
+pagina che non è cambiata risponde `304` senza corpo e viene riusata quella in
+cache: la maggioranza dei cicli. Costa meno al provider ed è la differenza tra
+essere limitati per rate e non esserlo, su chi ha una soglia stretta. Un `304`
+a una richiesta senza validatore, una rivalidazione fallita o una pagina che
+smette di inviare validatori azzerano la voce in cache invece di inchiodare una
+lettura vecchia.
 
 ### 3.6 Canali di notifica
 
@@ -687,7 +762,7 @@ docker history isitdown:ui --no-trunc --format "{{.CreatedBy}}" | grep -iE "TOKE
 ### 5.2 La dashboard
 
 Apri **http://localhost:3000** e percorri il rail: Overview · Providers · Incidents ·
-History · Settings. Poi prova i due controlli a runtime nell'header:
+History · Log invii · Settings. Poi prova i due controlli a runtime nell'header:
 
 - il pulsante del **tema** cicla chiaro → scuro → sistema e sopravvive a un reload;
 - lo switch **EN / IT** cambia ogni stringa senza ricaricare la pagina, incluso il
@@ -715,6 +790,24 @@ curl -s -X POST localhost:3000/config/services/vercel/test
 
 Un test di connessione raggiunge il provider ma non registra nulla: nessun campione,
 nessun incidente, nessuna notifica. È diagnostica, non cronologia.
+
+Rimuovere un provider si può annullare. La conferma dice cosa la rimozione si
+porterà via (campioni, incidenti, finestre di manutenzione, regole di routing e
+lo span di cronologia dietro di essi), poi il provider esce dalla dashboard
+mentre la sua storia aspetta la finestra di ripristino: `Impostazioni →
+Rimossi di recente` offre **Ripristina** e **Rimuovi ora** fino alla scadenza:
+
+```bash
+curl -s -X DELETE localhost:3000/config/services/vercel
+#   {"removed":"vercel","removedAt":"...","restoreUntil":"..."}
+curl -s localhost:3000/config | jq '.removed[] | {id, restoreUntil}'
+curl -s -X POST localhost:3000/config/services/vercel/restore    # annulla
+```
+
+La vista **Log invii** è l'altra metà della stessa onestà: ogni notifica
+tentata, prima quelle fallite, con ogni riga che si apre sul payload esatto
+inviato e sull'errore riportato dal canale. Una credenziale scaduta si vede lì,
+invece di manifestarsi come avvisi che hanno smesso di arrivare in silenzio.
 
 ### 5.3 Le modifiche di configurazione si applicano senza restart
 
@@ -919,9 +1012,12 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `GET` | `/incidents/:providerId/:incidentId` | Dettaglio: l'incidente, la cronologia osservata, il log di ciò che è stato inviato, gli altri incidenti aperti del provider e gli ultimi 24 poll. |
 | `GET` | `/maintenances?provider=&days=` | Le finestre di manutenzione dichiarate — in corso, future e passate — come `{ maintenances }`. `days` limita quanto indietro nel tempo resta visibile una finestra chiusa (default 90, massimo 365); `provider` restringe a uno solo. Senza `provider`, ogni provider abilitato. |
 | `GET` | `/notifications?limit=` | Ciò che è stato inviato davvero, dal più recente. Massimo 200. |
-| `GET` | `/config` | Servizi, impostazioni di polling, canali. Le credenziali dei canali appaiono come **nomi** di variabili con un flag `isSet`, mai come valori. |
+| `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | Una pagina del log invii: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` è `all` (default), `sent` o `failed`; `channel` restringe a un canale; `pageSize` vale 25 di default, massimo 200. Un `page`, `pageSize` o `state` senza senso ricade sui valori di default invece di dare 400. `counts` porta ogni esito qualunque sia il filtro. |
+| `GET` | `/config` | Servizi, impostazioni di polling, canali, routing e `removed` — i provider rimossi ma ancora ripristinabili. Le credenziali dei canali appaiono come **nomi** di variabili con un flag `isSet`, mai come valori. |
 | `POST` | `/config/services` | Aggiunge un servizio. `201`, oppure `409` su id duplicato, oppure `400` col nome del campo non valido. |
-| `PATCH` `DELETE` | `/config/services/:id` | Modifica o rimozione. La cancellazione propaga a campioni, incidenti e stato di quel provider, così non sopravvive nulla orfano. |
+| `PATCH` `DELETE` | `/config/services/:id` | Modifica, o rimozione. La rimozione è una **cancellazione morbida**: il provider esce subito dalla dashboard e dal ciclo di polling, e la risposta dice per quanto resta ripristinabile (`{ removed, removedAt, restoreUntil }`). `404` su un id sconosciuto o già rimosso. |
+| `POST` | `/config/services/:id/restore` | Annulla una rimozione entro la finestra. Non era stato portato via nulla, quindi non si ricostruisce nulla; il buco nella cronologia dei giorni da rimosso viene ricostruito. `404` se non è un servizio rimosso. |
+| `DELETE` | `/config/services/:id/permanently` | La metà distruttiva, su un percorso a sé perché non ci si arrivi per sbaglio: propaga a campioni, incidenti, manutenzioni, stato e regole di routing di quel provider. Succede comunque da sé alla scadenza della finestra di ripristino. |
 | `PATCH` | `/config/settings` | Impostazioni di polling. |
 | `PATCH` | `/config/channels/:id` | Attiva/disattiva e imposta i nomi delle variabili. **Rifiuta** un segreto letterale. |
 | `PUT` | `/config/channels/:id/secrets` | Salva i **valori** delle credenziali — `{"fields":{"<campo>":"<valore>"}}`. Sola scrittura: il valore va in `secrets.env` accanto al database e nell'ambiente del processo, con effetto immediato, e la risposta è la solita forma nomi-e-`isSet`. `400` per un campo sconosciuto o un valore inutilizzabile. |
@@ -1197,7 +1293,9 @@ timestamp restano UTC con suffisso esplicito in ogni lingua.
   "è cambiato tutto". Testato in entrambe le edizioni, anche nel container.
 - **Rate limiting** — i provider sono sfasati all'interno del ciclo e l'intervallo
   porta jitter, così né una singola istanza né una flotta martellano un provider nello
-  stesso secondo.
+  stesso secondo. Il validatore memorizzato per provider trasforma la maggior parte
+  dei cicli in un `304` senza corpo, e a un provider che pubblica due volte l'anno si
+  può dare la sua cadenza più lenta con `intervalMinutes`.
 - **Timestamp non affidabili** — un `updatedAt` del provider avanti rispetto al nostro
   orologio non può far iniziare un incidente nel futuro; l'orario di inizio è ancorato
   al poll che lo ha visto per primo, mentre la data dichiarata dal provider resta
@@ -1317,6 +1415,7 @@ isitdown/
 │   │   ├── diffEngine.ts              l'unica autorità su se una notifica scatta
 │   │   ├── notificationDispatcher.ts  l'unico chiamante di Notifier.send
 │   │   ├── scheduler.ts               il loop; rilegge la configurazione a ogni ciclo
+│   │   ├── http.ts                    l'unica lettura HTTP: rivalidazione ETag/Last-Modified, decodifica del charset
 │   │   ├── logger.ts
 │   │   └── i18n/                      stringhe delle notifiche, indipendenti dall'edizione
 │   │       ├── index.ts               lookup + fallback su en + formattazione UTC
@@ -1325,6 +1424,10 @@ isitdown/
 │   ├── adapters/                      (condiviso)
 │   │   ├── statuspage.adapter.ts      adapter generico Atlassian Statuspage
 │   │   ├── rss.adapter.ts             adapter generico per feed RSS / Atom
+│   │   ├── slack.adapter.ts           l'API di stato di Slack
+│   │   ├── aws.adapter.ts             il feed degli eventi aperti di AWS Health, per regione
+│   │   ├── gcp.adapter.ts             incidents.json di Google Cloud: stato e cronologia in uno
+│   │   ├── azure.adapter.ts           il feed di stato di Azure, col suo vocabolario di chiusura
 │   │   └── index.ts                   registro per id di adapter
 │   ├── notifiers/                     (condiviso)
 │   │   ├── formatting.ts              emoji, colori, etichette di severità, composizione del messaggio
@@ -1363,7 +1466,7 @@ isitdown/
 │           ├── components/ui/         primitive shadcn
 │           ├── components/            rail, header, indicatore di polling, charts/
 │           ├── views/                 overview, providers, incidents, incident,
-│           │                          history, settings
+│           │                          history, log invii, settings
 │           ├── hooks/                 queries, theme, rail, busy
 │           ├── lib/                   api, types, chartConfig, format, i18n
 │           ├── css/base.css            punto di ingresso Tailwind: importa tailwindcss, tokens, motion
@@ -1624,10 +1727,16 @@ Consegnato:
   preferenza persistita, e dashboard localizzata (`en`, `it`) sopra i messaggi di
   notifica localizzati che entrambe le edizioni già condividevano.
 
+Dopo la v1.4 (su `dev`): adapter per AWS, Google Cloud e Azure, richieste
+condizionali così che la maggior parte dei cicli sia un `304`, una cadenza di
+polling per provider, la vista del log invii e una rimozione di provider
+annullabile entro una finestra di ripristino.
+
 Ancora aperto:
 
-- Adapter per provider che non stanno su Atlassian Statuspage.
 - Una revisione madrelingua delle stringhe italiane.
+- Probe HTTP diretti ("il *mio* servizio è su?") e una status page pubblica in sola
+  lettura: i due punti che cambiano cosa è IsItDown, elencati in `ROADMAP.md`.
 
 Non-obiettivi espliciti: autenticazione multi-utente (questa è una dashboard locale per
 un singolo operatore), status page dietro login, e un'app mobile pacchettizzata.
