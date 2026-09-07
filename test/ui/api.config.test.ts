@@ -95,7 +95,7 @@ test("config returns the services, the polling settings and the channels", async
     const config = body as {
       services: { id: string }[];
       polling: { intervalMinutes: number };
-      channels: { id: string; fields: { name: string; envVar: string; isSet: boolean }[] }[];
+      channels: { id: string; fields: { name: string; envVar: string; isSet: boolean; optional: boolean }[] }[];
     };
     assert.equal(config.services.length, 3);
     assert.equal(config.polling.intervalMinutes, 3);
@@ -104,6 +104,7 @@ test("config returns the services, the polling settings and the channels", async
       name: "botToken",
       envVar: "TELEGRAM_BOT_TOKEN",
       isSet: true,
+      optional: false,
     });
   } finally {
     await app.close();
@@ -343,7 +344,12 @@ test("a channel can be enabled and its variable name changed", async () => {
     };
     const webhook = config.channels.find((channel) => channel.id === "webhook");
     assert.equal(webhook?.enabled, true);
-    assert.deepEqual(webhook?.fields, [{ name: "url", envVar: "MY_HOOK", isSet: true }]);
+    assert.deepEqual(webhook?.fields, [
+      { name: "url", envVar: "MY_HOOK", isSet: true, optional: false },
+      // The signing secret is offered to every installation and set by few:
+      // unset, it must read as optional rather than as a broken channel.
+      { name: "secret", envVar: "WEBHOOK_SECRET", isSet: false, optional: true },
+    ]);
   } finally {
     await app.close();
   }

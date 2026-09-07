@@ -3,6 +3,13 @@ export interface CapturedRequest {
   method: string;
   headers: Record<string, string>;
   body: unknown;
+  /**
+   * The body exactly as it went out. Kept alongside the parsed form because a
+   * signature is computed over bytes: re-serialising the parsed object and
+   * checking a signature against that would pass even if the notifier sent
+   * something else.
+   */
+  rawBody?: string | undefined;
 }
 
 export interface FetchStub {
@@ -30,6 +37,7 @@ export function stubFetch(respond: (request: CapturedRequest) => Response): Fetc
       method: init?.method ?? "GET",
       headers,
       body: raw === undefined ? undefined : (JSON.parse(raw) as unknown),
+      rawBody: raw,
     };
     requests.push(request);
     return respond(request);

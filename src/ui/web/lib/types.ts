@@ -288,6 +288,8 @@ export interface DescribedField {
   name: string;
   envVar: string;
   isSet: boolean;
+  /** The channel works without it, so unset is a choice rather than a hole. */
+  optional?: boolean;
 }
 
 /** The only channel shape the API ever returns — no resolved secret leaves the server. */
