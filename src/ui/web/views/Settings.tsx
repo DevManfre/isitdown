@@ -18,7 +18,7 @@ import {
   useSettingsMutation,
 } from "@/hooks/queries.ts";
 import { useFieldProps } from "@/hooks/useBusy.tsx";
-import { hostOf } from "@/lib/format.ts";
+import { formatRelative, hostOf } from "@/lib/format.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { MapView } from "@/lib/types.ts";
 
@@ -53,12 +53,12 @@ const POLLING_DEBOUNCE_MS = 600;
  * whether that variable currently resolves.
  */
 export function Settings() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: config } = useConfig();
   const { data: preferences } = usePreferences();
   const patchPreferences = usePreferencesMutation();
   const settingsMutation = useSettingsMutation();
-  const servicePatch = useServiceMutations().patch;
+  const { patch: servicePatch, restore: serviceRestore, purge: servicePurge } = useServiceMutations();
   // Above the early return below: a hook cannot be called conditionally.
   const fieldProps = useFieldProps();
 
@@ -80,6 +80,9 @@ export function Settings() {
   const interval = interval_ ?? config.polling.intervalMinutes;
   const timeout = timeout_ ?? config.polling.requestTimeoutSeconds;
   const maxRetries = retries ?? config.polling.maxRetries;
+  // Defaulted rather than assumed: the section only exists when a removal is
+  // waiting, and an older payload carries no list at all.
+  const removed = config.removed ?? [];
 
   const commitPolling = (next: {
     intervalMinutes: number;
@@ -237,6 +240,49 @@ export function Settings() {
           ))
         )}
       </SettingsSection>
+
+      {/* Only while something is restorable: an empty "recently removed" card
+          would be permanent chrome for a state that is normally absent. */}
+      {removed.length > 0 && (
+        <SettingsSection
+          title={t("settings.section.removed")}
+          note={t("settings.removed-note")}
+          delay={stagger(2, SECTION_CASCADE)}
+        >
+          {removed.map((service) => (
+            <SettingRow
+              key={service.id}
+              className="service-row"
+              label={service.name}
+              description={`${service.adapter} · ${hostOf(service.baseUrl)}`}
+              meta={t("providers.restore-until", {
+                when: formatRelative(i18n.language, service.restoreUntil),
+              })}
+            >
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={serviceRestore.isPending}
+                onClick={() => serviceRestore.mutate(service.id)}
+              >
+                {t("action.restore")}
+              </Button>
+              {/* The destructive half: everything the removal's confirmation
+                  named goes now instead of when the window closes. */}
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={servicePurge.isPending}
+                onClick={() => servicePurge.mutate(service.id)}
+              >
+                {t("action.remove-now")}
+              </Button>
+            </SettingRow>
+          ))}
+        </SettingsSection>
+      )}
 
       <SettingsSection
         title={t("settings.section.notifications")}
