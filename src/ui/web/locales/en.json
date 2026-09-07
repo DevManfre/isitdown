@@ -1,4 +1,6 @@
 {
+  "document.title.affected_one": "{count} provider in trouble \u00b7 IsItDown",
+  "document.title.affected_other": "{count} providers in trouble \u00b7 IsItDown",
   "app.name": "IsItDown",
 
   "nav.views": "Views",

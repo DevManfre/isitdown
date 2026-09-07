@@ -1,4 +1,6 @@
 {
+  "document.title.affected_one": "{count} provider in difficolt\u00e0 \u00b7 IsItDown",
+  "document.title.affected_other": "{count} provider in difficolt\u00e0 \u00b7 IsItDown",
   "app.name": "IsItDown",
 
   "nav.views": "Viste",

@@ -75,6 +75,25 @@ const tailwindColour = new RegExp(
  */
 const ALLOWED_HEX: Record<string, string[]> = {
   "components/ui/chart.tsx": ["#ccc", "#fff"],
+  /**
+   * lib/documentStatus.ts builds the tab's favicon as an SVG data URI
+   * (roadmap 5.10). It is rendered by the browser chrome, where no stylesheet
+   * of ours applies and `var(--token)` resolves to nothing, so the mark's two
+   * gradient stops, its white trace and the status dot's fallback colour have
+   * to be literals in the file — the same reason public/favicon.svg carries
+   * them. The dot still prefers the live token: `statusFill` reads
+   * `--status-*-fill` off the document and only falls back to these.
+   */
+  "lib/documentStatus.ts": [
+    "#968ae0",
+    "#5d5294",
+    "#fff",
+    "#16a34a",
+    "#bd8404",
+    "#ea580c",
+    "#dc2626",
+    "#8e8e96",
+  ],
 };
 
 const allowedIn = (file: string, hex: string): boolean =>
