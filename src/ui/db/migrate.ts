@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -40,7 +40,8 @@ export function migrate(db: DatabaseSync): void {
       provider_id    TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
       observed_at    TEXT NOT NULL,
       overall_status TEXT NOT NULL,
-      ok             INTEGER NOT NULL
+      ok             INTEGER NOT NULL,
+      latency_ms     INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS incidents (
@@ -285,6 +286,18 @@ export function migrate(db: DatabaseSync): void {
     );
     if (!serviceColumns.includes("deleted_at")) {
       db.exec("ALTER TABLE services ADD COLUMN deleted_at TEXT");
+    }
+  }
+
+  if (from < 12) {
+    // How long the provider's page took to answer the read behind the sample.
+    // Null is "not measured", which every existing row is, and which a
+    // backfilled row stays: an incident feed says nothing about response times.
+    const sampleColumns = (db.prepare("PRAGMA table_info(status_samples)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!sampleColumns.includes("latency_ms")) {
+      db.exec("ALTER TABLE status_samples ADD COLUMN latency_ms INTEGER");
     }
   }
 

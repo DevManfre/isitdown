@@ -1,6 +1,7 @@
 import type { Adapter } from "./adapter.interface.ts";
 import type { RuntimeConfig, ServiceDefinition } from "./configSource.interface.ts";
 import { diff } from "./diffEngine.ts";
+import type { StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
 import type { StateStore } from "./stateStore.interface.ts";
 import type { NormalizedStatus, StatusChange } from "./types.ts";
@@ -89,7 +90,7 @@ export function createPoller(deps: PollerDeps): Poller {
   async function attemptFetch(
     service: ServiceDefinition,
     config: RuntimeConfig,
-  ): Promise<{ status: NormalizedStatus; attempts: number }> {
+  ): Promise<{ status: NormalizedStatus; attempts: number; latencyMs?: number | undefined }> {
     const adapter = getAdapter(service.adapter);
     const timeoutMs = config.polling.requestTimeoutSeconds * 1000;
     let lastError: unknown;
@@ -101,6 +102,9 @@ export function createPoller(deps: PollerDeps): Poller {
         const delay = BACKOFF_BASE_MS * 2 ** (attempt - 1) + Math.random() * BACKOFF_JITTER_MS;
         await sleep(Math.round(delay));
       }
+      // The read the successful attempt made; a retried attempt's own timing
+      // describes the failure, not the page we ended up reading.
+      let read: StatusPageRead | undefined;
       try {
         const status = await adapter.fetchStatus(
           {
@@ -111,9 +115,14 @@ export function createPoller(deps: PollerDeps): Poller {
             components: service.components,
             scopeToComponents: service.scopeToComponents,
           },
-          { timeoutMs },
+          {
+            timeoutMs,
+            onRead: (observed) => {
+              read = observed;
+            },
+          },
         );
-        return { status, attempts: attempt + 1 };
+        return { status, attempts: attempt + 1, latencyMs: read?.latencyMs };
       } catch (error) {
         lastError = error;
         logger.debug("poll attempt failed", {
@@ -139,7 +148,7 @@ export function createPoller(deps: PollerDeps): Poller {
     const before = await store.getState(service.id);
 
     const startedAt = Date.now();
-    let outcome: { status: NormalizedStatus; attempts: number };
+    let outcome: { status: NormalizedStatus; attempts: number; latencyMs?: number | undefined };
     try {
       outcome = await attemptFetch(service, config);
     } catch (error) {
@@ -178,7 +187,7 @@ export function createPoller(deps: PollerDeps): Poller {
 
     // Diff against the state read before this save, then persist.
     const changes = diff(before.last, outcome.status);
-    await store.saveStatus(outcome.status);
+    await store.saveStatus(outcome.status, { latencyMs: outcome.latencyMs });
     if (before.failureCount > 0) await store.clearFailures(service.id);
     if (before.degradedNotified) await store.setDegradedNotified(service.id, false);
 

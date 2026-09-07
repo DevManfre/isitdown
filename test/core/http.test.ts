@@ -195,3 +195,38 @@ test("a provider answering in UTF-16 is decoded by the charset it declared", asy
     },
   );
 });
+
+test("a completed read reports its latency, whether the body was replayed or not", async () => {
+  resetValidators();
+  const provider = conditionalProvider('{"ok":true}');
+  const reads: { latencyMs: number; notModified: boolean }[] = [];
+  await withServer(provider.handler, async (baseUrl) => {
+    const url = `${baseUrl}/summary.json`;
+    await fetchConditional(url, { ...opts, onRead: (read) => reads.push(read) });
+    await fetchConditional(url, { ...opts, onRead: (read) => reads.push(read) });
+  });
+  assert.deepEqual(
+    reads.map((read) => read.notModified),
+    [false, true],
+  );
+  for (const read of reads) {
+    assert.ok(Number.isInteger(read.latencyMs) && read.latencyMs >= 0, `bad latency ${read.latencyMs}`);
+  }
+});
+
+test("a failed read reports no latency", async () => {
+  resetValidators();
+  const reads: { latencyMs: number; notModified: boolean }[] = [];
+  await withServer(
+    (_req, res) => {
+      res.writeHead(503);
+      res.end();
+    },
+    async (baseUrl) => {
+      await assert.rejects(
+        fetchConditional(`${baseUrl}/summary.json`, { ...opts, onRead: (read) => reads.push(read) }),
+      );
+    },
+  );
+  assert.deepEqual(reads, []);
+});
