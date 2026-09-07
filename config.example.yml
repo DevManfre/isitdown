@@ -17,6 +17,11 @@ services:
     id: github
     adapter: statuspage
     baseUrl: https://www.githubstatus.com
+    # Optional: poll this provider on its own cadence instead of the global
+    # pollIntervalMinutes above. A page that publishes every few minutes and one
+    # that changes twice a year do not deserve the same one. Omit to follow the
+    # global interval.
+    intervalMinutes: 2
 
   - name: Cloudflare
     id: cloudflare

@@ -67,6 +67,23 @@ export type MaintenanceRow = MaintenanceWindow & {
   lastSeenAt: string;
 };
 
+export interface NotificationFilter {
+  /** Same semantics as `IncidentFilter.providerIds`: an empty array matches nothing. */
+  providerIds?: string[] | undefined;
+  /** `failed` is the outcome the view leads with — a dead channel is the reason it exists. */
+  state?: "sent" | "failed" | undefined;
+  channel?: string | undefined;
+  limit?: number | undefined;
+  /** Rows to skip before the page starts. Honoured with or without `limit`. */
+  offset?: number | undefined;
+}
+
+export interface NotificationCounts {
+  all: number;
+  sent: number;
+  failed: number;
+}
+
 export interface DailyBucket {
   /** UTC calendar day, `YYYY-MM-DD`. */
   day: string;
@@ -90,6 +107,21 @@ export interface HistoryStore extends StateStore {
    * so filtering afterwards would return fewer rows than were asked for.
    */
   listNotifications(limit: number, providerIds?: string[] | undefined): Promise<SentRecord[]>;
+  /**
+   * One page of the delivery log. Same discipline as the incident list: the
+   * filter, the window and the counts are all SQL, because a page filtered in
+   * the browser would report that page's totals as the whole log's.
+   */
+  queryNotifications(filter: NotificationFilter): Promise<SentRecord[]>;
+  /**
+   * How many sends match the filter, split by outcome — the delivery log's
+   * pills show every count while one state is on screen, so they cannot be
+   * derived from the loaded page. `state`, `limit` and `offset` are ignored:
+   * counting every outcome at once is the point.
+   */
+  countNotifications(
+    filter: Omit<NotificationFilter, "state" | "limit" | "offset">,
+  ): Promise<NotificationCounts>;
   listIncidents(filter: IncidentFilter): Promise<IncidentRow[]>;
   /**
    * The counts behind the incident list's pager and its filter pills. One

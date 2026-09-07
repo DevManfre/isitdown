@@ -192,7 +192,40 @@ test("editing a service applies and an unknown id is a 404", async () => {
   }
 });
 
-test("deleting a service removes it and its history", async () => {
+test("GET /config/services/:id/impact reports what a removal would take", async () => {
+  const app = await api();
+  try {
+    await app.runtime.store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    const { status, body } = await app.request("GET", "/config/services/github/impact");
+
+    assert.equal(status, 200);
+    assert.equal((body as { samples: number }).samples, 1);
+    assert.equal((body as { incidents: number }).incidents, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test("GET /config/services/:id/impact 404s for a service that is not there", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.request("GET", "/config/services/nope/impact");
+
+    assert.equal(status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
+test("removing a service hides it but keeps its history for the restore window", async () => {
   const app = await api();
   try {
     await app.runtime.store.saveStatus({
@@ -205,9 +238,69 @@ test("deleting a service removes it and its history", async () => {
     });
     assert.equal((await app.runtime.store.getRecentSamples("github", 5)).length, 1);
 
-    assert.equal((await app.request("DELETE", "/config/services/github")).status, 200);
-    assert.deepEqual(await app.runtime.store.getRecentSamples("github", 5), []);
+    const removal = await app.request("DELETE", "/config/services/github");
+    assert.equal(removal.status, 200);
+    const { restoreUntil } = removal.body as { restoreUntil: string };
+    // The response has to say when the undo expires, or the dashboard's offer
+    // of one is a guess.
+    assert.ok(Date.parse(restoreUntil) > Date.now());
+
+    // Gone from the config and from the poll cycle, but nothing was taken yet.
+    const config = (await app.request("GET", "/config")).body as {
+      services: { id: string }[];
+      removed: { id: string; restoreUntil: string }[];
+    };
+    assert.ok(!config.services.some((service) => service.id === "github"));
+    assert.deepEqual(
+      config.removed.map((service) => service.id),
+      ["github"],
+    );
+    assert.equal((await app.runtime.store.getRecentSamples("github", 5)).length, 1);
+
+    // A second removal is a 404: the row is already on its way out.
     assert.equal((await app.request("DELETE", "/config/services/github")).status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
+test("restoring a removed service puts it back, and an unknown restore is a 404", async () => {
+  const app = await api();
+  try {
+    await app.request("DELETE", "/config/services/github");
+
+    assert.equal((await app.request("POST", "/config/services/github/restore")).status, 200);
+    const config = (await app.request("GET", "/config")).body as {
+      services: { id: string }[];
+      removed: unknown[];
+    };
+    assert.ok(config.services.some((service) => service.id === "github"));
+    assert.deepEqual(config.removed, []);
+
+    assert.equal((await app.request("POST", "/config/services/github/restore")).status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
+test("removing a service permanently is what finally takes its history", async () => {
+  const app = await api();
+  try {
+    await app.runtime.store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    assert.equal((await app.request("DELETE", "/config/services/github/permanently")).status, 200);
+
+    assert.deepEqual(await app.runtime.store.getRecentSamples("github", 5), []);
+    const config = (await app.request("GET", "/config")).body as { removed: unknown[] };
+    assert.deepEqual(config.removed, []);
+    assert.equal((await app.request("DELETE", "/config/services/github/permanently")).status, 404);
   } finally {
     await app.close();
   }
@@ -545,5 +638,54 @@ test("PUT /config/routing accepts an empty list", async () => {
     assert.deepEqual((body as { rules: unknown[] }).rules, []);
   } finally {
     await app.close();
+  }
+});
+
+test("a provider can be given its own poll interval and put back on the global one", async () => {
+  const provider = await fakeProvider();
+  const app = await api();
+  const intervalOf = async (): Promise<number | undefined> => {
+    const config = (await app.request("GET", "/config")).body as {
+      services: { id: string; intervalMinutes?: number }[];
+    };
+    return config.services.find((service) => service.id === "vercel")?.intervalMinutes;
+  };
+  try {
+    await app.request("POST", "/config/services", {
+      id: "vercel",
+      name: "Vercel",
+      adapter: "statuspage",
+      baseUrl: provider.baseUrl,
+      intervalMinutes: 60,
+    });
+    assert.equal(await intervalOf(), 60);
+
+    // Null is the only way to say "back to the global cadence": omitting the
+    // field on a patch means "leave it alone".
+    const cleared = await app.request("PATCH", "/config/services/vercel", { intervalMinutes: null });
+    assert.equal(cleared.status, 200);
+    assert.equal(await intervalOf(), undefined);
+  } finally {
+    await app.close();
+    await provider.close();
+  }
+});
+
+test("a poll interval outside the allowed range is refused", async () => {
+  const provider = await fakeProvider();
+  const app = await api();
+  try {
+    const { status, body } = await app.request("POST", "/config/services", {
+      id: "vercel",
+      name: "Vercel",
+      adapter: "statuspage",
+      baseUrl: provider.baseUrl,
+      intervalMinutes: 0,
+    });
+    assert.equal(status, 400);
+    assert.match(JSON.stringify(body), /intervalMinutes/);
+  } finally {
+    await app.close();
+    await provider.close();
   }
 });

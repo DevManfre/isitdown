@@ -94,6 +94,16 @@ async function openChannel(label: string): Promise<HTMLElement> {
   return row;
 }
 
+/** A provider whose removal is still undoable — the `removed` list `GET /config` carries. */
+const removedService = {
+  id: "cloudflare",
+  name: "Cloudflare",
+  adapter: "statuspage",
+  baseUrl: "https://www.cloudflarestatus.com",
+  removedAt: "2026-09-05T10:00:00Z",
+  restoreUntil: "2026-09-12T10:00:00Z",
+};
+
 const fixtures = {
   config,
   status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
@@ -932,5 +942,38 @@ describe("Settings", () => {
     });
 
     expect(await screen.findByText(i18n.t("settings.routing.count", { count: 1 }))).toBeInTheDocument();
+  });
+
+  describe("recently removed", () => {
+    it("says nothing at all when no removal is waiting", async () => {
+      renderWithProviders(<Settings />, fixtures);
+
+      // The section is not empty chrome for a state that is normally absent.
+      expect(await screen.findByText(i18n.t("settings.section.services"))).toBeInTheDocument();
+      expect(screen.queryByText(i18n.t("settings.section.removed"))).not.toBeInTheDocument();
+    });
+
+    it("offers a restore for a removed provider, with the window it has left", async () => {
+      renderWithProviders(<Settings />, { ...fixtures, config: { ...config, removed: [removedService] } });
+      const calls = interceptWrites({ "POST /config/services/cloudflare/restore": {} });
+
+      expect(await screen.findByText(i18n.t("settings.section.removed"))).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: i18n.t("action.restore") }));
+
+      expect(writesIn(calls)).toEqual([
+        { path: "/config/services/cloudflare/restore", method: "POST", body: undefined },
+      ]);
+    });
+
+    it("removing now is a separate call from the removal that scheduled it", async () => {
+      renderWithProviders(<Settings />, { ...fixtures, config: { ...config, removed: [removedService] } });
+      const calls = interceptWrites({ "DELETE /config/services/cloudflare/permanently": {} });
+
+      await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.remove-now") }));
+
+      expect(writesIn(calls)).toEqual([
+        { path: "/config/services/cloudflare/permanently", method: "DELETE", body: undefined },
+      ]);
+    });
   });
 });

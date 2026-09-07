@@ -248,8 +248,9 @@ notifications:
 | `failureThreshold` | `5` | Consecutive failed cycles before one "monitoring degraded" warning. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `rss` reads any RSS or Atom incident feed. |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `rss` reads any RSS or Atom incident feed; `slack`, `aws`, `gcp` and `azure` read those providers' own shapes. |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
+| `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
 
 Anything invalid stops the container at boot with the reason and the offending
 path — a missing file, malformed YAML, a bad base URL, a duplicate service id, an
@@ -422,8 +423,110 @@ component listing, because a feed has no components; and its incident history
 never claims to be complete, because a feed is a window onto a history rather
 than the history itself.
 
-For a provider on neither Statuspage nor a feed, add an adapter under
-`src/adapters/`.
+#### Slack adapter
+
+Slack publishes its own small JSON API instead of running on Statuspage, so it
+gets its own adapter:
+
+```yaml
+  - id: slack
+    name: Slack
+    adapter: slack
+    baseUrl: https://slack-status.com
+```
+
+`baseUrl` is the host; the adapter appends `/api/v2.0.0/current` for what is
+open now and `/api/v2.0.0/history` for the timeline. (`https://status.slack.com`
+redirects there and works too.)
+
+The payload carries no severity field — an incident is a title, a lifecycle word
+and a list of affected service names — so severity is read from Slack's own
+wording, exactly as the feed adapter does it. What that produces:
+
+| Payload | Reading |
+|---|---|
+| `active_incidents` empty | Operational |
+| An entry of `type: notice` | Listed as an incident, but does not move the provider's status on its own |
+| Top-level `status: ok` with an entry still open | Trouble: the incident list is the dial, not the word |
+| An entry with no `id` | Dropped: nothing stable to key the incident on |
+
+Slack names the affected services on an incident but publishes no per-service
+status list, so the adapter offers no component listing; and it exposes no
+scheduled-maintenance data, so an entry announcing one stays an incident rather
+than becoming a window that would silence the provider while it sat there.
+
+#### AWS, Google Cloud and Azure
+
+The three hyperscalers publish nothing Statuspage-shaped, and each is odd in its
+own way, so each gets its own adapter:
+
+```yaml
+  - id: aws
+    name: AWS
+    adapter: aws
+    baseUrl: https://health.aws.amazon.com
+    options:
+      region: eu-west-1        # optional; omit to watch every region
+
+  - id: gcp
+    name: Google Cloud
+    adapter: gcp
+    baseUrl: https://status.cloud.google.com
+
+  - id: azure
+    name: Azure
+    adapter: azure
+    baseUrl: https://azure.status.microsoft
+    options:
+      locale: en-us            # optional; the feed is published per locale
+```
+
+**AWS** — the adapter appends `/public/currentevents`, a document of the events
+open right now. Two things follow from that. There is no history to backfill
+from, because a resolved event drops out of the document rather than being
+marked closed; and every event is scoped to one region, so `options.region`
+narrows it to yours. A global event — one the feed publishes with no region at
+all — is always reported, since narrowing must not hide the class of event that
+hits everything. Severity is AWS's own numeric code, not a guess from wording:
+
+| Code | Reading |
+|---|---|
+| `0` | Closed; drops out rather than keeping a recovered region red |
+| `1` | Informational: listed as an incident, does not move the status |
+| `2` | Degraded |
+| `3` | Major outage |
+| anything else | Major outage — never silently downgraded |
+
+The document is served as UTF-16, which `fetch`'s own `text()` decodes as UTF-8
+and mangles; IsItDown decodes by the charset the response declared.
+
+**Google Cloud** — the adapter appends `/incidents.json`, one flat list that is
+both the current state and the history: an incident with no `end` is open, and
+the provider's status is whatever the open ones add up to. Severity comes from
+`status_impact` (`SERVICE_INFORMATION` → an announcement that does not move the
+status, `SERVICE_DISRUPTION` → partial outage, `SERVICE_OUTAGE` → major outage,
+anything unrecognised → major outage) rather than from the `severity` word beside
+it, which disagrees with it.
+
+**Azure** — the machine-readable half of `azure.status.microsoft` is an RSS
+feed, so this adapter reads the feed at `/<locale>/status/feed/` and adds the
+two things the generic feed adapter gets wrong about Azure: it knows
+"mitigated" ends an incident, and it knows the feed is *empty* while Azure is
+healthy, so an empty feed is operational rather than unknown. Its incident
+history reaches only as far as the feed does, which for a provider that
+publishes open communications only is not far.
+
+For a provider on none of these, add an adapter under `src/adapters/`.
+
+#### Conditional requests
+
+Every adapter reads through one HTTP helper that remembers the `ETag` (or
+`Last-Modified`) a provider sent and offers it back on the next cycle. A page
+that has not changed answers `304` with no body and the cached one is replayed,
+which is most cycles: cheaper for the provider, and the difference between being
+rate-limited and not on one with a tight budget. A `304` to a request that
+carried no validator, a failed revalidation, or a page that stops sending
+validators all drop the cache entry rather than pin a stale reading.
 
 ### 3.6 Notification channels
 
@@ -654,7 +757,8 @@ docker history isitdown:ui --no-trunc --format "{{.CreatedBy}}" | grep -iE "TOKE
 ### 5.2 The dashboard
 
 Open **http://localhost:3000** and walk the rail: Overview · Providers ·
-Incidents · History · Settings. Then check the two runtime controls in the header:
+Incidents · History · Delivery log · Settings. Then check the two runtime controls
+in the header:
 
 - the **theme** button cycles light → dark → system and survives a reload;
 - the **EN / IT** switch changes every string with no page reload, including the
@@ -681,6 +785,24 @@ curl -s -X POST localhost:3000/config/services/vercel/test
 
 A connection test reaches the provider but records nothing: no sample, no incident,
 no notification. It is diagnostics, not history.
+
+Removing a provider is undoable. The confirmation names what the removal will
+eventually take (samples, incidents, maintenance windows, routing rules, and the
+span of history behind them), then the provider leaves the dashboard while its
+history waits out a restore window — `Settings → Recently removed` offers
+**Restore** and **Remove now** until it closes:
+
+```bash
+curl -s -X DELETE localhost:3000/config/services/vercel
+#   {"removed":"vercel","removedAt":"...","restoreUntil":"..."}
+curl -s localhost:3000/config | jq '.removed[] | {id, restoreUntil}'
+curl -s -X POST localhost:3000/config/services/vercel/restore    # undo
+```
+
+The **Delivery log** view is the other half of that honesty: every notification
+that was attempted, failed ones first, each row expanding to the exact payload
+sent and the channel's own error string. A credential that went stale shows up
+there instead of as alerts that quietly stopped arriving.
 
 ### 5.3 Configuration changes apply without a restart
 
@@ -884,9 +1006,12 @@ back reports a parse failure instead of the real problem.
 | `GET` | `/incidents/:providerId/:incidentId` | Detail: the incident, the observed timeline, the action log of what was sent, the provider's other open incidents, and the last 24 polls. |
 | `GET` | `/maintenances?provider=&days=` | Declared maintenance windows — running, upcoming and past — as `{ maintenances }`. `days` bounds how far back a closed window is still returned (default 90, max 365); `provider` narrows to one. Without `provider`, every enabled provider. |
 | `GET` | `/notifications?limit=` | What was actually sent, newest first. Capped at 200. |
-| `GET` | `/config` | Services, polling settings, channels. Channel credentials appear as variable **names** with an `isSet` flag — never values. |
+| `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | One page of the delivery log: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` is `all` (default), `sent` or `failed`; `channel` narrows to one channel; `pageSize` defaults to 25 and is capped at 200. A nonsense `page`, `pageSize` or `state` falls back rather than 400s. `counts` carries every outcome whatever the filter. |
+| `GET` | `/config` | Services, polling settings, channels, routing, and `removed` — providers taken out but still restorable. Channel credentials appear as variable **names** with an `isSet` flag — never values. |
 | `POST` | `/config/services` | Add a service. `201`, or `409` on a duplicate id, or `400` naming the invalid field. |
-| `PATCH` `DELETE` | `/config/services/:id` | Edit or remove. Deleting cascades to that provider's samples, incidents and state, so nothing orphaned survives. |
+| `PATCH` `DELETE` | `/config/services/:id` | Edit, or remove. A removal is a **soft delete**: the provider leaves the dashboard and the poll cycle at once, and the response says how long it stays restorable (`{ removed, removedAt, restoreUntil }`). `404` on an id that is unknown or already removed. |
+| `POST` | `/config/services/:id/restore` | Undo a removal inside its window. Nothing was taken, so nothing is rebuilt; the gap in history from the days it was removed is backfilled. `404` if it is not a removed service. |
+| `DELETE` | `/config/services/:id/permanently` | The destructive half, on its own path so nothing reaches it by accident: cascades to that provider's samples, incidents, maintenances, state and routing rules. This also happens on its own once the restore window closes. |
 | `PATCH` | `/config/settings` | Polling settings. |
 | `PATCH` | `/config/channels/:id` | Enable/disable, and set variable names. **Refuses** a literal secret. |
 | `PUT` | `/config/channels/:id/secrets` | Save credential **values** — `{"fields":{"<field>":"<value>"}}`. Write-only: the value goes to `secrets.env` beside the database and into the process environment, effective immediately, and the response is the usual names-and-`isSet` shape. `400` for an unknown field or an unusable value. |
@@ -895,6 +1020,7 @@ back reports a parse failure instead of the real problem.
 | `POST` | `/config/channels/:id/test` | One test notification, through the dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
 | `POST` | `/poll` | Run a cycle now, through the scheduler. Returns the cycle summary. |
+| `GET` | `/events` | Server-sent events, one long-lived response per open tab. `hello` on connect (`lastPollAt`, `nextPollAt`, `serverNow`), then `cycle` as each cycle finishes (`finishedAt`, `providers`, `failed`, `changedProviders` — no deadline: the scheduler re-arms after the event, so the fresh one comes with the re-read). The stream is a courier, not a source of truth: it says what changed, and the dashboard re-reads it. Not JSON — see [6.3](#63-live-updates). |
 | `GET` | `/metrics` | Prometheus exposition. The one non-JSON endpoint — see [6.2](#62-prometheus-metrics). |
 | `GET` | `/` | The dashboard. |
 
@@ -966,6 +1092,40 @@ groups:
 
 There is no authentication: this is a local, single-operator dashboard. Do not
 publish port 3000 to a network you do not trust.
+
+---
+
+### 6.3 Live updates
+
+The dashboard is pushed to rather than polling: it opens `/events` once and
+re-reads what an event names.
+
+```bash
+curl -N localhost:3000/events
+#   event: hello
+#   data: {"lastPollAt":"...","nextPollAt":"...","serverNow":"..."}
+#   event: cycle
+#   data: {"startedAt":"...","finishedAt":"...","providers":4,"failed":0,"changedProviders":["github"]}
+```
+
+Server-sent events, not a WebSocket: nothing the dashboard sends needs a socket
+— every write it makes is already an HTTP request — and SSE rides plain HTTP
+with reconnection handled by the browser, so it costs no new dependency.
+
+A cycle event re-reads the cheap keys (status, incidents, notifications,
+maintenance); the 90-day history and the map are re-read only when
+`changedProviders` is non-empty, which for most cycles it is not. Polling does
+not go away, it steps back: with the stream connected every query drops to a
+two-minute safety interval, because a stream the browser still believes is open
+but whose events stopped arriving — a proxy that dropped it, a suspended laptop
+— would otherwise leave the dashboard frozen with no sign of it. When the
+stream drops, the queries return to the 30-second rhythm until it reconnects,
+and the header's next-poll label carries a **Live** badge whenever the push is
+what is keeping the page fresh.
+
+Behind a reverse proxy, the stream needs buffering off (the response sends
+`X-Accel-Buffering: no` for nginx) and a read timeout longer than a heartbeat,
+which is written every 20 seconds.
 
 ---
 
@@ -1154,6 +1314,9 @@ Timestamps stay UTC with an explicit suffix in every language.
   burst. Tested in both editions, including in the container.
 - **Rate limiting** — providers are staggered within a cycle and the interval carries
   jitter, so neither one instance nor a fleet hammers a provider on the same second.
+  A provider's stored validator turns most cycles into a `304` with no body, and a
+  provider that publishes twice a year can be given its own slower cadence with
+  `intervalMinutes`.
 - **Untrusted timestamps** — a provider's `updatedAt` ahead of our clock cannot start
   an incident in the future; the start time is pinned to the poll that first saw it,
   while the provider's own claim is still recorded.
@@ -1269,6 +1432,11 @@ isitdown/
 │   ├── adapters/                      (shared)
 │   │   ├── statuspage.adapter.ts       generic Atlassian Statuspage adapter
 │   │   ├── rss.adapter.ts              generic RSS / Atom incident-feed adapter
+│   │   ├── slack.adapter.ts            Slack's own status API
+│   │   ├── aws.adapter.ts              AWS Health's open-events feed, region-scoped
+│   │   ├── gcp.adapter.ts              Google Cloud's incidents.json, current state and history in one
+│   │   ├── azure.adapter.ts            Azure's status feed, with its own closure vocabulary
+│   │   ├── severity.ts                 severity read from a provider's own wording
 │   │   └── index.ts                    registry keyed by adapter id
 │   ├── notifiers/                     (shared)
 │   │   ├── formatting.ts               emoji, colours, severity labels, message assembly
@@ -1299,11 +1467,12 @@ isitdown/
 │       ├── dbConfigSource.ts           config from SQLite; resolves secrets by variable name
 │       ├── secretsFile.ts              credentials saved from the dashboard: 0600 file beside the database, applied to the environment
 │       ├── metrics.ts                  the Prometheus scrape surface: gauges from the store, counters in memory
+│       ├── liveEvents.ts               the push hub behind /events: subscribe, publish, nothing transport-specific
 │       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
 │       ├── geo/                        resolveLocation.ts + the IATA/cloud-region lookup tables it resolves against
 │       ├── db/                         open.ts, migrate.ts, seed.ts
-│       ├── routes/                     status, history, incidents, notifications, config, preferences, map, metrics
+│       ├── routes/                     status, events, history, incidents, notifications, config, preferences, map, metrics
 │       └── web/                        the dashboard: react, vite, shadcn/ui
 │           ├── index.html              pre-paint theme script, fonts, #root
 │           ├── main.tsx                provider tree: i18n, query, theme, router
@@ -1312,8 +1481,8 @@ isitdown/
 │           ├── components/ui/          shadcn primitives
 │           ├── components/             rail, header, poll indicator, charts/
 │           ├── views/                  overview, providers, incidents, incident,
-│           │                           history, settings
-│           ├── hooks/                  queries, theme, rail, busy
+│           │                           history, delivery log, settings
+│           ├── hooks/                  queries, theme, rail, busy, live
 │           ├── lib/                    api, types, chartConfig, format, i18n
 │           ├── css/base.css            Tailwind entry point: imports tailwindcss, tokens, motion
 │           ├── css/tokens.css          the only file with a colour literal
@@ -1329,7 +1498,7 @@ isitdown/
 │   ├── notifiers/
 │   ├── light/
 │   ├── ui/                            store contract, aggregation, every API route, theme and locale guards
-│   ├── fixtures/statuspage/           payloads recorded from the live pages, never fetched in a test
+│   ├── fixtures/<provider>/            payloads recorded from the live pages, never fetched in a test
 │   ├── helpers/
 │   └── integration/                   *.itest.ts — fake provider and webhook receiver end to end
 ├── design/                            Claude Design prototypes (git-ignored: on disk, not in a clone)
@@ -1562,10 +1731,15 @@ Delivered:
   persisted preference, and a localised dashboard (`en`, `it`) on top of the localised
   notification messages both editions already share.
 
+Since v1.4 (on `dev`): adapters for AWS, Google Cloud and Azure, conditional
+requests so most cycles are a `304`, a per-provider poll cadence, the delivery log
+view, and a provider removal that can be undone inside a restore window.
+
 Still open:
 
-- Adapters for providers not on Atlassian Statuspage.
 - A native review of the Italian strings.
+- Direct HTTP probes ("is *my* thing up") and a public read-only status page — the
+  two items that change what IsItDown is, listed in `ROADMAP.md`.
 
 Explicit non-goals: multi-user auth (this is a local, single-operator dashboard),
 status pages behind a login, and a packaged mobile app.

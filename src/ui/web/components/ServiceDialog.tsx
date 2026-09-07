@@ -14,7 +14,11 @@ import { previewComponents } from "@/lib/api.ts";
 import { slugify } from "@/lib/slugify.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
 
-const ADAPTERS = ["statuspage", "rss", "custom"] as const;
+const ADAPTERS = ["statuspage", "rss", "slack", "aws", "gcp", "azure", "custom"] as const;
+
+/** The stored interval as a form value; empty when the provider follows the global cadence. */
+const intervalValue = (service: ServiceDefinition | undefined): string =>
+  service?.intervalMinutes == null ? "" : String(service.intervalMinutes);
 
 /**
  * What the base URL means differs per adapter — Statuspage appends a path to
@@ -24,6 +28,10 @@ const ADAPTERS = ["statuspage", "rss", "custom"] as const;
 const ADAPTER_NOTES: Record<string, string> = {
   statuspage: "add.note.statuspage",
   rss: "add.note.rss",
+  slack: "add.note.slack",
+  aws: "add.note.aws",
+  gcp: "add.note.gcp",
+  azure: "add.note.azure",
   custom: "add.note.custom",
 };
 
@@ -65,6 +73,9 @@ export function ServiceDialog({
   const [baseUrl, setBaseUrl] = useState(service?.baseUrl ?? "");
   const [selection, setSelection] = useState<ComponentPickerSelection[]>(service?.components ?? []);
   const [scopeToComponents, setScopeToComponents] = useState(service?.scopeToComponents ?? false);
+  // Kept as the typed string, not a number: an empty field is what "follow the
+  // global cadence" looks like, and 0/NaN cannot express it.
+  const [intervalMinutes, setIntervalMinutes] = useState(intervalValue(service));
   const [preview, setPreview] = useState<
     { supported: boolean; components: ComponentPickerEntry[] } | undefined
   >(undefined);
@@ -104,6 +115,7 @@ export function ServiceDialog({
     setBaseUrl(service?.baseUrl ?? "");
     setSelection(service?.components ?? []);
     setScopeToComponents(service?.scopeToComponents ?? false);
+    setIntervalMinutes(intervalValue(service));
     setPreview(undefined);
     setMessage(undefined);
     setSaving(false);
@@ -161,6 +173,9 @@ export function ServiceDialog({
       if (mode === "add") {
         await add.mutateAsync({
           id, name, adapter, baseUrl, enabled: true, components: selection, scopeToComponents,
+          // Omitted rather than null on an add: the schema behind the POST takes
+          // the field as optional, and absent already means the global cadence.
+          ...(intervalMinutes.trim() === "" ? {} : { intervalMinutes: Number(intervalMinutes) }),
         });
         const result = await test.mutateAsync(id);
         if (!result.ok) {
@@ -175,7 +190,12 @@ export function ServiceDialog({
       } else if (service !== undefined) {
         await patch.mutateAsync({
           id: service.id,
-          patch: { name, baseUrl, components: selection, scopeToComponents },
+          patch: {
+            name, baseUrl, components: selection, scopeToComponents,
+            // Null, not omitted: a cleared field has to travel as an instruction
+            // to forget the interval, or the row keeps the one it had.
+            intervalMinutes: intervalMinutes.trim() === "" ? null : Number(intervalMinutes),
+          },
         });
       }
       close();
@@ -235,6 +255,21 @@ export function ServiceDialog({
                 {...fieldProps}
               />
               {mode === "add" && <span className="font-mono text-xs text-muted-foreground">{t(ADAPTER_NOTES[adapter] ?? "add.note.custom")}</span>}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="service-interval">{t("field.provider-interval")}</Label>
+              <Input
+                id="service-interval"
+                type="number"
+                min={1}
+                max={1440}
+                placeholder={t("field.provider-interval-placeholder")}
+                value={intervalMinutes}
+                onChange={(event) => setIntervalMinutes(event.target.value)}
+                {...fieldProps}
+              />
+              <span className="text-xs text-muted-foreground">{t("field.provider-interval-hint")}</span>
             </div>
 
             <div className="flex flex-col gap-2">

@@ -116,4 +116,15 @@ describe("Rail", () => {
     mount();
     expect(await screen.findByText("telegram")).toBeInTheDocument();
   });
+
+  // The brand mark sits next to the product name, so it has to stay out of the
+  // accessibility tree: labelled, it would have a screen reader announce
+  // "IsItDown" twice over.
+  it("brands the header with a decorative mark", async () => {
+    const { container } = mount();
+    await screen.findByText(i18n.t("app.name"));
+    const mark = container.querySelector('[data-slot="brand-mark"]');
+    expect(mark).not.toBeNull();
+    expect(mark).toHaveAttribute("aria-hidden", "true");
+  });
 });

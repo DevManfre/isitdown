@@ -495,3 +495,30 @@ test("every incident page is served by an index instead of a temp b-tree sort", 
   }
   db.close();
 });
+
+test("migrating schema 11 adds latency_ms without touching existing samples", async () => {
+  const db = await freshDb();
+  migrate(db);
+  // Roll the database back to how it looked before this column existed.
+  db.exec("ALTER TABLE status_samples DROP COLUMN latency_ms");
+  db.exec("PRAGMA user_version = 11");
+  db.prepare(
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).run("github", "GitHub", "statuspage", "https://www.githubstatus.com", null, 1, "2026-08-19T00:00:00.000Z");
+  db.prepare(
+    "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok) VALUES (?, ?, ?, ?)",
+  ).run("github", "2026-08-19T14:05:00.000Z", "operational", 1);
+
+  migrate(db);
+
+  const rows = db.prepare("SELECT overall_status, latency_ms FROM status_samples").all() as {
+    overall_status: string;
+    latency_ms: number | null;
+  }[];
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.overall_status, "operational");
+  assert.equal(rows[0]?.latency_ms, null);
+  const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
+  assert.equal(version?.user_version, SCHEMA_VERSION);
+  db.close();
+});

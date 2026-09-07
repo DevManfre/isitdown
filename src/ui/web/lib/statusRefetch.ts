@@ -2,6 +2,16 @@
 export const REFRESH_MS = 30_000;
 
 /**
+ * The rhythm once the event stream is connected. Not `false`: a stream the
+ * browser still believes is open but whose events no longer arrive — a proxy
+ * that dropped it silently, a suspended laptop — would leave the dashboard
+ * frozen with no sign of it. A slow poll behind the push is the safety net,
+ * and it is the interval the dashboard falls back to rather than the one it
+ * normally runs on.
+ */
+export const LIVE_REFRESH_MS = 120_000;
+
+/**
  * How fast the dashboard re-asks once the deadline has passed but the server
  * has not published the next one yet — the window in which the cycle is
  * actually running upstream.

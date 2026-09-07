@@ -1,0 +1,62 @@
+{
+  "status": "active",
+  "date_created": "2026-08-13T14:21:41-07:00",
+  "date_updated": "2026-09-01T15:51:21-07:00",
+  "active_incidents": [
+    {
+      "id": 1576,
+      "title": "Trouble Accessing Historical Messages With Custom Data Retention Policies Enabled",
+      "type": "incident",
+      "status": "active",
+      "url": "https://slack-status.com/2026-08/e07b9271f0346c3b",
+      "date_created": "2026-08-13T14:21:41-07:00",
+      "date_updated": "2026-09-01T15:51:21-07:00",
+      "notes": [
+        {
+          "body": "<p>Users with custom data retention policies enabled might be unable to see or load older messages. We apologize for the trouble and we'll share more news as it becomes available.</p>",
+          "date_created": "2026-08-13T14:21:41-07:00"
+        },
+        {
+          "body": "<p>We're continuing to investigate an issue affecting a subset of channels with custom message retention settings. Our teams are working to identify the technical trigger and an appropriate fix. We'll provide an update as more news becomes available.</p>",
+          "date_created": "2026-08-13T14:49:40-07:00"
+        },
+        {
+          "body": "<p>We're continuing to investigate an issue affecting a subset of channels with custom message retention settings. Our Teams have restored functionality to the affected retention settings for known impacted customers. We are now working to identify and address any additional concerns regarding the message retention issues.</p>",
+          "date_created": "2026-08-14T12:35:56-07:00"
+        },
+        {
+          "body": "<p>After further investigation, the custom retention settings have not fully been restored yet. Our teams have identified the technical trigger and are currently developing a mitigation plan to mitigate the impact to the custom retention settings. All custom retention jobs have been put on hold as the team works to address this issue. We apologize for the confusion, and thank you for bearing with us while we work through this issue.&nbsp;</p>",
+          "date_created": "2026-08-14T13:20:26-07:00"
+        },
+        {
+          "body": "<p>We're continuing to investigate an issue affecting a subset of channels with custom message retention settings. Custom channel retention settings have been restored for affected customers. Custom retention jobs remain on hold for some customers as we work to fully resolve the underlying cause regarding the custom message retention issues.</p>",
+          "date_created": "2026-08-14T14:39:25-07:00"
+        },
+        {
+          "body": "<p>We're continuing our restoration efforts regarding this issue affecting a subset of channels with custom message retention settings. While we work to resolve this issue, data retention processing remains paused for affected customers.&nbsp;</p><p><br></p><p>We will provide another update as additional information becomes available.</p>",
+          "date_created": "2026-08-17T14:57:51-07:00"
+        },
+        {
+          "body": "<p>We're continuing to work on restoring messages, message edits, and file shares for a limited number of workspaces that were affected by an issue with custom data retention settings. We've fixed what triggered the issue and are running data recovery using backup restoration methods. Custom retention settings have been restored for impacted channels, and we're gradually re-enabling retention jobs.</p><p>We will provide another update as additional information becomes available.</p>",
+          "date_created": "2026-08-20T15:54:59-07:00"
+        },
+        {
+          "body": "<p>We’re continuing our work to restore the remaining message data affected by this issue. Our teams have made progress developing and validating the recovery process for messages, message edits, and shared files. We’re addressing additional technical dependencies and completing validation before proceeding with the next stages of restoration.</p><p>We’ll continue to provide updates as we make progress.</p>",
+          "date_created": "2026-08-25T13:55:43-07:00"
+        },
+        {
+          "body": "<p>We’re continuing our work to restore the remaining message data affected by this issue. We’ve made further progress across the recovery processes for messages, message edits, and shared files. Validation of the message-edit recovery process has identified additional adjustments needed before restoration proceeds, while preparation and validation for message recovery continue. We’ve also completed additional development work supporting shared-file restoration, including handling for shared channels.</p><p>Custom retention processing has been re-enabled for affected active workspaces. We’ll continue to provide updates as restoration and validation progress.</p>",
+          "date_created": "2026-08-27T11:58:04-07:00"
+        },
+        {
+          "body": "<p>We continue to restore batches of messages, message edits, and shared files. Each batch requires careful planning, monitoring, and validation to ensure the affected messages are accurately restored. Custom retention processing remains re-enabled for affected active workspaces. Thank you for bearing with us while we continue to work through this complex and nuanced issue.&nbsp;</p><p>More updates will come as restoration and validation progress.</p>",
+          "date_created": "2026-09-01T15:51:21-07:00"
+        }
+      ],
+      "services": [
+        "Messaging",
+        "Workspace/Org Administration"
+      ]
+    }
+  ]
+}

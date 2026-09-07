@@ -9,6 +9,15 @@ export interface ProviderRuntimeState {
   degradedNotified: boolean;
 }
 
+/** What the poller observed while taking a reading, beyond the reading itself. */
+export interface SaveStatusMeta {
+  /**
+   * How long the provider's page took to answer the read behind this status.
+   * Absent when the reading came from somewhere that did not measure one.
+   */
+  latencyMs?: number | undefined;
+}
+
 /**
  * The only persistence the core engine knows about. The Light edition backs it
  * with a JSON file, the UI edition with SQLite; both pass the same contract
@@ -17,7 +26,7 @@ export interface ProviderRuntimeState {
 export interface StateStore {
   /** Returns zeroed defaults for a provider that has never been seen. */
   getState(providerId: string): Promise<ProviderRuntimeState>;
-  saveStatus(status: NormalizedStatus): Promise<void>;
+  saveStatus(status: NormalizedStatus, meta?: SaveStatusMeta | undefined): Promise<void>;
   /** Returns the new consecutive-failure count. */
   recordFailure(providerId: string): Promise<number>;
   clearFailures(providerId: string): Promise<void>;
