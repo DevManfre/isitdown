@@ -394,6 +394,8 @@ export interface Preferences {
   uiLocale: string;
   notificationLocale: string;
   mapView: MapView;
+  /** `auto` is the browser's own zone; anything else is an IANA name. */
+  timeZone?: string;
 }
 
 /**

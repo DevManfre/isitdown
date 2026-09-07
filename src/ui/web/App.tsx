@@ -7,6 +7,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
 import { useDocumentStatus } from "@/hooks/useDocumentStatus.tsx";
 import { usePreferenceSync } from "@/hooks/usePreferenceSync.tsx";
+import { usePreferences } from "@/hooks/queries.ts";
 
 /**
  * What a repaint does to the view's entry animations.
@@ -20,8 +21,13 @@ import { usePreferenceSync } from "@/hooks/usePreferenceSync.tsx";
  * holds its cascade until its first data has landed, so the page enters once
  * rather than once per query.
  */
-export const viewKey = (view: string, params: string, locale: string, theme: string) =>
-  [view, params, locale, theme].join("|");
+export const viewKey = (
+  view: string,
+  params: string,
+  locale: string,
+  theme: string,
+  timeZone: string = "auto",
+) => [view, params, locale, theme, timeZone].join("|");
 
 /** "incident" for the detail route, otherwise the route's own segment. */
 export function currentView(pathname: string, hasParams: boolean): string {
@@ -40,6 +46,7 @@ export function App() {
   // the view, so the frame below waits for it rather than cascading once in the
   // default theme and again in the operator's.
   const seeded = usePreferenceSync();
+  const { data: preferences } = usePreferences();
   // The browser tab reflects the worst status in the fleet. Mounted in the
   // shell, like the seed above, because the tab belongs to no single view.
   useDocumentStatus();
@@ -60,7 +67,11 @@ export function App() {
       <SidebarInset className="min-w-0 bg-transparent">
         <Header view={view} />
         <ViewFrame
-          key={viewKey(view, paramString, i18n.language, mode)}
+          // The zone is in the key for the same reason the locale is: the
+          // formatters read it at render time from a module-level value, so a
+          // changed zone only reaches the timestamps already on screen if the
+          // view remounts.
+          key={viewKey(view, paramString, i18n.language, mode, preferences?.timeZone ?? "auto")}
           view={view}
           hold={!seeded}
         >

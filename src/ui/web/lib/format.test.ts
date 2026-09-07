@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { effectiveTimeZone, setTimeZone, timeZone } from "./timeZone.ts";
 import {
-  formatDay, formatDuration, formatNumber, formatPercent, formatRelative, notificationHeadline,
+  formatDay, formatDuration, formatNumber, formatPercent, formatRelative, formatTime, notificationHeadline,
 } from "./format.ts";
 
 describe("locale-aware formatting", () => {
@@ -40,5 +41,50 @@ describe("notificationHeadline", () => {
 
   it("keeps a headline that starts with a word, and only the first line", () => {
     expect(notificationHeadline("Anthropic degraded\nsecond line")).toBe("Anthropic degraded");
+  });
+});
+
+describe("the time zone preference", () => {
+  afterEach(() => {
+    setTimeZone("auto");
+  });
+
+  it("renders clock times in the chosen zone rather than the browser's", () => {
+    const noonUtc = "2026-09-01T12:00:00.000Z";
+
+    setTimeZone("UTC");
+    const utc = formatTime("en", noonUtc);
+    setTimeZone("Asia/Tokyo");
+    const tokyo = formatTime("en", noonUtc);
+
+    expect(utc).toMatch(/12/);
+    // Tokyo is UTC+9 all year, so noon UTC is 21:00 there.
+    expect(tokyo).toMatch(/09|9/);
+    expect(tokyo).not.toBe(utc);
+  });
+
+  it("keeps daily bars on UTC days, whatever zone the operator picked", () => {
+    // The bucket is a UTC day: labelling its midnight in another zone would
+    // name the bar after the day beside the data it holds.
+    setTimeZone("Pacific/Auckland");
+    const auckland = formatDay("en", "2026-09-01");
+    setTimeZone("America/Los_Angeles");
+
+    expect(auckland).toBe(formatDay("en", "2026-09-01"));
+    expect(auckland).toMatch(/1/);
+  });
+
+  it("falls back to the browser's zone when the stored name is unusable", () => {
+    setTimeZone("Mars/Olympus");
+
+    expect(timeZone()).toBeUndefined();
+    expect(effectiveTimeZone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
+  it("treats auto as no choice at all", () => {
+    setTimeZone("UTC");
+    setTimeZone("auto");
+
+    expect(timeZone()).toBeUndefined();
   });
 });
