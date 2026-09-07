@@ -3,15 +3,20 @@ import { z } from "zod";
 import { getAdapter } from "../../adapters/index.ts";
 import { pollingSchema, routingRulesSchema, serviceDefinitionSchema } from "../../core/config.schema.ts";
 import {
-  deleteService,
   describeChannels,
   describeRouting,
   describeServiceImpact,
   insertService,
   listChannels,
+  listRemovedServices,
   listServices,
+  purgeService,
   readSettings,
+  restoreDeadline,
+  restoreService,
   replaceRoutingRules,
+  servicePatchSchema,
+  softDeleteService,
   updateChannel,
   updateService,
   writeSettings,
@@ -19,7 +24,6 @@ import {
 import type { UiRuntimeCore } from "../runtime.ts";
 import { ensureVapidKeys } from "../vapidKeys.ts";
 
-const servicePatchSchema = serviceDefinitionSchema.partial().omit({ id: true });
 const previewComponentsSchema = serviceDefinitionSchema.pick({ adapter: true, baseUrl: true });
 const settingsPatchSchema = pollingSchema.partial();
 const channelPatchSchema = z.object({
@@ -77,6 +81,10 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       },
       channels: describeChannels(db, runtime.env),
       routing: describeRouting(db, runtime.logger),
+      // Removed but still restorable. Part of the config payload rather than a
+      // route of its own: the undo has to be visible on a page an operator
+      // reloads tomorrow, not only in the seconds a toast lives for.
+      removed: listRemovedServices(db),
     });
   });
 
@@ -153,12 +161,45 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     res.json(impact);
   });
 
+  /**
+   * A removal is a soft delete: the provider leaves the dashboard and the poll
+   * cycle at once, and its history waits out a grace period in which the whole
+   * thing can be undone. The response says when that runs out, because the
+   * dashboard's undo affordance is only honest if it knows.
+   */
   router.delete("/config/services/:id", (req, res) => {
-    if (!deleteService(db, req.params.id)) {
+    const removedAt = new Date().toISOString();
+    if (!softDeleteService(db, req.params.id, new Date(removedAt))) {
       res.status(404).json({ error: { message: `unknown service: ${req.params.id}` } });
       return;
     }
-    res.json({ deleted: req.params.id });
+    res.json({ removed: req.params.id, removedAt, restoreUntil: restoreDeadline(removedAt) });
+  });
+
+  /** Undo, for as long as the grace period lasts: nothing was taken, so nothing is rebuilt. */
+  router.post("/config/services/:id/restore", (req, res) => {
+    if (!restoreService(db, req.params.id)) {
+      res.status(404).json({ error: { message: `no removed service: ${req.params.id}` } });
+      return;
+    }
+    res.json(listServices(db).find((service) => service.id === req.params.id));
+    // The provider was invisible while removed, so its history has a hole where
+    // the grace period was. Same fire-and-forget backfill an add gets.
+    void runtime.backfill.backfillOne(req.params.id);
+  });
+
+  /**
+   * "Remove it now" — the destructive half, kept behind its own path rather
+   * than a flag on the delete above, so nothing can reach it by accident. This
+   * is the call that takes the samples, incidents, maintenances and rules
+   * `GET /config/services/:id/impact` named.
+   */
+  router.delete("/config/services/:id/permanently", (req, res) => {
+    if (!purgeService(db, req.params.id)) {
+      res.status(404).json({ error: { message: `unknown service: ${req.params.id}` } });
+      return;
+    }
+    res.json({ purged: req.params.id });
   });
 
   router.patch("/config/settings", (req, res) => {

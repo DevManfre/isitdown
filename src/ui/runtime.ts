@@ -12,7 +12,7 @@ import { createWebPushNotifier } from "../notifiers/webpush.notifier.ts";
 import { buildNotifiers } from "../notifiers/index.ts";
 import { createApp } from "./app.ts";
 import { createBackfillService, type BackfillService } from "./backfill.ts";
-import { createDbConfigSource, listServices } from "./dbConfigSource.ts";
+import { createDbConfigSource, listServices, purgeExpiredServices } from "./dbConfigSource.ts";
 import { migrate } from "./db/migrate.ts";
 import { openDatabase } from "./db/open.ts";
 import { seedDefaults } from "./db/seed.ts";
@@ -168,9 +168,23 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
 
   const backfill = createBackfillService({ getAdapter, store, configSource, logger });
 
-  await store.pruneOlderThan(RETENTION_DAYS);
+  /**
+   * Two jobs on one timer: history past the retention window, and providers
+   * whose removal has outlived its grace period. Both destroy rows nobody is
+   * looking at any more, and a removal that expired while the container was
+   * off has to be taken on the next boot rather than sit there forever.
+   */
+  const prune = async (): Promise<void> => {
+    await store.pruneOlderThan(RETENTION_DAYS);
+    const purged = purgeExpiredServices(db);
+    if (purged.length > 0) {
+      logger.info("removed providers past their restore window were deleted", { providers: purged });
+    }
+  };
+
+  await prune();
   const pruneTimer = setInterval(() => {
-    void store.pruneOlderThan(RETENTION_DAYS).catch((error: unknown) => {
+    void prune().catch((error: unknown) => {
       logger.error("pruning history failed", {
         error: error instanceof Error ? error.message : String(error),
       });

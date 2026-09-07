@@ -88,6 +88,9 @@ export function RemoveServiceDialog({ service, trigger }: { service: ServiceDefi
           <DialogTitle>{t("action.remove")}</DialogTitle>
           <DialogDescription>{t("providers.remove-confirm", { name: service.name })}</DialogDescription>
         </DialogHeader>
+        {/* The removal is undoable now (roadmap 5.12), and a confirmation that
+            reads as final when it is not is its own kind of dishonest. */}
+        <p className="text-xs text-muted-foreground">{t("providers.remove-restorable")}</p>
         {impact.data !== undefined && (
           <div className="space-y-2 text-sm">
             {rows.length === 0 ? (
