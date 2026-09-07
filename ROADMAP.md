@@ -16,15 +16,19 @@ Legend:
 - ✅ — shipped; kept listed so the phase reads as a whole.
 - ◐ — partly shipped; the row's note says what is left.
 
-Current state for reference (v1.4.0): Statuspage, generic RSS/Atom and Slack
-adapters, all covered by the shared adapter contract suite; Telegram, webhook, Discord, Slack and web
+Current state for reference (v1.4.0): Statuspage, generic RSS/Atom, Slack, AWS,
+Google Cloud and Azure adapters, all covered by the shared adapter contract suite;
+every provider read through one HTTP helper that revalidates with `ETag` /
+`Last-Modified`, so most cycles are a 304; a global poll cadence plus an optional
+per-provider one; Telegram, webhook, Discord, Slack and web
 push channels; per-provider / per-severity notification routing rules, with a dry run
 and an explain that names the winning rule; scheduled-maintenance awareness (windows
 silence the diff engine and show on the dashboard and timeline); Prometheus
-`/metrics`; UI edition with overview, providers, incidents, history, settings,
-geographic map/globe; channel credentials settable from the dashboard (write-only, kept
-in a `0600` file beside the database and applied with no restart); a provider removal
-that names the rows it will delete first; SQLite history with 120-day retention;
+`/metrics`; UI edition with overview, providers, incidents, history, delivery log,
+settings, geographic map/globe; channel credentials settable from the dashboard
+(write-only, kept in a `0600` file beside the database and applied with no restart);
+a provider removal that names the rows it will delete, then keeps them for a restore
+window it can be undone in; SQLite history with 120-day retention;
 `en` + `it`.
 
 ---
@@ -36,9 +40,9 @@ does not cover is invisible.
 
 | # | Item | Size | Notes |
 |---|---|---|---|
-| 1.1 | **AWS Health adapter** | M | Not Statuspage. Public health feed is its own JSON shape, region-scoped. Most-requested provider by far in this category. |
-| 1.2 | **Google Cloud adapter** | M | `status.cloud.google.com/incidents.json` — flat incident list, no overall status field, so severity has to be derived. |
-| 1.3 | **Azure Status adapter** | M | RSS/Atom plus an HTML page; the messiest of the three hyperscalers. |
+| 1.1 ✅ | **AWS Health adapter** | M | Not Statuspage. Public health feed is its own JSON shape, region-scoped. Most-requested provider by far in this category. |
+| 1.2 ✅ | **Google Cloud adapter** | M | `status.cloud.google.com/incidents.json` — flat incident list, no overall status field, so severity has to be derived. |
+| 1.3 ✅ | **Azure Status adapter** | M | RSS/Atom plus an HTML page; the messiest of the three hyperscalers. |
 | 1.4 ✅ | **Slack adapter** | S | `status.slack.com/api/v2.0.0/current` — small, well-shaped, good first non-Statuspage adapter to prove the interface holds. |
 | 1.5 ✅ | **Generic RSS/Atom adapter** | M | A large tail of status pages publish a feed and nothing else. One adapter, configured by feed URL, unlocks dozens of providers with no new code per provider. High leverage. |
 | 1.6 | **Generic HTML-scrape adapter** | M | CSS selector + a status-word mapping in `options`. Fragile by nature; would need an explicit "this can break silently" warning in the UI. |
@@ -55,9 +59,9 @@ does not cover is invisible.
 | # | Item | Size | Notes |
 |---|---|---|---|
 | 2.1 ✅ | **Scheduled-maintenance awareness** | M | Already on the README's open list. Statuspage exposes `scheduled_maintenances`; today it is dropped. Add a `maintenance` state, show it on the timeline, and *suppress* incident alerts inside a declared window — a planned outage waking someone at 03:00 is the classic false positive. |
-| 2.2 | **Per-provider poll interval** | S | `intervalMinutes` is global. A provider that publishes every 5 minutes and one that updates twice a year do not deserve the same cadence. Small change to `ServiceDefinition` + poller. |
+| 2.2 ✅ | **Per-provider poll interval** | S | `intervalMinutes` is global. A provider that publishes every 5 minutes and one that updates twice a year do not deserve the same cadence. Small change to `ServiceDefinition` + poller. |
 | 2.3 | **Adaptive polling** | M | Poll every minute while an incident is open on that provider, back off to the configured interval when clear. Better signal, less traffic — the two usually trade off, here they do not. |
-| 2.4 | **Conditional requests (ETag / If-Modified-Since)** | S | Store the ETag per provider, send it back. Most cycles become a 304. Cheap, polite, and reduces the chance of being rate-limited. |
+| 2.4 ✅ | **Conditional requests (ETag / If-Modified-Since)** | S | Store the ETag per provider, send it back. Most cycles become a 304. Cheap, polite, and reduces the chance of being rate-limited. |
 | 2.5 | **Flap damping** | M | Require N consecutive samples agreeing before a transition notifies. Protects against a provider's page briefly disagreeing with itself. Must be expressible as diff-engine table rows, not a special case elsewhere. |
 | 2.6 | **Provider groups / "my stack"** | M | Group providers, derive a composite status per group, alert on the group. Answers "is my deploy path healthy" rather than "is GitHub healthy". |
 | 2.7 | **Correlated-outage detection** | L | Three providers degrade within the same window → one "likely shared upstream" meta-event instead of three alerts. Needs a correlation window and a suppression rule; genuinely useful during a Cloudflare/AWS day, and rare enough to be hard to test. Would need synthetic history in tests. |
@@ -87,7 +91,7 @@ is additive and independently shippable.
 | 3.14 | **Notification retry + dead-letter** | M | A failed send is logged and dropped today. Retry with backoff, and surface permanently-failed sends in the dashboard. |
 | 3.15 | **Customisable message templates** | L | Per-channel template with a small, safe token set. Powerful and much requested for webhooks; a real design problem to keep it from becoming a templating language, and it fights the "formatting lives in the notifier" convention. |
 | 3.16 | **HMAC signing for the generic webhook** | S | A shared secret and an `X-IsItDown-Signature` header. Lets a receiver verify the payload actually came from here. |
-| 3.17 | **Delivery log in the dashboard** | S | The `notifications` table already records what was sent; there is no view for it. Show sent/failed per channel with the payload. |
+| 3.17 ✅ | **Delivery log in the dashboard** | S | The `notifications` table already records what was sent; there is no view for it. Show sent/failed per channel with the payload. |
 | 3.18 | **Inbound chatops (Telegram bot commands)** | L | `/status`, `/mute github 2h`, `/history cloudflare`. Turns a one-way channel two-way. Needs a long-poll or webhook receiver and an auth model for "who may command this bot" — the first place where the no-auth stance actually pinches. |
 
 ## 4. Data, API and integrations
@@ -122,7 +126,7 @@ is additive and independently shippable.
 | 5.9 | **Timezone preference** | S | Everything is UTC. Correct, defensible, and mildly annoying every single day. |
 | 5.10 | **Favicon and title reflect worst status** | S | A red dot in the tab when something is down. Small, delightful, genuinely useful. |
 | 5.11 | **Provider catalog / onboarding wizard** | M | Pick "GitHub" from a bundled list instead of typing an id, a name and a base URL. First-run experience is currently a form; it should be a menu. |
-| 5.12 ◐ | **Undo for destructive actions** | S | Deleting a service cascades away its samples, incidents, maintenances and routing rules. The confirmation now counts and names those rows before the removal takes them (`GET /config/services/:id/impact`), so the footgun is at least signposted. Still no way back: a soft delete with a grace period, or an undo window, is open. |
+| 5.12 ✅ | **Undo for destructive actions** | S | Deleting a service cascades away its samples, incidents, maintenances and routing rules. The confirmation now counts and names those rows before the removal takes them (`GET /config/services/:id/impact`), so the footgun is at least signposted. A removal is now a soft delete: the provider leaves the dashboard and the poll cycle at once, its history waits out a restore window, and `Settings → Recently removed` offers Restore or Remove now until the window closes and the cascade finally runs. |
 | 5.13 | **Accessibility pass** | M | Keyboard traversal of every view, visible focus, `prefers-reduced-motion` honoured throughout (the UI leans hard on motion), colour contrast audit in both themes, screen-reader labels on charts. |
 | 5.14 | **More locales** | S each | `es`, `fr`, `de`, `pt`. The i18n plumbing exists and is enforced; adding a catalog is mechanical. |
 | 5.15 | **Native review of the Italian catalog** | S | On the README's open list already. |
@@ -184,17 +188,24 @@ effort is roughly:
 4. ✅ **2.1 scheduled maintenance** — removes the most annoying class of false alert.
 5. ✅ **3.1 + 3.2 Discord and Slack channels** — both nearly free behind the existing interface.
 6. ✅ **3.10 routing rules** — the notification feature people actually hit the ceiling on.
-7. ◐ **5.12 undo / safer delete** — a data-loss footgun that exists today. The
-   confirmation half shipped; the soft delete has not.
+7. ✅ **5.12 undo / safer delete** — the data-loss footgun is closed: a removal is
+   a soft delete with a restore window, and the permanent delete has a path of its own.
 
 The two items that most change *what IsItDown is*, and therefore deserve a
 decision rather than a slot in a queue, are **1.8 direct HTTP probes** and
 **5.1 the public status page**.
 
-That slice is now spent, and **1.4 Slack** went with it — the first non-Statuspage
-JSON shape, which is the rehearsal 1.1–1.3 were waiting on. The next one, on the
-same value-to-effort reading: **2.4 conditional requests** and **2.2 per-provider
-poll interval** (both S, both in the poller's existing seams), then **3.17 delivery
-log** (the `notifications` table is already written and has no view), then
-**1.1–1.3**, the three hyperscalers, now that a non-Statuspage adapter has a
-precedent to copy.
+That slice is spent, and so is the one after it: **2.4 conditional requests** and
+**2.2 per-provider poll interval** (both inside the poller's existing seams),
+**3.17 the delivery log** (the `notifications` table finally has a view, failures
+first), and **1.1–1.3**, the three hyperscalers, each with the oddity that kept it
+off Statuspage — AWS's UTF-16 region-scoped event feed, Google's flat list with no
+status field, Azure's feed that is empty while it is healthy.
+
+What the next slice looks like on the same value-to-effort reading: **2.8 fetch
+latency of the status page itself** and **4.5 configurable retention** (both S, both
+one column or one setting away), **3.14 notification retry + dead-letter** — the
+delivery log now makes a failed send visible, and retrying it is the obvious next
+move — then **2.3 adaptive polling**, which the per-provider interval has already
+laid the seam for, and **1.7 Instatus / Better Stack / Sorry™**, three small JSON
+shapes now that three non-Statuspage adapters have set the pattern.
