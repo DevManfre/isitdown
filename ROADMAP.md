@@ -177,35 +177,37 @@ not re-invented from scratch later.
 
 ---
 
-## Suggested first slice
+## Suggested next slice
 
-If the list has to collapse to one quarter's worth, the highest ratio of value to
-effort is roughly:
+The three slices before this one are spent — their rows are marked ✅ in the
+tables above. On the same reading of value against effort, the next quarter's
+worth:
 
-1. ✅ **1.11 + 1.12 adapter contract kit and fixture recorder** — makes section 1 cheap.
-2. ✅ **1.5 RSS adapter** — proves the adapter seam on something that is not Statuspage.
-3. ✅ **4.1 Prometheus `/metrics`** — a day of work, a large audience.
-4. ✅ **2.1 scheduled maintenance** — removes the most annoying class of false alert.
-5. ✅ **3.1 + 3.2 Discord and Slack channels** — both nearly free behind the existing interface.
-6. ✅ **3.10 routing rules** — the notification feature people actually hit the ceiling on.
-7. ✅ **5.12 undo / safer delete** — the data-loss footgun is closed: a removal is
-   a soft delete with a restore window, and the permanent delete has a path of its own.
+1. **4.2 SSE or WebSocket live updates** — the dashboard still polls `/status`
+   every 30 seconds, so a manual `/poll` is felt a beat late, an idle tab keeps
+   asking, and the poll indicator counts down to a deadline it only guesses at.
+   A push makes all three honest at once, and every view already reads through
+   the same query layer, so there is one seam to change rather than six.
+2. **2.8 fetch latency of the status page itself** — one extra column on
+   `status_samples`. A status page slowing down is often the first sign of
+   trouble, the conditional-request path already measures the round trip, and it
+   makes a chart for free.
+3. **4.5 configurable retention** — 120 days is hardcoded in
+   `src/ui/runtime.ts`, next to the prune that now also expires removals. A
+   setting with the storage cost shown beside it.
+4. **3.14 notification retry + dead-letter** — the delivery log made a failed
+   send visible; retrying it with backoff, and surfacing what stayed dead, is
+   the obvious next move on the same table.
+5. **2.3 adaptive polling** — poll every minute while an incident is open on
+   that provider, back off when it clears. The per-provider interval has already
+   laid the seam: the poller decides per provider whether a cycle is due.
+6. **5.10 favicon and title reflect the worst status** — small, and it pairs
+   with 4.2: a pushed change can turn the tab red without the operator looking
+   at it.
+7. **1.7 Instatus / Better Stack / Sorry™** — three small, stable JSON shapes,
+   now that three non-Statuspage adapters have set the pattern and the contract
+   suite catches the mistakes.
 
 The two items that most change *what IsItDown is*, and therefore deserve a
 decision rather than a slot in a queue, are **1.8 direct HTTP probes** and
 **5.1 the public status page**.
-
-That slice is spent, and so is the one after it: **2.4 conditional requests** and
-**2.2 per-provider poll interval** (both inside the poller's existing seams),
-**3.17 the delivery log** (the `notifications` table finally has a view, failures
-first), and **1.1–1.3**, the three hyperscalers, each with the oddity that kept it
-off Statuspage — AWS's UTF-16 region-scoped event feed, Google's flat list with no
-status field, Azure's feed that is empty while it is healthy.
-
-What the next slice looks like on the same value-to-effort reading: **2.8 fetch
-latency of the status page itself** and **4.5 configurable retention** (both S, both
-one column or one setting away), **3.14 notification retry + dead-letter** — the
-delivery log now makes a failed send visible, and retrying it is the obvious next
-move — then **2.3 adaptive polling**, which the per-provider interval has already
-laid the seam for, and **1.7 Instatus / Better Stack / Sorry™**, three small JSON
-shapes now that three non-Statuspage adapters have set the pattern.
