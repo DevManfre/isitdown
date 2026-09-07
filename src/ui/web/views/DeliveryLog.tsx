@@ -136,10 +136,14 @@ export function DeliveryLog() {
         )}
       </div>
 
+      {/* `gap-0` is not cosmetic: the stock Card ships `gap-6`, and `p-0` alone
+          left 24px of card background showing between rows — a striped list
+          whose row tint stopped short of the divider under it. The rows carry
+          their own `border-t`, so they need no gap at all. */}
       <Card
         role="region"
         aria-label={t("delivery.rows")}
-        className="anim-rise flex flex-col p-0"
+        className="anim-rise flex flex-col gap-0 p-0"
         style={{ animationDelay: "120ms" }}
       >
         {rows.length === 0 ? (
