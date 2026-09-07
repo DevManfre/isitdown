@@ -6,7 +6,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildUiRuntime } from "../../src/ui/runtime.ts";
-import { deleteService, insertService, listServices, updateChannel } from "../../src/ui/dbConfigSource.ts";
+import { insertService, listServices, purgeService, updateChannel } from "../../src/ui/dbConfigSource.ts";
 import { createLogger } from "../../src/core/logger.ts";
 
 const silent = createLogger("error", () => {});
@@ -73,7 +73,7 @@ test("boot backfills the charts from incident history without a single notificat
 
   try {
     // The seeded defaults point at real status pages; tests never touch those.
-    for (const service of listServices(runtime.db)) deleteService(runtime.db, service.id);
+    for (const service of listServices(runtime.db)) purgeService(runtime.db, service.id);
     insertService(runtime.db, {
       id: "fake",
       name: "Fake Provider",
@@ -144,7 +144,7 @@ test("a restart after backfill neither duplicates samples nor notifies", async (
     let first: Awaited<ReturnType<typeof buildUiRuntime>> | null = null;
     try {
       first = await buildUiRuntime({ dbPath, env, logger: silent });
-      for (const service of listServices(first.db)) deleteService(first.db, service.id);
+      for (const service of listServices(first.db)) purgeService(first.db, service.id);
       insertService(first.db, { id: "fake", name: "Fake", adapter: "statuspage", baseUrl: providerUrl, enabled: true });
       updateChannel(first.db, "webhook", { enabled: true, fields: { urlEnv: "WEBHOOK_URL" } });
       await first.backfill.backfillAll();
