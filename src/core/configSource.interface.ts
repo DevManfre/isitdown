@@ -15,6 +15,12 @@ export interface ServiceDefinition {
   adapter: string;
   baseUrl: string;
   enabled: boolean;
+  /**
+   * How often this provider is polled. Absent means the global cadence: a page
+   * that publishes every few minutes and one that changes twice a year do not
+   * deserve the same one.
+   */
+  intervalMinutes?: number | undefined;
   options?: Record<string, string> | undefined;
   components: { id: string; name: string }[];
   /** Report only what the selection covers. Meaningless with no selection. */

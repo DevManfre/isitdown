@@ -1,4 +1,4 @@
-import type { ChannelConfig, ConfigSource } from "./configSource.interface.ts";
+import type { ChannelConfig, ConfigSource, RuntimeConfig } from "./configSource.interface.ts";
 import type { Logger } from "./logger.ts";
 import type { Dispatcher } from "./notificationDispatcher.ts";
 import type { Notifier } from "./notifier.interface.ts";
@@ -61,11 +61,26 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
   let inFlight: Promise<CycleResult> | undefined;
   let lastIntervalMinutes = 3;
 
-  async function runCycle(): Promise<CycleResult> {
-    const config = await configSource.load();
-    lastIntervalMinutes = config.polling.intervalMinutes;
+  /**
+   * How often a cycle has to run: the shortest cadence anything asked for.
+   * Ticking at the global interval alone would starve a provider configured to
+   * be polled more often than it, and the providers on the slower cadences sit
+   * the extra ticks out inside the poller.
+   */
+  function tickIntervalMinutes(config: RuntimeConfig): number {
+    return config.services
+      .filter((service) => service.enabled)
+      .reduce(
+        (shortest, service) => Math.min(shortest, service.intervalMinutes ?? shortest),
+        config.polling.intervalMinutes,
+      );
+  }
 
-    const result = await poller.runCycle(config);
+  async function runCycle(ignoreSchedule: boolean): Promise<CycleResult> {
+    const config = await configSource.load();
+    lastIntervalMinutes = tickIntervalMinutes(config);
+
+    const result = await poller.runCycle(config, { ignoreSchedule });
     await dispatcher.dispatch(result.changes, {
       services: config.services,
       locale: config.locale,
@@ -79,7 +94,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     return result;
   }
 
-  function cycle(): Promise<CycleResult> {
+  function cycle(ignoreSchedule = false): Promise<CycleResult> {
     if (inFlight !== undefined) return inFlight;
     // The marker is cleared inside the run's own body rather than in a chained
     // callback: a chained .finally settles a microtask later than the promise
@@ -87,7 +102,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     // was handed back the finished one and no new cycle ran at all.
     const run = (async () => {
       try {
-        return await runCycle();
+        return await runCycle(ignoreSchedule);
       } finally {
         inFlight = undefined;
       }
@@ -144,7 +159,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     },
 
     async triggerNow(): Promise<CycleResult> {
-      const result = await cycle();
+      const result = await cycle(true);
       // The interval restarts from this poll. Leaving the standing timer alone
       // would fire the automatic cycle early — within seconds of a manual one,
       // in the worst case — and the countdown the dashboard just reset to a
