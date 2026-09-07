@@ -69,6 +69,10 @@ export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<
       ...(file.requestTimeoutSeconds === undefined ? {} : { requestTimeoutSeconds: file.requestTimeoutSeconds }),
       ...(file.maxRetries === undefined ? {} : { maxRetries: file.maxRetries }),
       ...(file.failureThreshold === undefined ? {} : { failureThreshold: file.failureThreshold }),
+      ...(file.adaptivePolling === undefined ? {} : { adaptivePolling: file.adaptivePolling }),
+      ...(file.adaptiveIntervalMinutes === undefined
+        ? {}
+        : { adaptiveIntervalMinutes: file.adaptiveIntervalMinutes }),
     }),
     locale: file.locale ?? "en",
     services: file.services,

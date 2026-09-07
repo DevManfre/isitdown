@@ -42,7 +42,14 @@ function interceptWrites(responses: Record<string, unknown>): RecordedCall[] {
 }
 
 const config = {
-  polling: { intervalMinutes: 5, requestTimeoutSeconds: 10, maxRetries: 3, failureThreshold: 3 },
+  polling: {
+    intervalMinutes: 5,
+    requestTimeoutSeconds: 10,
+    maxRetries: 3,
+    failureThreshold: 3,
+    adaptivePolling: true,
+    adaptiveIntervalMinutes: 1,
+  },
   retention: { days: 120 },
   locale: "en",
   services: [
@@ -122,6 +129,37 @@ describe("Settings", () => {
     expect(await screen.findByLabelText(i18n.t("field.interval"))).toHaveValue(5);
     expect(await screen.findByLabelText(i18n.t("field.timeout"))).toHaveValue(10);
     expect(await screen.findByLabelText(i18n.t("field.retries"))).toHaveValue(3);
+  });
+
+  it("saves the adaptive cadence on blur, and only that field", async () => {
+    // Roadmap 2.3. The switch and its cadence are their own patch: sending the
+    // three engine numbers along would write fields nobody touched.
+    renderWithProviders(<Settings />, fixtures);
+    const calls = interceptWrites({
+      "PATCH /config/settings": {
+        polling: { ...config.polling, adaptiveIntervalMinutes: 2 },
+      },
+    });
+
+    const cadence = await screen.findByLabelText(i18n.t("field.adaptive-interval"));
+    expect(cadence).toHaveValue(1);
+    await userEvent.clear(cadence);
+    await userEvent.type(cadence, "2");
+    await userEvent.tab();
+
+    await waitFor(() => expect(writesIn(calls)).toHaveLength(1));
+    expect(writesIn(calls)[0]?.body).toEqual({ adaptiveIntervalMinutes: 2 });
+  });
+
+  it("switching adaptive polling off takes its cadence field with it", async () => {
+    renderWithProviders(<Settings />, {
+      ...fixtures,
+      config: { ...config, polling: { ...config.polling, adaptivePolling: false } },
+    });
+
+    expect(await screen.findByLabelText(i18n.t("field.adaptive"))).not.toBeChecked();
+    // A cadence for a behaviour that is off is a field that changes nothing.
+    expect(screen.queryByLabelText(i18n.t("field.adaptive-interval"))).not.toBeInTheDocument();
   });
 
   it("saves a polling field when it loses focus, with no Save button in sight", async () => {

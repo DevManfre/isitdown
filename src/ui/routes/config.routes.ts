@@ -83,6 +83,8 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         requestTimeoutSeconds: settings.requestTimeoutSeconds,
         maxRetries: settings.maxRetries,
         failureThreshold: settings.failureThreshold,
+        adaptivePolling: settings.adaptivePolling,
+        adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
       },
       retention: { days: settings.retentionDays },
       channels: describeChannels(db, runtime.env),
@@ -225,6 +227,10 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       ...(parsed.data.failureThreshold === undefined
         ? {}
         : { failureThreshold: parsed.data.failureThreshold }),
+      ...(parsed.data.adaptivePolling === undefined ? {} : { adaptivePolling: parsed.data.adaptivePolling }),
+      ...(parsed.data.adaptiveIntervalMinutes === undefined
+        ? {}
+        : { adaptiveIntervalMinutes: parsed.data.adaptiveIntervalMinutes }),
       ...(parsed.data.retentionDays === undefined ? {} : { retentionDays: parsed.data.retentionDays }),
     });
     const settings = readSettings(db, runtime.logger);
@@ -234,6 +240,8 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         requestTimeoutSeconds: settings.requestTimeoutSeconds,
         maxRetries: settings.maxRetries,
         failureThreshold: settings.failureThreshold,
+        adaptivePolling: settings.adaptivePolling,
+        adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
       },
       retention: { days: settings.retentionDays },
     });

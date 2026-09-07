@@ -231,6 +231,10 @@
 
   "field.interval": "Poll interval",
   "field.timeout": "Request timeout",
+  "field.adaptive": "Adaptive polling",
+  "field.adaptive.hint": "While a provider has an open incident, poll it on the cadence below instead of its own.",
+  "field.adaptive-interval": "Incident cadence",
+  "field.adaptive-interval.hint": "Never slower than the provider\u2019s own interval, so this can only watch it more closely.",
   "field.retries": "Max retries",
   "field.interval.hint": "Requests are staggered and the interval carries jitter, so providers are never hit in lockstep.",
   "field.timeout.hint": "A provider slower than this counts as a failed poll, not an outage.",

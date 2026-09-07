@@ -337,6 +337,9 @@ export interface RuntimeConfigResponse {
     requestTimeoutSeconds: number;
     maxRetries: number;
     failureThreshold: number;
+    /** Poll a provider with an open incident on the cadence below — roadmap 2.3. */
+    adaptivePolling?: boolean;
+    adaptiveIntervalMinutes?: number;
   };
   /** How long history is kept before the daily prune takes it. */
   retention: { days: number };

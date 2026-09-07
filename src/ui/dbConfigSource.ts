@@ -43,6 +43,17 @@ const settingsSchema = z.object({
   maxRetries: z.coerce.number().int().positive().max(10).catch(3),
   failureThreshold: z.coerce.number().int().positive().max(100).catch(5),
   /**
+   * Watch a provider closely while it has an open incident (roadmap 2.3). On
+   * by default, so an installation upgrading into this gets the behaviour
+   * without having to find the switch. Stored as a string like every other
+   * setting, so "true"/"false" is what comes back out.
+   */
+  adaptivePolling: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .catch(true),
+  adaptiveIntervalMinutes: z.coerce.number().int().positive().max(1440).catch(1),
+  /**
    * How long history is kept. Four months by default — a month beyond the
    * 90-day view, so a full window is always available — and up to ten years for
    * anyone who wants year-on-year comparisons more than they want the disk.
@@ -626,6 +637,8 @@ export function createDbConfigSource(
           requestTimeoutSeconds: settings.requestTimeoutSeconds,
           maxRetries: settings.maxRetries,
           failureThreshold: settings.failureThreshold,
+          adaptivePolling: settings.adaptivePolling,
+          adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
         }),
         locale: settings.notificationLocale,
         services,
