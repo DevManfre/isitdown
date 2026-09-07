@@ -14,7 +14,17 @@ import { previewComponents } from "@/lib/api.ts";
 import { slugify } from "@/lib/slugify.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
 
-const ADAPTERS = ["statuspage", "rss", "slack", "aws", "gcp", "azure", "custom"] as const;
+const ADAPTERS = [
+  "statuspage",
+  "instatus",
+  "betterstack",
+  "rss",
+  "slack",
+  "aws",
+  "gcp",
+  "azure",
+  "custom",
+] as const;
 
 /** The stored interval as a form value; empty when the provider follows the global cadence. */
 const intervalValue = (service: ServiceDefinition | undefined): string =>
@@ -27,6 +37,8 @@ const intervalValue = (service: ServiceDefinition | undefined): string =>
  */
 const ADAPTER_NOTES: Record<string, string> = {
   statuspage: "add.note.statuspage",
+  instatus: "add.note.instatus",
+  betterstack: "add.note.betterstack",
   rss: "add.note.rss",
   slack: "add.note.slack",
   aws: "add.note.aws",

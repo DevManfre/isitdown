@@ -255,6 +255,8 @@
   "add.title": "Add a service",
   "add.subtitle": "Most providers run on Atlassian Statuspage and need no code.",
   "add.note.statuspage": "The adapter appends /api/v2/summary.json to this URL.",
+  "add.note.instatus": "Use the page's host, e.g. https://status.gcore.com; the adapter appends /summary.json to it.",
+  "add.note.betterstack": "Use the page's host, e.g. https://status.betterstack.com; the adapter appends /index.json to it.",
   "add.note.rss": "Give the full URL of the RSS or Atom feed; the adapter reads it as given.",
   "add.note.slack": "Use https://slack-status.com; the adapter appends /api/v2.0.0/current to it.",
   "add.note.custom": "The adapter reads this URL as given.",
