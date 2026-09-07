@@ -231,6 +231,10 @@
 
   "field.interval": "Intervallo di polling",
   "field.timeout": "Timeout della richiesta",
+  "field.adaptive": "Polling adattivo",
+  "field.adaptive.hint": "Mentre un provider ha un incidente aperto, interrogalo con la cadenza sotto invece della sua.",
+  "field.adaptive-interval": "Cadenza durante gli incidenti",
+  "field.adaptive-interval.hint": "Mai pi\u00f9 lenta dell\u2019intervallo del provider: pu\u00f2 solo osservarlo pi\u00f9 da vicino.",
   "field.retries": "Tentativi massimi",
   "field.interval.hint": "Le richieste sono distribuite e l'intervallo porta jitter, così i provider non vengono mai interrogati all'unisono.",
   "field.timeout.hint": "Un provider più lento di così conta come poll fallito, non come disservizio.",

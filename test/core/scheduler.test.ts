@@ -11,7 +11,14 @@ import { CATCH_ALL_RULE } from "../../src/core/routing.ts";
 const silent = createLogger("error", () => {});
 
 const baseConfig = (over: Partial<RuntimeConfig> = {}): RuntimeConfig => ({
-  polling: { intervalMinutes: 3, requestTimeoutSeconds: 8, maxRetries: 3, failureThreshold: 5 },
+  polling: {
+    intervalMinutes: 3,
+    requestTimeoutSeconds: 8,
+    maxRetries: 3,
+    failureThreshold: 5,
+    adaptivePolling: true,
+    adaptiveIntervalMinutes: 1,
+  },
   locale: "en",
   services: [
     {
@@ -52,6 +59,12 @@ function fakePoller(behaviour: () => Promise<CycleResult> = async () => cycleRes
     async runCycle(): Promise<CycleResult> {
       poller.calls += 1;
       return behaviour();
+    },
+    // The global cadence, which is the real poller's answer while nothing is in
+    // trouble. Tightening it is the poller's own business and is tested there;
+    // what matters here is that the scheduler still honours the configuration.
+    async nextIntervalMinutes(config: RuntimeConfig): Promise<number> {
+      return config.polling.intervalMinutes;
     },
   };
   return poller;
@@ -130,7 +143,14 @@ test("the configuration is re-read on every cycle, so a changed interval applies
   assert.equal(source.loads, 1);
 
   source.current = baseConfig({
-    polling: { intervalMinutes: 1, requestTimeoutSeconds: 8, maxRetries: 3, failureThreshold: 5 },
+    polling: {
+      intervalMinutes: 1,
+      requestTimeoutSeconds: 8,
+      maxRetries: 3,
+      failureThreshold: 5,
+      adaptivePolling: true,
+      adaptiveIntervalMinutes: 1,
+    },
   });
   t.mock.timers.tick(3 * 60_000);
   await scheduler.settled();
@@ -616,4 +636,46 @@ test("a disabled provider's short interval does not drag the tick down with it",
   scheduler.stop();
 
   assert.ok(armedIn > 1_700_000, `armed in ${armedIn}ms`);
+});
+
+test("a poller asking to be run sooner is armed sooner: an incident is watched closely", async () => {
+  // Roadmap 2.3. The scheduler cannot see which provider is having a bad day —
+  // that is stored state, which the poller reads — so it asks, and the shorter
+  // of the two answers is what the next cycle is armed for.
+  const configSource = fakeConfigSource();
+  const scheduler = createScheduler({
+    configSource,
+    poller: { ...fakePoller(), nextIntervalMinutes: async () => 1 },
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    random: noJitter,
+  });
+
+  await scheduler.start();
+  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - Date.now();
+  scheduler.stop();
+
+  // One minute, not the configured three.
+  assert.ok(armedIn > 50_000 && armedIn < 70_000, `armed in ${armedIn}ms`);
+});
+
+test("a poller asking for a longer cadence than the configuration cannot have it", async () => {
+  // The operator's interval is a ceiling on how rarely a cycle runs. A stub, an
+  // older poller or a bug must not be able to stretch it.
+  const configSource = fakeConfigSource();
+  const scheduler = createScheduler({
+    configSource,
+    poller: { ...fakePoller(), nextIntervalMinutes: async () => 240 },
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    random: noJitter,
+  });
+
+  await scheduler.start();
+  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - Date.now();
+  scheduler.stop();
+
+  assert.ok(armedIn > 170_000 && armedIn < 190_000, `armed in ${armedIn}ms`);
 });

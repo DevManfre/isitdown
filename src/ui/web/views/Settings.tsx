@@ -38,6 +38,9 @@ const POLLING_BOUNDS = {
   maxRetries: { min: 1, max: 10, labelKey: "field.retries" },
 } as const;
 
+/** Same bounds `pollingSchema` enforces for the adaptive cadence, same reason. */
+const ADAPTIVE_BOUNDS = { min: 1, max: 1440 } as const;
+
 /** Long enough that a two-keystroke number is one save, short enough to feel immediate. */
 const POLLING_DEBOUNCE_MS = 600;
 
@@ -71,6 +74,7 @@ export function Settings() {
   const [timeout_, setTimeout_] = useState<number | undefined>(undefined);
   const [retries, setRetries] = useState<number | undefined>(undefined);
   const [pollingStatus, setPollingStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(undefined);
+  const [adaptiveInterval_, setAdaptiveInterval] = useState<number | undefined>(undefined);
   const [retentionDays_, setRetentionDays] = useState<number | undefined>(undefined);
   const [retentionStatus, setRetentionStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
     undefined,
@@ -89,6 +93,11 @@ export function Settings() {
   const interval = interval_ ?? config.polling.intervalMinutes;
   const timeout = timeout_ ?? config.polling.requestTimeoutSeconds;
   const maxRetries = retries ?? config.polling.maxRetries;
+  // Defaulted rather than assumed present: a server from before adaptive
+  // polling (roadmap 2.3) answers without these two, and the section still has
+  // to render.
+  const adaptivePolling = config.polling.adaptivePolling ?? true;
+  const adaptiveInterval = adaptiveInterval_ ?? config.polling.adaptiveIntervalMinutes ?? 1;
   const retentionDays = retentionDays_ ?? config.retention.days;
   // Defaulted rather than assumed: the section only exists when a removal is
   // waiting, and an older payload carries no list at all.
@@ -123,6 +132,35 @@ export function Settings() {
   const schedulePolling = (next: Parameters<typeof commitPolling>[0]): void => {
     if (debounce.current !== undefined) clearTimeout(debounce.current);
     debounce.current = setTimeout(() => commitPolling(next), POLLING_DEBOUNCE_MS);
+  };
+
+  /**
+   * The adaptive pair saves on its own rather than through `commitPolling`: the
+   * switch is an instant apply with nothing to debounce, and sending the three
+   * engine numbers along with it would write fields the operator did not touch.
+   */
+  const commitAdaptive = (patch: { adaptivePolling?: boolean; adaptiveIntervalMinutes?: number }): void => {
+    const minutes = patch.adaptiveIntervalMinutes;
+    if (
+      minutes !== undefined &&
+      (!Number.isInteger(minutes) || minutes < ADAPTIVE_BOUNDS.min || minutes > ADAPTIVE_BOUNDS.max)
+    ) {
+      setPollingStatus({
+        text: t("settings.out-of-range", {
+          field: t("field.adaptive-interval"),
+          min: ADAPTIVE_BOUNDS.min,
+          max: ADAPTIVE_BOUNDS.max,
+        }),
+        tone: "error",
+      });
+      return;
+    }
+    setPollingStatus(undefined);
+    settingsMutation.mutate(patch, {
+      onSuccess: () => setPollingStatus({ text: t("settings.saved"), tone: "ok" }),
+      onError: (error) =>
+        setPollingStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+    });
   };
 
   const commitRetention = (days: number): void => {
@@ -205,6 +243,38 @@ export function Settings() {
           />
           <span className="font-mono text-xs text-muted-foreground">{t("unit.seconds")}</span>
         </SettingRow>
+        <SettingRow label={t("field.adaptive")} description={t("field.adaptive.hint")} align="top">
+          <Switch
+            id="adaptive-polling"
+            aria-label={t("field.adaptive")}
+            checked={adaptivePolling}
+            onCheckedChange={(next) => commitAdaptive({ adaptivePolling: next })}
+          />
+        </SettingRow>
+        {/* Only while it is on: a cadence for a behaviour that is switched off
+            is a field that changes nothing. */}
+        {adaptivePolling && (
+          <SettingRow
+            label={t("field.adaptive-interval")}
+            description={t("field.adaptive-interval.hint")}
+            align="top"
+          >
+            <Input
+              id="adaptive-interval"
+              aria-label={t("field.adaptive-interval")}
+              type="number"
+              className="w-20 text-right font-mono"
+              value={adaptiveInterval}
+              onChange={(event) => setAdaptiveInterval(Number(event.target.value))}
+              onFocus={fieldProps.onFocus}
+              onBlur={() => {
+                fieldProps.onBlur();
+                commitAdaptive({ adaptiveIntervalMinutes: adaptiveInterval });
+              }}
+            />
+            <span className="font-mono text-xs text-muted-foreground">{t("unit.minutes")}</span>
+          </SettingRow>
+        )}
         <SettingRow label={t("field.retries")} description={t("field.retries.hint")} align="top">
           <Input
             id="polling-retries"
