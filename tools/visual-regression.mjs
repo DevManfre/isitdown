@@ -1,0 +1,192 @@
+#!/usr/bin/env node
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createLogger } from "../src/core/logger.ts";
+import { NOW, seedVisualFixture } from "./visual/fixture.mjs";
+import { withBrowser } from "./visual/chrome.mjs";
+import { comparePng, decodePng } from "./visual/png.mjs";
+
+/**
+ * Visual regression for the dashboard (roadmap 7.1).
+ *
+ * The dashboard is large enough that a token change can quietly wreck a view
+ * nobody opened — the last few slices shipped a tab favicon, a settings pair, a
+ * badge and a card-gap fix, none of which any test could have caught. So: every
+ * view, in both themes and both locales, rendered against a fixed fleet with a
+ * frozen clock, and compared pixel by pixel with what was agreed.
+ *
+ *   node tools/visual-regression.mjs            # check against the baselines
+ *   node tools/visual-regression.mjs --update   # agree to what it renders now
+ *
+ * A failure writes both images plus the count of moved pixels, so the reviewer
+ * can see the change rather than being told a number.
+ */
+
+const ROOT = new URL("../", import.meta.url).pathname;
+const BASELINE_DIR = join(ROOT, "test/visual/baseline");
+const OUTPUT_DIR = join(ROOT, "test/visual/current");
+const WEB_DIR = join(ROOT, "dist/ui/public");
+
+/** Every view the rail can reach, by its hash route. */
+const VIEWS = [
+  { name: "overview", hash: "#/overview" },
+  { name: "providers", hash: "#/providers" },
+  { name: "incidents", hash: "#/incidents" },
+  { name: "history", hash: "#/history" },
+  { name: "delivery-log", hash: "#/delivery-log" },
+  { name: "settings", hash: "#/settings" },
+];
+
+const THEMES = ["light", "dark"];
+const LOCALES = ["en", "it"];
+
+/** 16:10 at a laptop width: the shape the dashboard was designed against. */
+const VIEWPORT = { width: 1440, height: 900 };
+
+/**
+ * How much may move before it counts as a regression, as a share of the frame.
+ *
+ * Not zero: text rasterisation differs by a shade or two between runs even on
+ * one machine, and a check that fails on that is a check people learn to
+ * ignore. Small enough that a moved card, a changed colour or a dropped element
+ * is well past it — a single row of this dashboard is about 2% of the frame.
+ */
+const MAX_RATIO = 0.004;
+
+/** Per-channel tolerance, in 0–255. Antialiasing noise, and nothing more. */
+const CHANNEL_THRESHOLD = 12;
+
+/**
+ * A colour change is a small number of very different pixels rather than a
+ * large number of slightly different ones: a status dot and its label are a
+ * fraction of a percent of the frame, so the whole-frame ratio above would
+ * never notice a token being edited. This is the second half of the check —
+ * pixels that moved by more than antialiasing ever does, and how many of them
+ * are still explained by text rasterisation.
+ */
+const STRONG_THRESHOLD = 64;
+const MAX_RECOLOURED = 200;
+
+const shotName = (view, theme, locale) => `${view}-${theme}-${locale}.png`;
+
+async function withServer(body) {
+  const dir = await mkdtemp(join(tmpdir(), "isitdown-visual-db-"));
+  // Before the app module is loaded, not merely before the server listens:
+  // `WEB_DIR` is read once at import time, and a static import would have
+  // pinned the static root to a directory that only exists in a container.
+  process.env["WEB_DIR"] = WEB_DIR;
+  const { buildUiRuntime } = await import("../src/ui/runtime.ts");
+  const runtime = await buildUiRuntime({
+    dbPath: join(dir, "isitdown.db"),
+    env: {},
+    logger: createLogger("error", () => {}),
+  });
+  seedVisualFixture(runtime.db);
+
+  // The scheduler is deliberately never started: a poll landing mid-run would
+  // overwrite the fixture with whatever the real internet says today.
+  const server = runtime.app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  const { port } = server.address();
+
+  try {
+    return await body(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await runtime.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function main() {
+  const update = process.argv.includes("--update");
+  const only = process.argv.find((argument) => argument.startsWith("--only="))?.slice("--only=".length);
+
+  if (!existsSync(join(WEB_DIR, "index.html"))) {
+    console.error(`no dashboard bundle in ${WEB_DIR}. Run "npm run build:ui" first.`);
+    process.exit(1);
+  }
+
+  await mkdir(update ? BASELINE_DIR : OUTPUT_DIR, { recursive: true });
+  const targetDir = update ? BASELINE_DIR : OUTPUT_DIR;
+  const failures = [];
+  const written = [];
+
+  await withServer(async (base) => {
+    await withBrowser({ frozenAt: NOW }, async ({ shot }) => {
+      for (const view of VIEWS) {
+        if (only !== undefined && view.name !== only) continue;
+        for (const theme of THEMES) {
+          for (const locale of LOCALES) {
+            const name = shotName(view.name, theme, locale);
+            const png = await shot({
+              url: `${base}/${view.hash}`,
+              colorScheme: theme,
+              // Written straight into localStorage, which is where the
+              // pre-paint script in index.html reads both from — the same path
+              // an operator's own browser takes.
+              storage: { "isitdown.theme": theme, "isitdown.uiLocale": locale },
+              ...VIEWPORT,
+            });
+
+            const path = join(targetDir, name);
+            await writeFile(path, png);
+            written.push(name);
+
+            if (update) continue;
+
+            const baselinePath = join(BASELINE_DIR, name);
+            if (!existsSync(baselinePath)) {
+              failures.push(`${name}: no baseline yet — review ${path} and re-run with --update`);
+              continue;
+            }
+            const result = comparePng(
+              decodePng(await readFile(baselinePath)),
+              decodePng(png),
+              CHANNEL_THRESHOLD,
+              STRONG_THRESHOLD,
+            );
+            if (result.sizeChanged) {
+              failures.push(`${name}: the frame changed size`);
+            } else if (result.ratio > MAX_RATIO) {
+              failures.push(
+                `${name}: ${result.differing} of ${result.total} pixels moved (${(result.ratio * 100).toFixed(2)}%) — see ${path}`,
+              );
+            } else if (result.recoloured > MAX_RECOLOURED) {
+              failures.push(
+                `${name}: ${result.recoloured} pixels changed colour outright — see ${path}`,
+              );
+            }
+          }
+        }
+      }
+    });
+  });
+
+  if (update) {
+    // A view that was removed leaves a baseline nothing renders any more, and a
+    // stale baseline is a check that passes for the wrong reason.
+    const stale = (await readdir(BASELINE_DIR)).filter(
+      (name) => name.endsWith(".png") && !written.includes(name),
+    );
+    if (only === undefined) {
+      for (const name of stale) await rm(join(BASELINE_DIR, name));
+    }
+    console.log(`agreed ${written.length} baselines${stale.length > 0 && only === undefined ? `, dropped ${stale.length} stale` : ""}`);
+    return;
+  }
+
+  if (failures.length > 0) {
+    console.error(`visual regression in ${failures.length} of ${written.length} views:`);
+    for (const failure of failures) console.error(`  ${failure}`);
+    console.error("\nIf the change is intended: node tools/visual-regression.mjs --update");
+    process.exit(1);
+  }
+
+  console.log(`${written.length} views match their baselines`);
+  await rm(OUTPUT_DIR, { recursive: true, force: true });
+}
+
+await main();
