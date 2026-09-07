@@ -14,6 +14,7 @@ import type {
   NormalizedStatus,
   OverallStatus,
 } from "../core/types.ts";
+import { fetchConditional } from "../core/http.ts";
 
 /**
  * The generic adapter for Atlassian Statuspage, which most providers run on —
@@ -339,42 +340,41 @@ export function parseComponentList(raw: unknown, service: ServiceRef): Component
     }));
 }
 
+/**
+ * Read through the shared conditional-request helper, so a provider whose page
+ * has not changed since the last cycle answers 304 and the cached body is
+ * replayed. The parse still runs: `fetchedAt` is when we asked, not when the
+ * body was first served.
+ */
+async function readJson(path: string, service: ServiceRef, ctx: FetchContext, label: string): Promise<unknown> {
+  const raw = await fetchConditional(`${service.baseUrl}${path}`, {
+    providerId: service.id,
+    accept: "application/json",
+    timeoutMs: ctx.timeoutMs,
+    label,
+  });
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(`${label} for ${service.id} returned a body that is not JSON`);
+  }
+}
+
 export const statuspageAdapter: Adapter = {
   id: "statuspage",
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
-    const url = `${service.baseUrl}${SUMMARY_PATH}`;
-    const response = await fetch(url, {
-      headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(ctx.timeoutMs),
-    });
-    if (!response.ok) {
-      throw new Error(`statuspage fetch for ${service.id} failed: HTTP ${response.status}`);
-    }
-    return parseSummary(await response.json(), service);
+    return parseSummary(await readJson(SUMMARY_PATH, service, ctx, "statuspage fetch"), service);
   },
 
   async fetchIncidentHistory(service: ServiceRef, ctx: FetchContext): Promise<IncidentHistoryResult> {
-    const url = `${service.baseUrl}${INCIDENTS_PATH}`;
-    const response = await fetch(url, {
-      headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(ctx.timeoutMs),
-    });
-    if (!response.ok) {
-      throw new Error(`statuspage incident history for ${service.id} failed: HTTP ${response.status}`);
-    }
-    return parseIncidentHistory(await response.json(), service);
+    return parseIncidentHistory(
+      await readJson(INCIDENTS_PATH, service, ctx, "statuspage incident history"),
+      service,
+    );
   },
 
   async listComponents(service: ServiceRef, ctx: FetchContext): Promise<ComponentPreview[]> {
-    const url = `${service.baseUrl}${SUMMARY_PATH}`;
-    const response = await fetch(url, {
-      headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(ctx.timeoutMs),
-    });
-    if (!response.ok) {
-      throw new Error(`statuspage components fetch for ${service.id} failed: HTTP ${response.status}`);
-    }
-    return parseComponentList(await response.json(), service);
+    return parseComponentList(await readJson(SUMMARY_PATH, service, ctx, "statuspage components fetch"), service);
   },
 };
