@@ -130,7 +130,49 @@ export async function withBrowser(options, body) {
 
   const browser = await connect(endpoint);
 
-  async function shot({ url, colorScheme, storage, width, height, waitMs = 1200 }) {
+  /**
+   * Waits for the page to stop changing, rather than for a fixed number of
+   * milliseconds.
+   *
+   * A fixed wait is what made the first baselines wrong: the Overview holds its
+   * entry cascade until its queries land, so 1.2s caught it with one status
+   * ring drawn and the provider rows still missing. Two signals settle it —
+   * no animation is running (which covers the staggered entry and every CSS
+   * delay, since a delayed animation still reports as running), and the markup
+   * has stopped growing between polls.
+   */
+  async function waitForQuiet(send, url, { timeoutMs = 20_000, stableChecks = 3, intervalMs = 150 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    let previous = "";
+    let stable = 0;
+    while (Date.now() < deadline) {
+      const { result } = await send("Runtime.evaluate", {
+        expression: `(() => {
+          // The dashboard's own readiness signal: ViewFrame stamps
+          // data-animate on #view the moment the view's first loads have come
+          // back (see useViewReady). Without waiting for it, an empty document
+          // reads as "quiet" — which is how a blank page got agreed as a
+          // baseline.
+          const ready = document.querySelector("#view[data-animate]") !== null;
+          const running = document.getAnimations().filter((a) => a.playState === "running").length;
+          return (ready ? "ready" : "waiting") + "|" + running + "|" + document.body.innerHTML.length;
+        })()`,
+        returnByValue: true,
+      });
+      const snapshot = String(result.value ?? "");
+      const [ready, running] = snapshot.split("|");
+      stable = ready === "ready" && running === "0" && snapshot === previous ? stable + 1 : 0;
+      previous = snapshot;
+      if (stable >= stableChecks) return;
+      await sleep(intervalMs);
+    }
+    // Not fatal: a page that never settles is worth capturing and comparing
+    // anyway — a permanent spinner is exactly the kind of regression this
+    // check should show rather than hide behind a timeout.
+    console.warn(`page never went quiet within ${timeoutMs}ms: ${url}`);
+  }
+
+  async function shot({ url, colorScheme, storage, width, height }) {
     const { targetId } = await browser.send("Target.createTarget", { url: "about:blank" });
     const { sessionId } = await browser.send("Target.attachToTarget", { targetId, flatten: true });
     const send = (method, params) => browser.send(method, params, sessionId);
@@ -182,10 +224,9 @@ export async function withBrowser(options, body) {
       });
 
       await send("Page.navigate", { url });
-      // Chromium's load event fires before the dashboard's own queries land, and
-      // the views hold their entry cascade until first data — so the wait is on
-      // the app rather than on the network.
-      await sleep(waitMs);
+      // The wait is on the app rather than on the network: Chromium's load
+      // event fires before the dashboard's own queries land.
+      await waitForQuiet(send, url);
 
       const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
       return Buffer.from(data, "base64");
@@ -199,6 +240,16 @@ export async function withBrowser(options, body) {
   } finally {
     browser.close();
     chrome.kill("SIGKILL");
-    await rm(profile, { recursive: true, force: true });
+    // Wait for the process to actually be gone before taking its profile
+    // directory away: SIGKILL returns immediately while Chromium's helper
+    // processes are still writing, and removing the directory under them threw
+    // ENOTEMPTY — in a `finally`, which turned a passing check into exit 1 with
+    // no result printed.
+    await Promise.race([
+      new Promise((resolve) => chrome.once("exit", resolve)),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
+    // And a leftover temp directory is not a reason to fail: it is /tmp.
+    await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => undefined);
   }
 }
