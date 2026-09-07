@@ -1026,6 +1026,7 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `POST` | `/config/channels/:id/test` | Una notifica di test, attraverso il dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
 | `POST` | `/poll` | Esegue subito un ciclo, tramite lo scheduler. Restituisce il riepilogo del ciclo. |
+| `GET` | `/events` | Server-sent events, una risposta long-lived per tab aperta. `hello` alla connessione (`lastPollAt`, `nextPollAt`, `serverNow`), poi `cycle` alla fine di ogni ciclo (`finishedAt`, `providers`, `failed`, `changedProviders` — nessuna scadenza: lo scheduler ri-arma dopo l'evento, quindi quella nuova arriva con la rilettura). Lo stream è un corriere, non una fonte di verità: dice cosa è cambiato, la dashboard lo rilegge. Non JSON — vedi [6.3](#63-aggiornamenti-live). |
 | `GET` | `/metrics` | Esposizione Prometheus. L'unico endpoint non JSON — vedi [6.2](#62-metriche-prometheus). |
 | `GET` | `/` | La dashboard. |
 
@@ -1099,6 +1100,41 @@ groups:
 
 Non c'è autenticazione: questa è una dashboard locale per un singolo operatore. Non
 pubblicare la porta 3000 su una rete di cui non ti fidi.
+
+---
+
+### 6.3 Aggiornamenti live
+
+La dashboard viene notificata invece di interrogare: apre `/events` una volta e
+rilegge ciò che l'evento nomina.
+
+```bash
+curl -N localhost:3000/events
+#   event: hello
+#   data: {"lastPollAt":"...","nextPollAt":"...","serverNow":"..."}
+#   event: cycle
+#   data: {"startedAt":"...","finishedAt":"...","providers":4,"failed":0,"changedProviders":["github"]}
+```
+
+Server-sent events, non WebSocket: niente di ciò che la dashboard invia ha
+bisogno di un socket — ogni sua scrittura è già una richiesta HTTP — e gli SSE
+viaggiano su HTTP semplice con la riconnessione gestita dal browser, quindi non
+costano una dipendenza nuova.
+
+Un evento `cycle` rilegge le chiavi economiche (stato, incidenti, notifiche,
+manutenzioni); i 90 giorni di cronologia e la mappa solo quando
+`changedProviders` non è vuoto, che per la maggior parte dei cicli non lo è. Il
+polling non scompare, arretra: con lo stream connesso ogni query scende a un
+intervallo di sicurezza di due minuti, perché uno stream che il browser crede
+ancora aperto ma i cui eventi hanno smesso di arrivare — un proxy che lo ha
+chiuso, un portatile sospeso — lascerebbe la dashboard ferma senza dirlo. Se lo
+stream cade, le query tornano al ritmo di 30 secondi finché non si riconnette, e
+l'etichetta del prossimo poll nell'header porta un badge **Live** quando è il
+push a tenere fresca la pagina.
+
+Dietro un reverse proxy servono buffering disattivato (la risposta manda
+`X-Accel-Buffering: no` per nginx) e un read timeout più lungo di un heartbeat,
+che viene scritto ogni 20 secondi.
 
 ---
 
