@@ -18,6 +18,7 @@ import { openDatabase } from "./db/open.ts";
 import { seedDefaults } from "./db/seed.ts";
 import { loadGeoTables } from "./geo/resolveLocation.ts";
 import { createHistoryService } from "./history.ts";
+import { createLiveEvents, type LiveEvents } from "./liveEvents.ts";
 import type { HistoryStore } from "./historyStore.interface.ts";
 import { createMapLane, type MapLane } from "./mapLane.ts";
 import { createMapStore, type MapStore } from "./mapStore.ts";
@@ -61,6 +62,8 @@ export interface UiRuntimeCore {
   mapStore: MapStore;
   /** The Prometheus scrape surface, fed by the dispatcher and the scheduler. */
   metrics: MetricsRegistry;
+  /** The push channel behind `GET /events`; published to as each cycle finishes. */
+  live: LiveEvents;
   pushSubscriptions: SqlitePushSubscriptionStore;
   /**
    * The shared registry cannot build `webpush` on its own: that channel needs the
@@ -139,6 +142,8 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   });
 
   const poller = createPoller({ getAdapter, store, logger });
+  const live = createLiveEvents();
+
   const metrics = createMetricsRegistry({
     store,
     listEnabledServices: () => listServices(db).filter((service) => service.enabled),
@@ -163,6 +168,29 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     onCycle: (result) => {
       lastCycle = result;
       metrics.recordCycle(result);
+      // Published after the metrics are recorded and `lastCycle` is set, so a
+      // client that re-reads the moment it hears about the cycle cannot be
+      // answered with the previous one's numbers.
+      live.publish({
+        type: "cycle",
+        data: {
+          startedAt: result.startedAt,
+          finishedAt: result.finishedAt,
+          // No `nextPollAt` here, unlike the greeting: the scheduler re-arms
+          // *after* this callback returns, so the deadline readable now is the
+          // one that just expired. A client that drew a countdown from it
+          // would sit at zero until its own re-read of `/status` landed. The
+          // fresh deadline is in that read, which this event is asking for
+          // anyway.
+          serverNow: new Date().toISOString(),
+          providers: result.results.length,
+          failed: result.results.filter((entry) => !entry.ok).length,
+          // Which providers to re-read, rather than "something changed": a
+          // cycle where nothing moved is the common case, and it should cost a
+          // client nothing but a new countdown.
+          changedProviders: [...new Set(result.changes.map((change) => change.providerId))],
+        },
+      });
     },
   });
 
@@ -204,6 +232,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     backfill,
     mapStore,
     metrics,
+    live,
     pushSubscriptions,
     buildNotifiers: buildAllNotifiers,
     mapLane,

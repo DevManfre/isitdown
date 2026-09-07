@@ -1,5 +1,6 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { configRoutes } from "./routes/config.routes.ts";
+import { eventsRoutes } from "./routes/events.routes.ts";
 import { historyRoutes } from "./routes/history.routes.ts";
 import { incidentsRoutes } from "./routes/incidents.routes.ts";
 import { mapRoutes } from "./routes/map.routes.ts";
@@ -23,6 +24,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(express.json({ limit: "64kb" }));
 
   app.use(statusRoutes(runtime));
+  app.use(eventsRoutes(runtime));
   app.use(historyRoutes(runtime));
   app.use(incidentsRoutes(runtime));
   app.use(notificationsRoutes(runtime));
