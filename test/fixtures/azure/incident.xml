@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:a10="http://www.w3.org/2005/Atom"
+  version="2.0">
+  <channel xmlns:slash="http://purl.org/rss/1.0/modules/slash/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:wfw="http://wellformedweb.org/CommentAPI/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <title>Azure Status</title>
+    <link>https://azure.status.microsoft/en-us/status/</link>
+    <description>Azure Status</description>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 07 Sep 2026 06:52:00 Z</lastBuildDate>
+    <item>
+      <title>Service Issue - Multiple Services - West Europe</title>
+      <link>https://azure.status.microsoft/en-us/status/history/</link>
+      <description>&lt;p&gt;Starting at 09:20 UTC on 07 Sep 2026, a subset of customers in West Europe may experience failures or timeouts when calling Virtual Machines and Storage APIs. We are investigating.&lt;/p&gt;</description>
+      <category>Virtual Machines</category>
+      <pubDate>Mon, 07 Sep 2026 09:35:00 Z</pubDate>
+      <guid isPermaLink="false">ABCD-1234-WEU</guid>
+    </item>
+    <item>
+      <title>Health Advisory - Azure Kubernetes Service - Global</title>
+      <link>https://azure.status.microsoft/en-us/status/history/</link>
+      <description>&lt;p&gt;Clusters on a retiring node image should be upgraded before 30 Sep 2026.&lt;/p&gt;</description>
+      <category>Azure Kubernetes Service</category>
+      <pubDate>Sun, 06 Sep 2026 12:00:00 Z</pubDate>
+      <guid isPermaLink="false">EFGH-5678-GLOBAL</guid>
+    </item>
+  </channel>
+</rss>
