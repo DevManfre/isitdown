@@ -1,0 +1,47 @@
+[
+  {
+    "date": "1772369485",
+    "arn": "arn:aws:health:me-central-1::event/MULTIPLE_SERVICES/AWS_MULTIPLE_SERVICES_OPERATIONAL_ISSUE/AWS_MULTIPLE_SERVICES_OPERATIONAL_ISSUE_1A2B3_INFORMATIONAL",
+    "region_name": "UAE",
+    "status": "1",
+    "service": "multipleservices-me-central-1",
+    "service_name": "Multiple services",
+    "summary": "Informational message",
+    "event_log": [
+      {
+        "summary": "Increased Error Rates",
+        "message": "We are investigating issues with AWS services in the ME-CENTRAL-1 Region.",
+        "status": 1,
+        "timestamp": 1772369485
+      }
+    ],
+    "impacted_services": {
+      "cloudwatchsynthetics-me-central-1": {
+        "service_name": "Amazon CloudWatch Synthetics",
+        "current": "3",
+        "max": "3"
+      },
+      "s3rtc-me-central-1": {
+        "service_name": "Amazon S3 Replication Time Control",
+        "current": "3",
+        "max": "3"
+      }
+    },
+    "impacted_service_status_changes": [
+      {
+        "service": "acm-pca-me-central-1",
+        "service_name": "AWS Private Certificate Authority",
+        "previous_status": "0",
+        "current_status": "3",
+        "timestamp": 1772369485000
+      },
+      {
+        "service": "airflow-me-central-1",
+        "service_name": "Amazon Managed Workflows for Apache Airflow",
+        "previous_status": "0",
+        "current_status": "3",
+        "timestamp": 1772369485000
+      }
+    ]
+  }
+]
