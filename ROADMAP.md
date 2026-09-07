@@ -182,38 +182,47 @@ not re-invented from scratch later.
 
 ## Suggested next slice
 
-The three slices before this one are spent — their rows are marked ✅ in the
-tables above. On the same reading of value against effort, the next quarter's
-worth:
+The four slices before this one are spent — their rows are marked ✅ in the
+tables above, and the one row that came back partly done (1.7 ◐) did so with a
+finding: Sorry™ has no JSON to parse, so it is now an argument *for* 1.6 rather
+than a small adapter of its own.
 
-1. ✅ **4.2 SSE or WebSocket live updates** — shipped as server-sent events:
-   `/events` pushes a `cycle` frame as each cycle finishes, the dashboard
-   re-reads what the frame names, and polling steps back to a two-minute safety
-   interval behind it.
-2. ✅ **2.8 fetch latency of the status page itself** — shipped as a
-   `latency_ms` column on `status_samples`: `fetchConditional` times the round
-   trip to the response headers, reports it through `FetchContext.onRead`, and
-   the poller hands it to `saveStatus`. A 304 is recorded like any other read.
-   Nothing reads the column yet — the chart is still to design.
-3. ✅ **4.5 configurable retention** — shipped as a `retentionDays` setting the
-   prune reads on every run, with the cost of the chosen window measured from
-   the database itself and shown beside the field.
-4. ✅ **3.14 notification retry + dead-letter** — shipped in the dispatcher:
-   three attempts with jittered backoff, one delivery-log row per message with
-   the attempts it cost, and a **Dead letter** badge for the ones that spent
-   them all.
-5. ✅ **2.3 adaptive polling** — shipped as a minimum against each provider's
-   own cadence, so it can only ever watch a provider more closely. The poller
-   now owns due-ness for every provider and tells the scheduler how soon to
-   tick, which is what keeps one provider's incident from pulling the whole
-   fleet onto a one-minute loop.
-6. ✅ **5.10 favicon and title reflect the worst status** — shipped in the app
-   shell: a count in the title, a severity dot on the mark, and a restore to the
-   page's own icon once the fleet is calm.
-7. ◐ **1.7 Instatus / Better Stack / Sorry™** — the first two shipped, both
-   through the contract suite. The third turned out not to belong in this row at
-   all: Sorry™ publishes no unauthenticated JSON, so it is 1.6's problem rather
-   than a small parser's.
+On the same reading of value against effort, the next quarter's worth. The
+shape of this slice is deliberate: two rows that finish something already
+shipped, three that are a day each, and one that is the honest cost of the
+dashboard having grown.
+
+1. **1.6 generic HTML-scrape adapter** — now pulled forward by 1.7's finding.
+   A CSS selector plus a status-word mapping in `options` unlocks Sorry™ and the
+   long tail of pages that publish neither JSON nor a feed. Fragile by nature,
+   so it ships with an explicit "this can break silently" warning in the UI and
+   a reading that degrades to `unknown` rather than to `operational`.
+2. **2.5 flap damping** — the other half of trustworthy alerting, now that a
+   send is retried rather than dropped: a provider's page briefly disagreeing
+   with itself should not page anyone. Must be expressible as diff-engine table
+   rows (N consecutive samples agreeing before a transition notifies), not as a
+   special case in the poller — that constraint is what keeps the engine's one
+   testable table the whole truth about what notifies.
+3. **5.2 mute / acknowledge a provider or incident** — "I know, stop telling
+   me, for two hours." Today the only options are notified or deleted. It has to
+   be a diff-engine *input* rather than a notifier filter, so the mute is
+   visible on the dashboard instead of being a silence nobody can see. Pairs
+   with 3.13's per-provider cap as the two ways to stop a flood.
+4. **3.16 HMAC signing for the generic webhook** — a shared secret and an
+   `X-IsItDown-Signature` header, so a receiver can verify the payload came
+   from here. The credential plumbing (5.17) already exists to hold the secret,
+   which is what makes this a small row rather than a medium one.
+5. **4.8 badge endpoint** + **4.11 `homepage` / Dashy widget** — two ~40-line
+   routes on the read side that put IsItDown on a README and on a homelab home
+   page. Cheap, and the reach is out of proportion to the effort.
+6. **5.9 timezone preference** — everything is UTC: correct, defensible, and
+   mildly annoying every single day. It is also a prerequisite for 3.11 quiet
+   hours, which cannot mean anything without one.
+7. **7.1 visual regression tests** — the bill for the last four slices. The
+   dashboard is now large enough that a token change can quietly wreck a view
+   nobody opened, and this slice alone shipped a tab favicon, a settings pair,
+   a badge and a card-gap fix that no test could have caught. Playwright
+   screenshots per view, both themes, both locales.
 
 The two items that most change *what IsItDown is*, and therefore deserve a
 decision rather than a slot in a queue, are **1.8 direct HTTP probes** and
