@@ -226,6 +226,20 @@ export const useNotifications = (limit = 20) => {
 };
 
 /**
+ * The delivery log's page. Keyed on every part of the query, so changing the
+ * filter or the page re-requests rather than re-slicing what is loaded — the
+ * server is the only thing that can see past the page.
+ */
+export const useDeliveryLog = (query: api.DeliveryLogQuery = {}) => {
+  const busy = useBusy();
+  return useQuery({
+    queryKey: ["delivery-log", query.state ?? "all", query.channel ?? "", query.page ?? 1, query.pageSize ?? null],
+    queryFn: () => api.getDeliveryLog(query),
+    refetchInterval: busy ? false : REFRESH_MS,
+  });
+};
+
+/**
  * The Overview's geographic card.
  *
  * `enabled` is the stored `mapView` preference being anything but `off`: the
@@ -306,6 +320,8 @@ export function useServiceMutations() {
       onSuccess: invalidate,
     }),
     remove: useMutation({ mutationFn: api.removeService, onSuccess: invalidate }),
+    restore: useMutation({ mutationFn: api.restoreService, onSuccess: invalidate }),
+    purge: useMutation({ mutationFn: api.purgeService, onSuccess: invalidate }),
     test: useMutation({ mutationFn: api.testService }),
   };
 }

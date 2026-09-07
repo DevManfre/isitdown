@@ -25,6 +25,7 @@ const TITLE_KEYS: Record<string, string> = {
   incidents: "nav.incidents",
   incident: "nav.incidents",
   history: "nav.history",
+  "delivery-log": "nav.delivery-log",
   settings: "nav.settings",
 };
 

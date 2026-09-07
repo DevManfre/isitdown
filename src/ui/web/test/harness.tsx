@@ -18,6 +18,7 @@ type FixtureKey =
   | "incidents"
   | "incident"
   | "notifications"
+  | "deliveryLog"
   | "componentHistory"
   | "map"
   | "preferences"
@@ -31,6 +32,8 @@ export interface Fixtures {
   incidents?: unknown;
   incident?: unknown;
   notifications?: unknown;
+  /** `/notifications/log`, matched before `/notifications` — the log is a nested path with its own shape. */
+  deliveryLog?: unknown;
   componentHistory?: unknown;
   map?: unknown;
   preferences?: unknown;
@@ -70,17 +73,19 @@ export function stubApi(fixtures: Fixtures): void {
               ? "incidents"
               : path.startsWith("/maintenances")
                 ? "maintenances"
-                : path.startsWith("/notifications")
-                  ? "notifications"
-                  : path.endsWith("/impact")
-                    ? "serviceImpact"
-                    : path.startsWith("/config")
-                      ? "config"
-                      : path.startsWith("/map")
-                        ? "map"
-                        : path.startsWith("/api/preferences")
-                          ? "preferences"
-                          : "status";
+                : path.startsWith("/notifications/log")
+                  ? "deliveryLog"
+                  : path.startsWith("/notifications")
+                    ? "notifications"
+                    : path.endsWith("/impact")
+                      ? "serviceImpact"
+                      : path.startsWith("/config")
+                        ? "config"
+                        : path.startsWith("/map")
+                          ? "map"
+                          : path.startsWith("/api/preferences")
+                            ? "preferences"
+                            : "status";
       const errorStatus = fixtures.errors?.[key];
       if (errorStatus !== undefined) {
         return { ok: false, status: errorStatus, text: async () => "" };

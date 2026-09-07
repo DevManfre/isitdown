@@ -2,6 +2,7 @@ import { createHashRouter, Navigate } from "react-router";
 import { ROUTE_PATHS } from "../routePaths.ts";
 import { App } from "./App.tsx";
 import { ViewError } from "./components/ViewError.tsx";
+import { DeliveryLog } from "./views/DeliveryLog.tsx";
 import { History } from "./views/History.tsx";
 import { IncidentDetail } from "./views/IncidentDetail.tsx";
 import { Incidents } from "./views/Incidents.tsx";
@@ -38,6 +39,7 @@ export const router = createHashRouter([
           { path: ROUTE_PATHS.incidents, element: <Incidents /> },
           { path: ROUTE_PATHS.incidentDetail, element: <IncidentDetail /> },
           { path: ROUTE_PATHS.history, element: <History /> },
+          { path: ROUTE_PATHS.deliveryLog, element: <DeliveryLog /> },
           { path: ROUTE_PATHS.settings, element: <Settings /> },
         ],
       },

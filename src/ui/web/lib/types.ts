@@ -224,6 +224,23 @@ export interface SentRecord {
   error?: string;
 }
 
+/** Which slice of the delivery log the view is asking for. */
+export type DeliveryState = "all" | "sent" | "failed";
+
+export interface DeliveryPage {
+  items: SentRecord[];
+  page: number;
+  pageSize: number;
+  /** Sends matching the requested state, not the page's length. */
+  total: number;
+}
+
+export interface DeliveryLogResponse {
+  page: DeliveryPage;
+  /** Every outcome's count, whichever one the page is showing. */
+  counts: Record<DeliveryState, number>;
+}
+
 export interface IncidentDetail {
   incident: IncidentRow;
   timeline: TimelineEntry[];
@@ -240,6 +257,11 @@ export interface ServiceDefinition {
   enabled: boolean;
   /** Adapter-specific extras (e.g. a region). Absent when the adapter needs none. */
   options?: Record<string, string>;
+  /**
+   * How often this provider is polled. Absent means the global cadence; `null`
+   * is only ever sent, on a patch, to put it back on that cadence.
+   */
+  intervalMinutes?: number | null;
   components: { id: string; name: string }[];
   scopeToComponents: boolean;
 }
@@ -312,6 +334,19 @@ export interface RuntimeConfigResponse {
   services: ServiceDefinition[];
   channels: DescribedChannel[];
   routing: RoutingResponse;
+  /** Removed but still restorable, newest removal first. */
+  removed: RemovedService[];
+}
+
+/** A provider whose removal has not yet taken its history — roadmap 5.12. */
+export interface RemovedService {
+  id: string;
+  name: string;
+  adapter: string;
+  baseUrl: string;
+  removedAt: string;
+  /** When the grace period runs out and the removal becomes permanent. */
+  restoreUntil: string;
 }
 
 export interface MapPoint {
