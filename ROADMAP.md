@@ -103,7 +103,7 @@ is additive and independently shippable.
 | 4.2 ✅ | **SSE or WebSocket live updates** | M | Replaces the dashboard's 30-second poll with a push. Instant reaction on a manual `/poll`, less idle work, and it makes the poll indicator honest. |
 | 4.3 | **Config export / import** | M | `GET /config/export` → a `config.yml` the Light edition can eat, and the reverse for seeding UI from a file. Makes the two editions genuinely interchangeable, which today they only are in principle. |
 | 4.4 | **Backup / restore of the SQLite file from the UI** | S | Download the DB, upload to restore. Nearly all state is one file — `secrets.env` (5.17) is the exception, and a backup that silently omits the credentials is worse than none, so the flow has to say which of the two it covers. |
-| 4.5 | **Configurable retention** | S | 120 days is hardcoded in `src/ui/runtime.ts`. Should be a setting, with the storage cost shown next to it. |
+| 4.5 ✅ | **Configurable retention** | S | A `retentionDays` setting, 7 to 3650 days, default 120. The boot-and-daily prune reads it per run, so a change applies without a restart, and Settings shows what the window costs from `GET /config/storage` — the database's real size and its measured bytes per sample. |
 | 4.6 | **CSV / JSON export of history and incidents** | S | Per provider, per window. Asked for by anyone who has to report uptime to someone else. |
 | 4.7 | **Monthly uptime report** | M | Generated Markdown (or print-styled HTML) summarising the month: uptime per provider, incident count, worst day. Pairs with 4.6. |
 | 4.8 | **Shields.io-compatible badge endpoint** | S | `/badge/github.svg` → a green/red badge for a README. Fun, viral, ~40 lines. |
@@ -169,7 +169,7 @@ not re-invented from scratch later.
 | # | Item | Notes |
 |---|---|---|
 | 8.1 | **Provider trust score** | Compare a provider's self-declared status against observed reality (needs 1.8/1.10) and score how honest their status page is. Nobody publishes this. It would be genuinely interesting and slightly inflammatory. |
-| 8.2 | **"This day last year"** | Seasonal comparison on the history view. Requires more than a year of data before it says anything, and 120-day retention means it never will without 4.5. |
+| 8.2 | **"This day last year"** | Seasonal comparison on the history view. Requires more than a year of data before it says anything — possible now that 4.5 lets retention go past a year, but only for an instance that opted into it. |
 | 8.3 | **Anomaly detection on uptime patterns** | Statistically dubious at this data volume. Listed to be explicitly dismissed. |
 | 8.4 | **Terminal client / TUI** | `isitdown watch` in a pane. Fun, and the API already supports it. |
 | 8.5 | **Browser extension** | Fleet status in the toolbar. Mostly redundant with web push, which already exists. |
@@ -193,9 +193,9 @@ worth:
    trip to the response headers, reports it through `FetchContext.onRead`, and
    the poller hands it to `saveStatus`. A 304 is recorded like any other read.
    Nothing reads the column yet — the chart is still to design.
-3. **4.5 configurable retention** — 120 days is hardcoded in
-   `src/ui/runtime.ts`, next to the prune that now also expires removals. A
-   setting with the storage cost shown beside it.
+3. ✅ **4.5 configurable retention** — shipped as a `retentionDays` setting the
+   prune reads on every run, with the cost of the chosen window measured from
+   the database itself and shown beside the field.
 4. **3.14 notification retry + dead-letter** — the delivery log made a failed
    send visible; retrying it with backoff, and surfacing what stayed dead, is
    the obvious next move on the same table.
