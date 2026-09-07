@@ -210,6 +210,7 @@ maxRetries: 3               # tentativi per provider per ciclo, con backoff
 failureThreshold: 5         # fallimenti consecutivi prima dell'avviso "monitoring degraded"
 adaptivePolling: true       # con un incidente aperto, interroga il provider con la cadenza sotto
 adaptiveIntervalMinutes: 1  # quella cadenza; mai più lenta dell'intervallo del provider
+confirmSamples: 1           # poll consecutivi che devono concordare prima di notificare
 locale: en                  # lingua dei messaggi di notifica: en | it
 
 services:
@@ -254,9 +255,47 @@ notifications:
 | `adaptiveIntervalMinutes` | `1` | 1–1440. Preso come **minimo** rispetto all'intervallo del provider, quindi può solo osservarlo più da vicino. Un provider che non ha mai risposto resta sulla sua cadenza: `unknown` non è un incidente. |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus` e `betterstack` coprono quelle due piattaforme; `rss` legge qualunque feed RSS o Atom di incidenti; `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider. |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus` e `betterstack` coprono quelle due piattaforme; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider. |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
+| `services[].mutedUntil` | — | ISO 8601. Finché è nel futuro il provider viene interrogato e registrato come sempre ma non notifica nulla — "lo so, smetti di dirmelo, fino ad allora". Nell'edizione UI è ciò che scrive il comando **Silenzia** della dashboard. |
+| `services[].options` | — | Extra specifici dell'adapter. Oggi solo `html` ne accetta: `selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`. |
+
+#### L'adapter `html`
+
+Per le pagine che non pubblicano né JSON né feed. Gli si dà l'URL della pagina,
+un selettore CSS per l'elemento il cui testo dice come sta il provider e — se la
+pagina usa parole inconsuete — quali parole significano cosa:
+
+```yaml
+  - name: Provider su Sorry
+    id: example
+    adapter: html
+    baseUrl: https://status.example.com/
+    options:
+      selector: ".status-banner"
+      operational: "tutto tranquillo, nessun problema"
+      major_outage: "outage, down"
+```
+
+Il selettore supporta i composti tag, `#id`, `.class` e `[attr]` /
+`[attr="valore"]` con i combinatori discendente e figlio (`>`). Tutto ciò che va
+oltre — una lista di selettori, una pseudo-classe, un combinatore fratello —
+viene rifiutato invece di non corrispondere in silenzio.
+
+Leggere il markup è fragile per natura, quindi i modi di rompersi sono
+deliberati:
+
+- un selettore che non corrisponde a nulla **solleva un errore**, così una
+  pagina la cui struttura è cambiata fallisce come un provider non raggiungibile
+  (ritentativi, poi l'avviso "monitoraggio degradato") invece di assestarsi su
+  una lettura che nessuno ha chiesto;
+- un testo che non corrisponde a nessuna parola configurata legge `unknown`, mai
+  `operational`;
+- vince la formulazione più specifica: "partial outage on the API, everything
+  else operational" legge come disservizio parziale;
+- non ci sono incidenti, componenti o finestre di manutenzione — una pagina che
+  ha richiesto lo scraping non ha struttura da cui leggerli.
 
 Qualunque cosa non valida ferma il container all'avvio indicando motivo e percorso:
 file mancante, YAML malformato, base URL sbagliato, id duplicato, lista di servizi
@@ -270,11 +309,11 @@ L'edizione UI **non** monta alcun `config.yml`; uno presente su disco verrebbe
 ignorato. Tutto vive in SQLite in `/app/data/isitdown.db` e si modifica da
 **Settings** nella dashboard (o tramite [`/config`](#6-api-http)):
 
-- intervallo di polling, timeout delle richieste, numero di tentativi
+- intervallo di polling, timeout delle richieste, numero di tentativi, smorzamento dei rimbalzi
 - la lista dei servizi: aggiungi, modifica, rimuovi
 - quali canali di notifica sono attivi, quale variabile d'ambiente porta ogni
   credenziale e — in sola scrittura — la credenziale stessa
-- tema, lingua della dashboard, lingua delle notifiche
+- tema, lingua della dashboard, lingua delle notifiche, fuso orario
 
 Le scritture hanno effetto al **ciclo di poll successivo**, senza restart, perché lo
 scheduler rilegge la configurazione a ogni passaggio. Un database nuovo viene
@@ -290,6 +329,7 @@ tua lista non viene più sovrascritta in seguito.
 | `WEBHOOK_URL` | entrambe | — | Dove il webhook generico fa POST. Obbligatoria se quel canale è attivo. |
 | `DISCORD_WEBHOOK_URL` | entrambe | — | Webhook in entrata di Discord. Obbligatoria se il canale Discord è attivo. |
 | `SLACK_WEBHOOK_URL` | entrambe | — | Webhook in entrata di Slack. Obbligatoria se il canale Slack è attivo. |
+| `WEBHOOK_SECRET` | entrambe | — | Segreto condiviso opzionale per il webhook generico. Impostandolo ogni richiesta viene firmata (vedi [3.6](#36-canali-di-notifica)); lasciandolo vuoto le richieste partono non firmate, esattamente come prima. |
 | `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Dove leggere `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Dove tenere il file di stato. |
@@ -625,6 +665,22 @@ mostrare il testo già formattato oppure fare routing sui campi strutturati:
   "message": "🔴 Cloudflare — MAJOR OUTAGE\n\nStatus changed from Operational to Major outage.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.cloudflarestatus.com"
 }
 ```
+
+**Firma.** Impostando `WEBHOOK_SECRET` (o `webhook.secret` in `config.yml`) ogni
+richiesta porta due header in più:
+
+```
+X-IsItDown-Timestamp: 2026-08-19T14:32:07.000Z
+X-IsItDown-Signature: sha256=<hex>
+```
+
+La firma è un HMAC-SHA256 su `` `${timestamp}.${body}` `` con il segreto come
+chiave, calcolato sui byte esatti che sono stati inviati. Per verificarla,
+ricostruisci la stessa stringa dal body grezzo — non da un parse riserializzato —
+e confronta a tempo costante; il timestamp è dentro il materiale firmato, così un
+ricevitore può anche rifiutare una richiesta troppo vecchia per essere autentica.
+Senza segreto non viene aggiunto nulla, quindi un ricevitore esistente continua a
+funzionare intatto.
 
 Discord e Slack sono entrambi webhook in entrata: creane uno nel server o nel
 workspace di destinazione, metti l'URL in `DISCORD_WEBHOOK_URL` o
@@ -1106,10 +1162,13 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `DELETE` | `/config/channels/:id/secrets/:field` | Dimentica un valore salvato. `409` se la variabile arriva dall'ambiente del container. |
 | `POST` | `/config/services/:id/test` | Una fetch reale verso quel provider. Non registra nulla. |
 | `POST` | `/config/channels/:id/test` | Una notifica di test, attraverso il dispatcher. |
-| `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
+| `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale, mapView, timeZone }`. `timeZone` è `auto` — il fuso di questo browser — oppure un nome IANA; qualunque valore in cui il runtime non sappia formattare una data viene rifiutato. |
 | `POST` | `/poll` | Esegue subito un ciclo, tramite lo scheduler. Restituisce il riepilogo del ciclo. |
 | `GET` | `/events` | Server-sent events, una risposta long-lived per tab aperta. `hello` alla connessione (`lastPollAt`, `nextPollAt`, `serverNow`), poi `cycle` alla fine di ogni ciclo (`finishedAt`, `providers`, `failed`, `changedProviders` — nessuna scadenza: lo scheduler ri-arma dopo l'evento, quindi quella nuova arriva con la rilettura). Lo stream è un corriere, non una fonte di verità: dice cosa è cambiato, la dashboard lo rilegge. Non JSON — vedi [6.3](#63-aggiornamenti-live). |
 | `GET` | `/metrics` | Esposizione Prometheus. L'unico endpoint non JSON — vedi [6.2](#62-metriche-prometheus). |
+| `GET` | `/badge.svg` | Un badge SVG per l'intera flotta: la lettura peggiore in circolazione. Non JSON — vedi [6.4](#64-badge-e-riepilogo-widget). |
+| `GET` | `/badge/:providerId.svg` | Lo stesso per un singolo provider. `404` (comunque come badge) se quell'id non esiste. |
+| `GET` | `/widget` | Un oggetto di riepilogo piatto per il widget "custom API" di una dashboard homelab — vedi [6.4](#64-badge-e-riepilogo-widget). |
 | `GET` | `/` | La dashboard. |
 
 ### 6.1 Backfill dello storico
@@ -1219,6 +1278,46 @@ Dietro un reverse proxy servono buffering disattivato (la risposta manda
 che viene scritto ogni 20 secondi.
 
 ---
+
+### 6.4 Badge e riepilogo widget
+
+Due endpoint in sola lettura rivolti verso l'esterno, non alla dashboard.
+
+`GET /badge/github.svg` disegna un badge piatto — il nome del provider, la sua
+lettura attuale e il colore che le corrisponde — da incollare in un README:
+
+```markdown
+![GitHub](http://localhost:3000/badge/github.svg)
+```
+
+`GET /badge.svg` fa lo stesso per la flotta, riportando la lettura peggiore in
+circolazione. Sono disegnati qui invece di essere scaricati da shields.io, così
+un'istanza senza accesso a internet in uscita li serve comunque, ed entrambi
+rispondono con `Cache-Control: max-age=60` — abbastanza perché un README molto
+visitato non diventi un generatore di carico, abbastanza poco perché un badge non
+resti verde un'ora dopo l'inizio di un disservizio. Un provider mai interrogato
+legge `unknown`, in grigio: mai verde.
+
+`GET /widget` risponde nella forma che `homepage` e Dashy si aspettano da un
+widget "custom API" — conteggi e una parola, nessuno storico annidato:
+
+```json
+{
+  "status": "major_outage",
+  "providers": 4,
+  "operational": 2,
+  "degraded": 1,
+  "down": 1,
+  "unknown": 0,
+  "muted": 1,
+  "incidents": 2,
+  "lastPollAt": "2026-08-19T14:32:07.000Z",
+  "retentionDays": 120
+}
+```
+
+Nessuno dei due contatta un provider e nessuno dei due registra qualcosa: sono
+letture dello stato salvato, ed è questo che li rende interrogabili spesso.
 
 ## 7. Come funziona
 
@@ -1349,6 +1448,23 @@ casi limite si aggiungono come righe invece che come test isolati.
 | nessuna finestra in corso | inizia una finestra dichiarata | sì — `maintenance_started` |
 | una finestra in corso | la stessa finestra termina | sì — `maintenance_ended`, con lo stato in cui il provider è uscito |
 | una finestra in corso | qualunque altra cosa cambia a monte (stato, componenti, incidenti) | **no** — soppressa finché la finestra non termina |
+| un silenziamento in corso (`mutedUntil` nel futuro) | qualunque cosa | **no** — l'operatore ha detto che già lo sa; polling e registrazione continuano |
+| `confirmSamples: N` | un cambio visto in meno di N poll consecutivi | **non ancora** — la baseline resta ferma, quindi lo stesso cambio viene annunciato quando N poll concordano |
+| `confirmSamples: N` | un cambio che rientra prima che N poll concordino | **mai** — una pagina che si contraddice non era una notizia |
+
+Il **silenziamento** è la stessa regola con l'operatore al posto del provider: è
+un input del diff engine, non un filtro in uscita, ed è per questo che un
+provider silenziato mostra un badge sulla dashboard invece di limitarsi a tacere.
+Un silenziamento mantiene anche aggiornata la baseline delle notifiche, così
+riattivarlo non ripropone quello che è successo mentre era attivo.
+
+Lo **smorzamento dei rimbalzi** (`confirmSamples`) muove la *baseline delle
+notifiche* indipendentemente dai campioni: le letture continuano a essere
+registrate a ogni poll, così la dashboard dice sempre cosa dice la pagina in
+questo momento, mentre la baseline resta ferma finché un cambio non è stato visto
+per il numero di poll configurato. Un disservizio reale costa quindi al massimo
+`confirmSamples - 1` poll di ritardo, e una discordanza di un ciclo non costa
+nulla.
 
 **Regola di soppressione**: finché una finestra di manutenzione dichiarata da
 un provider è in corso, nient'altro riguardo quel provider è una novità — un
@@ -1733,6 +1849,7 @@ sviluppo; `docker inspect -f '{{.Config.Cmd}}' isitdown-ui` mostra
 ```bash
 npm test                 # suite node:test + vitest run
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
+npm run test:visual      # baseline visive: ogni vista, entrambi i temi, entrambe le lingue
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
 npm run build:light      # tsc + copia asset, escludendo src/ui
 npm run build:ui         # tsc + vite build + copia asset
@@ -1768,6 +1885,15 @@ Suite notevoli:
   direttamente nel JSX — un'euristica, deliberatamente più debole della scansione
   esatta sui nodi di testo che ha sostituito, perché il JSX non offre un modo
   privo di parsing per distinguere un'espressione tradotta da un letterale.
+- **Regressione visiva** — ogni vista fotografata in entrambi i temi ed entrambe
+  le lingue su una flotta fissa e con l'orologio congelato, poi confrontata con
+  le baseline concordate sotto `test/visual/baseline/`. Due criteri: quanta
+  parte del frame si è spostata (un cambio di layout) e quanti pixel hanno
+  cambiato colore del tutto (un cambio di token, un'area troppo piccola per
+  muovere un rapporto sull'intero frame). Chromium arriva dalla cache di
+  Playwright e viene pilotato via DevTools protocol — nulla importa il pacchetto,
+  che resta fuori da `package.json`. `node tools/visual-regression.mjs --update`
+  accetta un cambio voluto, `--only=<vista>` serve mentre si itera su una sola.
 - **End to end** — un provider finto e un ricevitore webhook: una transizione consegna
   esattamente una notifica, un ciclo invariato nessuna, un restart nessuna, un provider
   irraggiungibile conserva l'ultimo stato noto, e l'entrypoint resta vivo tra i cicli e
