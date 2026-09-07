@@ -42,6 +42,12 @@ const settingsSchema = z.object({
   requestTimeoutSeconds: z.coerce.number().int().positive().max(120).catch(8),
   maxRetries: z.coerce.number().int().positive().max(10).catch(3),
   failureThreshold: z.coerce.number().int().positive().max(100).catch(5),
+  /**
+   * How long history is kept. Four months by default — a month beyond the
+   * 90-day view, so a full window is always available — and up to ten years for
+   * anyone who wants year-on-year comparisons more than they want the disk.
+   */
+  retentionDays: z.coerce.number().int().min(7).max(3650).catch(120),
   theme: z.enum(["light", "dark", "system"]).catch("system"),
   uiLocale: localeSchema.catch("en"),
   notificationLocale: localeSchema.catch("en"),

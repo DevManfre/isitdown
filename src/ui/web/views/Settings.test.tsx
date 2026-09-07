@@ -43,6 +43,7 @@ function interceptWrites(responses: Record<string, unknown>): RecordedCall[] {
 
 const config = {
   polling: { intervalMinutes: 5, requestTimeoutSeconds: 10, maxRetries: 3, failureThreshold: 3 },
+  retention: { days: 120 },
   locale: "en",
   services: [
     {
@@ -104,8 +105,12 @@ const removedService = {
   restoreUntil: "2026-09-12T10:00:00Z",
 };
 
+/** What `GET /config/storage` answers: ~100 B a sample, three providers on a 5-minute poll. */
+const storage = { dbBytes: 6_000_000, sampleCount: 56_437, bytesPerSample: 101, measured: true, samplesPerDay: 864 };
+
 const fixtures = {
   config,
+  storage,
   status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
 };
 
@@ -975,5 +980,48 @@ describe("Settings", () => {
         { path: "/config/services/cloudflare/permanently", method: "DELETE", body: undefined },
       ]);
     });
+  });
+});
+
+describe("Settings retention", () => {
+  it("shows the retention setting with what it costs on disk", async () => {
+    renderWithProviders(<Settings />, fixtures);
+
+    expect(await screen.findByLabelText(i18n.t("field.retention"))).toHaveValue(120);
+    // 864 samples a day x 101 bytes x 120 days is ~10.5 MB of history, on a 6 MB database.
+    const cost = await screen.findByTestId("retention-cost");
+    expect(cost.textContent).toMatch(/10\.5 MB/);
+    expect(cost.textContent).toMatch(/6 MB/);
+  });
+
+  it("saves the retention when the field loses focus", async () => {
+    // `renderWithProviders` installs the fixture-driven fetch, so the write
+    // recorder has to wrap it — same order as the polling tests above.
+    renderWithProviders(<Settings />, fixtures);
+    const calls = interceptWrites({ "PATCH /config/settings": { retention: { days: 365 } } });
+
+    const field = await screen.findByLabelText(i18n.t("field.retention"));
+    await userEvent.clear(field);
+    await userEvent.type(field, "365");
+    await userEvent.tab();
+
+    await waitFor(() =>
+      expect(writesIn(calls)).toEqual([
+        { path: "/config/settings", method: "PATCH", body: { retentionDays: 365 } },
+      ]),
+    );
+  });
+
+  it("refuses a retention outside its bounds without calling the server", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const calls = interceptWrites({});
+
+    const field = await screen.findByLabelText(i18n.t("field.retention"));
+    await userEvent.clear(field);
+    await userEvent.type(field, "5");
+    await userEvent.tab();
+
+    expect(writesIn(calls)).toEqual([]);
+    expect(await screen.findByText(/7/)).toBeTruthy();
   });
 });

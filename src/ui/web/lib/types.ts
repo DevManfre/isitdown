@@ -331,6 +331,8 @@ export interface RuntimeConfigResponse {
     maxRetries: number;
     failureThreshold: number;
   };
+  /** How long history is kept before the daily prune takes it. */
+  retention: { days: number };
   services: ServiceDefinition[];
   channels: DescribedChannel[];
   routing: RoutingResponse;
@@ -380,4 +382,18 @@ export interface Preferences {
   uiLocale: string;
   notificationLocale: string;
   mapView: MapView;
+}
+
+/**
+ * What a retention window costs on disk, measured server-side. The dashboard
+ * multiplies the last three itself so the projection tracks a half-typed
+ * number without a request per keystroke.
+ */
+export interface StorageReport {
+  dbBytes: number;
+  sampleCount: number;
+  bytesPerSample: number;
+  /** False when `bytesPerSample` is the server's built-in figure, not this database's. */
+  measured: boolean;
+  samplesPerDay: number;
 }
