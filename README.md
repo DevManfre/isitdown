@@ -206,6 +206,8 @@ pollIntervalMinutes: 3      # how often to poll every provider
 requestTimeoutSeconds: 8    # per-request timeout
 maxRetries: 3               # attempts per provider per cycle, with backoff
 failureThreshold: 5         # consecutive failures before a "monitoring degraded" warning
+adaptivePolling: true       # while a provider has an open incident, poll it on the cadence below
+adaptiveIntervalMinutes: 1  # that cadence; never slower than the provider's own interval
 locale: en                  # language for notification messages: en | it
 
 services:
@@ -246,9 +248,11 @@ notifications:
 | `requestTimeoutSeconds` | `8` | Per HTTP request, not per cycle. |
 | `maxRetries` | `3` | Attempts per provider per cycle, exponential backoff plus jitter. |
 | `failureThreshold` | `5` | Consecutive failed cycles before one "monitoring degraded" warning. |
+| `adaptivePolling` | `true` | While a provider has an open incident — or any status worse than operational — poll it on `adaptiveIntervalMinutes` instead of its own cadence. `false` leaves every provider on the cadence it was configured with. |
+| `adaptiveIntervalMinutes` | `1` | 1–1440. Taken as a *minimum* against the provider's own interval, so it can only ever watch a provider more closely. A provider that has never answered stays on its configured cadence: `unknown` is not an incident. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `rss` reads any RSS or Atom incident feed; `slack`, `aws`, `gcp` and `azure` read those providers' own shapes. |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus` and `betterstack` cover those two hosted platforms; `rss` reads any RSS or Atom incident feed; `slack`, `aws`, `gcp` and `azure` read those providers' own shapes. |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
 
@@ -516,6 +520,63 @@ healthy, so an empty feed is operational rather than unknown. Its incident
 history reaches only as far as the feed does, which for a provider that
 publishes open communications only is not far.
 
+#### Instatus and Better Stack
+
+The two most common Statuspage competitors, each with one unauthenticated JSON
+endpoint of its own:
+
+```yaml
+  - id: gcore
+    name: Gcore
+    adapter: instatus
+    baseUrl: https://status.gcore.com
+
+  - id: betterstack
+    name: Better Stack
+    adapter: betterstack
+    baseUrl: https://status.betterstack.com
+```
+
+**Instatus** — the adapter appends `/summary.json` for the page's own word plus
+its open incidents and declared maintenance windows, and `/v3/components.json`
+for the component list. The second request is only made when the provider has
+components selected: a provider nobody picked components for must not pay two
+requests a cycle for a list nothing reads.
+
+| Payload | Reading |
+|---|---|
+| `page.status: UP`, nothing open | Operational |
+| An incident's `impact` | `DEGRADEDPERFORMANCE` → degraded, `PARTIALOUTAGE` → partial outage, `MAJOROUTAGE` → major outage |
+| `page.status: HASISSUES` with nothing listed | Degraded: a page that has not published the incident yet must not read as calm |
+| `page.status: UNDERMAINTENANCE` | Unknown — it abstains rather than claiming to be up |
+| An impact word we do not know | Major outage; never silently downgraded |
+| `activeMaintenances[].duration` | Minutes, so the window's end is derived from it — Instatus publishes no end timestamp |
+
+`summary.json` does not attribute an incident to the components it affects, so
+`scopeToComponents` narrows the reported components and the status folded from
+them, but never drops an incident. And Instatus publishes no JSON incident
+history, so there is nothing to backfill from — a page's RSS feed can be added
+as a second provider on the `rss` adapter if you want its timeline.
+
+**Better Stack** — the adapter appends `/index.json`, and that one document is
+the whole page: the aggregate state, every resource (their word for a
+component) with its own status, every report — theirs for both incidents and
+scheduled maintenance — and every update posted on those. So components,
+component scoping *including* incident attribution, and the incident history all
+come out of a single read.
+
+| Payload | Reading |
+|---|---|
+| `aggregate_state` | `operational`, `degraded` → degraded, `downtime` → major outage |
+| `maintenance` or `not_monitored` | Unknown — abstains rather than reading as a recovery |
+| A report with `report_type: manual` not in state `resolved` | An open incident |
+| A report with `report_type: maintenance` | A maintenance window, not an incident |
+| A report's `ends_at` | Often null even once resolved — Better Stack closes one by state — so the newest update on the report is the closure time |
+
+Sorry™, the third page in this family, publishes no unauthenticated JSON at all:
+its public pages are HTML and its API needs a key, so it needs the generic
+HTML-scrape adapter (roadmap 1.6) rather than a small parser of its own.
+
 For a provider on none of these, add an adapter under `src/adapters/`.
 
 #### Conditional requests
@@ -764,6 +825,14 @@ in the header:
 - the **EN / IT** switch changes every string with no page reload, including the
   time format (`7:36 PM` vs `19:36`) and decimal separator (`99.87%` vs `99,87%`).
 
+The browser tab answers the same question without being looked at: while
+something is wrong, the title counts the providers in trouble (`2 providers in
+trouble · IsItDown`) and the favicon takes a dot in that severity's colour. A
+calm fleet puts the page's own icon and title back, so a dot in the tab always
+means there is something to open. A provider that has never been read
+successfully is not "trouble" — a first cycle that has not landed yet must not
+show a red tab — and a disabled provider is off the dashboard entirely.
+
 The same data over HTTP:
 
 ```bash
@@ -803,6 +872,14 @@ The **Delivery log** view is the other half of that honesty: every notification
 that was attempted, failed ones first, each row expanding to the exact payload
 sent and the channel's own error string. A credential that went stale shows up
 there instead of as alerts that quietly stopped arriving.
+
+A failed send is retried up to three times with exponential backoff and jitter,
+so a rate limit or a restarting webhook receiver no longer loses an alert. One
+row is written per *message*, not per attempt, and it carries how many attempts
+it took: a send that landed on the second try reads as delivered, and one that
+spent all three is badged **Dead letter** — the alert is gone, which is a
+different statement from "failed". A delivery test from Settings is tried once
+on purpose: the operator is waiting for the answer.
 
 ### 5.3 Configuration changes apply without a restart
 
@@ -1006,13 +1083,14 @@ back reports a parse failure instead of the real problem.
 | `GET` | `/incidents/:providerId/:incidentId` | Detail: the incident, the observed timeline, the action log of what was sent, the provider's other open incidents, and the last 24 polls. |
 | `GET` | `/maintenances?provider=&days=` | Declared maintenance windows — running, upcoming and past — as `{ maintenances }`. `days` bounds how far back a closed window is still returned (default 90, max 365); `provider` narrows to one. Without `provider`, every enabled provider. |
 | `GET` | `/notifications?limit=` | What was actually sent, newest first. Capped at 200. |
-| `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | One page of the delivery log: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` is `all` (default), `sent` or `failed`; `channel` narrows to one channel; `pageSize` defaults to 25 and is capped at 200. A nonsense `page`, `pageSize` or `state` falls back rather than 400s. `counts` carries every outcome whatever the filter. |
-| `GET` | `/config` | Services, polling settings, channels, routing, and `removed` — providers taken out but still restorable. Channel credentials appear as variable **names** with an `isSet` flag — never values. |
+| `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | One page of the delivery log: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` is `all` (default), `sent` or `failed`; `channel` narrows to one channel; `pageSize` defaults to 25 and is capped at 200. A nonsense `page`, `pageSize` or `state` falls back rather than 400s. `counts` carries every outcome whatever the filter. Each item carries `attempts`: a failed send with more than one is a dead letter. |
+| `GET` | `/config` | Services, polling settings (`adaptivePolling` and `adaptiveIntervalMinutes` included), `retention`, channels, routing, and `removed` — providers taken out but still restorable. Channel credentials appear as variable **names** with an `isSet` flag — never values. |
 | `POST` | `/config/services` | Add a service. `201`, or `409` on a duplicate id, or `400` naming the invalid field. |
 | `PATCH` `DELETE` | `/config/services/:id` | Edit, or remove. A removal is a **soft delete**: the provider leaves the dashboard and the poll cycle at once, and the response says how long it stays restorable (`{ removed, removedAt, restoreUntil }`). `404` on an id that is unknown or already removed. |
 | `POST` | `/config/services/:id/restore` | Undo a removal inside its window. Nothing was taken, so nothing is rebuilt; the gap in history from the days it was removed is backfilled. `404` if it is not a removed service. |
 | `DELETE` | `/config/services/:id/permanently` | The destructive half, on its own path so nothing reaches it by accident: cascades to that provider's samples, incidents, maintenances, state and routing rules. This also happens on its own once the restore window closes. |
-| `PATCH` | `/config/settings` | Polling settings. |
+| `PATCH` | `/config/settings` | Polling settings — including `adaptivePolling` and `adaptiveIntervalMinutes` (1–1440) — and `retentionDays`, how long history is kept, 7 to 3650 days. |
+| `GET` | `/config/storage` | What retention costs: the database's size on disk, the sample count, measured bytes per sample (`measured: false` when the database is too small to measure and the server's own figure stands in), and samples a day at the current provider count and interval. |
 | `PATCH` | `/config/channels/:id` | Enable/disable, and set variable names. **Refuses** a literal secret. |
 | `PUT` | `/config/channels/:id/secrets` | Save credential **values** — `{"fields":{"<field>":"<value>"}}`. Write-only: the value goes to `secrets.env` beside the database and into the process environment, effective immediately, and the response is the usual names-and-`isSet` shape. `400` for an unknown field or an unusable value. |
 | `DELETE` | `/config/channels/:id/secrets/:field` | Forget a saved value. `409` if the variable came from the container's environment instead. |
@@ -1174,13 +1252,20 @@ in the `ConfigSource` and `StateStore` they inject.
    interval ±10% jitter, so a slow cycle delays the next rather than overlapping it
    and a fleet of instances never hits a provider in lockstep. It re-reads the
    configuration every cycle, which is what makes UI changes take effect with no
-   restart. A cycle that throws is logged and the loop keeps running.
+   restart. A cycle that throws is logged and the loop keeps running. The tick is
+   the shortest cadence anything asked for: it takes the configuration's own
+   shortest interval and then asks the poller, which may only ask for *sooner* —
+   that is how an open incident tightens the loop without an interval change.
 
 2. **Poller** — staggers providers 250ms apart, then runs them under
    `Promise.allSettled` so one provider's failure cannot affect another's result.
    Up to `maxRetries` attempts each, exponential backoff plus jitter, every request
    under its own timeout. On exhausted retries it records the failure and leaves the
-   stored status untouched.
+   stored status untouched. It also decides who is *due*: a provider is polled when
+   its own cadence has elapsed — its `intervalMinutes`, the global one when it names
+   none, or `adaptiveIntervalMinutes` while it has an open incident — so a tick
+   pulled down to a minute by one provider in trouble does not sweep the whole fleet
+   along with it.
 
 3. **Adapters** — turn a provider's raw response into the normalised shape:
 

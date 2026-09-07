@@ -59,6 +59,8 @@ test("a full file maps onto a runtime config with the polling keys flattened", a
     requestTimeoutSeconds: 12,
     maxRetries: 2,
     failureThreshold: 4,
+    adaptivePolling: true,
+    adaptiveIntervalMinutes: 1,
   });
   assert.equal(config.locale, "it");
   assert.equal(config.services.length, 2);
@@ -101,6 +103,8 @@ test("omitted optional keys fall back to the documented defaults", async () => {
     requestTimeoutSeconds: 8,
     maxRetries: 3,
     failureThreshold: 5,
+    adaptivePolling: true,
+    adaptiveIntervalMinutes: 1,
   });
   assert.equal(config.locale, "en");
   assert.deepEqual(config.channels, []);
@@ -300,4 +304,28 @@ test("the config source reads the file on every load, so an edit applies without
 
   await writeFile(path, `pollIntervalMinutes: 9\n${MINIMAL}`, "utf8");
   assert.equal((await source.load()).polling.intervalMinutes, 9);
+});
+
+test("the file's adaptive polling keys reach the runtime config", async () => {
+  // Roadmap 2.3. Both editions read the same shared polling schema, so the one
+  // thing this edition has to get right is passing the file's keys through.
+  const path = await configFile(`
+adaptivePolling: false
+adaptiveIntervalMinutes: 5
+${MINIMAL}
+`);
+
+  const config = await loadConfig(path, {});
+
+  assert.equal(config.polling.adaptivePolling, false);
+  assert.equal(config.polling.adaptiveIntervalMinutes, 5);
+});
+
+test("an adaptive cadence of zero is refused rather than silently ignored", async () => {
+  const path = await configFile(`
+adaptiveIntervalMinutes: 0
+${MINIMAL}
+`);
+
+  await assert.rejects(loadConfig(path, {}), /adaptiveIntervalMinutes/);
 });

@@ -91,6 +91,12 @@ const notificationRowSchema = z.object({
   sent_at: z.string(),
   ok: z.number(),
   error: z.string().nullable(),
+  /**
+   * Coerced with a fallback rather than required: the column arrived with
+   * retries (roadmap 3.14) and a row written before the migration reads back
+   * as one attempt, which is what it was.
+   */
+  attempts: z.coerce.number().int().positive().catch(1),
 });
 
 const bucketRowSchema = z.object({
@@ -192,6 +198,7 @@ function toSentRecord(row: z.infer<typeof notificationRowSchema>): SentRecord {
     text: row.text,
     sentAt: row.sent_at,
     ok: row.ok === 1,
+    attempts: row.attempts,
     ...(row.error === null ? {} : { error: row.error }),
   };
 }
@@ -272,7 +279,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     "UPDATE incidents SET resolved_at = ? WHERE provider_id = ? AND resolved_at IS NULL",
   );
   const insertNotification = db.prepare(
-    "INSERT INTO notifications (provider_id, channel, kind, text, sent_at, ok, error) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO notifications (provider_id, channel, kind, text, sent_at, ok, error, attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
   const selectEarliestSampleTime = db.prepare(
     "SELECT MIN(observed_at) AS earliest FROM status_samples WHERE provider_id = ?",
@@ -410,6 +417,10 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         record.sentAt,
         record.ok ? 1 : 0,
         record.error ?? null,
+        // Defaulted, not required: a caller from before retries existed
+        // (roadmap 3.14) tried exactly once, which is what the column then
+        // says — the same reading the migration gave the rows already stored.
+        record.attempts ?? 1,
       );
     },
 
@@ -421,7 +432,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       const where = scope === null ? "" : `WHERE ${scope.clause}`;
       const rows = db
         .prepare(
-          `SELECT provider_id, channel, kind, text, sent_at, ok, error
+          `SELECT provider_id, channel, kind, text, sent_at, ok, error, attempts
            FROM notifications ${where} ORDER BY sent_at DESC, id DESC LIMIT ?`,
         )
         .all(...(scope?.params ?? []), limit)
@@ -453,7 +464,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
 
       return db
         .prepare(
-          `SELECT provider_id, channel, kind, text, sent_at, ok, error
+          `SELECT provider_id, channel, kind, text, sent_at, ok, error, attempts
            FROM notifications ${where} ORDER BY sent_at DESC, id DESC ${window}`,
         )
         .all(...params)

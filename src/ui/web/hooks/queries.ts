@@ -323,6 +323,9 @@ const WRITE_KEYS = [
   ["incident"],
   ["notifications"],
   ["maintenances"],
+  // A poll interval or a provider added changes how many samples a day the
+  // retention cost is projected from.
+  ["storage"],
 ];
 
 function useInvalidateAll() {
@@ -350,6 +353,15 @@ export function useServiceMutations() {
     purge: useMutation({ mutationFn: api.purgeService, onSuccess: invalidate }),
     test: useMutation({ mutationFn: api.testService }),
   };
+}
+
+/**
+ * The retention cost report. Read once per view rather than on the shared
+ * polling interval: it measures the database on the server, and the number an
+ * operator is reading only moves as history accumulates over days.
+ */
+export function useStorage() {
+  return useQuery({ queryKey: ["storage"], queryFn: api.getStorage });
 }
 
 export function useSettingsMutation() {

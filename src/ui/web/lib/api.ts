@@ -19,6 +19,7 @@ import type {
   SentRecord,
   ServiceImpact,
   StatusResponse,
+  StorageReport,
 } from "./types.ts";
 import type { PushSubscriptionBody } from "./push.ts";
 
@@ -176,6 +177,7 @@ export const testService = (id: string) =>
     `/config/services/${encodeURIComponent(id)}/test`,
   );
 export const patchSettings = (patch: unknown) => request<unknown>("PATCH", "/config/settings", patch);
+export const getStorage = () => request<StorageReport>("GET", "/config/storage");
 /** Every edit, add, delete and reorder saves the whole ordered list — see RoutingRules.tsx. */
 export const putRouting = (rules: RoutingRule[]) =>
   request<RoutingResponse>("PUT", "/config/routing", { rules });

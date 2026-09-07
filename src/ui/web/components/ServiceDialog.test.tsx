@@ -41,6 +41,7 @@ function interceptWrites(responses: Record<string, unknown>): RecordedCall[] {
 
 const config = {
   polling: { intervalMinutes: 5, requestTimeoutSeconds: 10, maxRetries: 3, failureThreshold: 3 },
+  retention: { days: 120 },
   locale: "en",
   services: [
     {

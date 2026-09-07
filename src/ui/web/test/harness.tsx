@@ -14,6 +14,7 @@ import type { ProviderStatus } from "@/lib/types.ts";
 type FixtureKey =
   | "status"
   | "config"
+  | "storage"
   | "history"
   | "incidents"
   | "incident"
@@ -40,6 +41,8 @@ export interface Fixtures {
   maintenances?: unknown;
   /** `/config/services/:id/impact`, matched before `/config` — it is a nested config path. */
   serviceImpact?: unknown;
+  /** `/config/storage`, matched before `/config` — the retention cost report. */
+  storage?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -79,7 +82,9 @@ export function stubApi(fixtures: Fixtures): void {
                     ? "notifications"
                     : path.endsWith("/impact")
                       ? "serviceImpact"
-                      : path.startsWith("/config")
+                      : path.startsWith("/config/storage")
+                        ? "storage"
+                        : path.startsWith("/config")
                         ? "config"
                         : path.startsWith("/map")
                           ? "map"

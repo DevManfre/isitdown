@@ -67,6 +67,7 @@ async function openIncidents(runtime: UiRuntime): Promise<string[]> {
       text: `${id} is down`,
       sentAt: new Date().toISOString(),
       ok: true,
+      attempts: 1,
     });
   }
   return ids;

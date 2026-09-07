@@ -3,7 +3,7 @@ import type { RuntimeConfig, ServiceDefinition } from "./configSource.interface.
 import { diff } from "./diffEngine.ts";
 import type { StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
-import type { StateStore } from "./stateStore.interface.ts";
+import type { ProviderRuntimeState, StateStore } from "./stateStore.interface.ts";
 import type { NormalizedStatus, StatusChange } from "./types.ts";
 
 const STAGGER_MS = 250;
@@ -46,6 +46,15 @@ export interface CycleOptions {
 
 export interface Poller {
   runCycle(config: RuntimeConfig, options?: CycleOptions): Promise<CycleResult>;
+  /**
+   * The shortest cadence any enabled provider is asking for right now, in
+   * minutes — which is how often the scheduler has to tick for nobody to be
+   * starved. It lives here rather than in the scheduler because the answer
+   * depends on stored state, not only on the configuration: a provider with an
+   * open incident asks for the adaptive cadence (roadmap 2.3), and the poller
+   * is the one thing that reads both.
+   */
+  nextIntervalMinutes(config: RuntimeConfig): Promise<number>;
 }
 
 export interface PollerDeps {
@@ -204,24 +213,80 @@ export function createPoller(deps: PollerDeps): Poller {
   }
 
   /**
-   * A provider with no interval of its own is governed by the scheduler's tick,
-   * exactly as it was before intervals became per-provider — the poller only
-   * holds back the ones that asked to be polled less often than the tick runs.
+   * Whether the provider's last reading was anything but calm.
+   *
+   * An open incident or a status worse than operational counts; `unknown` does
+   * not. `unknown` is what a provider we have never read successfully looks
+   * like, and polling a page we cannot parse every minute would hammer it for
+   * nothing — a failing fetch is already the retry and failure-threshold
+   * path's business, not this one's.
    */
-  function isDue(service: ServiceDefinition, at: number): boolean {
-    if (service.intervalMinutes === undefined) return true;
+  function inTrouble(state: ProviderRuntimeState): boolean {
+    const last = state.last;
+    if (last === null) return false;
+    return (
+      last.activeIncidents.length > 0 ||
+      (last.overallStatus !== "operational" && last.overallStatus !== "unknown")
+    );
+  }
+
+  /**
+   * How often this provider wants to be polled: its own interval, the global
+   * one when it has none, and the adaptive cadence while it is in trouble.
+   *
+   * The adaptive value is taken as a *minimum* against what was configured,
+   * never as a replacement: a provider deliberately put on an hourly cadence
+   * still gets watched closely through its incident, and one already polled
+   * more often than the adaptive cadence is not slowed down by having one.
+   */
+  function effectiveIntervalMinutes(
+    service: ServiceDefinition,
+    config: RuntimeConfig,
+    state: ProviderRuntimeState,
+  ): number {
+    const configured = service.intervalMinutes ?? config.polling.intervalMinutes;
+    if (!config.polling.adaptivePolling || !inTrouble(state)) return configured;
+    return Math.min(configured, config.polling.adaptiveIntervalMinutes);
+  }
+
+  /**
+   * The scheduler ticks at the shortest cadence anything asked for, so every
+   * provider on a slower one has to sit ticks out here. That now includes the
+   * providers with no interval of their own: before adaptive polling the tick
+   * *was* the global cadence and they could simply follow it, but a single
+   * provider in trouble pulls the tick down to the adaptive cadence, and the
+   * rest of the fleet must not come along with it.
+   */
+  async function isDue(service: ServiceDefinition, at: number, config: RuntimeConfig): Promise<boolean> {
     const last = lastAttemptAt.get(service.id);
     if (last === undefined) return true;
-    return at - last >= service.intervalMinutes * 60_000 * (1 - DUE_SLACK);
+    const interval = effectiveIntervalMinutes(service, config, await store.getState(service.id));
+    return at - last >= interval * 60_000 * (1 - DUE_SLACK);
   }
 
   return {
+    async nextIntervalMinutes(config: RuntimeConfig): Promise<number> {
+      let shortest = config.polling.intervalMinutes;
+      for (const service of config.services) {
+        if (!service.enabled) continue;
+        shortest = Math.min(
+          shortest,
+          effectiveIntervalMinutes(service, config, await store.getState(service.id)),
+        );
+      }
+      return shortest;
+    },
+
     async runCycle(config: RuntimeConfig, options: CycleOptions = {}): Promise<CycleResult> {
       const startedAt = new Date().toISOString();
       const at = now();
-      const enabled = config.services.filter(
-        (service) => service.enabled && (options.ignoreSchedule === true || isDue(service, at)),
-      );
+      // A loop rather than `filter`: whether a provider is due now depends on
+      // its stored state, and reading that is asynchronous.
+      const enabled: ServiceDefinition[] = [];
+      for (const service of config.services) {
+        if (!service.enabled) continue;
+        if (options.ignoreSchedule === true || (await isDue(service, at, config))) enabled.push(service);
+      }
       for (const service of enabled) lastAttemptAt.set(service.id, at);
       // A provider removed from the configuration must not keep its slot here,
       // or a long-lived process accumulates one per id it has ever seen.

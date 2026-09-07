@@ -16,9 +16,10 @@ import {
   usePreferencesMutation,
   useServiceMutations,
   useSettingsMutation,
+  useStorage,
 } from "@/hooks/queries.ts";
 import { useFieldProps } from "@/hooks/useBusy.tsx";
-import { formatRelative, hostOf } from "@/lib/format.ts";
+import { formatBytes, formatRelative, hostOf } from "@/lib/format.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { MapView } from "@/lib/types.ts";
 
@@ -37,6 +38,9 @@ const POLLING_BOUNDS = {
   maxRetries: { min: 1, max: 10, labelKey: "field.retries" },
 } as const;
 
+/** Same bounds `pollingSchema` enforces for the adaptive cadence, same reason. */
+const ADAPTIVE_BOUNDS = { min: 1, max: 1440 } as const;
+
 /** Long enough that a two-keystroke number is one save, short enough to feel immediate. */
 const POLLING_DEBOUNCE_MS = 600;
 
@@ -52,12 +56,16 @@ const POLLING_DEBOUNCE_MS = 600;
  * environment variable carries it is behind the row's own toggle, along with
  * whether that variable currently resolves.
  */
+/** Same reason as `POLLING_BOUNDS`: instant-apply must not fire a half-typed number at the server. */
+const RETENTION_BOUNDS = { min: 7, max: 3650 };
+
 export function Settings() {
   const { t, i18n } = useTranslation();
   const { data: config } = useConfig();
   const { data: preferences } = usePreferences();
   const patchPreferences = usePreferencesMutation();
   const settingsMutation = useSettingsMutation();
+  const { data: storage } = useStorage();
   const { patch: servicePatch, restore: serviceRestore, purge: servicePurge } = useServiceMutations();
   // Above the early return below: a hook cannot be called conditionally.
   const fieldProps = useFieldProps();
@@ -66,6 +74,11 @@ export function Settings() {
   const [timeout_, setTimeout_] = useState<number | undefined>(undefined);
   const [retries, setRetries] = useState<number | undefined>(undefined);
   const [pollingStatus, setPollingStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(undefined);
+  const [adaptiveInterval_, setAdaptiveInterval] = useState<number | undefined>(undefined);
+  const [retentionDays_, setRetentionDays] = useState<number | undefined>(undefined);
+  const [retentionStatus, setRetentionStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
+    undefined,
+  );
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [openChannel, setOpenChannel] = useState<string | undefined>(undefined);
 
@@ -80,6 +93,12 @@ export function Settings() {
   const interval = interval_ ?? config.polling.intervalMinutes;
   const timeout = timeout_ ?? config.polling.requestTimeoutSeconds;
   const maxRetries = retries ?? config.polling.maxRetries;
+  // Defaulted rather than assumed present: a server from before adaptive
+  // polling (roadmap 2.3) answers without these two, and the section still has
+  // to render.
+  const adaptivePolling = config.polling.adaptivePolling ?? true;
+  const adaptiveInterval = adaptiveInterval_ ?? config.polling.adaptiveIntervalMinutes ?? 1;
+  const retentionDays = retentionDays_ ?? config.retention.days;
   // Defaulted rather than assumed: the section only exists when a removal is
   // waiting, and an older payload carries no list at all.
   const removed = config.removed ?? [];
@@ -113,6 +132,58 @@ export function Settings() {
   const schedulePolling = (next: Parameters<typeof commitPolling>[0]): void => {
     if (debounce.current !== undefined) clearTimeout(debounce.current);
     debounce.current = setTimeout(() => commitPolling(next), POLLING_DEBOUNCE_MS);
+  };
+
+  /**
+   * The adaptive pair saves on its own rather than through `commitPolling`: the
+   * switch is an instant apply with nothing to debounce, and sending the three
+   * engine numbers along with it would write fields the operator did not touch.
+   */
+  const commitAdaptive = (patch: { adaptivePolling?: boolean; adaptiveIntervalMinutes?: number }): void => {
+    const minutes = patch.adaptiveIntervalMinutes;
+    if (
+      minutes !== undefined &&
+      (!Number.isInteger(minutes) || minutes < ADAPTIVE_BOUNDS.min || minutes > ADAPTIVE_BOUNDS.max)
+    ) {
+      setPollingStatus({
+        text: t("settings.out-of-range", {
+          field: t("field.adaptive-interval"),
+          min: ADAPTIVE_BOUNDS.min,
+          max: ADAPTIVE_BOUNDS.max,
+        }),
+        tone: "error",
+      });
+      return;
+    }
+    setPollingStatus(undefined);
+    settingsMutation.mutate(patch, {
+      onSuccess: () => setPollingStatus({ text: t("settings.saved"), tone: "ok" }),
+      onError: (error) =>
+        setPollingStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+    });
+  };
+
+  const commitRetention = (days: number): void => {
+    if (!Number.isInteger(days) || days < RETENTION_BOUNDS.min || days > RETENTION_BOUNDS.max) {
+      setRetentionStatus({
+        text: t("settings.out-of-range", {
+          field: t("field.retention"),
+          min: RETENTION_BOUNDS.min,
+          max: RETENTION_BOUNDS.max,
+        }),
+        tone: "error",
+      });
+      return;
+    }
+    setRetentionStatus(undefined);
+    settingsMutation.mutate(
+      { retentionDays: days },
+      {
+        onSuccess: () => setRetentionStatus({ text: t("settings.saved"), tone: "ok" }),
+        onError: (error) =>
+          setRetentionStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+      },
+    );
   };
 
   return (
@@ -172,6 +243,38 @@ export function Settings() {
           />
           <span className="font-mono text-xs text-muted-foreground">{t("unit.seconds")}</span>
         </SettingRow>
+        <SettingRow label={t("field.adaptive")} description={t("field.adaptive.hint")} align="top">
+          <Switch
+            id="adaptive-polling"
+            aria-label={t("field.adaptive")}
+            checked={adaptivePolling}
+            onCheckedChange={(next) => commitAdaptive({ adaptivePolling: next })}
+          />
+        </SettingRow>
+        {/* Only while it is on: a cadence for a behaviour that is switched off
+            is a field that changes nothing. */}
+        {adaptivePolling && (
+          <SettingRow
+            label={t("field.adaptive-interval")}
+            description={t("field.adaptive-interval.hint")}
+            align="top"
+          >
+            <Input
+              id="adaptive-interval"
+              aria-label={t("field.adaptive-interval")}
+              type="number"
+              className="w-20 text-right font-mono"
+              value={adaptiveInterval}
+              onChange={(event) => setAdaptiveInterval(Number(event.target.value))}
+              onFocus={fieldProps.onFocus}
+              onBlur={() => {
+                fieldProps.onBlur();
+                commitAdaptive({ adaptiveIntervalMinutes: adaptiveInterval });
+              }}
+            />
+            <span className="font-mono text-xs text-muted-foreground">{t("unit.minutes")}</span>
+          </SettingRow>
+        )}
         <SettingRow label={t("field.retries")} description={t("field.retries.hint")} align="top">
           <Input
             id="polling-retries"
@@ -320,7 +423,60 @@ export function Settings() {
         </SettingRow>
       </SettingsSection>
 
-      <SettingsSection title={t("settings.section.appearance")} delay={stagger(3, SECTION_CASCADE)}>
+      <SettingsSection
+        title={t("settings.section.data")}
+        status={
+          retentionStatus === undefined ? undefined : (
+            <span
+              className={retentionStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}
+            >
+              {retentionStatus.text}
+            </span>
+          )
+        }
+        delay={stagger(3, SECTION_CASCADE)}
+      >
+        <SettingRow
+          label={t("field.retention")}
+          description={
+            <>
+              {t("field.retention.hint")}
+              {/* The number that makes the choice a decision rather than a
+                  guess: what this window costs, beside what the database
+                  already weighs. */}
+              <span data-testid="retention-cost" className="mt-0.5 block font-mono">
+                {storage === undefined
+                  ? "—"
+                  : t(storage.measured ? "settings.retention.cost" : "settings.retention.cost-estimated", {
+                      projected: formatBytes(
+                        i18n.language,
+                        storage.bytesPerSample * storage.samplesPerDay * retentionDays,
+                      ),
+                      current: formatBytes(i18n.language, storage.dbBytes),
+                    })}
+              </span>
+            </>
+          }
+          align="top"
+        >
+          <Input
+            id="retention-days"
+            aria-label={t("field.retention")}
+            type="number"
+            className="w-20 text-right font-mono"
+            value={retentionDays}
+            onChange={(event) => setRetentionDays(Number(event.target.value))}
+            onFocus={fieldProps.onFocus}
+            onBlur={() => {
+              fieldProps.onBlur();
+              commitRetention(retentionDays);
+            }}
+          />
+          <span className="font-mono text-xs text-muted-foreground">{t("unit.days")}</span>
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection title={t("settings.section.appearance")} delay={stagger(4, SECTION_CASCADE)}>
         <SettingRow
           label={t("settings.map-view.label")}
           description={t("settings.map-view.hint")}

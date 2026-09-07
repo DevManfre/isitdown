@@ -128,6 +128,34 @@ describe("DeliveryLog", () => {
     expect(row).toHaveAttribute("aria-expanded", "true");
   });
 
+  it("names a retried failure a dead letter, with what it cost", async () => {
+    // "Failed" reads like something that might still arrive; a spent retry
+    // budget is a lost alert, and the badge has to say so.
+    render([{ ...failed, attempts: 3 }, sent]);
+
+    const row = await rows().findByRole("button", { name: (name) => name.includes("GitHub") });
+    expect(within(row).getByText(i18n.t("delivery.result.dead"))).toBeInTheDocument();
+
+    await userEvent.click(row);
+
+    expect(
+      await screen.findByText(i18n.t("delivery.attempts.dead", { attempts: 3 })),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps calling a one-attempt failure failed, and says nothing about attempts", async () => {
+    render();
+
+    const row = await rows().findByRole("button", { name: (name) => name.includes("GitHub") });
+    expect(within(row).getByText(i18n.t("delivery.result.failed"))).toBeInTheDocument();
+
+    await userEvent.click(row);
+
+    // A row stored before retries existed carries no count, so the view must
+    // not invent one for it.
+    expect(screen.queryByText(/attempt/i)).not.toBeInTheDocument();
+  });
+
   it("says that nothing failed rather than showing a blank panel", async () => {
     render([], { all: 4, sent: 4, failed: 0 });
 

@@ -56,6 +56,8 @@ test("load maps the seeded database onto a usable runtime config", async () => {
     requestTimeoutSeconds: 8,
     maxRetries: 3,
     failureThreshold: 5,
+    adaptivePolling: true,
+    adaptiveIntervalMinutes: 1,
   });
   assert.equal(config.locale, "en");
   assert.deepEqual(
@@ -562,5 +564,42 @@ test("a removed service's id cannot be updated or re-described", async () => {
   // its way out, and a route must 404 rather than edit it back into service.
   assert.equal(updateService(db, "github", { name: "GitHub" }), false);
   assert.equal(describeServiceImpact(db, "github"), null);
+  db.close();
+});
+
+test("retention defaults to 120 days and refuses a value outside its bounds", async () => {
+  const db = await freshDb();
+  assert.equal(readSettings(db, silent).retentionDays, 120);
+
+  writeSettings(db, { retentionDays: 365 });
+  assert.equal(readSettings(db, silent).retentionDays, 365);
+
+  writeSettings(db, { retentionDays: 4000 });
+  const warnings: string[] = [];
+  assert.equal(readSettings(db, createLogger("warn", (line) => warnings.push(line))).retentionDays, 120);
+  assert.match(warnings.join(" "), /retentionDays/);
+  db.close();
+});
+
+test("adaptive polling is a stored setting, off when the operator switched it off", async () => {
+  // Roadmap 2.3. The switch lives in SQLite like every other setting, so a
+  // dashboard change reaches the poller on the next cycle with no restart.
+  const db = await freshDb();
+  writeSettings(db, { adaptivePolling: false, adaptiveIntervalMinutes: 5 });
+
+  const config = await createDbConfigSource(db, {}, silent).load();
+
+  assert.equal(config.polling.adaptivePolling, false);
+  assert.equal(config.polling.adaptiveIntervalMinutes, 5);
+  db.close();
+});
+
+test("an unusable adaptive cadence falls back rather than stopping the cycle", async () => {
+  const db = await freshDb();
+  writeSettings(db, { adaptiveIntervalMinutes: "every so often" });
+
+  const config = await createDbConfigSource(db, {}, silent).load();
+
+  assert.equal(config.polling.adaptiveIntervalMinutes, 1);
   db.close();
 });

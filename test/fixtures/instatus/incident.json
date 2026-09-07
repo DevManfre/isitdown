@@ -1,0 +1,27 @@
+{
+  "page": {
+    "name": "testing-sms",
+    "url": "https://instatus.instatus.com",
+    "status": "HASISSUES"
+  },
+  "activeIncidents": [
+    {
+      "id": "clq3wc2ap1350bronl8974nko",
+      "name": "partial",
+      "started": "2023-12-13T14:58:14.917Z",
+      "status": "INVESTIGATING",
+      "impact": "PARTIALOUTAGE",
+      "url": "https://instatus.instatus.com/clq3wc2ap1350bronl8974nko",
+      "updatedAt": "2025-10-04T17:08:17.917Z"
+    },
+    {
+      "id": "clq3wa0jh18301b7ogv9747apy",
+      "name": "degraded",
+      "started": "2023-12-13T14:56:36.026Z",
+      "status": "INVESTIGATING",
+      "impact": "DEGRADEDPERFORMANCE",
+      "url": "https://instatus.instatus.com/clq3wa0jh18301b7ogv9747apy",
+      "updatedAt": "2025-10-04T17:08:17.528Z"
+    }
+  ]
+}

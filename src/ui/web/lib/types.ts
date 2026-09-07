@@ -222,6 +222,13 @@ export interface SentRecord {
   sentAt: string;
   ok: boolean;
   error?: string;
+  /**
+   * How many times the channel was asked to take the message. Optional because
+   * a row written before retries existed (roadmap 3.14) carries no count, and
+   * the view has to render that row rather than claim a number for it. A failed
+   * record with more than one attempt is a dead letter: every try was spent.
+   */
+  attempts?: number;
 }
 
 /** Which slice of the delivery log the view is asking for. */
@@ -330,7 +337,12 @@ export interface RuntimeConfigResponse {
     requestTimeoutSeconds: number;
     maxRetries: number;
     failureThreshold: number;
+    /** Poll a provider with an open incident on the cadence below — roadmap 2.3. */
+    adaptivePolling?: boolean;
+    adaptiveIntervalMinutes?: number;
   };
+  /** How long history is kept before the daily prune takes it. */
+  retention: { days: number };
   services: ServiceDefinition[];
   channels: DescribedChannel[];
   routing: RoutingResponse;
@@ -380,4 +392,18 @@ export interface Preferences {
   uiLocale: string;
   notificationLocale: string;
   mapView: MapView;
+}
+
+/**
+ * What a retention window costs on disk, measured server-side. The dashboard
+ * multiplies the last three itself so the projection tracks a half-typed
+ * number without a request per keystroke.
+ */
+export interface StorageReport {
+  dbBytes: number;
+  sampleCount: number;
+  bytesPerSample: number;
+  /** False when `bytesPerSample` is the server's built-in figure, not this database's. */
+  measured: boolean;
+  samplesPerDay: number;
 }

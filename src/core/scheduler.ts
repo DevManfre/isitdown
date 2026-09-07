@@ -78,9 +78,17 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 
   async function runCycle(ignoreSchedule: boolean): Promise<CycleResult> {
     const config = await configSource.load();
+    // Set before the cycle as well as after it, so a cycle that throws still
+    // arms the next one on the configuration it managed to read.
     lastIntervalMinutes = tickIntervalMinutes(config);
 
     const result = await poller.runCycle(config, { ignoreSchedule });
+    // Read *after* the cycle: a provider whose incident opened in it should be
+    // watched from now rather than from the tick after next. The poller may only
+    // ask for a shorter cadence than the configuration's — never a longer one —
+    // so the minimum is what protects the operator's own interval from a
+    // poller (or a stub) reporting something coarser.
+    lastIntervalMinutes = Math.min(lastIntervalMinutes, await poller.nextIntervalMinutes(config));
     await dispatcher.dispatch(result.changes, {
       services: config.services,
       locale: config.locale,

@@ -6,6 +6,17 @@ export interface PollingConfig {
   maxRetries: number;
   /** Consecutive failures before one "monitoring degraded" warning is sent. */
   failureThreshold: number;
+  /**
+   * Whether a provider in trouble is polled faster than its own cadence.
+   * See `adaptiveIntervalMinutes`.
+   */
+  adaptivePolling: boolean;
+  /**
+   * The cadence a provider with an open incident is polled on while
+   * `adaptivePolling` is set. The poller takes the shorter of this and the
+   * provider's own interval, so it can only ever speed a provider up.
+   */
+  adaptiveIntervalMinutes: number;
 }
 
 export interface ServiceDefinition {

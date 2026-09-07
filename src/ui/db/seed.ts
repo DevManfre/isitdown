@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   requestTimeoutSeconds: "8",
   maxRetries: "3",
   failureThreshold: "5",
+  retentionDays: "120",
   theme: "system",
   uiLocale: "en",
   notificationLocale: "en",

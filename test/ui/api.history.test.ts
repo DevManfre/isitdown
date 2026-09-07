@@ -346,6 +346,7 @@ test("an incident detail carries the timeline, the action log and the recent pol
       text: "🔴 GitHub — MAJOR OUTAGE",
       sentAt: at(0, 10),
       ok: true,
+      attempts: 1,
     });
 
     const { status, body } = await app.get("/incidents/github/i1");
@@ -424,6 +425,7 @@ test("the notification feed is newest first and capped", async () => {
         text: `note ${i}`,
         sentAt: new Date(Date.now() - (5 - i) * 60_000).toISOString(),
         ok: true,
+        attempts: 1,
       });
     }
 
@@ -478,6 +480,7 @@ test("an incident's action log shows only that provider's notifications", async 
         text,
         sentAt: at(0, 10),
         ok: true,
+        attempts: 1,
       });
     }
 

@@ -93,3 +93,19 @@ export function notificationHeadline(text: string): string {
   const [first = ""] = text.split("\n");
   return first.replace(/^[^\p{L}\p{N}]+/u, "").trim();
 }
+
+/**
+ * A size in the locale's own unit notation, e.g. "10.5 MB" / "10,5 MB".
+ *
+ * Decimal units, not binary: this sits next to a retention window an operator
+ * compares against what a disk or a volume quota is sold in.
+ */
+export function formatBytes(locale: string, bytes: number): string {
+  const [unit, divisor]: [string, number] =
+    bytes < 1e6 ? ["kilobyte", 1e3] : bytes < 1e9 ? ["megabyte", 1e6] : ["gigabyte", 1e9];
+  return new Intl.NumberFormat(locale, {
+    style: "unit",
+    unit,
+    maximumFractionDigits: 1,
+  }).format(bytes / divisor);
+}
