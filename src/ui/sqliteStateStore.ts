@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
-import type { ProviderRuntimeState } from "../core/stateStore.interface.ts";
+import type { ProviderRuntimeState, SaveStatusMeta } from "../core/stateStore.interface.ts";
 import { componentStatusSchema, incidentSchema, maintenanceWindowSchema } from "../core/status.schema.ts";
 import { STATUS_CHANGE_KINDS } from "../core/types.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
@@ -253,7 +253,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     ON CONFLICT (provider_id) DO UPDATE SET degraded_notified = excluded.degraded_notified
   `);
   const insertSample = db.prepare(
-    "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok) VALUES (?, ?, ?, ?)",
+    "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok, latency_ms) VALUES (?, ?, ?, ?, ?)",
   );
   const insertComponentSample = db.prepare(
     "INSERT INTO component_samples (provider_id, component_id, observed_at, status, ok) VALUES (?, ?, ?, ?, ?)",
@@ -320,7 +320,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       };
     },
 
-    async saveStatus(status: NormalizedStatus): Promise<void> {
+    async saveStatus(status: NormalizedStatus, meta?: SaveStatusMeta | undefined): Promise<void> {
       db.exec("BEGIN");
       try {
         upsertState.run(
@@ -336,6 +336,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
           status.fetchedAt,
           status.overallStatus,
           status.overallStatus === "operational" ? 1 : 0,
+          meta?.latencyMs ?? null,
         );
 
         // `unknown` writes no sample: an unmeasured component must not read as

@@ -581,3 +581,76 @@ test("the jitter the scheduler arms with never costs a due provider its cycle", 
   );
   await provider.close();
 });
+
+test("the latency of the read behind a status reaches the store", async () => {
+  const store = await freshStore();
+  const saved: (number | undefined)[] = [];
+  const timer = fakeSleep();
+  // A stub adapter reports the read itself, the way every real one forwards
+  // `onRead` to the conditional-fetch helper.
+  const poller = createPoller({
+    getAdapter: () => ({
+      id: "stub",
+      fetchStatus: async (service, ctx) => {
+        ctx.onRead?.({ latencyMs: 42, notModified: false });
+        return {
+          provider: service.id,
+          overallStatus: "operational",
+          activeIncidents: [],
+          components: [],
+          fetchedAt: new Date().toISOString(),
+        };
+      },
+    }),
+    store: {
+      ...store,
+      saveStatus: async (status, meta) => {
+        saved.push(meta?.latencyMs);
+        await store.saveStatus(status, meta);
+      },
+    },
+    logger: silent,
+    sleep: timer.sleep,
+  });
+
+  try {
+    await poller.runCycle(config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]));
+    assert.deepEqual(saved, [42]);
+  } finally {
+    await store.close();
+  }
+});
+
+test("a read that measured nothing saves no latency rather than a zero", async () => {
+  const store = await freshStore();
+  const saved: (number | undefined)[] = [];
+  const timer = fakeSleep();
+  const poller = createPoller({
+    getAdapter: () => ({
+      id: "stub",
+      fetchStatus: async (service) => ({
+        provider: service.id,
+        overallStatus: "operational",
+        activeIncidents: [],
+        components: [],
+        fetchedAt: new Date().toISOString(),
+      }),
+    }),
+    store: {
+      ...store,
+      saveStatus: async (status, meta) => {
+        saved.push(meta?.latencyMs);
+        await store.saveStatus(status, meta);
+      },
+    },
+    logger: silent,
+    sleep: timer.sleep,
+  });
+
+  try {
+    await poller.runCycle(config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]));
+    assert.deepEqual(saved, [undefined]);
+  } finally {
+    await store.close();
+  }
+});

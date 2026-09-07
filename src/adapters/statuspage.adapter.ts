@@ -351,6 +351,7 @@ async function readJson(path: string, service: ServiceRef, ctx: FetchContext, la
     providerId: service.id,
     accept: "application/json",
     timeoutMs: ctx.timeoutMs,
+    onRead: ctx.onRead,
     label,
   });
   try {

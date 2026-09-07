@@ -125,6 +125,7 @@ async function readFeed(service: ServiceRef, ctx: FetchContext): Promise<string>
     providerId: service.id,
     accept: ACCEPT,
     timeoutMs: ctx.timeoutMs,
+    onRead: ctx.onRead,
     label: "azure fetch",
   });
 }

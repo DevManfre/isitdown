@@ -37,6 +37,19 @@ function decode(bytes: ArrayBuffer, contentType: string | null): string {
   }
 }
 
+/** One completed read of a status page, reported so the caller can record it. */
+export interface StatusPageRead {
+  /**
+   * Time to the response headers. The body transfer is deliberately outside it:
+   * `fetch` resolves on the headers and a 304 carries no body at all, so
+   * including the download would make a revalidated read look faster than a
+   * full one for reasons that say nothing about the provider's health.
+   */
+  latencyMs: number;
+  /** A 304 — a real round trip, but the body was replayed from the cache. */
+  notModified: boolean;
+}
+
 interface CacheEntry {
   etag?: string | undefined;
   lastModified?: string | undefined;
@@ -50,6 +63,8 @@ export interface ConditionalFetchOptions {
   timeoutMs: number;
   /** Prefixes the error a failed read throws, e.g. "statuspage fetch". */
   label: string;
+  /** Called once per successful read, a 304 included. A failed read reports nothing. */
+  onRead?: ((read: StatusPageRead) => void) | undefined;
 }
 
 /**
@@ -100,6 +115,7 @@ export async function fetchConditional(url: string, opts: ConditionalFetchOption
   else if (cached?.lastModified !== undefined) headers["if-modified-since"] = cached.lastModified;
 
   let response: Response;
+  const askedAt = Date.now();
   try {
     response = await fetch(url, { headers, signal: AbortSignal.timeout(opts.timeoutMs) });
   } catch (error) {
@@ -109,8 +125,13 @@ export async function fetchConditional(url: string, opts: ConditionalFetchOption
     throw error;
   }
 
+  const latencyMs = Date.now() - askedAt;
+
   if (response.status === 304) {
-    if (cached !== undefined) return cached.body;
+    if (cached !== undefined) {
+      opts.onRead?.({ latencyMs, notModified: true });
+      return cached.body;
+    }
     // Only reachable from a provider answering 304 to a request that carried no
     // validator. There is no body to fall back on, and reporting an empty
     // reading would look like a provider with nothing wrong.
@@ -136,5 +157,6 @@ export async function fetchConditional(url: string, opts: ConditionalFetchOption
     // for a page that no longer supports conditional reads.
     cache.delete(key);
   }
+  opts.onRead?.({ latencyMs, notModified: false });
   return body;
 }
