@@ -10,6 +10,8 @@ pollIntervalMinutes: 3      # how often to poll every provider
 requestTimeoutSeconds: 8    # per-request timeout
 maxRetries: 3               # attempts per provider per cycle, with backoff
 failureThreshold: 5         # consecutive failures before a "monitoring degraded" warning
+adaptivePolling: true       # while a provider has an open incident, poll it on the cadence below
+adaptiveIntervalMinutes: 1  # that cadence; never slower than the provider's own interval
 locale: en                  # language for notification messages: en | it (falls back to en)
 
 services:

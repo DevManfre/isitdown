@@ -47,6 +47,7 @@ const sent = (over: Partial<SentRecord> = {}): SentRecord => ({
   text: "🔴 GitHub is down\nWas: operational",
   sentAt: "2026-09-07T14:02:11.000Z",
   ok: true,
+  attempts: 1,
   ...over,
 });
 
@@ -160,6 +161,29 @@ test("a disabled provider's sends leave the log, page and counts alike", async (
       log.page.items.map((item) => item.providerId),
       [first],
     );
+  } finally {
+    await app.close();
+  }
+});
+
+test("a dead letter reaches the log with the attempts it cost", async () => {
+  // What roadmap 3.14 exists for: the delivery log has to say that a send was
+  // retried and still lost, not merely that it failed.
+  const app = await api();
+  try {
+    await record(
+      app.runtime,
+      sent({ ok: false, error: "401 Unauthorized", attempts: 3 }),
+      sent({ channel: "telegram", attempts: 2 }),
+    );
+
+    const log = (await app.get("/notifications/log?state=all")).body as DeliveryLogBody;
+    const dead = log.page.items.find((item) => !item.ok);
+    const recovered = log.page.items.find((item) => item.ok);
+
+    assert.equal(dead?.attempts, 3);
+    assert.equal(dead?.error, "401 Unauthorized");
+    assert.equal(recovered?.attempts, 2, "a send that took two tries still reports two");
   } finally {
     await app.close();
   }

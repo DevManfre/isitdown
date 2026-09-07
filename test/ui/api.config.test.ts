@@ -689,3 +689,102 @@ test("a poll interval outside the allowed range is refused", async () => {
     await provider.close();
   }
 });
+
+test("retention is part of the config payload and can be changed", async () => {
+  const app = await api();
+  try {
+    const initial = (await app.request("GET", "/config")).body as { retention: { days: number } };
+    assert.equal(initial.retention.days, 120);
+
+    const { status, body } = await app.request("PATCH", "/config/settings", { retentionDays: 365 });
+    assert.equal(status, 200);
+    assert.equal((body as { retention: { days: number } }).retention.days, 365);
+
+    const reread = (await app.request("GET", "/config")).body as { retention: { days: number } };
+    assert.equal(reread.retention.days, 365);
+  } finally {
+    await app.close();
+  }
+});
+
+test("an out-of-range retention is refused", async () => {
+  const app = await api();
+  try {
+    for (const patch of [{ retentionDays: 6 }, { retentionDays: 3651 }, { retentionDays: 30.5 }]) {
+      const { status } = await app.request("PATCH", "/config/settings", patch);
+      assert.equal(status, 400, JSON.stringify(patch));
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+test("the storage report measures the database so a retention choice can be costed", async () => {
+  const app = await api();
+  try {
+    await app.runtime.store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    const { status, body } = await app.request("GET", "/config/storage");
+    assert.equal(status, 200);
+    const report = body as {
+      dbBytes: number;
+      sampleCount: number;
+      bytesPerSample: number;
+      samplesPerDay: number;
+    };
+    assert.ok(report.dbBytes > 0, "an existing database has a size");
+    assert.equal(report.sampleCount, 1);
+    assert.ok(report.bytesPerSample > 0);
+    // Three seeded providers polled every three minutes.
+    assert.equal(report.samplesPerDay, 3 * (1440 / 3));
+  } finally {
+    await app.close();
+  }
+});
+
+test("adaptive polling can be switched off and given its own cadence from the dashboard", async () => {
+  // Roadmap 2.3. Both fields travel on the same settings patch as the rest of
+  // the engine, and take effect on the next config load — no restart.
+  const app = await api();
+  try {
+    const { status, body } = await app.request("PATCH", "/config/settings", {
+      adaptivePolling: false,
+      adaptiveIntervalMinutes: 5,
+    });
+    assert.equal(status, 200);
+    const polling = (body as { polling: { adaptivePolling: boolean; adaptiveIntervalMinutes: number } }).polling;
+    assert.equal(polling.adaptivePolling, false);
+    assert.equal(polling.adaptiveIntervalMinutes, 5);
+
+    const loaded = (await app.runtime.configSource.load()).polling;
+    assert.equal(loaded.adaptivePolling, false);
+    assert.equal(loaded.adaptiveIntervalMinutes, 5);
+
+    const config = (await app.request("GET", "/config")).body as {
+      polling: { adaptivePolling: boolean; adaptiveIntervalMinutes: number };
+    };
+    assert.equal(config.polling.adaptivePolling, false);
+    assert.equal(config.polling.adaptiveIntervalMinutes, 5);
+  } finally {
+    await app.close();
+  }
+});
+
+test("an out-of-range adaptive cadence is refused", async () => {
+  const app = await api();
+  try {
+    for (const patch of [{ adaptiveIntervalMinutes: 0 }, { adaptiveIntervalMinutes: 1441 }, { adaptivePolling: "yes" }]) {
+      const { status } = await app.request("PATCH", "/config/settings", patch);
+      assert.equal(status, 400, JSON.stringify(patch));
+    }
+  } finally {
+    await app.close();
+  }
+});

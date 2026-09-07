@@ -60,6 +60,20 @@ export const pollingSchema = z.object({
   requestTimeoutSeconds: z.number().int().positive().max(120).default(8),
   maxRetries: z.number().int().positive().max(10).default(3),
   failureThreshold: z.number().int().positive().max(100).default(5),
+  /**
+   * Watch a provider closely while it is having a bad day, and leave it alone
+   * once it is not. On by default: an incident is the one time the configured
+   * cadence is too slow, and the traffic it costs is bounded by how long the
+   * incident lasts.
+   */
+  adaptivePolling: z.boolean().default(true),
+  /**
+   * The cadence a provider with an open incident (or a status worse than
+   * operational) is polled on instead of its own. Never slower than what the
+   * provider already asked for — the poller takes the shorter of the two — so
+   * raising this can only ever mean "less closely".
+   */
+  adaptiveIntervalMinutes: z.number().int().positive().max(1440).default(1),
 });
 
 export const localeSchema = z

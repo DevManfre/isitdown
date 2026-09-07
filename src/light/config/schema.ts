@@ -43,6 +43,13 @@ export const fileConfigSchema = z.object({
   requestTimeoutSeconds: positiveInt.max(120).optional(),
   maxRetries: positiveInt.max(10).optional(),
   failureThreshold: positiveInt.max(100).optional(),
+  /**
+   * Poll a provider with an open incident on `adaptiveIntervalMinutes` instead
+   * of its own cadence. Omitted, not defaulted: the shared polling schema owns
+   * the default, and restating it here is how the two editions drift.
+   */
+  adaptivePolling: z.boolean().optional(),
+  adaptiveIntervalMinutes: positiveInt.max(1440).optional(),
   locale: localeSchema.optional(),
   services: z.array(serviceDefinitionSchema).min(1, "at least one service is required"),
   notifications: z

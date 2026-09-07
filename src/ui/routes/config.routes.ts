@@ -22,10 +22,15 @@ import {
   writeSettings,
 } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
+import { storageReport } from "../storageReport.ts";
 import { ensureVapidKeys } from "../vapidKeys.ts";
 
 const previewComponentsSchema = serviceDefinitionSchema.pick({ adapter: true, baseUrl: true });
-const settingsPatchSchema = pollingSchema.partial();
+const settingsPatchSchema = pollingSchema
+  .partial()
+  // Retention is not a polling field and lives only in this edition: the Light
+  // edition prunes nothing, so the shared schema has no business knowing it.
+  .extend({ retentionDays: z.number().int().min(7).max(3650).optional() });
 const channelPatchSchema = z.object({
   enabled: z.boolean().optional(),
   fields: z.record(z.string()).optional(),
@@ -78,7 +83,10 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         requestTimeoutSeconds: settings.requestTimeoutSeconds,
         maxRetries: settings.maxRetries,
         failureThreshold: settings.failureThreshold,
+        adaptivePolling: settings.adaptivePolling,
+        adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
       },
+      retention: { days: settings.retentionDays },
       channels: describeChannels(db, runtime.env),
       routing: describeRouting(db, runtime.logger),
       // Removed but still restorable. Part of the config payload rather than a
@@ -219,6 +227,11 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       ...(parsed.data.failureThreshold === undefined
         ? {}
         : { failureThreshold: parsed.data.failureThreshold }),
+      ...(parsed.data.adaptivePolling === undefined ? {} : { adaptivePolling: parsed.data.adaptivePolling }),
+      ...(parsed.data.adaptiveIntervalMinutes === undefined
+        ? {}
+        : { adaptiveIntervalMinutes: parsed.data.adaptiveIntervalMinutes }),
+      ...(parsed.data.retentionDays === undefined ? {} : { retentionDays: parsed.data.retentionDays }),
     });
     const settings = readSettings(db, runtime.logger);
     res.json({
@@ -227,8 +240,26 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         requestTimeoutSeconds: settings.requestTimeoutSeconds,
         maxRetries: settings.maxRetries,
         failureThreshold: settings.failureThreshold,
+        adaptivePolling: settings.adaptivePolling,
+        adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
       },
+      retention: { days: settings.retentionDays },
     });
+  });
+
+  /**
+   * What the retention setting costs on disk. Kept apart from `GET /config`
+   * because it measures the database on every read, and because the dashboard
+   * wants it while the operator is still typing a number.
+   */
+  router.get("/config/storage", (_req, res) => {
+    const settings = readSettings(db, runtime.logger);
+    res.json(
+      storageReport(db, {
+        providerCount: listServices(db).filter((service) => service.enabled).length,
+        intervalMinutes: settings.pollIntervalMinutes,
+      }),
+    );
   });
 
   router.patch("/config/channels/:id", (req, res) => {

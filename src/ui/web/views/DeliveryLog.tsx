@@ -40,6 +40,16 @@ const rowKey = (record: SentRecord, index: number): string =>
   `${record.providerId}-${record.channel}-${record.sentAt}-${index}`;
 
 /**
+ * A failed send that was retried is a dead letter: the attempts were spent and
+ * the alert is gone. It gets its own word on the badge, because "failed" reads
+ * like something that might still arrive.
+ *
+ * A missing count is a row written before retries existed (roadmap 3.14), so it
+ * is never treated as one attempt or as many — it simply says nothing extra.
+ */
+const isDeadLetter = (record: SentRecord): boolean => !record.ok && (record.attempts ?? 1) > 1;
+
+/**
  * The delivery log (roadmap 3.17), built on the `design/` prototype of the same
  * name.
  *
@@ -126,10 +136,14 @@ export function DeliveryLog() {
         )}
       </div>
 
+      {/* `gap-0` is not cosmetic: the stock Card ships `gap-6`, and `p-0` alone
+          left 24px of card background showing between rows — a striped list
+          whose row tint stopped short of the divider under it. The rows carry
+          their own `border-t`, so they need no gap at all. */}
       <Card
         role="region"
         aria-label={t("delivery.rows")}
-        className="anim-rise flex flex-col p-0"
+        className="anim-rise flex flex-col gap-0 p-0"
         style={{ animationDelay: "120ms" }}
       >
         {rows.length === 0 ? (
@@ -160,7 +174,13 @@ export function DeliveryLog() {
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm">{notificationHeadline(record.text)}</span>
                   <Badge variant={record.ok ? "muted" : "destructive"}>
-                    {t(record.ok ? "delivery.result.sent" : "delivery.result.failed")}
+                    {t(
+                      record.ok
+                        ? "delivery.result.sent"
+                        : isDeadLetter(record)
+                          ? "delivery.result.dead"
+                          : "delivery.result.failed",
+                    )}
                   </Badge>
                   <span className="shrink-0 font-mono text-xs text-muted-foreground">
                     {formatDateTime(i18n.language, record.sentAt)}
@@ -174,6 +194,15 @@ export function DeliveryLog() {
                     <pre className="whitespace-pre-wrap rounded-md bg-muted/40 px-3 py-2 font-mono text-xs leading-relaxed text-muted-foreground">
                       {record.text}
                     </pre>
+                    {/* What the retries cost, in the order an operator asks it:
+                        how many tries, then what the channel said each time. */}
+                    {(record.attempts ?? 1) > 1 && (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {t(record.ok ? "delivery.attempts.recovered" : "delivery.attempts.dead", {
+                          attempts: record.attempts,
+                        })}
+                      </span>
+                    )}
                     {record.error !== undefined && (
                       <span className="font-mono text-xs text-destructive">{record.error}</span>
                     )}

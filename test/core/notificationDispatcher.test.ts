@@ -55,6 +55,32 @@ function recorder(id: string, behaviour: "ok" | "throw" = "ok"): {
   };
 }
 
+/** Fails the first `failures` attempts, then works. */
+function flaky(id: string, failures: number): { notifier: Notifier; calls: number } {
+  const channel = {
+    calls: 0,
+    notifier: {
+      id,
+      async send() {
+        channel.calls += 1;
+        if (channel.calls <= failures) throw new Error(`${id} is rate limited`);
+      },
+    },
+  };
+  return channel;
+}
+
+/** Records requested delays instead of waiting, so backoff is asserted not endured. */
+function fakeSleep(): { sleep: (ms: number) => Promise<void>; delays: number[] } {
+  const delays: number[] = [];
+  return {
+    delays,
+    sleep: async (ms: number) => {
+      delays.push(ms);
+    },
+  };
+}
+
 test("each change becomes one payload carrying the change, service and locale", async () => {
   const channel = recorder("telegram");
   const dispatcher = createDispatcher({ logger: silent });
@@ -128,7 +154,7 @@ test("a change goes to every enabled channel", async () => {
 test("one failing channel never blocks another and never rejects the dispatch", async () => {
   const broken = recorder("telegram", "throw");
   const healthy = recorder("webhook");
-  const dispatcher = createDispatcher({ logger: silent });
+  const dispatcher = createDispatcher({ logger: silent, sleep: fakeSleep().sleep });
 
   const records = await dispatcher.dispatch([change()], {
     services,
@@ -153,6 +179,7 @@ test("onSent is called once per change and channel, with the outcome", async () 
   const seen: SentRecord[] = [];
   const dispatcher = createDispatcher({
     logger: silent,
+    sleep: fakeSleep().sleep,
     onSent: (record) => {
       seen.push(record);
     },
@@ -355,4 +382,105 @@ test("sendTest ignores the rules entirely", async () => {
 
   assert.equal(slack.seen.length, 1);
   assert.equal(record.ok, true);
+});
+
+test("a send that fails once and then works is one delivered record, not two", async () => {
+  // The delivery log is a log of messages, not of attempts: a retried alert
+  // that arrived must not read as a failure beside a success.
+  const channel = flaky("telegram", 1);
+  const seen: SentRecord[] = [];
+  const dispatcher = createDispatcher({
+    logger: silent,
+    sleep: fakeSleep().sleep,
+    onSent: (record) => {
+      seen.push(record);
+    },
+  });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.equal(channel.calls, 2, "the second attempt is what delivered it");
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.ok, true);
+  assert.equal(records[0]?.attempts, 2);
+  assert.equal(records[0]?.error, undefined);
+  assert.deepEqual(seen.length, 1, "one row per message, whatever it took");
+});
+
+test("a channel that fails every attempt is a dead letter, with growing backoff", async () => {
+  const channel = flaky("telegram", 99);
+  const timer = fakeSleep();
+  const dispatcher = createDispatcher({ logger: silent, sleep: timer.sleep });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.equal(channel.calls, 3, "three attempts, not more and not fewer");
+  assert.equal(records[0]?.ok, false);
+  assert.equal(records[0]?.attempts, 3);
+  assert.match(records[0]?.error ?? "", /rate limited/);
+  assert.equal(timer.delays.length, 2, `expected two backoffs, got ${JSON.stringify(timer.delays)}`);
+  assert.ok((timer.delays[1] ?? 0) > (timer.delays[0] ?? 0), "backoff must grow across attempts");
+});
+
+test("a send that works first time is never retried and never waits", async () => {
+  const channel = flaky("telegram", 0);
+  const timer = fakeSleep();
+  const dispatcher = createDispatcher({ logger: silent, sleep: timer.sleep });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.equal(channel.calls, 1);
+  assert.equal(records[0]?.attempts, 1);
+  assert.deepEqual(timer.delays, []);
+});
+
+test("a delivery test is tried once: the operator is waiting for the answer", async () => {
+  const channel = flaky("telegram", 99);
+  const timer = fakeSleep();
+  const dispatcher = createDispatcher({ logger: silent, sleep: timer.sleep });
+
+  const record = await dispatcher.sendTest(channel.notifier, services[0]!, "en");
+
+  assert.equal(channel.calls, 1);
+  assert.equal(record.ok, false);
+  assert.equal(record.attempts, 1);
+  assert.deepEqual(timer.delays, []);
+});
+
+test("a dead letter is logged as an error, its retried attempts only as warnings", async () => {
+  const lines: string[] = [];
+  const channel = flaky("telegram", 99);
+  const dispatcher = createDispatcher({
+    logger: createLogger("warn", (line) => lines.push(line)),
+    sleep: fakeSleep().sleep,
+  });
+
+  await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.equal(lines.filter((line) => line.includes("attempt failed")).length, 3);
+  assert.equal(lines.filter((line) => line.includes("failed permanently")).length, 1);
 });

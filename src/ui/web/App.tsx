@@ -5,6 +5,7 @@ import { Header } from "@/components/Header.tsx";
 import { ViewFrame } from "@/components/ViewFrame.tsx";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
+import { useDocumentStatus } from "@/hooks/useDocumentStatus.tsx";
 import { usePreferenceSync } from "@/hooks/usePreferenceSync.tsx";
 
 /**
@@ -39,6 +40,9 @@ export function App() {
   // the view, so the frame below waits for it rather than cascading once in the
   // default theme and again in the operator's.
   const seeded = usePreferenceSync();
+  // The browser tab reflects the worst status in the fleet. Mounted in the
+  // shell, like the seed above, because the tab belongs to no single view.
+  useDocumentStatus();
 
   const paramString = [params["providerId"], params["incidentId"]].filter(Boolean).join("/");
   const view = currentView(location.pathname, paramString !== "");

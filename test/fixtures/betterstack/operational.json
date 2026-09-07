@@ -1,0 +1,375 @@
+{
+  "data": {
+    "id": "133002",
+    "type": "status_page",
+    "attributes": {
+      "company_name": "Better Stack",
+      "company_url": "",
+      "contact_url": "mailto:hello@betterstack.com",
+      "logo_url": "https://d1lppblt9t2x15.cloudfront.net/logos/fac98af47212c48ae6e6c2b3fdbb63a3.png",
+      "timezone": "UTC",
+      "subdomain": "betterstack",
+      "custom_domain": "status.betterstack.com",
+      "announcement": null,
+      "logo_remote_url": null,
+      "aggregate_state": "operational",
+      "created_at": "2021-11-25T01:11:42.091Z",
+      "updated_at": "2026-09-07T12:17:28.639Z"
+    },
+    "relationships": {
+      "sections": {
+        "data": [
+          {
+            "id": "104771",
+            "type": "status_page_section"
+          },
+          {
+            "id": "166666",
+            "type": "status_page_section"
+          },
+          {
+            "id": "166667",
+            "type": "status_page_section"
+          }
+        ]
+      },
+      "resources": {
+        "data": [
+          {
+            "id": "4018902",
+            "type": "status_page_resource"
+          },
+          {
+            "id": "4188755",
+            "type": "status_page_resource"
+          },
+          {
+            "id": "4188756",
+            "type": "status_page_resource"
+          },
+          {
+            "id": "4188758",
+            "type": "status_page_resource"
+          }
+        ]
+      },
+      "status_reports": {
+        "data": [
+          {
+            "id": "1050825",
+            "type": "status_report"
+          },
+          {
+            "id": "1049150",
+            "type": "status_report"
+          },
+          {
+            "id": "1035022",
+            "type": "status_report"
+          },
+          {
+            "id": "1023558",
+            "type": "status_report"
+          },
+          {
+            "id": "994058",
+            "type": "status_report"
+          },
+          {
+            "id": "977145",
+            "type": "status_report"
+          }
+        ]
+      }
+    }
+  },
+  "included": [
+    {
+      "id": "104771",
+      "type": "status_page_section",
+      "attributes": {
+        "name": "Better Stack ",
+        "position": 0
+      }
+    },
+    {
+      "id": "166666",
+      "type": "status_page_section",
+      "attributes": {
+        "name": "Uptime",
+        "position": 1
+      }
+    },
+    {
+      "id": "4018902",
+      "type": "status_page_resource",
+      "attributes": {
+        "status_page_section_id": 104771,
+        "resource_id": 356317,
+        "resource_type": "Monitor",
+        "public_name": "Better Stack",
+        "explanation": "",
+        "position": 0,
+        "availability": 1.0,
+        "status": "operational",
+        "status_history": [
+          {
+            "day": "2026-09-05",
+            "status": "operational",
+            "downtime_duration": 0,
+            "maintenance_duration": 0
+          },
+          {
+            "day": "2026-09-06",
+            "status": "operational",
+            "downtime_duration": 0,
+            "maintenance_duration": 0
+          },
+          {
+            "day": "2026-09-07",
+            "status": "operational",
+            "downtime_duration": 0,
+            "maintenance_duration": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "4188755",
+      "type": "status_page_resource",
+      "attributes": {
+        "status_page_section_id": 166666,
+        "resource_id": 24,
+        "resource_type": "Monitor",
+        "public_name": "Uptime",
+        "explanation": "",
+        "position": 0,
+        "availability": 1.0,
+        "status": "operational",
+        "status_history": [
+          {
+            "day": "2026-09-05",
+            "status": "operational",
+            "downtime_duration": 0,
+            "maintenance_duration": 0
+          },
+          {
+            "day": "2026-09-06",
+            "status": "operational",
+            "downtime_duration": 0,
+            "maintenance_duration": 0
+          },
+          {
+            "day": "2026-09-07",
+            "status": "operational",
+            "downtime_duration": 0,
+            "maintenance_duration": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "4188756",
+      "type": "status_page_resource",
+      "attributes": {
+        "status_page_section_id": 166666,
+        "resource_id": 127308,
+        "resource_type": "Monitor",
+        "public_name": "Uptime backend processing health",
+        "explanation": "We have strict checks for making sure millions of requests are processed as intended",
+        "position": 1,
+        "availability": 1.0,
+        "status": "not_monitored",
+        "status_history": [
+          {
+            "day": "2026-09-05",
+            "status": "operational",
+            "downtime_duration": 0,
+            "maintenance_duration": 0
+          },
+          {
+            "day": "2026-09-06",
+            "status": "operational",
+            "downtime_duration": 0,
+            "maintenance_duration": 0
+          },
+          {
+            "day": "2026-09-07",
+            "status": "operational",
+            "downtime_duration": 0,
+            "maintenance_duration": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "1050825",
+      "type": "status_report",
+      "attributes": {
+        "title": "Delayed data processing in the Europe region",
+        "report_type": "manual",
+        "starts_at": "2026-09-04T13:50:00.000Z",
+        "ends_at": null,
+        "affected_resources": [
+          {
+            "status_page_resource_id": "4188758",
+            "status": "resolved"
+          }
+        ],
+        "aggregate_state": "resolved"
+      },
+      "relationships": {
+        "status_updates": {
+          "data": [
+            {
+              "id": "5709883",
+              "type": "status_update"
+            },
+            {
+              "id": "5713636",
+              "type": "status_update"
+            },
+            {
+              "id": "5708773",
+              "type": "status_update"
+            },
+            {
+              "id": "5719311",
+              "type": "status_update"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "1049150",
+      "type": "status_report",
+      "attributes": {
+        "title": "Delayed data processing in the Europe region",
+        "report_type": "manual",
+        "starts_at": "2026-09-03T02:15:00.000Z",
+        "ends_at": null,
+        "affected_resources": [
+          {
+            "status_page_resource_id": "4188758",
+            "status": "resolved"
+          }
+        ],
+        "aggregate_state": "resolved"
+      },
+      "relationships": {
+        "status_updates": {
+          "data": [
+            {
+              "id": "5707158",
+              "type": "status_update"
+            },
+            {
+              "id": "5703680",
+              "type": "status_update"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "1035022",
+      "type": "status_report",
+      "attributes": {
+        "title": "Migrating some Telemetry sources to new infrastructure",
+        "report_type": "maintenance",
+        "starts_at": "2026-09-03T00:00:00.000Z",
+        "ends_at": "2026-09-03T17:00:00.000Z",
+        "affected_resources": [
+          {
+            "status_page_resource_id": "4188758",
+            "status": "maintenance"
+          }
+        ],
+        "aggregate_state": "resolved"
+      },
+      "relationships": {
+        "status_updates": {
+          "data": [
+            {
+              "id": "5703821",
+              "type": "status_update"
+            },
+            {
+              "id": "5660393",
+              "type": "status_update"
+            },
+            {
+              "id": "5701192",
+              "type": "status_update"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5709883",
+      "type": "status_update",
+      "attributes": {
+        "message": "Processing of new data in the Europe region is starting to recover. Backfilling delayed data will take longer, so older timestamps may still be missing. No data has been lost.",
+        "published_at": "2026-09-04T19:53:00.000Z",
+        "published_at_timezone": "Pacific Time (US & Canada)",
+        "notify_subscribers": false,
+        "affected_resources": [
+          {
+            "status_page_resource_id": "4188758",
+            "status": "degraded"
+          }
+        ]
+      }
+    },
+    {
+      "id": "5713636",
+      "type": "status_update",
+      "attributes": {
+        "message": "Live data is coming in. Historical data is backfilling at a steady rate, we expect several more hours until all data is processed.\n\nThank you for your patience. Please reach out to [hello@betterstack.com](mailto:hello@betterstack.com) with any questions.",
+        "published_at": "2026-09-05T15:23:00.000Z",
+        "published_at_timezone": "Pacific Time (US & Canada)",
+        "notify_subscribers": false,
+        "affected_resources": [
+          {
+            "status_page_resource_id": "4188758",
+            "status": "degraded"
+          }
+        ]
+      }
+    },
+    {
+      "id": "5708773",
+      "type": "status_update",
+      "attributes": {
+        "message": "We're seeing delayed data processing for some sources located in the Europe region again.\n\nThe team is looking into resolving as soon as possible. There has been no data loss, all incoming data is ingested and will become visible as the system catches up.\n\nIf you have any questions, please reach out to [hello@betterstack.com](mailto:hello@betterstack.com). Thank you for your patience!",
+        "published_at": "2026-09-04T13:50:00.000Z",
+        "published_at_timezone": "Pacific Time (US & Canada)",
+        "notify_subscribers": false,
+        "affected_resources": [
+          {
+            "status_page_resource_id": "4188758",
+            "status": "degraded"
+          }
+        ]
+      }
+    },
+    {
+      "id": "5719311",
+      "type": "status_update",
+      "attributes": {
+        "message": "This incident is now resolved. All sources in the Europe region are processing in real time and the delayed backlog has been processed in full. \n\nWhat happened: On September 3, we consolidated several EU Telemetry clusters onto new, higher-capacity infrastructure. The cutover multiplied concurrent write streams on the cluster, and the volume of concurrent inserts saturated per-host write throughput on I/O contention. Ingestion fell behind, and affected sources saw delays in Live tail, dashboards, alerts, and queries.\n\nOur initial fixes, tuning the write path and adding capacity, restored real-time ingestion within a day, but draining the backlog alongside live traffic re-created the contention. We then rebuilt the recovery pipeline and held live data with strict priority while separately replaying the backlog at a controlled rate. Replaying several days of data was the slowest part of the recovery by design, as we rate-limited the replay so that real-time ingestion wasn't put at risk.\n\nWe know teams rely on this data to operate their own systems, and losing that visibility for days is serious. We are sorry, both for the disruption and for turning what we originally announced as 90-minute maintenance into a multi-day incident. The fixes we made here are permanent, and this kind of contention can't happen again.\n\nThank you very much for your patience. Please reach out to [hello@betterstack.com](mailto:hello@betterstack.com) if you have any questions.",
+        "published_at": "2026-09-06T19:13:00.000Z",
+        "published_at_timezone": "Pacific Time (US & Canada)",
+        "notify_subscribers": false,
+        "affected_resources": [
+          {
+            "status_page_resource_id": "4188758",
+            "status": "resolved"
+          }
+        ]
+      }
+    }
+  ]
+}
