@@ -1,3 +1,5 @@
+import { zoneOptions } from "./timeZone.ts";
+
 export const formatNumber = (locale: string, value: number) =>
   new Intl.NumberFormat(locale).format(value);
 
@@ -5,15 +7,21 @@ export const formatPercent = (locale: string, value: number) =>
   new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) + "%";
 
 export const formatTime = (locale: string, iso: string) =>
-  new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", ...zoneOptions() }).format(new Date(iso));
 
 export const formatDateTime = (locale: string, iso: string) =>
   new Intl.DateTimeFormat(locale, {
-    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", ...zoneOptions(),
   }).format(new Date(iso));
 
+/**
+ * A day bucket's label. Pinned to UTC, and deliberately not affected by the
+ * timezone preference: a bucket *is* a UTC day — that is how the samples were
+ * grouped — so rendering its midnight in another zone would label a bar with
+ * the day before or after the data it holds.
+ */
 export const formatDay = (locale: string, day: string) =>
-  new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(
+  new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(
     new Date(`${day}T00:00:00Z`),
   );
 

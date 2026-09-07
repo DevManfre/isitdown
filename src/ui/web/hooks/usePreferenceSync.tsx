@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePreferences } from "./queries.ts";
 import { useTheme } from "./useTheme.tsx";
 import { adoptLocale } from "@/lib/i18n.ts";
+import { setTimeZone } from "@/lib/timeZone.ts";
 
 /**
  * The read half of the preference round-trip: applies the theme and UI locale
@@ -53,6 +54,9 @@ export function usePreferenceSync(): boolean {
 
     seeded.current = true;
     adopt(data.theme);
+    // Before the view is released, like the other two: a zone arriving after
+    // the first paint would redraw every timestamp on the page.
+    setTimeZone(data.timeZone);
     // Both halves before the view is released, not just the theme: a locale
     // arriving a beat later is a second remount and a second cascade.
     void adoptLocale(data.uiLocale).finally(() => setApplied(true));

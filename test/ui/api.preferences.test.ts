@@ -50,7 +50,14 @@ test("preferences default to following the system theme and English", async () =
   try {
     const { status, body } = await app.request("GET", "/api/preferences");
     assert.equal(status, 200);
-    assert.deepEqual(body, { theme: "system", uiLocale: "en", notificationLocale: "en", mapView: "off" });
+    assert.deepEqual(body, {
+      theme: "system",
+      uiLocale: "en",
+      notificationLocale: "en",
+      mapView: "off",
+      // "auto" rather than a zone name: the default has to stay per-browser.
+      timeZone: "auto",
+    });
   } finally {
     await app.close();
   }
@@ -64,7 +71,9 @@ test("a preference change round-trips and survives a restart", async () => {
       uiLocale: "it",
     });
     assert.equal(status, 200);
-    assert.deepEqual(body, { theme: "dark", uiLocale: "it", notificationLocale: "en", mapView: "off" });
+    assert.deepEqual(body, {
+      theme: "dark", uiLocale: "it", notificationLocale: "en", mapView: "off", timeZone: "auto",
+    });
     await app.close();
 
     const restarted = await api(app.dbPath);
@@ -74,6 +83,7 @@ test("a preference change round-trips and survives a restart", async () => {
         uiLocale: "it",
         notificationLocale: "en",
         mapView: "off",
+        timeZone: "auto",
       });
     } finally {
       await restarted.close();
@@ -108,6 +118,48 @@ test("an unknown theme or locale is refused", async () => {
       const { status } = await app.request("PATCH", "/api/preferences", patch);
       assert.equal(status, 400, JSON.stringify(patch));
     }
+  } finally {
+    await app.close();
+  }
+});
+
+test("a time zone can be chosen, survives a restart, and is refused when it is not a zone", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.request("PATCH", "/api/preferences", { timeZone: "Europe/Rome" });
+    assert.equal(status, 200);
+    assert.equal((body as { timeZone: string }).timeZone, "Europe/Rome");
+
+    // A name nothing can format would leave every timestamp on the dashboard
+    // an Invalid Date, so it never reaches the database.
+    assert.equal((await app.request("PATCH", "/api/preferences", { timeZone: "Mars/Olympus" })).status, 400);
+    assert.equal(
+      ((await app.request("GET", "/api/preferences")).body as { timeZone: string }).timeZone,
+      "Europe/Rome",
+    );
+
+    await app.close();
+    const restarted = await api(app.dbPath);
+    try {
+      assert.equal(
+        ((await restarted.request("GET", "/api/preferences")).body as { timeZone: string }).timeZone,
+        "Europe/Rome",
+      );
+    } finally {
+      await restarted.close();
+    }
+  } finally {
+    // Closed above on the happy path; closing twice is a no-op the harness allows.
+  }
+});
+
+test("following the browser's own zone is expressible, not only a named zone", async () => {
+  const app = await api();
+  try {
+    await app.request("PATCH", "/api/preferences", { timeZone: "UTC" });
+    const { body } = await app.request("PATCH", "/api/preferences", { timeZone: "auto" });
+
+    assert.equal((body as { timeZone: string }).timeZone, "auto");
   } finally {
     await app.close();
   }

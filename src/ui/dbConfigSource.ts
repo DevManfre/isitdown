@@ -68,6 +68,13 @@ const settingsSchema = z.object({
    */
   retentionDays: z.coerce.number().int().min(7).max(3650).catch(120),
   theme: z.enum(["light", "dark", "system"]).catch("system"),
+  /**
+   * Which zone clock times are rendered in. `auto` — the default — is the
+   * browser's own, which is why the preference is stored as a name rather than
+   * an offset: an offset is wrong twice a year, and "auto" has to stay
+   * per-machine rather than pin every browser to the one that set it.
+   */
+  timeZone: z.string().max(64).catch("auto"),
   uiLocale: localeSchema.catch("en"),
   notificationLocale: localeSchema.catch("en"),
   /**
