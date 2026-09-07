@@ -1,8 +1,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type Query } from "@tanstack/react-query";
 import * as api from "@/lib/api.ts";
-import { msUntilNextPoll, REFRESH_MS, statusRefetchDelay } from "@/lib/statusRefetch.ts";
+import { LIVE_REFRESH_MS, msUntilNextPoll, REFRESH_MS, statusRefetchDelay } from "@/lib/statusRefetch.ts";
 import type { StatusResponse } from "@/lib/types.ts";
 import { useBusy } from "./useBusy.tsx";
+import { useLive } from "./useLive.tsx";
 
 /**
  * `["status"]` refetches on the countdown rather than on the flat idle rhythm:
@@ -19,11 +20,24 @@ import { useBusy } from "./useBusy.tsx";
 const statusRefetchInterval = (query: Query<StatusResponse>): number =>
   statusRefetchDelay(msUntilNextPoll(query.state.data, query.state.dataUpdatedAt, Date.now()));
 
+/**
+ * How often a query asks on its own: never while the operator is mid-edit, a
+ * slow fallback while the event stream is pushing (`LiveProvider` invalidates
+ * on each cycle, so the timer is only there in case the stream dies quietly),
+ * and the idle rhythm otherwise.
+ */
+const idleInterval = (busy: boolean, live: boolean): number | false =>
+  busy ? false : live ? LIVE_REFRESH_MS : REFRESH_MS;
+
 export function useStatus() {
+  const live = useLive();
   return useQuery({
     queryKey: ["status"],
     queryFn: api.getStatus,
-    refetchInterval: statusRefetchInterval,
+    // The deadline-driven rhythm exists to close the gap between a cycle
+    // finishing and the dashboard hearing about it. A connected stream closes
+    // it properly, so the timer steps back to being a safety net.
+    refetchInterval: live ? LIVE_REFRESH_MS : statusRefetchInterval,
   });
 }
 
@@ -44,20 +58,22 @@ export function useStatus() {
  * same graceful-degradation contract this mirrors.
  */
 export function useStatusChrome() {
+  const live = useLive();
   return useQuery({
     queryKey: ["status"],
     queryFn: api.getStatus,
-    refetchInterval: statusRefetchInterval,
+    refetchInterval: live ? LIVE_REFRESH_MS : statusRefetchInterval,
     throwOnError: false,
   });
 }
 
 export function useConfig() {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: ["config"],
     queryFn: api.getConfig,
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
   });
 }
 
@@ -74,10 +90,11 @@ export function useConfig() {
  */
 export function useConfigChrome() {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: ["config"],
     queryFn: api.getConfig,
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
     throwOnError: false,
   });
 }
@@ -108,10 +125,11 @@ export function useConfigChrome() {
  */
 export const useHistory = (days: number) => {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: ["history", days, null],
     queryFn: () => api.getHistory(days),
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
   });
 };
 
@@ -142,12 +160,13 @@ export const useHistory = (days: number) => {
  */
 export const useProviderHistory = (provider: string | null, days: number) => {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: ["history", days, provider],
     queryFn: () => api.getHistory(days, provider ?? undefined),
     throwOnError: false,
     enabled: provider !== null,
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
   });
 };
 
@@ -162,11 +181,12 @@ export const useProviderHistory = (provider: string | null, days: number) => {
  */
 export const useComponentHistory = (provider: string, days: number) => {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: ["history", "components", provider, days],
     queryFn: () => api.getComponentHistory(provider, days),
     throwOnError: false,
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
   });
 };
 
@@ -177,6 +197,7 @@ export const useComponentHistory = (provider: string, days: number) => {
  */
 export const useIncidents = (query: api.IncidentListQuery = {}) => {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: [
       "incidents",
@@ -187,22 +208,24 @@ export const useIncidents = (query: api.IncidentListQuery = {}) => {
     ],
     queryFn: () => api.getIncidents(query),
     placeholderData: keepPreviousData,
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
   });
 };
 
 export const useIncident = (providerId: string, incidentId: string) => {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: ["incident", providerId, incidentId],
     queryFn: () => api.getIncident(providerId, incidentId),
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
   });
 };
 
 /** Newest first by `startsAt`, scoped to enabled providers server-side. */
 export const useMaintenances = (query: api.MaintenanceListQuery = {}) => {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: [
       "maintenances",
@@ -212,16 +235,17 @@ export const useMaintenances = (query: api.MaintenanceListQuery = {}) => {
       query.includeUpcoming ?? null,
     ],
     queryFn: () => api.getMaintenances(query),
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
   });
 };
 
 export const useNotifications = (limit = 20) => {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: ["notifications", limit],
     queryFn: () => api.getNotifications(limit),
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
   });
 };
 
@@ -232,10 +256,11 @@ export const useNotifications = (limit = 20) => {
  */
 export const useDeliveryLog = (query: api.DeliveryLogQuery = {}) => {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: ["delivery-log", query.state ?? "all", query.channel ?? "", query.page ?? 1, query.pageSize ?? null],
     queryFn: () => api.getDeliveryLog(query),
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
   });
 };
 
@@ -250,11 +275,12 @@ export const useDeliveryLog = (query: api.DeliveryLogQuery = {}) => {
  */
 export function useMap(enabled: boolean) {
   const busy = useBusy();
+  const live = useLive();
   return useQuery({
     queryKey: ["map"],
     queryFn: api.getMap,
     enabled,
-    refetchInterval: busy ? false : REFRESH_MS,
+    refetchInterval: idleInterval(busy, live),
     throwOnError: false,
   });
 }
