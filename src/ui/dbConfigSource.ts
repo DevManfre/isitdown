@@ -15,6 +15,7 @@ import type {
   ServiceDefinition,
 } from "../core/configSource.interface.ts";
 import type { Logger } from "../core/logger.ts";
+import { forgetProvider } from "../core/http.ts";
 import { CATCH_ALL_RULE } from "../core/routing.ts";
 import type { RoutingRule } from "../core/routing.ts";
 
@@ -71,7 +72,27 @@ const serviceRowSchema = z.object({
   enabled: z.number(),
   components: z.string().nullable(),
   scope_to_components: z.number(),
+  interval_minutes: z.number().nullable(),
 });
+
+const removedRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  adapter: z.string(),
+  base_url: z.string(),
+  deleted_at: z.string(),
+});
+
+/** A provider removed but still restorable — `GET /config`'s `removed` list. */
+export interface RemovedService {
+  id: string;
+  name: string;
+  adapter: string;
+  baseUrl: string;
+  removedAt: string;
+  /** When the grace period runs out and the cascade takes its history. */
+  restoreUntil: string;
+}
 
 export interface StoredChannel {
   id: string;
@@ -124,7 +145,11 @@ export function writeSettings(db: DatabaseSync, patch: Partial<Record<keyof Sett
 export function listServices(db: DatabaseSync): ServiceDefinition[] {
   return db
     .prepare(
-      "SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components FROM services ORDER BY id",
+      // A removed provider is invisible to everything that reads this: it stops
+      // being polled, drops off the dashboard and out of every count, while its
+      // history waits out the grace period.
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes
+       FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
     .map((row) => serviceRowSchema.parse(row))
@@ -137,6 +162,9 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       components:
         row.components === null ? [] : componentSelectionSchema.catch([]).parse(JSON.parse(row.components)),
       scopeToComponents: row.scope_to_components === 1,
+      // Left off rather than passed as null: absent is what the poller reads as
+      // "follow the global cadence".
+      ...(row.interval_minutes === null ? {} : { intervalMinutes: row.interval_minutes }),
       ...(row.options === null ? {} : { options: JSON.parse(row.options) as Record<string, string> }),
     }));
 }
@@ -144,7 +172,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
 export function insertService(db: DatabaseSync, definition: ServiceDefinition): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -154,11 +182,20 @@ export function insertService(db: DatabaseSync, definition: ServiceDefinition): 
     parsed.enabled ? 1 : 0,
     parsed.components.length === 0 ? null : JSON.stringify(parsed.components),
     parsed.scopeToComponents ? 1 : 0,
+    parsed.intervalMinutes ?? null,
     new Date().toISOString(),
   );
 }
 
-const servicePatchSchema = serviceDefinitionSchema.partial().omit({ id: true });
+/**
+ * Null is how the dashboard puts a provider back on the global cadence.
+ * `undefined` cannot say it: on a patch it means "leave this alone", so
+ * clearing an interval needs a value of its own.
+ */
+export const servicePatchSchema = serviceDefinitionSchema
+  .partial()
+  .omit({ id: true })
+  .extend({ intervalMinutes: z.number().int().positive().max(1440).nullable().optional() });
 
 /** Returns false when there was no such service, so a route can answer 404. */
 export function updateService(
@@ -179,13 +216,16 @@ export function updateService(
   if (parsed.scopeToComponents !== undefined) {
     columns["scope_to_components"] = parsed.scopeToComponents ? 1 : 0;
   }
+  if (parsed.intervalMinutes !== undefined) columns["interval_minutes"] = parsed.intervalMinutes;
   if (Object.keys(columns).length === 0) return exists(db, id);
 
   const assignments = Object.keys(columns)
     .map((column) => `${column} = ?`)
     .join(", ");
+  // A removed provider is on its way out: editing it back into service through
+  // a patch would be an update nothing on the dashboard could see.
   const result = db
-    .prepare(`UPDATE services SET ${assignments} WHERE id = ?`)
+    .prepare(`UPDATE services SET ${assignments} WHERE id = ? AND deleted_at IS NULL`)
     .run(...Object.values(columns), id);
   return result.changes > 0;
 }
@@ -200,7 +240,7 @@ export interface ServiceImpact {
 }
 
 /**
- * What `deleteService` would take with it. Read-only, and deliberately next to
+ * What removing a provider will eventually take with it. Read-only, and deliberately next to
  * the delete it describes: the cascade lives in the schema, so the only way the
  * two stay in step is for a new `ON DELETE CASCADE` table to be visible from
  * here when it is added.
@@ -209,7 +249,7 @@ export interface ServiceImpact {
  * route can answer 404 rather than a confident row of zeros.
  *
  * Rules naming "*" are not counted: they survive the removal (see
- * `deleteService`), and a confirmation that claims otherwise is worse than one
+ * `purgeService`), and a confirmation that claims otherwise is worse than one
  * that says nothing.
  */
 export function describeServiceImpact(db: DatabaseSync, id: string): ServiceImpact | null {
@@ -236,9 +276,87 @@ export function describeServiceImpact(db: DatabaseSync, id: string): ServiceImpa
   };
 }
 
-export function deleteService(db: DatabaseSync, id: string): boolean {
+/**
+ * How long a removed provider can be brought back. Long enough to survive a
+ * weekend — the mistake this exists for is noticed when somebody looks for a
+ * chart that is gone, not in the ten seconds a toast lasts.
+ */
+export const RESTORE_WINDOW_DAYS = 7;
+
+/** When the grace period on a removal runs out. */
+export const restoreDeadline = (deletedAt: string): string =>
+  new Date(Date.parse(deletedAt) + RESTORE_WINDOW_DAYS * 86_400_000).toISOString();
+
+/**
+ * Marks a provider removed without taking anything with it yet. It leaves the
+ * dashboard and the poll cycle immediately — `listServices` is the one thing
+ * both read — while its history sits untouched until the grace period expires.
+ *
+ * Returns false for an id that is not there or is already removed, so a route
+ * can answer 404 and a second click cannot restart the clock.
+ */
+export function softDeleteService(db: DatabaseSync, id: string, at: Date = new Date()): boolean {
+  return (
+    db
+      .prepare("UPDATE services SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL")
+      .run(at.toISOString(), id).changes > 0
+  );
+}
+
+/** Puts a removed provider back, history and rules included — nothing was taken. */
+export function restoreService(db: DatabaseSync, id: string): boolean {
+  return db.prepare("UPDATE services SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL").run(id)
+    .changes > 0;
+}
+
+/** Every removed provider still inside its grace period, oldest removal last. */
+export function listRemovedServices(db: DatabaseSync): RemovedService[] {
+  return db
+    .prepare(
+      "SELECT id, name, adapter, base_url, deleted_at FROM services WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC",
+    )
+    .all()
+    .map((row) => removedRowSchema.parse(row))
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      adapter: row.adapter,
+      baseUrl: row.base_url,
+      removedAt: row.deleted_at,
+      restoreUntil: restoreDeadline(row.deleted_at),
+    }));
+}
+
+/**
+ * Takes every removal whose grace period has run out. This is where the cascade
+ * finally happens, so it is the one path that actually destroys history —
+ * called on boot and on the same daily timer that prunes old samples.
+ *
+ * Returns the ids it took, for the log line: a deletion nobody asked for today
+ * should still be traceable to the removal that scheduled it.
+ */
+export function purgeExpiredServices(db: DatabaseSync, at: Date = new Date()): string[] {
+  const cutoff = new Date(at.getTime() - RESTORE_WINDOW_DAYS * 86_400_000).toISOString();
+  const expired = db
+    .prepare("SELECT id FROM services WHERE deleted_at IS NOT NULL AND deleted_at <= ?")
+    .all(cutoff)
+    .map((row) => z.object({ id: z.string() }).parse(row).id);
+  for (const id of expired) purgeService(db, id);
+  return expired;
+}
+
+/**
+ * The hard delete, cascade and all. Reachable two ways: the grace period
+ * expiring, and an operator saying "remove it now" — the same code either way,
+ * because a purge that behaved differently depending on who asked would be a
+ * second deletion path to keep in step.
+ */
+export function purgeService(db: DatabaseSync, id: string): boolean {
   const deleted = db.prepare("DELETE FROM services WHERE id = ?").run(id).changes > 0;
   if (deleted) {
+    // Nothing cached for a provider that no longer exists — a re-added id must
+    // not be revalidated against the validator of the one that is gone.
+    forgetProvider(id);
     // No FK could do this: "*" is not a service id. A rule left naming a deleted
     // provider would match nothing and quietly sit in the list forever. Only
     // when a row actually went away — a 404 on an unknown id must not mutate.
@@ -516,4 +634,4 @@ export function createDbConfigSource(
 }
 
 const exists = (db: DatabaseSync, id: string): boolean =>
-  db.prepare("SELECT 1 AS one FROM services WHERE id = ?").get(id) !== undefined;
+  db.prepare("SELECT 1 AS one FROM services WHERE id = ? AND deleted_at IS NULL").get(id) !== undefined;
