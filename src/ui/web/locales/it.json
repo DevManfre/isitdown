@@ -258,10 +258,18 @@
   "add.note.instatus": "Usa l'host della pagina, es. https://status.gcore.com: l'adapter gli aggiunge /summary.json.",
   "add.note.betterstack": "Usa l'host della pagina, es. https://status.betterstack.com: l'adapter gli aggiunge /index.json.",
   "add.note.rss": "Indica l'URL completo del feed RSS o Atom; l'adapter lo legge così com'è.",
+  "add.note.html": "Indica l'URL completo della pagina da leggere; l'adapter lo legge così com'è.",
   "add.note.slack": "Usa https://slack-status.com; l'adapter aggiunge /api/v2.0.0/current a questo URL.",
   "add.note.custom": "L'adapter legge questo URL così com'è.",
   "add.test-ok": "Raggiungibile — ha risposto {status}.",
   "add.test-failed": "Non raggiungibile: {error}",
+
+  "scrape.warning": "Leggere il markup di una pagina si rompe in silenzio quando la pagina cambia. Un selettore che smette di corrispondere viene segnalato come provider non raggiungibile, mai come \"operativo\".",
+  "scrape.selector": "Selettore CSS",
+  "scrape.selector-hint": "L'elemento il cui testo dice come sta il provider, es. .status-banner o #status > h2. Tag, #id, .class e [attr] con i combinatori discendente e figlio.",
+  "scrape.words": "Parole di stato",
+  "scrape.words-hint": "Separate da virgola, per severità. Lascia vuota una severità per mantenere le parole predefinite; sulla pagina vince la corrispondenza più lunga.",
+  "scrape.words-placeholder": "es. {example}",
 
   "components.field": "Componenti",
   "components.load": "Scegli i componenti",

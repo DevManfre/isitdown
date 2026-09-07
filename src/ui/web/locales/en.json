@@ -258,10 +258,18 @@
   "add.note.instatus": "Use the page's host, e.g. https://status.gcore.com; the adapter appends /summary.json to it.",
   "add.note.betterstack": "Use the page's host, e.g. https://status.betterstack.com; the adapter appends /index.json to it.",
   "add.note.rss": "Give the full URL of the RSS or Atom feed; the adapter reads it as given.",
+  "add.note.html": "Give the full URL of the page to read; the adapter reads it as given.",
   "add.note.slack": "Use https://slack-status.com; the adapter appends /api/v2.0.0/current to it.",
   "add.note.custom": "The adapter reads this URL as given.",
   "add.test-ok": "Reachable — reported {status}.",
   "add.test-failed": "Could not reach it: {error}",
+
+  "scrape.warning": "Reading a page's markup breaks silently when the page changes. A selector that stops matching is reported as a failing provider, never as \"operational\".",
+  "scrape.selector": "CSS selector",
+  "scrape.selector-hint": "The element whose text says how the provider is, e.g. .status-banner or #status > h2. Tag, #id, .class and [attr] with the descendant and child combinators.",
+  "scrape.words": "Status words",
+  "scrape.words-hint": "Comma-separated, per severity. Leave a severity empty to keep the built-in words for it; the longest match on the page wins.",
+  "scrape.words-placeholder": "e.g. {example}",
 
   "components.field": "Components",
   "components.load": "Choose components",

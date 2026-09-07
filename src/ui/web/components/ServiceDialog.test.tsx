@@ -152,6 +152,43 @@ describe("the service dialog's adapter choice", () => {
   });
 });
 
+describe("the service dialog's scrape adapter fields", () => {
+  it("asks for a selector and warns about the reading breaking, only for the scrape adapter", async () => {
+    const { dialog } = await openAdd();
+    expect(within(dialog).queryByLabelText(i18n.t("scrape.selector"))).toBeNull();
+
+    await userEvent.click(within(dialog).getByRole("radio", { name: "html" }));
+
+    expect(within(dialog).getByLabelText(i18n.t("scrape.selector"))).toBeInTheDocument();
+    expect(within(dialog).getByText(i18n.t("scrape.warning"))).toBeInTheDocument();
+  });
+
+  it("submits the selector and only the status words the operator filled in", async () => {
+    const { dialog } = await openAdd();
+    const calls = interceptWrites({
+      "POST /config/services": {},
+      "POST /config/services/scraped/test": { ok: true, overallStatus: "operational" },
+    });
+
+    await userEvent.click(within(dialog).getByRole("radio", { name: "html" }));
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "Scraped");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://status.example.com/");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("scrape.selector")), ".status-banner");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("status.operational")), "tutto tranquillo");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const addCall = calls.find((call) => call.method === "POST" && call.path === "/config/services");
+    // The severities left empty are absent rather than sent as blanks: a blank
+    // would be stored as a mapping that matches nothing.
+    expect(addCall?.body).toMatchObject({
+      adapter: "html",
+      options: { selector: ".status-banner", operational: "tutto tranquillo" },
+    });
+  });
+});
+
 describe("the service dialog's write path", () => {
   it("a successful add calls the mutation with the expected body, component selection included", async () => {
     const { dialog } = await openAdd();
