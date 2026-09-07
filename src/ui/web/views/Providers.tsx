@@ -24,6 +24,7 @@ import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { severity, statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { hostOf } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
+import { isMuted } from "@/lib/mute.ts";
 import { isReorder, rowShifts } from "@/lib/rowShift.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { ComponentStatus, HistoryBucket, OverallStatus, ProviderStatus } from "@/lib/types.ts";
@@ -73,6 +74,8 @@ interface ProviderRow {
   components: ComponentStatus[];
   /** A declared window is running right now — an upcoming one is not this table's job. */
   maintenanceActive: boolean;
+  /** The operator asked for silence, and it has not run out yet. */
+  muted: boolean;
 }
 
 /**
@@ -293,6 +296,7 @@ export function Providers() {
           monitored: provider.componentSelection,
           components: provider.components,
           maintenanceActive: provider.maintenance.active.length > 0,
+          muted: isMuted(provider.mutedUntil),
         };
       });
   }, [providers, summary, filter, leaving]);
@@ -335,6 +339,11 @@ export function Providers() {
                   {row.original.maintenanceActive && (
                     <Badge variant="muted">{t("provider.maintenance.badge")}</Badge>
                   )}
+                  {/* Shown alongside, not instead: a muted provider inside a
+                      maintenance window is silent twice over, and hiding one
+                      badge behind the other would make lifting the mute look
+                      like it changed nothing. */}
+                  {row.original.muted && <Badge variant="muted">{t("provider.muted.badge")}</Badge>}
                 </span>
                 <span className="font-mono text-[10px] text-muted-foreground">{row.original.host}</span>
               </span>
