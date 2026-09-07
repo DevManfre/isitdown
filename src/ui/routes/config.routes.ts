@@ -85,6 +85,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         failureThreshold: settings.failureThreshold,
         adaptivePolling: settings.adaptivePolling,
         adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
+        confirmSamples: settings.confirmSamples,
       },
       retention: { days: settings.retentionDays },
       channels: describeChannels(db, runtime.env),
@@ -231,6 +232,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       ...(parsed.data.adaptiveIntervalMinutes === undefined
         ? {}
         : { adaptiveIntervalMinutes: parsed.data.adaptiveIntervalMinutes }),
+      ...(parsed.data.confirmSamples === undefined ? {} : { confirmSamples: parsed.data.confirmSamples }),
       ...(parsed.data.retentionDays === undefined ? {} : { retentionDays: parsed.data.retentionDays }),
     });
     const settings = readSettings(db, runtime.logger);
@@ -242,6 +244,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         failureThreshold: settings.failureThreshold,
         adaptivePolling: settings.adaptivePolling,
         adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
+        confirmSamples: settings.confirmSamples,
       },
       retention: { days: settings.retentionDays },
     });

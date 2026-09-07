@@ -73,6 +73,7 @@ export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<
       ...(file.adaptiveIntervalMinutes === undefined
         ? {}
         : { adaptiveIntervalMinutes: file.adaptiveIntervalMinutes }),
+      ...(file.confirmSamples === undefined ? {} : { confirmSamples: file.confirmSamples }),
     }),
     locale: file.locale ?? "en",
     services: file.services,

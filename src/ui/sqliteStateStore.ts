@@ -1,9 +1,14 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { ProviderRuntimeState, SaveStatusMeta } from "../core/stateStore.interface.ts";
-import { componentStatusSchema, incidentSchema, maintenanceWindowSchema } from "../core/status.schema.ts";
+import {
+  componentStatusSchema,
+  incidentSchema,
+  maintenanceWindowSchema,
+  normalizedStatusSchema,
+} from "../core/status.schema.ts";
 import { STATUS_CHANGE_KINDS } from "../core/types.ts";
-import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
+import type { DampingState, HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { z } from "zod";
 import type {
   DailyBucket,
@@ -43,6 +48,10 @@ const stateRowSchema = z.object({
   fetched_at: z.string(),
   failure_count: z.number(),
   degraded_notified: z.number(),
+  // Written by the notification gate, and null on every row that predates it.
+  notify_baseline: z.string().nullable(),
+  pending_signature: z.string().nullable(),
+  pending_count: z.number(),
 });
 
 const incidentRowSchema = z.object({
@@ -156,6 +165,8 @@ const baseline = (): ProviderRuntimeState => ({
   last: null,
   failureCount: 0,
   degradedNotified: false,
+  notifyBaseline: null,
+  pending: null,
 });
 
 const toIncidentRow = (row: IncidentDbRow): IncidentRow => ({
@@ -236,7 +247,9 @@ export interface SqliteStateStoreDeps {
 export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreDeps = {}): HistoryStore {
   const now = deps.now ?? ((): Date => new Date());
   const selectState = db.prepare(
-    "SELECT overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified FROM provider_state WHERE provider_id = ?",
+    `SELECT overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified,
+            notify_baseline, pending_signature, pending_count
+     FROM provider_state WHERE provider_id = ?`,
   );
   const upsertState = db.prepare(`
     INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified)
@@ -254,6 +267,14 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     ON CONFLICT (provider_id) DO UPDATE SET failure_count = failure_count + 1
   `);
   const clearFailure = db.prepare("UPDATE provider_state SET failure_count = 0 WHERE provider_id = ?");
+  const setNotifyState = db.prepare(`
+    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified, notify_baseline, pending_signature, pending_count)
+    VALUES (?, 'unknown', '[]', '[]', '[]', ?, 0, 0, ?, ?, ?)
+    ON CONFLICT (provider_id) DO UPDATE SET
+      notify_baseline = excluded.notify_baseline,
+      pending_signature = excluded.pending_signature,
+      pending_count = excluded.pending_count
+  `);
   const setDegraded = db.prepare(`
     INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified)
     VALUES (?, 'unknown', '[]', '[]', '[]', ?, 0, ?)
@@ -324,6 +345,14 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
               },
         failureCount: row.failure_count,
         degradedNotified: row.degraded_notified === 1,
+        notifyBaseline:
+          row.notify_baseline === null
+            ? null
+            : normalizedStatusSchema.parse(JSON.parse(row.notify_baseline)),
+        pending:
+          row.pending_signature === null
+            ? null
+            : { signature: row.pending_signature, count: row.pending_count },
       };
     },
 
@@ -406,6 +435,20 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
 
     async setDegradedNotified(providerId: string, value: boolean): Promise<void> {
       setDegraded.run(providerId, "", value ? 1 : 0);
+    },
+
+    async saveNotifyState(
+      providerId: string,
+      notifyBaseline: NormalizedStatus | null,
+      pending: DampingState | null,
+    ): Promise<void> {
+      setNotifyState.run(
+        providerId,
+        "",
+        notifyBaseline === null ? null : JSON.stringify(notifyBaseline),
+        pending?.signature ?? null,
+        pending?.count ?? 0,
+      );
     },
 
     async recordNotification(record: SentRecord): Promise<void> {
