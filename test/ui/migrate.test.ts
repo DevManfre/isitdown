@@ -523,3 +523,29 @@ test("migrating schema 11 adds latency_ms without touching existing samples", as
   assert.equal(version?.user_version, SCHEMA_VERSION);
   db.close();
 });
+
+test("migrating from schema 12 counts every stored send as one attempt", async () => {
+  const db = await freshDb();
+  migrate(db);
+  // Roll the database back to how it looked before retries existed.
+  db.exec("ALTER TABLE notifications DROP COLUMN attempts");
+  db.exec("PRAGMA user_version = 12");
+  db.prepare(
+    "INSERT INTO notifications (provider_id, channel, kind, text, sent_at, ok, error) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).run("github", "telegram", "status_change", "GitHub is down", "2026-09-07T14:02:11.000Z", 0, "401");
+
+  migrate(db);
+
+  // One, not null: before retries a failed send was tried exactly once, so
+  // that is what the row actually records — nothing has to be guessed.
+  const rows = db.prepare("SELECT ok, attempts FROM notifications").all() as {
+    ok: number;
+    attempts: number;
+  }[];
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.ok, 0);
+  assert.equal(rows[0]?.attempts, 1);
+  const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
+  assert.equal(version?.user_version, SCHEMA_VERSION);
+  db.close();
+});

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -64,7 +64,8 @@ export function migrate(db: DatabaseSync): void {
       text        TEXT NOT NULL,
       sent_at     TEXT NOT NULL,
       ok          INTEGER NOT NULL,
-      error       TEXT
+      error       TEXT,
+      attempts    INTEGER NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -298,6 +299,18 @@ export function migrate(db: DatabaseSync): void {
     );
     if (!sampleColumns.includes("latency_ms")) {
       db.exec("ALTER TABLE status_samples ADD COLUMN latency_ms INTEGER");
+    }
+  }
+
+  if (from < 13) {
+    // How many times the channel was asked to take the message. One is what
+    // every existing row was: before retries, a failed send was logged and
+    // dropped, so a stored failure is a row that was tried exactly once.
+    const notificationColumns = (
+      db.prepare("PRAGMA table_info(notifications)").all() as { name: string }[]
+    ).map((column) => column.name);
+    if (!notificationColumns.includes("attempts")) {
+      db.exec("ALTER TABLE notifications ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1");
     }
   }
 

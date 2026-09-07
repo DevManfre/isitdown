@@ -222,6 +222,13 @@ export interface SentRecord {
   sentAt: string;
   ok: boolean;
   error?: string;
+  /**
+   * How many times the channel was asked to take the message. Optional because
+   * a row written before retries existed (roadmap 3.14) carries no count, and
+   * the view has to render that row rather than claim a number for it. A failed
+   * record with more than one attempt is a dead letter: every try was spent.
+   */
+  attempts?: number;
 }
 
 /** Which slice of the delivery log the view is asking for. */

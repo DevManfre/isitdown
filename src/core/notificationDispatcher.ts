@@ -14,6 +14,13 @@ export interface SentRecord {
   sentAt: string;
   ok: boolean;
   error?: string | undefined;
+  /**
+   * How many times the channel was asked to take this message before the
+   * outcome above. `1` is a send that worked first time or was never retried;
+   * anything higher on a failed record is a dead letter — every attempt was
+   * spent and the message is gone.
+   */
+  attempts: number;
 }
 
 export interface DispatchContext {
@@ -54,9 +61,31 @@ export interface Dispatcher {
 
 export interface DispatcherDeps {
   logger: Logger;
-  /** Called once per attempt, success or failure. The UI edition persists these. */
+  /** Called once per send, success or failure — never once per attempt. The UI edition persists these. */
   onSent?: ((record: SentRecord) => void | Promise<void>) | undefined;
+  /** Injected so tests assert the backoff schedule instead of waiting it out. */
+  sleep?: ((ms: number) => Promise<void>) | undefined;
 }
+
+/**
+ * How many times one message may be handed to one channel. A rate limit, a
+ * restarting webhook receiver or a dropped connection is over in seconds, and
+ * those are the failures that used to lose an alert outright; a stale
+ * credential fails all three times and lands in the delivery log as a dead
+ * letter, which is the state the operator has to see.
+ *
+ * Three rather than more: the retries happen inside the poll cycle, so the
+ * whole schedule has to stay short against the shortest cadence anything can
+ * be polled on (one minute).
+ */
+const MAX_ATTEMPTS = 3;
+const RETRY_BASE_MS = 1000;
+const RETRY_JITTER_MS = 250;
+
+const realSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 /**
  * The only caller of `Notifier.send` in either edition. Its input is the diff
@@ -65,35 +94,80 @@ export interface DispatcherDeps {
  */
 export function createDispatcher(deps: DispatcherDeps): Dispatcher {
   const { logger, onSent } = deps;
+  const sleep = deps.sleep ?? realSleep;
 
+  /**
+   * One message to one channel, retried with exponential backoff until it lands
+   * or the attempts run out. Exactly one record comes out either way: the
+   * delivery log is a log of messages, not of attempts, and a retried send that
+   * wrote a row per try would report a single alert as three failures.
+   *
+   * `maxAttempts` is a parameter rather than a constant read here so a delivery
+   * test can ask for one attempt: the operator pressing "test" is waiting for
+   * the answer, and three seconds of backoff on a credential they know is wrong
+   * is a worse answer than a fast no.
+   */
   async function deliver(
     notifier: Notifier,
     payload: NotificationPayload,
     text: string,
+    maxAttempts: number = MAX_ATTEMPTS,
   ): Promise<SentRecord> {
+    const providerId = payload.change.providerId;
+    const kind = payload.change.kind;
+    let attempts = 0;
+    let failure: string | undefined;
+
+    while (attempts < maxAttempts) {
+      if (attempts > 0) {
+        // Jittered, like the poller's own backoff: a provider-wide incident
+        // notifies every channel at once, and a fleet of instances retrying in
+        // lockstep is how a rate limit becomes permanent.
+        await sleep(RETRY_BASE_MS * 2 ** (attempts - 1) + Math.random() * RETRY_JITTER_MS);
+      }
+      attempts += 1;
+      try {
+        await notifier.send(payload);
+        failure = undefined;
+        break;
+      } catch (error) {
+        failure = error instanceof Error ? error.message : String(error);
+        // Warn, not error: an attempt that has a retry behind it is not yet a
+        // lost notification. The dead letter below is the one worth an error.
+        logger.warn("notification attempt failed", {
+          channel: notifier.id,
+          providerId,
+          kind,
+          attempt: attempts,
+          error: failure,
+        });
+      }
+    }
+
     const record: SentRecord = {
-      providerId: payload.change.providerId,
+      providerId,
       channel: notifier.id,
-      kind: payload.change.kind,
+      kind,
       text,
+      // Stamped now rather than before the first attempt: this is when the
+      // message reached the channel, or when it was given up on.
       sentAt: new Date().toISOString(),
-      ok: true,
+      ok: failure === undefined,
+      attempts,
+      ...(failure === undefined ? {} : { error: failure }),
     };
 
-    try {
-      await notifier.send(payload);
-      logger.info("notification sent", {
+    if (record.ok) {
+      logger.info("notification sent", { channel: notifier.id, providerId, kind, attempts });
+    } else {
+      // The dead letter: every attempt spent, the message gone. The delivery
+      // log is the other half of this — a line in a log nobody tails is not a
+      // channel an operator notices has stopped working.
+      logger.error("notification failed permanently", {
         channel: notifier.id,
-        providerId: record.providerId,
-        kind: record.kind,
-      });
-    } catch (error) {
-      record.ok = false;
-      record.error = error instanceof Error ? error.message : String(error);
-      logger.error("notification failed", {
-        channel: notifier.id,
-        providerId: record.providerId,
-        kind: record.kind,
+        providerId,
+        kind,
+        attempts,
         error: record.error,
       });
     }
@@ -126,7 +200,8 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         service: { id: service.id, name: service.name, statusUrl: service.baseUrl },
         locale,
       };
-      return deliver(notifier, payload, renderMessage(payload));
+      // One attempt: the operator is waiting on this answer (see `deliver`).
+      return deliver(notifier, payload, renderMessage(payload), 1);
     },
 
     async dispatch(changes: StatusChange[], ctx: DispatchContext): Promise<SentRecord[]> {
