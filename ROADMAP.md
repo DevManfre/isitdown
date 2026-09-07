@@ -66,7 +66,7 @@ does not cover is invisible.
 | 2.5 | **Flap damping** | M | Require N consecutive samples agreeing before a transition notifies. Protects against a provider's page briefly disagreeing with itself. Must be expressible as diff-engine table rows, not a special case elsewhere. |
 | 2.6 | **Provider groups / "my stack"** | M | Group providers, derive a composite status per group, alert on the group. Answers "is my deploy path healthy" rather than "is GitHub healthy". |
 | 2.7 | **Correlated-outage detection** | L | Three providers degrade within the same window → one "likely shared upstream" meta-event instead of three alerts. Needs a correlation window and a suppression rule; genuinely useful during a Cloudflare/AWS day, and rare enough to be hard to test. Would need synthetic history in tests. |
-| 2.8 | **Record fetch latency of the status page itself** | S | One extra column on `status_samples`. Free signal: a status page slowing down is often the first sign of trouble, and it makes a nice chart. |
+| 2.8 ✅ | **Record fetch latency of the status page itself** | S | One extra column on `status_samples`. Free signal: a status page slowing down is often the first sign of trouble, and it makes a nice chart. |
 | 2.9 | **Component-level alerting** | M | `scopeToComponents` already narrows what is *reported*; extend it so a specific component's transition can notify independently, with its own severity. |
 
 ## 3. Notification channels
@@ -188,10 +188,11 @@ worth:
    `/events` pushes a `cycle` frame as each cycle finishes, the dashboard
    re-reads what the frame names, and polling steps back to a two-minute safety
    interval behind it.
-2. **2.8 fetch latency of the status page itself** — one extra column on
-   `status_samples`. A status page slowing down is often the first sign of
-   trouble, the conditional-request path already measures the round trip, and it
-   makes a chart for free.
+2. ✅ **2.8 fetch latency of the status page itself** — shipped as a
+   `latency_ms` column on `status_samples`: `fetchConditional` times the round
+   trip to the response headers, reports it through `FetchContext.onRead`, and
+   the poller hands it to `saveStatus`. A 304 is recorded like any other read.
+   Nothing reads the column yet — the chart is still to design.
 3. **4.5 configurable retention** — 120 days is hardcoded in
    `src/ui/runtime.ts`, next to the prune that now also expires removals. A
    setting with the storage cost shown beside it.
