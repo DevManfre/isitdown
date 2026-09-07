@@ -197,6 +197,7 @@ test("notifications are counted per channel and outcome", async () => {
       text: "x",
       sentAt: "2026-01-01T00:00:00.000Z",
       ok: true,
+      attempts: 1,
     });
     app.runtime.metrics.recordSent({
       providerId: "github",
@@ -206,6 +207,7 @@ test("notifications are counted per channel and outcome", async () => {
       sentAt: "2026-01-01T00:00:01.000Z",
       ok: false,
       error: "401",
+      attempts: 3,
     });
 
     const { body } = await app.get("/metrics");
