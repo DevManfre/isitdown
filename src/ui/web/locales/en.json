@@ -306,6 +306,7 @@
   "service.disabled": "disabled",
   "channel.env-set": "set",
   "channel.env-missing": "not set",
+  "channel.env-optional": "optional",
   "channel.test-ok": "Test message sent.",
   "channel.test-failed": "Test failed: {error}",
   "channel.env-var-toggle": "Environment variable",

@@ -17,6 +17,7 @@ import type {
 import type { Logger } from "../core/logger.ts";
 import { forgetProvider } from "../core/http.ts";
 import { CATCH_ALL_RULE } from "../core/routing.ts";
+import { isOptionalSetting } from "../notifiers/settings.ts";
 import type { RoutingRule } from "../core/routing.ts";
 
 /**
@@ -129,6 +130,8 @@ export interface DescribedField {
   name: string;
   envVar: string;
   isSet: boolean;
+  /** The channel works without it — the dashboard must not read it as missing. */
+  optional: boolean;
 }
 
 export interface DescribedChannel {
@@ -600,6 +603,7 @@ export function describeChannels(db: DatabaseSync, env: NodeJS.ProcessEnv): Desc
         name: key.slice(0, -ENV_SUFFIX.length),
         envVar,
         isSet: (env[envVar] ?? "") !== "",
+        optional: isOptionalSetting(channel.id, key.slice(0, -ENV_SUFFIX.length)),
       })),
   }));
 }
@@ -637,8 +641,12 @@ export function createDbConfigSource(
           }
           const name = key.slice(0, -ENV_SUFFIX.length);
           const fromEnv = env[value] ?? "";
-          if (fromEnv === "") missing.push(value);
-          else resolved[name] = fromEnv;
+          // An unset optional credential is not a broken channel: the webhook's
+          // signing secret is offered as a field to every installation, and
+          // most of them will never set it.
+          if (fromEnv === "") {
+            if (!isOptionalSetting(channel.id, name)) missing.push(value);
+          } else resolved[name] = fromEnv;
         }
 
         if (channel.enabled && missing.length > 0) {

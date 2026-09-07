@@ -157,8 +157,8 @@ test("describeChannels reports which variable carries each credential and whethe
 
   assert.equal(telegram?.enabled, false);
   assert.deepEqual(telegram?.fields, [
-    { name: "botToken", envVar: "TELEGRAM_BOT_TOKEN", isSet: true },
-    { name: "chatId", envVar: "TELEGRAM_CHAT_ID", isSet: false },
+    { name: "botToken", envVar: "TELEGRAM_BOT_TOKEN", isSet: true, optional: false },
+    { name: "chatId", envVar: "TELEGRAM_CHAT_ID", isSet: false, optional: false },
   ]);
   db.close();
 });
@@ -280,7 +280,7 @@ test("a channel's environment variable name can be changed but a value cannot be
   const db = await freshDb();
   updateChannel(db, "webhook", { fields: { urlEnv: "MY_OWN_HOOK" } });
   const stored = listChannels(db).find((channel) => channel.id === "webhook");
-  assert.deepEqual(stored?.config, { urlEnv: "MY_OWN_HOOK" });
+  assert.deepEqual(stored?.config, { urlEnv: "MY_OWN_HOOK", secretEnv: "WEBHOOK_SECRET" });
 
   assert.throws(
     () => updateChannel(db, "webhook", { fields: { url: "https://hooks.example/x" } }),
