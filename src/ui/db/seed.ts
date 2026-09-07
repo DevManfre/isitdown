@@ -28,13 +28,17 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   failureThreshold: "5",
   retentionDays: "120",
   theme: "system",
+  timeZone: "auto",
   uiLocale: "en",
   notificationLocale: "en",
 };
 
 const DEFAULT_CHANNELS = [
   { id: "telegram", config: { botTokenEnv: "TELEGRAM_BOT_TOKEN", chatIdEnv: "TELEGRAM_CHAT_ID" } },
-  { id: "webhook", config: { urlEnv: "WEBHOOK_URL" } },
+  // The signing secret is offered as a field even though signing is optional:
+  // an operator who never sets the variable gets unsigned requests, which is
+  // what a webhook receiver written before roadmap 3.16 expects.
+  { id: "webhook", config: { urlEnv: "WEBHOOK_URL", secretEnv: "WEBHOOK_SECRET" } },
   { id: "discord", config: { webhookUrlEnv: "DISCORD_WEBHOOK_URL" } },
   { id: "slack", config: { webhookUrlEnv: "SLACK_WEBHOOK_URL" } },
   // No `*Env` fields: the VAPID pair is generated on first use (src/ui/vapidKeys.ts).
