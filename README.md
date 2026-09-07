@@ -1020,6 +1020,7 @@ back reports a parse failure instead of the real problem.
 | `POST` | `/config/channels/:id/test` | One test notification, through the dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
 | `POST` | `/poll` | Run a cycle now, through the scheduler. Returns the cycle summary. |
+| `GET` | `/events` | Server-sent events, one long-lived response per open tab. `hello` on connect (`lastPollAt`, `nextPollAt`, `serverNow`), then `cycle` as each cycle finishes (`finishedAt`, `providers`, `failed`, `changedProviders` — no deadline: the scheduler re-arms after the event, so the fresh one comes with the re-read). The stream is a courier, not a source of truth: it says what changed, and the dashboard re-reads it. Not JSON — see [6.3](#63-live-updates). |
 | `GET` | `/metrics` | Prometheus exposition. The one non-JSON endpoint — see [6.2](#62-prometheus-metrics). |
 | `GET` | `/` | The dashboard. |
 
@@ -1091,6 +1092,40 @@ groups:
 
 There is no authentication: this is a local, single-operator dashboard. Do not
 publish port 3000 to a network you do not trust.
+
+---
+
+### 6.3 Live updates
+
+The dashboard is pushed to rather than polling: it opens `/events` once and
+re-reads what an event names.
+
+```bash
+curl -N localhost:3000/events
+#   event: hello
+#   data: {"lastPollAt":"...","nextPollAt":"...","serverNow":"..."}
+#   event: cycle
+#   data: {"startedAt":"...","finishedAt":"...","providers":4,"failed":0,"changedProviders":["github"]}
+```
+
+Server-sent events, not a WebSocket: nothing the dashboard sends needs a socket
+— every write it makes is already an HTTP request — and SSE rides plain HTTP
+with reconnection handled by the browser, so it costs no new dependency.
+
+A cycle event re-reads the cheap keys (status, incidents, notifications,
+maintenance); the 90-day history and the map are re-read only when
+`changedProviders` is non-empty, which for most cycles it is not. Polling does
+not go away, it steps back: with the stream connected every query drops to a
+two-minute safety interval, because a stream the browser still believes is open
+but whose events stopped arriving — a proxy that dropped it, a suspended laptop
+— would otherwise leave the dashboard frozen with no sign of it. When the
+stream drops, the queries return to the 30-second rhythm until it reconnects,
+and the header's next-poll label carries a **Live** badge whenever the push is
+what is keeping the page fresh.
+
+Behind a reverse proxy, the stream needs buffering off (the response sends
+`X-Accel-Buffering: no` for nginx) and a read timeout longer than a heartbeat,
+which is written every 20 seconds.
 
 ---
 
@@ -1432,11 +1467,12 @@ isitdown/
 │       ├── dbConfigSource.ts           config from SQLite; resolves secrets by variable name
 │       ├── secretsFile.ts              credentials saved from the dashboard: 0600 file beside the database, applied to the environment
 │       ├── metrics.ts                  the Prometheus scrape surface: gauges from the store, counters in memory
+│       ├── liveEvents.ts               the push hub behind /events: subscribe, publish, nothing transport-specific
 │       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
 │       ├── geo/                        resolveLocation.ts + the IATA/cloud-region lookup tables it resolves against
 │       ├── db/                         open.ts, migrate.ts, seed.ts
-│       ├── routes/                     status, history, incidents, notifications, config, preferences, map, metrics
+│       ├── routes/                     status, events, history, incidents, notifications, config, preferences, map, metrics
 │       └── web/                        the dashboard: react, vite, shadcn/ui
 │           ├── index.html              pre-paint theme script, fonts, #root
 │           ├── main.tsx                provider tree: i18n, query, theme, router
@@ -1446,7 +1482,7 @@ isitdown/
 │           ├── components/             rail, header, poll indicator, charts/
 │           ├── views/                  overview, providers, incidents, incident,
 │           │                           history, delivery log, settings
-│           ├── hooks/                  queries, theme, rail, busy
+│           ├── hooks/                  queries, theme, rail, busy, live
 │           ├── lib/                    api, types, chartConfig, format, i18n
 │           ├── css/base.css            Tailwind entry point: imports tailwindcss, tokens, motion
 │           ├── css/tokens.css          the only file with a colour literal
