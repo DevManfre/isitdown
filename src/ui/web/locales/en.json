@@ -346,5 +346,6 @@
   "delivery.total_other": "{count} sends recorded",
   "delivery.showing_one": "{count} matching send",
   "delivery.showing_other": "{count} matching sends",
-  "providers.restore-until": "Restorable until {when}"
+  "providers.restore-until": "Restorable until {when}",
+  "meta.live": "Live"
 }
