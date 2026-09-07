@@ -1,5 +1,6 @@
 import type { Adapter, FetchContext, IncidentHistoryResult, ServiceRef } from "../core/adapter.interface.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
+import { fetchConditional } from "../core/http.ts";
 import { severityFromWords, worstStatus } from "./severity.ts";
 
 /**
@@ -190,14 +191,14 @@ export function parseFeedHistory(xml: string, service: ServiceRef): IncidentHist
 }
 
 async function readFeed(service: ServiceRef, ctx: FetchContext): Promise<string> {
-  const response = await fetch(service.baseUrl, {
-    headers: { accept: ACCEPT },
-    signal: AbortSignal.timeout(ctx.timeoutMs),
+  // Feeds are the endpoint most worth revalidating: they are the largest bodies
+  // we read and the ones that change least often.
+  return fetchConditional(service.baseUrl, {
+    providerId: service.id,
+    accept: ACCEPT,
+    timeoutMs: ctx.timeoutMs,
+    label: "rss fetch",
   });
-  if (!response.ok) {
-    throw new Error(`rss fetch for ${service.id} failed: HTTP ${response.status}`);
-  }
-  return response.text();
 }
 
 export const rssAdapter: Adapter = {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Adapter, FetchContext, IncidentHistoryResult, ServiceRef } from "../core/adapter.interface.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus } from "../core/types.ts";
+import { fetchConditional } from "../core/http.ts";
 import { severityFromWords, worstStatus } from "./severity.ts";
 
 /**
@@ -151,14 +152,12 @@ export function parseSlackHistory(raw: string, service: ServiceRef): IncidentHis
 }
 
 async function readJson(path: string, service: ServiceRef, ctx: FetchContext): Promise<string> {
-  const response = await fetch(`${service.baseUrl}${path}`, {
-    headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(ctx.timeoutMs),
+  return fetchConditional(`${service.baseUrl}${path}`, {
+    providerId: service.id,
+    accept: "application/json",
+    timeoutMs: ctx.timeoutMs,
+    label: "slack fetch",
   });
-  if (!response.ok) {
-    throw new Error(`slack fetch for ${service.id} failed: HTTP ${response.status}`);
-  }
-  return response.text();
 }
 
 export const slackAdapter: Adapter = {
