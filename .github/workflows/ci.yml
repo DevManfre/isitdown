@@ -1,7 +1,7 @@
 # Every push to a long-lived branch and every pull request must pass exactly
 # what a contributor runs locally: typecheck, unit tests, integration tests,
-# then a build as a smoke check. Nothing in the release workflow is trusted
-# unless this one is green first.
+# a build as a smoke check, and the visual baselines. Nothing in the release
+# workflow is trusted unless this one is green first.
 name: CI
 
 on:
@@ -45,3 +45,23 @@ jobs:
       # not at release time.
       - name: Build (smoke check)
         run: npm run build
+
+      # After the build, because it screenshots the bundle in dist/. The
+      # browser is Playwright's cached Chromium, installed here rather than
+      # carried as a dependency — the harness drives it over the DevTools
+      # protocol and imports nothing from the package.
+      - name: Install Chromium for the visual check
+        run: npx --yes playwright@latest install --with-deps chromium
+
+      - name: Visual regression (every view, both themes, both locales)
+        run: npm run test:visual
+
+      # The rendered frames, so a failure can be looked at rather than argued
+      # about. Only on failure: 24 screenshots per green run is noise.
+      - name: Upload the rendered views
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression
+          path: test/visual/current
+          if-no-files-found: ignore
