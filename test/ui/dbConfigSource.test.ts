@@ -564,3 +564,17 @@ test("a removed service's id cannot be updated or re-described", async () => {
   assert.equal(describeServiceImpact(db, "github"), null);
   db.close();
 });
+
+test("retention defaults to 120 days and refuses a value outside its bounds", async () => {
+  const db = await freshDb();
+  assert.equal(readSettings(db, silent).retentionDays, 120);
+
+  writeSettings(db, { retentionDays: 365 });
+  assert.equal(readSettings(db, silent).retentionDays, 365);
+
+  writeSettings(db, { retentionDays: 4000 });
+  const warnings: string[] = [];
+  assert.equal(readSettings(db, createLogger("warn", (line) => warnings.push(line))).retentionDays, 120);
+  assert.match(warnings.join(" "), /retentionDays/);
+  db.close();
+});

@@ -12,7 +12,12 @@ import { createWebPushNotifier } from "../notifiers/webpush.notifier.ts";
 import { buildNotifiers } from "../notifiers/index.ts";
 import { createApp } from "./app.ts";
 import { createBackfillService, type BackfillService } from "./backfill.ts";
-import { createDbConfigSource, listServices, purgeExpiredServices } from "./dbConfigSource.ts";
+import {
+  createDbConfigSource,
+  listServices,
+  purgeExpiredServices,
+  readSettings,
+} from "./dbConfigSource.ts";
 import { migrate } from "./db/migrate.ts";
 import { openDatabase } from "./db/open.ts";
 import { seedDefaults } from "./db/seed.ts";
@@ -28,8 +33,6 @@ import { loadSecretsFile, type SecretsFile } from "./secretsFile.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
 import { ensureVapidKeys } from "./vapidKeys.ts";
 
-/** Kept a month beyond the 90-day view so a full window is always available. */
-const RETENTION_DAYS = 120;
 const PRUNE_INTERVAL_MS = 24 * 3600 * 1000;
 const NOTIFICATION_FEED_LIMIT = 200;
 
@@ -203,7 +206,9 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
    * off has to be taken on the next boot rather than sit there forever.
    */
   const prune = async (): Promise<void> => {
-    await store.pruneOlderThan(RETENTION_DAYS);
+    // Read per run, not captured once: a retention changed from the dashboard
+    // has to take effect on the next prune without a restart.
+    await store.pruneOlderThan(readSettings(db, logger).retentionDays);
     const purged = purgeExpiredServices(db);
     if (purged.length > 0) {
       logger.info("removed providers past their restore window were deleted", { providers: purged });

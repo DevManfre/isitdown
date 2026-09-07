@@ -178,6 +178,7 @@ test("seedDefaults writes the polling and preference defaults", async () => {
     requestTimeoutSeconds: "8",
     maxRetries: "3",
     failureThreshold: "5",
+    retentionDays: "120",
     theme: "system",
     uiLocale: "en",
     notificationLocale: "en",
