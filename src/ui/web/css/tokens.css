@@ -514,6 +514,19 @@
   }
 }
 
+/* The product mark's own colours, and the only tokens in this file that hold
+   the same value in every theme: a logo is identity rather than semantics, so
+   it does not restyle itself between light and dark. That is why they sit
+   outside the three palette blocks instead of being declared three times.
+   `public/favicon.svg` repeats these values as literals — browser chrome
+   fetches an icon by URL and gets no stylesheet with it — so the two have to
+   be changed together. */
+:root {
+  --brand-mark-from: #968ae0;
+  --brand-mark-to: #5d5294;
+  --brand-mark-trace: #ffffff;
+}
+
 /* Tailwind's `dark:` prefix must follow this repo's attribute, not shadcn's
    default `.dark` class: the pre-paint script in index.html stamps
    data-theme, and "system" stamps nothing at all so the media query decides. */
