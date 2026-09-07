@@ -18,6 +18,12 @@ const telegramSchema = z.object({
 const webhookSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default(""),
+  /**
+   * Optional shared secret for the `X-IsItDown-Signature` header. Written as a
+   * `${VAR}` reference like every other credential — a secret in the file is a
+   * secret in the operator's git history.
+   */
+  secret: z.string().default(""),
 });
 
 const discordSchema = z.object({
@@ -50,6 +56,8 @@ export const fileConfigSchema = z.object({
    */
   adaptivePolling: z.boolean().optional(),
   adaptiveIntervalMinutes: positiveInt.max(1440).optional(),
+  /** Consecutive agreeing polls before a transition notifies. 1 is off. */
+  confirmSamples: positiveInt.max(10).optional(),
   locale: localeSchema.optional(),
   services: z.array(serviceDefinitionSchema).min(1, "at least one service is required"),
   notifications: z

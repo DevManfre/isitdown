@@ -1,4 +1,4 @@
-import type { NormalizedStatus } from "./types.ts";
+import type { DampingState, NormalizedStatus } from "./types.ts";
 
 export interface ProviderRuntimeState {
   /** null until the provider has been polled successfully at least once. */
@@ -7,6 +7,16 @@ export interface ProviderRuntimeState {
   failureCount: number;
   /** Whether the "monitoring degraded" warning has already been sent. */
   degradedNotified: boolean;
+  /**
+   * The reading the operator was last notified about, which is what the next
+   * poll is compared against. It moves independently of `last`: while flap
+   * damping holds an unconfirmed transition, samples keep being recorded but
+   * this stays put, so the transition is announced a poll later rather than
+   * lost. Null on a store written before damping existed — `last` stands in.
+   */
+  notifyBaseline: NormalizedStatus | null;
+  /** The transition being held, if any. Null when nothing is pending. */
+  pending: DampingState | null;
 }
 
 /** What the poller observed while taking a reading, beyond the reading itself. */
@@ -31,5 +41,15 @@ export interface StateStore {
   recordFailure(providerId: string): Promise<number>;
   clearFailures(providerId: string): Promise<void>;
   setDegradedNotified(providerId: string, value: boolean): Promise<void>;
+  /**
+   * Persists what the notification gate decided: the baseline the next poll
+   * compares against, and the transition still being held. Written once per
+   * successful poll, right after the status itself.
+   */
+  saveNotifyState(
+    providerId: string,
+    baseline: NormalizedStatus | null,
+    pending: DampingState | null,
+  ): Promise<void>;
   close(): Promise<void>;
 }

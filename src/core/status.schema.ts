@@ -38,8 +38,18 @@ export const normalizedStatusSchema = z.object({
   fetchedAt: z.string(),
 });
 
+export const dampingStateSchema = z.object({
+  signature: z.string(),
+  count: z.number().int().positive(),
+});
+
 export const providerRuntimeStateSchema = z.object({
   last: normalizedStatusSchema.nullable(),
   failureCount: z.number().int().min(0),
   degradedNotified: z.boolean(),
+  // Both defaulted: a state file written before flap damping existed is a
+  // valid store, and reading it must not be fatal. Absent means "no baseline
+  // of its own yet", which the gate reads as the undamped behaviour.
+  notifyBaseline: normalizedStatusSchema.nullable().default(null),
+  pending: dampingStateSchema.nullable().default(null),
 });

@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 import { providerRuntimeStateSchema } from "../core/status.schema.ts";
 import type { ProviderRuntimeState, StateStore } from "../core/stateStore.interface.ts";
-import type { NormalizedStatus } from "../core/types.ts";
+import type { DampingState, NormalizedStatus } from "../core/types.ts";
 
 const FORMAT_VERSION = 1;
 
@@ -16,6 +16,8 @@ const baseline = (): ProviderRuntimeState => ({
   last: null,
   failureCount: 0,
   degradedNotified: false,
+  notifyBaseline: null,
+  pending: null,
 });
 
 /**
@@ -90,6 +92,17 @@ export async function createFileStateStore(path: string): Promise<StateStore> {
 
     async setDegradedNotified(providerId: string, value: boolean): Promise<void> {
       stateOf(providerId).degradedNotified = value;
+      await persist();
+    },
+
+    async saveNotifyState(
+      providerId: string,
+      notifyBaseline: NormalizedStatus | null,
+      pending: DampingState | null,
+    ): Promise<void> {
+      const state = stateOf(providerId);
+      state.notifyBaseline = notifyBaseline;
+      state.pending = pending;
       await persist();
     },
 

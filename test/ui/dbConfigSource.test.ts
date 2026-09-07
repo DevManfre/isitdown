@@ -57,6 +57,7 @@ test("load maps the seeded database onto a usable runtime config", async () => {
     maxRetries: 3,
     failureThreshold: 5,
     adaptivePolling: true,
+    confirmSamples: 1,
     adaptiveIntervalMinutes: 1,
   });
   assert.equal(config.locale, "en");

@@ -17,6 +17,11 @@ export interface PollingConfig {
    * provider's own interval, so it can only ever speed a provider up.
    */
   adaptiveIntervalMinutes: number;
+  /**
+   * Flap damping: consecutive polls that must agree on a reading before a
+   * transition notifies. 1 is off. See `confirmedChanges` in the diff engine.
+   */
+  confirmSamples: number;
 }
 
 export interface ServiceDefinition {
@@ -36,6 +41,11 @@ export interface ServiceDefinition {
   components: { id: string; name: string }[];
   /** Report only what the selection covers. Meaningless with no selection. */
   scopeToComponents: boolean;
+  /**
+   * ISO 8601, UTC. While a reading is taken before it, nothing about this
+   * provider notifies. Absent means the provider is not muted.
+   */
+  mutedUntil?: string | undefined;
 }
 
 export interface ChannelConfig {

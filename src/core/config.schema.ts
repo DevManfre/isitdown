@@ -51,6 +51,13 @@ export const serviceDefinitionSchema = z.object({
   /** Omitted, not defaulted: absent has to stay distinguishable from "same as the global". */
   intervalMinutes: z.number().int().positive().max(1440).optional(),
   options: z.record(z.string()).optional(),
+  /**
+   * ISO 8601, UTC. While it is in the future the provider notifies nothing —
+   * "I know, stop telling me, for two hours". Optional rather than defaulted:
+   * absent is the normal state, and it reads differently from a mute that has
+   * expired but is still recorded.
+   */
+  mutedUntil: z.string().datetime().optional(),
   components: componentSelectionSchema.default([]),
   scopeToComponents: z.boolean().default(false),
 });
@@ -74,6 +81,14 @@ export const pollingSchema = z.object({
    * raising this can only ever mean "less closely".
    */
   adaptiveIntervalMinutes: z.number().int().positive().max(1440).default(1),
+  /**
+   * Flap damping: how many consecutive polls must agree on a reading before a
+   * transition notifies. 1 is off, and off is the default — damping trades
+   * latency for trust, and which side of that an operator wants depends on
+   * their providers. Capped low: anything past a handful of polls is a mute
+   * with extra steps.
+   */
+  confirmSamples: z.number().int().positive().max(10).default(1),
 });
 
 export const localeSchema = z
