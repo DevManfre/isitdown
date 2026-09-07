@@ -346,5 +346,6 @@
   "delivery.total_other": "{count} invii registrati",
   "delivery.showing_one": "{count} invio corrispondente",
   "delivery.showing_other": "{count} invii corrispondenti",
-  "providers.restore-until": "Ripristinabile fino a {when}"
+  "providers.restore-until": "Ripristinabile fino a {when}",
+  "meta.live": "Live"
 }
