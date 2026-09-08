@@ -1,7 +1,9 @@
 import type { ServiceDefinition } from "./configSource.interface.ts";
+import { DELIVERY_DEFAULTS, type DeliveryConfig } from "./delivery.ts";
 import type { Logger } from "./logger.ts";
+import type { MessageRefStore } from "./messageRefStore.interface.ts";
 import type { Notifier } from "./notifier.interface.ts";
-import { resolveTargets, type RoutingRule } from "./routing.ts";
+import { clearsFloor, explain, severityOf, type RoutingRule } from "./routing.ts";
 import type { NotificationPayload, StatusChange, StatusChangeKind } from "./types.ts";
 import { renderMessage } from "../notifiers/formatting.ts";
 
@@ -45,6 +47,12 @@ export interface DispatchContext {
    * a static list would warn about it on every send.
    */
   knownChannelIds: string[];
+  /**
+   * Quiet hours, the digest window and the per-provider cap. Optional so a
+   * caller from before the policy existed still compiles into "everything
+   * off", which is the behaviour it had.
+   */
+  delivery?: DeliveryConfig | undefined;
 }
 
 export interface Dispatcher {
@@ -65,6 +73,15 @@ export interface DispatcherDeps {
   onSent?: ((record: SentRecord) => void | Promise<void>) | undefined;
   /** Injected so tests assert the backoff schedule instead of waiting it out. */
   sleep?: ((ms: number) => Promise<void>) | undefined;
+  /** Injected so a test can let a digest window and an hour of the cap elapse without waiting. */
+  now?: (() => number) | undefined;
+  /**
+   * Where the id of the message already sent about an incident is kept, so the
+   * next update can edit it (roadmap 3.19). Absent means the feature cannot
+   * work at all, which is how a caller opts out of it entirely — an edition
+   * with nowhere to keep a reference must not silently send duplicates.
+   */
+  messageRefs?: MessageRefStore | undefined;
 }
 
 /**
@@ -79,6 +96,24 @@ export interface DispatcherDeps {
  * be polled on (one minute).
  */
 const MAX_ATTEMPTS = 3;
+const HOUR_MS = 3600_000;
+
+/**
+ * Severity as a number, for picking the worst member of a digest. `unknown`
+ * ranks below `operational` here — in a batch it is the least informative
+ * thing present, and it must never stand in for a batch that also holds a real
+ * outage.
+ */
+const RANK: Record<string, number> = {
+  unknown: -1,
+  operational: 0,
+  degraded: 1,
+  partial_outage: 2,
+  major_outage: 3,
+};
+
+const rankOf = (status: string): number => RANK[status] ?? -1;
+
 const RETRY_BASE_MS = 1000;
 const RETRY_JITTER_MS = 250;
 
@@ -95,6 +130,32 @@ const realSleep = (ms: number): Promise<void> =>
 export function createDispatcher(deps: DispatcherDeps): Dispatcher {
   const { logger, onSent } = deps;
   const sleep = deps.sleep ?? realSleep;
+  const now = deps.now ?? Date.now;
+  const messageRefs = deps.messageRefs;
+
+  /**
+   * When this provider's recent messages went out, newest last. The cap's whole
+   * state (roadmap 3.13), and deliberately in memory: a restart is the one
+   * moment an operator is watching, and a cap that survived one would swallow
+   * the first alerts after it for reasons nothing on screen could explain.
+   */
+  const recentSends = new Map<string, number[]>();
+
+  /**
+   * How many alerts the cap has swallowed for this provider since the last one
+   * that got through. Carried into that next message rather than dropped:
+   * silence an operator cannot distinguish from a broken channel is the one
+   * thing a cap must not produce.
+   */
+  const suppressedSince = new Map<string, number>();
+
+  /**
+   * What is waiting for the next digest window, per channel (roadmap 3.12).
+   * Per channel rather than global: the rules decide who covers a change, and
+   * two channels covering different providers must not receive each other's
+   * batch.
+   */
+  const digests = new Map<string, { since: number; items: NotificationPayload[] }>();
 
   /**
    * One message to one channel, retried with exponential backoff until it lands
@@ -112,11 +173,55 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     payload: NotificationPayload,
     text: string,
     maxAttempts: number = MAX_ATTEMPTS,
+    /**
+     * The incident this message continues, when the policy says one incident is
+     * one message that gets edited (roadmap 3.19). Absent for everything else,
+     * which is every message that has nothing to edit: a status change, a
+     * maintenance window, a digest.
+     */
+    link?: { incidentId: string; final: boolean } | undefined,
   ): Promise<SentRecord> {
     const providerId = payload.change.providerId;
     const kind = payload.change.kind;
     let attempts = 0;
     let failure: string | undefined;
+
+    // An edit first, when there is a message to edit and a channel that can.
+    // One attempt, not the retry schedule below: the errors channels give here
+    // — message too old, message deleted — are permanent, and the answer to
+    // them is the fresh send that follows rather than three more edits.
+    if (link !== undefined && messageRefs !== undefined && notifier.update !== undefined) {
+      const ref = await messageRefs.getRef(notifier.id, providerId, link.incidentId);
+      if (ref !== null) {
+        try {
+          await notifier.update(payload, ref);
+          if (link.final) await messageRefs.forgetRef(notifier.id, providerId, link.incidentId);
+          const record: SentRecord = {
+            providerId,
+            channel: notifier.id,
+            kind,
+            text,
+            sentAt: new Date().toISOString(),
+            ok: true,
+            attempts: 1,
+          };
+          logger.info("notification edited in place", { channel: notifier.id, providerId, kind });
+          await audit(record);
+          return record;
+        } catch (error) {
+          logger.warn("editing a message failed, sending a new one instead", {
+            channel: notifier.id,
+            providerId,
+            kind,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Forgotten before the fallback send: keeping a reference the channel
+          // has just refused would make every later update try the same edit
+          // and fail the same way.
+          await messageRefs.forgetRef(notifier.id, providerId, link.incidentId);
+        }
+      }
+    }
 
     while (attempts < maxAttempts) {
       if (attempts > 0) {
@@ -127,7 +232,21 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       }
       attempts += 1;
       try {
-        await notifier.send(payload);
+        const ref = await notifier.send(payload);
+        // A channel that names its messages, an incident to attach it to, and
+        // somewhere to keep it: remember it so the next update edits this one.
+        // Not for the message that closes an incident — there is nothing left
+        // to edit — which is also what keeps the table from growing a row per
+        // incident forever.
+        if (
+          typeof ref === "string" &&
+          ref !== "" &&
+          link !== undefined &&
+          !link.final &&
+          messageRefs !== undefined
+        ) {
+          await messageRefs.saveRef(notifier.id, providerId, link.incidentId, ref);
+        }
         failure = undefined;
         break;
       } catch (error) {
@@ -172,19 +291,132 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       });
     }
 
-    if (onSent !== undefined) {
-      try {
-        await onSent(record);
-      } catch (error) {
-        // Losing the audit row must not lose the delivery result.
-        logger.error("recording a sent notification failed", {
-          channel: notifier.id,
-          error: error instanceof Error ? error.message : String(error),
+    await audit(record);
+    return record;
+  }
+
+  /**
+   * Hands one delivery result to whoever is keeping the audit trail. Its own
+   * function because both outcomes go through it — a message sent and a message
+   * edited in place — and losing the audit row must not lose the result.
+   */
+  async function audit(record: SentRecord): Promise<void> {
+    if (onSent === undefined) return;
+    try {
+      await onSent(record);
+    } catch (error) {
+      logger.error("recording a sent notification failed", {
+        channel: record.channel,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * The incident a message should be attached to, when the policy says one
+   * incident is one message that gets edited (roadmap 3.19).
+   *
+   * Only the three incident kinds qualify: the opening message is the one that
+   * gets edited, an update edits it, and the resolution edits it one last time
+   * and lets it go. A status change or a maintenance window is not part of an
+   * incident's story, and folding those into the same message would rewrite
+   * history an operator had already read.
+   */
+  function linkOf(
+    change: StatusChange,
+    delivery: DeliveryConfig,
+  ): { incidentId: string; final: boolean } | undefined {
+    if (!delivery.updateInPlace) return undefined;
+    const incidentId = change.incident?.id;
+    if (incidentId === undefined) return undefined;
+    if (
+      change.kind !== "incident_opened" &&
+      change.kind !== "incident_updated" &&
+      change.kind !== "incident_resolved"
+    ) {
+      return undefined;
+    }
+    return { incidentId, final: change.kind === "incident_resolved" };
+  }
+
+  /** Whether this provider has any of its hourly allowance left at `at`. */
+  function capAllows(providerId: string, at: number, cap: DeliveryConfig["cap"]): boolean {
+    if (!cap.enabled) return true;
+    // Pruned on read rather than on a timer: the map is only ever consulted
+    // here, and a timer would keep a dispatcher's state alive for providers
+    // nothing is polling any more.
+    const window = (recentSends.get(providerId) ?? []).filter((sent) => at - sent < HOUR_MS);
+    recentSends.set(providerId, window);
+    return window.length < cap.maxPerHour;
+  }
+
+  /**
+   * One message about one provider went out. Counted per change, not per
+   * channel: a change routed to three channels is one thing the operator was
+   * told, and counting the channels would make the cap depend on how many of
+   * them are switched on.
+   */
+  function countSend(providerId: string, at: number): void {
+    recentSends.set(providerId, [...(recentSends.get(providerId) ?? []), at]);
+  }
+
+  /** Takes the suppressed tally for a provider and clears it, so it is reported once. */
+  function takeSuppressed(providerId: string): number {
+    const count = suppressedSince.get(providerId) ?? 0;
+    if (count > 0) suppressedSince.delete(providerId);
+    return count;
+  }
+
+  /**
+   * Sends every digest whose window has elapsed, and only those: a batch that
+   * is still collecting is the whole point of the feature, so the flush is
+   * driven by the clock rather than by a cycle happening to run.
+   *
+   * The notifier is looked up in the *current* cycle's channels, not captured
+   * when the batch started: a channel switched off while a window was open has
+   * its batch dropped with a line in the log, which is the same thing a
+   * disabled channel does to an immediate send.
+   */
+  function flushDue(
+    ctx: DispatchContext,
+    delivery: DeliveryConfig,
+    at: number,
+    force: boolean,
+  ): Promise<SentRecord>[] {
+    const byChannelId = new Map(ctx.notifiers.map((notifier) => [notifier.id, notifier]));
+    const windowMs = delivery.digest.windowMinutes * 60_000;
+    const sends: Promise<SentRecord>[] = [];
+
+    for (const [channelId, batch] of [...digests]) {
+      if (!force && at - batch.since < windowMs) continue;
+      digests.delete(channelId);
+      const [worst] = [...batch.items].sort(
+        (a, b) => rankOf(severityOf(b.change)) - rankOf(severityOf(a.change)),
+      );
+      if (worst === undefined) continue;
+
+      const notifier = byChannelId.get(channelId);
+      if (notifier === undefined) {
+        logger.warn("dropping a digest for a channel that is no longer enabled", {
+          channel: channelId,
+          changes: batch.items.length,
         });
+        continue;
       }
+
+      const payload: NotificationPayload = {
+        ...worst,
+        // The most severe member stands in as "the change" so a channel that
+        // colours or badges by severity still has one to read; `items` is what
+        // the message is actually made of.
+        digest: { items: batch.items, windowMinutes: delivery.digest.windowMinutes },
+        suppressedCount: takeSuppressed(worst.change.providerId),
+      };
+      countSend(worst.change.providerId, at);
+      sends.push(deliver(notifier, payload, renderMessage(payload)));
     }
 
-    return record;
+    return sends;
   }
 
   return {
@@ -205,10 +437,20 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     },
 
     async dispatch(changes: StatusChange[], ctx: DispatchContext): Promise<SentRecord[]> {
-      if (changes.length === 0) return [];
+      const delivery = ctx.delivery ?? DELIVERY_DEFAULTS;
+      const at = now();
+
+      // Not `changes.length === 0 && return`: a cycle in which nothing changed
+      // is exactly when a digest window quietly runs out, and a flush that only
+      // happened on a busy cycle would hold a batch until the next change —
+      // which is the flood it exists to replace, delayed.
+      const attempts: Promise<SentRecord>[] = flushDue(ctx, delivery, at, false);
+      if (changes.length === 0) {
+        const settled = await Promise.allSettled(attempts);
+        return settled.flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value] : []));
+      }
 
       const byId = new Map(ctx.services.map((service) => [service.id, service]));
-      const attempts: Promise<SentRecord>[] = [];
 
       // Neither varies per change, so both are built once for the whole batch
       // rather than rebuilt on every iteration of the loop below.
@@ -228,14 +470,56 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           continue;
         }
 
-        const payload: NotificationPayload = {
+        const base: NotificationPayload = {
           change,
           service: { id: service.id, name: service.name, statusUrl: service.baseUrl },
           locale: ctx.locale,
         };
-        const text = renderMessage(payload);
 
-        for (const channelId of resolveTargets(change, ctx.rules, enabledChannelIds)) {
+        // Who covers this change, and whether the hour of the day takes it
+        // away from them again (roadmap 3.11). Evaluated together in core's own
+        // evaluator, so the dashboard's dry run and this cannot disagree.
+        const routed = explain(change, ctx.rules, enabledChannelIds, {
+          quietHours: delivery.quietHours,
+          at: new Date(at),
+        });
+        if (routed.quieted) {
+          logger.info("quiet hours held a change back", {
+            providerId: change.providerId,
+            kind: change.kind,
+            floor: delivery.quietHours.minSeverity,
+          });
+          continue;
+        }
+        if (routed.targets.length === 0) continue;
+
+        // The cap is per provider and per change, so it is asked once here
+        // rather than inside the channel loop below (roadmap 3.13).
+        if (!capAllows(change.providerId, at, delivery.cap)) {
+          suppressedSince.set(change.providerId, (suppressedSince.get(change.providerId) ?? 0) + 1);
+          logger.warn("the hourly cap held a change back", {
+            providerId: change.providerId,
+            kind: change.kind,
+            maxPerHour: delivery.cap.maxPerHour,
+          });
+          continue;
+        }
+
+        // Under the floor, so it waits for the batch (roadmap 3.12). It is
+        // deliberately not counted against the cap: a digest is one message
+        // however many changes went into it, and charging each of them would
+        // make the two controls fight.
+        const batched =
+          delivery.digest.enabled &&
+          !clearsFloor(severityOf(change), delivery.digest.immediateFloor);
+
+        // Taken once for the change, not once per channel: the tally is what
+        // the operator was not told about this provider, and reporting it on
+        // the first channel and zero on the rest would be a message that
+        // disagrees with itself across channels.
+        let counted = false;
+        let suppressed: number | undefined;
+        for (const channelId of routed.targets) {
           const notifier = byChannelId.get(channelId);
           if (notifier === undefined) {
             // A configured-but-disabled channel is the normal case and says
@@ -250,7 +534,21 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
             }
             continue;
           }
-          attempts.push(deliver(notifier, payload, text));
+
+          if (batched) {
+            const batch = digests.get(channelId) ?? { since: at, items: [] };
+            batch.items.push(base);
+            digests.set(channelId, batch);
+            continue;
+          }
+
+          if (!counted) {
+            countSend(change.providerId, at);
+            suppressed = takeSuppressed(change.providerId);
+            counted = true;
+          }
+          const payload: NotificationPayload = { ...base, suppressedCount: suppressed ?? 0 };
+          attempts.push(deliver(notifier, payload, renderMessage(payload), MAX_ATTEMPTS, linkOf(change, delivery)));
         }
       }
 

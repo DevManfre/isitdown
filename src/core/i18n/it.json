@@ -22,5 +22,18 @@
   "notification.incident.resolved": "{provider} — {severity}\n\nL'incidente \"{title}\" è stato risolto.\nAggiornato: {updatedAt}\n\n{url}",
   "notification.monitoring.degraded": "{provider} — monitoraggio degradato\n\n{count} richieste consecutive non riuscite. Ultimo stato noto: {lastStatus}.\nAggiornato: {updatedAt}",
   "notification.maintenance.started": "{provider} — manutenzione\n\nÈ iniziata una manutenzione programmata: {title}\nFine prevista: {endsAt}\nGli avvisi per questo provider sono sospesi fino al termine.\n\n{url}",
-  "notification.maintenance.ended": "{provider} — manutenzione conclusa\n\n{title} è terminata.\nStato attuale: {current} — {count} incidente/i aperto/i.\nAggiornato: {updatedAt}\n\n{url}"
+  "notification.maintenance.ended": "{provider} — manutenzione conclusa\n\n{title} è terminata.\nStato attuale: {current} — {count} incidente/i aperto/i.\nAggiornato: {updatedAt}\n\n{url}",
+
+  "notification.digest.heading": "IsItDown — {count} cambiamento/i negli ultimi {minutes} minuto/i",
+  "notification.digest.line": "{provider}: {what}",
+  "notification.digest.status": "stato passato da {previous} a {current}",
+  "notification.digest.component": "{component} ora è {current}",
+  "notification.digest.incident-opened": "incidente aperto — {title}",
+  "notification.digest.incident-updated": "incidente aggiornato — {title} ({status})",
+  "notification.digest.incident-resolved": "incidente risolto — {title}",
+  "notification.digest.maintenance-started": "manutenzione iniziata — {title}",
+  "notification.digest.maintenance-ended": "manutenzione conclusa — {title}",
+  "notification.digest.monitoring": "monitoraggio degradato — {count} letture consecutive fallite",
+
+  "notification.suppressed": "{count} ulteriore/i avviso/i per questo provider sono stati soppressi dal limite orario."
 }

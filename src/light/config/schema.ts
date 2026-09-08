@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { localeSchema, routingRuleSchema, serviceDefinitionSchema } from "../../core/config.schema.ts";
+import {
+  deliverySchema,
+  localeSchema,
+  routingRuleSchema,
+  serviceDefinitionSchema,
+} from "../../core/config.schema.ts";
 
 /**
  * The shape of `config.yml`. Service definitions and the locale reuse the shared
@@ -76,6 +81,13 @@ export const fileConfigSchema = z.object({
    * left out.
    */
   routing: z.array(routingRuleSchema).optional(),
+  /**
+   * Quiet hours, the digest window, the per-provider cap and message editing.
+   * Absent means every one of them off, which is what this edition did before
+   * they existed — the shared schema owns the defaults, so nothing is restated
+   * here.
+   */
+  delivery: deliverySchema.optional(),
 });
 
 export type FileConfig = z.infer<typeof fileConfigSchema>;
