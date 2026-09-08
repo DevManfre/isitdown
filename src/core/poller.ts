@@ -1,12 +1,20 @@
 import type { Adapter } from "./adapter.interface.ts";
 import type { RuntimeConfig, ServiceDefinition } from "./configSource.interface.ts";
 import { confirmedChanges } from "./diffEngine.ts";
-import type { StatusPageRead } from "./http.ts";
+import { RetryAfterError, type StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
 import type { ProviderRuntimeState, StateStore } from "./stateStore.interface.ts";
 import type { NormalizedStatus, StatusChange } from "./types.ts";
 
-const STAGGER_MS = 250;
+/**
+ * How much of a provider's own cadence the staggered start may spread over, and
+ * the ceiling on it whatever the cadence. A cycle is not finished until its
+ * slowest provider is, so the spread is paid in cycle wall time and lands on
+ * top of the scheduler's own jitter — a tenth of an interval, capped, keeps
+ * both inside the slack `DUE_SLACK` already allows.
+ */
+const STAGGER_FRACTION = 0.1;
+const MAX_STAGGER_MS = 20_000;
 /**
  * How much of a provider's own interval may still be missing and have the poll
  * count as due. The scheduler arms with up to a tenth of an interval of jitter
@@ -18,6 +26,32 @@ const DUE_SLACK = 0.15;
 const BACKOFF_BASE_MS = 500;
 const BACKOFF_JITTER_MS = 250;
 
+/** FNV-1a, 32-bit: small, stable across runs, and no dependency. */
+function hash(value: string): number {
+  let h = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    h ^= value.charCodeAt(index);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/**
+ * Where inside the cadence this provider's request goes (roadmap 2.11).
+ *
+ * Anchored on the provider's id rather than its position in the list, which is
+ * what makes it stable: adding or removing a provider used to shift every
+ * request after it in the array onto a different offset, and a fleet that
+ * re-shuffles on every configuration edit is not a stagger, it is noise. Two
+ * instances watching the same provider still collide — the id is the same on
+ * both — which is what the scheduler's per-instance jitter is for.
+ */
+export function staggerOffsetMs(providerId: string, intervalMinutes: number): number {
+  const budget = Math.min(Math.round(intervalMinutes * 60_000 * STAGGER_FRACTION), MAX_STAGGER_MS);
+  if (budget <= 0) return 0;
+  return hash(providerId) % budget;
+}
+
 export interface ProviderResult {
   providerId: string;
   ok: boolean;
@@ -25,6 +59,14 @@ export interface ProviderResult {
   attempts: number;
   /** Wall-clock time the fetch took, retries included, stagger excluded. */
   durationMs: number;
+  /**
+   * Whether the successful read was a 304 whose body came from our own cache.
+   * Absent when nothing measured one — a failed read, or an adapter that does
+   * not report its reads. The debug panel (roadmap 5.18) is what needs it:
+   * without it, "the provider answered instantly" and "we never asked" look
+   * the same.
+   */
+  notModified?: boolean | undefined;
   error?: string | undefined;
 }
 
@@ -96,10 +138,23 @@ export function createPoller(deps: PollerDeps): Poller {
    */
   const lastAttemptAt = new Map<string, number>();
 
+  /**
+   * Providers that answered `Retry-After` and when the hold runs out. In memory
+   * for the same reason as the map above: a restart is an operator asking for a
+   * poll now, and a hold that survived one would be a provider that stays dark
+   * with nothing on the dashboard to explain it.
+   */
+  const holdUntil = new Map<string, number>();
+
   async function attemptFetch(
     service: ServiceDefinition,
     config: RuntimeConfig,
-  ): Promise<{ status: NormalizedStatus; attempts: number; latencyMs?: number | undefined }> {
+  ): Promise<{
+    status: NormalizedStatus;
+    attempts: number;
+    latencyMs?: number | undefined;
+    notModified?: boolean | undefined;
+  }> {
     const adapter = getAdapter(service.adapter);
     const timeoutMs = config.polling.requestTimeoutSeconds * 1000;
     let lastError: unknown;
@@ -131,7 +186,12 @@ export function createPoller(deps: PollerDeps): Poller {
             },
           },
         );
-        return { status, attempts: attempt + 1, latencyMs: read?.latencyMs };
+        return {
+          status,
+          attempts: attempt + 1,
+          latencyMs: read?.latencyMs,
+          notModified: read?.notModified,
+        };
       } catch (error) {
         lastError = error;
         logger.debug("poll attempt failed", {
@@ -139,6 +199,11 @@ export function createPoller(deps: PollerDeps): Poller {
           attempt: attempt + 1,
           error: error instanceof Error ? error.message : String(error),
         });
+        // A stated window is the one failure the in-cycle retries cannot help
+        // with: the backoff here is seconds and the window is at least tens of
+        // them, so every remaining attempt would be another request the
+        // provider already refused.
+        if (error instanceof RetryAfterError) break;
       }
     }
 
@@ -147,21 +212,42 @@ export function createPoller(deps: PollerDeps): Poller {
 
   async function pollOne(
     service: ServiceDefinition,
-    index: number,
     config: RuntimeConfig,
+    options: CycleOptions,
   ): Promise<{ result: ProviderResult; changes: StatusChange[] }> {
-    // Spread the requests out rather than firing every provider on the same
-    // millisecond of every cycle.
-    await sleep(index * STAGGER_MS);
+    // Spread the requests across the cadence rather than firing every provider
+    // on the same millisecond of every cycle. A manual poll skips it: the
+    // operator pressed the button and is watching, so a deliberate wait of up
+    // to a fifth of a minute is a dashboard that looks stuck.
+    if (options.ignoreSchedule !== true) {
+      await sleep(staggerOffsetMs(service.id, service.intervalMinutes ?? config.polling.intervalMinutes));
+    }
 
     const before = await store.getState(service.id);
 
     const startedAt = Date.now();
-    let outcome: { status: NormalizedStatus; attempts: number; latencyMs?: number | undefined };
+    let outcome: Awaited<ReturnType<typeof attemptFetch>>;
     try {
       outcome = await attemptFetch(service, config);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      // A provider that said "not now" is held off until it said to come back
+      // (roadmap 2.12). Still a failed read — the failure count and the
+      // monitoring warning behind it are how an operator finds out that we
+      // have stopped being able to read a page — but asking again on the next
+      // tick is exactly what the header exists to stop.
+      if (error instanceof RetryAfterError) {
+        // The injected clock, not the wall one: it is compared against the
+        // cycle's own `at` in `isDue`, and two clocks there is a hold that
+        // either never expires or never applies.
+        const until = now() + error.retryAfterMs;
+        holdUntil.set(service.id, until);
+        logger.warn("provider asked to be left alone", {
+          providerId: service.id,
+          retryAfterMs: error.retryAfterMs,
+          until: new Date(until).toISOString(),
+        });
+      }
       const failureCount = await store.recordFailure(service.id);
       logger.warn("provider poll failed", {
         providerId: service.id,
@@ -218,6 +304,7 @@ export function createPoller(deps: PollerDeps): Poller {
         status: outcome.status,
         attempts: outcome.attempts,
         durationMs: Date.now() - startedAt,
+        ...(outcome.notModified === undefined ? {} : { notModified: outcome.notModified }),
       },
       changes,
     };
@@ -269,6 +356,14 @@ export function createPoller(deps: PollerDeps): Poller {
    * rest of the fleet must not come along with it.
    */
   async function isDue(service: ServiceDefinition, at: number, config: RuntimeConfig): Promise<boolean> {
+    const held = holdUntil.get(service.id);
+    if (held !== undefined) {
+      if (at < held) return false;
+      // Spent: dropped rather than left to be compared against forever, so the
+      // map holds only live holds and a provider cannot be skipped twice for
+      // the same 429.
+      holdUntil.delete(service.id);
+    }
     const last = lastAttemptAt.get(service.id);
     if (last === undefined) return true;
     const interval = effectiveIntervalMinutes(service, config, await store.getState(service.id));
@@ -296,6 +391,9 @@ export function createPoller(deps: PollerDeps): Poller {
       const enabled: ServiceDefinition[] = [];
       for (const service of config.services) {
         if (!service.enabled) continue;
+        // A manual poll overrides the schedule, a `Retry-After` hold included:
+        // the operator asked for one request now, which is not the hammering
+        // the hold exists to prevent.
         if (options.ignoreSchedule === true || (await isDue(service, at, config))) enabled.push(service);
       }
       for (const service of enabled) lastAttemptAt.set(service.id, at);
@@ -305,9 +403,12 @@ export function createPoller(deps: PollerDeps): Poller {
       for (const id of lastAttemptAt.keys()) {
         if (!known.has(id)) lastAttemptAt.delete(id);
       }
+      for (const id of holdUntil.keys()) {
+        if (!known.has(id)) holdUntil.delete(id);
+      }
 
       const settled = await Promise.allSettled(
-        enabled.map((service, index) => pollOne(service, index, config)),
+        enabled.map((service) => pollOne(service, config, options)),
       );
 
       const results: ProviderResult[] = [];

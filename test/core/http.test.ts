@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { fetchConditional, forgetProvider, resetValidators } from "../../src/core/http.ts";
+import {
+  fetchConditional,
+  forgetProvider,
+  parseRetryAfter,
+  resetValidators,
+  RetryAfterError,
+} from "../../src/core/http.ts";
 import { withServer } from "../helpers/localServer.ts";
 
 const opts = { providerId: "github", accept: "application/json", timeoutMs: 2000, label: "statuspage fetch" };
@@ -229,4 +235,78 @@ test("a failed read reports no latency", async () => {
     },
   );
   assert.deepEqual(reads, []);
+});
+
+test("Retry-After is read as seconds or as an HTTP date, and anything else as absent", () => {
+  const now = Date.parse("2026-09-08T12:00:00.000Z");
+  assert.equal(parseRetryAfter("120", now), 120_000);
+  assert.equal(parseRetryAfter("  30  ", now), 30_000);
+  assert.equal(parseRetryAfter("Tue, 08 Sep 2026 12:02:00 GMT", now), 120_000);
+  // Already past, or zero seconds: the provider stated no window at all, which
+  // is not the same as a hold of zero the caller would have to special-case.
+  assert.equal(parseRetryAfter("Tue, 08 Sep 2026 11:00:00 GMT", now), undefined);
+  assert.equal(parseRetryAfter("0", now), undefined);
+  assert.equal(parseRetryAfter(null, now), undefined);
+  assert.equal(parseRetryAfter("", now), undefined);
+  assert.equal(parseRetryAfter("soon", now), undefined);
+  assert.equal(parseRetryAfter("-5", now), undefined);
+  assert.equal(parseRetryAfter("2026-13-45", now), undefined);
+  // Bounded: a week-long window would take the provider off the dashboard with
+  // nothing to explain it.
+  assert.equal(parseRetryAfter("604800", now), 6 * 3600 * 1000);
+});
+
+test("a 429 rejects with the window it stated, so the poller can honour it", async () => {
+  resetValidators();
+  await withServer(
+    (_req, res) => {
+      res.writeHead(429, { "retry-after": "45" });
+      res.end("slow down");
+    },
+    async (baseUrl) => {
+      const error = await fetchConditional(`${baseUrl}/summary.json`, opts).then(
+        () => undefined,
+        (reason: unknown) => reason,
+      );
+      assert.ok(error instanceof RetryAfterError, `expected a RetryAfterError, got ${String(error)}`);
+      assert.equal(error.retryAfterMs, 45_000);
+      assert.match(error.message, /HTTP 429/);
+    },
+  );
+});
+
+test("a 503 with no stated window is an ordinary failure, not a hold", async () => {
+  resetValidators();
+  await withServer(
+    (_req, res) => {
+      res.writeHead(503);
+      res.end();
+    },
+    async (baseUrl) => {
+      const error = await fetchConditional(`${baseUrl}/summary.json`, opts).then(
+        () => undefined,
+        (reason: unknown) => reason,
+      );
+      assert.ok(error instanceof Error);
+      assert.ok(!(error instanceof RetryAfterError), "a bare 503 is not a provider asking for room");
+    },
+  );
+});
+
+test("a 503 that does state a window is honoured like a 429", async () => {
+  resetValidators();
+  await withServer(
+    (_req, res) => {
+      res.writeHead(503, { "retry-after": "10" });
+      res.end();
+    },
+    async (baseUrl) => {
+      const error = await fetchConditional(`${baseUrl}/summary.json`, opts).then(
+        () => undefined,
+        (reason: unknown) => reason,
+      );
+      assert.ok(error instanceof RetryAfterError);
+      assert.equal(error.retryAfterMs, 10_000);
+    },
+  );
 });

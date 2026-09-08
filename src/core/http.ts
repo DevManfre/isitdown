@@ -37,6 +37,65 @@ function decode(bytes: ArrayBuffer, contentType: string | null): string {
   }
 }
 
+/**
+ * A provider that answered "not now": a 429, or any status carrying a
+ * `Retry-After` header. It is a failed read like any other — the poller's
+ * retry and failure accounting still apply — but it is the one failure that
+ * says how long to stay away, and the poller holds the provider off until then
+ * instead of asking again next cycle (roadmap 2.12).
+ */
+export class RetryAfterError extends Error {
+  readonly retryAfterMs: number;
+
+  constructor(message: string, retryAfterMs: number) {
+    super(message);
+    this.name = "RetryAfterError";
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+/**
+ * How long a 429 without a `Retry-After` header is held off for. A rate limit
+ * with no stated window is still a rate limit, and asking again on the next
+ * tick is how a provider that is politely throttling us decides to stop
+ * answering at all.
+ */
+const DEFAULT_RETRY_AFTER_MS = 60_000;
+
+/**
+ * A hold is a promise not to ask, so it is bounded: a provider answering
+ * `Retry-After: 604800` would otherwise take itself off the dashboard for a
+ * week with no way for an operator to see why.
+ */
+const MAX_RETRY_AFTER_MS = 6 * 3600 * 1000;
+
+/**
+ * `Retry-After` is either a number of seconds or an HTTP date. Both are
+ * accepted, as the spec allows either, and anything else reads as absent
+ * rather than as zero — a malformed header must not turn a hold into a
+ * hammering.
+ */
+export function parseRetryAfter(header: string | null, now: number = Date.now()): number | undefined {
+  if (header === null) return undefined;
+  const value = header.trim();
+  if (value === "") return undefined;
+
+  if (/^\d+$/.test(value)) {
+    const ms = Math.min(Number(value) * 1000, MAX_RETRY_AFTER_MS);
+    // "Retry-After: 0" states no window at all; a 429 then falls back to the
+    // default below rather than to a hold that has already expired.
+    return ms === 0 ? undefined : ms;
+  }
+
+  const at = Date.parse(value);
+  if (Number.isNaN(at)) return undefined;
+  // A date already in the past is a provider saying "now", which is no window
+  // either — same answer as above, so a stale date cannot become a hold of
+  // zero that the caller has to special-case.
+  const ms = Math.min(Math.max(at - now, 0), MAX_RETRY_AFTER_MS);
+  return ms === 0 ? undefined : ms;
+}
+
 /** One completed read of a status page, reported so the caller can record it. */
 export interface StatusPageRead {
   /**
@@ -140,6 +199,18 @@ export async function fetchConditional(url: string, opts: ConditionalFetchOption
 
   if (!response.ok) {
     cache.delete(key);
+    const stated = parseRetryAfter(response.headers.get("retry-after"));
+    // A stated window, or a 429 whatever it stated: both are the provider
+    // asking for room, and only these two are turned into a hold. A bare 503
+    // is not — it is the generic "something is broken over here", and holding
+    // a provider off for a minute over one would be reading a wish into it.
+    const holdMs = stated ?? (response.status === 429 ? DEFAULT_RETRY_AFTER_MS : undefined);
+    if (holdMs !== undefined) {
+      throw new RetryAfterError(
+        `${opts.label} for ${opts.providerId} failed: HTTP ${response.status} (retry after ${Math.round(holdMs / 1000)}s)`,
+        holdMs,
+      );
+    }
     throw new Error(`${opts.label} for ${opts.providerId} failed: HTTP ${response.status}`);
   }
 
