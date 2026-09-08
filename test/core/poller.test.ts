@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPoller } from "../../src/core/poller.ts";
+import { createPoller, staggerOffsetMs } from "../../src/core/poller.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import { getAdapter } from "../../src/adapters/index.ts";
 import { createFileStateStore } from "../../src/light/fileStateStore.ts";
@@ -421,8 +421,176 @@ test("providers are staggered rather than fired at the same instant", async () =
         service("c", provider.baseUrl),
       ]),
     );
-    // One stagger per provider, growing with position, and the first is not delayed.
-    assert.deepEqual(timer.delays, [0, 250, 500]);
+    // One stagger per provider, each its own offset inside the cadence, and no
+    // two of them the same instant.
+    assert.deepEqual(
+      [...timer.delays].sort((a, b) => a - b),
+      ["a", "b", "c"].map((id) => staggerOffsetMs(id, 3)).sort((a, b) => a - b),
+    );
+    assert.equal(new Set(timer.delays).size, 3);
+  } finally {
+    await store.close();
+    await provider.close();
+  }
+});
+
+test("a provider's offset is anchored on its id, not on its place in the list", () => {
+  // The point of the anchor: an operator adding a provider must not move every
+  // other provider's request to a different moment of the cadence.
+  const before = ["github", "cloudflare", "anthropic"].map((id) => staggerOffsetMs(id, 3));
+  const after = ["anthropic", "slack", "github", "cloudflare"]
+    .filter((id) => id !== "slack")
+    .map((id) => staggerOffsetMs(id, 3));
+  assert.deepEqual(after, [before[2], before[0], before[1]]);
+});
+
+test("the stagger stays inside a tenth of the cadence, and inside its ceiling", () => {
+  for (const id of ["a", "github", "a-very-long-provider-id", "zz"]) {
+    assert.ok(staggerOffsetMs(id, 3) < 18_000, `${id} at a 3 minute cadence`);
+    // A day-long cadence would otherwise spread requests over two hours, which
+    // is a cycle that never seems to finish.
+    assert.ok(staggerOffsetMs(id, 1440) < 20_001, `${id} at a daily cadence`);
+  }
+});
+
+test("a manual poll is not staggered: the operator is watching", async () => {
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+
+  try {
+    await poller.runCycle(config([service("a", provider.baseUrl), service("b", provider.baseUrl)]), {
+      ignoreSchedule: true,
+    });
+    assert.deepEqual(timer.delays, []);
+  } finally {
+    await store.close();
+    await provider.close();
+  }
+});
+
+test("a provider answering 429 is left alone for the window it stated", async () => {
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(429, { "retry-after": "900" });
+    res.end("slow down");
+  });
+  const store = await freshStore();
+  const clock = fakeClock();
+  const timer = fakeSleep();
+  const poller = createPoller({
+    getAdapter,
+    store,
+    logger: silent,
+    sleep: timer.sleep,
+    now: clock.now,
+  });
+
+  try {
+    const first = await poller.runCycle(config([service("a", provider.baseUrl)]));
+    assert.equal(first.results[0]?.ok, false);
+    // One attempt, not three: retrying inside a window the provider just
+    // stated is three more requests it already refused.
+    assert.equal(provider.hits.length, 1);
+
+    clock.advance(ONE_INTERVAL_MS);
+    const second = await poller.runCycle(config([service("a", provider.baseUrl)]));
+    assert.deepEqual(second.results, [], "the provider is still inside its stated window");
+    assert.equal(provider.hits.length, 1);
+
+    clock.advance(15 * 60_000);
+    await poller.runCycle(config([service("a", provider.baseUrl)]));
+    assert.equal(provider.hits.length, 2, "the window has passed, so it is asked again");
+  } finally {
+    await store.close();
+    await provider.close();
+  }
+});
+
+test("a 429 that states no window is still held off, for a default one", async () => {
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(429, {});
+    res.end("no");
+  });
+  const store = await freshStore();
+  const clock = fakeClock();
+  const timer = fakeSleep();
+  const poller = createPoller({
+    getAdapter,
+    store,
+    logger: silent,
+    sleep: timer.sleep,
+    now: clock.now,
+  });
+
+  try {
+    // A one-minute cadence, so the default hold is the only thing that can be
+    // keeping the provider out of the cycle below.
+    const services = [service("a", provider.baseUrl, { intervalMinutes: 1 })];
+    await poller.runCycle(config(services));
+    clock.advance(55_000);
+    assert.deepEqual((await poller.runCycle(config(services))).results, []);
+    clock.advance(10_000);
+    assert.equal((await poller.runCycle(config(services))).results.length, 1);
+  } finally {
+    await store.close();
+    await provider.close();
+  }
+});
+
+test("one provider's hold is its own: the rest of the fleet is polled", async () => {
+  const limited = await fakeProvider((_req, res) => {
+    res.writeHead(429, { "retry-after": "600" });
+    res.end("no");
+  });
+  const healthy = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const store = await freshStore();
+  const clock = fakeClock();
+  const timer = fakeSleep();
+  const poller = createPoller({
+    getAdapter,
+    store,
+    logger: silent,
+    sleep: timer.sleep,
+    now: clock.now,
+  });
+
+  try {
+    const services = [service("limited", limited.baseUrl), service("healthy", healthy.baseUrl)];
+    await poller.runCycle(config(services));
+    clock.advance(ONE_INTERVAL_MS);
+    const second = await poller.runCycle(config(services));
+    assert.deepEqual(
+      second.results.map((result) => result.providerId),
+      ["healthy"],
+      "the rate-limited provider sits the cycle out, the other does not",
+    );
+  } finally {
+    await store.close();
+    await limited.close();
+    await healthy.close();
+  }
+});
+
+test("a manual poll asks a held provider anyway: the operator overrode the schedule", async () => {
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(429, { "retry-after": "600" });
+    res.end("slow down");
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+
+  try {
+    await poller.runCycle(config([service("a", provider.baseUrl)]));
+    await poller.runCycle(config([service("a", provider.baseUrl)]), { ignoreSchedule: true });
+    assert.equal(provider.hits.length, 2);
   } finally {
     await store.close();
     await provider.close();
