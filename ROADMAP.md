@@ -16,8 +16,9 @@ Legend:
 - ✅ — shipped; kept listed so the phase reads as a whole.
 - ◐ — partly shipped; the row's note says what is left.
 
-Current state for reference (v1.4.0): Statuspage, generic RSS/Atom, Slack, AWS,
-Google Cloud, Azure, Instatus and Better Stack adapters, all covered by the shared adapter contract suite;
+Current state for reference (v1.6.0): Statuspage, generic RSS/Atom, generic
+HTML-scrape, Slack, AWS, Google Cloud, Azure, Instatus and Better Stack
+adapters, all covered by the shared adapter contract suite;
 every provider read through one HTTP helper that revalidates with `ETag` /
 `Last-Modified`, so most cycles are a 304; a global poll cadence plus an optional
 per-provider one; Telegram, webhook, Discord, Slack and web
@@ -60,6 +61,8 @@ does not cover is invisible.
 | 1.11 ✅ | **Adapter contract test kit** | S | Mirror `test/core/stateStore.contract.ts`: one suite every adapter must pass (throws on non-2xx, degrades on missing optional field, never returns an unvalidated shape). Makes every item above cheaper and safer. Should land *before* 1.1. |
 | 1.12 ✅ | **Fixture recorder script** | S | `node tools/record-fixture.mjs <url> <provider>` — fetch once, save under `test/fixtures/`. Removes the main friction in adding an adapter. |
 | 1.13 | **Plugin adapters from a directory** | L | Drop a `.js` into `/plugins` and it registers itself. Lets people add a provider without forking. Security and validation implications: a plugin runs with full process privileges. |
+| 1.14 | **Adapter auto-detect when adding a provider** | S | Given a domain, probe the shapes already read here (`/api/v2/summary.json`, `/summary.json`, `/index.json`, a feed URL) and propose the adapter plus the base URL, instead of asking the operator which of nine to pick. Cheap now that the adapters exist, and most of 5.11's value depends on it. |
+| 1.15 | **Second tier of small JSON shapes: Cachet, Uptime Kuma, Freshstatus, Uptime.com** | S each | Same play as 1.7 — one document carrying an aggregate state and a component list. Cachet and Uptime Kuma matter more than their market share suggests: they are what *this* audience self-hosts, so a fleet can include the neighbour's own status page. |
 
 ## 2. Polling and the diff engine
 
@@ -74,6 +77,9 @@ does not cover is invisible.
 | 2.7 | **Correlated-outage detection** | L | Three providers degrade within the same window → one "likely shared upstream" meta-event instead of three alerts. Needs a correlation window and a suppression rule; genuinely useful during a Cloudflare/AWS day, and rare enough to be hard to test. Would need synthetic history in tests. |
 | 2.8 ✅ | **Record fetch latency of the status page itself** | S | One extra column on `status_samples`. Free signal: a status page slowing down is often the first sign of trouble, and it makes a nice chart. |
 | 2.9 | **Component-level alerting** | M | `scopeToComponents` already narrows what is *reported*; extend it so a specific component's transition can notify independently, with its own severity. |
+| 2.10 | **Provider push instead of poll (Statuspage webhook subscription)** | L ⚠️ | Statuspage lets a subscriber register a URL and pushes on every change: latency drops from a cadence to seconds and the request budget to zero. It needs an inbound reachable URL, which a homelab install does not have, so polling stays as the fallback and both paths have to converge on the same diff-engine input. |
+| 2.11 | **Stagger the fleet across the cadence** | S | Every provider is polled on the same tick, so a 20-provider fleet fires 20 requests at once and then idles. Anchoring each provider at a hash of its id spreads them over the interval: same total work, no burst, and a per-host rate no provider can read as abuse. |
+| 2.12 | **Honour `Retry-After` and back off a rate-limited host** | S | A 429 is treated as any other failure today. Reading the header and holding that host until it says so is a few lines, and it is the difference between a hiccup and a provider blocking the instance outright. |
 
 ## 3. Notification channels
 
@@ -100,6 +106,8 @@ is additive and independently shippable.
 | 3.16 ✅ | **HMAC signing for the generic webhook** | S | A shared secret and an `X-IsItDown-Signature` header. Lets a receiver verify the payload actually came from here. |
 | 3.17 ✅ | **Delivery log in the dashboard** | S | The `notifications` table already records what was sent; there is no view for it. Show sent/failed per channel with the payload. |
 | 3.18 | **Inbound chatops (Telegram bot commands)** | L | `/status`, `/mute github 2h`, `/history cloudflare`. Turns a one-way channel two-way. Needs a long-poll or webhook receiver and an auth model for "who may command this bot" — the first place where the no-auth stance actually pinches. |
+| 3.19 | **Update the message in place as an incident evolves** | M | An incident with six updates sends six messages. Telegram (`editMessageText`), Slack (`ts`) and Discord (a webhook message id) can all edit what they already sent, so one incident becomes one message that grows a timeline. Needs the message id stored per incident per channel — a small table, and the cleanest attack on the flood that 3.12 fights from the other side. |
+| 3.20 | **Per-channel locale** | S | The catalogs exist and the dashboard already switches; a notification is English-only. A channel that names its locale lets the Telegram chat read Italian while the webhook payload stays English. |
 
 ## 4. Data, API and integrations
 
@@ -117,6 +125,9 @@ is additive and independently shippable.
 | 4.10 | **OpenAPI spec** | M | The API is documented in prose in `README.md` and nowhere machine-readable. A spec enables generated clients and keeps the docs honest. |
 | 4.11 ✅ | **`homepage` / Dashy widget endpoint** | S | A single summary JSON in the shape those dashboards expect. Trivial, and it puts IsItDown on a lot of homelab home pages. |
 | 4.12 | **Home Assistant integration** | M | Expose providers as binary sensors (MQTT or REST). Same audience, deeper hook. |
+| 4.13 | **Per-provider SLA target and error budget** | M | A monthly target (`99.9`) per provider, the budget it implies, how much of it the month has spent, and an alert when the burn rate says the month will miss. Turns history from "what happened" into "does this vendor meet what we were promised", and the samples to compute it are already stored. |
+| 4.14 | **Ship a Grafana dashboard JSON** | S | 4.1 exposes the metrics and leaves the panels as an exercise. One committed dashboard file (fleet status, poll duration, notification rate) makes the integration a copy-paste instead of an afternoon. |
+| 4.15 | **Read-only API token** | S ⚠️ | Every route is open, which is right on `127.0.0.1` and wrong the moment 4.11's widget or 5.1's page has to be reachable from another host. One bearer token granting read-only access is the smallest thing that unblocks those two without becoming user management. |
 
 ## 5. Dashboard
 
@@ -139,6 +150,10 @@ is additive and independently shippable.
 | 5.15 | **Native review of the Italian catalog** | S | On the README's open list already. |
 | 5.16 | **Bundle-size budget** | S | The dashboard has grown Recharts, motion, cobe, dotted-map. A CI check that fails on regression keeps it from quietly becoming a megabyte. |
 | 5.17 ✅ | **Set a channel credential from the dashboard** | M | Settings took only the *name* of the environment variable, so configuring a channel meant editing `.env` and recreating the container. A value now goes to `secrets.env` beside the database (`0600`, in the data volume) and into the process environment, live on the next request; the database still stores only the variable name and no route reads a value back. |
+| 5.18 | **Adapter debug panel** | S | When a provider reads `unknown` the dashboard cannot say why: the last raw payload, what the parser made of it, and the error if it threw all live in the logs. Showing them per provider is the first thing anyone debugging an adapter — 1.6's scrape adapter above all — actually needs. |
+| 5.19 | **Incident search and filter** | S | The incident list is chronological and unfiltered. Free text over titles plus a status and a date filter; findability breaks at a few hundred rows, and a year of retention gets there. |
+| 5.20 | **Year heat calendar** | S | 365 day cells per provider, coloured by that day's worst status. The 90-day bars are the widest view today; retention can now go past a year (4.5), and this is the view that makes the extra data say something — and what 8.2 would read from. |
+| 5.21 | **PWA install and a phone layout** | M | Web push already reaches a phone, then hands the notification to a dashboard laid out for a desktop and not installable. A manifest, a service worker and a narrow overview layout would make the alert lead somewhere usable. |
 
 ## 6. Operations and packaging
 
@@ -155,6 +170,8 @@ is additive and independently shippable.
 | 6.9 | **Split readiness and liveness probes** | S | The current healthcheck conflates "the process is alive" with "polling is working". |
 | 6.10 | **OpenTelemetry traces** | M ⚠️ | Useful for debugging a slow cycle, but it adds a runtime dependency to a project whose whole pitch is three of them. Probably a no. |
 | 6.11 | **Log to file with rotation** | S | Today logs go to stdout only, which is right for Docker and wrong for a bare-metal install. |
+| 6.12 | **`check` command for a Light config** | S | Validating `config.yml` today means starting the container and reading the logs. A command that loads the file, resolves every adapter, names each missing environment variable and exits non-zero is CI-able for the operator, not only for us. |
+| 6.13 | **Database maintenance from the UI** | S | `PRAGMA integrity_check` plus a `VACUUM` after a large prune, surfaced as one button that reports the bytes reclaimed. Pairs with 4.4: the two things anyone does to a SQLite file they care about. |
 
 ## 7. Internal quality
 
@@ -166,6 +183,7 @@ is additive and independently shippable.
 | 7.4 | **Load / soak test** | M | 200 providers, a week of simulated history. Finds the point where the SQLite reads or the overview render fall over. |
 | 7.5 | **Docs split** | S | `README.md` is ~69k and has to be both a landing page and a manual. Splitting into `docs/` with a short README would make both jobs easier — at the cost of the current "everything is in one file" property, which is genuinely nice. |
 | 7.6 | **Keep `README.it.md` in sync automatically** | S | Two 70k documents drift. At minimum a CI check that flags when one moves without the other. |
+| 7.7 | **Fuzz the adapters with malformed payloads** | S | The contract kit (1.11) asserts the shapes we thought of. Feeding every adapter truncated, re-typed and empty variants of its own fixtures asserts the property that matters across all of them: a bad payload degrades to `unknown`, never throws past the poller, never invents `operational`. |
 
 ## 8. Speculative
 
@@ -181,6 +199,8 @@ not re-invented from scratch later.
 | 8.5 | **Browser extension** | Fleet status in the toolbar. Mostly redundant with web push, which already exists. |
 | 8.6 | **Federation between instances** | One instance aggregates several others read-only. Interesting for multi-site setups, hard to justify for a single-operator tool. |
 | 8.7 | **Incident postmortem export** | Generate a Markdown postmortem skeleton from an incident's timeline plus operator notes (5.3). Cute, narrow. |
+| 8.8 | **Plain-language incident summary** | Collapse a provider's twelve terse updates into one sentence an operator can act on. Wants a model call — a network dependency and an API key, in a project whose pitch is three dependencies and no key. A product decision, not a feature; listed so the "just add AI" reflex meets an argument rather than a blank page. |
+| 8.9 | **Watch a provider edit its own past** | Status pages quietly rewrite resolved incidents. Keeping the first version read here and diffing later ones would catch it. Same family as 8.1, about as inflammatory, and it needs 4.5's longer retention before it says anything. |
 
 ---
 
@@ -234,13 +254,40 @@ tables above. The last of them is now a record rather than a plan:
    frame moved, and how many pixels changed colour outright (a token change is
    ~300 pixels, far below any whole-frame ratio worth having).
 
-The next slice is unchosen. On the same reading of value against effort, the
-rows that stand out now are **3.11 quiet hours** (5.9 was its prerequisite and
-is now in place), **3.12 digest mode** and **3.13 the per-provider alert cap**
-— the three that finish the "stop the flood" family mute and damping started —
-plus **2.6 provider groups**, **4.3 config export/import** and **5.13 the
-accessibility pass**, which the visual harness can now catch regressions for.
+The next slice is chosen: **finish the "stop the flood" family**, which mute
+(5.2) and damping (2.5) started from the diff-engine side and which nothing yet
+addresses on the delivery side, plus the two cheap rows that make the fleet
+itself calmer to run.
+
+1. **3.11 quiet hours** — 5.9 was the prerequisite and is in place, so a floor
+   ("nothing below `major_outage` between 23:00 and 07:00, in *my* zone") is now
+   expressible. Must be a notification-routing input, next to 3.10's rules, not
+   a second filter somewhere else in the dispatcher.
+2. **3.12 digest mode** — batch every change in a window into one message. The
+   window is the whole design: too short and it is the current flood, too long
+   and the first alert arrives late. Likely a floor that always sends
+   immediately, with everything under it batched.
+3. **3.13 per-provider alert cap** — N messages per hour per provider, with a
+   "suppressed X more" line. Cheap, and unlike 3.11 and 3.12 it protects against
+   a pathological provider rather than a busy day.
+4. **3.19 update the message in place** — one incident becomes one message that
+   grows, instead of one per update. Attacks the same flood from the other end
+   and needs a small table (message id per incident per channel) rather than a
+   new concept.
+5. **2.11 stagger the fleet across the cadence** — a burst of N requests every
+   tick is the one impolite thing left in the poll path after 2.4's conditional
+   requests. A hash-anchored offset per provider, and **2.12 `Retry-After`** on
+   top of it, are a day's work between them.
+6. **5.18 adapter debug panel** — nine adapters now, one of them a CSS-selector
+   scrape that is *documented* as fragile, and no way to see a parse failure
+   without container logs. The cheapest row in section 5 by value delivered.
+
+Then, on the same reading of value against effort: **2.6 provider groups**,
+**4.3 config export/import** and **5.13 the accessibility pass** — which the
+visual harness can now catch regressions for.
 
 The two items that most change *what IsItDown is*, and therefore deserve a
-decision rather than a slot in a queue, are **1.8 direct HTTP probes** and
-**5.1 the public status page**.
+decision rather than a slot in a queue, are **1.8 direct HTTP probes** (with
+1.9, 1.10 and 8.1 behind it) and **5.1 the public status page** (which drags
+4.15's token with it). **2.10 provider push** is a third, smaller one: it
+inverts the whole data flow for the subset of providers that support it.
