@@ -1887,13 +1887,18 @@ Suite notevoli:
   privo di parsing per distinguere un'espressione tradotta da un letterale.
 - **Regressione visiva** — ogni vista fotografata in entrambi i temi ed entrambe
   le lingue su una flotta fissa e con l'orologio congelato, poi confrontata con
-  le baseline concordate sotto `test/visual/baseline/`. Due criteri: quanta
-  parte del frame si è spostata (un cambio di layout) e quanti pixel hanno
-  cambiato colore del tutto (un cambio di token, un'area troppo piccola per
-  muovere un rapporto sull'intero frame). Chromium arriva dalla cache di
-  Playwright e viene pilotato via DevTools protocol — nulla importa il pacchetto,
-  che resta fuori da `package.json`. `node tools/visual-regression.mjs --update`
-  accetta un cambio voluto, `--only=<vista>` serve mentre si itera su una sola.
+  le baseline concordate sotto `test/visual/baseline/`. Il confronto avviene su
+  una riduzione 8× di entrambi i frame, ed è questo che permette a un solo set di
+  baseline di valere su più macchine: la rasterizzazione dei font non è
+  portabile, e la stessa pagina sul runner della CI differisce da quella locale
+  fino all'1,5% dei pixel solo lungo i bordi del testo. Mediato via quel rumore
+  restano i due criteri che contano — quante celle si sono spostate (un cambio di
+  layout) e quante hanno cambiato colore del tutto (un cambio di token) — con
+  limiti misurati sia sul rumore cross-macchina sia su regressioni reali, non
+  scelti a intuito. Chromium arriva dalla cache di Playwright e viene pilotato
+  via DevTools protocol, quindi nulla importa il pacchetto e resta fuori da
+  `package.json`. `node tools/visual-regression.mjs --update` accetta un cambio
+  voluto, `--only=<vista>` serve mentre si itera su una sola.
 - **End to end** — un provider finto e un ricevitore webhook: una transizione consegna
   esattamente una notifica, un ciclo invariato nessuna, un restart nessuna, un provider
   irraggiungibile conserva l'ultimo stato noto, e l'entrypoint resta vivo tra i cicli e

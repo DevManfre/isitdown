@@ -1851,13 +1851,18 @@ Notable suites:
   from a literal.
 - **Visual regression** — every view screenshotted in both themes and both
   locales against a fixed fleet and a frozen clock, then compared with the
-  agreed baselines under `test/visual/baseline/`. Two criteria: how much of the
-  frame moved (a layout change) and how many pixels changed colour outright (a
-  token change, which is far too small an area to move a whole-frame ratio).
-  Chromium comes from Playwright's own cache and is driven over the DevTools
-  protocol — nothing imports the package, so it stays out of `package.json`.
-  Run `node tools/visual-regression.mjs --update` to agree to an intended
-  change, and `--only=<view>` while iterating on one.
+  agreed baselines under `test/visual/baseline/`. The comparison runs on an 8×
+  downscale of both frames, which is what lets one set of baselines hold on more
+  than one machine: font rasterisation is not portable, and the same page on a CI
+  runner differs from the same page locally on up to 1.5% of its pixels along the
+  edges of text alone. Averaging that away leaves the two criteria that matter —
+  how many cells moved (a layout change) and how many changed colour outright (a
+  token change) — with limits measured against both the cross-machine noise and
+  real regressions rather than guessed. Chromium comes from Playwright's own
+  cache and is driven over the DevTools protocol, so nothing imports the package
+  and it stays out of `package.json`. Run
+  `node tools/visual-regression.mjs --update` to agree to an intended change, and
+  `--only=<view>` while iterating on one.
 - **End to end** — a fake provider and a webhook receiver: a transition delivers
   exactly one notification, an unchanged cycle none, a restart none, an unreachable
   provider keeps its last known state, and the entrypoint stays alive between cycles

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createLogger } from "../src/core/logger.ts";
 import { NOW, seedVisualFixture } from "./visual/fixture.mjs";
 import { withBrowser } from "./visual/chrome.mjs";
-import { comparePng, decodePng } from "./visual/png.mjs";
+import { comparePng, decodePng, downscale } from "./visual/png.mjs";
 
 /**
  * Visual regression for the dashboard (roadmap 7.1).
@@ -46,28 +46,38 @@ const LOCALES = ["en", "it"];
 const VIEWPORT = { width: 1440, height: 900 };
 
 /**
- * How much may move before it counts as a regression, as a share of the frame.
+ * Screenshots are compared after an 8× box downscale, which is what lets one
+ * set of baselines hold on more than one machine: font rasterisation is not
+ * portable, and the same page on a CI runner differs from the same page here
+ * on up to 1.5% of its pixels along the edges of text alone. See `downscale`.
  *
- * Not zero: text rasterisation differs by a shade or two between runs even on
- * one machine, and a check that fails on that is a check people learn to
- * ignore. Small enough that a moved card, a changed colour or a dropped element
- * is well past it — a single row of this dashboard is about 2% of the frame.
+ * Every threshold below is therefore counted in downscaled cells, each one an
+ * 8×8 block of the original frame.
  */
-const MAX_RATIO = 0.004;
+const SCALE = 8;
 
-/** Per-channel tolerance, in 0–255. Antialiasing noise, and nothing more. */
+/** Per-channel tolerance, in 0–255. Averaged-away antialiasing, nothing more. */
 const CHANNEL_THRESHOLD = 12;
 
 /**
- * A colour change is a small number of very different pixels rather than a
- * large number of slightly different ones: a status dot and its label are a
- * fraction of a percent of the frame, so the whole-frame ratio above would
- * never notice a token being edited. This is the second half of the check —
- * pixels that moved by more than antialiasing ever does, and how many of them
- * are still explained by text rasterisation.
+ * How many cells may move at all, and how many may change colour outright,
+ * before it counts as a regression.
+ *
+ * Measured rather than guessed. Cross-machine noise, over all 24 views: at most
+ * 6 cells moved and never one recoloured. The changes this check exists to
+ * catch, on the same frames: a status token edited moves 31 cells and recolours
+ * 7, a vanished badge moves 19 and recolours 7, a four-pixel row shift moves
+ * 500. The limits sit in the gap, nearer the noise than the signal.
  */
-const STRONG_THRESHOLD = 64;
-const MAX_RECOLOURED = 200;
+const MAX_MOVED = 12;
+const MAX_RECOLOURED = 3;
+
+/**
+ * What counts as "changed colour outright" per channel. Lower than it would be
+ * at full resolution: averaging a block dilutes a small strong change into a
+ * moderate one, and a status dot is a small strong change.
+ */
+const STRONG_THRESHOLD = 40;
 
 const shotName = (view, theme, locale) => `${view}-${theme}-${locale}.png`;
 
@@ -143,20 +153,20 @@ async function main() {
               continue;
             }
             const result = comparePng(
-              decodePng(await readFile(baselinePath)),
-              decodePng(png),
+              downscale(decodePng(await readFile(baselinePath)), SCALE),
+              downscale(decodePng(png), SCALE),
               CHANNEL_THRESHOLD,
               STRONG_THRESHOLD,
             );
             if (result.sizeChanged) {
               failures.push(`${name}: the frame changed size`);
-            } else if (result.ratio > MAX_RATIO) {
+            } else if (result.differing > MAX_MOVED) {
               failures.push(
-                `${name}: ${result.differing} of ${result.total} pixels moved (${(result.ratio * 100).toFixed(2)}%) — see ${path}`,
+                `${name}: ${result.differing} of ${result.total} cells moved (${(result.ratio * 100).toFixed(2)}%) — see ${path}`,
               );
             } else if (result.recoloured > MAX_RECOLOURED) {
               failures.push(
-                `${name}: ${result.recoloured} pixels changed colour outright — see ${path}`,
+                `${name}: ${result.recoloured} cells changed colour outright — see ${path}`,
               );
             }
           }

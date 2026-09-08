@@ -150,3 +150,42 @@ export function comparePng(left, right, threshold = 8, strongThreshold = 64) {
 
   return { sizeChanged: false, differing, recoloured, total, ratio: differing / total };
 }
+
+/**
+ * Box-average downscale by an integer factor.
+ *
+ * This is what makes a baseline survive a different machine. Glyph
+ * rasterisation is not portable — the same page on the CI runner and on a
+ * developer's machine differs on up to 1.5% of pixels and a couple of thousand
+ * of them differ *strongly*, purely along the edges of text — so a
+ * pixel-for-pixel comparison of full-resolution screenshots can only ever pass
+ * on the machine that recorded them.
+ *
+ * Averaging 8×8 blocks dissolves that noise (measured: 0.03% of cells, none of
+ * them strongly) while keeping what the check is actually for. A status colour
+ * changing still moves 31 cells and recolours 7; a four-pixel layout shift
+ * moves 500; a vanished badge moves 19. Structure and colour survive the
+ * blur, glyph edges do not.
+ */
+export function downscale(image, factor) {
+  const width = Math.floor(image.width / factor);
+  const height = Math.floor(image.height / factor);
+  const { bpp } = image;
+  const pixels = Buffer.alloc(width * height * bpp);
+  const area = factor * factor;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      for (let channel = 0; channel < bpp; channel += 1) {
+        let sum = 0;
+        for (let dy = 0; dy < factor; dy += 1) {
+          for (let dx = 0; dx < factor; dx += 1) {
+            sum += image.pixels[((y * factor + dy) * image.width + (x * factor + dx)) * bpp + channel];
+          }
+        }
+        pixels[(y * width + x) * bpp + channel] = Math.round(sum / area);
+      }
+    }
+  }
+  return { width, height, bpp, pixels };
+}
