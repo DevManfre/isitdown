@@ -302,6 +302,20 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
   const insertNotification = db.prepare(
     "INSERT INTO notifications (provider_id, channel, kind, text, sent_at, ok, error, attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
+  // Message editing (roadmap 3.19): one reference per channel per incident.
+  // Upserted rather than inserted, because an edit can move the reference — a
+  // channel that refuses an edit and takes a fresh send has a new message id
+  // for the same incident.
+  const selectMessageRef = db.prepare(
+    "SELECT ref FROM message_refs WHERE channel = ? AND provider_id = ? AND incident_id = ?",
+  );
+  const upsertMessageRef = db.prepare(
+    `INSERT INTO message_refs (channel, provider_id, incident_id, ref, updated_at) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (channel, provider_id, incident_id) DO UPDATE SET ref = excluded.ref, updated_at = excluded.updated_at`,
+  );
+  const deleteMessageRef = db.prepare(
+    "DELETE FROM message_refs WHERE channel = ? AND provider_id = ? AND incident_id = ?",
+  );
   const selectEarliestSampleTime = db.prepare(
     "SELECT MIN(observed_at) AS earliest FROM status_samples WHERE provider_id = ?",
   );
@@ -449,6 +463,20 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         pending?.signature ?? null,
         pending?.count ?? 0,
       );
+    },
+
+    async getRef(channel: string, providerId: string, incidentId: string): Promise<string | null> {
+      const row = selectMessageRef.get(channel, providerId, incidentId);
+      if (row === undefined) return null;
+      return z.object({ ref: z.string() }).parse(row).ref;
+    },
+
+    async saveRef(channel: string, providerId: string, incidentId: string, ref: string): Promise<void> {
+      upsertMessageRef.run(channel, providerId, incidentId, ref, new Date().toISOString());
+    },
+
+    async forgetRef(channel: string, providerId: string, incidentId: string): Promise<void> {
+      deleteMessageRef.run(channel, providerId, incidentId);
     },
 
     async recordNotification(record: SentRecord): Promise<void> {

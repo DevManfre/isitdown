@@ -1,4 +1,5 @@
 import type { SentRecord } from "../core/notificationDispatcher.ts";
+import type { MessageRefStore } from "../core/messageRefStore.interface.ts";
 import type { StateStore } from "../core/stateStore.interface.ts";
 import type { HistoricalIncident, MaintenanceWindow, OverallStatus } from "../core/types.ts";
 
@@ -93,7 +94,7 @@ export interface DailyBucket {
   totalSamples: number;
 }
 
-export interface HistoryStore extends StateStore {
+export interface HistoryStore extends StateStore, MessageRefStore {
   /** One row per day that has samples, oldest first. Days with none are absent. */
   getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]>;
   /** Daily buckets for one selected component, same shape as the provider's. */

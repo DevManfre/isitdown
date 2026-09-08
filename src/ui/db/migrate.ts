@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -356,6 +356,28 @@ export function migrate(db: DatabaseSync): void {
         );
       }
     }
+  }
+
+  if (from < 15) {
+    // One row per channel per incident: the id of the message we sent about it,
+    // so the next update can edit that message instead of adding another
+    // (roadmap 3.19). Cascaded with the provider like its samples and
+    // incidents — a reference to a message about a provider that is gone can
+    // never be useful again.
+    //
+    // The incident id is the provider's own, not a row in `incidents`: an
+    // incident can be notified about before the history service has written it,
+    // and a foreign key here would turn that ordering into a failed insert.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS message_refs (
+        channel TEXT NOT NULL,
+        provider_id TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        incident_id TEXT NOT NULL,
+        ref TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (channel, provider_id, incident_id)
+      );
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
