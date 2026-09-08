@@ -22,5 +22,18 @@
   "notification.incident.resolved": "{provider} — {severity}\n\nIncident \"{title}\" has been resolved.\nUpdated: {updatedAt}\n\n{url}",
   "notification.monitoring.degraded": "{provider} — monitoring degraded\n\n{count} consecutive fetches failed. Last known status: {lastStatus}.\nUpdated: {updatedAt}",
   "notification.maintenance.started": "{provider} — maintenance\n\nScheduled maintenance has started: {title}\nEnds: {endsAt}\nAlerts for this provider are paused until it is over.\n\n{url}",
-  "notification.maintenance.ended": "{provider} — maintenance over\n\n{title} has finished.\nStatus now: {current} — {count} open incident(s).\nUpdated: {updatedAt}\n\n{url}"
+  "notification.maintenance.ended": "{provider} — maintenance over\n\n{title} has finished.\nStatus now: {current} — {count} open incident(s).\nUpdated: {updatedAt}\n\n{url}",
+
+  "notification.digest.heading": "IsItDown — {count} change(s) in the last {minutes} minute(s)",
+  "notification.digest.line": "{provider}: {what}",
+  "notification.digest.status": "status changed from {previous} to {current}",
+  "notification.digest.component": "{component} is now {current}",
+  "notification.digest.incident-opened": "incident opened — {title}",
+  "notification.digest.incident-updated": "incident updated — {title} ({status})",
+  "notification.digest.incident-resolved": "incident resolved — {title}",
+  "notification.digest.maintenance-started": "maintenance started — {title}",
+  "notification.digest.maintenance-ended": "maintenance over — {title}",
+  "notification.digest.monitoring": "monitoring degraded — {count} consecutive fetches failed",
+
+  "notification.suppressed": "{count} further alert(s) for this provider were suppressed by the hourly cap."
 }

@@ -137,4 +137,17 @@ export interface NotificationPayload {
     statusUrl: string;
   };
   locale: string;
+  /**
+   * How many alerts for this provider the hourly cap swallowed before this one
+   * (roadmap 3.13). Rendered as a line under the message: a cap that hid
+   * messages without ever saying so is indistinguishable from a channel that
+   * has stopped working.
+   */
+  suppressedCount?: number | undefined;
+  /**
+   * Set when this message is a digest (roadmap 3.12): `change` is then its most
+   * severe member, kept so a channel that colours or badges a message by
+   * severity still has one to read, and `items` is the batch itself.
+   */
+  digest?: { items: NotificationPayload[]; windowMinutes: number } | undefined;
 }
