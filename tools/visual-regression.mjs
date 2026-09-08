@@ -81,6 +81,32 @@ const STRONG_THRESHOLD = 40;
 
 const shotName = (view, theme, locale) => `${view}-${theme}-${locale}.png`;
 
+/**
+ * Freezes this process's clock, before the server is loaded.
+ *
+ * Freezing only the browser's was not enough: the server buckets history by its
+ * own clock, so a baseline recorded yesterday failed today with the uptime chart
+ * shifted by exactly one day — Jun 15…Sep 7 became Jun 16…Sep 8, and the
+ * percentages moved with it. The fixture, the server and the page now all read
+ * the same instant, which is what makes a baseline hold on any day and on any
+ * machine.
+ *
+ * Safe because this process is only ever the visual harness: nothing here polls
+ * a provider, and the scheduler is never started.
+ */
+function freezeClock(at) {
+  const RealDate = Date;
+  class FrozenDate extends RealDate {
+    constructor(...args) {
+      super(...(args.length === 0 ? [at] : args));
+    }
+    static now() {
+      return at;
+    }
+  }
+  globalThis.Date = FrozenDate;
+}
+
 async function withServer(body) {
   const dir = await mkdtemp(join(tmpdir(), "isitdown-visual-db-"));
   // Before the app module is loaded, not merely before the server listens:
@@ -118,6 +144,9 @@ async function main() {
     console.error(`no dashboard bundle in ${WEB_DIR}. Run "npm run build:ui" first.`);
     process.exit(1);
   }
+
+  // Before the fixture is written and before the server module is loaded.
+  freezeClock(NOW);
 
   await mkdir(update ? BASELINE_DIR : OUTPUT_DIR, { recursive: true });
   const targetDir = update ? BASELINE_DIR : OUTPUT_DIR;
