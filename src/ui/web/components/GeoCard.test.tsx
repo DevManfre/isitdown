@@ -105,7 +105,12 @@ describe("GeoCard", () => {
     });
     renderCard();
     // A blank world map with no sentence is the state this exists to avoid.
-    expect(screen.getByText(/12/)).toBeInTheDocument();
+    // Asserted as the whole footnote rather than as a bare number: the card
+    // renders the snapshot's age in the same paragraph, so a regex for a digit
+    // matches whatever the calendar happens to make that age today.
+    // With nothing located the card renders `map.empty` rather than the
+    // footnote — the sentence that says the map is blank *and* why.
+    expect(screen.getByText(i18n.t("map.empty", { count: 12 }))).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     // The brief's own suspicion about the error test ("would it pass if the
     // card rendered an error for every state?") applies just as much here:
@@ -121,13 +126,17 @@ describe("GeoCard", () => {
       data: {
         points: [point(52.31, 4.76), point(50.11, 8.68, "major_outage")],
         unlocated: [{ providerId: "github", providerName: "GitHub", count: 12 }],
-        generatedAt: "2026-08-27T10:00:00.000Z",
+        // Relative, not a pinned date: an absolute one drifts with the wall
+        // clock, and this fixture's age reached "12 days ago" — the same
+        // number as the unplaced count, which is what broke the assertion
+        // below on a day nobody touched this file.
+        generatedAt: new Date(Date.now() - 3600_000).toISOString(),
       } satisfies MapResponse,
       isError: false,
     });
     renderCard();
     expect(screen.getByRole("img")).toBeInTheDocument();
-    expect(screen.getByText(/12/)).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("map.footnote", { count: 2, unplaced: 12 }))).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
