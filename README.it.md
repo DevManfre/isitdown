@@ -42,6 +42,8 @@ server) e **UI** (lo stesso motore più una dashboard locale, configurabile a ru
   - [3.4 Come vengono gestiti i segreti](#34-come-vengono-gestiti-i-segreti)
   - [3.5 Provider monitorati](#35-provider-monitorati)
   - [3.6 Canali di notifica](#36-canali-di-notifica)
+  - [3.7 Instradamento delle notifiche](#37-instradamento-delle-notifiche)
+  - [3.8 Politica di consegna — ore di silenzio, riepiloghi, limiti](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti)
 - [4. Docker](#4-docker)
   - [4.1 Immagini e target di build](#41-immagini-e-target-di-build)
   - [4.2 Profili compose](#42-profili-compose)
@@ -729,6 +731,72 @@ dove l'editor delle regole di instradamento offre anche una prova a secco
 vincerebbe e quali non sono mai state raggiunte, valutate contro le regole
 che hai effettivamente salvato, non un insieme ipotetico.
 
+### 3.8 Politica di consegna — ore di silenzio, riepiloghi, limiti
+
+Le regole di instradamento decidono *chi* viene informato di un cambiamento.
+Altri quattro controlli decidono *quanto* di quel cambiamento esce davvero, e in
+quanti messaggi. Tutti e quattro sono disattivati per default, così
+un'installazione che non ne configura nessuno si comporta esattamente come prima
+che esistessero.
+
+```yaml
+delivery:
+  quietHours:
+    enabled: true
+    start: "23:00"          # inclusa
+    end: "07:00"            # esclusa; la finestra può scavalcare la mezzanotte
+    timeZone: "Europe/Rome" # un nome IANA, o "auto" per il fuso del container
+    minSeverity: major_outage
+  digest:
+    enabled: true
+    windowMinutes: 15
+    immediateFloor: major_outage
+  cap:
+    enabled: true
+    maxPerHour: 6
+  updateInPlace: true
+```
+
+**Le ore di silenzio** sono un *ingresso* dell'instradamento, non un filtro
+aggiunto dopo le regole: dentro la finestra escono solo i cambiamenti che
+superano `minSeverity`, e la prova a secco dell'edizione UI dice quando è stata
+l'ora — e non una regola — a decidere. Un cambiamento trattenuto viene scartato,
+non rinviato: rinviare è il compito del riepilogo. La finestra si legge in
+`timeZone` e in caso di valore inutilizzabile (un orario malformato, un fuso
+sconosciuto, estremi uguali) fallisce *in apertura*, perché l'unico esito da
+escludere qui è una notte di silenzio causata da un errore di battitura.
+
+**La modalità riepilogo** raccoglie tutto ciò che sta *sotto*
+`immediateFloor` e lo invia come un unico messaggio per finestra; ciò che è pari
+o superiore alla soglia parte comunque nell'istante in cui accade, così la
+finestra ritarda soltanto quello che hai dichiarato non urgente. Il batch viene
+svuotato in base all'orologio e non all'arrivo del prossimo cambiamento: è per
+questo che anche una finestra tranquilla finisce con un messaggio. Due limiti
+dichiarati: un canale disattivato mentre una finestra è aperta perde il proprio
+batch (con una riga nel log), e un batch ancora in raccolta quando il processo si
+ferma viene perso invece di arrivare un'ora dopo.
+
+**Il limite** è un tetto per provider per ora scorrevole, contato per
+*cambiamento* e non per canale — chi legge è una persona sola, qualunque sia il
+numero di canali attivi. Ciò che il limite trattiene viene contato, e il primo
+messaggio che passa porta una riga "altri avvisi sono stati soppressi", così un
+limite non può essere confuso con un canale che ha smesso di funzionare. Un
+cambiamento finito nel riepilogo non viene volutamente addebitato al limite: un
+batch è un messaggio.
+
+**`updateInPlace`** fa di un incidente un solo messaggio, riscritto man mano che
+l'incidente evolve, sui canali che sanno modificare ciò che hanno inviato:
+Telegram (`editMessageText`) e Discord (l'id del messaggio del webhook). L'id è
+ricordato per canale e per incidente, il messaggio che chiude l'incidente lo
+rilascia, e una modifica rifiutata dal canale (troppo vecchia, cancellata a
+mano) ripiega su un messaggio nuovo invece di perdere l'aggiornamento. Il
+webhook entrante di Slack non sa modificare, quindi continua a ricevere un
+messaggio per aggiornamento.
+
+L'edizione Light configura tutti e quattro con il blocco `delivery` sopra;
+l'edizione UI li modifica da **Impostazioni → Consegna**, dove ogni riga si
+applica da sé e senza riavvio.
+
 ---
 
 ## 4. Docker
@@ -1121,7 +1189,9 @@ Per l'edizione Light imposta le stesse due variabili, `telegram.enabled: true` i
 | `the telegram channel is enabled but TELEGRAM_BOT_TOKEN is not set` | `.env` non viene passato. Controlla `env_file` e ricrea il container: l'ambiente si legge all'avvio. |
 | Container fermo su `starting` per sempre | L'healthcheck non è mai passato. Light: `state.json` non viene scritto, quindi nessun ciclo è andato a termine. UI: `/health` non risponde. |
 | La dashboard carica ma la griglia è vuota | Nessun ciclo è ancora girato. `POST /poll`, oppure aspetta un intervallo. |
-| Un provider mostra `unknown` | Non è mai stato interrogato con successo. `POST /config/services/<id>/test` riporta l'errore reale. |
+| Un provider mostra `unknown` | Non è mai stato interrogato con successo. Edizione UI: **Impostazioni → la riga del provider → Diagnostica** mostra le ultime letture con i loro errori e legge la pagina su richiesta (`GET /debug/adapters`, `POST /debug/adapters/<id>/probe`). Una pagina che si legge ma non produce nulla — uno scrape il cui selettore non corrisponde più — viene segnalata lì. |
+| Nessuna notifica durante la notte, o un messaggio invece di diversi | La politica di consegna sta facendo il suo lavoro. Controlla **Impostazioni → Consegna** (o il blocco `delivery`): le ore di silenzio scartano ciò che sta sotto la soglia, e il riepilogo lo trattiene per la sua finestra. |
+| Un provider viene interrogato e un altro no | O il suo `intervalMinutes` non è ancora trascorso, oppure ha risposto `Retry-After` e viene lasciato in pace finché la finestra dichiarata non passa — `docker logs` porta `provider asked to be left alone` con la scadenza. |
 | Il provider è `degraded` ma Incidents è vuoto | Corretto. Statuspage deriva l'indicator anche dallo stato dei componenti: può non esistere alcun incidente registrato. |
 | L'uptime di un provider è `0%` | Ha esattamente un campione e non era operational. Sale con i cicli successivi. |
 | Una colonna del mese mostra `—` | Nessun campione in quel mese. Volutamente non `0%`, che si leggerebbe come un outage lungo un mese. |
@@ -1150,12 +1220,12 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `GET` | `/maintenances?provider=&days=` | Le finestre di manutenzione dichiarate — in corso, future e passate — come `{ maintenances }`. `days` limita quanto indietro nel tempo resta visibile una finestra chiusa (default 90, massimo 365); `provider` restringe a uno solo. Senza `provider`, ogni provider abilitato. |
 | `GET` | `/notifications?limit=` | Ciò che è stato inviato davvero, dal più recente. Massimo 200. |
 | `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | Una pagina del log invii: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` è `all` (default), `sent` o `failed`; `channel` restringe a un canale; `pageSize` vale 25 di default, massimo 200. Un `page`, `pageSize` o `state` senza senso ricade sui valori di default invece di dare 400. `counts` porta ogni esito qualunque sia il filtro. Ogni elemento porta `attempts`: un invio fallito con più di uno è una notifica non recapitata. |
-| `GET` | `/config` | Servizi, impostazioni di polling (`adaptivePolling` e `adaptiveIntervalMinutes` compresi), `retention`, canali, routing e `removed` — i provider rimossi ma ancora ripristinabili. Le credenziali dei canali appaiono come **nomi** di variabili con un flag `isSet`, mai come valori. |
+| `GET` | `/config` | Servizi, impostazioni di polling (`adaptivePolling` e `adaptiveIntervalMinutes` compresi), `retention`, `delivery` (ore di silenzio, riepilogo, limite, `updateInPlace` — vedi [3.8](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti)), canali, routing e `removed` — i provider rimossi ma ancora ripristinabili. Le credenziali dei canali appaiono come **nomi** di variabili con un flag `isSet`, mai come valori. |
 | `POST` | `/config/services` | Aggiunge un servizio. `201`, oppure `409` su id duplicato, oppure `400` col nome del campo non valido. |
 | `PATCH` `DELETE` | `/config/services/:id` | Modifica, o rimozione. La rimozione è una **cancellazione morbida**: il provider esce subito dalla dashboard e dal ciclo di polling, e la risposta dice per quanto resta ripristinabile (`{ removed, removedAt, restoreUntil }`). `404` su un id sconosciuto o già rimosso. |
 | `POST` | `/config/services/:id/restore` | Annulla una rimozione entro la finestra. Non era stato portato via nulla, quindi non si ricostruisce nulla; il buco nella cronologia dei giorni da rimosso viene ricostruito. `404` se non è un servizio rimosso. |
 | `DELETE` | `/config/services/:id/permanently` | La metà distruttiva, su un percorso a sé perché non ci si arrivi per sbaglio: propaga a campioni, incidenti, manutenzioni, stato e regole di routing di quel provider. Succede comunque da sé alla scadenza della finestra di ripristino. |
-| `PATCH` | `/config/settings` | Impostazioni di polling — `adaptivePolling` e `adaptiveIntervalMinutes` (1–1440) compresi — e `retentionDays`, per quanto tempo si conserva lo storico, da 7 a 3650 giorni. |
+| `PATCH` | `/config/settings` | Impostazioni di polling — `adaptivePolling` e `adaptiveIntervalMinutes` (1–1440) compresi — `retentionDays`, per quanto tempo si conserva lo storico, da 7 a 3650 giorni, e `delivery`, la politica di [3.8](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti). La patch di `delivery` è parziale a ogni livello, così si può cambiare un campo senza riscrivere gli altri. |
 | `GET` | `/config/storage` | Quanto costa la conservazione: dimensione del database su disco, numero di campioni, byte per campione misurati (`measured: false` quando il database è troppo piccolo per misurarli e vale la stima del server) e campioni al giorno con provider e intervallo attuali. |
 | `PATCH` | `/config/channels/:id` | Attiva/disattiva e imposta i nomi delle variabili. **Rifiuta** un segreto letterale. |
 | `PUT` | `/config/channels/:id/secrets` | Salva i **valori** delle credenziali — `{"fields":{"<campo>":"<valore>"}}`. Sola scrittura: il valore va in `secrets.env` accanto al database e nell'ambiente del processo, con effetto immediato, e la risposta è la solita forma nomi-e-`isSet`. `400` per un campo sconosciuto o un valore inutilizzabile. |
@@ -1163,6 +1233,8 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `POST` | `/config/services/:id/test` | Una fetch reale verso quel provider. Non registra nulla. |
 | `POST` | `/config/channels/:id/test` | Una notifica di test, attraverso il dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale, mapView, timeZone }`. `timeZone` è `auto` — il fuso di questo browser — oppure un nome IANA; qualunque valore in cui il runtime non sappia formattare una data viene rifiutato. |
+| `GET` | `/debug/adapters` | Diagnostica degli adapter: per ogni provider il suo adapter, la base URL e le opzioni, più gli ultimi venti esiti di lettura (durata, tentativi, se era un `304`, e l'errore per intero). In memoria — diagnostica per l'esecuzione che hai davanti, non storico, quindi un restart la svuota. |
+| `POST` | `/debug/adapters/:id/probe` | Una lettura della pagina di quel provider, adesso, riportata per intero: l'intera lettura interpretata in caso di successo, l'errore dell'adapter in caso di fallimento (come `200` con `ok: false`, come il test di connessione). Non registra e non notifica nulla. `404` su un id sconosciuto. |
 | `POST` | `/poll` | Esegue subito un ciclo, tramite lo scheduler. Restituisce il riepilogo del ciclo. |
 | `GET` | `/events` | Server-sent events, una risposta long-lived per tab aperta. `hello` alla connessione (`lastPollAt`, `nextPollAt`, `serverNow`), poi `cycle` alla fine di ogni ciclo (`finishedAt`, `providers`, `failed`, `changedProviders` — nessuna scadenza: lo scheduler ri-arma dopo l'evento, quindi quella nuova arriva con la rilettura). Lo stream è un corriere, non una fonte di verità: dice cosa è cambiato, la dashboard lo rilegge. Non JSON — vedi [6.3](#63-aggiornamenti-live). |
 | `GET` | `/metrics` | Esposizione Prometheus. L'unico endpoint non JSON — vedi [6.2](#62-metriche-prometheus). |
@@ -1466,6 +1538,14 @@ per il numero di poll configurato. Un disservizio reale costa quindi al massimo
 `confirmSamples - 1` poll di ritardo, e una discordanza di un ciclo non costa
 nulla.
 
+Tutto ciò che sta nella tabella sopra è il diff engine che decide cosa è
+*notizia*. Cosa succede a un cambiamento dopo di quello è affare della politica
+di consegna — ore di silenzio, finestra di riepilogo, limite orario, un
+messaggio per incidente — ed è
+[3.8](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti). L'ordine è
+voluto e mai il contrario: il motore risponde a "è cambiato qualcosa", le regole
+a "chi se ne occupa", la politica a "gli arriva adesso".
+
 **Regola di soppressione**: finché una finestra di manutenzione dichiarata da
 un provider è in corso, nient'altro riguardo quel provider è una novità — un
 cambio di stato, un incidente nuovo o aggiornato, un flip di componente,
@@ -1533,11 +1613,21 @@ timestamp restano UTC con suffisso esplicito in ogni lingua.
   che decide, e il dispatcher l'unica che invia.
 - **Restart** — lo stato viene ricaricato dallo store, quindi nessuna falsa raffica di
   "è cambiato tutto". Testato in entrambe le edizioni, anche nel container.
-- **Rate limiting** — i provider sono sfasati all'interno del ciclo e l'intervallo
+- **Rate limiting** — la richiesta di ogni provider è sfasata di un valore derivato
+  dall'hash del suo id, limitato a un decimo della sua cadenza, e l'intervallo stesso
   porta jitter, così né una singola istanza né una flotta martellano un provider nello
-  stesso secondo. Il validatore memorizzato per provider trasforma la maggior parte
-  dei cicli in un `304` senza corpo, e a un provider che pubblica due volte l'anno si
-  può dare la sua cadenza più lenta con `intervalMinutes`.
+  stesso secondo; poiché lo sfasamento è ancorato all'id, aggiungere un provider non
+  sposta la richiesta di tutti gli altri. Il validatore memorizzato per provider
+  trasforma la maggior parte dei cicli in un `304` senza corpo, e a un provider che
+  pubblica due volte l'anno si può dare la sua cadenza più lenta con
+  `intervalMinutes`.
+- **Un provider che chiede spazio** — un `429`, o qualsiasi risposta che porti
+  `Retry-After`, viene rispettato: quel provider salta i cicli finché la finestra che
+  ha dichiarato non è passata, invece di essere ritentato dentro di essa. Un `503`
+  nudo resta un fallimento ordinario, un `429` senza header ottiene un default di un
+  minuto, e una finestra dichiarata è limitata a sei ore così un provider non può
+  togliersi dalla dashboard per una settimana. Un poll manuale dalla dashboard chiede
+  comunque: è una richiesta che l'operatore ha scelto.
 - **Timestamp non affidabili** — un `updatedAt` del provider avanti rispetto al nostro
   orologio non può far iniziare un incidente nel futuro; l'orario di inizio è ancorato
   al poll che lo ha visto per primo, mentre la data dichiarata dal provider resta
