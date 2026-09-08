@@ -1,6 +1,6 @@
 import type { Adapter } from "./adapter.interface.ts";
 import type { RuntimeConfig, ServiceDefinition } from "./configSource.interface.ts";
-import { diff } from "./diffEngine.ts";
+import { confirmedChanges } from "./diffEngine.ts";
 import type { StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
 import type { ProviderRuntimeState, StateStore } from "./stateStore.interface.ts";
@@ -194,9 +194,20 @@ export function createPoller(deps: PollerDeps): Poller {
       };
     }
 
-    // Diff against the state read before this save, then persist.
-    const changes = diff(before.last, outcome.status);
+    // Ask the engine what is news, against the state read before this save.
+    // The gate is what flap damping and a mute are expressed through: both
+    // decide whether a reading notifies, so both belong on this one path
+    // rather than anywhere a message could be sent from.
+    const gate = confirmedChanges(outcome.status, {
+      baseline: before.notifyBaseline,
+      last: before.last,
+      pending: before.pending,
+      confirmations: config.polling.confirmSamples,
+      mutedUntil: service.mutedUntil ?? null,
+    });
+    const changes = gate.changes;
     await store.saveStatus(outcome.status, { latencyMs: outcome.latencyMs });
+    await store.saveNotifyState(service.id, gate.baseline, gate.pending);
     if (before.failureCount > 0) await store.clearFailures(service.id);
     if (before.degradedNotified) await store.setDegradedNotified(service.id, false);
 

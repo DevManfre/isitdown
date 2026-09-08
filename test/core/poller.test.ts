@@ -65,6 +65,7 @@ const config = (services: ServiceDefinition[], over: Partial<RuntimeConfig["poll
     failureThreshold: 5,
     adaptivePolling: true,
     adaptiveIntervalMinutes: 1,
+    confirmSamples: 1,
     ...over,
   },
   locale: "en",
@@ -924,5 +925,107 @@ test("a disabled provider's incident asks for nothing: it is not being polled", 
     assert.equal(await poller.nextIntervalMinutes(cfg), 5, "only the global cadence is left to honour");
   } finally {
     await store.close();
+  }
+});
+
+test("with flap damping on, a provider that changes its mind for one cycle notifies nobody", async () => {
+  let indicator = "none";
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary(indicator));
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({
+    getAdapter,
+    store,
+    logger: silent,
+    sleep: timer.sleep,
+    now: clock.now,
+  });
+  const damped = config([service("github", provider.baseUrl)], { confirmSamples: 2 });
+
+  try {
+    await poller.runCycle(damped);
+
+    indicator = "major";
+    clock.advance(ONE_INTERVAL_MS);
+    const flap = await poller.runCycle(damped);
+    assert.deepEqual(flap.changes, [], "one disagreeing sample must not notify");
+    // The sample itself is still recorded: the dashboard tells the truth about
+    // what the page said, damping only holds the notification.
+    assert.equal((await store.getState("github")).last?.overallStatus, "partial_outage");
+
+    indicator = "none";
+    clock.advance(ONE_INTERVAL_MS);
+    const back = await poller.runCycle(damped);
+    assert.deepEqual(back.changes, [], "the flap is over; there was never any news");
+  } finally {
+    await store.close();
+    await provider.close();
+  }
+});
+
+test("with flap damping on, a change that persists is announced one cycle later", async () => {
+  let indicator = "none";
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary(indicator));
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const damped = config([service("github", provider.baseUrl)], { confirmSamples: 2 });
+
+  try {
+    await poller.runCycle(damped);
+    indicator = "major";
+    clock.advance(ONE_INTERVAL_MS);
+    assert.deepEqual((await poller.runCycle(damped)).changes, []);
+
+    clock.advance(ONE_INTERVAL_MS);
+    const confirmed = await poller.runCycle(damped);
+    assert.deepEqual(
+      confirmed.changes.map((change) => change.kind),
+      ["status_change"],
+      "the same reading twice is news, against the baseline it was held against",
+    );
+    assert.equal(confirmed.changes[0]?.previousStatus, "operational");
+    assert.equal(confirmed.changes[0]?.currentStatus, "partial_outage");
+  } finally {
+    await store.close();
+    await provider.close();
+  }
+});
+
+test("a muted provider is polled and recorded, and reports nothing", async () => {
+  let indicator = "none";
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary(indicator));
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const muted = {
+    ...service("github", provider.baseUrl),
+    mutedUntil: new Date(Date.now() + 3_600_000).toISOString(),
+  };
+
+  try {
+    await poller.runCycle(config([muted]));
+    indicator = "major";
+    clock.advance(ONE_INTERVAL_MS);
+    const cycle = await poller.runCycle(config([muted]));
+
+    assert.deepEqual(cycle.changes, [], "a mute is the operator saying they already know");
+    assert.equal(cycle.results[0]?.ok, true, "a mute silences alerts, not monitoring");
+    assert.equal((await store.getState("github")).last?.overallStatus, "partial_outage");
+  } finally {
+    await store.close();
+    await provider.close();
   }
 });

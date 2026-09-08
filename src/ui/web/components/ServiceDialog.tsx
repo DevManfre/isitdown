@@ -19,6 +19,7 @@ const ADAPTERS = [
   "instatus",
   "betterstack",
   "rss",
+  "html",
   "slack",
   "aws",
   "gcp",
@@ -40,12 +41,34 @@ const ADAPTER_NOTES: Record<string, string> = {
   instatus: "add.note.instatus",
   betterstack: "add.note.betterstack",
   rss: "add.note.rss",
+  html: "add.note.html",
   slack: "add.note.slack",
   aws: "add.note.aws",
   gcp: "add.note.gcp",
   azure: "add.note.azure",
   custom: "add.note.custom",
 };
+
+/**
+ * The adapter that reads a page's markup instead of a machine-readable
+ * endpoint. It is the one adapter whose configuration cannot be inferred from a
+ * base URL — an operator has to say which element to read and, when the page
+ * uses unusual wording, which words mean what — so it is also the one adapter
+ * this dialog grows fields for.
+ */
+const SCRAPE_ADAPTER = "html";
+
+/** Worst first, the order the reading itself resolves them in. */
+const SCRAPE_SEVERITIES: { key: string; label: string; example: string }[] = [
+  { key: "major_outage", label: "status.major-outage", example: "major outage, down" },
+  { key: "partial_outage", label: "status.partial-outage", example: "partial outage" },
+  { key: "degraded", label: "status.degraded", example: "degraded, slow" },
+  { key: "operational", label: "status.operational", example: "all systems operational" },
+];
+
+/** Drops the fields the operator left empty, so a blank never travels as a mapping. */
+const usedOptions = (options: Record<string, string>): Record<string, string> =>
+  Object.fromEntries(Object.entries(options).filter(([, value]) => value.trim() !== ""));
 
 /**
  * Add/edit dialog for a monitored service, on shadcn's Radix `Dialog`. Port of
@@ -88,6 +111,10 @@ export function ServiceDialog({
   // Kept as the typed string, not a number: an empty field is what "follow the
   // global cadence" looks like, and 0/NaN cannot express it.
   const [intervalMinutes, setIntervalMinutes] = useState(intervalValue(service));
+  // Adapter-specific extras, of which the scrape adapter is so far the only
+  // user. Kept as the raw record the service definition carries, rather than as
+  // named fields, so an adapter that grows an option later needs no new state.
+  const [options, setOptions] = useState<Record<string, string>>(service?.options ?? {});
   const [preview, setPreview] = useState<
     { supported: boolean; components: ComponentPickerEntry[] } | undefined
   >(undefined);
@@ -100,6 +127,13 @@ export function ServiceDialog({
   // ("Google Cloud") came back as a rejected write. Derive it from the name
   // instead — one field to fill, and the value is valid by construction.
   const id = mode === "add" ? slugify(name) : (service?.id ?? "");
+  // The adapter is only choosable while adding; an edit shows the fields of the
+  // adapter the service already has.
+  const activeAdapter = mode === "add" ? adapter : (service?.adapter ?? "");
+  const scraping = activeAdapter === SCRAPE_ADAPTER;
+  const setOption = (key: string, value: string): void => {
+    setOptions((current) => ({ ...current, [key]: value }));
+  };
 
   // Claim-it-release-it: every close path above releases the busy state this
   // dialog claimed on open, but an unmount is not a close path — it runs no
@@ -128,6 +162,7 @@ export function ServiceDialog({
     setSelection(service?.components ?? []);
     setScopeToComponents(service?.scopeToComponents ?? false);
     setIntervalMinutes(intervalValue(service));
+    setOptions(service?.options ?? {});
     setPreview(undefined);
     setMessage(undefined);
     setSaving(false);
@@ -185,6 +220,10 @@ export function ServiceDialog({
       if (mode === "add") {
         await add.mutateAsync({
           id, name, adapter, baseUrl, enabled: true, components: selection, scopeToComponents,
+          // Omitted entirely for the adapters that take none: an empty record
+          // would be stored as one, and `undefined` is what "this adapter has
+          // no extras" looks like everywhere else.
+          ...(scraping ? { options: usedOptions(options) } : {}),
           // Omitted rather than null on an add: the schema behind the POST takes
           // the field as optional, and absent already means the global cadence.
           ...(intervalMinutes.trim() === "" ? {} : { intervalMinutes: Number(intervalMinutes) }),
@@ -207,6 +246,7 @@ export function ServiceDialog({
             // Null, not omitted: a cleared field has to travel as an instruction
             // to forget the interval, or the row keeps the one it had.
             intervalMinutes: intervalMinutes.trim() === "" ? null : Number(intervalMinutes),
+          ...(scraping ? { options: usedOptions(options) } : {}),
           },
         });
       }
@@ -241,8 +281,16 @@ export function ServiceDialog({
             {mode === "add" && (
               <div className="flex flex-col gap-1.5">
                 <Label>{t("field.adapter")}</Label>
+                {/* Ten adapters do not fit one line of a dialog: unwrapped,
+                    the row ran under the dialog's own edge and the last three
+                    were unreachable. Wrapped *and* spaced — a segmented bar
+                    broken over two lines shows square corners where the rows
+                    break, while spaced items are individually rounded chips
+                    that read the same on every line. */}
                 <ToggleGroup
                   type="single"
+                  spacing={1}
+                  className="w-full flex-wrap"
                   value={adapter}
                   onValueChange={(next) => {
                     if (next !== "") setAdapter(next);
@@ -268,6 +316,42 @@ export function ServiceDialog({
               />
               {mode === "add" && <span className="font-mono text-xs text-muted-foreground">{t(ADAPTER_NOTES[adapter] ?? "add.note.custom")}</span>}
             </div>
+
+            {scraping && (
+              <div className="flex flex-col gap-3 rounded-md border border-dashed border-border p-3">
+                <p className="text-xs text-muted-foreground">{t("scrape.warning")}</p>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="service-selector">{t("scrape.selector")}</Label>
+                  <Input
+                    id="service-selector"
+                    className="font-mono"
+                    value={options["selector"] ?? ""}
+                    onChange={(event) => setOption("selector", event.target.value)}
+                    {...fieldProps}
+                  />
+                  <span className="text-xs text-muted-foreground">{t("scrape.selector-hint")}</span>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>{t("scrape.words")}</Label>
+                  {SCRAPE_SEVERITIES.map((severity) => (
+                    <div key={severity.key} className="grid grid-cols-[8rem_1fr] items-center gap-2">
+                      <Label className="text-xs font-normal text-muted-foreground" htmlFor={`service-words-${severity.key}`}>
+                        {t(severity.label)}
+                      </Label>
+                      <Input
+                        id={`service-words-${severity.key}`}
+                        className="font-mono"
+                        placeholder={t("scrape.words-placeholder", { example: severity.example })}
+                        value={options[severity.key] ?? ""}
+                        onChange={(event) => setOption(severity.key, event.target.value)}
+                        {...fieldProps}
+                      />
+                    </div>
+                  ))}
+                  <span className="text-xs text-muted-foreground">{t("scrape.words-hint")}</span>
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="service-interval">{t("field.provider-interval")}</Label>

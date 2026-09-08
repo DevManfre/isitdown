@@ -56,6 +56,8 @@ export function runStateStoreContract(name: string, makeStore: () => Promise<Sto
       last: null,
       failureCount: 0,
       degradedNotified: false,
+      notifyBaseline: null,
+      pending: null,
     });
     await store.close();
   });
@@ -136,6 +138,47 @@ export function runStateStoreContract(name: string, makeStore: () => Promise<Sto
     assert.equal(state.failureCount, 2);
     assert.equal(state.degradedNotified, true);
     await reopened.close();
+  });
+
+  test(`${name}: the notification baseline and a held transition survive a reopen`, async () => {
+    const { store, reopen } = await makeStore();
+    const baseline = snap("github", "operational");
+    await store.saveNotifyState("github", baseline, { signature: "sig-1", count: 2 });
+    await store.close();
+
+    const reopened = await reopen();
+    const state = await reopened.getState("github");
+    // Both halves matter: the baseline is what the next poll compares against,
+    // and losing the streak on a restart would make a held transition start
+    // its wait over.
+    assert.deepEqual(state.notifyBaseline, baseline);
+    assert.deepEqual(state.pending, { signature: "sig-1", count: 2 });
+    await reopened.close();
+  });
+
+  test(`${name}: clearing the held transition is persisted as nothing pending`, async () => {
+    const { store } = await makeStore();
+    await store.saveNotifyState("github", snap("github", "degraded"), { signature: "sig-1", count: 1 });
+    await store.saveNotifyState("github", snap("github", "degraded"), null);
+
+    assert.equal((await store.getState("github")).pending, null);
+    await store.close();
+  });
+
+  test(`${name}: a held transition is separate from the sample the dashboard reads`, async () => {
+    const { store } = await makeStore();
+    const flap = snap("github", "major_outage");
+    await store.saveNotifyState("github", snap("github", "operational"), { signature: "sig-1", count: 1 });
+    await store.saveStatus(flap);
+
+    const state = await store.getState("github");
+    assert.equal(state.last?.overallStatus, "major_outage", "the sample is what the page said");
+    assert.equal(
+      state.notifyBaseline?.overallStatus,
+      "operational",
+      "the baseline is what the operator was last told",
+    );
+    await store.close();
   });
 
   test(`${name}: a restart does not make the diff engine fire`, async () => {

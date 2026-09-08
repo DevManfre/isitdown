@@ -95,7 +95,7 @@ test("config returns the services, the polling settings and the channels", async
     const config = body as {
       services: { id: string }[];
       polling: { intervalMinutes: number };
-      channels: { id: string; fields: { name: string; envVar: string; isSet: boolean }[] }[];
+      channels: { id: string; fields: { name: string; envVar: string; isSet: boolean; optional: boolean }[] }[];
     };
     assert.equal(config.services.length, 3);
     assert.equal(config.polling.intervalMinutes, 3);
@@ -104,6 +104,7 @@ test("config returns the services, the polling settings and the channels", async
       name: "botToken",
       envVar: "TELEGRAM_BOT_TOKEN",
       isSet: true,
+      optional: false,
     });
   } finally {
     await app.close();
@@ -343,7 +344,12 @@ test("a channel can be enabled and its variable name changed", async () => {
     };
     const webhook = config.channels.find((channel) => channel.id === "webhook");
     assert.equal(webhook?.enabled, true);
-    assert.deepEqual(webhook?.fields, [{ name: "url", envVar: "MY_HOOK", isSet: true }]);
+    assert.deepEqual(webhook?.fields, [
+      { name: "url", envVar: "MY_HOOK", isSet: true, optional: false },
+      // The signing secret is offered to every installation and set by few:
+      // unset, it must read as optional rather than as a broken channel.
+      { name: "secret", envVar: "WEBHOOK_SECRET", isSet: false, optional: true },
+    ]);
   } finally {
     await app.close();
   }
@@ -784,6 +790,74 @@ test("an out-of-range adaptive cadence is refused", async () => {
       const { status } = await app.request("PATCH", "/config/settings", patch);
       assert.equal(status, 400, JSON.stringify(patch));
     }
+  } finally {
+    await app.close();
+  }
+});
+
+test("a provider can be muted for a while and unmuted early", async () => {
+  const provider = await fakeProvider();
+  const app = await api();
+  const mutedUntilOf = async (): Promise<string | undefined> => {
+    const config = (await app.request("GET", "/config")).body as {
+      services: { id: string; mutedUntil?: string }[];
+    };
+    return config.services.find((service) => service.id === "vercel")?.mutedUntil;
+  };
+  try {
+    await app.request("POST", "/config/services", {
+      id: "vercel",
+      name: "Vercel",
+      adapter: "statuspage",
+      baseUrl: provider.baseUrl,
+    });
+    const until = new Date(Date.now() + 7_200_000).toISOString();
+
+    assert.equal((await app.request("PATCH", "/config/services/vercel", { mutedUntil: until })).status, 200);
+    assert.equal(await mutedUntilOf(), until);
+    // The mute has to reach the engine's input, not just the config payload.
+    const loaded = (await app.runtime.configSource.load()).services.find((service) => service.id === "vercel");
+    assert.equal(loaded?.mutedUntil, until);
+
+    assert.equal((await app.request("PATCH", "/config/services/vercel", { mutedUntil: null })).status, 200);
+    assert.equal(await mutedUntilOf(), undefined);
+  } finally {
+    await app.close();
+    await provider.close();
+  }
+});
+
+test("a mute that has already run out is not reported as one", async () => {
+  const provider = await fakeProvider();
+  const app = await api();
+  try {
+    await app.request("POST", "/config/services", {
+      id: "vercel",
+      name: "Vercel",
+      adapter: "statuspage",
+      baseUrl: provider.baseUrl,
+      mutedUntil: new Date(Date.now() - 60_000).toISOString(),
+    });
+
+    const config = (await app.request("GET", "/config")).body as {
+      services: { id: string; mutedUntil?: string }[];
+    };
+    assert.equal(config.services.find((service) => service.id === "vercel")?.mutedUntil, undefined);
+  } finally {
+    await app.close();
+    await provider.close();
+  }
+});
+
+test("the flap-damping threshold is stored and reaches the next config load", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.request("PATCH", "/config/settings", { confirmSamples: 3 });
+
+    assert.equal(status, 200);
+    assert.equal((body as { polling: { confirmSamples: number } }).polling.confirmSamples, 3);
+    assert.equal((await app.runtime.configSource.load()).polling.confirmSamples, 3);
+    assert.equal((await app.request("PATCH", "/config/settings", { confirmSamples: 99 })).status, 400);
   } finally {
     await app.close();
   }

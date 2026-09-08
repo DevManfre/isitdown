@@ -1,6 +1,6 @@
 {
   "name": "isitdown",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "description": "Polls the public status pages of third-party providers and notifies on state transitions",
   "license": "MIT",
@@ -19,6 +19,7 @@
     "release-notes": "node tools/release-notes.mjs",
     "test": "node --test \"test/**/*.test.ts\" && vitest run",
     "test:integration": "node --test \"test/**/*.itest.ts\"",
+    "test:visual": "node tools/visual-regression.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {

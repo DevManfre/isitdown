@@ -8,6 +8,7 @@ import { ServiceDialog } from "@/components/ServiceDialog.tsx";
 import { SettingRow } from "@/components/SettingRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
 import { ChannelRow, ChannelSummary, channelRank } from "@/components/settings/ChannelRow.tsx";
+import { MuteMenu } from "@/components/settings/MuteMenu.tsx";
 import { RemoveServiceDialog } from "@/components/settings/RemoveServiceDialog.tsx";
 import { RoutingRulesDialog } from "@/components/settings/RoutingRulesDialog.tsx";
 import {
@@ -20,6 +21,8 @@ import {
 } from "@/hooks/queries.ts";
 import { useFieldProps } from "@/hooks/useBusy.tsx";
 import { formatBytes, formatRelative, hostOf } from "@/lib/format.ts";
+import { isMuted } from "@/lib/mute.ts";
+import { effectiveTimeZone, setTimeZone, TIME_ZONES } from "@/lib/timeZone.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { MapView } from "@/lib/types.ts";
 
@@ -40,6 +43,13 @@ const POLLING_BOUNDS = {
 
 /** Same bounds `pollingSchema` enforces for the adaptive cadence, same reason. */
 const ADAPTIVE_BOUNDS = { min: 1, max: 1440 } as const;
+
+/**
+ * Flap damping. One is off, and the ceiling is deliberately low: a transition
+ * held for more than a handful of polls is a mute with extra steps, and the
+ * mute is a control of its own.
+ */
+const CONFIRM_BOUNDS = { min: 1, max: 10 } as const;
 
 /** Long enough that a two-keystroke number is one save, short enough to feel immediate. */
 const POLLING_DEBOUNCE_MS = 600;
@@ -75,6 +85,7 @@ export function Settings() {
   const [retries, setRetries] = useState<number | undefined>(undefined);
   const [pollingStatus, setPollingStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(undefined);
   const [adaptiveInterval_, setAdaptiveInterval] = useState<number | undefined>(undefined);
+  const [confirmSamples_, setConfirmSamples] = useState<number | undefined>(undefined);
   const [retentionDays_, setRetentionDays] = useState<number | undefined>(undefined);
   const [retentionStatus, setRetentionStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
     undefined,
@@ -98,6 +109,9 @@ export function Settings() {
   // to render.
   const adaptivePolling = config.polling.adaptivePolling ?? true;
   const adaptiveInterval = adaptiveInterval_ ?? config.polling.adaptiveIntervalMinutes ?? 1;
+  // Defaulted for the same reason as the two above: a server from before flap
+  // damping answers without the field, and one sample is what it was doing.
+  const confirmSamples = confirmSamples_ ?? config.polling.confirmSamples ?? 1;
   const retentionDays = retentionDays_ ?? config.retention.days;
   // Defaulted rather than assumed: the section only exists when a removal is
   // waiting, and an older payload carries no list at all.
@@ -157,6 +171,26 @@ export function Settings() {
     }
     setPollingStatus(undefined);
     settingsMutation.mutate(patch, {
+      onSuccess: () => setPollingStatus({ text: t("settings.saved"), tone: "ok" }),
+      onError: (error) =>
+        setPollingStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+    });
+  };
+
+  const commitConfirm = (samples: number): void => {
+    if (!Number.isInteger(samples) || samples < CONFIRM_BOUNDS.min || samples > CONFIRM_BOUNDS.max) {
+      setPollingStatus({
+        text: t("settings.out-of-range", {
+          field: t("field.confirm-samples"),
+          min: CONFIRM_BOUNDS.min,
+          max: CONFIRM_BOUNDS.max,
+        }),
+        tone: "error",
+      });
+      return;
+    }
+    setPollingStatus(undefined);
+    settingsMutation.mutate({ confirmSamples: samples }, {
       onSuccess: () => setPollingStatus({ text: t("settings.saved"), tone: "ok" }),
       onError: (error) =>
         setPollingStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
@@ -275,6 +309,26 @@ export function Settings() {
             <span className="font-mono text-xs text-muted-foreground">{t("unit.minutes")}</span>
           </SettingRow>
         )}
+        <SettingRow
+          label={t("field.confirm-samples")}
+          description={t("field.confirm-samples.hint")}
+          align="top"
+        >
+          <Input
+            id="confirm-samples"
+            aria-label={t("field.confirm-samples")}
+            type="number"
+            className="w-20 text-right font-mono"
+            value={confirmSamples}
+            onChange={(event) => setConfirmSamples(Number(event.target.value))}
+            onFocus={fieldProps.onFocus}
+            onBlur={() => {
+              fieldProps.onBlur();
+              commitConfirm(confirmSamples);
+            }}
+          />
+          <span className="font-mono text-xs text-muted-foreground">{t("unit.polls")}</span>
+        </SettingRow>
         <SettingRow label={t("field.retries")} description={t("field.retries.hint")} align="top">
           <Input
             id="polling-retries"
@@ -318,7 +372,14 @@ export function Settings() {
                   }}
                 />
               }
-              meta={t(service.enabled ? "service.enabled" : "service.disabled")}
+              // A live mute outranks "enabled" here: both describe whether the
+              // provider will say anything, and the mute is the one with an end
+              // the operator wants to read.
+              meta={
+                isMuted(service.mutedUntil)
+                  ? t("service.muted-until", { when: formatRelative(i18n.language, service.mutedUntil ?? "") })
+                  : t(service.enabled ? "service.enabled" : "service.disabled")
+              }
             >
               {/* Taking a provider out of the rotation is not deleting it:
                   the poller already skips a disabled service, and this is
@@ -330,6 +391,7 @@ export function Settings() {
               />
               {/* The variants are the ones these two buttons already carry — the
                   row shape changes, the actions do not. */}
+              <MuteMenu service={service} />
               <ServiceDialog
                 mode="edit"
                 service={service}
@@ -477,6 +539,33 @@ export function Settings() {
       </SettingsSection>
 
       <SettingsSection title={t("settings.section.appearance")} delay={stagger(4, SECTION_CASCADE)}>
+        <SettingRow
+          label={t("settings.timezone.label")}
+          description={t("settings.timezone.hint", { zone: effectiveTimeZone() })}
+          align="top"
+        >
+          <Select
+            value={preferences?.timeZone ?? "auto"}
+            onValueChange={(value) => {
+              // Applied here as well as stored: the mutation only writes the
+              // preference back, and the formatters read the module value.
+              setTimeZone(value);
+              patchPreferences.mutate({ timeZone: value });
+            }}
+          >
+            <SelectTrigger id="time-zone" className="w-56" aria-label={t("settings.timezone.label")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">{t("settings.timezone.auto")}</SelectItem>
+              {TIME_ZONES.map((zone) => (
+                <SelectItem key={zone} value={zone}>
+                  {zone === "UTC" ? t("settings.timezone.utc") : zone.replace(/_/g, " ")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
         <SettingRow
           label={t("settings.map-view.label")}
           description={t("settings.map-view.hint")}

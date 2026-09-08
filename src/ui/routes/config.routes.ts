@@ -85,6 +85,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         failureThreshold: settings.failureThreshold,
         adaptivePolling: settings.adaptivePolling,
         adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
+        confirmSamples: settings.confirmSamples,
       },
       retention: { days: settings.retentionDays },
       channels: describeChannels(db, runtime.env),
@@ -231,6 +232,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       ...(parsed.data.adaptiveIntervalMinutes === undefined
         ? {}
         : { adaptiveIntervalMinutes: parsed.data.adaptiveIntervalMinutes }),
+      ...(parsed.data.confirmSamples === undefined ? {} : { confirmSamples: parsed.data.confirmSamples }),
       ...(parsed.data.retentionDays === undefined ? {} : { retentionDays: parsed.data.retentionDays }),
     });
     const settings = readSettings(db, runtime.logger);
@@ -242,6 +244,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         failureThreshold: settings.failureThreshold,
         adaptivePolling: settings.adaptivePolling,
         adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
+        confirmSamples: settings.confirmSamples,
       },
       retention: { days: settings.retentionDays },
     });
@@ -460,7 +463,9 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     const resolved = config.channels.find((channel) => channel.id === req.params.id);
     const missing = describeChannels(db, runtime.env)
       .find((channel) => channel.id === req.params.id)
-      ?.fields.filter((field) => !field.isSet)
+      // Optional credentials are skipped: an unset signing secret means
+      // "send unsigned", not "this channel cannot be tested".
+      ?.fields.filter((field) => !field.isSet && !field.optional)
       .map((field) => field.envVar) ?? [];
 
     if (missing.length > 0 || resolved === undefined) {

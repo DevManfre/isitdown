@@ -60,6 +60,7 @@ test("a full file maps onto a runtime config with the polling keys flattened", a
     maxRetries: 2,
     failureThreshold: 4,
     adaptivePolling: true,
+    confirmSamples: 1,
     adaptiveIntervalMinutes: 1,
   });
   assert.equal(config.locale, "it");
@@ -104,6 +105,7 @@ test("omitted optional keys fall back to the documented defaults", async () => {
     maxRetries: 3,
     failureThreshold: 5,
     adaptivePolling: true,
+    confirmSamples: 1,
     adaptiveIntervalMinutes: 1,
   });
   assert.equal(config.locale, "en");
