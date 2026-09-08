@@ -7,6 +7,8 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
 import { SettingRow } from "@/components/SettingRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
+import { AdapterDebugDialog } from "@/components/settings/AdapterDebugDialog.tsx";
+import { Reveal } from "@/components/settings/Reveal.tsx";
 import { ChannelRow, ChannelSummary, channelRank } from "@/components/settings/ChannelRow.tsx";
 import { MuteMenu } from "@/components/settings/MuteMenu.tsx";
 import { RemoveServiceDialog } from "@/components/settings/RemoveServiceDialog.tsx";
@@ -24,7 +26,10 @@ import { formatBytes, formatRelative, hostOf } from "@/lib/format.ts";
 import { isMuted } from "@/lib/mute.ts";
 import { effectiveTimeZone, setTimeZone, TIME_ZONES } from "@/lib/timeZone.ts";
 import { stagger } from "@/lib/stagger.ts";
-import type { MapView } from "@/lib/types.ts";
+import type { DeliveryPolicy, MapView, SeverityFloorName } from "@/lib/types.ts";
+// The floors come from core's own list rather than a copy: a floor added there
+// has to appear here, and a literal array would silently not.
+import { SEVERITY_FLOORS } from "../../../core/routing.ts";
 
 /** Sections enter in reading order, after the view's own frame has landed. */
 const SECTION_CASCADE = { base: 60, step: 60 };
@@ -69,6 +74,57 @@ const POLLING_DEBOUNCE_MS = 600;
 /** Same reason as `POLLING_BOUNDS`: instant-apply must not fire a half-typed number at the server. */
 const RETENTION_BOUNDS = { min: 7, max: 3650 };
 
+/**
+ * What a server from before the delivery policy existed answers with, and what
+ * every field means when nothing has been configured: all of it off.
+ */
+const DELIVERY_OFF: DeliveryPolicy = {
+  quietHours: { enabled: false, start: "23:00", end: "07:00", timeZone: "auto", minSeverity: "major_outage" },
+  digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" },
+  cap: { enabled: false, maxPerHour: 10 },
+  updateInPlace: false,
+};
+
+/** The two typed numbers in the delivery section, bounded like the engine's. */
+const DELIVERY_BOUNDS = {
+  windowMinutes: { min: 1, max: 1440, labelKey: "field.digest.window" },
+  maxPerHour: { min: 1, max: 1000, labelKey: "field.cap.max" },
+};
+
+/**
+ * A severity floor, in the same words in all three places one is chosen. Its
+ * own component because "any" and "major outage only" are the ends of one
+ * scale, and three hand-written option lists is three chances to word one
+ * end differently from the others.
+ */
+function FloorSelect({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: SeverityFloorName;
+  onChange: (value: SeverityFloorName) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Select value={value} onValueChange={(next) => onChange(next as SeverityFloorName)}>
+      <SelectTrigger id={id} className="w-56" aria-label={label}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {SEVERITY_FLOORS.map((floor) => (
+          <SelectItem key={floor} value={floor}>
+            {t(`severity.floor.${floor}`)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function Settings() {
   const { t, i18n } = useTranslation();
   const { data: config } = useConfig();
@@ -92,6 +148,11 @@ export function Settings() {
   );
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [openChannel, setOpenChannel] = useState<string | undefined>(undefined);
+  const [digestWindow_, setDigestWindow] = useState<number | undefined>(undefined);
+  const [capPerHour_, setCapPerHour] = useState<number | undefined>(undefined);
+  const [deliveryStatus, setDeliveryStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     return () => {
@@ -116,6 +177,46 @@ export function Settings() {
   // Defaulted rather than assumed: the section only exists when a removal is
   // waiting, and an older payload carries no list at all.
   const removed = config.removed ?? [];
+  const delivery = config.delivery ?? DELIVERY_OFF;
+  const digestWindow = digestWindow_ ?? delivery.digest.windowMinutes;
+  const capPerHour = capPerHour_ ?? delivery.cap.maxPerHour;
+
+  /**
+   * One field of the delivery policy at a time. The patch is partial at every
+   * level, so a floor changed here cannot write back a window the operator is
+   * still typing into.
+   */
+  const commitDelivery = (patch: {
+    quietHours?: Partial<DeliveryPolicy["quietHours"]>;
+    digest?: Partial<DeliveryPolicy["digest"]>;
+    cap?: Partial<DeliveryPolicy["cap"]>;
+    updateInPlace?: boolean;
+  }): void => {
+    setDeliveryStatus(undefined);
+    settingsMutation.mutate(
+      { delivery: patch },
+      {
+        onSuccess: () => setDeliveryStatus({ text: t("settings.saved"), tone: "ok" }),
+        onError: (error) =>
+          setDeliveryStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+      },
+    );
+  };
+
+  /** Bounds-checked before it is sent, for the same reason the engine's numbers are. */
+  const commitDeliveryNumber = (field: keyof typeof DELIVERY_BOUNDS, value: number): void => {
+    const bound = DELIVERY_BOUNDS[field];
+    if (!Number.isInteger(value) || value < bound.min || value > bound.max) {
+      setDeliveryStatus({
+        text: t("settings.out-of-range", { field: t(bound.labelKey), min: bound.min, max: bound.max }),
+        tone: "error",
+      });
+      return;
+    }
+    commitDelivery(
+      field === "windowMinutes" ? { digest: { windowMinutes: value } } : { cap: { maxPerHour: value } },
+    );
+  };
 
   const commitPolling = (next: {
     intervalMinutes: number;
@@ -286,8 +387,10 @@ export function Settings() {
           />
         </SettingRow>
         {/* Only while it is on: a cadence for a behaviour that is switched off
-            is a field that changes nothing. */}
-        {adaptivePolling && (
+            is a field that changes nothing. Unfolded rather than appeared, for
+            the same reason the delivery groups below are — this row had the
+            same jump before `Reveal` existed. */}
+        <Reveal open={adaptivePolling}>
           <SettingRow
             label={t("field.adaptive-interval")}
             description={t("field.adaptive-interval.hint")}
@@ -308,7 +411,7 @@ export function Settings() {
             />
             <span className="font-mono text-xs text-muted-foreground">{t("unit.minutes")}</span>
           </SettingRow>
-        )}
+        </Reveal>
         <SettingRow
           label={t("field.confirm-samples")}
           description={t("field.confirm-samples.hint")}
@@ -392,6 +495,9 @@ export function Settings() {
               {/* The variants are the ones these two buttons already carry — the
                   row shape changes, the actions do not. */}
               <MuteMenu service={service} />
+              {/* Beside Edit rather than in the Providers table: an operator
+                  looking at why a page will not parse is already in this row. */}
+              <AdapterDebugDialog service={service} />
               <ServiceDialog
                 mode="edit"
                 service={service}
@@ -481,7 +587,182 @@ export function Settings() {
           meta={t("settings.routing.count", { count: config.routing.rules.length })}
           align="top"
         >
-          <RoutingRulesDialog routing={config.routing} channels={config.channels} services={config.services} />
+          <RoutingRulesDialog
+            routing={config.routing}
+            channels={config.channels}
+            services={config.services}
+            quietHours={delivery.quietHours}
+          />
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection
+        title={t("settings.section.delivery")}
+        note={t("settings.delivery.note")}
+        status={
+          deliveryStatus === undefined ? undefined : (
+            <span
+              className={deliveryStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}
+            >
+              {deliveryStatus.text}
+            </span>
+          )
+        }
+        delay={stagger(3, SECTION_CASCADE)}
+      >
+        <SettingRow label={t("field.quiet-hours")} description={t("field.quiet-hours.hint")} align="top">
+          <Switch
+            id="quiet-hours"
+            aria-label={t("field.quiet-hours")}
+            checked={delivery.quietHours.enabled}
+            onCheckedChange={(next) => commitDelivery({ quietHours: { enabled: next } })}
+          />
+        </SettingRow>
+
+        {/* Only while the window is on, like the adaptive cadence above: four
+            fields that change nothing are four questions with no answer. */}
+        <Reveal open={delivery.quietHours.enabled}>
+            <SettingRow label={t("field.quiet-hours.from")} align="top">
+              <Input
+                id="quiet-hours-start"
+                aria-label={t("field.quiet-hours.from")}
+                type="time"
+                className="w-28 font-mono"
+                value={delivery.quietHours.start}
+                onFocus={fieldProps.onFocus}
+                onBlur={fieldProps.onBlur}
+                // A time input hands over a complete "HH:MM" or an empty
+                // string, never a half-typed one, so this applies on change
+                // like a switch rather than on blur like a number.
+                onChange={(event) => {
+                  if (event.target.value === "") return;
+                  commitDelivery({ quietHours: { start: event.target.value } });
+                }}
+              />
+            </SettingRow>
+            <SettingRow label={t("field.quiet-hours.to")} align="top">
+              <Input
+                id="quiet-hours-end"
+                aria-label={t("field.quiet-hours.to")}
+                type="time"
+                className="w-28 font-mono"
+                value={delivery.quietHours.end}
+                onFocus={fieldProps.onFocus}
+                onBlur={fieldProps.onBlur}
+                onChange={(event) => {
+                  if (event.target.value === "") return;
+                  commitDelivery({ quietHours: { end: event.target.value } });
+                }}
+              />
+            </SettingRow>
+            <SettingRow
+              label={t("field.quiet-hours.zone")}
+              description={t("field.quiet-hours.zone.hint")}
+              align="top"
+            >
+              {/* The server's zone, not the browser's: the window is read where
+                  the dispatcher runs, so "auto" here has to mean the container. */}
+              <Select
+                value={delivery.quietHours.timeZone}
+                onValueChange={(value) => commitDelivery({ quietHours: { timeZone: value } })}
+              >
+                <SelectTrigger id="quiet-hours-zone" className="w-56" aria-label={t("field.quiet-hours.zone")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">{t("timezone.server")}</SelectItem>
+                  {TIME_ZONES.map((zone) => (
+                    <SelectItem key={zone} value={zone}>
+                      {zone === "UTC" ? t("settings.timezone.utc") : zone.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingRow>
+            <SettingRow label={t("field.quiet-hours.floor")} align="top">
+              <FloorSelect
+                id="quiet-hours-floor"
+                label={t("field.quiet-hours.floor")}
+                value={delivery.quietHours.minSeverity}
+                onChange={(value) => commitDelivery({ quietHours: { minSeverity: value } })}
+              />
+            </SettingRow>
+        </Reveal>
+
+        <SettingRow label={t("field.digest")} description={t("field.digest.hint")} align="top">
+          <Switch
+            id="digest-mode"
+            aria-label={t("field.digest")}
+            checked={delivery.digest.enabled}
+            onCheckedChange={(next) => commitDelivery({ digest: { enabled: next } })}
+          />
+        </SettingRow>
+
+        <Reveal open={delivery.digest.enabled}>
+            <SettingRow label={t("field.digest.window")} align="top">
+              <Input
+                id="digest-window"
+                aria-label={t("field.digest.window")}
+                type="number"
+                className="w-20 text-right font-mono"
+                value={digestWindow}
+                onChange={(event) => setDigestWindow(Number(event.target.value))}
+                onFocus={fieldProps.onFocus}
+                onBlur={() => {
+                  fieldProps.onBlur();
+                  commitDeliveryNumber("windowMinutes", digestWindow);
+                }}
+              />
+              <span className="font-mono text-xs text-muted-foreground">{t("unit.minutes")}</span>
+            </SettingRow>
+            <SettingRow label={t("field.digest.floor")} align="top">
+              <FloorSelect
+                id="digest-floor"
+                label={t("field.digest.floor")}
+                value={delivery.digest.immediateFloor}
+                onChange={(value) => commitDelivery({ digest: { immediateFloor: value } })}
+              />
+            </SettingRow>
+        </Reveal>
+
+        <SettingRow label={t("field.cap")} description={t("field.cap.hint")} align="top">
+          <Switch
+            id="alert-cap"
+            aria-label={t("field.cap")}
+            checked={delivery.cap.enabled}
+            onCheckedChange={(next) => commitDelivery({ cap: { enabled: next } })}
+          />
+        </SettingRow>
+
+        <Reveal open={delivery.cap.enabled}>
+          <SettingRow label={t("field.cap.max")} align="top">
+            <Input
+              id="alert-cap-max"
+              aria-label={t("field.cap.max")}
+              type="number"
+              className="w-20 text-right font-mono"
+              value={capPerHour}
+              onChange={(event) => setCapPerHour(Number(event.target.value))}
+              onFocus={fieldProps.onFocus}
+              onBlur={() => {
+                fieldProps.onBlur();
+                commitDeliveryNumber("maxPerHour", capPerHour);
+              }}
+            />
+          </SettingRow>
+        </Reveal>
+
+        <SettingRow
+          label={t("field.update-in-place")}
+          description={t("field.update-in-place.hint")}
+          align="top"
+        >
+          <Switch
+            id="update-in-place"
+            aria-label={t("field.update-in-place")}
+            checked={delivery.updateInPlace}
+            onCheckedChange={(next) => commitDelivery({ updateInPlace: next })}
+          />
         </SettingRow>
       </SettingsSection>
 
@@ -496,7 +777,7 @@ export function Settings() {
             </span>
           )
         }
-        delay={stagger(3, SECTION_CASCADE)}
+        delay={stagger(4, SECTION_CASCADE)}
       >
         <SettingRow
           label={t("field.retention")}
@@ -538,7 +819,7 @@ export function Settings() {
         </SettingRow>
       </SettingsSection>
 
-      <SettingsSection title={t("settings.section.appearance")} delay={stagger(4, SECTION_CASCADE)}>
+      <SettingsSection title={t("settings.section.appearance")} delay={stagger(5, SECTION_CASCADE)}>
         <SettingRow
           label={t("settings.timezone.label")}
           description={t("settings.timezone.hint", { zone: effectiveTimeZone() })}

@@ -1,4 +1,6 @@
 import type {
+  AdapterDebugResponse,
+  AdapterProbeResult,
   ComponentHistoryResponse,
   ComponentPreview,
   DeliveryLogResponse,
@@ -178,6 +180,11 @@ export const testService = (id: string) =>
   );
 export const patchSettings = (patch: unknown) => request<unknown>("PATCH", "/config/settings", patch);
 export const getStorage = () => request<StorageReport>("GET", "/config/storage");
+/** The adapter debug panel's two halves — roadmap 5.18. */
+export const getAdapterDebug = () => request<AdapterDebugResponse>("GET", "/debug/adapters");
+/** One read, right now. Records nothing and notifies nothing, like the connection test. */
+export const probeAdapter = (id: string) =>
+  request<AdapterProbeResult>("POST", `/debug/adapters/${encodeURIComponent(id)}/probe`);
 /** Every edit, add, delete and reorder saves the whole ordered list — see RoutingRules.tsx. */
 export const putRouting = (rules: RoutingRule[]) =>
   request<RoutingResponse>("PUT", "/config/routing", { rules });

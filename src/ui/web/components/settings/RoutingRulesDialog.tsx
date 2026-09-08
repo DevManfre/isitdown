@@ -7,7 +7,7 @@ import {
 import { RoutingRules } from "@/components/RoutingRules.tsx";
 import { useRoutingMutations } from "@/hooks/queries.ts";
 import { useBusyControls } from "@/hooks/useBusy.tsx";
-import type { DescribedChannel, RoutingResponse } from "@/lib/types.ts";
+import type { DescribedChannel, QuietHoursPolicy, RoutingResponse } from "@/lib/types.ts";
 
 /**
  * The rules editor, behind a button.
@@ -29,10 +29,13 @@ export function RoutingRulesDialog({
   routing,
   channels,
   services,
+  quietHours,
 }: {
   routing: RoutingResponse;
   channels: DescribedChannel[];
   services: { id: string; name: string }[];
+  /** The window the dry run evaluates with — see `DryRun` in RoutingRules. */
+  quietHours?: QuietHoursPolicy | undefined;
 }) {
   const { t } = useTranslation();
   const { setDialogOpen } = useBusyControls();
@@ -79,6 +82,7 @@ export function RoutingRulesDialog({
           routing={routing}
           channels={channels}
           services={services}
+          quietHours={quietHours}
           onSave={(rules) => save.mutateAsync(rules)}
           saving={save.isPending}
         />

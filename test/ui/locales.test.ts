@@ -116,6 +116,10 @@ test("template keys built from a prefix resolve for every value they can take", 
   for (const label of ["opened", "observed", "resolved"]) {
     assert.ok(`incident.timeline.${label}` in en, `incident.timeline.${label} is missing`);
   }
+  // Settings.tsx offers every severity floor core defines in two selects.
+  for (const floor of ["any", "degraded", "partial_outage", "major_outage"]) {
+    assert.ok(`severity.floor.${floor}` in en, `severity.floor.${floor} is missing`);
+  }
   // Header.tsx cycles through these three, and renders theme.<mode>.
   for (const mode of ["light", "dark", "system"]) {
     assert.ok(`theme.${mode}` in en, `theme.${mode} is missing`);
@@ -152,6 +156,10 @@ const DYNAMIC_FAMILIES: { prefix: string; reason: string }[] = [
   {
     prefix: "routing.dryrun.event.",
     reason: "RoutingRules.tsx renders t(`routing.dryrun.event.${candidate.id}`) for each canned dry-run event",
+  },
+  {
+    prefix: "severity.floor.",
+    reason: "Settings.tsx renders t(`severity.floor.${floor}`) for each floor its quiet-hours and digest selects offer",
   },
   {
     prefix: "channel.name.",
