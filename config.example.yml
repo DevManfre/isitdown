@@ -12,6 +12,7 @@ maxRetries: 3               # attempts per provider per cycle, with backoff
 failureThreshold: 5         # consecutive failures before a "monitoring degraded" warning
 adaptivePolling: true       # while a provider has an open incident, poll it on the cadence below
 adaptiveIntervalMinutes: 1  # that cadence; never slower than the provider's own interval
+confirmSamples: 1           # consecutive polls that must agree before a change notifies (1 = off)
 locale: en                  # language for notification messages: en | it (falls back to en)
 
 services:
@@ -48,6 +49,22 @@ services:
     # status.anthropic.com 301-redirects here; the canonical host avoids the hop
     baseUrl: https://status.claude.com
 
+  # A page that publishes neither JSON nor a feed: read one element's text and
+  # map the words onto a severity. Fragile by nature — a selector that stops
+  # matching is reported as a failing provider, never as "operational" — so use
+  # it only where there is nothing better.
+  #
+  # - name: Example
+  #   id: example
+  #   adapter: html
+  #   baseUrl: https://status.example.com/
+  #   options:
+  #     selector: ".status-banner"
+  #     # Optional. Each severity keeps its built-in words unless you give it
+  #     # your own; on the page, the longest match wins.
+  #     operational: "all systems operational"
+  #     major_outage: "outage, down"
+
 notifications:
   telegram:
     enabled: true
@@ -56,6 +73,10 @@ notifications:
   webhook:
     enabled: false
     url: "${WEBHOOK_URL}"
+    # Optional. With a secret set, every request carries X-IsItDown-Timestamp
+    # and X-IsItDown-Signature (HMAC-SHA256 over "<timestamp>.<body>"), so a
+    # receiver can verify the payload came from here. Unset means unsigned.
+    secret: "${WEBHOOK_SECRET}"
   discord:
     enabled: false
     # Server settings → Integrations → Webhooks → Copy Webhook URL

@@ -50,6 +50,9 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
           scopeToComponents: service.scopeToComponents,
           fetchedAt: state.last?.fetchedAt ?? null,
           failureCount: state.failureCount,
+          // Only ever a live mute: `listServices` drops one that has expired,
+          // so the dashboard never has to work out whether it still counts.
+          mutedUntil: service.mutedUntil ?? null,
           uptime90: history.uptime90,
           maintenance: {
             active: (state.last?.maintenances ?? []).filter((window) => isActive(window, serverNow)),

@@ -16,3 +16,4 @@ config.yml
 *.db-journal
 *.db-wal
 *.db-shm
+test/visual/current/

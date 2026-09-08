@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -32,7 +32,10 @@ export function migrate(db: DatabaseSync): void {
       active_incidents  TEXT NOT NULL,
       fetched_at        TEXT NOT NULL,
       failure_count     INTEGER NOT NULL DEFAULT 0,
-      degraded_notified INTEGER NOT NULL DEFAULT 0
+      degraded_notified INTEGER NOT NULL DEFAULT 0,
+      notify_baseline   TEXT,
+      pending_signature TEXT,
+      pending_count     INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS status_samples (
@@ -311,6 +314,47 @@ export function migrate(db: DatabaseSync): void {
     ).map((column) => column.name);
     if (!notificationColumns.includes("attempts")) {
       db.exec("ALTER TABLE notifications ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1");
+    }
+  }
+
+  if (from < 14) {
+    // Flap damping's two columns. Both nullable and empty on an existing row:
+    // no baseline of its own means the last sample stands in, which is exactly
+    // how the store behaved before damping existed.
+    const stateColumns = (db.prepare("PRAGMA table_info(provider_state)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!stateColumns.includes("notify_baseline")) {
+      db.exec("ALTER TABLE provider_state ADD COLUMN notify_baseline TEXT");
+    }
+    if (!stateColumns.includes("pending_signature")) {
+      db.exec("ALTER TABLE provider_state ADD COLUMN pending_signature TEXT");
+      db.exec("ALTER TABLE provider_state ADD COLUMN pending_count INTEGER NOT NULL DEFAULT 0");
+    }
+    // A mute is per provider and set by the operator, so it belongs beside the
+    // provider's own configuration rather than in its runtime state — it
+    // survives a state reset, and it is part of what /config reports.
+    const serviceColumns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!serviceColumns.includes("muted_until")) {
+      db.exec("ALTER TABLE services ADD COLUMN muted_until TEXT");
+    }
+
+    // The webhook channel's signing secret (roadmap 3.16). Seeding only covers
+    // a fresh database, so an existing installation is given the *field* here —
+    // the variable it names may well not be set, and an unset secret is an
+    // unsigned request, exactly as before.
+    const webhook = db.prepare("SELECT config FROM channels WHERE id = 'webhook'").get() as
+      | { config: string }
+      | undefined;
+    if (webhook !== undefined) {
+      const config = JSON.parse(webhook.config) as Record<string, string>;
+      if (config["secretEnv"] === undefined) {
+        db.prepare("UPDATE channels SET config = ? WHERE id = 'webhook'").run(
+          JSON.stringify({ ...config, secretEnv: "WEBHOOK_SECRET" }),
+        );
+      }
     }
   }
 

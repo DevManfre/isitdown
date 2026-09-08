@@ -133,9 +133,14 @@ const CHANNEL_NAME_KEYS: Record<string, string> = {
   webpush: "channel.name.webpush",
 };
 
-/** Configured means every environment variable the channel needs resolves. */
+/**
+ * Configured means every environment variable the channel *needs* resolves. An
+ * optional credential — the webhook's signing secret — is offered to every
+ * installation and set by few, so counting it would report a perfectly working
+ * channel as incomplete.
+ */
 const isConfigured = (channel: DescribedChannel): boolean =>
-  channel.fields.every((field) => field.isSet);
+  channel.fields.every((field) => field.isSet || field.optional === true);
 
 /**
  * Active first, then configured but off, then anything whose environment is
@@ -320,9 +325,19 @@ export function ChannelRow({
                 <Label htmlFor={valueId}>{field.name}</Label>
                 <span
                   className="font-mono text-xs"
-                  style={{ color: field.isSet ? "var(--status-operational)" : "var(--status-degraded)" }}
+                  style={{
+                    color: field.isSet
+                      ? "var(--status-operational)"
+                      : field.optional === true
+                        ? "var(--color-muted-foreground)"
+                        : "var(--status-degraded)",
+                  }}
                 >
-                  {field.isSet ? t("channel.env-set") : t("channel.env-missing")}
+                  {field.isSet
+                    ? t("channel.env-set")
+                    : field.optional === true
+                      ? t("channel.env-optional")
+                      : t("channel.env-missing")}
                 </span>
               </div>
               <div className="flex items-center gap-2">

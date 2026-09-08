@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { diff } from "../../src/core/diffEngine.ts";
+import { confirmedChanges, diff, signatureOf } from "../../src/core/diffEngine.ts";
 import type {
   ComponentStatus,
   Incident,
@@ -319,4 +319,129 @@ test("monitoring keeps reporting normally once the window is over", () => {
   const next = snap("degraded", [], [], []);
 
   assert.equal(diff(previous, next)[0]?.kind, "status_change");
+});
+
+/**
+ * The mute, which is the same rule as a maintenance window with the operator
+ * standing in for the provider (roadmap 5.2).
+ */
+
+test("a mute running when the reading was taken reports nothing", () => {
+  const previous = snap("operational");
+  const next = snap("major_outage", [inc({ id: "i9" })]);
+
+  assert.deepEqual(diff(previous, next, { mutedUntil: "2026-08-19T15:00:00.000Z" }), []);
+});
+
+test("a mute that ended before the reading reports normally again", () => {
+  const previous = snap("operational");
+  const next = snap("degraded");
+
+  // The reading is stamped 14:05; the mute ran out at 14:00.
+  assert.equal(diff(previous, next, { mutedUntil: "2026-08-19T14:00:00.000Z" })[0]?.kind, "status_change");
+});
+
+test("an unparseable mute is no mute, so a bad value cannot silence a provider forever", () => {
+  const changes = diff(snap("operational"), snap("degraded"), { mutedUntil: "whenever" });
+
+  assert.equal(changes[0]?.kind, "status_change");
+});
+
+/** Flap damping (roadmap 2.5), the gate the poller actually calls. */
+
+const undamped = { pending: null, confirmations: 1 };
+
+test("with damping off the gate emits exactly what the table decided", () => {
+  const last = snap("operational");
+  const next = snap("degraded");
+
+  const result = confirmedChanges(next, { ...undamped, baseline: null, last });
+
+  assert.equal(result.changes[0]?.kind, "status_change");
+  assert.equal(result.baseline, next);
+  assert.equal(result.pending, null);
+});
+
+test("a transition is held until the configured number of polls agree", () => {
+  const baseline = snap("operational");
+  const flap = snap("major_outage", [inc({ id: "i9" })]);
+
+  const first = confirmedChanges(flap, { baseline, last: baseline, pending: null, confirmations: 3 });
+  assert.deepEqual(first.changes, []);
+  // The baseline stays put: the next poll has to ask the same question again.
+  assert.equal(first.baseline, baseline);
+  assert.equal(first.pending?.count, 1);
+
+  const second = confirmedChanges(flap, { baseline, last: flap, pending: first.pending, confirmations: 3 });
+  assert.deepEqual(second.changes, []);
+  assert.equal(second.pending?.count, 2);
+
+  const third = confirmedChanges(flap, { baseline, last: flap, pending: second.pending, confirmations: 3 });
+  assert.equal(third.changes[0]?.kind, "status_change");
+  assert.equal(third.baseline, flap);
+  assert.equal(third.pending, null);
+});
+
+test("a reading that disagrees with itself never reaches the operator", () => {
+  const baseline = snap("operational");
+  const flap = snap("major_outage");
+
+  const held = confirmedChanges(flap, { baseline, last: baseline, pending: null, confirmations: 2 });
+  // The page changes its mind: back to what it was, so the streak is spent on
+  // nothing and the baseline was never moved.
+  const back = confirmedChanges(baseline, { baseline, last: flap, pending: held.pending, confirmations: 2 });
+
+  assert.deepEqual(held.changes, []);
+  assert.deepEqual(back.changes, []);
+  assert.equal(back.pending, null);
+});
+
+test("a different reading restarts the streak rather than inheriting it", () => {
+  const baseline = snap("operational");
+  const first = confirmedChanges(snap("degraded"), {
+    baseline, last: baseline, pending: null, confirmations: 3,
+  });
+  const other = confirmedChanges(snap("major_outage"), {
+    baseline, last: baseline, pending: first.pending, confirmations: 3,
+  });
+
+  assert.equal(other.pending?.count, 1);
+  assert.deepEqual(other.changes, []);
+});
+
+test("a store with no baseline of its own damps against the last sample", () => {
+  // What an installation upgrading into damping looks like on its first poll.
+  const last = snap("operational");
+  const result = confirmedChanges(snap("degraded"), {
+    baseline: null, last, pending: null, confirmations: 2,
+  });
+
+  assert.deepEqual(result.changes, []);
+  assert.equal(result.baseline, null);
+  assert.equal(result.pending?.count, 1);
+});
+
+test("a mute keeps the baseline current, so lifting it does not replay the outage", () => {
+  const baseline = snap("operational");
+  const during = snap("major_outage", [inc({ id: "i9" })]);
+
+  const muted = confirmedChanges(during, {
+    baseline, last: baseline, pending: null, confirmations: 1, mutedUntil: "2026-08-19T15:00:00.000Z",
+  });
+
+  assert.deepEqual(muted.changes, []);
+  assert.equal(muted.baseline, during);
+});
+
+test("a signature ignores timestamps and reads incident lifecycle, components and running windows", () => {
+  const one = snap("degraded", [inc({ id: "i1", status: "investigating" })], [comp()], []);
+  const later = {
+    ...snap("degraded", [inc({ id: "i1", status: "investigating" })], [comp()], []),
+    fetchedAt: "2026-08-19T18:00:00.000Z",
+  };
+
+  assert.equal(signatureOf(one), signatureOf(later));
+  assert.notEqual(signatureOf(one), signatureOf(snap("degraded", [inc({ id: "i1", status: "monitoring" })], [comp()])));
+  assert.notEqual(signatureOf(one), signatureOf(snap("degraded", [inc()], [comp({ status: "major_outage" })])));
+  assert.notEqual(signatureOf(one), signatureOf(snap("degraded", [inc()], [comp()], [running])));
 });

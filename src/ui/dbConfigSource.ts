@@ -17,6 +17,7 @@ import type {
 import type { Logger } from "../core/logger.ts";
 import { forgetProvider } from "../core/http.ts";
 import { CATCH_ALL_RULE } from "../core/routing.ts";
+import { isOptionalSetting } from "../notifiers/settings.ts";
 import type { RoutingRule } from "../core/routing.ts";
 
 /**
@@ -54,12 +55,26 @@ const settingsSchema = z.object({
     .catch(true),
   adaptiveIntervalMinutes: z.coerce.number().int().positive().max(1440).catch(1),
   /**
+   * Flap damping (roadmap 2.5): consecutive polls that must agree before a
+   * transition notifies. Off by default — one sample is what every existing
+   * installation has been running on, and turning damping on for them without
+   * being asked would delay alerts they already trust.
+   */
+  confirmSamples: z.coerce.number().int().positive().max(10).catch(1),
+  /**
    * How long history is kept. Four months by default — a month beyond the
    * 90-day view, so a full window is always available — and up to ten years for
    * anyone who wants year-on-year comparisons more than they want the disk.
    */
   retentionDays: z.coerce.number().int().min(7).max(3650).catch(120),
   theme: z.enum(["light", "dark", "system"]).catch("system"),
+  /**
+   * Which zone clock times are rendered in. `auto` — the default — is the
+   * browser's own, which is why the preference is stored as a name rather than
+   * an offset: an offset is wrong twice a year, and "auto" has to stay
+   * per-machine rather than pin every browser to the one that set it.
+   */
+  timeZone: z.string().max(64).catch("auto"),
   uiLocale: localeSchema.catch("en"),
   notificationLocale: localeSchema.catch("en"),
   /**
@@ -90,6 +105,7 @@ const serviceRowSchema = z.object({
   components: z.string().nullable(),
   scope_to_components: z.number(),
   interval_minutes: z.number().nullable(),
+  muted_until: z.string().nullable(),
 });
 
 const removedRowSchema = z.object({
@@ -121,6 +137,8 @@ export interface DescribedField {
   name: string;
   envVar: string;
   isSet: boolean;
+  /** The channel works without it — the dashboard must not read it as missing. */
+  optional: boolean;
 }
 
 export interface DescribedChannel {
@@ -165,7 +183,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -183,13 +201,20 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // "follow the global cadence".
       ...(row.interval_minutes === null ? {} : { intervalMinutes: row.interval_minutes }),
       ...(row.options === null ? {} : { options: JSON.parse(row.options) as Record<string, string> }),
+      // Absent rather than null for the same reason as the interval: the
+      // engine reads "no mute" from the field not being there, and an expired
+      // mute is dropped here so nothing downstream has to know today's date to
+      // tell a live mute from a spent one.
+      ...(row.muted_until === null || Date.parse(row.muted_until) <= Date.now()
+        ? {}
+        : { mutedUntil: row.muted_until }),
     }));
 }
 
 export function insertService(db: DatabaseSync, definition: ServiceDefinition): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -200,6 +225,7 @@ export function insertService(db: DatabaseSync, definition: ServiceDefinition): 
     parsed.components.length === 0 ? null : JSON.stringify(parsed.components),
     parsed.scopeToComponents ? 1 : 0,
     parsed.intervalMinutes ?? null,
+    parsed.mutedUntil ?? null,
     new Date().toISOString(),
   );
 }
@@ -212,7 +238,12 @@ export function insertService(db: DatabaseSync, definition: ServiceDefinition): 
 export const servicePatchSchema = serviceDefinitionSchema
   .partial()
   .omit({ id: true })
-  .extend({ intervalMinutes: z.number().int().positive().max(1440).nullable().optional() });
+  .extend({
+    intervalMinutes: z.number().int().positive().max(1440).nullable().optional(),
+    // Null is how the dashboard lifts a mute early, for the same reason: on a
+    // patch `undefined` already means "leave it alone".
+    mutedUntil: z.string().datetime().nullable().optional(),
+  });
 
 /** Returns false when there was no such service, so a route can answer 404. */
 export function updateService(
@@ -234,6 +265,7 @@ export function updateService(
     columns["scope_to_components"] = parsed.scopeToComponents ? 1 : 0;
   }
   if (parsed.intervalMinutes !== undefined) columns["interval_minutes"] = parsed.intervalMinutes;
+  if (parsed.mutedUntil !== undefined) columns["muted_until"] = parsed.mutedUntil;
   if (Object.keys(columns).length === 0) return exists(db, id);
 
   const assignments = Object.keys(columns)
@@ -578,6 +610,7 @@ export function describeChannels(db: DatabaseSync, env: NodeJS.ProcessEnv): Desc
         name: key.slice(0, -ENV_SUFFIX.length),
         envVar,
         isSet: (env[envVar] ?? "") !== "",
+        optional: isOptionalSetting(channel.id, key.slice(0, -ENV_SUFFIX.length)),
       })),
   }));
 }
@@ -615,8 +648,12 @@ export function createDbConfigSource(
           }
           const name = key.slice(0, -ENV_SUFFIX.length);
           const fromEnv = env[value] ?? "";
-          if (fromEnv === "") missing.push(value);
-          else resolved[name] = fromEnv;
+          // An unset optional credential is not a broken channel: the webhook's
+          // signing secret is offered as a field to every installation, and
+          // most of them will never set it.
+          if (fromEnv === "") {
+            if (!isOptionalSetting(channel.id, name)) missing.push(value);
+          } else resolved[name] = fromEnv;
         }
 
         if (channel.enabled && missing.length > 0) {
@@ -639,6 +676,7 @@ export function createDbConfigSource(
           failureThreshold: settings.failureThreshold,
           adaptivePolling: settings.adaptivePolling,
           adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
+          confirmSamples: settings.confirmSamples,
         }),
         locale: settings.notificationLocale,
         services,

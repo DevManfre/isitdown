@@ -42,6 +42,7 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
   - [3.4 How secrets are handled](#34-how-secrets-are-handled)
   - [3.5 Monitored providers](#35-monitored-providers)
   - [3.6 Notification channels](#36-notification-channels)
+  - [3.7 Notification routing](#37-notification-routing)
 - [4. Docker](#4-docker)
   - [4.1 Images and build targets](#41-images-and-build-targets)
   - [4.2 Compose profiles](#42-compose-profiles)
@@ -208,6 +209,7 @@ maxRetries: 3               # attempts per provider per cycle, with backoff
 failureThreshold: 5         # consecutive failures before a "monitoring degraded" warning
 adaptivePolling: true       # while a provider has an open incident, poll it on the cadence below
 adaptiveIntervalMinutes: 1  # that cadence; never slower than the provider's own interval
+confirmSamples: 1           # consecutive polls that must agree before a change notifies
 locale: en                  # language for notification messages: en | it
 
 services:
@@ -234,6 +236,7 @@ notifications:
   webhook:
     enabled: false
     url: "${WEBHOOK_URL}"
+    secret: "${WEBHOOK_SECRET}"   # optional: signs the request, see 3.6
   discord:
     enabled: false
     webhookUrl: "${DISCORD_WEBHOOK_URL}"
@@ -250,11 +253,47 @@ notifications:
 | `failureThreshold` | `5` | Consecutive failed cycles before one "monitoring degraded" warning. |
 | `adaptivePolling` | `true` | While a provider has an open incident — or any status worse than operational — poll it on `adaptiveIntervalMinutes` instead of its own cadence. `false` leaves every provider on the cadence it was configured with. |
 | `adaptiveIntervalMinutes` | `1` | 1–1440. Taken as a *minimum* against the provider's own interval, so it can only ever watch a provider more closely. A provider that has never answered stays on its configured cadence: `unknown` is not an incident. |
+| `confirmSamples` | `1` | 1–10. Flap damping: how many consecutive polls must agree on a reading before the change is announced. `1` notifies immediately; `2` ignores a page that disagrees with itself for one cycle, at the cost of one poll of delay. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus` and `betterstack` cover those two hosted platforms; `rss` reads any RSS or Atom incident feed; `slack`, `aws`, `gcp` and `azure` read those providers' own shapes. |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus` and `betterstack` cover those two hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes. |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
+| `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
+| `services[].options` | — | Adapter-specific extras. Only the `html` adapter takes any today: `selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists. |
+
+#### The `html` adapter
+
+For the pages that publish no JSON and no feed at all. Give it the page URL, a
+CSS selector for the element whose text says how the provider is, and — when the
+page uses unusual wording — the words that mean what:
+
+```yaml
+  - name: Sorry-hosted provider
+    id: example
+    adapter: html
+    baseUrl: https://status.example.com/
+    options:
+      selector: ".status-banner"
+      operational: "all systems operational, everything is fine"
+      major_outage: "outage, down"
+```
+
+The selector supports tag, `#id`, `.class` and `[attr]` / `[attr="value"]`
+compounds with the descendant and child (`>`) combinators. Anything past that —
+a selector list, a pseudo-class, a sibling combinator — is refused rather than
+silently matching nothing.
+
+Reading markup is fragile by nature, so the failure modes are deliberate:
+
+- a selector that matches nothing **throws**, so a page whose structure moved
+  fails like an unreachable provider (retries, then the monitoring-degraded
+  warning) instead of settling into a reading nobody ordered;
+- text matching no configured word reads `unknown`, never `operational`;
+- the most specific wording wins, so "partial outage on the API, everything else
+  operational" reads as the partial outage;
+- there are no incidents, components or maintenance windows — a page that needed
+  scraping has no structure to read them out of.
 
 Anything invalid stops the container at boot with the reason and the offending
 path — a missing file, malformed YAML, a bad base URL, a duplicate service id, an
@@ -268,11 +307,11 @@ The UI edition mounts **no** `config.yml`; one on disk would be ignored.
 Everything lives in SQLite at `/app/data/isitdown.db` and is edited from
 **Settings** in the dashboard (or through [`/config`](#6-http-api)):
 
-- polling interval, request timeout, retries
+- polling interval, request timeout, retries, flap damping
 - the service list — add, edit, remove
 - which notification channels are enabled, which environment variable carries
   each credential, and — write-only — the credential itself
-- theme, dashboard language, notification language
+- theme, dashboard language, notification language, time zone
 
 Writes take effect on the **next poll cycle**, with no restart, because the
 scheduler re-reads its configuration every pass. A fresh database is seeded with
@@ -288,6 +327,7 @@ list is never overwritten afterwards.
 | `WEBHOOK_URL` | both | — | Where the generic webhook POSTs. Required if that channel is enabled. |
 | `DISCORD_WEBHOOK_URL` | both | — | Discord incoming webhook. Required if the Discord channel is enabled. |
 | `SLACK_WEBHOOK_URL` | both | — | Slack incoming webhook. Required if the Slack channel is enabled. |
+| `WEBHOOK_SECRET` | both | — | Optional shared secret for the generic webhook. Set it and every request is signed (see [3.6](#36-notification-channels)); leave it unset and requests go out unsigned, exactly as before. |
 | `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Where to read `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Where to keep the state file. |
@@ -621,6 +661,21 @@ the rendered text or route on the structured fields:
   "message": "🔴 Cloudflare — MAJOR OUTAGE\n\nStatus changed from Operational to Major outage.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.cloudflarestatus.com"
 }
 ```
+
+**Signing.** Set `WEBHOOK_SECRET` (or `webhook.secret` in `config.yml`) and each
+request carries two extra headers:
+
+```
+X-IsItDown-Timestamp: 2026-08-19T14:32:07.000Z
+X-IsItDown-Signature: sha256=<hex>
+```
+
+The signature is HMAC-SHA256 over `` `${timestamp}.${body}` `` with the secret as
+the key, computed on the exact bytes that were sent. Verify it by recomputing the
+same string from the raw body — not from a re-serialised parse — and comparing in
+constant time; the timestamp is inside the signed material so a receiver can also
+reject a request that is too old to be genuine. With no secret set nothing is
+added, so an existing receiver keeps working untouched.
 
 Desktop (Web Push) is UI edition only, and the browser Push API refuses to
 register a service worker unless the dashboard is served over localhost or HTTPS.
@@ -1096,10 +1151,13 @@ back reports a parse failure instead of the real problem.
 | `DELETE` | `/config/channels/:id/secrets/:field` | Forget a saved value. `409` if the variable came from the container's environment instead. |
 | `POST` | `/config/services/:id/test` | One live fetch against that provider. Records nothing. |
 | `POST` | `/config/channels/:id/test` | One test notification, through the dispatcher. |
-| `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale }`. |
+| `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale, mapView, timeZone }`. `timeZone` is `auto` — this browser's own — or an IANA name; anything the runtime cannot format a date in is refused. |
 | `POST` | `/poll` | Run a cycle now, through the scheduler. Returns the cycle summary. |
 | `GET` | `/events` | Server-sent events, one long-lived response per open tab. `hello` on connect (`lastPollAt`, `nextPollAt`, `serverNow`), then `cycle` as each cycle finishes (`finishedAt`, `providers`, `failed`, `changedProviders` — no deadline: the scheduler re-arms after the event, so the fresh one comes with the re-read). The stream is a courier, not a source of truth: it says what changed, and the dashboard re-reads it. Not JSON — see [6.3](#63-live-updates). |
 | `GET` | `/metrics` | Prometheus exposition. The one non-JSON endpoint — see [6.2](#62-prometheus-metrics). |
+| `GET` | `/badge.svg` | An SVG badge for the whole fleet: the worst reading anything is showing. Not JSON — see [6.4](#64-badges-and-the-widget-summary). |
+| `GET` | `/badge/:providerId.svg` | The same for one provider. `404` (still as a badge) when nothing knows that id. |
+| `GET` | `/widget` | One flat summary object for a homelab dashboard's custom-API widget — see [6.4](#64-badges-and-the-widget-summary). |
 | `GET` | `/` | The dashboard. |
 
 ### 6.1 History backfill
@@ -1206,6 +1264,45 @@ Behind a reverse proxy, the stream needs buffering off (the response sends
 which is written every 20 seconds.
 
 ---
+
+### 6.4 Badges and the widget summary
+
+Two read-only endpoints aimed outward rather than at the dashboard.
+
+`GET /badge/github.svg` renders a flat badge — the provider's name, its current
+reading, and the colour that goes with it — for pasting into a README:
+
+```markdown
+![GitHub](http://localhost:3000/badge/github.svg)
+```
+
+`GET /badge.svg` does the same for the fleet, reporting the worst reading
+anything is showing. Both are drawn here rather than fetched from shields.io, so
+an instance with no outbound internet access still serves them, and both are
+`Cache-Control: max-age=60` — long enough that a popular README is not a load
+generator, short enough that a badge is not still green an hour into an outage.
+A provider that has never been polled reads `unknown`, in grey: never green.
+
+`GET /widget` answers the shape `homepage` and Dashy expect from a custom API
+widget — counts and one word, no nested history:
+
+```json
+{
+  "status": "major_outage",
+  "providers": 4,
+  "operational": 2,
+  "degraded": 1,
+  "down": 1,
+  "unknown": 0,
+  "muted": 1,
+  "incidents": 2,
+  "lastPollAt": "2026-08-19T14:32:07.000Z",
+  "retentionDays": 120
+}
+```
+
+Neither endpoint contacts a provider and neither records anything: both are
+reads of stored state, which is what makes them safe to poll often.
 
 ## 7. How it works
 
@@ -1333,6 +1430,22 @@ cases get added as rows rather than as one-off tests.
 | no window running | a declared window starts | yes — `maintenance_started` |
 | a window running | the same window ends | yes — `maintenance_ended`, naming the status the provider came out in |
 | a window running | anything else changes upstream (status, components, incidents) | **no** — suppressed until the window ends |
+| a mute is running (`mutedUntil` in the future) | anything | **no** — the operator said they already know; polling and recording carry on |
+| `confirmSamples: N` | a change seen fewer than N polls in a row | **no**, *yet* — the baseline is held, so the same change is announced once N polls agree |
+| `confirmSamples: N` | a change that reverts before N polls agree | **no**, ever — a page disagreeing with itself was never news |
+
+**Mute** is the same rule with the operator standing in for the provider: it is
+an input to the diff engine rather than a filter on the way out, which is why a
+muted provider shows a badge on the dashboard instead of just going quiet. A mute
+also keeps the notification baseline current, so lifting it does not replay what
+happened while it ran.
+
+**Flap damping** (`confirmSamples`) moves the *notification baseline*
+independently of the samples: readings keep being recorded every poll, so the
+dashboard always says what the page says right now, while the baseline stays put
+until a change has been seen the configured number of polls in a row. A real
+outage therefore costs at most `confirmSamples - 1` polls of delay, and a
+one-cycle disagreement costs nothing at all.
 
 **Suppression rule**: while any maintenance window a provider declared is
 running, nothing else about that provider is news — a status change, a new or
@@ -1704,6 +1817,7 @@ mode.
 ```bash
 npm test                 # node:test suites + vitest run
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
+npm run test:visual      # visual baselines: every view, both themes, both locales
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
 npm run build:light      # tsc + copy assets, excluding src/ui
 npm run build:ui         # tsc + vite build + copy assets
@@ -1735,6 +1849,20 @@ Notable suites:
   straight into JSX — a heuristic, knowingly weaker than the exact text-node scan
   it replaced, since JSX gives no parse-free way to tell a translated expression
   from a literal.
+- **Visual regression** — every view screenshotted in both themes and both
+  locales against a fixed fleet and a frozen clock, then compared with the
+  agreed baselines under `test/visual/baseline/`. The comparison runs on an 8×
+  downscale of both frames, which is what lets one set of baselines hold on more
+  than one machine: font rasterisation is not portable, and the same page on a CI
+  runner differs from the same page locally on up to 1.5% of its pixels along the
+  edges of text alone. Averaging that away leaves the two criteria that matter —
+  how many cells moved (a layout change) and how many changed colour outright (a
+  token change) — with limits measured against both the cross-machine noise and
+  real regressions rather than guessed. Chromium comes from Playwright's own
+  cache and is driven over the DevTools protocol, so nothing imports the package
+  and it stays out of `package.json`. Run
+  `node tools/visual-regression.mjs --update` to agree to an intended change, and
+  `--only=<view>` while iterating on one.
 - **End to end** — a fake provider and a webhook receiver: a transition delivers
   exactly one notification, an unchanged cycle none, a restart none, an unreachable
   provider keeps its last known state, and the entrypoint stays alive between cycles

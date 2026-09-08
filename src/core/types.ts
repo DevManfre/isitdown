@@ -118,6 +118,16 @@ export interface StatusChange {
   at: string;
 }
 
+/**
+ * A reading seen but not yet believed, carried between polls by the state
+ * store: the signature of the reading and how many consecutive polls agreed on
+ * it. Flap damping is the only thing that reads it — see `confirmedChanges`.
+ */
+export interface DampingState {
+  signature: string;
+  count: number;
+}
+
 export interface NotificationPayload {
   change: StatusChange;
   service: {

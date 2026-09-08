@@ -151,6 +151,7 @@ test("polling schema fills every default", () => {
     maxRetries: 3,
     failureThreshold: 5,
     adaptivePolling: true,
+    confirmSamples: 1,
     adaptiveIntervalMinutes: 1,
   });
 });
