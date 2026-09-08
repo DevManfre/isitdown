@@ -24,7 +24,8 @@ type FixtureKey =
   | "map"
   | "preferences"
   | "maintenances"
-  | "serviceImpact";
+  | "serviceImpact"
+  | "adapterDebug";
 
 export interface Fixtures {
   status?: unknown;
@@ -43,6 +44,8 @@ export interface Fixtures {
   serviceImpact?: unknown;
   /** `/config/storage`, matched before `/config` — the retention cost report. */
   storage?: unknown;
+  /** `/debug/adapters` — the adapter diagnostics panel's recent reads. */
+  adapterDebug?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -86,6 +89,8 @@ export function stubApi(fixtures: Fixtures): void {
                         ? "storage"
                         : path.startsWith("/config")
                         ? "config"
+                        : path.startsWith("/debug/adapters")
+                          ? "adapterDebug"
                         : path.startsWith("/map")
                           ? "map"
                           : path.startsWith("/api/preferences")
