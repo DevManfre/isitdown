@@ -514,7 +514,13 @@ test("a manual poll re-arms, so the next automatic cycle is a full interval afte
 });
 
 test("no cycle runs before the deadline the dashboard is counting down to", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+  // Date is mocked here, unlike most tests above, because this one compares a
+  // tick against `nextRunAt()` — which the scheduler derives from `Date.now()`
+  // when it arms. With a real clock the milliseconds spent awaiting between
+  // the arm and the measurement shrink `deadline - Date.now()` below the
+  // timer's remaining delay, the final tick(1) lands short, and no cycle runs:
+  // a failure that only appears on a machine slow enough to drift.
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
   // Each arm() draws once. A fixed draw hides a leaked timer, because both
   // copies then land on the same millisecond and the second joins the first.
   const draws = [0.5, 0, 1];
