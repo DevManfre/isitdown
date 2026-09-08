@@ -1,8 +1,16 @@
 import { Router } from "express";
 import { z } from "zod";
 import { getAdapter } from "../../adapters/index.ts";
-import { pollingSchema, routingRulesSchema, serviceDefinitionSchema } from "../../core/config.schema.ts";
 import {
+  alertCapSchema,
+  digestSchema,
+  pollingSchema,
+  quietHoursSchema,
+  routingRulesSchema,
+  serviceDefinitionSchema,
+} from "../../core/config.schema.ts";
+import {
+  deliveryOf,
   describeChannels,
   describeRouting,
   describeServiceImpact,
@@ -26,11 +34,28 @@ import { storageReport } from "../storageReport.ts";
 import { ensureVapidKeys } from "../vapidKeys.ts";
 
 const previewComponentsSchema = serviceDefinitionSchema.pick({ adapter: true, baseUrl: true });
+
+/**
+ * The delivery policy, patchable a field at a time. Partial at every level
+ * because the dashboard's rows apply instantly and one at a time: sending the
+ * whole policy to change a floor would write back four values the operator did
+ * not touch, and race their own next keystroke.
+ */
+const deliveryPatchSchema = z.object({
+  quietHours: quietHoursSchema.partial().optional(),
+  digest: digestSchema.partial().optional(),
+  cap: alertCapSchema.partial().optional(),
+  updateInPlace: z.boolean().optional(),
+});
+
 const settingsPatchSchema = pollingSchema
   .partial()
   // Retention is not a polling field and lives only in this edition: the Light
   // edition prunes nothing, so the shared schema has no business knowing it.
-  .extend({ retentionDays: z.number().int().min(7).max(3650).optional() });
+  .extend({
+    retentionDays: z.number().int().min(7).max(3650).optional(),
+    delivery: deliveryPatchSchema.optional(),
+  });
 const channelPatchSchema = z.object({
   enabled: z.boolean().optional(),
   fields: z.record(z.string()).optional(),
@@ -54,6 +79,32 @@ const subscriptionSchema = z.object({
   }),
   label: z.string().min(1).max(80),
 });
+
+/**
+ * The delivery policy patch, flattened onto the setting rows that store it.
+ * One row per field rather than a JSON blob, so an unreadable value falls back
+ * on its own instead of taking the whole policy with it — see the read side in
+ * `dbConfigSource`.
+ */
+function deliveryPatch(
+  patch: z.infer<typeof deliveryPatchSchema> | undefined,
+): Record<string, unknown> {
+  if (patch === undefined) return {};
+  const { quietHours, digest, cap, updateInPlace } = patch;
+  return {
+    ...(quietHours?.enabled === undefined ? {} : { quietHoursEnabled: quietHours.enabled }),
+    ...(quietHours?.start === undefined ? {} : { quietHoursStart: quietHours.start }),
+    ...(quietHours?.end === undefined ? {} : { quietHoursEnd: quietHours.end }),
+    ...(quietHours?.timeZone === undefined ? {} : { quietHoursTimeZone: quietHours.timeZone }),
+    ...(quietHours?.minSeverity === undefined ? {} : { quietHoursMinSeverity: quietHours.minSeverity }),
+    ...(digest?.enabled === undefined ? {} : { digestEnabled: digest.enabled }),
+    ...(digest?.windowMinutes === undefined ? {} : { digestWindowMinutes: digest.windowMinutes }),
+    ...(digest?.immediateFloor === undefined ? {} : { digestImmediateFloor: digest.immediateFloor }),
+    ...(cap?.enabled === undefined ? {} : { alertCapEnabled: cap.enabled }),
+    ...(cap?.maxPerHour === undefined ? {} : { alertCapPerHour: cap.maxPerHour }),
+    ...(updateInPlace === undefined ? {} : { updateInPlace }),
+  };
+}
 
 const issues = (error: z.ZodError): string =>
   error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
@@ -88,6 +139,11 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         confirmSamples: settings.confirmSamples,
       },
       retention: { days: settings.retentionDays },
+      // Quiet hours, the digest window, the per-provider cap and whether an
+      // incident's updates edit one message. Read through the same helper the
+      // config source uses, so what the dashboard shows is what the dispatcher
+      // is running on.
+      delivery: deliveryOf(settings),
       channels: describeChannels(db, runtime.env),
       routing: describeRouting(db, runtime.logger),
       // Removed but still restorable. Part of the config payload rather than a
@@ -208,6 +264,9 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       res.status(404).json({ error: { message: `unknown service: ${req.params.id}` } });
       return;
     }
+    // The provider is gone, so are its diagnostics: probes for an id nothing
+    // polls any more would sit in memory until the process ends.
+    runtime.adapterDebug.forget(req.params.id);
     res.json({ purged: req.params.id });
   });
 
@@ -234,9 +293,11 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         : { adaptiveIntervalMinutes: parsed.data.adaptiveIntervalMinutes }),
       ...(parsed.data.confirmSamples === undefined ? {} : { confirmSamples: parsed.data.confirmSamples }),
       ...(parsed.data.retentionDays === undefined ? {} : { retentionDays: parsed.data.retentionDays }),
+      ...deliveryPatch(parsed.data.delivery),
     });
     const settings = readSettings(db, runtime.logger);
     res.json({
+      delivery: deliveryOf(settings),
       polling: {
         intervalMinutes: settings.pollIntervalMinutes,
         requestTimeoutSeconds: settings.requestTimeoutSeconds,
