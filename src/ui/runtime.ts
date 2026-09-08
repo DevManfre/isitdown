@@ -11,6 +11,7 @@ import { createScheduler, type Scheduler } from "../core/scheduler.ts";
 import { createWebPushNotifier } from "../notifiers/webpush.notifier.ts";
 import { buildNotifiers } from "../notifiers/index.ts";
 import { createApp } from "./app.ts";
+import { createAdapterDebugStore, type AdapterDebugStore } from "./adapterDebug.ts";
 import { createBackfillService, type BackfillService } from "./backfill.ts";
 import {
   createDbConfigSource,
@@ -68,6 +69,11 @@ export interface UiRuntimeCore {
   /** The push channel behind `GET /events`; published to as each cycle finishes. */
   live: LiveEvents;
   pushSubscriptions: SqlitePushSubscriptionStore;
+  /**
+   * The last few adapter outcomes per provider, behind `GET /debug/adapters`
+   * (roadmap 5.18). In memory: diagnostics for the run in front of you.
+   */
+  adapterDebug: AdapterDebugStore;
   /**
    * The shared registry cannot build `webpush` on its own: that channel needs the
    * device list, which only this edition has. Composed once here so the scheduler
@@ -151,8 +157,14 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     store,
     listEnabledServices: () => listServices(db).filter((service) => service.enabled),
   });
+  const adapterDebug = createAdapterDebugStore();
+
   const dispatcher = createDispatcher({
     logger,
+    // Where the id of the message already sent about an incident lives, so the
+    // next update can edit it rather than add another (roadmap 3.19). The same
+    // store as everything else: the references cascade with the provider.
+    messageRefs: store,
     // What the dashboard's notification feed is built from, and — since every
     // outbound message passes here — what the delivery counters count.
     onSent: (record) => {
@@ -171,6 +183,10 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     onCycle: (result) => {
       lastCycle = result;
       metrics.recordCycle(result);
+      // Recorded next to the metrics and for the same reason: both are read
+      // from a page rather than from the logs, and the debug panel is the one
+      // that says *why* a read failed.
+      adapterDebug.recordCycle(result);
       // Published after the metrics are recorded and `lastCycle` is set, so a
       // client that re-reads the moment it hears about the cycle cannot be
       // answered with the previous one's numbers.
@@ -239,6 +255,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     metrics,
     live,
     pushSubscriptions,
+    adapterDebug,
     buildNotifiers: buildAllNotifiers,
     mapLane,
     logger,
