@@ -104,6 +104,25 @@ export async function withBrowser(options, body) {
       "--force-prefers-reduced-motion",
       "--force-device-scale-factor=1",
       "--font-render-hinting=none",
+      // Only our own server and the font CDN may answer. The provider tiles ask
+      // each provider's own domain for a favicon and fall back to DuckDuckGo's
+      // icon service (see faviconCandidates), so a run with the internet
+      // reachable bakes third-party bytes into the baseline: the tile draws
+      // whichever icon that CDN served, at whichever size, and draws the
+      // three-letter label when it served nothing in time. That is a baseline
+      // that changes when someone else's icon does, and it is what made the
+      // overview shot flap between two stable images. Resolving those hosts to
+      // nothing makes the label the only outcome.
+      //
+      // fonts.googleapis.com and fonts.gstatic.com stay reachable because
+      // index.html loads Inter and JetBrains Mono from them: blocking those too
+      // renders every view in whatever fallback face the machine happens to
+      // have, which differs between a laptop and a CI runner — a far worse
+      // baseline than the favicons ever were. Serving the two families from our
+      // own bundle would end that dependency; until then they are fetched here
+      // exactly as an operator's browser fetches them.
+      "--host-resolver-rules=MAP * ~NOTFOUND," +
+        " EXCLUDE 127.0.0.1, EXCLUDE fonts.googleapis.com, EXCLUDE fonts.gstatic.com",
       // Sandbox off: this runs in containers and CI as a non-root user with no
       // user namespaces, where the sandbox cannot start at all. The only page
       // it ever loads is our own server on localhost.
