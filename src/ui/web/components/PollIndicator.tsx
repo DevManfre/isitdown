@@ -35,13 +35,21 @@ export function PollIndicator() {
   const minutesLeft = secondsLeft === null ? 0 : Math.floor(secondsLeft / 60);
   const remainderSeconds = secondsLeft === null ? 0 : secondsLeft % 60;
 
-  const label = polling
-    ? t("meta.polling")
-    : secondsLeft === null
-      ? t("meta.never-polled")
-      : minutesLeft > 0
-        ? t("meta.countdown", { minutes: minutesLeft, seconds: remainderSeconds })
-        : t("meta.countdown-seconds", { seconds: remainderSeconds });
+  // Undefined status is "the read has not answered", not "answered, and there
+  // is no deadline". Saying "not polled yet" for it claimed something about
+  // the server on every visit before /status landed, and kept claiming it when
+  // the read failed. The line is reserved rather than removed so the header
+  // keeps its height while there is nothing to put in it.
+  const label =
+    status === undefined
+      ? null
+      : polling
+        ? t("meta.polling")
+        : secondsLeft === null
+          ? t("meta.never-polled")
+          : minutesLeft > 0
+            ? t("meta.countdown", { minutes: minutesLeft, seconds: remainderSeconds })
+            : t("meta.countdown-seconds", { seconds: remainderSeconds });
 
   return (
     <div className="header-poll flex items-center gap-4">
@@ -56,7 +64,7 @@ export function PollIndicator() {
             </span>
           )}
         </span>
-        <span className="flex items-center gap-1.5">
+        <span className="flex min-h-5 items-center gap-1.5">
           <span
             className={cn("poll-next-dot size-1.5 rounded-full bg-primary", polling && "dot-pulse")}
           />

@@ -35,6 +35,11 @@ export function Header({ view }: { view: string }) {
   const { data: status } = useStatusChrome();
   const savePreferences = usePreferencesMutation();
 
+  // Undefined status is "the read has not answered", which is not the same
+  // claim as an answer whose lastPollAt is null — collapsing the two put a
+  // "not polled yet" the server had never said under the title on every
+  // visit, and left it there for good when the read failed. The span stays,
+  // with the line it will fill reserved, so the header keeps its height.
   const lastSeen = status?.lastPollAt ?? null;
   // theme.mode's template needs {mode}; an empty call would leak the raw
   // "{mode} mode" placeholder into the aria-label instead of "Light mode".
@@ -45,11 +50,15 @@ export function Header({ view }: { view: string }) {
     <header className="header flex items-center justify-between gap-4 border-b border-border px-8 py-4">
       <div className="header-title flex flex-col">
         <h1 className="text-lg font-medium">{t(TITLE_KEYS[view] ?? "nav.overview")}</h1>
-        <span className="header-meta text-xs text-muted-foreground">
-          {lastSeen === null
-            ? t("meta.never-polled")
-            : t("meta.interval", { minutes: status?.pollIntervalMinutes ?? 0 })}
-          {lastSeen !== null && ` · ${formatRelative(i18n.language, lastSeen)}`}
+        <span className="header-meta min-h-4 text-xs text-muted-foreground">
+          {status !== undefined && (
+            <>
+              {lastSeen === null
+                ? t("meta.never-polled")
+                : t("meta.interval", { minutes: status.pollIntervalMinutes })}
+              {lastSeen !== null && ` · ${formatRelative(i18n.language, lastSeen)}`}
+            </>
+          )}
         </span>
       </div>
 
