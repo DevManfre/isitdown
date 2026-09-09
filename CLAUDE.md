@@ -203,6 +203,7 @@ This repo ships with Claude Code skills under `.claude/skills/` tailored to recu
 - `ui-dashboard-charts` — implement status-page-style uptime charts/timeline in the UI edition dashboard, consistent with the Claude Design prototypes.
 - `shadcn-components` — add or modify a shadcn/ui primitive and wire it into the theme correctly.
 - `i18n-strings` — every user-facing string goes in an English source catalog and gets translated; no literals in code.
+- `readme-translation-sync` — an edit to `README.md` lands in `README.it.md` in the same pass, section for section.
 - `git-commit-style` — write commit messages in the required `<emoji> <TITLE> - <description>` format.
 - `release-flow` — ship a release: push `dev`, gate on CI, bump the version, `mergeclean` into `main`, tag, verify the published images.
 - `writing-code` — write or modify production code (read neighbours first, exact scope, match conventions).
