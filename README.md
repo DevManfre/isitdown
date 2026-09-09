@@ -67,8 +67,8 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
 - [8. Theming and localisation](#8-theming-and-localisation)
   - [8.1 Themes](#81-themes)
   - [8.2 Localisation](#82-localisation)
-- [9. Development](#9-development)
   - [8.3 Accessibility](#83-accessibility)
+- [9. Development](#9-development)
   - [9.1 Repo structure](#91-repo-structure)
   - [9.2 Tech stack](#92-tech-stack)
   - [9.3 Live development](#93-live-development)
@@ -398,8 +398,6 @@ entry with `adapter: statuspage`. Verified:
 `status.anthropic.com` issues a 301 to `status.claude.com`. The adapter follows
 redirects so either works; the canonical host avoids the extra hop.
 
-The provider's own `status.indicator` maps onto the internal severity model:
-
 The UI edition also ships a **bundled catalog** of well-known providers (roadmap
 5.11): the add dialog opens on a menu of names, and one pick fills in the
 adapter, the base URL and the id. Every entry in `src/adapters/catalog.ts` was
@@ -410,6 +408,8 @@ and broken — for those, and for anything else the list does not have, paste th
 URL and let detection (`POST /config/services/detect`) name the adapter. An entry already
 watched stays in the menu, marked, rather than disappearing from it. Served as
 `GET /config/catalog`.
+
+The provider's own `status.indicator` maps onto the internal severity model:
 
 | Statuspage indicator | IsItDown status |
 |---|---|
@@ -800,19 +800,6 @@ The Light edition configures all four as the `delivery` block above; the UI
 edition edits them under **Settings → Delivery**, where each row applies on its
 own without a restart.
 
----
-
-## 4. Docker
-
-### 4.1 Images and build targets
-
-One `Dockerfile`, four stages. `builder` compiles everything once; `light` and
-`ui` are the two shipped runtime images; `dev` exists only for
-[live development](#93-live-development) and is never built by
-`docker compose --profile ui up`.
-
-```
-builder  node:24-alpine   npm ci (incl. devDependencies), tsc, vite build, copy non-TS assets into dist
 ### 3.9 Validating a `config.yml` — the `check` command
 
 Validating a file by starting the container and reading its logs tells you about
@@ -824,6 +811,7 @@ node dist/light/check.js ./config.yml
 #   ./config.yml is valid — 4 services (3 enabled), channels: telegram, file only, no provider read
 
 docker exec isitdown-light node dist/light/check.js; echo "exit=$?"
+#   /app/config/config.yml is valid — 4 services (4 enabled), channels: telegram, ...
 #   exit=0
 ```
 
@@ -851,6 +839,18 @@ defensible choice for a page that also serves a Statuspage summary.
 `--probe` reads each enabled provider's page (disabled ones are left alone, since
 the file already says to) and asks which adapter recognises it, using the same
 detection the UI edition's add-provider form uses. It is off by default: a check
+that reaches the network is not something CI can depend on, and every other
+finding above is answerable from the file alone.
+
+Exit codes: `0` valid, `1` at least one error, `2` the command itself was called
+wrong (unknown option, two paths). That makes it CI-able for the operator rather
+than only for us:
+
+```yaml
+- run: docker run --rm -v ./config.yml:/app/config/config.yml:ro \
+    ghcr.io/devmanfre/isitdown:light-latest node dist/light/check.js
+```
+
 ### 3.10 Provider groups — "my stack"
 
 A flat fleet answers "is GitHub healthy" and never "is my deploy path healthy",
@@ -905,18 +905,6 @@ One `Dockerfile`, four stages. `builder` compiles everything once; `light` and
 
 ```
 builder  node:24-alpine   npm ci (incl. devDependencies), tsc, vite build, copy non-TS assets into dist
-that reaches the network is not something CI can depend on, and every other
-finding above is answerable from the file alone.
-
-Exit codes: `0` valid, `1` at least one error, `2` the command itself was called
-wrong (unknown option, two paths). That makes it CI-able for the operator rather
-than only for us:
-
-```yaml
-- run: docker run --rm -v ./config.yml:/app/config/config.yml:ro \
-    ghcr.io/devmanfre/isitdown:light-latest node dist/light/check.js
-```
-
 light    node:24-alpine   prod deps + dist/{core,adapters,notifiers,light}
                           VOLUME /app/config /app/data · no EXPOSE · no server
 dev      FROM builder     keeps devDependencies · vite build --watch + node --watch · tagged isitdown:dev only
@@ -1318,10 +1306,17 @@ back reports a parse failure instead of the real problem.
 | `GET` | `/history?provider=&days=` | Pre-aggregated daily buckets, 7/30/90-day uptime, month columns. `days` accepts `7`, `30` or `90`; anything else is a 400 naming them. Without `provider`, a summary across all of them. |
 | `GET` | `/incidents?provider=&state=&q=&days=&page=&pageSize=` | One page of the incident list: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` is `all` (default), `active` or `resolved`; `q` searches incident names, case-insensitively, and `days` keeps only incidents that started within that window (both narrow the page **and** the counts); `pageSize` defaults to 20 and is capped at 100. A nonsense `page`, `pageSize`, `state`, `q` or `days` falls back to the first page of everything rather than a 400. `counts` carries all three states whatever the filter, and `active` is the open list the dashboard's hero card shows on every page — outside the search, so a card cannot vanish while the operator types. |
 | `GET` | `/incidents/:providerId/:incidentId` | Detail: the incident, the observed timeline, the action log of what was sent, the provider's other open incidents, and the last 24 polls. |
+| `GET` | `/export/incidents.csv?provider=&state=&q=&days=` | The incident search's own result as a download — the same filters `/incidents` takes, without paging: `provider_id,incident_id,name,impact,status,started_at,updated_at,resolved_at`. RFC 4180, so a name carrying a comma, a quote or a newline stays one field. Capped at 20 000 rows; a capped export answers with `X-IsItDown-Truncated: true` rather than looking complete. |
+| `GET` | `/export/incidents.json?provider=&state=&q=&days=` | The same rows as `{ generatedAt, filter, count, truncated, incidents }` — `filter` echoes what the export was taken with, so a file found later still says what it is. |
+| `GET` | `/export/history.csv?provider=&days=` | Uptime history as one row per provider per day: `provider_id,day,worst_status,uptime_pct`. `days` accepts `7`, `30` or `90`, like `/history`; `provider` narrows to one (`404` on an unknown id), and without it, every enabled provider. |
+| `GET` | `/export/history.json?provider=&days=` | The same window as `{ generatedAt, days, providers }`, each provider carrying the buckets, the daily series and the window's percentages the charts are drawn from. |
 | `GET` | `/maintenances?provider=&days=` | Declared maintenance windows — running, upcoming and past — as `{ maintenances }`. `days` bounds how far back a closed window is still returned (default 90, max 365); `provider` narrows to one. Without `provider`, every enabled provider. |
 | `GET` | `/notifications?limit=` | What was actually sent, newest first. Capped at 200. |
 | `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | One page of the delivery log: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` is `all` (default), `sent` or `failed`; `channel` narrows to one channel; `pageSize` defaults to 25 and is capped at 200. A nonsense `page`, `pageSize` or `state` falls back rather than 400s. `counts` carries every outcome whatever the filter. Each item carries `attempts`: a failed send with more than one is a dead letter. |
 | `GET` | `/config` | Services, polling settings (`adaptivePolling` and `adaptiveIntervalMinutes` included), `retention`, `delivery` (quiet hours, digest, cap, `updateInPlace` — see [3.8](#38-delivery-policy--quiet-hours-digests-caps)), channels, routing, and `removed` — providers taken out but still restorable. Channel credentials appear as variable **names** with an `isSet` flag — never values. |
+| `GET` | `/config/export` | The whole configuration as a Light edition `config.yml`, as a download (roadmap 4.3) — polling, delivery, services, routing and channels. Credentials leave as `${VAR}` references, never values, and `webpush` is skipped: a browser subscription has no meaning in an edition with no browser. The file starts the Light image as it stands. |
+| `POST` | `/config/import` | The same file, read back. Takes the YAML as the request body (`text/yaml`) or as `{ yaml }`. Validated through the Light edition's own file schema before anything is written, so a bad file changes nothing; a literal credential is refused outright. A service the file does not mention is removed the way the dashboard removes one — soft, restorable, history intact — and an absent `routing` block leaves the rules alone. Answers `{ added, updated, removed, channels, routingRules, settings }`. |
+| `GET` | `/config/catalog` | The bundled provider catalog (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Answered from memory — the list ships with the image, so there is no upstream to be down and nothing to keep in sync. `configured` marks an id already watched: the row stays in the menu saying so rather than disappearing from it. Detection stays the path for a page the list does not have. |
 | `POST` | `/config/services` | Add a service. `201`, or `409` on a duplicate id, or `400` naming the invalid field. |
 | `POST` | `/config/services/detect` | Which adapter reads the page at `{ url }`, and the base URL that adapter wants: `{ adapter, baseUrl, probes }`. Tries the shapes IsItDown already reads, in order (Statuspage's `/api/v2/summary.json`, Instatus's `/summary.json`, Better Stack's `/index.json`, then a feed), and recognises the four single-provider adapters by host with no request at all. A page nothing recognised is a `200` with `adapter: null` and the probes it tried — only an unusable URL is a `400`. Records nothing and notifies nothing. |
 | `PATCH` `DELETE` | `/config/services/:id` | Edit, or remove. A removal is a **soft delete**: the provider leaves the dashboard and the poll cycle at once, and the response says how long it stays restorable (`{ removed, removedAt, restoreUntil }`). `404` on an id that is unknown or already removed. |
@@ -1369,17 +1364,10 @@ adapter in between:
 ```yaml
 scrape_configs:
   - job_name: isitdown
-| `GET` | `/config/export` | The whole configuration as a Light edition `config.yml`, as a download (roadmap 4.3) — polling, delivery, services, routing and channels. Credentials leave as `${VAR}` references, never values, and `webpush` is skipped: a browser subscription has no meaning in an edition with no browser. The file starts the Light image as it stands. |
-| `POST` | `/config/import` | The same file, read back. Takes the YAML as the request body (`text/yaml`) or as `{ yaml }`. Validated through the Light edition's own file schema before anything is written, so a bad file changes nothing; a literal credential is refused outright. A service the file does not mention is removed the way the dashboard removes one — soft, restorable, history intact — and an absent `routing` block leaves the rules alone. Answers `{ added, updated, removed, channels, routingRules, settings }`. |
     static_configs:
-| `GET` | `/config/catalog` | The bundled provider catalog (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Answered from memory — the list ships with the image, so there is no upstream to be down and nothing to keep in sync. `configured` marks an id already watched: the row stays in the menu saying so rather than disappearing from it. Detection stays the path for a page the list does not have. |
       - targets: ["isitdown-ui:3000"]
 ```
 
-| `GET` | `/export/incidents.csv?provider=&state=&q=&days=` | The incident search's own result as a download — the same filters `/incidents` takes, without paging: `provider_id,incident_id,name,impact,status,started_at,updated_at,resolved_at`. RFC 4180, so a name carrying a comma, a quote or a newline stays one field. Capped at 20 000 rows; a capped export answers with `X-IsItDown-Truncated: true` rather than looking complete. |
-| `GET` | `/export/incidents.json?provider=&state=&q=&days=` | The same rows as `{ generatedAt, filter, count, truncated, incidents }` — `filter` echoes what the export was taken with, so a file found later still says what it is. |
-| `GET` | `/export/history.csv?provider=&days=` | Uptime history as one row per provider per day: `provider_id,day,worst_status,uptime_pct`. `days` accepts `7`, `30` or `90`, like `/history`; `provider` narrows to one (`404` on an unknown id), and without it, every enabled provider. |
-| `GET` | `/export/history.json?provider=&days=` | The same window as `{ generatedAt, days, providers }`, each provider carrying the buckets, the daily series and the window's percentages the charts are drawn from. |
 Like `/status`, a scrape is a pure read of stored state and never reaches a
 provider, so scraping every 15 seconds costs nothing upstream. Only enabled
 providers are exported: a disabled one has rows in the database but no cycle
@@ -1808,52 +1796,6 @@ Shipping: `en` and `it`. Locale resolution is the stored preference, then `en`.
 > The Italian strings were written alongside the implementation and have not had a
 > native review.
 
----
-
-## 9. Development
-
-### 9.1 Repo structure
-
-```
-isitdown/
-├── src/
-│   ├── core/                          (shared by both editions)
-│   │   ├── types.ts                   NormalizedStatus, Incident, StatusChange, NotificationPayload
-│   │   ├── adapter.interface.ts        ServiceRef, FetchContext, Adapter
-│   │   ├── notifier.interface.ts       Notifier
-│   │   ├── stateStore.interface.ts     ProviderRuntimeState, StateStore
-│   │   ├── configSource.interface.ts   RuntimeConfig, ServiceDefinition, ChannelConfig, ConfigSource
-│   │   ├── config.schema.ts            zod schemas shared by the file loader and the UI's settings writes
-│   │   ├── status.schema.ts            validation for a persisted NormalizedStatus
-│   │   ├── poller.ts                   one cycle: stagger, retry, isolation, failure accounting
-│   │   ├── diffEngine.ts               the sole authority on whether a notification fires
-│   │   ├── notificationDispatcher.ts   the only caller of Notifier.send
-│   │   ├── scheduler.ts                the loop; re-reads config every cycle
-│   │   ├── logger.ts
-│   │   └── i18n/                       notification strings, edition-agnostic
-│   │       ├── index.ts                lookup + en fallback + UTC formatting
-│   │       ├── en.json                 source locale
-│   │       └── it.json
-│   ├── adapters/                      (shared)
-│   │   ├── statuspage.adapter.ts       generic Atlassian Statuspage adapter
-│   │   ├── rss.adapter.ts              generic RSS / Atom incident-feed adapter
-│   │   ├── slack.adapter.ts            Slack's own status API
-│   │   ├── aws.adapter.ts              AWS Health's open-events feed, region-scoped
-│   │   ├── gcp.adapter.ts              Google Cloud's incidents.json, current state and history in one
-│   │   ├── azure.adapter.ts            Azure's status feed, with its own closure vocabulary
-│   │   ├── severity.ts                 severity read from a provider's own wording
-│   │   └── index.ts                    registry keyed by adapter id
-│   ├── notifiers/                     (shared)
-│   │   ├── groups.ts                   provider groups: the composite status a group reports (§3.10)
-│   │   ├── formatting.ts               emoji, colours, severity labels, message assembly
-│   │   ├── settings.ts                 shared validation for URL-only channel settings
-│   │   ├── telegram.notifier.ts
-│   │   ├── webhook.notifier.ts
-│   │   ├── discord.notifier.ts         incoming webhook, one embed per change
-│   │   ├── slack.notifier.ts           incoming webhook, Block Kit section + button
-│   │   └── index.ts                    registry keyed by channel id
-│   ├── light/                         (Light edition only)
-│   │   ├── index.ts                    entrypoint
 ### 8.3 Accessibility
 
 The dashboard is one operator's console, and that operator may be using a
@@ -1884,8 +1826,56 @@ What is guaranteed, and checked:
   hover travel and pulse in `motion.css`, and the views that animate in
   JavaScript check the same query.
 
+---
+
+## 9. Development
+
+### 9.1 Repo structure
+
+```
+isitdown/
+├── src/
+│   ├── core/                          (shared by both editions)
+│   │   ├── types.ts                   NormalizedStatus, Incident, StatusChange, NotificationPayload
+│   │   ├── adapter.interface.ts        ServiceRef, FetchContext, Adapter
+│   │   ├── notifier.interface.ts       Notifier
+│   │   ├── stateStore.interface.ts     ProviderRuntimeState, StateStore
+│   │   ├── configSource.interface.ts   RuntimeConfig, ServiceDefinition, ChannelConfig, ConfigSource
+│   │   ├── config.schema.ts            zod schemas shared by the file loader and the UI's settings writes
+│   │   ├── status.schema.ts            validation for a persisted NormalizedStatus
+│   │   ├── poller.ts                   one cycle: stagger, retry, isolation, failure accounting
+│   │   ├── groups.ts                   provider groups: the composite status a group reports (§3.10)
+│   │   ├── diffEngine.ts               the sole authority on whether a notification fires
+│   │   ├── notificationDispatcher.ts   the only caller of Notifier.send
+│   │   ├── scheduler.ts                the loop; re-reads config every cycle
+│   │   ├── logger.ts
+│   │   └── i18n/                       notification strings, edition-agnostic
+│   │       ├── index.ts                lookup + en fallback + UTC formatting
+│   │       ├── en.json                 source locale
+│   │       └── it.json
+│   ├── adapters/                      (shared)
+│   │   ├── catalog.ts                  bundled catalog of well-known providers
+│   │   ├── statuspage.adapter.ts       generic Atlassian Statuspage adapter
+│   │   ├── rss.adapter.ts              generic RSS / Atom incident-feed adapter
+│   │   ├── slack.adapter.ts            Slack's own status API
+│   │   ├── aws.adapter.ts              AWS Health's open-events feed, region-scoped
+│   │   ├── gcp.adapter.ts              Google Cloud's incidents.json, current state and history in one
+│   │   ├── azure.adapter.ts            Azure's status feed, with its own closure vocabulary
+│   │   ├── severity.ts                 severity read from a provider's own wording
+│   │   └── index.ts                    registry keyed by adapter id
+│   ├── notifiers/                     (shared)
+│   │   ├── formatting.ts               emoji, colours, severity labels, message assembly
+│   │   ├── settings.ts                 shared validation for URL-only channel settings
+│   │   ├── telegram.notifier.ts
+│   │   ├── webhook.notifier.ts
+│   │   ├── discord.notifier.ts         incoming webhook, one embed per change
+│   │   ├── slack.notifier.ts           incoming webhook, Block Kit section + button
+│   │   └── index.ts                    registry keyed by channel id
+│   ├── light/                         (Light edition only)
+│   │   ├── index.ts                    entrypoint
 │   │   ├── runtime.ts                  wiring, shared with the end-to-end test
 │   │   ├── healthcheck.ts              state-file freshness
+│   │   ├── check.ts                    config.yml validation, CI-able (§3.9)
 │   │   ├── fileStateStore.ts           JSON file, atomic writes
 │   │   └── config/
 │   │       ├── schema.ts               config.yml shape
@@ -1905,6 +1895,7 @@ What is guaranteed, and checked:
 │       ├── secretsFile.ts              credentials saved from the dashboard: 0600 file beside the database, applied to the environment
 │       ├── metrics.ts                  the Prometheus scrape surface: gauges from the store, counters in memory
 │       ├── liveEvents.ts               the push hub behind /events: subscribe, publish, nothing transport-specific
+│       ├── configFile.ts             config.yml export / import (§4.3)
 │       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
 │       ├── geo/                        resolveLocation.ts + the IATA/cloud-region lookup tables it resolves against
@@ -1944,14 +1935,12 @@ What is guaranteed, and checked:
 ├── docker-compose.dev.yml             dev override: UI edition live from src/, Vite watch-builds the bundle
 ├── config.example.yml                 tracked template; config.yml is git-ignored
 ├── .env.example                       secret variable names, never values
-│   │   ├── catalog.ts                  bundled catalog of well-known providers
 ├── .nvmrc  .npmrc                     pins Node 24 and makes an older one fail loudly
 ├── tsconfig.json                      server TypeScript
 ├── tsconfig.light.json                the Light build: excludes src/ui
 ├── tsconfig.web.json                  the dashboard: DOM lib + react-jsx
 ├── vite.config.ts                     bundle, dev proxy, vitest config
 └── components.json                    shadcn CLI config
-│       ├── configFile.ts             config.yml export / import (§4.3)
 ```
 
 Dashboard component and hook tests are colocated under `web/` as `*.test.tsx`,
@@ -1982,7 +1971,6 @@ interfaces instead. A test enforces this, including the edition-only dependencie
 | Container | one multi-stage `Dockerfile` | `--target light` / `--target ui`, `node:24-alpine`. |
 
 Runtime dependencies, exhaustively: `zod`, `yaml` (both editions) and `express`
-│   │   ├── check.ts                    config.yml validation, CI-able (§3.9)
 (UI). Everything the dashboard uses — React, Vite, Tailwind, shadcn/ui's Radix
 primitives, TanStack Query, react-i18next, Recharts and the rest — is a
 devDependency compiled into static assets at build time, so the `ui` image gains

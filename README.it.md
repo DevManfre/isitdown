@@ -67,8 +67,8 @@ server) e **UI** (lo stesso motore più una dashboard locale, configurabile a ru
 - [8. Tema e localizzazione](#8-tema-e-localizzazione)
   - [8.1 Tema](#81-tema)
   - [8.2 Localizzazione](#82-localizzazione)
-- [9. Sviluppo](#9-sviluppo)
   - [8.3 Accessibilità](#83-accessibilità)
+- [9. Sviluppo](#9-sviluppo)
   - [9.1 Struttura del repository](#91-struttura-del-repository)
   - [9.2 Stack tecnologico](#92-stack-tecnologico)
   - [9.3 Sviluppo live](#93-sviluppo-live)
@@ -404,8 +404,6 @@ una voce con `adapter: statuspage`. Verificati:
 `status.anthropic.com` risponde con un 301 verso `status.claude.com`. L'adapter segue
 i redirect, quindi funzionano entrambi; l'host canonico evita il salto in più.
 
-Lo `status.indicator` del provider viene mappato sul modello di severità interno:
-
 L'edizione UI include anche un **catalogo** di provider noti (roadmap 5.11): il
 dialog di aggiunta si apre su un menu di nomi, e una scelta riempie adapter,
 base URL e id. Ogni voce in `src/adapters/catalog.ts` è stata confermata
@@ -415,6 +413,8 @@ automatica (Stripe, GitLab, Zendesk, Okta) sono volutamente assenti invece che
 elencati e rotti — per quelli, e per tutto ciò che la lista non ha, si incolla
 l'URL e si lascia che la detection (`POST /config/services/detect`) nomini l'adapter. Una voce già monitorata
 resta nel menu, segnata, invece di sparire. Servito come `GET /config/catalog`.
+
+Lo `status.indicator` del provider viene mappato sul modello di severità interno:
 
 | Indicator Statuspage | Stato IsItDown |
 |---|---|
@@ -818,18 +818,6 @@ L'edizione Light configura tutti e quattro con il blocco `delivery` sopra;
 l'edizione UI li modifica da **Impostazioni → Consegna**, dove ogni riga si
 applica da sé e senza riavvio.
 
----
-
-## 4. Docker
-
-### 4.1 Immagini e target di build
-
-Un solo `Dockerfile`, quattro stage. `builder` compila tutto una volta sola;
-`light` e `ui` sono le due immagini di runtime distribuite; `dev` esiste solo per
-lo [sviluppo live](#93-sviluppo-live) e non viene mai costruito da
-`docker compose --profile ui up`.
-
-```
 ### 3.9 Validare un `config.yml` — il comando `check`
 
 Validare un file avviando il container e leggendone i log racconta solo il primo
@@ -841,6 +829,7 @@ node dist/light/check.js ./config.yml
 #   ./config.yml is valid — 4 services (3 enabled), channels: telegram, file only, no provider read
 
 docker exec isitdown-light node dist/light/check.js; echo "exit=$?"
+#   /app/config/config.yml is valid — 4 services (4 enabled), channels: telegram, ...
 #   exit=0
 ```
 
@@ -869,6 +858,17 @@ una scelta difendibile per una pagina che pubblica anche un riepilogo Statuspage
 lasciati stare, perché il file lo dice già) e chiede quale adapter la riconosce,
 con la stessa detection usata dal form "aggiungi provider" dell'edizione UI. È
 disattivato per default: un controllo che va in rete non è qualcosa su cui una CI
+possa contare, e ogni altra segnalazione qui sopra si risponde dal solo file.
+
+Codici di uscita: `0` valido, `1` almeno un errore, `2` comando invocato male
+(opzione sconosciuta, due percorsi). Così è CI-abile per chi gestisce l'istanza e
+non solo per noi:
+
+```yaml
+- run: docker run --rm -v ./config.yml:/app/config/config.yml:ro \
+    ghcr.io/devmanfre/isitdown:light-latest node dist/light/check.js
+```
+
 ### 3.10 Gruppi di provider — "il mio stack"
 
 Una flotta piatta risponde a "GitHub sta bene" e mai a "il mio percorso di deploy
@@ -924,17 +924,6 @@ lo [sviluppo live](#93-sviluppo-live) e non viene mai costruito da
 `docker compose --profile ui up`.
 
 ```
-possa contare, e ogni altra segnalazione qui sopra si risponde dal solo file.
-
-Codici di uscita: `0` valido, `1` almeno un errore, `2` comando invocato male
-(opzione sconosciuta, due percorsi). Così è CI-abile per chi gestisce l'istanza e
-non solo per noi:
-
-```yaml
-- run: docker run --rm -v ./config.yml:/app/config/config.yml:ro \
-    ghcr.io/devmanfre/isitdown:light-latest node dist/light/check.js
-```
-
 builder  node:24-alpine   npm ci (con le devDependencies), tsc, vite build, copia in dist gli asset non-TS
 light    node:24-alpine   dipendenze prod + dist/{core,adapters,notifiers,light}
                           VOLUME /app/config /app/data · nessun EXPOSE · nessun server
@@ -1343,10 +1332,17 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `GET` | `/history?provider=&days=` | Bucket giornalieri pre-aggregati, uptime a 7/30/90 giorni, colonne dei mesi. `days` accetta `7`, `30` o `90`; altro è un 400 che li elenca. Senza `provider`, un riepilogo su tutti. |
 | `GET` | `/incidents?provider=&state=&q=&days=&page=&pageSize=` | Una pagina della lista incidenti: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` è `all` (default), `active` o `resolved`; `q` cerca nei nomi degli incidenti, senza distinguere maiuscole, e `days` tiene solo gli incidenti iniziati entro quella finestra (entrambi restringono la pagina **e** i conteggi); `pageSize` vale 20 di default, massimo 100. Un `page`, `pageSize`, `state`, `q` o `days` senza senso ricade sulla prima pagina di tutto invece di dare 400. `counts` porta tutti e tre gli stati qualunque sia il filtro, e `active` è la lista degli aperti che la card in evidenza della dashboard mostra su ogni pagina — fuori dalla ricerca, così la card non può sparire mentre l'operatore digita. |
 | `GET` | `/incidents/:providerId/:incidentId` | Dettaglio: l'incidente, la cronologia osservata, il log di ciò che è stato inviato, gli altri incidenti aperti del provider e gli ultimi 24 poll. |
+| `GET` | `/export/incidents.csv?provider=&state=&q=&days=` | Il risultato della ricerca incidenti come download — gli stessi filtri di `/incidents`, senza paginazione: `provider_id,incident_id,name,impact,status,started_at,updated_at,resolved_at`. RFC 4180, così un nome con virgola, virgolette o ritorno a capo resta un solo campo. Limite di 20 000 righe; un export che lo raggiunge risponde con `X-IsItDown-Truncated: true` invece di sembrare completo. |
+| `GET` | `/export/incidents.json?provider=&state=&q=&days=` | Le stesse righe come `{ generatedAt, filter, count, truncated, incidents }` — `filter` riporta con quali filtri l'export è stato preso, così un file ritrovato dopo dice ancora cosa contiene. |
+| `GET` | `/export/history.csv?provider=&days=` | Storico di uptime, una riga per provider per giorno: `provider_id,day,worst_status,uptime_pct`. `days` accetta `7`, `30` o `90`, come `/history`; `provider` restringe a uno (`404` se l'id è sconosciuto), e senza di esso ogni provider attivo. |
+| `GET` | `/export/history.json?provider=&days=` | La stessa finestra come `{ generatedAt, days, providers }`, con per ogni provider i bucket, la serie giornaliera e le percentuali della finestra da cui sono disegnati i grafici. |
 | `GET` | `/maintenances?provider=&days=` | Le finestre di manutenzione dichiarate — in corso, future e passate — come `{ maintenances }`. `days` limita quanto indietro nel tempo resta visibile una finestra chiusa (default 90, massimo 365); `provider` restringe a uno solo. Senza `provider`, ogni provider abilitato. |
 | `GET` | `/notifications?limit=` | Ciò che è stato inviato davvero, dal più recente. Massimo 200. |
 | `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | Una pagina del log invii: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` è `all` (default), `sent` o `failed`; `channel` restringe a un canale; `pageSize` vale 25 di default, massimo 200. Un `page`, `pageSize` o `state` senza senso ricade sui valori di default invece di dare 400. `counts` porta ogni esito qualunque sia il filtro. Ogni elemento porta `attempts`: un invio fallito con più di uno è una notifica non recapitata. |
 | `GET` | `/config` | Servizi, impostazioni di polling (`adaptivePolling` e `adaptiveIntervalMinutes` compresi), `retention`, `delivery` (ore di silenzio, riepilogo, limite, `updateInPlace` — vedi [3.8](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti)), canali, routing e `removed` — i provider rimossi ma ancora ripristinabili. Le credenziali dei canali appaiono come **nomi** di variabili con un flag `isSet`, mai come valori. |
+| `GET` | `/config/export` | L'intera configurazione come un `config.yml` dell'edizione Light, come download (roadmap 4.3) — polling, consegna, servizi, instradamento e canali. Le credenziali escono come riferimenti `${VAR}`, mai come valori, e `webpush` viene saltato: una subscription del browser non ha senso in un'edizione senza browser. Il file avvia l'immagine Light così com'è. |
+| `POST` | `/config/import` | Lo stesso file, riletto. Accetta lo YAML come corpo della richiesta (`text/yaml`) o come `{ yaml }`. Validato con lo schema di file dell'edizione Light prima di scrivere qualsiasi cosa, così un file sbagliato non cambia nulla; una credenziale letterale viene rifiutata. Un servizio che il file non menziona viene rimosso come lo rimuove la dashboard — soft, ripristinabile, storico intatto — e un blocco `routing` assente lascia stare le regole. Risponde `{ added, updated, removed, channels, routingRules, settings }`. |
+| `GET` | `/config/catalog` | Il catalogo di provider incluso (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Risposto dalla memoria — la lista viaggia con l'immagine, quindi non c'è nessun upstream che possa essere giù né niente da tenere sincronizzato. `configured` segna un id già monitorato: la riga resta nel menu e lo dice, invece di sparire. La detection resta la strada per una pagina che la lista non ha. |
 | `POST` | `/config/services` | Aggiunge un servizio. `201`, oppure `409` su id duplicato, oppure `400` col nome del campo non valido. |
 | `POST` | `/config/services/detect` | Quale adapter legge la pagina all'URL `{ url }`, e la base URL che quell'adapter si aspetta: `{ adapter, baseUrl, probes }`. Prova le forme che IsItDown già legge, in ordine (`/api/v2/summary.json` di Statuspage, `/summary.json` di Instatus, `/index.json` di Better Stack, poi un feed), e riconosce dall'host i quattro adapter dedicati a un solo provider senza fare alcuna richiesta. Una pagina che nessuno riconosce è un `200` con `adapter: null` e le prove tentate — solo un URL inutilizzabile dà `400`. Non registra e non notifica nulla. |
 | `PATCH` `DELETE` | `/config/services/:id` | Modifica, o rimozione. La rimozione è una **cancellazione morbida**: il provider esce subito dalla dashboard e dal ciclo di polling, e la risposta dice per quanto resta ripristinabile (`{ removed, removedAt, restoreUntil }`). `404` su un id sconosciuto o già rimosso. |
@@ -1396,16 +1392,9 @@ IsItDown senza adattatori in mezzo:
 scrape_configs:
   - job_name: isitdown
     static_configs:
-| `GET` | `/config/export` | L'intera configurazione come un `config.yml` dell'edizione Light, come download (roadmap 4.3) — polling, consegna, servizi, instradamento e canali. Le credenziali escono come riferimenti `${VAR}`, mai come valori, e `webpush` viene saltato: una subscription del browser non ha senso in un'edizione senza browser. Il file avvia l'immagine Light così com'è. |
-| `POST` | `/config/import` | Lo stesso file, riletto. Accetta lo YAML come corpo della richiesta (`text/yaml`) o come `{ yaml }`. Validato con lo schema di file dell'edizione Light prima di scrivere qualsiasi cosa, così un file sbagliato non cambia nulla; una credenziale letterale viene rifiutata. Un servizio che il file non menziona viene rimosso come lo rimuove la dashboard — soft, ripristinabile, storico intatto — e un blocco `routing` assente lascia stare le regole. Risponde `{ added, updated, removed, channels, routingRules, settings }`. |
       - targets: ["isitdown-ui:3000"]
-| `GET` | `/config/catalog` | Il catalogo di provider incluso (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Risposto dalla memoria — la lista viaggia con l'immagine, quindi non c'è nessun upstream che possa essere giù né niente da tenere sincronizzato. `configured` segna un id già monitorato: la riga resta nel menu e lo dice, invece di sparire. La detection resta la strada per una pagina che la lista non ha. |
 ```
 
-| `GET` | `/export/incidents.csv?provider=&state=&q=&days=` | Il risultato della ricerca incidenti come download — gli stessi filtri di `/incidents`, senza paginazione: `provider_id,incident_id,name,impact,status,started_at,updated_at,resolved_at`. RFC 4180, così un nome con virgola, virgolette o ritorno a capo resta un solo campo. Limite di 20 000 righe; un export che lo raggiunge risponde con `X-IsItDown-Truncated: true` invece di sembrare completo. |
-| `GET` | `/export/incidents.json?provider=&state=&q=&days=` | Le stesse righe come `{ generatedAt, filter, count, truncated, incidents }` — `filter` riporta con quali filtri l'export è stato preso, così un file ritrovato dopo dice ancora cosa contiene. |
-| `GET` | `/export/history.csv?provider=&days=` | Storico di uptime, una riga per provider per giorno: `provider_id,day,worst_status,uptime_pct`. `days` accetta `7`, `30` o `90`, come `/history`; `provider` restringe a uno (`404` se l'id è sconosciuto), e senza di esso ogni provider attivo. |
-| `GET` | `/export/history.json?provider=&days=` | La stessa finestra come `{ generatedAt, days, providers }`, con per ogni provider i bucket, la serie giornaliera e le percentuali della finestra da cui sono disegnati i grafici. |
 Come `/status`, uno scrape è una lettura pura dello stato salvato e non
 raggiunge mai un provider: farlo ogni 15 secondi non costa nulla a monte.
 Vengono esportati solo i provider abilitati: uno disabilitato ha righe nel
@@ -1860,54 +1849,6 @@ poi `en`.
 > Le stringhe italiane sono state scritte insieme all'implementazione e non hanno
 > avuto una revisione da madrelingua. Vale anche per questo documento.
 
----
-
-## 9. Sviluppo
-
-### 9.1 Struttura del repository
-
-```
-isitdown/
-├── src/
-│   ├── core/                          (condiviso dalle due edizioni)
-│   │   ├── types.ts                   NormalizedStatus, Incident, StatusChange, NotificationPayload
-│   │   ├── adapter.interface.ts       ServiceRef, FetchContext, Adapter
-│   │   ├── notifier.interface.ts      Notifier
-│   │   ├── stateStore.interface.ts    ProviderRuntimeState, StateStore
-│   │   ├── configSource.interface.ts  RuntimeConfig, ServiceDefinition, ChannelConfig, ConfigSource
-│   │   ├── config.schema.ts           schemi zod condivisi dal loader su file e dalle scritture della UI
-│   │   ├── status.schema.ts           validazione di un NormalizedStatus persistito
-│   │   ├── poller.ts                  un ciclo: sfasamento, retry, isolamento, conteggio fallimenti
-│   │   ├── diffEngine.ts              l'unica autorità su se una notifica scatta
-│   │   ├── notificationDispatcher.ts  l'unico chiamante di Notifier.send
-│   │   ├── scheduler.ts               il loop; rilegge la configurazione a ogni ciclo
-│   │   ├── http.ts                    l'unica lettura HTTP: rivalidazione ETag/Last-Modified, decodifica del charset
-│   │   ├── logger.ts
-│   │   └── i18n/                      stringhe delle notifiche, indipendenti dall'edizione
-│   │       ├── index.ts               lookup + fallback su en + formattazione UTC
-│   │       ├── en.json                lingua di partenza
-│   │       └── it.json
-│   ├── adapters/                      (condiviso)
-│   │   ├── statuspage.adapter.ts      adapter generico Atlassian Statuspage
-│   │   ├── rss.adapter.ts             adapter generico per feed RSS / Atom
-│   │   ├── slack.adapter.ts           l'API di stato di Slack
-│   │   ├── aws.adapter.ts             il feed degli eventi aperti di AWS Health, per regione
-│   │   ├── gcp.adapter.ts             incidents.json di Google Cloud: stato e cronologia in uno
-│   │   ├── azure.adapter.ts           il feed di stato di Azure, col suo vocabolario di chiusura
-│   │   └── index.ts                   registro per id di adapter
-│   ├── notifiers/                     (condiviso)
-│   │   ├── formatting.ts              emoji, colori, etichette di severità, composizione del messaggio
-│   │   ├── settings.ts                validazione condivisa per i canali configurati con un solo URL
-│   │   ├── groups.ts                  gruppi di provider: lo stato composito di un gruppo (§3.10)
-│   │   ├── telegram.notifier.ts
-│   │   ├── webhook.notifier.ts
-│   │   └── index.ts                   registro per id di canale
-│   ├── light/                         (solo edizione Light)
-│   │   ├── index.ts                   entrypoint
-│   │   ├── runtime.ts                 wiring, condiviso col test end-to-end
-│   │   ├── healthcheck.ts             freschezza del file di stato
-│   │   ├── fileStateStore.ts          file JSON, scritture atomiche
-│   │   └── config/
 ### 8.3 Accessibilità
 
 La dashboard è la console di un singolo operatore, e quell'operatore può usare
@@ -1939,6 +1880,56 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   ingresso, spostamento in hover e pulsazione in `motion.css`, e le view che
   animano in JavaScript controllano la stessa query.
 
+---
+
+## 9. Sviluppo
+
+### 9.1 Struttura del repository
+
+```
+isitdown/
+├── src/
+│   ├── core/                          (condiviso dalle due edizioni)
+│   │   ├── types.ts                   NormalizedStatus, Incident, StatusChange, NotificationPayload
+│   │   ├── adapter.interface.ts       ServiceRef, FetchContext, Adapter
+│   │   ├── notifier.interface.ts      Notifier
+│   │   ├── stateStore.interface.ts    ProviderRuntimeState, StateStore
+│   │   ├── configSource.interface.ts  RuntimeConfig, ServiceDefinition, ChannelConfig, ConfigSource
+│   │   ├── config.schema.ts           schemi zod condivisi dal loader su file e dalle scritture della UI
+│   │   ├── status.schema.ts           validazione di un NormalizedStatus persistito
+│   │   ├── poller.ts                  un ciclo: sfasamento, retry, isolamento, conteggio fallimenti
+│   │   ├── groups.ts                  gruppi di provider: lo stato composito di un gruppo (§3.10)
+│   │   ├── diffEngine.ts              l'unica autorità su se una notifica scatta
+│   │   ├── notificationDispatcher.ts  l'unico chiamante di Notifier.send
+│   │   ├── scheduler.ts               il loop; rilegge la configurazione a ogni ciclo
+│   │   ├── http.ts                    l'unica lettura HTTP: rivalidazione ETag/Last-Modified, decodifica del charset
+│   │   ├── logger.ts
+│   │   └── i18n/                      stringhe delle notifiche, indipendenti dall'edizione
+│   │       ├── index.ts               lookup + fallback su en + formattazione UTC
+│   │       ├── en.json                lingua di partenza
+│   │       └── it.json
+│   ├── adapters/                      (condiviso)
+│   │   ├── catalog.ts                 catalogo di provider noti incluso
+│   │   ├── statuspage.adapter.ts      adapter generico Atlassian Statuspage
+│   │   ├── rss.adapter.ts             adapter generico per feed RSS / Atom
+│   │   ├── slack.adapter.ts           l'API di stato di Slack
+│   │   ├── aws.adapter.ts             il feed degli eventi aperti di AWS Health, per regione
+│   │   ├── gcp.adapter.ts             incidents.json di Google Cloud: stato e cronologia in uno
+│   │   ├── azure.adapter.ts           il feed di stato di Azure, col suo vocabolario di chiusura
+│   │   └── index.ts                   registro per id di adapter
+│   ├── notifiers/                     (condiviso)
+│   │   ├── formatting.ts              emoji, colori, etichette di severità, composizione del messaggio
+│   │   ├── settings.ts                validazione condivisa per i canali configurati con un solo URL
+│   │   ├── telegram.notifier.ts
+│   │   ├── webhook.notifier.ts
+│   │   └── index.ts                   registro per id di canale
+│   ├── light/                         (solo edizione Light)
+│   │   ├── index.ts                   entrypoint
+│   │   ├── runtime.ts                 wiring, condiviso col test end-to-end
+│   │   ├── healthcheck.ts             freschezza del file di stato
+│   │   ├── check.ts                   validazione di config.yml, CI-abile (§3.9)
+│   │   ├── fileStateStore.ts          file JSON, scritture atomiche
+│   │   └── config/
 │   │       ├── schema.ts              forma di config.yml
 │   │       ├── loadConfig.ts          YAML + sostituzione ${ENV} + validazione
 │   │       └── checkConfig.ts         tutti i problemi in una volta, non il primo
@@ -1955,6 +1946,7 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
 │       ├── dbConfigSource.ts          configurazione da SQLite; risolve i segreti per nome di variabile
 │       ├── secretsFile.ts             credenziali salvate dalla dashboard: file 0600 accanto al database, applicate all'ambiente
 │       ├── metrics.ts                  la superficie di scrape Prometheus: gauge dallo store, counter in memoria
+│       ├── configFile.ts             export / import di config.yml (§4.3)
 │       ├── db/                        open.ts, migrate.ts, seed.ts
 │       ├── routes/                    status, history, incidents, export, notifications, config, preferences, metrics
 │       └── web/                       la dashboard: react, vite, shadcn/ui
@@ -2001,9 +1993,7 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
 
 I test dei componenti e degli hook della dashboard vivono insieme al codice sotto
 `web/`, come `*.test.tsx` accanto a ciò che testano, e sono raccolti da lì da
-│   │   ├── catalog.ts                 catalogo di provider noti incluso
 Vitest — il resto dell'albero segue la convenzione `test/` di sopra.
-│       ├── configFile.ts             export / import di config.yml (§4.3)
 
 **Regola d'oro:** `src/core`, `src/adapters` e `src/notifiers` non importano mai da
 `src/light` o `src/ui`. Il comportamento specifico dell'edizione viene iniettato
@@ -2035,7 +2025,6 @@ primitive Radix di shadcn/ui, TanStack Query, react-i18next, Recharts e il resto
 è una devDependency compilata in asset statici al momento della build, così
 l'immagine `ui` guadagna un bundle, non un albero di dipendenze. Dipendenze di
 sviluppo per il resto: `typescript`, `@types/node`, `@types/express`,
-│   │   ├── check.ts                   validazione di config.yml, CI-abile (§3.9)
 `@types/react`, `@types/react-dom`, i plugin di Vite, Vitest e React Testing
 Library.
 
