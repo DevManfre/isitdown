@@ -255,6 +255,7 @@ notifications:
 | `failureThreshold` | `5` | Cicli falliti consecutivi prima di **un** avviso "monitoring degraded". |
 | `adaptivePolling` | `true` | Mentre un provider ha un incidente aperto — o uno stato peggiore di operativo — lo interroga con `adaptiveIntervalMinutes` invece della sua cadenza. `false` lascia ogni provider sulla cadenza configurata. |
 | `adaptiveIntervalMinutes` | `1` | 1–1440. Preso come **minimo** rispetto all'intervallo del provider, quindi può solo osservarlo più da vicino. Un provider che non ha mai risposto resta sulla sua cadenza: `unknown` non è un incidente. |
+| `confirmSamples` | `1` | 1–10. Smorzamento dei rimbalzi: quanti poll consecutivi devono concordare su una lettura prima che il cambio venga annunciato. `1` notifica subito; `2` ignora una pagina che si contraddice per un ciclo, al costo di un poll di ritardo. |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
 | `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus` e `betterstack` coprono quelle due piattaforme; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider. |
@@ -650,6 +651,13 @@ lettura vecchia.
 | Webhook generico | `webhook` | `WEBHOOK_URL` |
 | Discord | `discord` | `DISCORD_WEBHOOK_URL` |
 | Slack | `slack` | `SLACK_WEBHOOK_URL` |
+| Desktop (Web Push) | `webpush` | nessuna |
+
+Il push desktop non richiede alcuna configurazione: il server genera la propria
+coppia di chiavi VAPID la prima volta che il canale viene usato e la conserva nel
+database, quindi abilitare il canale e premere "abilita su questo browser" nelle
+Impostazioni è tutta la procedura. Ogni browser abilitato compare nell'elenco
+dispositivi della card e può essere rimosso da lì.
 
 Il webhook fa POST di `{ change, service, message }`, così chi lo consuma può
 mostrare il testo già formattato oppure fare routing sui campi strutturati:
@@ -1215,13 +1223,14 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `GET` | `/health` | Liveness. `{ status, providers, lastCycleAt }`. |
 | `GET` | `/status` | Stato corrente di ogni provider, più ultimo e prossimo poll, più `maintenance: { active, upcoming }` — le finestre in corso adesso e quelle il cui `startsAt` è ancora nel futuro; una finestra già terminata ma ancora presente nel payload salvato non compare in nessuna delle due liste. Pura lettura dal database — si può interrogare ogni 30s, come fa la dashboard. Non raggiunge mai l'upstream. |
 | `GET` | `/history?provider=&days=` | Bucket giornalieri pre-aggregati, uptime a 7/30/90 giorni, colonne dei mesi. `days` accetta `7`, `30` o `90`; altro è un 400 che li elenca. Senza `provider`, un riepilogo su tutti. |
-| `GET` | `/incidents?provider=` | `{ active, closed }`. |
+| `GET` | `/incidents?provider=&state=&q=&days=&page=&pageSize=` | Una pagina della lista incidenti: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` è `all` (default), `active` o `resolved`; `q` cerca nei nomi degli incidenti, senza distinguere maiuscole, e `days` tiene solo gli incidenti iniziati entro quella finestra (entrambi restringono la pagina **e** i conteggi); `pageSize` vale 20 di default, massimo 100. Un `page`, `pageSize`, `state`, `q` o `days` senza senso ricade sulla prima pagina di tutto invece di dare 400. `counts` porta tutti e tre gli stati qualunque sia il filtro, e `active` è la lista degli aperti che la card in evidenza della dashboard mostra su ogni pagina — fuori dalla ricerca, così la card non può sparire mentre l'operatore digita. |
 | `GET` | `/incidents/:providerId/:incidentId` | Dettaglio: l'incidente, la cronologia osservata, il log di ciò che è stato inviato, gli altri incidenti aperti del provider e gli ultimi 24 poll. |
 | `GET` | `/maintenances?provider=&days=` | Le finestre di manutenzione dichiarate — in corso, future e passate — come `{ maintenances }`. `days` limita quanto indietro nel tempo resta visibile una finestra chiusa (default 90, massimo 365); `provider` restringe a uno solo. Senza `provider`, ogni provider abilitato. |
 | `GET` | `/notifications?limit=` | Ciò che è stato inviato davvero, dal più recente. Massimo 200. |
 | `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | Una pagina del log invii: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` è `all` (default), `sent` o `failed`; `channel` restringe a un canale; `pageSize` vale 25 di default, massimo 200. Un `page`, `pageSize` o `state` senza senso ricade sui valori di default invece di dare 400. `counts` porta ogni esito qualunque sia il filtro. Ogni elemento porta `attempts`: un invio fallito con più di uno è una notifica non recapitata. |
 | `GET` | `/config` | Servizi, impostazioni di polling (`adaptivePolling` e `adaptiveIntervalMinutes` compresi), `retention`, `delivery` (ore di silenzio, riepilogo, limite, `updateInPlace` — vedi [3.8](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti)), canali, routing e `removed` — i provider rimossi ma ancora ripristinabili. Le credenziali dei canali appaiono come **nomi** di variabili con un flag `isSet`, mai come valori. |
 | `POST` | `/config/services` | Aggiunge un servizio. `201`, oppure `409` su id duplicato, oppure `400` col nome del campo non valido. |
+| `POST` | `/config/services/detect` | Quale adapter legge la pagina all'URL `{ url }`, e la base URL che quell'adapter si aspetta: `{ adapter, baseUrl, probes }`. Prova le forme che IsItDown già legge, in ordine (`/api/v2/summary.json` di Statuspage, `/summary.json` di Instatus, `/index.json` di Better Stack, poi un feed), e riconosce dall'host i quattro adapter dedicati a un solo provider senza fare alcuna richiesta. Una pagina che nessuno riconosce è un `200` con `adapter: null` e le prove tentate — solo un URL inutilizzabile dà `400`. Non registra e non notifica nulla. |
 | `PATCH` `DELETE` | `/config/services/:id` | Modifica, o rimozione. La rimozione è una **cancellazione morbida**: il provider esce subito dalla dashboard e dal ciclo di polling, e la risposta dice per quanto resta ripristinabile (`{ removed, removedAt, restoreUntil }`). `404` su un id sconosciuto o già rimosso. |
 | `POST` | `/config/services/:id/restore` | Annulla una rimozione entro la finestra. Non era stato portato via nulla, quindi non si ricostruisce nulla; il buco nella cronologia dei giorni da rimosso viene ricostruito. `404` se non è un servizio rimosso. |
 | `DELETE` | `/config/services/:id/permanently` | La metà distruttiva, su un percorso a sé perché non ci si arrivi per sbaglio: propaga a campioni, incidenti, manutenzioni, stato e regole di routing di quel provider. Succede comunque da sé alla scadenza della finestra di ripristino. |
