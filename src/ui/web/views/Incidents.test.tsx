@@ -432,4 +432,40 @@ describe("Incidents", () => {
     expect(list().getByText("API errors")).toBeInTheDocument();
     expect(asked.some((path) => path.includes("days=7"))).toBe(true);
   });
+
+  it("exports what the current search asked for, as a link the browser can save", async () => {
+    renderWithProviders(<Incidents />, fixtures);
+    expect(await list().findByText("API errors")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole("searchbox", { name: i18n.t("incidents.search.label") }), "api");
+    await userEvent.click(screen.getByRole("radio", { name: i18n.t("incidents.window.days", { count: 30 }) }));
+
+    const group = within(screen.getByRole("group", { name: i18n.t("incidents.export.label") }));
+    // The export is a link rather than a fetch: the response is a download.
+    await waitFor(() => {
+      expect(group.getByRole("link", { name: "csv" })).toHaveAttribute(
+        "href",
+        "/export/incidents.csv?state=all&q=api&days=30",
+      );
+    });
+    expect(group.getByRole("link", { name: "json" })).toHaveAttribute(
+      "href",
+      "/export/incidents.json?state=all&q=api&days=30",
+    );
+  });
+
+  it("carries the chosen state filter into the export", async () => {
+    renderWithProviders(<Incidents />, fixtures);
+    expect(await list().findByText("API errors")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("radio", radioNamed(i18n.t("filter.resolved"))));
+
+    const group = within(screen.getByRole("group", { name: i18n.t("incidents.export.label") }));
+    await waitFor(() => {
+      expect(group.getByRole("link", { name: "csv" })).toHaveAttribute(
+        "href",
+        "/export/incidents.csv?state=resolved",
+      );
+    });
+  });
 });

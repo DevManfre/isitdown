@@ -228,6 +228,30 @@ export function Incidents() {
     </div>
   );
 
+  /**
+   * The export is the search's own result, so it carries the same parameters
+   * the list was just asked for (roadmap 4.6) — a plain link rather than a
+   * fetch, because the response is a download and the browser already knows how
+   * to save one.
+   */
+  const exportHref = (format: "csv" | "json"): string => {
+    const params = new URLSearchParams({ state: filter });
+    if (query !== "") params.set("q", query);
+    if (days !== 0) params.set("days", String(days));
+    return `/export/incidents.${format}?${params.toString()}`;
+  };
+
+  const exportControl = (
+    <div className="flex items-center gap-1" role="group" aria-label={t("incidents.export.label")}>
+      <span className="text-xs text-muted-foreground">{t("incidents.export.label")}</span>
+      {(["csv", "json"] as const).map((format) => (
+        <Button key={format} asChild variant="ghost" size="sm" className="h-8 px-2 font-mono text-xs uppercase">
+          <a href={exportHref(format)}>{format}</a>
+        </Button>
+      ))}
+    </div>
+  );
+
   const filterControl = (
     <ToggleGroup
       type="single"
@@ -377,6 +401,7 @@ export function Incidents() {
           <div className="flex flex-wrap items-center gap-3">
             {searchControl}
             {filterControl}
+            {exportControl}
           </div>
         </div>
 

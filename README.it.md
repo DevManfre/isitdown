@@ -1332,6 +1332,10 @@ scrape_configs:
       - targets: ["isitdown-ui:3000"]
 ```
 
+| `GET` | `/export/incidents.csv?provider=&state=&q=&days=` | Il risultato della ricerca incidenti come download — gli stessi filtri di `/incidents`, senza paginazione: `provider_id,incident_id,name,impact,status,started_at,updated_at,resolved_at`. RFC 4180, così un nome con virgola, virgolette o ritorno a capo resta un solo campo. Limite di 20 000 righe; un export che lo raggiunge risponde con `X-IsItDown-Truncated: true` invece di sembrare completo. |
+| `GET` | `/export/incidents.json?provider=&state=&q=&days=` | Le stesse righe come `{ generatedAt, filter, count, truncated, incidents }` — `filter` riporta con quali filtri l'export è stato preso, così un file ritrovato dopo dice ancora cosa contiene. |
+| `GET` | `/export/history.csv?provider=&days=` | Storico di uptime, una riga per provider per giorno: `provider_id,day,worst_status,uptime_pct`. `days` accetta `7`, `30` o `90`, come `/history`; `provider` restringe a uno (`404` se l'id è sconosciuto), e senza di esso ogni provider attivo. |
+| `GET` | `/export/history.json?provider=&days=` | La stessa finestra come `{ generatedAt, days, providers }`, con per ogni provider i bucket, la serie giornaliera e le percentuali della finestra da cui sono disegnati i grafici. |
 Come `/status`, uno scrape è una lettura pura dello stato salvato e non
 raggiunge mai un provider: farlo ogni 15 secondi non costa nulla a monte.
 Vengono esportati solo i provider abilitati: uno disabilitato ha righe nel
@@ -1850,7 +1854,7 @@ isitdown/
 │       ├── secretsFile.ts             credenziali salvate dalla dashboard: file 0600 accanto al database, applicate all'ambiente
 │       ├── metrics.ts                  la superficie di scrape Prometheus: gauge dallo store, counter in memoria
 │       ├── db/                        open.ts, migrate.ts, seed.ts
-│       ├── routes/                    status, history, incidents, notifications, config, preferences, metrics
+│       ├── routes/                    status, history, incidents, export, notifications, config, preferences, metrics
 │       └── web/                       la dashboard: react, vite, shadcn/ui
 │           ├── index.html             script del tema pre-paint, font, #root
 │           ├── main.tsx               albero dei provider: i18n, query, tema, router

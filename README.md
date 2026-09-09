@@ -1306,6 +1306,10 @@ scrape_configs:
       - targets: ["isitdown-ui:3000"]
 ```
 
+| `GET` | `/export/incidents.csv?provider=&state=&q=&days=` | The incident search's own result as a download — the same filters `/incidents` takes, without paging: `provider_id,incident_id,name,impact,status,started_at,updated_at,resolved_at`. RFC 4180, so a name carrying a comma, a quote or a newline stays one field. Capped at 20 000 rows; a capped export answers with `X-IsItDown-Truncated: true` rather than looking complete. |
+| `GET` | `/export/incidents.json?provider=&state=&q=&days=` | The same rows as `{ generatedAt, filter, count, truncated, incidents }` — `filter` echoes what the export was taken with, so a file found later still says what it is. |
+| `GET` | `/export/history.csv?provider=&days=` | Uptime history as one row per provider per day: `provider_id,day,worst_status,uptime_pct`. `days` accepts `7`, `30` or `90`, like `/history`; `provider` narrows to one (`404` on an unknown id), and without it, every enabled provider. |
+| `GET` | `/export/history.json?provider=&days=` | The same window as `{ generatedAt, days, providers }`, each provider carrying the buckets, the daily series and the window's percentages the charts are drawn from. |
 Like `/status`, a scrape is a pure read of stored state and never reaches a
 provider, so scraping every 15 seconds costs nothing upstream. Only enabled
 providers are exported: a disabled one has rows in the database but no cycle
@@ -1804,7 +1808,7 @@ isitdown/
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
 │       ├── geo/                        resolveLocation.ts + the IATA/cloud-region lookup tables it resolves against
 │       ├── db/                         open.ts, migrate.ts, seed.ts
-│       ├── routes/                     status, events, history, incidents, notifications, config, preferences, map, metrics
+│       ├── routes/                     status, events, history, incidents, exports, notifications, config, preferences, map, metrics
 │       └── web/                        the dashboard: react, vite, shadcn/ui
 │           ├── index.html              pre-paint theme script, fonts, #root
 │           ├── main.tsx                provider tree: i18n, query, theme, router
