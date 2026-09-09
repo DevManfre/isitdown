@@ -44,6 +44,7 @@ server) e **UI** (lo stesso motore più una dashboard locale, configurabile a ru
   - [3.6 Canali di notifica](#36-canali-di-notifica)
   - [3.7 Instradamento delle notifiche](#37-instradamento-delle-notifiche)
   - [3.8 Politica di consegna — ore di silenzio, riepiloghi, limiti](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti)
+  - [3.9 Validare un config.yml — il comando check](#39-validare-un-configyml--il-comando-check)
 - [4. Docker](#4-docker)
   - [4.1 Immagini e target di build](#41-immagini-e-target-di-build)
   - [4.2 Profili compose](#42-profili-compose)
@@ -817,6 +818,56 @@ lo [sviluppo live](#93-sviluppo-live) e non viene mai costruito da
 `docker compose --profile ui up`.
 
 ```
+### 3.9 Validare un `config.yml` — il comando `check`
+
+Validare un file avviando il container e leggendone i log racconta solo il primo
+problema, e costa un container per scoprirlo. `check` legge lo stesso file con lo
+stesso loader e stampa *tutti* i problemi, poi esce con codice diverso da zero:
+
+```bash
+node dist/light/check.js ./config.yml
+#   ./config.yml is valid — 4 services (3 enabled), channels: telegram, file only, no provider read
+
+docker exec isitdown-light node dist/light/check.js; echo "exit=$?"
+#   exit=0
+```
+
+Senza percorso legge `$CONFIG_PATH`, come fa il container. Da un checkout dei
+sorgenti, `npm run check:config -- ./config.yml` esegue lo stesso comando senza
+build.
+
+Cosa segnala, tutto in una passata:
+
+| Segnalazione | Livello |
+|---|---|
+| File assente, illeggibile o YAML non valido | error |
+| Tutto ciò che lo schema rifiuta (chiave mancante, intervallo fuori scala, base url malformata) | error |
+| Un riferimento `${VAR}` senza valore nell'ambiente — **ognuno**, per nome | error |
+| Lo stesso `id` di servizio dichiarato due volte | error |
+| Un canale attivo con un'impostazione obbligatoria vuota | error |
+| Una regola di instradamento che nomina un provider o un canale che il file non definisce | error |
+| Un servizio che nomina un `adapter` inesistente, con l'elenco di quelli noti | error |
+| Con `--probe`: una base url che nessun adapter riconosce | error |
+| Con `--probe`: una pagina che sembra un adapter diverso da quello dichiarato | warning |
+
+I warning vengono stampati e non fanno fallire il controllo: l'adapter `html` è
+una scelta difendibile per una pagina che pubblica anche un riepilogo Statuspage.
+
+`--probe` legge la pagina di ogni provider attivo (quelli disattivati vengono
+lasciati stare, perché il file lo dice già) e chiede quale adapter la riconosce,
+con la stessa detection usata dal form "aggiungi provider" dell'edizione UI. È
+disattivato per default: un controllo che va in rete non è qualcosa su cui una CI
+possa contare, e ogni altra segnalazione qui sopra si risponde dal solo file.
+
+Codici di uscita: `0` valido, `1` almeno un errore, `2` comando invocato male
+(opzione sconosciuta, due percorsi). Così è CI-abile per chi gestisce l'istanza e
+non solo per noi:
+
+```yaml
+- run: docker run --rm -v ./config.yml:/app/config/config.yml:ro \
+    ghcr.io/devmanfre/isitdown:light-latest node dist/light/check.js
+```
+
 builder  node:24-alpine   npm ci (con le devDependencies), tsc, vite build, copia in dist gli asset non-TS
 light    node:24-alpine   dipendenze prod + dist/{core,adapters,notifiers,light}
                           VOLUME /app/config /app/data · nessun EXPOSE · nessun server
@@ -1783,7 +1834,8 @@ isitdown/
 │   │   ├── fileStateStore.ts          file JSON, scritture atomiche
 │   │   └── config/
 │   │       ├── schema.ts              forma di config.yml
-│   │       └── loadConfig.ts          YAML + sostituzione ${ENV} + validazione
+│   │       ├── loadConfig.ts          YAML + sostituzione ${ENV} + validazione
+│   │       └── checkConfig.ts         tutti i problemi in una volta, non il primo
 │   └── ui/                            (solo edizione UI)
 │       ├── server.ts                  entrypoint
 │       ├── runtime.ts                 wiring, condiviso coi test delle API
@@ -1875,6 +1927,7 @@ primitive Radix di shadcn/ui, TanStack Query, react-i18next, Recharts e il resto
 è una devDependency compilata in asset statici al momento della build, così
 l'immagine `ui` guadagna un bundle, non un albero di dipendenze. Dipendenze di
 sviluppo per il resto: `typescript`, `@types/node`, `@types/express`,
+│   │   ├── check.ts                   validazione di config.yml, CI-abile (§3.9)
 `@types/react`, `@types/react-dom`, i plugin di Vite, Vitest e React Testing
 Library.
 

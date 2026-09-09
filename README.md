@@ -44,6 +44,7 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
   - [3.6 Notification channels](#36-notification-channels)
   - [3.7 Notification routing](#37-notification-routing)
   - [3.8 Delivery policy — quiet hours, digests, caps](#38-delivery-policy--quiet-hours-digests-caps)
+  - [3.9 Validating a config.yml — the check command](#39-validating-a-configyml--the-check-command)
 - [4. Docker](#4-docker)
   - [4.1 Images and build targets](#41-images-and-build-targets)
   - [4.2 Compose profiles](#42-compose-profiles)
@@ -799,6 +800,56 @@ One `Dockerfile`, four stages. `builder` compiles everything once; `light` and
 
 ```
 builder  node:24-alpine   npm ci (incl. devDependencies), tsc, vite build, copy non-TS assets into dist
+### 3.9 Validating a `config.yml` — the `check` command
+
+Validating a file by starting the container and reading its logs tells you about
+the first problem only, and costs a container to learn it. `check` reads the same
+file through the same loader and prints *every* problem, then exits non-zero:
+
+```bash
+node dist/light/check.js ./config.yml
+#   ./config.yml is valid — 4 services (3 enabled), channels: telegram, file only, no provider read
+
+docker exec isitdown-light node dist/light/check.js; echo "exit=$?"
+#   exit=0
+```
+
+With no path it reads `$CONFIG_PATH`, the way the container does. From a source
+checkout, `npm run check:config -- ./config.yml` runs the same command without a
+build.
+
+What it reports, all in one pass:
+
+| Finding | Level |
+|---|---|
+| File missing, unreadable, or not valid YAML | error |
+| Anything the schema rejects (missing key, bad interval, malformed base url) | error |
+| A `${VAR}` reference with no value in the environment — **every** one, named | error |
+| The same service `id` declared twice | error |
+| An enabled channel whose required setting is empty | error |
+| A routing rule naming a provider or channel the file does not define | error |
+| A service naming an `adapter` that does not exist, with the known ones listed | error |
+| With `--probe`: a base url no adapter recognises | error |
+| With `--probe`: a page that looks like a different adapter than the file names | warning |
+
+Warnings are printed and do not fail the check — the `html` adapter is a
+defensible choice for a page that also serves a Statuspage summary.
+
+`--probe` reads each enabled provider's page (disabled ones are left alone, since
+the file already says to) and asks which adapter recognises it, using the same
+detection the UI edition's add-provider form uses. It is off by default: a check
+that reaches the network is not something CI can depend on, and every other
+finding above is answerable from the file alone.
+
+Exit codes: `0` valid, `1` at least one error, `2` the command itself was called
+wrong (unknown option, two paths). That makes it CI-able for the operator rather
+than only for us:
+
+```yaml
+- run: docker run --rm -v ./config.yml:/app/config/config.yml:ro \
+    ghcr.io/devmanfre/isitdown:light-latest node dist/light/check.js
+```
+
 light    node:24-alpine   prod deps + dist/{core,adapters,notifiers,light}
                           VOLUME /app/config /app/data · no EXPOSE · no server
 dev      FROM builder     keeps devDependencies · vite build --watch + node --watch · tagged isitdown:dev only
@@ -1733,7 +1784,8 @@ isitdown/
 │   │   ├── fileStateStore.ts           JSON file, atomic writes
 │   │   └── config/
 │   │       ├── schema.ts               config.yml shape
-│   │       └── loadConfig.ts           YAML + ${ENV} substitution + validation
+│   │       ├── loadConfig.ts           YAML + ${ENV} substitution + validation
+│   │       └── checkConfig.ts          every problem at once, not the first
 │   └── ui/                            (UI edition only)
 │       ├── server.ts                   entrypoint
 │       ├── runtime.ts                  wiring, shared with the API tests
@@ -1823,6 +1875,7 @@ interfaces instead. A test enforces this, including the edition-only dependencie
 | Container | one multi-stage `Dockerfile` | `--target light` / `--target ui`, `node:24-alpine`. |
 
 Runtime dependencies, exhaustively: `zod`, `yaml` (both editions) and `express`
+│   │   ├── check.ts                    config.yml validation, CI-able (§3.9)
 (UI). Everything the dashboard uses — React, Vite, Tailwind, shadcn/ui's Radix
 primitives, TanStack Query, react-i18next, Recharts and the rest — is a
 devDependency compiled into static assets at build time, so the `ui` image gains
