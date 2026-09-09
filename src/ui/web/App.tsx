@@ -8,6 +8,7 @@ import { useTheme } from "@/hooks/useTheme.tsx";
 import { useDocumentStatus } from "@/hooks/useDocumentStatus.tsx";
 import { usePreferenceSync } from "@/hooks/usePreferenceSync.tsx";
 import { usePreferences } from "@/hooks/queries.ts";
+import { useViewReady } from "@/hooks/useViewReady.ts";
 
 /**
  * What a repaint does to the view's entry animations.
@@ -50,6 +51,16 @@ export function App() {
   // The browser tab reflects the worst status in the fleet. Mounted in the
   // shell, like the seed above, because the tab belongs to no single view.
   useDocumentStatus();
+  // The same readiness `ViewFrame` gates the view on, held here for the chrome
+  // around it. `Rail`, `Header` and `PollIndicator` are siblings of the frame,
+  // so they were never behind its gate: they painted a countdown that said
+  // "not polled yet", a rail with no badges and no channels, and swapped all
+  // three for real figures a second before the view entered. Read separately
+  // rather than handed down from the frame because the two gates differ in
+  // exactly one way — the frame is keyed on the view and resets its gate on
+  // every remount to replay the cascade, and the chrome, which does not
+  // remount, must not blank itself again each time the operator changes view.
+  const ready = useViewReady(!seeded);
 
   const paramString = [params["providerId"], params["incidentId"]].filter(Boolean).join("/");
   const view = currentView(location.pathname, paramString !== "");
@@ -59,7 +70,7 @@ export function App() {
     // rail has no collapse control, and a controlled `open` with no
     // `onOpenChange` also makes the primitive's ⌘B shortcut inert, so there is
     // no way to reach a collapsed rail nothing is styled for.
-    <SidebarProvider className="console" open>
+    <SidebarProvider className="console" open data-ready={ready ? "" : undefined}>
       <Rail />
       {/* `SidebarInset` is the page's one <main>, so the animated view below is
           a div. Its stock `bg-background` is dropped: the body carries
