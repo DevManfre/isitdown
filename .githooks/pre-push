@@ -1,0 +1,56 @@
+#!/bin/sh
+# Run the visual regression before a push that touches the dashboard, so a
+# stale baseline is caught here instead of as a red CI run somebody else has to
+# notice. Only fires when the pushed commits touch the dashboard, its harness
+# or its baselines — a push of server or docs commits pays nothing.
+#
+# Template: installed into .git/hooks/ by scripts/setup-hooks.sh.
+[ -n "$SKIP_VISUAL" ] && exit 0
+
+zero=0000000000000000000000000000000000000000
+touched=0
+
+# One line per pushed ref: <local ref> <local sha> <remote ref> <remote sha>.
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  # A deletion pushes no content.
+  [ "$local_sha" = "$zero" ] && continue
+
+  if [ "$remote_sha" = "$zero" ]; then
+    # A branch the remote does not have yet: compare against main, not against
+    # the whole history, or every first push rebuilds for nothing.
+    base=$(git merge-base "$local_sha" origin/main 2>/dev/null) || base=
+  else
+    base=$remote_sha
+  fi
+  [ -z "$base" ] && base=$(git rev-list --max-parents=0 "$local_sha" | tail -n 1)
+
+  if git diff --name-only "$base" "$local_sha" -- src/ui tools/visual test/visual | grep -q .; then
+    touched=1
+  fi
+done
+
+[ "$touched" = 1 ] || exit 0
+
+echo "pre-push: the dashboard changed — rebuilding and comparing every view"
+if ! npm run build:ui >/dev/null; then
+  echo "pre-push: the build failed, so there is nothing to compare" >&2
+  exit 1
+fi
+if ! npm run test:visual; then
+  cat >&2 <<'EOF'
+
+pre-push: the rendered views no longer match their baselines.
+
+  Look at the frames listed above (test/visual/current/) before deciding.
+  If the change is wrong, fix it. If it is intended, agree only the views it
+  touches, one at a time, and look at each:
+
+      node tools/visual-regression.mjs --only=<view> --update
+
+  Never agree the whole set blind: --update with no --only rewrites all 24,
+  which is how a half-rendered frame once became the baseline.
+
+  To push without this check: SKIP_VISUAL=1 git push …
+EOF
+  exit 1
+fi

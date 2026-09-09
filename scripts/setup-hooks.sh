@@ -40,7 +40,7 @@ git config alias.mergeclean '!f() { MERGECLEAN_MESSAGE="🔀 $(git rev-parse --a
 
 printf '%s\n' \
   "wrapper        : \$GIT_DIR/merge-clean" \
-  "hooks          : \$GIT_DIR/hooks/{post-checkout,pre-commit,pre-merge-commit}" \
+  "hooks          : \$GIT_DIR/hooks/{post-checkout,pre-commit,pre-merge-commit,pre-push}" \
   "exclude list   : \$GIT_DIR/merge-exclude" \
   "purge ref      : $(git config mergeclean.purgeFrom)" \
   "merge command  : git mergeclean <branch>" \
