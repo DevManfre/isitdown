@@ -41,7 +41,9 @@ export async function buildLightRuntime(options: LightRuntimeOptions): Promise<L
   const store = await createFileStateStore(options.dataPath);
 
   const poller = createPoller({ getAdapter, store, logger });
-  const dispatcher = createDispatcher({ logger });
+  // The state file keeps the message ids too, so an incident's updates can edit
+  // the message its opening sent (roadmap 3.19).
+  const dispatcher = createDispatcher({ logger, messageRefs: store });
   const scheduler = createScheduler({
     configSource,
     poller,

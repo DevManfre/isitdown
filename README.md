@@ -43,6 +43,7 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
   - [3.5 Monitored providers](#35-monitored-providers)
   - [3.6 Notification channels](#36-notification-channels)
   - [3.7 Notification routing](#37-notification-routing)
+  - [3.8 Delivery policy — quiet hours, digests, caps](#38-delivery-policy--quiet-hours-digests-caps)
 - [4. Docker](#4-docker)
   - [4.1 Images and build targets](#41-images-and-build-targets)
   - [4.2 Compose profiles](#42-compose-profiles)
@@ -724,6 +725,67 @@ editor also offers a dry run — pick a provider and a canned event and it names
 which rule would win and which ones were never reached, evaluated against the
 rules you currently have saved, not a hypothetical set.
 
+### 3.8 Delivery policy — quiet hours, digests, caps
+
+The routing rules decide *who* hears about a change. Four further controls
+decide *how much* of it actually goes out, and in how many messages. All four
+are off by default, so an installation that configures none of them behaves
+exactly as it did before they existed.
+
+```yaml
+delivery:
+  quietHours:
+    enabled: true
+    start: "23:00"          # inclusive
+    end: "07:00"            # exclusive; the window may wrap midnight
+    timeZone: "Europe/Rome" # an IANA name, or "auto" for the container's zone
+    minSeverity: major_outage
+  digest:
+    enabled: true
+    windowMinutes: 15
+    immediateFloor: major_outage
+  cap:
+    enabled: true
+    maxPerHour: 6
+  updateInPlace: true
+```
+
+**Quiet hours** are a routing *input*, not a filter bolted on after the rules:
+inside the window, only changes clearing `minSeverity` reach anybody, and the
+UI edition's dry run says when the hour — rather than a rule — is what decided.
+A change held back is dropped, not deferred; deferring is the digest's job. The
+window is read in `timeZone` and fails open on anything unusable (a malformed
+time, an unknown zone, equal ends), because the one failure mode worth ruling
+out here is a night of silence caused by a typo.
+
+**Digest mode** collects everything *under* `immediateFloor` and sends it as one
+message per window; anything at or above the floor still goes out the moment it
+happens, so the window only ever delays what you said was not urgent. The batch
+is flushed on the clock rather than when the next change arrives, which is why a
+quiet window still ends in a message. Two honest limits: a channel switched off
+while a window is open has its batch dropped (with a line in the log), and a
+batch still collecting when the process stops is lost rather than arriving an
+hour late.
+
+**The cap** is a ceiling per provider per rolling hour, counted per *change*
+rather than per channel — the operator reading them is one person however many
+channels are enabled. What the cap holds back is counted, and the next message
+that gets through carries a "further alerts were suppressed" line, so a cap can
+never be mistaken for a channel that has stopped working. A digested change is
+deliberately not charged against the cap: one batch is one message.
+
+**`updateInPlace`** makes one incident one message that is rewritten as the
+incident moves, on the channels that can edit what they sent — Telegram
+(`editMessageText`) and Discord (a webhook message id). The id is remembered per
+channel per incident, the message that closes an incident releases it, and an
+edit the channel refuses (too old, deleted by hand) falls back to a fresh
+message rather than losing the update. Slack's incoming webhook cannot edit at
+all, so it keeps receiving a message per update.
+
+The Light edition configures all four as the `delivery` block above; the UI
+edition edits them under **Settings → Delivery**, where each row applies on its
+own without a restart.
+
 ---
 
 ## 4. Docker
@@ -1110,7 +1172,9 @@ For the Light edition, set the same two variables, `telegram.enabled: true` in
 | `the telegram channel is enabled but TELEGRAM_BOT_TOKEN is not set` | `.env` is not being passed. Check `env_file` and recreate the container — env is read at start. |
 | Container stuck `starting` forever | The healthcheck never passed. Light: `state.json` is not being written, so no cycle completed. UI: `/health` is not answering. |
 | Dashboard loads but the grid is empty | No cycle has run yet. `POST /poll`, or wait one interval. |
-| A provider shows `unknown` | It has never been polled successfully. `POST /config/services/<id>/test` reports the actual error. |
+| A provider shows `unknown` | It has never been polled successfully. UI edition: **Settings → the provider's row → Diagnose** shows the last reads with their errors and reads the page on demand (`GET /debug/adapters`, `POST /debug/adapters/<id>/probe`). A page that reads but parses into nothing — a scrape whose selector no longer matches — is called out there. |
+| No notifications during the night, or one message instead of several | The delivery policy is doing its job. Check **Settings → Delivery** (or the `delivery` block): quiet hours drop what is under their floor, and the digest holds it for its window. |
+| One provider is polled and another is not | Either its own `intervalMinutes` has not elapsed, or it answered `Retry-After` and is being left alone until the window it stated passes — `docker logs` carries `provider asked to be left alone` with the deadline. |
 | Provider shows `degraded` but Incidents is empty | Correct. Statuspage derives the indicator from component state too; there may be no incident record. |
 | Uptime reads `0%` for a provider | It has exactly one sample and it was not operational. It rises with the next cycles. |
 | A month column shows `—` | No samples in that month. Deliberately not `0%`, which would read as a month-long outage. |
@@ -1139,12 +1203,12 @@ back reports a parse failure instead of the real problem.
 | `GET` | `/maintenances?provider=&days=` | Declared maintenance windows — running, upcoming and past — as `{ maintenances }`. `days` bounds how far back a closed window is still returned (default 90, max 365); `provider` narrows to one. Without `provider`, every enabled provider. |
 | `GET` | `/notifications?limit=` | What was actually sent, newest first. Capped at 200. |
 | `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | One page of the delivery log: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` is `all` (default), `sent` or `failed`; `channel` narrows to one channel; `pageSize` defaults to 25 and is capped at 200. A nonsense `page`, `pageSize` or `state` falls back rather than 400s. `counts` carries every outcome whatever the filter. Each item carries `attempts`: a failed send with more than one is a dead letter. |
-| `GET` | `/config` | Services, polling settings (`adaptivePolling` and `adaptiveIntervalMinutes` included), `retention`, channels, routing, and `removed` — providers taken out but still restorable. Channel credentials appear as variable **names** with an `isSet` flag — never values. |
+| `GET` | `/config` | Services, polling settings (`adaptivePolling` and `adaptiveIntervalMinutes` included), `retention`, `delivery` (quiet hours, digest, cap, `updateInPlace` — see [3.8](#38-delivery-policy--quiet-hours-digests-caps)), channels, routing, and `removed` — providers taken out but still restorable. Channel credentials appear as variable **names** with an `isSet` flag — never values. |
 | `POST` | `/config/services` | Add a service. `201`, or `409` on a duplicate id, or `400` naming the invalid field. |
 | `PATCH` `DELETE` | `/config/services/:id` | Edit, or remove. A removal is a **soft delete**: the provider leaves the dashboard and the poll cycle at once, and the response says how long it stays restorable (`{ removed, removedAt, restoreUntil }`). `404` on an id that is unknown or already removed. |
 | `POST` | `/config/services/:id/restore` | Undo a removal inside its window. Nothing was taken, so nothing is rebuilt; the gap in history from the days it was removed is backfilled. `404` if it is not a removed service. |
 | `DELETE` | `/config/services/:id/permanently` | The destructive half, on its own path so nothing reaches it by accident: cascades to that provider's samples, incidents, maintenances, state and routing rules. This also happens on its own once the restore window closes. |
-| `PATCH` | `/config/settings` | Polling settings — including `adaptivePolling` and `adaptiveIntervalMinutes` (1–1440) — and `retentionDays`, how long history is kept, 7 to 3650 days. |
+| `PATCH` | `/config/settings` | Polling settings — including `adaptivePolling` and `adaptiveIntervalMinutes` (1–1440) — `retentionDays`, how long history is kept, 7 to 3650 days, and `delivery`, the policy of [3.8](#38-delivery-policy--quiet-hours-digests-caps). The delivery patch is partial at every level, so one field can be changed without writing back the rest. |
 | `GET` | `/config/storage` | What retention costs: the database's size on disk, the sample count, measured bytes per sample (`measured: false` when the database is too small to measure and the server's own figure stands in), and samples a day at the current provider count and interval. |
 | `PATCH` | `/config/channels/:id` | Enable/disable, and set variable names. **Refuses** a literal secret. |
 | `PUT` | `/config/channels/:id/secrets` | Save credential **values** — `{"fields":{"<field>":"<value>"}}`. Write-only: the value goes to `secrets.env` beside the database and into the process environment, effective immediately, and the response is the usual names-and-`isSet` shape. `400` for an unknown field or an unusable value. |
@@ -1152,6 +1216,8 @@ back reports a parse failure instead of the real problem.
 | `POST` | `/config/services/:id/test` | One live fetch against that provider. Records nothing. |
 | `POST` | `/config/channels/:id/test` | One test notification, through the dispatcher. |
 | `GET` `PATCH` | `/api/preferences` | `{ theme, uiLocale, notificationLocale, mapView, timeZone }`. `timeZone` is `auto` — this browser's own — or an IANA name; anything the runtime cannot format a date in is refused. |
+| `GET` | `/debug/adapters` | Adapter diagnostics: per provider, its adapter, base URL and options, and the last twenty read outcomes (duration, attempts, whether it was a `304`, and the error in full). In memory — diagnostics for the run in front of you, not history, so a restart empties it. |
+| `POST` | `/debug/adapters/:id/probe` | One read of that provider's page, right now, reported in full: the whole parsed reading on success, the adapter's own error on failure (as `200` with `ok: false`, like the connection test). Records nothing and notifies nothing. `404` on an unknown id. |
 | `POST` | `/poll` | Run a cycle now, through the scheduler. Returns the cycle summary. |
 | `GET` | `/events` | Server-sent events, one long-lived response per open tab. `hello` on connect (`lastPollAt`, `nextPollAt`, `serverNow`), then `cycle` as each cycle finishes (`finishedAt`, `providers`, `failed`, `changedProviders` — no deadline: the scheduler re-arms after the event, so the fresh one comes with the re-read). The stream is a courier, not a source of truth: it says what changed, and the dashboard re-reads it. Not JSON — see [6.3](#63-live-updates). |
 | `GET` | `/metrics` | Prometheus exposition. The one non-JSON endpoint — see [6.2](#62-prometheus-metrics). |
@@ -1447,6 +1513,13 @@ until a change has been seen the configured number of polls in a row. A real
 outage therefore costs at most `confirmSamples - 1` polls of delay, and a
 one-cycle disagreement costs nothing at all.
 
+Everything in the table above is the diff engine deciding what is *news*. What
+happens to a change after that is the delivery policy's business — quiet hours,
+a digest window, an hourly cap, one message per incident — and that is
+[3.8](#38-delivery-policy--quiet-hours-digests-caps). The order is deliberate
+and never the other way round: the engine answers "did something change", the
+rules answer "who covers it", and the policy answers "does it reach them now".
+
 **Suppression rule**: while any maintenance window a provider declared is
 running, nothing else about that provider is news — a status change, a new or
 updated incident, a component flip, all of it stays quiet until the window
@@ -1510,11 +1583,19 @@ Timestamps stay UTC with an explicit suffix in every language.
   thing that decides, and the dispatcher is the only thing that sends.
 - **Restart** — state is reloaded from the store, so no false "everything changed"
   burst. Tested in both editions, including in the container.
-- **Rate limiting** — providers are staggered within a cycle and the interval carries
-  jitter, so neither one instance nor a fleet hammers a provider on the same second.
-  A provider's stored validator turns most cycles into a `304` with no body, and a
+- **Rate limiting** — each provider's request is offset by a hash of its id, bounded
+  to a tenth of its cadence, and the interval itself carries jitter, so neither one
+  instance nor a fleet hammers a provider on the same second; because the offset is
+  anchored on the id, adding a provider does not move everyone else's request. A
+  provider's stored validator turns most cycles into a `304` with no body, and a
   provider that publishes twice a year can be given its own slower cadence with
   `intervalMinutes`.
+- **A provider that asks for room** — a `429`, or any answer carrying `Retry-After`,
+  is honoured: that provider sits out the cycles until the window it stated has
+  passed, instead of being retried inside it. A bare `503` stays an ordinary failure,
+  a `429` with no header gets a one-minute default, and a stated window is capped at
+  six hours so a provider cannot take itself off the dashboard for a week. A manual
+  poll from the dashboard still asks — that is one request the operator chose.
 - **Untrusted timestamps** — a provider's `updatedAt` ahead of our clock cannot start
   an incident in the future; the start time is pinned to the poll that first saw it,
   while the provider's own claim is still recorded.

@@ -97,6 +97,9 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       // Every channel the configuration defines, enabled or not: the UI edition
       // seeds all of them and the Light edition lists whatever the file names.
       knownChannelIds: config.channels.map((channel) => channel.id),
+      // Re-read every cycle like everything else here, so a quiet-hours window
+      // or a digest length changed from the dashboard applies without a restart.
+      delivery: config.delivery,
     });
     if (onCycle !== undefined) await onCycle(result);
     return result;

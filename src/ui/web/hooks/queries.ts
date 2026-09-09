@@ -364,6 +364,32 @@ export function useStorage() {
   return useQuery({ queryKey: ["storage"], queryFn: api.getStorage });
 }
 
+/**
+ * The adapter debug panel — roadmap 5.18. Not on the shared polling interval:
+ * it lives behind a dialog, so it is fetched when opened and refreshed on the
+ * same cadence as the rest while it is, which is what makes a failing read
+ * appear without the operator reopening it.
+ */
+export function useAdapterDebug(enabled: boolean) {
+  const busy = useBusy();
+  const live = useLive();
+  return useQuery({
+    queryKey: ["adapter-debug"],
+    queryFn: api.getAdapterDebug,
+    refetchInterval: idleInterval(busy, live),
+    enabled,
+  });
+}
+
+/**
+ * One live read of a provider's page. A mutation rather than a query because
+ * it is a request an operator makes, not state the panel reflects — and
+ * because two clicks must mean two reads.
+ */
+export function useAdapterProbe() {
+  return useMutation({ mutationFn: api.probeAdapter });
+}
+
 export function useSettingsMutation() {
   const invalidate = useInvalidateAll();
   return useMutation({ mutationFn: api.patchSettings, onSuccess: invalidate });

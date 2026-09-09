@@ -36,7 +36,9 @@ test("an opened incident posts one embed titled with the severity", async () => 
     stub.restore();
   }
   const [request] = stub.requests;
-  assert.equal(request?.url, settings.webhookUrl);
+  // `?wait=true` so Discord answers with the message it created: its id is what
+  // an edit needs later (roadmap 3.19).
+  assert.equal(request?.url, `${settings.webhookUrl}?wait=true`);
   assert.equal(request?.method, "POST");
   assert.equal(request?.headers["content-type"], "application/json");
   const body = request?.body as DiscordBody;
@@ -109,4 +111,48 @@ test("the notifier refuses a missing or non-http webhook url", () => {
 
 test("the notifier reports its channel id", () => {
   assert.equal(createDiscordNotifier(settings).id, "discord");
+});
+
+test("a send reports the message id Discord assigned, so an update can edit it", async () => {
+  const stub = stubFetch(() => jsonResponse({ id: "42" }));
+  try {
+    const ref = await createDiscordNotifier(settings).send(opened);
+    assert.equal(ref, "42");
+  } finally {
+    stub.restore();
+  }
+});
+
+test("an answer without an id is still a delivered message", async () => {
+  const stub = stubFetch(() => new Response(null, { status: 204 }));
+  try {
+    assert.equal(await createDiscordNotifier(settings).send(opened), undefined);
+  } finally {
+    stub.restore();
+  }
+});
+
+test("an update patches the message by id, with the same embed a send posts", async () => {
+  const stub = stubFetch(() => jsonResponse({ id: "42" }));
+  try {
+    await createDiscordNotifier(settings).update?.(opened, "42");
+  } finally {
+    stub.restore();
+  }
+  const [request] = stub.requests;
+  assert.equal(request?.url, `${settings.webhookUrl}/messages/42`);
+  assert.equal(request?.method, "PATCH");
+  const [embed] = (request?.body as DiscordBody).embeds;
+  assert.equal(embed?.title, "🔴 GitHub — MAJOR OUTAGE");
+});
+
+test("an update Discord refuses is reported, so the dispatcher can send a new message", async () => {
+  const stub = stubFetch(() => jsonResponse({ message: "Unknown Message" }, 404));
+  try {
+    await assert.rejects(createDiscordNotifier(settings).update?.(opened, "42") ?? Promise.resolve(), {
+      message: "discord notification edit failed: HTTP 404 (Unknown Message)",
+    });
+  } finally {
+    stub.restore();
+  }
 });

@@ -55,6 +55,93 @@ const STATUS_RANK: Record<OverallStatus, number | null> = {
   unknown: null,
 };
 
+/**
+ * A nightly floor: while the window runs, a change has to be at least this bad
+ * to reach anybody (roadmap 3.11).
+ *
+ * It is an input to the evaluator below rather than a filter in the dispatcher,
+ * for the same reason a mute is an input to the diff engine: an operator asking
+ * "who would hear about this?" has to get one answer, and a second gate
+ * somewhere downstream is how the dry run and the delivery start disagreeing.
+ */
+export interface QuietHours {
+  enabled: boolean;
+  /** Wall clock in `timeZone`, "HH:MM". A window may wrap midnight. */
+  start: string;
+  end: string;
+  /** IANA zone name, or "auto" for the zone the process itself runs in. */
+  timeZone: string;
+  /** What a change must clear to notify while the window runs. */
+  minSeverity: SeverityFloor;
+}
+
+/** What an installation that has never configured quiet hours behaves like. */
+export const QUIET_HOURS_OFF: QuietHours = {
+  enabled: false,
+  start: "23:00",
+  end: "07:00",
+  timeZone: "auto",
+  minSeverity: "major_outage",
+};
+
+/** "HH:MM" as minutes since midnight, or null when it is not that shape. */
+function minutesOfClock(value: string): number | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  if (match === null) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+/**
+ * What the wall clock reads in `timeZone` at `at`, in minutes since midnight.
+ * Null when the zone is not one this runtime can format in — the caller then
+ * fails open rather than reading a window in the wrong zone.
+ *
+ * Formatted rather than computed from an offset: an offset is wrong twice a
+ * year, which is the whole reason the timezone preference stores a name.
+ */
+export function minutesOfDay(at: Date, timeZone: string): number | null {
+  const zone = timeZone === "auto" ? Intl.DateTimeFormat().resolvedOptions().timeZone : timeZone;
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: zone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(at);
+  } catch {
+    return null;
+  }
+  const hour = parts.find((part) => part.type === "hour")?.value;
+  const minute = parts.find((part) => part.type === "minute")?.value;
+  if (hour === undefined || minute === undefined) return null;
+  // "24" is what some runtimes render midnight as under hour12: false.
+  return (Number(hour) % 24) * 60 + Number(minute);
+}
+
+/**
+ * Whether `at` falls inside the window. The start is inclusive and the end is
+ * exclusive, so 23:00–07:00 covers 23:00 and not 07:00 — an operator setting
+ * 07:00 means "I am up at seven".
+ *
+ * Fails open on anything unusable: a malformed time, an unknown zone, or a
+ * window whose ends are equal (which reads as either "always" or "never" and
+ * would be a whole day of silence if read the wrong way). Quiet hours trade
+ * alerts for sleep, and a broken setting must lose that trade.
+ */
+export function inQuietHours(quiet: QuietHours, at: Date): boolean {
+  if (!quiet.enabled) return false;
+  const start = minutesOfClock(quiet.start);
+  const end = minutesOfClock(quiet.end);
+  if (start === null || end === null || start === end) return false;
+  const nowMinutes = minutesOfDay(at, quiet.timeZone);
+  if (nowMinutes === null) return false;
+  return start < end
+    ? nowMinutes >= start && nowMinutes < end
+    : // Wrapping midnight: two ranges, one on each side of it.
+      nowMinutes >= start || nowMinutes < end;
+}
+
 export interface RoutingRule {
   /** A provider id, or "*" for every provider. */
   provider: string;
@@ -102,7 +189,7 @@ export function severityOf(change: StatusChange): OverallStatus {
  * serves both sides of the comparison and there is no second scale to keep
  * in step.
  */
-function clears(severity: OverallStatus, floor: SeverityFloor): boolean {
+export function clearsFloor(severity: OverallStatus, floor: SeverityFloor): boolean {
   if (floor === "any") return true;
   const rank = STATUS_RANK[severity];
   const required = STATUS_RANK[floor];
@@ -127,6 +214,18 @@ export interface Explanation {
   outcomes: RuleOutcome[];
   /** Exactly what `resolveTargets` returns for the same inputs. */
   targets: string[];
+  /**
+   * True when quiet hours took the change away from a rule that had already
+   * won it. Reported rather than folded into `targets` alone: a dry run that
+   * showed no channels and no reason would read as a broken rule.
+   */
+  quieted: boolean;
+}
+
+export interface RoutingOptions {
+  quietHours?: QuietHours | undefined;
+  /** When the change is being evaluated. Defaults to the change's own timestamp. */
+  at?: Date | undefined;
 }
 
 /**
@@ -149,6 +248,7 @@ export function explain(
   change: StatusChange,
   rules: RoutingRule[],
   enabledChannelIds: string[],
+  options: RoutingOptions = {},
 ): Explanation {
   const severity = severityOf(change);
   const eventClass = classOf(change.kind);
@@ -172,7 +272,7 @@ export function explain(
       outcomes.push({ kind: "skipped", because: "class" });
       continue;
     }
-    if (!clears(severity, rule.minSeverity)) {
+    if (!clearsFloor(severity, rule.minSeverity)) {
       outcomes.push({ kind: "skipped", because: "severity" });
       continue;
     }
@@ -188,13 +288,26 @@ export function explain(
     targets = won;
   }
 
-  return { winner, outcomes, targets };
+  // Applied after the rules, never instead of them: the winning rule is still
+  // the answer to "who covers this change", and quiet hours only decide
+  // whether tonight is the night they hear about it. Keeping the order this
+  // way is what lets the dry run show both — the rule that won, and the window
+  // that overrode it.
+  const quiet = options.quietHours;
+  const quieted =
+    quiet !== undefined &&
+    targets.length > 0 &&
+    inQuietHours(quiet, options.at ?? new Date(change.at)) &&
+    !clearsFloor(severity, quiet.minSeverity);
+
+  return { winner, outcomes, targets: quieted ? [] : targets, quieted };
 }
 
 export function resolveTargets(
   change: StatusChange,
   rules: RoutingRule[],
   enabledChannelIds: string[],
+  options: RoutingOptions = {},
 ): string[] {
-  return explain(change, rules, enabledChannelIds).targets;
+  return explain(change, rules, enabledChannelIds, options).targets;
 }

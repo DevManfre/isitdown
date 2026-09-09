@@ -1,3 +1,4 @@
+import type { DeliveryConfig } from "./delivery.ts";
 import type { RoutingRule } from "./routing.ts";
 
 export interface PollingConfig {
@@ -71,6 +72,14 @@ export interface RuntimeConfig {
    * "no notifications".
    */
   rules: RoutingRule[];
+  /**
+   * How much of what the rules admit actually goes out, and in how many
+   * messages: quiet hours, the digest window, the per-provider cap, and
+   * whether an incident's updates edit one message instead of adding
+   * another. Every field has an "off" default, so an installation that
+   * configures none of this behaves exactly as it did before.
+   */
+  delivery: DeliveryConfig;
 }
 
 /**

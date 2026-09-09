@@ -4,8 +4,11 @@ import {
   CATCH_ALL_RULE,
   classOf,
   explain,
+  inQuietHours,
+  minutesOfDay,
   resolveTargets,
   severityOf,
+  type QuietHours,
   type RoutingRule,
 } from "../../src/core/routing.ts";
 import { STATUS_CHANGE_KINDS, type StatusChange } from "../../src/core/types.ts";
@@ -155,4 +158,89 @@ test("explain's targets always equal what resolveTargets returns for the same in
   for (const c of [change(), change({ providerId: "cloudflare" }), change({ kind: "maintenance_started" })]) {
     assert.deepEqual(explain(c, rules, ALL).targets, resolveTargets(c, rules, ALL));
   }
+});
+
+const quiet = (over: Partial<QuietHours> = {}): QuietHours => ({
+  enabled: true,
+  start: "23:00",
+  end: "07:00",
+  timeZone: "UTC",
+  minSeverity: "major_outage",
+  ...over,
+});
+
+test("a wall clock is read in the zone the window is written in", () => {
+  const at = new Date("2026-09-08T21:30:00.000Z");
+  assert.equal(minutesOfDay(at, "UTC"), 21 * 60 + 30);
+  assert.equal(minutesOfDay(at, "Europe/Rome"), 23 * 60 + 30);
+  assert.equal(minutesOfDay(new Date("2026-09-08T22:10:00.000Z"), "Europe/Rome"), 10);
+  // Not a zone this runtime knows: the caller has to be able to fail open.
+  assert.equal(minutesOfDay(at, "Mars/Olympus_Mons"), null);
+});
+
+test("a window that wraps midnight covers both sides of it", () => {
+  const window = quiet();
+  assert.equal(inQuietHours(window, new Date("2026-09-08T23:00:00.000Z")), true, "the start is inside");
+  assert.equal(inQuietHours(window, new Date("2026-09-09T03:00:00.000Z")), true);
+  assert.equal(inQuietHours(window, new Date("2026-09-09T06:59:00.000Z")), true);
+  assert.equal(inQuietHours(window, new Date("2026-09-09T07:00:00.000Z")), false, "the end is outside");
+  assert.equal(inQuietHours(window, new Date("2026-09-09T12:00:00.000Z")), false);
+});
+
+test("a daytime window does not wrap", () => {
+  const window = quiet({ start: "09:00", end: "18:00" });
+  assert.equal(inQuietHours(window, new Date("2026-09-08T12:00:00.000Z")), true);
+  assert.equal(inQuietHours(window, new Date("2026-09-08T20:00:00.000Z")), false);
+});
+
+test("quiet hours fail open on anything unusable", () => {
+  const at = new Date("2026-09-09T03:00:00.000Z");
+  assert.equal(inQuietHours(quiet({ enabled: false }), at), false);
+  assert.equal(inQuietHours(quiet({ start: "25:00" }), at), false, "a malformed start");
+  assert.equal(inQuietHours(quiet({ end: "7:00" }), at), false, "a malformed end");
+  assert.equal(inQuietHours(quiet({ timeZone: "Nowhere/Nothing" }), at), false, "an unknown zone");
+  // Equal ends read as either "always" or "never"; a whole day of silence is
+  // the reading that loses alerts, so it is the one that is refused.
+  assert.equal(inQuietHours(quiet({ start: "07:00", end: "07:00" }), at), false);
+});
+
+test("quiet hours take a change from the rule that won it, and say so", () => {
+  const night = change({ currentStatus: "degraded", at: "2026-09-09T03:00:00.000Z" });
+  const held = explain(night, [CATCH_ALL_RULE], ALL, { quietHours: quiet() });
+  assert.deepEqual(held.targets, [], "nothing goes out");
+  assert.equal(held.quieted, true, "and the dry run can explain why");
+  assert.equal(held.winner, 0, "the rule still won: quiet hours are not a rule");
+
+  const bad = change({ currentStatus: "major_outage", at: "2026-09-09T03:00:00.000Z" });
+  const through = explain(bad, [CATCH_ALL_RULE], ALL, { quietHours: quiet() });
+  assert.deepEqual(through.targets, ALL);
+  assert.equal(through.quieted, false);
+});
+
+test("a change no rule wanted is not reported as quieted", () => {
+  const muting = rule({ channels: [] });
+  const held = explain(change({ at: "2026-09-09T03:00:00.000Z" }), [muting], ALL, {
+    quietHours: quiet(),
+  });
+  assert.deepEqual(held.targets, []);
+  assert.equal(held.quieted, false, "the rule silenced it, not the hour");
+});
+
+test("the timestamp quiet hours are read at is the change's own, unless one is given", () => {
+  const night = change({ at: "2026-09-09T03:00:00.000Z" });
+  assert.equal(explain(night, [CATCH_ALL_RULE], ALL, { quietHours: quiet() }).quieted, true);
+  // A dry run asks "what would happen right now", so it passes its own clock.
+  assert.equal(
+    explain(night, [CATCH_ALL_RULE], ALL, {
+      quietHours: quiet(),
+      at: new Date("2026-09-09T12:00:00.000Z"),
+    }).quieted,
+    false,
+  );
+});
+
+test("with no quiet hours passed, routing behaves exactly as it did before them", () => {
+  const night = change({ at: "2026-09-09T03:00:00.000Z" });
+  assert.deepEqual(resolveTargets(night, [CATCH_ALL_RULE], ALL), ALL);
+  assert.equal(explain(night, [CATCH_ALL_RULE], ALL).quieted, false);
 });

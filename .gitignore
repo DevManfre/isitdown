@@ -17,3 +17,6 @@ config.yml
 *.db-wal
 *.db-shm
 test/visual/current/
+
+# graphify
+graphify-out

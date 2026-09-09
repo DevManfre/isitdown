@@ -862,3 +862,86 @@ test("the flap-damping threshold is stored and reaches the next config load", as
     await app.close();
   }
 });
+
+test("GET /config reports the delivery policy, and an unconfigured one reads as off", async () => {
+  const it = await api();
+  try {
+    const { body } = await it.request("GET", "/config");
+    assert.deepEqual((body as { delivery: unknown }).delivery, {
+      quietHours: {
+        enabled: false,
+        start: "23:00",
+        end: "07:00",
+        timeZone: "auto",
+        minSeverity: "major_outage",
+      },
+      digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" },
+      cap: { enabled: false, maxPerHour: 10 },
+      updateInPlace: false,
+    });
+  } finally {
+    await it.close();
+  }
+});
+
+test("a delivery patch writes only the fields it names, and reaches the engine", async () => {
+  const it = await api();
+  try {
+    const { status, body } = await it.request("PATCH", "/config/settings", {
+      delivery: { quietHours: { enabled: true, start: "22:30", timeZone: "Europe/Rome" } },
+    });
+    assert.equal(status, 200);
+    const patched = (body as { delivery: { quietHours: Record<string, unknown> } }).delivery;
+    assert.equal(patched.quietHours.enabled, true);
+    assert.equal(patched.quietHours.start, "22:30");
+    // Untouched, rather than reset to a default by a partial write.
+    assert.equal(patched.quietHours.end, "07:00");
+    assert.equal(patched.quietHours.minSeverity, "major_outage");
+
+    // And it is the same policy the dispatcher will read on the next cycle,
+    // not a second copy assembled by the route.
+    const config = await it.runtime.configSource.load();
+    assert.equal(config.delivery.quietHours.enabled, true);
+    assert.equal(config.delivery.quietHours.timeZone, "Europe/Rome");
+  } finally {
+    await it.close();
+  }
+});
+
+test("a delivery patch the schema refuses changes nothing", async () => {
+  const it = await api();
+  try {
+    const { status } = await it.request("PATCH", "/config/settings", {
+      delivery: { quietHours: { start: "25:00" } },
+    });
+    assert.equal(status, 400);
+    const config = await it.runtime.configSource.load();
+    assert.equal(config.delivery.quietHours.start, "23:00");
+  } finally {
+    await it.close();
+  }
+});
+
+test("a digest and a cap survive the round trip through the setting rows", async () => {
+  const it = await api();
+  try {
+    await it.request("PATCH", "/config/settings", {
+      delivery: {
+        digest: { enabled: true, windowMinutes: 45, immediateFloor: "partial_outage" },
+        cap: { enabled: true, maxPerHour: 6 },
+        updateInPlace: true,
+      },
+    });
+
+    const config = await it.runtime.configSource.load();
+    assert.deepEqual(config.delivery.digest, {
+      enabled: true,
+      windowMinutes: 45,
+      immediateFloor: "partial_outage",
+    });
+    assert.deepEqual(config.delivery.cap, { enabled: true, maxPerHour: 6 });
+    assert.equal(config.delivery.updateInPlace, true);
+  } finally {
+    await it.close();
+  }
+});

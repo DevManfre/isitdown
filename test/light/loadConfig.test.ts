@@ -331,3 +331,84 @@ ${MINIMAL}
 
   await assert.rejects(loadConfig(path, {}), /adaptiveIntervalMinutes/);
 });
+
+test("a file with no delivery block reads as every control off", async () => {
+  // Which is what this edition did before the policy existed, and the reason
+  // the defaults live in the shared schema rather than in a literal here.
+  const config = await loadConfig(await configFile(MINIMAL), {});
+
+  assert.deepEqual(config.delivery, {
+    quietHours: {
+      enabled: false,
+      start: "23:00",
+      end: "07:00",
+      timeZone: "auto",
+      minSeverity: "major_outage",
+    },
+    digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" },
+    cap: { enabled: false, maxPerHour: 10 },
+    updateInPlace: false,
+  });
+});
+
+test("the file's delivery block reaches the runtime config", async () => {
+  const path = await configFile(`
+delivery:
+  quietHours:
+    enabled: true
+    start: "22:30"
+    end: "06:45"
+    timeZone: Europe/Rome
+    minSeverity: partial_outage
+  digest:
+    enabled: true
+    windowMinutes: 30
+    immediateFloor: major_outage
+  cap:
+    enabled: true
+    maxPerHour: 6
+  updateInPlace: true
+${MINIMAL}
+`);
+
+  const config = await loadConfig(path, {});
+
+  assert.deepEqual(config.delivery.quietHours, {
+    enabled: true,
+    start: "22:30",
+    end: "06:45",
+    timeZone: "Europe/Rome",
+    minSeverity: "partial_outage",
+  });
+  assert.equal(config.delivery.digest.windowMinutes, 30);
+  assert.equal(config.delivery.cap.maxPerHour, 6);
+  assert.equal(config.delivery.updateInPlace, true);
+});
+
+test("a half-configured delivery block keeps the defaults for the rest", async () => {
+  const path = await configFile(`
+delivery:
+  cap:
+    enabled: true
+${MINIMAL}
+`);
+
+  const config = await loadConfig(path, {});
+
+  assert.equal(config.delivery.cap.enabled, true);
+  assert.equal(config.delivery.cap.maxPerHour, 10, "the ceiling still has its default");
+  assert.equal(config.delivery.quietHours.enabled, false);
+});
+
+test("a quiet-hours window that is not a clock time is refused, not rounded", async () => {
+  // A window read wrong is a night of silence or a night of noise, and this
+  // edition is fatal on configuration it cannot understand.
+  const path = await configFile(`
+delivery:
+  quietHours:
+    start: "25:00"
+${MINIMAL}
+`);
+
+  await assert.rejects(loadConfig(path, {}), /start/);
+});

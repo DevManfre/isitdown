@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import {
   componentSelectionSchema,
+  deliverySchema,
   localeSchema,
   pollingSchema,
   routingRuleSchema,
@@ -16,7 +17,7 @@ import type {
 } from "../core/configSource.interface.ts";
 import type { Logger } from "../core/logger.ts";
 import { forgetProvider } from "../core/http.ts";
-import { CATCH_ALL_RULE } from "../core/routing.ts";
+import { CATCH_ALL_RULE, SEVERITY_FLOORS } from "../core/routing.ts";
 import { isOptionalSetting } from "../notifiers/settings.ts";
 import type { RoutingRule } from "../core/routing.ts";
 
@@ -35,6 +36,16 @@ import type { RoutingRule } from "../core/routing.ts";
  */
 
 const ENV_SUFFIX = "Env";
+
+/**
+ * Every setting is a string in SQLite, so a flag comes back as "true"/"false".
+ * Stated once here: three of the rows below are flags, and three hand-written
+ * transforms is three chances for one of them to read a missing row as true.
+ */
+const booleanSetting = z.enum(["true", "false"]).transform((value) => value === "true");
+
+/** A 24-hour wall clock time, the shape `quietHoursSchema` accepts. */
+const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
 export type ThemePreference = "light" | "dark" | "system";
 
@@ -83,6 +94,36 @@ const settingsSchema = z.object({
    * an empty world map is worse than no card.
    */
   mapView: z.enum(["off", "map", "globe"]).catch("off"),
+
+  /**
+   * Quiet hours (roadmap 3.11). Stored as five flat rows like every other
+   * setting rather than as one JSON blob, so a value that cannot be read falls
+   * back on its own instead of taking the other four with it.
+   */
+  quietHoursEnabled: booleanSetting.catch(false),
+  // Shape-checked here as well as in the shared schema: `deliverySchema` is a
+  // hard parse, so a row holding "25:00" — hand-edited, or written by a version
+  // that validated less — would take the whole configuration load down with it.
+  quietHoursStart: clockTime.catch("23:00"),
+  quietHoursEnd: clockTime.catch("07:00"),
+  quietHoursTimeZone: z.string().max(64).catch("auto"),
+  quietHoursMinSeverity: z.enum(SEVERITY_FLOORS).catch("major_outage"),
+
+  /** Digest mode (roadmap 3.12). */
+  digestEnabled: booleanSetting.catch(false),
+  digestWindowMinutes: z.coerce.number().int().positive().max(1440).catch(15),
+  digestImmediateFloor: z.enum(SEVERITY_FLOORS).catch("major_outage"),
+
+  /** Per-provider alert cap (roadmap 3.13). */
+  alertCapEnabled: booleanSetting.catch(false),
+  alertCapPerHour: z.coerce.number().int().positive().max(1000).catch(10),
+
+  /**
+   * Edit one message per incident instead of sending one per update (roadmap
+   * 3.19). Off by default: an installation used to a message per update would
+   * otherwise watch its channel history collapse without having asked.
+   */
+  updateInPlace: booleanSetting.catch(false),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -165,6 +206,42 @@ export function readSettings(db: DatabaseSync, logger: Logger): Settings {
     }
   }
   return settings;
+}
+
+/**
+ * The delivery policy as the shared schema wants it, assembled from the flat
+ * setting rows. One function, called by both the config source and the route
+ * that reports the current policy, so the API and the engine can never be
+ * reading two different windows.
+ */
+export function deliveryOf(settings: Settings): {
+  quietHours: {
+    enabled: boolean;
+    start: string;
+    end: string;
+    timeZone: string;
+    minSeverity: Settings["quietHoursMinSeverity"];
+  };
+  digest: { enabled: boolean; windowMinutes: number; immediateFloor: Settings["digestImmediateFloor"] };
+  cap: { enabled: boolean; maxPerHour: number };
+  updateInPlace: boolean;
+} {
+  return {
+    quietHours: {
+      enabled: settings.quietHoursEnabled,
+      start: settings.quietHoursStart,
+      end: settings.quietHoursEnd,
+      timeZone: settings.quietHoursTimeZone,
+      minSeverity: settings.quietHoursMinSeverity,
+    },
+    digest: {
+      enabled: settings.digestEnabled,
+      windowMinutes: settings.digestWindowMinutes,
+      immediateFloor: settings.digestImmediateFloor,
+    },
+    cap: { enabled: settings.alertCapEnabled, maxPerHour: settings.alertCapPerHour },
+    updateInPlace: settings.updateInPlace,
+  };
 }
 
 export function writeSettings(db: DatabaseSync, patch: Partial<Record<keyof Settings, unknown>>): void {
@@ -685,6 +762,10 @@ export function createDbConfigSource(
         // Falling back keeps "no rules" from meaning "no notifications", which
         // is a state nobody chooses on purpose.
         rules: routing.rules.length === 0 ? [CATCH_ALL_RULE] : routing.rules,
+        // Through the shared schema, like the polling block above: the flat
+        // rows are this edition's storage, and the policy's shape and defaults
+        // stay the Light edition's too.
+        delivery: deliverySchema.parse(deliveryOf(settings)),
       };
     },
   };

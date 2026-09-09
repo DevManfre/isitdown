@@ -98,3 +98,48 @@ test("the notifier refuses to be built without its required settings", () => {
 test("the notifier reports its channel id", () => {
   assert.equal(createTelegramNotifier(settings).id, "telegram");
 });
+
+test("a send reports the message_id Telegram assigned, so an update can edit it", async () => {
+  const stub = stubFetch(() => jsonResponse({ ok: true, result: { message_id: 77 } }));
+  try {
+    assert.equal(await createTelegramNotifier(settings).send(degraded), "77");
+  } finally {
+    stub.restore();
+  }
+});
+
+test("an answer without a message_id is still a delivered message", async () => {
+  const stub = stubFetch(() => jsonResponse({ ok: true }));
+  try {
+    assert.equal(await createTelegramNotifier(settings).send(degraded), undefined);
+  } finally {
+    stub.restore();
+  }
+});
+
+test("an update edits the message by id through editMessageText", async () => {
+  const stub = stubFetch(() => jsonResponse({ ok: true, result: { message_id: 77 } }));
+  try {
+    await createTelegramNotifier(settings).update?.(degraded, "77");
+  } finally {
+    stub.restore();
+  }
+  const [request] = stub.requests;
+  assert.ok(request?.url.endsWith("/editMessageText"), request?.url);
+  const body = request?.body as { chat_id: string; message_id: number; text: string };
+  assert.equal(body.message_id, 77);
+  assert.equal(body.chat_id, settings.chatId);
+  assert.ok(body.text.includes("GitHub"), body.text);
+});
+
+test("an edit Telegram refuses is reported rather than swallowed", async () => {
+  // What Telegram answers for a message older than 48 hours.
+  const stub = stubFetch(() => jsonResponse({ ok: false, description: "message can't be edited" }));
+  try {
+    await assert.rejects(createTelegramNotifier(settings).update?.(degraded, "77") ?? Promise.resolve(), {
+      message: "telegram notification rejected: message can't be edited",
+    });
+  } finally {
+    stub.restore();
+  }
+});

@@ -344,6 +344,47 @@ describe("RoutingRules", () => {
       expect(verdictChannelNames()).toEqual(expectedChannelNames(sentryMajorOutage));
     });
 
+    it("says quiet hours held it back, rather than naming channels that hear nothing", async () => {
+      const user = userEvent.setup();
+      // Roadmap 3.11. The window is a routing input, so the dry run has to
+      // answer the question an operator is really asking — "would this reach me
+      // *now*" — and a preview that ignored the window would promise a delivery
+      // the dispatcher is about to drop.
+      const catchAll: RoutingRule[] = [
+        { provider: "*", classes: ["status"], minSeverity: "any", channels: ["*"] },
+      ];
+      mount(
+        <RoutingRules
+          routing={{ rules: catchAll, invalidRules: 0 }}
+          channels={channels}
+          services={dryRunServices}
+          quietHours={{
+            enabled: true,
+            // A window covering the whole day, so the test does not depend on
+            // the hour it runs at: 00:00–23:59 wraps nothing and excludes only
+            // the last minute of the day.
+            start: "00:00",
+            end: "23:59",
+            timeZone: "UTC",
+            minSeverity: "major_outage",
+          }}
+        />,
+      );
+
+      // The default event is the major outage, which clears the floor.
+      expect(screen.getByTestId("routing-dryrun-verdict").textContent).not.toBe(
+        i18n.t("routing.dryrun.quiet"),
+      );
+
+      // A degradation does not, so inside the window it reaches nobody — and
+      // the panel says which of the two answered, the rules or the hour.
+      await user.click(screen.getByRole("button", { name: i18n.t("routing.dryrun.event.degraded") }));
+      expect(screen.getByTestId("routing-dryrun-verdict").textContent).toBe(
+        i18n.t("routing.dryrun.quiet"),
+      );
+      expect(screen.getByText(i18n.t("routing.dryrun.quiet-note"))).toBeInTheDocument();
+    });
+
     it("shows nobody-will-receive-this when the winning rule names only a disabled channel", () => {
       // `resolveTargets` deliberately passes a named channel verbatim even
       // when it is disabled — the dispatcher is what drops it. A dry run

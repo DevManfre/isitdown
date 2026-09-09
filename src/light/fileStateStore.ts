@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { providerRuntimeStateSchema } from "../core/status.schema.ts";
+import type { MessageRefStore } from "../core/messageRefStore.interface.ts";
 import type { ProviderRuntimeState, StateStore } from "../core/stateStore.interface.ts";
 import type { DampingState, NormalizedStatus } from "../core/types.ts";
 
@@ -10,6 +11,13 @@ const FORMAT_VERSION = 1;
 const fileSchema = z.object({
   version: z.literal(FORMAT_VERSION),
   providers: z.record(providerRuntimeStateSchema),
+  /**
+   * Message ids per channel and incident (roadmap 3.19), keyed by a serialised
+   * triple. Defaulted rather than versioned: a file written before message
+   * editing existed simply has none, and a version bump would have made an
+   * upgrade fatal for a feature that is off by default.
+   */
+  messageRefs: z.record(z.string()).default({}),
 });
 
 const baseline = (): ProviderRuntimeState => ({
@@ -29,8 +37,14 @@ const baseline = (): ProviderRuntimeState => ({
  * from an empty store would make the next cycle re-notify every provider, which
  * is exactly the alert burst the design exists to prevent.
  */
-export async function createFileStateStore(path: string): Promise<StateStore> {
-  const providers = new Map<string, ProviderRuntimeState>(Object.entries(await readState(path)));
+export async function createFileStateStore(path: string): Promise<StateStore & MessageRefStore> {
+  const file = await readState(path);
+  const providers = new Map<string, ProviderRuntimeState>(Object.entries(file.providers));
+  const messageRefs = new Map<string, string>(Object.entries(file.messageRefs));
+
+  /** One key from the triple, serialised so an incident id containing anything is safe. */
+  const refKey = (channel: string, providerId: string, incidentId: string): string =>
+    JSON.stringify([channel, providerId, incidentId]);
 
   // A cycle polls every provider concurrently, so several mutations land at once.
   // Writes are serialised and each uses its own temporary file: sharing one
@@ -42,7 +56,11 @@ export async function createFileStateStore(path: string): Promise<StateStore> {
   async function writeOnce(): Promise<void> {
     await mkdir(dirname(path), { recursive: true });
     const payload = JSON.stringify(
-      { version: FORMAT_VERSION, providers: Object.fromEntries(providers) },
+      {
+        version: FORMAT_VERSION,
+        providers: Object.fromEntries(providers),
+        messageRefs: Object.fromEntries(messageRefs),
+      },
       null,
       2,
     );
@@ -106,18 +124,34 @@ export async function createFileStateStore(path: string): Promise<StateStore> {
       await persist();
     },
 
+    async getRef(channel: string, providerId: string, incidentId: string): Promise<string | null> {
+      return messageRefs.get(refKey(channel, providerId, incidentId)) ?? null;
+    },
+
+    async saveRef(channel: string, providerId: string, incidentId: string, ref: string): Promise<void> {
+      messageRefs.set(refKey(channel, providerId, incidentId), ref);
+      await persist();
+    },
+
+    async forgetRef(channel: string, providerId: string, incidentId: string): Promise<void> {
+      if (!messageRefs.delete(refKey(channel, providerId, incidentId))) return;
+      await persist();
+    },
+
     async close(): Promise<void> {
       // Every mutation already persisted; nothing is held open.
     },
   };
 }
 
-async function readState(path: string): Promise<Record<string, ProviderRuntimeState>> {
+async function readState(
+  path: string,
+): Promise<{ providers: Record<string, ProviderRuntimeState>; messageRefs: Record<string, string> }> {
   let raw: string;
   try {
     raw = await readFile(path, "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { providers: {}, messageRefs: {} };
     throw error;
   }
 
@@ -138,5 +172,5 @@ async function readState(path: string): Promise<Record<string, ProviderRuntimeSt
         .join("; ")}`,
     );
   }
-  return result.data.providers;
+  return { providers: result.data.providers, messageRefs: result.data.messageRefs };
 }
