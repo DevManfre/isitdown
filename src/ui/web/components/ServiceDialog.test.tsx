@@ -291,6 +291,9 @@ describe("the service dialog's write path", () => {
       // An empty interval field is the provider following the global cadence,
       // and only a null says so on a patch.
       intervalMinutes: null,
+      // Same for the group (roadmap 2.6): an empty field means "out of the
+      // group", which only a null can say.
+      group: null,
     });
   });
 

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentPicker, type ComponentPickerEntry, type ComponentPickerSelection } from "@/components/ComponentPicker.tsx";
-import { useCatalog, useServiceMutations } from "@/hooks/queries.ts";
+import { useCatalog, useConfig, useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { detectAdapter, previewComponents } from "@/lib/api.ts";
 import { slugify } from "@/lib/slugify.ts";
@@ -112,6 +112,9 @@ export function ServiceDialog({
   // Kept as the typed string, not a number: an empty field is what "follow the
   // global cadence" looks like, and 0/NaN cannot express it.
   const [intervalMinutes, setIntervalMinutes] = useState(intervalValue(service));
+  // "My stack" (roadmap 2.6). A free-text slug rather than a picker: the first
+  // group has to be creatable, and a select with nothing in it cannot do that.
+  const [group, setGroup] = useState(service?.group ?? "");
   // Adapter-specific extras, of which the scrape adapter is so far the only
   // user. Kept as the raw record the service definition carries, rather than as
   // named fields, so an adapter that grows an option later needs no new state.
@@ -126,6 +129,14 @@ export function ServiceDialog({
   // Only while adding, and only while the dialog is open: an edit already has
   // every answer the menu would offer.
   const { data: catalog } = useCatalog(open && mode === "add");
+  const { data: config } = useConfig();
+  const existingGroups = [
+    ...new Set(
+      (config?.services ?? [])
+        .map((entry) => entry.group)
+        .filter((entry): entry is string => typeof entry === "string" && entry !== ""),
+    ),
+  ].sort();
 
   // Hand-typing the id was busywork with a failure mode: the schema only
   // accepts `/^[a-z0-9][a-z0-9-]*$/`, so anything an operator typed naturally
@@ -168,6 +179,7 @@ export function ServiceDialog({
     setSelection(service?.components ?? []);
     setScopeToComponents(service?.scopeToComponents ?? false);
     setIntervalMinutes(intervalValue(service));
+    setGroup(service?.group ?? "");
     setOptions(service?.options ?? {});
     setPreview(undefined);
     setMessage(undefined);
@@ -281,6 +293,9 @@ export function ServiceDialog({
       if (mode === "add") {
         await add.mutateAsync({
           id, name, adapter, baseUrl, enabled: true, components: selection, scopeToComponents,
+          // Omitted rather than empty: "in no group" is the field being absent,
+          // and an empty string is not a slug the schema would take.
+          ...(slugify(group) === "" ? {} : { group: slugify(group) }),
           // Omitted entirely for the adapters that take none: an empty record
           // would be stored as one, and `undefined` is what "this adapter has
           // no extras" looks like everywhere else.
@@ -307,6 +322,9 @@ export function ServiceDialog({
             // Null, not omitted: a cleared field has to travel as an instruction
             // to forget the interval, or the row keeps the one it had.
             intervalMinutes: intervalMinutes.trim() === "" ? null : Number(intervalMinutes),
+            // Same rule for the group: cleared means "out of the group", which
+            // only null can say (roadmap 2.6).
+            group: slugify(group) === "" ? null : slugify(group),
           ...(scraping ? { options: usedOptions(options) } : {}),
           },
         });
@@ -477,6 +495,31 @@ export function ServiceDialog({
                 </div>
               </div>
             )}
+
+            {/* Roadmap 2.6. Typed, not picked: the first group has to be
+                creatable, and a select with nothing in it cannot create one.
+                Slugified on the way out, the way the id is, so "Deploy path"
+                is a legal group rather than a rejected write. */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="service-group">{t("field.group")}</Label>
+              <Input
+                id="service-group"
+                list="service-group-options"
+                placeholder={t("field.group-placeholder")}
+                value={group}
+                onChange={(event) => setGroup(event.target.value)}
+                {...fieldProps}
+              />
+              {/* The groups that already exist, offered rather than imposed:
+                  an operator adding the fifth provider to a stack should not
+                  have to remember how they spelled it. */}
+              <datalist id="service-group-options">
+                {existingGroups.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+              <span className="text-xs text-muted-foreground">{t("field.group-hint")}</span>
+            </div>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="service-interval">{t("field.provider-interval")}</Label>

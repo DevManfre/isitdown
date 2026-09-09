@@ -48,6 +48,14 @@ export const serviceDefinitionSchema = z.object({
   adapter: slug,
   baseUrl: httpUrl,
   enabled: z.boolean().default(true),
+  /**
+   * The group this provider belongs to — "my stack" (roadmap 2.6). A slug, so
+   * a routing rule can name it (`group:deploy-path`) and both editions write it
+   * the same way. Optional rather than defaulted: a fleet is a flat list until
+   * an operator says otherwise, and "no group" has to stay distinguishable from
+   * a group that happens to be called something.
+   */
+  group: slug.optional(),
   /** Omitted, not defaulted: absent has to stay distinguishable from "same as the global". */
   intervalMinutes: z.number().int().positive().max(1440).optional(),
   options: z.record(z.string()).optional(),
