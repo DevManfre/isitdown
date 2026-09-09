@@ -945,3 +945,44 @@ test("a digest and a cap survive the round trip through the setting rows", async
     await it.close();
   }
 });
+
+test("the detect route names the adapter that reads a pasted page, and the base url it wants", async () => {
+  const app = await api();
+  const provider = await fakeProvider();
+  try {
+    const { status, body } = await app.request("POST", "/config/services/detect", { url: provider.baseUrl });
+    assert.equal(status, 200);
+    // `fakeProvider` serves exactly the Statuspage summary document, which is
+    // what the detection is reading.
+    assert.deepEqual(
+      { adapter: (body as { adapter: string }).adapter, baseUrl: (body as { baseUrl: string }).baseUrl },
+      { adapter: "statuspage", baseUrl: provider.baseUrl },
+    );
+  } finally {
+    await provider.close();
+    await app.close();
+  }
+});
+
+test("a page no adapter recognises answers 200 with a null adapter, not an error", async () => {
+  const app = await api();
+  try {
+    // Nothing is listening here, so every probe comes back unreachable — the
+    // dashboard still asked a fair question and gets an answer it can show.
+    const { status, body } = await app.request("POST", "/config/services/detect", { url: "http://192.0.2.1:9" });
+    assert.equal(status, 200);
+    assert.equal((body as { adapter: string | null }).adapter, null);
+  } finally {
+    await app.close();
+  }
+});
+
+test("the detect route refuses a url it cannot parse", async () => {
+  const app = await api();
+  try {
+    assert.equal((await app.request("POST", "/config/services/detect", { url: "not a url" })).status, 400);
+    assert.equal((await app.request("POST", "/config/services/detect", {})).status, 400);
+  } finally {
+    await app.close();
+  }
+});

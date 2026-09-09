@@ -424,6 +424,14 @@ export interface AdapterDebugResponse {
 }
 
 /** What one live probe found: the whole reading, or why there was not one. */
+/** What the detect endpoint worked out about a pasted url (roadmap 1.14). */
+export interface AdapterDetection {
+  /** Null when no adapter recognised the page. */
+  adapter: string | null;
+  baseUrl: string | null;
+  probes: { adapter: string; url: string; outcome: "match" | "other-shape" | "unreachable" }[];
+}
+
 export interface AdapterProbeResult {
   ok: boolean;
   durationMs: number;

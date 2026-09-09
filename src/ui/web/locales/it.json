@@ -27,6 +27,7 @@
   "action.add": "Aggiungi",
   "action.back": "Torna alla panoramica",
   "action.test-connection": "Testa connessione",
+  "action.detect-adapter": "Rileva",
   "action.send-test": "Invia test",
   "action.incident-details": "Dettagli incidente",
   "action.history-90d": "Cronologia 90 giorni",
@@ -276,6 +277,8 @@
   "add.note.slack": "Usa https://slack-status.com; l'adapter aggiunge /api/v2.0.0/current a questo URL.",
   "add.note.custom": "L'adapter legge questo URL così com'è.",
   "add.test-ok": "Raggiungibile — ha risposto {status}.",
+  "add.detect-ok": "Riconosciuto come {adapter} — adapter e URL base compilati.",
+  "add.detect-none": "Nessun adapter conosciuto ha riconosciuto questa pagina. Scegline uno qui sotto.",
   "add.test-failed": "Non raggiungibile: {error}",
 
   "scrape.warning": "Leggere il markup di una pagina si rompe in silenzio quando la pagina cambia. Un selettore che smette di corrispondere viene segnalato come provider non raggiungibile, mai come \"operativo\".",

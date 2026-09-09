@@ -27,6 +27,7 @@
   "action.add": "Add",
   "action.back": "Back to overview",
   "action.test-connection": "Test connection",
+  "action.detect-adapter": "Detect",
   "action.send-test": "Send test",
   "action.incident-details": "Incident details",
   "action.history-90d": "90-day history",
@@ -276,6 +277,8 @@
   "add.note.slack": "Use https://slack-status.com; the adapter appends /api/v2.0.0/current to it.",
   "add.note.custom": "The adapter reads this URL as given.",
   "add.test-ok": "Reachable — reported {status}.",
+  "add.detect-ok": "Reads as {adapter} — adapter and base URL filled in.",
+  "add.detect-none": "No known adapter recognised this page. Pick one below.",
   "add.test-failed": "Could not reach it: {error}",
 
   "scrape.warning": "Reading a page's markup breaks silently when the page changes. A selector that stops matching is reported as a failing provider, never as \"operational\".",

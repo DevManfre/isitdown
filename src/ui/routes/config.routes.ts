@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { detectAdapter } from "../../adapters/detect.ts";
 import { getAdapter } from "../../adapters/index.ts";
 import {
   alertCapSchema,
@@ -34,6 +35,9 @@ import { storageReport } from "../storageReport.ts";
 import { ensureVapidKeys } from "../vapidKeys.ts";
 
 const previewComponentsSchema = serviceDefinitionSchema.pick({ adapter: true, baseUrl: true });
+
+/** Whatever the operator pasted into the base url field, before it is a service. */
+const detectSchema = z.object({ url: z.string().min(1).max(2048) });
 
 /**
  * The delivery policy, patchable a field at a time. Partial at every level
@@ -199,6 +203,32 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       res.json({ supported: true, components });
     } catch (error) {
       res.status(502).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+    }
+  });
+
+  /**
+   * Which adapter reads the page at a given url, and the base url it wants
+   * (roadmap 1.14). Read-only upstream like the preview above: it records
+   * nothing and notifies nothing, and no service row exists yet.
+   *
+   * A page nothing recognised answers 200 with `adapter: null` and the probes
+   * it tried, the same way the connection test reports a provider that would
+   * not answer: the dashboard asked a question and got an answer, and the
+   * operator can still pick an adapter by hand.
+   */
+  router.post("/config/services/detect", async (req, res) => {
+    const parsed = detectSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+    const { requestTimeoutSeconds } = readSettings(db, runtime.logger);
+    try {
+      res.json(await detectAdapter(parsed.data.url, { timeoutMs: requestTimeoutSeconds * 1000 }));
+    } catch (error) {
+      // Only an unusable url reaches here — every probe failure is an outcome,
+      // not an exception — so this is the request's own fault.
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
     }
   });
 
