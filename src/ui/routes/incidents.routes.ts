@@ -24,6 +24,21 @@ const pageSizeSchema = z.coerce
   .catch(DEFAULT_PAGE_SIZE)
   .transform((value) => Math.min(value, MAX_PAGE_SIZE));
 const stateSchema = z.enum(["all", "active", "resolved"]).catch("all");
+/**
+ * Free text over incident names, and the window it is searched in (roadmap
+ * 5.19). Both fall back to "no narrowing" on anything unusable, like the paging
+ * parameters above: a hand-edited URL should show the unfiltered list, not an
+ * error page.
+ *
+ * The search string is bounded because it becomes a `LIKE` pattern scanned over
+ * every row a long retention has accumulated.
+ */
+const querySchema = z
+  .string()
+  .max(120)
+  .catch("")
+  .transform((value) => value.trim());
+const daysSchema = z.coerce.number().int().positive().max(3650).catch(0);
 
 interface TimelineEntry {
   at: string;
@@ -62,6 +77,17 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
     const state = stateSchema.parse(req.query["state"] ?? undefined);
     const page = pageSchema.parse(req.query["page"] ?? undefined);
     const pageSize = pageSizeSchema.parse(req.query["pageSize"] ?? undefined);
+    const query = querySchema.parse(req.query["q"] ?? undefined);
+    const days = daysSchema.parse(req.query["days"] ?? undefined);
+    // The search and the window narrow the page *and* the counts, so the pills
+    // report what the search found rather than what the fleet has ever had.
+    // The active list below is deliberately outside them: it is the hero card's
+    // data, and a card that vanished while an operator typed a search would
+    // read as "the incident resolved itself".
+    const search = {
+      ...(query === "" ? {} : { query }),
+      ...(days === 0 ? {} : { days }),
+    };
     // A disabled provider is not being watched, so its incidents are not news:
     // the allow-list goes into the query rather than over the answer, because
     // the page, the pager's total and the pills' counts all come from the
@@ -73,11 +99,12 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       runtime.store.listIncidents({
         ...scope,
         providerIds,
+        ...search,
         ...(state === "all" ? {} : { state }),
         limit: pageSize,
         offset: (page - 1) * pageSize,
       }),
-      runtime.store.countIncidents({ ...scope, providerIds }),
+      runtime.store.countIncidents({ ...scope, providerIds, ...search }),
     ]);
 
     res.json({ active, page: { items, page, pageSize, total: counts[state] }, counts });

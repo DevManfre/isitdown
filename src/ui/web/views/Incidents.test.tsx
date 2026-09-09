@@ -1,4 +1,4 @@
-import { act, screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
@@ -369,5 +369,67 @@ describe("Incidents", () => {
     expect(await screen.findByText("Delivery 5")).toBeInTheDocument();
     // One CTA only: revealing the rest leaves nothing left to expand.
     expect(screen.queryByRole("button", { name: i18n.t("action.show-more") })).not.toBeInTheDocument();
+  });
+
+  // Roadmap 5.19. The search has to travel to the server: the list is one page
+  // of 20 rows, so a name filter applied in the browser would search that page
+  // and report the result as the whole history.
+  it("searches on the server, and says so when a search finds nothing", async () => {
+    const searched = (path: string) => {
+      const query = new URLSearchParams(path.split("?")[1] ?? "");
+      const term = (query.get("q") ?? "").toLowerCase();
+      const rows = [open, resolved].filter((row) => row.name.toLowerCase().includes(term));
+      return {
+        active: [open],
+        page: { items: rows, page: 1, pageSize: 20, total: rows.length },
+        counts: { all: rows.length, active: 0, resolved: rows.length },
+      };
+    };
+
+    renderWithProviders(<Incidents />, { ...fixtures, incidents: searched });
+    expect(await screen.findByText("Old blip")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole("searchbox", { name: i18n.t("incidents.search.label") }), "old");
+    // Searched away on the server, not hidden in the DOM. Awaited, because the
+    // typed text becomes a query one debounce later.
+    await waitFor(() => {
+      expect(list().queryByText("API errors")).toBeNull();
+    });
+    expect(list().getByText("Old blip")).toBeInTheDocument();
+    // The hero card keeps the open incident whatever the search says.
+    expect(screen.getByText(i18n.t("incidents.active"))).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByRole("searchbox", { name: i18n.t("incidents.search.label") }));
+    await userEvent.type(screen.getByRole("searchbox", { name: i18n.t("incidents.search.label") }), "zzz");
+    // A search with no matches is not an empty history, and the view says which.
+    expect(await screen.findByText(i18n.t("incidents.empty-search"))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("incidents.empty-list"))).toBeNull();
+  });
+
+  it("narrows the window it searches in, and asks the server for that window", async () => {
+    const asked: string[] = [];
+    const windowed = (path: string) => {
+      asked.push(path);
+      const days = new URLSearchParams(path.split("?")[1] ?? "").get("days");
+      const rows = days === null ? [open, resolved] : [open];
+      return {
+        active: [open],
+        page: { items: rows, page: 1, pageSize: 20, total: rows.length },
+        counts: { all: rows.length, active: 1, resolved: rows.length - 1 },
+      };
+    };
+
+    renderWithProviders(<Incidents />, { ...fixtures, incidents: windowed });
+    expect(await screen.findByText("Old blip")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("radio", { name: i18n.t("incidents.window.days", { count: 7 }) }));
+
+    await waitFor(() => {
+      expect(list().queryByText("Old blip")).toBeNull();
+    });
+    // The open incident is still listed, so the narrowed window is a filter
+    // rather than an emptied list.
+    expect(list().getByText("API errors")).toBeInTheDocument();
+    expect(asked.some((path) => path.includes("days=7"))).toBe(true);
   });
 });

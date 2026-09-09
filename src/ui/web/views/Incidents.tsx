@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Card } from "@/components/ui/card.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import {
   Pagination,
@@ -38,6 +39,17 @@ const FILTERS = [
 ] as const;
 
 type Filter = (typeof FILTERS)[number]["value"];
+
+/**
+ * Windows the search runs in (roadmap 5.19). `0` is every incident ever kept,
+ * which is what the list has always shown; the narrower ones exist because
+ * retention can be set as high as ten years, and "was this the same failure as
+ * last week" is a different question from "has this ever happened".
+ */
+const WINDOWS = [0, 7, 30, 90] as const;
+
+/** How long the operator stops typing before the server is asked. */
+const SEARCH_DEBOUNCE_MS = 250;
 
 /** One row of the merged timeline: an incident the list already knew, or a declared maintenance window. */
 type TimelineListEntry =
@@ -88,7 +100,20 @@ export function Incidents() {
   // click away rather than on another screen.
   const [feedExpanded, setFeedExpanded] = useState(false);
   const [page, setPage] = useState(1);
-  const { data: incidents } = useIncidents({ state: filter, page, pageSize: PAGE_SIZE });
+  // Two pieces of state for one field: `search` is what is on screen and has to
+  // echo every keystroke, `query` is what the server has been asked for. Sending
+  // the first would fire a request per character.
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [days, setDays] = useState<number>(0);
+  const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const { data: incidents } = useIncidents({
+    state: filter,
+    ...(query === "" ? {} : { q: query }),
+    ...(days === 0 ? {} : { days }),
+    page,
+    pageSize: PAGE_SIZE,
+  });
   // Bounded and historical: a 90-day, upcoming-included set (the route's own
   // defaults) merged 100+ Cloudflare-shaped rows onto page 1 alone, sorted
   // with windows that haven't started yet on top of what claims to be a
@@ -112,7 +137,11 @@ export function Incidents() {
   // repeat the same windows on page 2, 3, ... and could push a page past
   // PAGE_SIZE rows. Page 1 is where a newest-first list reads "what's going on
   // right now" anyway, so that is the one page maintenance belongs on.
-  const maintenanceRows = page === 1 ? (maintenances?.maintenances ?? []) : [];
+  // ...and only while nothing is being searched for: the search runs over
+  // incident names on the server, so maintenance windows riding along under it
+  // would be rows the operator's own query never matched.
+  const searching = query !== "" || days !== 0;
+  const maintenanceRows = page === 1 && !searching ? (maintenances?.maintenances ?? []) : [];
   // The current page's incidents plus every declared maintenance window,
   // interleaved by when each started — newest first, same order the
   // incident-only list already read in. Maintenance carries no incident
@@ -129,6 +158,20 @@ export function Incidents() {
   // The server's own page size, not the one asked for: it caps the parameter, so
   // paging by what was requested would count pages that don't exist.
   const pages = Math.ceil(total / (incidents?.page.pageSize ?? PAGE_SIZE));
+
+  // The typed text becomes a query one pause later, and page 1 with it: a search
+  // narrowing the list while the operator sits on page 3 would otherwise land on
+  // a page the narrowed result does not have.
+  useEffect(() => {
+    if (debounce.current !== undefined) clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => {
+      setQuery(search.trim());
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (debounce.current !== undefined) clearTimeout(debounce.current);
+    };
+  }, [search]);
 
   // A poll can prune the list under an operator sitting on its last page (and a
   // remembered filter can be restored beside a page number that no longer
@@ -156,6 +199,35 @@ export function Incidents() {
   // Its own node, rendered inside the list's header below rather than at the top
   // of the page. `aria-label` carries the name the visible kicker used to, now
   // that the list's own heading sits right beside the control.
+  const searchControl = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        type="search"
+        className="h-8 w-full sm:w-56"
+        value={search}
+        placeholder={t("incidents.search.placeholder")}
+        aria-label={t("incidents.search.label")}
+        onChange={(event) => setSearch(event.target.value)}
+      />
+      <ToggleGroup
+        type="single"
+        value={String(days)}
+        onValueChange={(next) => {
+          if (next === "") return;
+          setDays(Number(next));
+          setPage(1);
+        }}
+        aria-label={t("incidents.window.label")}
+      >
+        {WINDOWS.map((option) => (
+          <ToggleGroupItem key={option} value={String(option)}>
+            {option === 0 ? t("incidents.window.all") : t("incidents.window.days", { count: option })}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
+  );
+
   const filterControl = (
     <ToggleGroup
       type="single"
@@ -299,13 +371,21 @@ export function Incidents() {
       <section aria-label={t("incidents.list")} className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("incidents.list")}</span>
-          {/* The filter sits on the list it filters, rather than at the top of
-              the page, two sections away from its own effect. */}
-          {filterControl}
+          {/* The filter, the search and the window sit on the list they narrow,
+              rather than at the top of the page, two sections away from their
+              own effect. */}
+          <div className="flex flex-wrap items-center gap-3">
+            {searchControl}
+            {filterControl}
+          </div>
         </div>
 
         {timelineEntries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("incidents.empty-list")}</p>
+          // A search that found nothing is not an empty history, and saying so
+          // is the difference between "no incidents" and "none matching this".
+          <p className="text-sm text-muted-foreground">
+            {t(searching ? "incidents.empty-search" : "incidents.empty-list")}
+          </p>
         ) : (
           timelineEntries.map((entry, index) =>
             entry.kind === "incident" ? (

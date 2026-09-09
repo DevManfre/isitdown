@@ -226,6 +226,19 @@ function providerScope(
 }
 
 /**
+ * A free-text search as a `LIKE` pattern, or undefined when the caller asked for
+ * no search. `%` and `_` are the wildcards of the pattern language itself, so an
+ * operator searching for "50% errors" is searching for that text rather than
+ * accidentally matching everything; `\\` is the escape character the clause
+ * declares.
+ */
+function likeTerm(query: string | undefined): string | undefined {
+  const trimmed = query?.trim() ?? "";
+  if (trimmed === "") return undefined;
+  return `%${trimmed.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+}
+
+/**
  * The UI edition's store. It satisfies the shared StateStore contract exactly as
  * the Light edition's file store does, and adds the history the dashboard reads.
  *
@@ -586,6 +599,11 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         clauses.push("started_at >= ?");
         params.push(new Date(now().getTime() - filter.days * 24 * 3600 * 1000).toISOString());
       }
+      const term = likeTerm(filter.query);
+      if (term !== undefined) {
+        clauses.push("name LIKE ? ESCAPE '\\'");
+        params.push(term);
+      }
       const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
       // SQLite has no bare OFFSET: skipping rows without a page size means asking
       // for every remaining one, which is what `LIMIT -1` spells.
@@ -617,6 +635,11 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       if (filter.days !== undefined) {
         clauses.push("started_at >= ?");
         params.push(new Date(now().getTime() - filter.days * 24 * 3600 * 1000).toISOString());
+      }
+      const term = likeTerm(filter.query);
+      if (term !== undefined) {
+        clauses.push("name LIKE ? ESCAPE '\\'");
+        params.push(term);
       }
       const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
 
