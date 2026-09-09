@@ -133,6 +133,8 @@ export function Settings() {
   const settingsMutation = useSettingsMutation();
   const { data: storage } = useStorage();
   const { patch: servicePatch, restore: serviceRestore, purge: servicePurge } = useServiceMutations();
+  const configImport = useConfigImport();
+  const [importStatus, setImportStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(undefined);
   // Above the early return below: a hook cannot be called conditionally.
   const fieldProps = useFieldProps();
 
@@ -299,6 +301,28 @@ export function Settings() {
   };
 
   const commitRetention = (days: number): void => {
+  /**
+   * Reads the picked file and hands it to the server as it stands (roadmap
+   * 4.3): the validation that matters is the file schema's, and it lives on the
+   * server where the Light edition's loader already is.
+   */
+  const runImport = async (file: File): Promise<void> => {
+    setImportStatus(undefined);
+    try {
+      const report = await configImport.mutateAsync(await file.text());
+      setImportStatus({
+        text: t("settings.backup.imported", {
+          added: report.added.length,
+          updated: report.updated.length,
+          removed: report.removed.length,
+        }),
+        tone: "ok",
+      });
+    } catch (error) {
+      setImportStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+    }
+  };
+
     if (!Number.isInteger(days) || days < RETENTION_BOUNDS.min || days > RETENTION_BOUNDS.max) {
       setRetentionStatus({
         text: t("settings.out-of-range", {
@@ -818,6 +842,50 @@ export function Settings() {
           <span className="font-mono text-xs text-muted-foreground">{t("unit.days")}</span>
         </SettingRow>
       </SettingsSection>
+
+        {/* Roadmap 4.3. Everything above is configurable here and nowhere else,
+            which until now meant it lived only inside one SQLite file. The
+            export is a Light edition config.yml — a backup and a migration
+            path in the same file — and the import is that file read back. */}
+        <SettingRow
+          label={t("settings.backup.label")}
+          description={
+            <>
+              {t("settings.backup.hint")}
+              {importStatus !== undefined && (
+                <span
+                  className={`mt-0.5 block ${
+                    importStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"
+                  }`}
+                >
+                  {importStatus.text}
+                </span>
+              )}
+            </>
+          }
+          align="top"
+        >
+          <Button asChild variant="outline" size="sm">
+            <a href="/config/export">{t("settings.backup.export")}</a>
+          </Button>
+          {/* A real, focusable file input rather than a hidden one behind a
+              button: a hidden input is out of the tab order, which is exactly
+              the kind of control 5.13 exists to stop adding. */}
+          <Input
+            id="config-import"
+            type="file"
+            accept=".yml,.yaml,text/yaml"
+            aria-label={t("settings.backup.import")}
+            className="h-8 w-56 cursor-pointer py-1 text-xs"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file !== undefined) void runImport(file);
+              // Cleared so picking the same file twice fires twice: a retry
+              // after fixing the file is the common second pick.
+              event.target.value = "";
+            }}
+          />
+        </SettingRow>
 
       <SettingsSection title={t("settings.section.appearance")} delay={stagger(5, SECTION_CASCADE)}>
         <SettingRow

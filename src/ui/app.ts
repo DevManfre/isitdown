@@ -25,6 +25,9 @@ export function createApp(runtime: UiRuntimeCore): Express {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "64kb" }));
+  // The config import (roadmap 4.3) takes a `config.yml` as it stands, so the
+  // YAML content types arrive as text rather than as a JSON string.
+  app.use(express.text({ limit: "256kb", type: ["text/yaml", "application/x-yaml", "text/plain"] }));
 
   app.use(statusRoutes(runtime));
   app.use(eventsRoutes(runtime));
