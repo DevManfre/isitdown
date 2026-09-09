@@ -986,3 +986,93 @@ test("the detect route refuses a url it cannot parse", async () => {
     await app.close();
   }
 });
+
+test("the catalog is served from the image, and says which entries are already watched", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.request("GET", "/config/catalog");
+    assert.equal(status, 200);
+    const providers = (body as { providers: { id: string; adapter: string; baseUrl: string; configured: boolean }[] })
+      .providers;
+    assert.ok(providers.length > 20, "a menu worth calling a catalog");
+
+    const github = providers.find((entry) => entry.id === "github");
+    assert.deepEqual(
+      { adapter: github?.adapter, baseUrl: github?.baseUrl },
+      { adapter: "statuspage", baseUrl: "https://www.githubstatus.com" },
+    );
+    // The seeded fleet already watches GitHub, and the row stays in the menu
+    // saying so rather than disappearing from it.
+    assert.equal(github?.configured, true);
+    assert.equal(providers.find((entry) => entry.id === "twitch")?.configured, false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a catalog pick is a service the add route accepts as it stands", async () => {
+  const app = await api();
+  try {
+    const { providers } = (await app.request("GET", "/config/catalog")).body as {
+      providers: { id: string; name: string; adapter: string; baseUrl: string; configured: boolean }[];
+    };
+    const pick = providers.find((entry) => !entry.configured);
+    assert.ok(pick !== undefined, "the seeded fleet cannot have taken every catalog id");
+
+    const { status } = await app.request("POST", "/config/services", {
+      id: pick.id,
+      name: pick.name,
+      adapter: pick.adapter,
+      baseUrl: pick.baseUrl,
+    });
+
+    assert.equal(status, 201, "the menu row travels to the add route unedited");
+    assert.equal((await app.request("GET", "/config/catalog")).body !== undefined, true);
+    const after = (await app.request("GET", "/config/catalog")).body as {
+      providers: { id: string; configured: boolean }[];
+    };
+    assert.equal(after.providers.find((entry) => entry.id === pick.id)?.configured, true);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a provider's group round-trips through the add and patch routes", async () => {
+  const app = await api();
+  try {
+    const added = await app.request("POST", "/config/services", {
+      id: "vercel",
+      name: "Vercel",
+      adapter: "statuspage",
+      baseUrl: "https://www.vercel-status.com",
+      group: "deploy-path",
+    });
+    assert.equal(added.status, 201);
+    assert.equal((added.body as { group?: string }).group, "deploy-path");
+
+    // Null takes it back out, the way a cleared interval does.
+    const patched = await app.request("PATCH", "/config/services/vercel", { group: null });
+    assert.equal(patched.status, 200);
+    const services = (await app.request("GET", "/config")).body as { services: { id: string; group?: string }[] };
+    assert.equal(services.services.find((service) => service.id === "vercel")?.group, undefined);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a group name the schema would reject is a 400, not a stored oddity", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.request("POST", "/config/services", {
+      id: "vercel",
+      name: "Vercel",
+      adapter: "statuspage",
+      baseUrl: "https://www.vercel-status.com",
+      group: "Deploy Path",
+    });
+
+    assert.equal(status, 400, "a group is a slug, so a routing rule can name it");
+  } finally {
+    await app.close();
+  }
+});

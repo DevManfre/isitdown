@@ -404,6 +404,16 @@ i redirect, quindi funzionano entrambi; l'host canonico evita il salto in più.
 
 Lo `status.indicator` del provider viene mappato sul modello di severità interno:
 
+L'edizione UI include anche un **catalogo** di provider noti (roadmap 5.11): il
+dialog di aggiunta si apre su un menu di nomi, e una scelta riempie adapter,
+base URL e id. Ogni voce in `src/adapters/catalog.ts` è stata confermata
+eseguendo la detection sulla pagina, quindi ciò che il menu offre è ciò che un
+adapter legge davvero. I provider la cui status page rifiuta una lettura
+automatica (Stripe, GitLab, Zendesk, Okta) sono volutamente assenti invece che
+elencati e rotti — per quelli, e per tutto ciò che la lista non ha, si incolla
+l'URL e si lascia che la detection (`POST /config/services/detect`) nomini l'adapter. Una voce già monitorata
+resta nel menu, segnata, invece di sparire. Servito come `GET /config/catalog`.
+
 | Indicator Statuspage | Stato IsItDown |
 |---|---|
 | `none` | `operational` |
@@ -1330,6 +1340,7 @@ scrape_configs:
   - job_name: isitdown
     static_configs:
       - targets: ["isitdown-ui:3000"]
+| `GET` | `/config/catalog` | Il catalogo di provider incluso (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Risposto dalla memoria — la lista viaggia con l'immagine, quindi non c'è nessun upstream che possa essere giù né niente da tenere sincronizzato. `configured` segna un id già monitorato: la riga resta nel menu e lo dice, invece di sparire. La detection resta la strada per una pagina che la lista non ha. |
 ```
 
 | `GET` | `/export/incidents.csv?provider=&state=&q=&days=` | Il risultato della ricerca incidenti come download — gli stessi filtri di `/incidents`, senza paginazione: `provider_id,incident_id,name,impact,status,started_at,updated_at,resolved_at`. RFC 4180, così un nome con virgola, virgolette o ritorno a capo resta un solo campo. Limite di 20 000 righe; un export che lo raggiunge risponde con `X-IsItDown-Truncated: true` invece di sembrare completo. |
@@ -1899,6 +1910,7 @@ isitdown/
 
 I test dei componenti e degli hook della dashboard vivono insieme al codice sotto
 `web/`, come `*.test.tsx` accanto a ciò che testano, e sono raccolti da lì da
+│   │   ├── catalog.ts                 catalogo di provider noti incluso
 Vitest — il resto dell'albero segue la convenzione `test/` di sopra.
 
 **Regola d'oro:** `src/core`, `src/adapters` e `src/notifiers` non importano mai da

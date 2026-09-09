@@ -25,7 +25,8 @@ type FixtureKey =
   | "preferences"
   | "maintenances"
   | "serviceImpact"
-  | "adapterDebug";
+  | "adapterDebug"
+  | "catalog";
 
 export interface Fixtures {
   status?: unknown;
@@ -46,6 +47,8 @@ export interface Fixtures {
   storage?: unknown;
   /** `/debug/adapters` — the adapter diagnostics panel's recent reads. */
   adapterDebug?: unknown;
+  /** `/config/catalog`, matched before `/config` — the bundled provider menu. */
+  catalog?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -87,6 +90,8 @@ export function stubApi(fixtures: Fixtures): void {
                       ? "serviceImpact"
                       : path.startsWith("/config/storage")
                         ? "storage"
+                        : path.startsWith("/config/catalog")
+                        ? "catalog"
                         : path.startsWith("/config")
                         ? "config"
                         : path.startsWith("/debug/adapters")

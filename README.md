@@ -398,6 +398,17 @@ redirects so either works; the canonical host avoids the extra hop.
 
 The provider's own `status.indicator` maps onto the internal severity model:
 
+The UI edition also ships a **bundled catalog** of well-known providers (roadmap
+5.11): the add dialog opens on a menu of names, and one pick fills in the
+adapter, the base URL and the id. Every entry in `src/adapters/catalog.ts` was
+confirmed by running the detection against the page, so what the menu offers is
+what an adapter actually reads. Providers whose status page refuses an automated
+read (Stripe, GitLab, Zendesk, Okta) are deliberately absent rather than listed
+and broken — for those, and for anything else the list does not have, paste the
+URL and let detection (`POST /config/services/detect`) name the adapter. An entry already
+watched stays in the menu, marked, rather than disappearing from it. Served as
+`GET /config/catalog`.
+
 | Statuspage indicator | IsItDown status |
 |---|---|
 | `none` | `operational` |
@@ -1303,6 +1314,7 @@ adapter in between:
 scrape_configs:
   - job_name: isitdown
     static_configs:
+| `GET` | `/config/catalog` | The bundled provider catalog (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Answered from memory — the list ships with the image, so there is no upstream to be down and nothing to keep in sync. `configured` marks an id already watched: the row stays in the menu saying so rather than disappearing from it. Detection stays the path for a page the list does not have. |
       - targets: ["isitdown-ui:3000"]
 ```
 
@@ -1843,6 +1855,7 @@ isitdown/
 ├── docker-compose.dev.yml             dev override: UI edition live from src/, Vite watch-builds the bundle
 ├── config.example.yml                 tracked template; config.yml is git-ignored
 ├── .env.example                       secret variable names, never values
+│   │   ├── catalog.ts                  bundled catalog of well-known providers
 ├── .nvmrc  .npmrc                     pins Node 24 and makes an older one fail loudly
 ├── tsconfig.json                      server TypeScript
 ├── tsconfig.light.json                the Light build: excludes src/ui

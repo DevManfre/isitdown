@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentPicker, type ComponentPickerEntry, type ComponentPickerSelection } from "@/components/ComponentPicker.tsx";
-import { useServiceMutations } from "@/hooks/queries.ts";
+import { useCatalog, useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { detectAdapter, previewComponents } from "@/lib/api.ts";
 import { slugify } from "@/lib/slugify.ts";
-import type { ServiceDefinition } from "@/lib/types.ts";
+import type { CatalogProvider, ServiceDefinition } from "@/lib/types.ts";
 
 const ADAPTERS = [
   "statuspage",
@@ -103,6 +103,7 @@ export function ServiceDialog({
   const { add, patch, test } = useServiceMutations();
 
   const [open, setOpen] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState("");
   const [name, setName] = useState(service?.name ?? "");
   const [adapter, setAdapter] = useState<string>(ADAPTERS[0]);
   const [baseUrl, setBaseUrl] = useState(service?.baseUrl ?? "");
@@ -122,6 +123,9 @@ export function ServiceDialog({
   const [detecting, setDetecting] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  // Only while adding, and only while the dialog is open: an edit already has
+  // every answer the menu would offer.
+  const { data: catalog } = useCatalog(open && mode === "add");
 
   // Hand-typing the id was busywork with a failure mode: the schema only
   // accepts `/^[a-z0-9][a-z0-9-]*$/`, so anything an operator typed naturally
@@ -157,6 +161,7 @@ export function ServiceDialog({
   // now), so a fresh open needs its own reset — otherwise a cancelled edit's
   // half-typed field would still be sitting there next time.
   const resetForm = (): void => {
+    setCatalogQuery("");
     setName(service?.name ?? "");
     setAdapter(ADAPTERS[0]);
     setBaseUrl(service?.baseUrl ?? "");
@@ -203,6 +208,29 @@ export function ServiceDialog({
       setPreviewLoading(false);
     }
   };
+
+  /**
+   * A catalog pick fills in the three fields an operator cannot be expected to
+   * know (roadmap 5.11): the adapter, the base url that adapter wants, and the
+   * name the id is derived from. Nothing is saved by picking — the form is the
+   * same form, filled in, so an operator can still change any of it before
+   * adding.
+   */
+  const pick = (entry: CatalogProvider): void => {
+    setName(entry.name);
+    setAdapter(entry.adapter);
+    setBaseUrl(entry.baseUrl);
+    // The component list belongs to the adapter it was loaded for, the way a
+    // detection invalidates it.
+    setPreview(undefined);
+    setMessage(undefined);
+  };
+
+  const catalogMatches = (catalog?.providers ?? []).filter((entry) =>
+    catalogQuery.trim() === ""
+      ? true
+      : `${entry.name} ${entry.id}`.toLowerCase().includes(catalogQuery.trim().toLowerCase()),
+  );
 
   /**
    * Asks the pasted url which adapter reads it, and fills in both fields from
@@ -300,6 +328,55 @@ export function ServiceDialog({
             {mode === "add" && <DialogDescription>{t("add.subtitle")}</DialogDescription>}
           </DialogHeader>
           <DialogBody>
+            {/* The menu the first run starts from: a bundled list is the half
+                of "add a provider" that detection cannot cover, since
+                detection needs a url and this needs only a name. Above the
+                fields rather than behind a tab, because filling them in by
+                hand is the fallback now, not the default. */}
+            {mode === "add" && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label id="catalog-label">{t("catalog.label")}</Label>
+                  <Input
+                    id="catalog-search"
+                    type="search"
+                    className="h-8 w-40"
+                    value={catalogQuery}
+                    placeholder={t("catalog.search-placeholder")}
+                    aria-label={t("catalog.search-label")}
+                    onChange={(event) => setCatalogQuery(event.target.value)}
+                  />
+                </div>
+                <div
+                  role="group"
+                  aria-labelledby="catalog-label"
+                  className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-dashed border-border p-2"
+                >
+                  {catalogMatches.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">{t("catalog.empty")}</span>
+                  ) : (
+                    catalogMatches.map((entry) => (
+                      <Button
+                        key={entry.id}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7"
+                        // Already watched: still listed, so the menu never
+                        // looks like it forgot a provider, but adding it again
+                        // would only earn a 409.
+                        disabled={entry.configured}
+                        onClick={() => pick(entry)}
+                      >
+                        {entry.name}
+                      </Button>
+                    ))
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">{t("catalog.hint")}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="service-name">{t("field.name")}</Label>
