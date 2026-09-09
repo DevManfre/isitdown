@@ -42,9 +42,15 @@ const entrySchema = z.object({
   date_updated: z.string().optional(),
 });
 
+/**
+ * `active_incidents` is required, `status` is not: the list is the dial (see
+ * above), so a body without it states nothing about Slack's health. It used to
+ * default to `[]`, which meant a `{}` — an error page rendered as JSON, another
+ * endpoint's answer — parsed cleanly and read as `operational`.
+ */
 const currentSchema = z.object({
   status: z.string().optional(),
-  active_incidents: z.array(entrySchema).default([]),
+  active_incidents: z.array(entrySchema),
 });
 
 const historySchema = z.array(entrySchema);
