@@ -131,12 +131,45 @@ npm test                 # unit tests: node:test (*.test.ts — adapters, diff e
 npm run test:integration # end to end: *.itest.ts — fake provider and webhook receiver
 npm run typecheck        # tsc -p tsconfig.json (server + core) and
                           # tsc -p tsconfig.web.json (dashboard React tree)
+npm run test:visual      # every view, both themes, both locales, against
+                          # test/visual/baseline/ (needs a fresh build:ui)
 ```
 
 Requires Node 24 (`.nvmrc`); `npm install` refuses an older one.
 
 - New adapters need fixture JSON files under `test/fixtures/<provider>/` — never hit a live provider endpoint in tests.
 - New diff-engine behavior needs a table-driven test case added to the existing suite (no change / status change / new incident / incident resolved).
+
+### The visual baselines
+
+CI runs `test:visual`, so a UI change that shifts any pixel fails the `verify`
+job until its baselines are agreed. Don't wait for that: the `pre-push` hook
+(installed by `scripts/setup-hooks.sh`) rebuilds and compares whenever the
+pushed commits touch `src/ui`, `tools/visual` or `test/visual`, so the drift
+surfaces before it reaches CI. `SKIP_VISUAL=1 git push` skips it.
+
+When frames differ, the loop is always: **look at the frame, then agree it** —
+
+```bash
+npm run build:ui && npm run test:visual        # what moved
+# open each test/visual/current/<view>-<theme>-<locale>.png it lists
+node tools/visual-regression.mjs --only=settings --update   # agree that view
+```
+
+- **Look at every frame you agree**, with the Read tool on the PNG — not at
+  the cell count. The count says something moved, never whether it should
+  have.
+- **Never `--update` with no `--only`.** It rewrites all 24 frames, including
+  views you never touched, and a single bad capture then *is* the baseline —
+  which has happened: a half-rendered Overview, missing a provider tile and an
+  uptime row, was agreed that way and had to be reverted by hand.
+- The harness renders with the browser resolving every host but the loopback to
+  nothing (see `tools/visual/chrome.mjs`), because the provider tiles ask each
+  provider's domain and then DuckDuckGo for a favicon. Keep it that way: a
+  baseline that contains third-party bytes breaks when someone else's icon
+  changes, and it made the Overview shot flap between two stable images.
+- Baselines belong in their own commit (`✅ VISUAL - …`), separate from the
+  change that moved them, with the review in the body.
 
 ## Conventions
 
