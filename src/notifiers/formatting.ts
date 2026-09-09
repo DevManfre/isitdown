@@ -139,7 +139,92 @@ export function renderMessage(payload: NotificationPayload): string {
   return render(payload, { omitUrl: false });
 }
 
+/**
+ * The digest (roadmap 3.12): every change collected in one window, as one
+ * message. A heading that says how many and over how long, then one line per
+ * change — the same words each change would have carried on its own, minus the
+ * per-message ceremony that is exactly what makes a flood a flood.
+ *
+ * Rendered here rather than in the dispatcher for the same reason every other
+ * message is: layout and emoji are formatting, and a channel that assembled its
+ * own digest would drift from the others by a version or two.
+ */
+export function renderDigest(items: NotificationPayload[], windowMinutes: number): string {
+  const [first] = items;
+  if (first === undefined) return "";
+  const locale = first.locale;
+  const heading = t(locale, "notification.digest.heading", {
+    count: items.length,
+    minutes: windowMinutes,
+  });
+  const lines = items.map((item) => {
+    const { emoji } = accentFor(item.change);
+    return `${emoji} ${t(locale, "notification.digest.line", {
+      provider: item.service.name,
+      what: summarise(item),
+    })}`;
+  });
+  return [heading, "", ...lines].join("\n");
+}
+
+/**
+ * One change in one line, for a digest. The full template is a heading, a blank
+ * line and a detail block — right for a message about one thing, and unreadable
+ * twelve times over — so the line is assembled from the same catalog pieces
+ * instead: what changed, in the words the status vocabulary already has.
+ */
+function summarise(payload: NotificationPayload): string {
+  const { change, locale } = payload;
+  const current = statusLabel(change.currentStatus, locale);
+  switch (change.kind) {
+    case "status_change":
+      return t(locale, "notification.digest.status", {
+        previous: change.previousStatus === undefined ? "" : statusLabel(change.previousStatus, locale),
+        current,
+      });
+    case "component_status_change":
+      return t(locale, "notification.digest.component", {
+        component: change.component?.name ?? "",
+        current,
+      });
+    case "incident_opened":
+      return t(locale, "notification.digest.incident-opened", { title: change.incident?.name ?? "" });
+    case "incident_updated":
+      return t(locale, "notification.digest.incident-updated", {
+        title: change.incident?.name ?? "",
+        status: incidentStatusLabel(change.incident?.status ?? "", locale),
+      });
+    case "incident_resolved":
+      return t(locale, "notification.digest.incident-resolved", { title: change.incident?.name ?? "" });
+    case "maintenance_started":
+      return t(locale, "notification.digest.maintenance-started", {
+        title: change.maintenance?.name ?? "",
+      });
+    case "maintenance_ended":
+      return t(locale, "notification.digest.maintenance-ended", { title: change.maintenance?.name ?? "" });
+    case "monitoring_degraded":
+      return t(locale, "notification.digest.monitoring", { count: change.failureCount ?? 0 });
+  }
+}
+
+/**
+ * The line a message carries when the cap swallowed others before it (roadmap
+ * 3.13). Appended by the dispatcher rather than templated into every message
+ * kind: it is not about the change, it is about what the operator did not get
+ * told.
+ */
+export function suppressedLine(count: number, locale: string): string {
+  return t(locale, "notification.suppressed", { count });
+}
+
 function render(payload: NotificationPayload, options: { omitUrl: boolean }): string {
+  // A digest is its own message shape, so it short-circuits the per-kind
+  // template below — but it still goes through here, which is what keeps the
+  // suppressed line and every channel's own rendering path shared.
+  if (payload.digest !== undefined) {
+    return withSuppressed(renderDigest(payload.digest.items, payload.digest.windowMinutes), payload);
+  }
+
   const { change, service, locale } = payload;
   const updatedAt = formatUtc(change.incident?.updatedAt ?? change.at);
 
@@ -170,5 +255,17 @@ function render(payload: NotificationPayload, options: { omitUrl: boolean }): st
     url: options.omitUrl ? "" : service.statusUrl,
   });
 
-  return `${accentFor(change).emoji} ${body}`.trimEnd();
+  return withSuppressed(`${accentFor(change).emoji} ${body}`.trimEnd(), payload);
+}
+
+/**
+ * The cap's own line, appended to whatever the message already said. Appended
+ * rather than templated in, so it reads the same on a digest and on a single
+ * change, and so a message with nothing suppressed is byte-for-byte what it
+ * was before the cap existed.
+ */
+function withSuppressed(message: string, payload: NotificationPayload): string {
+  const count = payload.suppressedCount ?? 0;
+  if (count <= 0) return message;
+  return `${message}\n\n${suppressedLine(count, payload.locale)}`;
 }

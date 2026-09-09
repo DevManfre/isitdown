@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select.tsx";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
-import type { DescribedChannel, RoutingResponse, RoutingRule } from "@/lib/types.ts";
+import type { DescribedChannel, QuietHoursPolicy, RoutingResponse, RoutingRule } from "@/lib/types.ts";
 // `explain` is core's own evaluator, imported rather than copied: a dry run
 // computed from a second copy of the matching logic could disagree with what
 // actually routes, and a preview that lies is worse than no preview. `@/`
@@ -91,10 +91,18 @@ function DryRun({
   rules,
   channels,
   services,
+  quietHours,
 }: {
   rules: RoutingRule[];
   channels: DescribedChannel[];
   services: { id: string; name: string }[];
+  /**
+   * The window as it stands, so the dry run answers the question an operator
+   * is actually asking — "would this reach me?" — rather than "would it, if it
+   * were the middle of the afternoon". Optional: a server from before quiet
+   * hours existed sends none, and the run then reads as it always did.
+   */
+  quietHours?: QuietHoursPolicy | undefined;
 }) {
   const { t } = useTranslation();
   const [providerId, setProviderId] = useState<string | undefined>(services[0]?.id);
@@ -105,7 +113,12 @@ function DryRun({
   const enabledChannelIds = channels.filter((channel) => channel.enabled).map((channel) => channel.id);
   const event = DRYRUN_EVENTS.find((candidate) => candidate.id === eventId) ?? DRYRUN_EVENTS[0]!;
   const change: StatusChange = { ...event.change, providerId, at: new Date().toISOString() };
-  const result = explain(change, rules, enabledChannelIds);
+  // Core's own evaluator, and now with the same quiet-hours window the
+  // dispatcher reads: a preview that ignored it would say "Telegram" for an
+  // event that, at this hour, reaches nobody.
+  const result = explain(change, rules, enabledChannelIds, {
+    ...(quietHours === undefined ? {} : { quietHours }),
+  });
 
   const won = result.winner === null ? undefined : rules[result.winner];
   // Delivery, not the rule's raw wildcard: `result.targets` is `explain`'s own
@@ -117,7 +130,11 @@ function DryRun({
   const enabledSet = new Set(enabledChannelIds);
   const delivered = result.targets.filter((id) => enabledSet.has(id));
   let verdict: string;
-  if (won === undefined) {
+  if (result.quieted) {
+    // Checked first: a rule did win, so every other branch below would report
+    // a delivery that quiet hours have already taken away.
+    verdict = t("routing.dryrun.quiet");
+  } else if (won === undefined) {
     verdict = t("routing.dryrun.none");
   } else if (won.channels.length === 0) {
     verdict = t("routing.dryrun.muted", { rule: result.winner! + 1 });
@@ -199,6 +216,12 @@ function DryRun({
           {verdict}
         </span>
       </div>
+
+      {/* Said once, not per event: with a window configured, every verdict here
+          is a verdict about this hour, whichever way it came out. */}
+      {quietHours?.enabled === true && (
+        <span className="text-[10px] text-muted-foreground">{t("routing.dryrun.quiet-note")}</span>
+      )}
     </div>
   );
 }
@@ -207,12 +230,15 @@ export function RoutingRules({
   routing,
   channels,
   services,
+  quietHours,
   onSave,
   saving = false,
 }: {
   routing: RoutingResponse;
   channels: DescribedChannel[];
   services: { id: string; name: string }[];
+  /** Passed through to the dry run, which evaluates with it — see `DryRun`. */
+  quietHours?: QuietHoursPolicy | undefined;
   onSave?: (rules: RoutingRule[]) => void | Promise<unknown>;
   /**
    * True between a click and the refetch that follows it. The panel is fully
@@ -448,7 +474,9 @@ export function RoutingRules({
         </Button>
       </div>
 
-      {rules.length > 0 && <DryRun rules={rules} channels={channels} services={services} />}
+      {rules.length > 0 && (
+        <DryRun rules={rules} channels={channels} services={services} quietHours={quietHours} />
+      )}
     </div>
   );
 }

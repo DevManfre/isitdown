@@ -354,11 +354,87 @@ export interface RuntimeConfigResponse {
   };
   /** How long history is kept before the daily prune takes it. */
   retention: { days: number };
+  /**
+   * How much of what the rules admit actually goes out: quiet hours, the
+   * digest window, the per-provider cap, and message editing. Optional for the
+   * same reason the polling fields above are: a server from before the policy
+   * existed answers without it, and the section then reads as everything off.
+   */
+  delivery?: DeliveryPolicy;
   services: ServiceDefinition[];
   channels: DescribedChannel[];
   routing: RoutingResponse;
   /** Removed but still restorable, newest removal first. */
   removed: RemovedService[];
+}
+
+/** A severity floor, as the routing rules and the two floors below spell it. */
+export type SeverityFloorName = "any" | "degraded" | "partial_outage" | "major_outage";
+
+/** Quiet hours — roadmap 3.11. Mirrors `QuietHours` in `src/core/routing.ts`. */
+export interface QuietHoursPolicy {
+  enabled: boolean;
+  /** Wall clock in `timeZone`, "HH:MM". A window may wrap midnight. */
+  start: string;
+  end: string;
+  /** An IANA zone name, or "auto" for the server's own. */
+  timeZone: string;
+  minSeverity: SeverityFloorName;
+}
+
+/** Mirrors `DeliveryConfig` in `src/core/delivery.ts`. */
+export interface DeliveryPolicy {
+  quietHours: QuietHoursPolicy;
+  /** Roadmap 3.12: batch everything under the floor into one message a window. */
+  digest: { enabled: boolean; windowMinutes: number; immediateFloor: SeverityFloorName };
+  /** Roadmap 3.13: a ceiling of messages per hour, per provider. */
+  cap: { enabled: boolean; maxPerHour: number };
+  /** Roadmap 3.19: an incident's updates edit its first message. */
+  updateInPlace: boolean;
+}
+
+/**
+ * One recorded adapter outcome — roadmap 5.18. Mirrors `AdapterProbe` in
+ * `src/ui/adapterDebug.ts`.
+ */
+export interface AdapterProbe {
+  at: string;
+  ok: boolean;
+  attempts: number;
+  durationMs: number;
+  /** A 304: a real round trip whose body was replayed from our own cache. */
+  notModified?: boolean;
+  error?: string;
+}
+
+export interface AdapterDebugProvider {
+  id: string;
+  name: string;
+  adapter: string;
+  baseUrl: string;
+  enabled: boolean;
+  /** The adapter's own options — a CSS selector, an RSS field. Never credentials. */
+  options: Record<string, string>;
+  /** Newest first, capped server-side. */
+  probes: AdapterProbe[];
+}
+
+export interface AdapterDebugResponse {
+  providers: AdapterDebugProvider[];
+}
+
+/** What one live probe found: the whole reading, or why there was not one. */
+export interface AdapterProbeResult {
+  ok: boolean;
+  durationMs: number;
+  error?: string;
+  status?: {
+    overallStatus: OverallStatus;
+    activeIncidents: Incident[];
+    components: ComponentStatus[];
+    maintenances: MaintenanceWindow[];
+    fetchedAt: string;
+  };
 }
 
 /** A provider whose removal has not yet taken its history — roadmap 5.12. */

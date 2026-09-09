@@ -1050,6 +1050,123 @@ describe("Settings retention", () => {
     );
   });
 
+  /**
+   * The delivery section — roadmap 3.11, 3.12, 3.13 and 3.19. Each control is
+   * its own instant-apply patch, and the assertion that matters in all four is
+   * the same: the patch carries the field that was touched and nothing else,
+   * because the section's rows apply one at a time.
+   */
+  describe("the delivery policy", () => {
+    it("switches quiet hours on, and only then offers the window", async () => {
+      renderWithProviders(<Settings />, fixtures);
+      const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+
+      // Off in the fixture, so the four fields the window needs are absent.
+      expect(screen.queryByLabelText(i18n.t("field.quiet-hours.from"))).toBeNull();
+
+      await userEvent.click(await screen.findByLabelText(i18n.t("field.quiet-hours")));
+
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          {
+            path: "/config/settings",
+            method: "PATCH",
+            body: { delivery: { quietHours: { enabled: true } } },
+          },
+        ]),
+      );
+    });
+
+    it("shows the window and its floor once quiet hours are on", async () => {
+      const on = {
+        ...fixtures,
+        config: {
+          ...config,
+          delivery: {
+            quietHours: {
+              enabled: true,
+              start: "23:00",
+              end: "07:00",
+              timeZone: "Europe/Rome",
+              minSeverity: "major_outage" as const,
+            },
+            digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" as const },
+            cap: { enabled: false, maxPerHour: 10 },
+            updateInPlace: false,
+          },
+        },
+      };
+      renderWithProviders(<Settings />, on);
+
+      expect(await screen.findByLabelText(i18n.t("field.quiet-hours.from"))).toHaveValue("23:00");
+      expect(await screen.findByLabelText(i18n.t("field.quiet-hours.to"))).toHaveValue("07:00");
+      // The floor reads as a sentence, not as a severity name on its own.
+      expect(await screen.findByLabelText(i18n.t("field.quiet-hours.floor"))).toBeTruthy();
+    });
+
+    it("saves the digest window on blur, without the floor beside it", async () => {
+      const on = {
+        ...fixtures,
+        config: {
+          ...config,
+          delivery: {
+            quietHours: {
+              enabled: false,
+              start: "23:00",
+              end: "07:00",
+              timeZone: "auto",
+              minSeverity: "major_outage" as const,
+            },
+            digest: { enabled: true, windowMinutes: 15, immediateFloor: "major_outage" as const },
+            cap: { enabled: false, maxPerHour: 10 },
+            updateInPlace: false,
+          },
+        },
+      };
+      renderWithProviders(<Settings />, on);
+      const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+
+      const field = await screen.findByLabelText(i18n.t("field.digest.window"));
+      await userEvent.clear(field);
+      await userEvent.type(field, "30");
+      await userEvent.tab();
+
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          {
+            path: "/config/settings",
+            method: "PATCH",
+            body: { delivery: { digest: { windowMinutes: 30 } } },
+          },
+        ]),
+      );
+    });
+
+    it("turns message editing on with one patch", async () => {
+      renderWithProviders(<Settings />, fixtures);
+      const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+
+      await userEvent.click(await screen.findByLabelText(i18n.t("field.update-in-place")));
+
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          { path: "/config/settings", method: "PATCH", body: { delivery: { updateInPlace: true } } },
+        ]),
+      );
+    });
+
+    it("reads a server that answers without a delivery policy as everything off", async () => {
+      // A payload from before the policy existed. The section still renders,
+      // and renders as off rather than as a page of undefined controls.
+      renderWithProviders(<Settings />, fixtures);
+
+      expect(await screen.findByLabelText(i18n.t("field.quiet-hours"))).not.toBeChecked();
+      expect(await screen.findByLabelText(i18n.t("field.digest"))).not.toBeChecked();
+      expect(await screen.findByLabelText(i18n.t("field.cap"))).not.toBeChecked();
+      expect(await screen.findByLabelText(i18n.t("field.update-in-place"))).not.toBeChecked();
+    });
+  });
+
   it("refuses a retention outside its bounds without calling the server", async () => {
     renderWithProviders(<Settings />, fixtures);
     const calls = interceptWrites({});

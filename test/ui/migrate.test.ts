@@ -30,6 +30,7 @@ test("migrate creates every table the dashboard reads", async () => {
     "maintenances",
     "map_geo_state",
     "map_points",
+    "message_refs",
     "notifications",
     "provider_state",
     "push_subscriptions",
@@ -548,5 +549,14 @@ test("migrating from schema 12 counts every stored send as one attempt", async (
   assert.equal(rows[0]?.attempts, 1);
   const [version] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
   assert.equal(version?.user_version, SCHEMA_VERSION);
+  db.close();
+});
+
+test("an existing database gains the message reference table", async () => {
+  const db = await freshDb();
+  // A database from before message editing existed (roadmap 3.19).
+  db.exec("PRAGMA user_version = 14");
+  migrate(db);
+  assert.ok(names(db, "table").includes("message_refs"));
   db.close();
 });

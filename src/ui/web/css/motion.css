@@ -199,6 +199,29 @@
 #view[data-animate] {
   animation: view-in 0.36s var(--ease-entry) both;
 }
+
+/* The chrome around the view — the header's subtitle and countdown, the rail's
+   badges and channel list — reads from the same first queries the view waits
+   on, but it is a sibling of #view in App, not a descendant, so the gate above
+   never covered it. It painted its own zero state the moment React mounted and
+   swapped it for real figures when /status and /config landed, a second before
+   the view itself entered: two arrival waves, the second of which reads as the
+   page reloading. `data-ready` is the same readiness `data-animate` waits for,
+   stamped once on the shell rather than re-stamped per view — the chrome does
+   not re-enter when the operator changes view, only the view does. */
+.console:not([data-ready]) .header-meta,
+.console:not([data-ready]) .poll-next,
+.console:not([data-ready]) .rail-badge,
+.console:not([data-ready]) .rail-channels {
+  visibility: hidden;
+}
+/* And they enter on the view's own curve, in the same frame it does. */
+.console[data-ready] .header-meta,
+.console[data-ready] .poll-next,
+.console[data-ready] .rail-badge,
+.console[data-ready] .rail-channels {
+  animation: fade 0.36s var(--ease-entry) both;
+}
 /* The incident detail enters a touch slower; it is a page, not a panel. */
 #view[data-animate="incident"] {
   animation-duration: 0.4s;

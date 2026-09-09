@@ -113,3 +113,37 @@ notifications:
 #   # polling trouble: somewhere quieter.
 #   - provider: "*"
 #     channels: [slack]
+
+# How much of what the rules above admit actually goes out, and in how many
+# messages. Leave this section out and all four controls are off, which is what
+# every installation before them was doing.
+#
+# delivery:
+#   # Quiet hours: inside the window, only changes at or above the floor are
+#   # sent. Anything under it is dropped, not deferred — the digest below is the
+#   # control that defers. The window may wrap midnight, and is read in
+#   # `timeZone` ("auto" means the zone the container runs in).
+#   quietHours:
+#     enabled: true
+#     start: "23:00"
+#     end: "07:00"
+#     timeZone: "Europe/Rome"
+#     minSeverity: major_outage
+#   # Digest mode: collect changes under `immediateFloor` and send them as one
+#   # message per window. Anything at or above the floor still goes out the
+#   # moment it happens, so the window's length only ever delays the news you
+#   # said was not urgent. A batch collected when the container stops is lost
+#   # rather than sent an hour late.
+#   digest:
+#     enabled: true
+#     windowMinutes: 15
+#     immediateFloor: major_outage
+#   # A ceiling per provider, per rolling hour. What the cap holds back is
+#   # counted, and the next message that gets through says how much it hid.
+#   cap:
+#     enabled: true
+#     maxPerHour: 6
+#   # One incident becomes one message that is rewritten as the incident moves,
+#   # on channels that can edit one (telegram, discord). The others still get a
+#   # message per update.
+#   updateInPlace: true

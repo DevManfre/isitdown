@@ -1,6 +1,7 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { badgeRoutes } from "./routes/badge.routes.ts";
 import { configRoutes } from "./routes/config.routes.ts";
+import { debugRoutes } from "./routes/debug.routes.ts";
 import { eventsRoutes } from "./routes/events.routes.ts";
 import { historyRoutes } from "./routes/history.routes.ts";
 import { incidentsRoutes } from "./routes/incidents.routes.ts";
@@ -35,6 +36,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(maintenancesRoutes(runtime));
   app.use(metricsRoutes(runtime));
   app.use(badgeRoutes(runtime));
+  app.use(debugRoutes(runtime));
 
   app.use(express.static(PUBLIC_DIR, { extensions: ["html"] }));
 

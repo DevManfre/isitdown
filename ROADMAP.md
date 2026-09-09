@@ -16,7 +16,7 @@ Legend:
 - ✅ — shipped; kept listed so the phase reads as a whole.
 - ◐ — partly shipped; the row's note says what is left.
 
-Current state for reference (v1.6.0): Statuspage, generic RSS/Atom, generic
+Current state for reference (v1.7.0): Statuspage, generic RSS/Atom, generic
 HTML-scrape, Slack, AWS, Google Cloud, Azure, Instatus and Better Stack
 adapters, all covered by the shared adapter contract suite;
 every provider read through one HTTP helper that revalidates with `ETag` /
@@ -37,7 +37,11 @@ that reflects the worst status in the fleet; flap damping and per-provider mutes
 both expressed as diff-engine inputs; an optional HMAC signature on the generic
 webhook; badge and widget endpoints for READMEs and homelab dashboards; a
 timezone preference; visual baselines for every view in both themes and locales;
-`en` + `it`.
+a delivery policy on top of the routing rules — quiet hours, a digest window, an
+hourly cap per provider, and an incident whose updates edit one message on the
+channels that can — a hash-anchored request stagger with `Retry-After` honoured
+per provider, an adapter diagnostics panel with the last reads and an on-demand
+one; `en` + `it`.
 
 ---
 
@@ -78,8 +82,8 @@ does not cover is invisible.
 | 2.8 ✅ | **Record fetch latency of the status page itself** | S | One extra column on `status_samples`. Free signal: a status page slowing down is often the first sign of trouble, and it makes a nice chart. |
 | 2.9 | **Component-level alerting** | M | `scopeToComponents` already narrows what is *reported*; extend it so a specific component's transition can notify independently, with its own severity. |
 | 2.10 | **Provider push instead of poll (Statuspage webhook subscription)** | L ⚠️ | Statuspage lets a subscriber register a URL and pushes on every change: latency drops from a cadence to seconds and the request budget to zero. It needs an inbound reachable URL, which a homelab install does not have, so polling stays as the fallback and both paths have to converge on the same diff-engine input. |
-| 2.11 | **Stagger the fleet across the cadence** | S | Every provider is polled on the same tick, so a 20-provider fleet fires 20 requests at once and then idles. Anchoring each provider at a hash of its id spreads them over the interval: same total work, no burst, and a per-host rate no provider can read as abuse. |
-| 2.12 | **Honour `Retry-After` and back off a rate-limited host** | S | A 429 is treated as any other failure today. Reading the header and holding that host until it says so is a few lines, and it is the difference between a hiccup and a provider blocking the instance outright. |
+| 2.11 ✅ | **Stagger the fleet across the cadence** | S | Shipped in the poller: each provider's request is offset by a hash of its id, bounded to a tenth of its cadence and capped at 20s, so adding a provider does not reshuffle every other one and a fleet no longer fires in one burst. A manual poll skips the offset — the operator is watching. |
+| 2.12 ✅ | **Honour `Retry-After` and back off a rate-limited host** | S | Shipped in the HTTP helper and the poller: a 429, or any answer carrying `Retry-After`, becomes a typed error whose window the poller honours, holding that provider out of the next cycles instead of retrying inside it. A bare 503 stays an ordinary failure, a 429 with no header gets a one-minute default, and any window is capped at six hours so a provider cannot take itself off the dashboard for a week. |
 
 ## 3. Notification channels
 
@@ -98,15 +102,15 @@ is additive and independently shippable.
 | 3.8 | **Microsoft Teams** | S | Webhook. Boring, widely needed. |
 | 3.9 | **Apprise bridge** | S | One notifier that speaks Apprise gets ~80 channels at once. Pragmatic shortcut — at the cost of an external binary or service. |
 | 3.10 ✅ | **Per-provider / per-severity routing** | M | On the README's open list. A channel matrix: "major outages of anything → phone; everything else → Slack". Probably the single highest-value notification feature. |
-| 3.11 | **Quiet hours** | M | Suppress below a severity floor between configured hours, with an override for major outages. Needs a timezone preference (5.9). |
-| 3.12 | **Digest mode** | M | Batch changes into one message every N minutes. During a big multi-provider incident the current one-message-per-change behaviour is a flood. |
-| 3.13 | **Per-provider alert cap** | S | Hard ceiling of N messages/hour/provider, with a "suppressed X more" note. Cheap insurance against a pathological provider. |
+| 3.11 ✅ | **Quiet hours** | M | Shipped as a routing input, evaluated in core's own `explain` beside the rules: inside the window only changes clearing the floor reach anybody, and the dashboard's dry run says when the hour rather than a rule decided. Read in an IANA zone (or the server's), wraps midnight, and fails open on a malformed window — a broken setting must not be a night of silence. |
+| 3.12 ✅ | **Digest mode** | M | Shipped in the dispatcher: changes under `immediateFloor` collect per channel and go out as one message a window, anything at or above it still goes immediately. The flush is driven by the clock rather than by a busy cycle, so a window that runs out during a quiet one still sends. A batch collected when the process stops is lost rather than arriving late. |
+| 3.13 ✅ | **Per-provider alert cap** | S | Shipped as a rolling hour per provider, counted per change rather than per channel, with the suppressed tally carried into the next message that gets through. Deliberately not charged for a digested change: one batch is one message however many changes went into it. |
 | 3.14 ✅ | **Notification retry + dead-letter** | M | Shipped in the dispatcher: three attempts per message with jittered exponential backoff, one row per message rather than per attempt, an `attempts` column on `notifications`, and a **Dead letter** badge in the delivery log for a failure that spent them all. A delivery test still gets one attempt — the operator is waiting. |
 | 3.15 | **Customisable message templates** | L | Per-channel template with a small, safe token set. Powerful and much requested for webhooks; a real design problem to keep it from becoming a templating language, and it fights the "formatting lives in the notifier" convention. |
 | 3.16 ✅ | **HMAC signing for the generic webhook** | S | A shared secret and an `X-IsItDown-Signature` header. Lets a receiver verify the payload actually came from here. |
 | 3.17 ✅ | **Delivery log in the dashboard** | S | The `notifications` table already records what was sent; there is no view for it. Show sent/failed per channel with the payload. |
 | 3.18 | **Inbound chatops (Telegram bot commands)** | L | `/status`, `/mute github 2h`, `/history cloudflare`. Turns a one-way channel two-way. Needs a long-poll or webhook receiver and an auth model for "who may command this bot" — the first place where the no-auth stance actually pinches. |
-| 3.19 | **Update the message in place as an incident evolves** | M | An incident with six updates sends six messages. Telegram (`editMessageText`), Slack (`ts`) and Discord (a webhook message id) can all edit what they already sent, so one incident becomes one message that grows a timeline. Needs the message id stored per incident per channel — a small table, and the cleanest attack on the flood that 3.12 fights from the other side. |
+| 3.19 ✅ | **Update the message in place as an incident evolves** | M | Shipped for the two channels that can edit: Telegram's `editMessageText` and a Discord webhook message id (`?wait=true` on the send is what learns it). The id is kept per channel per incident — a `message_refs` table in the UI edition, the state file in Light — and an edit the channel refuses (too old, deleted) falls back to a fresh send rather than losing the update. Slack's incoming webhook cannot edit, so it still gets a message per update. Off by default. |
 | 3.20 | **Per-channel locale** | S | The catalogs exist and the dashboard already switches; a notification is English-only. A channel that names its locale lets the Telegram chat read Italian while the webhook payload stays English. |
 
 ## 4. Data, API and integrations
@@ -150,7 +154,7 @@ is additive and independently shippable.
 | 5.15 | **Native review of the Italian catalog** | S | On the README's open list already. |
 | 5.16 | **Bundle-size budget** | S | The dashboard has grown Recharts, motion, cobe, dotted-map. A CI check that fails on regression keeps it from quietly becoming a megabyte. |
 | 5.17 ✅ | **Set a channel credential from the dashboard** | M | Settings took only the *name* of the environment variable, so configuring a channel meant editing `.env` and recreating the container. A value now goes to `secrets.env` beside the database (`0600`, in the data volume) and into the process environment, live on the next request; the database still stores only the variable name and no route reads a value back. |
-| 5.18 | **Adapter debug panel** | S | When a provider reads `unknown` the dashboard cannot say why: the last raw payload, what the parser made of it, and the error if it threw all live in the logs. Showing them per provider is the first thing anyone debugging an adapter — 1.6's scrape adapter above all — actually needs. |
+| 5.18 ✅ | **Adapter debug panel** | S | Shipped as `GET /debug/adapters` plus a **Diagnose** dialog beside each provider's settings row: the last twenty read outcomes per provider (duration, attempts, whether it was a 304, and the error in full) and a **Read now** button that reports the whole parsed reading. A page that reads but parses into nothing — the scrape adapter's own failure mode — is called out rather than left looking healthy. |
 | 5.19 | **Incident search and filter** | S | The incident list is chronological and unfiltered. Free text over titles plus a status and a date filter; findability breaks at a few hundred rows, and a year of retention gets there. |
 | 5.20 | **Year heat calendar** | S | 365 day cells per provider, coloured by that day's worst status. The 90-day bars are the widest view today; retention can now go past a year (4.5), and this is the view that makes the extra data say something — and what 8.2 would read from. |
 | 5.21 | **PWA install and a phone layout** | M | Web push already reaches a phone, then hands the notification to a dashboard laid out for a desktop and not installable. A manifest, a service worker and a narrow overview layout would make the alert lead somewhere usable. |
@@ -206,85 +210,72 @@ not re-invented from scratch later.
 
 ## Suggested next slice
 
-The five slices before this one are spent — their rows are marked ✅ in the
-tables above. The last of them is now a record rather than a plan:
+The six slices before this one are spent — their rows are marked ✅ in the
+tables above. The last of them is now a record rather than a plan: the delivery
+side of the flood is answered, and the poll path is polite.
 
-1. ✅ **1.6 generic HTML-scrape adapter** — shipped as the `html` adapter: a
-   `selector` option plus optional per-severity word lists, over a selector
-   reader written here rather than a DOM dependency (tag/#id/.class/[attr] with
-   the descendant and child combinators; anything past that throws instead of
-   matching nothing). The fragility is loud by design — a selector that matches
-   nothing fails like an unreachable provider, unmatched text reads `unknown`
-   never `operational`, and the dashboard carries the "this can break silently"
-   warning beside the fields.
-2. ✅ **2.5 flap damping** — shipped as `confirmSamples` and one gate in the
-   diff engine, `confirmedChanges`. It holds the *notification baseline* while
-   samples keep being recorded, so the dashboard still says what the page says
-   and a change is announced once N polls agree. A one-cycle disagreement now
-   costs nothing; a real outage costs at most N−1 polls. Off by default, since
-   turning it on for an existing installation would delay alerts it trusts.
-3. ✅ **5.2 mute / acknowledge a provider** — shipped as `mutedUntil` on the
-   service and a mute rule inside `diff`, alongside the maintenance-window one:
-   an operator-declared window rather than a provider-declared one. Polling and
-   recording carry on, the badge is on the dashboard, and the baseline moves
-   with the mute so lifting it does not replay what happened inside it. The
-   *incident*-level mute was left out — the provider-level one covers "stop
-   telling me" and needs no second concept.
-4. ✅ **3.16 HMAC signing for the generic webhook** — shipped as an optional
-   `secret`: `X-IsItDown-Signature: sha256=…` over `"<timestamp>.<body>"`, with
-   the timestamp inside the signed material so a receiver can reject a replay by
-   age. It also forced one honest fix: the UI edition disabled a channel whose
-   every `*Env` variable was unset, so credentials that a channel works without
-   are now declared as optional in one shared place.
-5. ✅ **4.8 badge endpoint** + **4.11 `homepage` / Dashy widget** — shipped as
-   `/badge.svg`, `/badge/:providerId.svg` and `/widget`. The badge is drawn
-   here rather than fetched from shields.io, so an instance with no outbound
-   access still serves one, and an unknown provider is grey rather than green.
-6. ✅ **5.9 timezone preference** — shipped as a `timeZone` preference (`auto`
-   or an IANA name, validated against the runtime's own zone table) applied to
-   every clock time on the dashboard. Daily uptime bars stay on UTC days, which
-   is how the samples are grouped — labelling a UTC bucket in another zone was
-   the one *existing* bug this row turned up.
-7. ✅ **7.1 visual regression tests** — shipped as `npm run test:visual`: every
-   view in both themes and both locales, against a fixed fleet and a frozen
-   clock, compared with baselines under `test/visual/baseline/`. Playwright is
-   still not a dependency — the harness drives its cached Chromium over the
-   DevTools protocol, which is also what makes the clock freezable and the
-   baselines stable. Two criteria, because one was not enough: how much of the
-   frame moved, and how many pixels changed colour outright (a token change is
-   ~300 pixels, far below any whole-frame ratio worth having).
+1. ✅ **3.11 quiet hours** — shipped as a routing input, evaluated inside core's
+   own `explain` next to 3.10's rules rather than as a second filter in the
+   dispatcher, which is what keeps the dashboard's dry run and the actual
+   delivery from disagreeing. The window is read in an IANA zone (or the
+   server's), may wrap midnight, and fails open on anything unusable — a
+   malformed time or an unknown zone must not become a night of silence.
+2. ✅ **3.12 digest mode** — shipped with the floor the row predicted: anything
+   clearing `immediateFloor` goes out at once, everything under it collects per
+   channel and arrives as one message a window. The flush is on the clock, not
+   on a busy cycle, because a window running out during a quiet one is exactly
+   when a batch is due. A channel switched off mid-window has its batch dropped
+   with a line in the log, and a batch collected when the process stops is lost
+   rather than sent an hour late — the side of that trade an operator watching a
+   container restart expects.
+3. ✅ **3.13 per-provider alert cap** — a rolling hour per provider, counted per
+   change rather than per channel (the person reading is one person however many
+   channels are on), with the suppressed tally carried into the next message
+   that gets through. A digested change is deliberately not charged against it:
+   one batch is one message, and charging both would make the two controls
+   fight.
+4. ✅ **3.19 update the message in place** — shipped for the two channels that
+   can actually edit: Telegram's `editMessageText` and a Discord webhook message
+   id, learned by sending with `?wait=true`. The id lives per channel per
+   incident (`message_refs` in the UI edition, the state file in Light), an edit
+   the channel refuses falls back to a fresh send instead of losing the update,
+   and Slack's incoming webhook — which cannot edit at all — still gets a
+   message per update. Off by default: an installation used to a message per
+   update should not watch its history collapse unasked.
+5. ✅ **2.11 stagger the fleet across the cadence** and **2.12 `Retry-After`** —
+   the offset is anchored on the provider's id rather than its position in the
+   list, so adding a provider no longer moves every other request, and it is
+   bounded to a tenth of the cadence (capped at 20s) because the spread is paid
+   in cycle wall time. `Retry-After` became a typed error the poller honours by
+   holding that provider out of the next cycles; a bare 503 stays an ordinary
+   failure, and a stated window is capped at six hours so a provider cannot take
+   itself off the dashboard for a week.
+6. ✅ **5.18 adapter debug panel** — `GET /debug/adapters` plus a **Diagnose**
+   dialog beside each provider's settings row: the last twenty read outcomes
+   (duration, attempts, whether it was a 304, the error in full) and a **Read
+   now** button that reports the whole parsed reading. The 304 marker and the
+   "read, but parsed into nothing" warning are the two things the logs were
+   being tailed for — the second is the scrape adapter's own failure mode, and
+   it used to look perfectly healthy.
 
-The next slice is chosen: **finish the "stop the flood" family**, which mute
-(5.2) and damping (2.5) started from the diff-engine side and which nothing yet
-addresses on the delivery side, plus the two cheap rows that make the fleet
-itself calmer to run.
+The next slice, on the same reading of value against effort — three rows that
+each make an existing surface answer a question it currently cannot:
 
-1. **3.11 quiet hours** — 5.9 was the prerequisite and is in place, so a floor
-   ("nothing below `major_outage` between 23:00 and 07:00, in *my* zone") is now
-   expressible. Must be a notification-routing input, next to 3.10's rules, not
-   a second filter somewhere else in the dispatcher.
-2. **3.12 digest mode** — batch every change in a window into one message. The
-   window is the whole design: too short and it is the current flood, too long
-   and the first alert arrives late. Likely a floor that always sends
-   immediately, with everything under it batched.
-3. **3.13 per-provider alert cap** — N messages per hour per provider, with a
-   "suppressed X more" line. Cheap, and unlike 3.11 and 3.12 it protects against
-   a pathological provider rather than a busy day.
-4. **3.19 update the message in place** — one incident becomes one message that
-   grows, instead of one per update. Attacks the same flood from the other end
-   and needs a small table (message id per incident per channel) rather than a
-   new concept.
-5. **2.11 stagger the fleet across the cadence** — a burst of N requests every
-   tick is the one impolite thing left in the poll path after 2.4's conditional
-   requests. A hash-anchored offset per provider, and **2.12 `Retry-After`** on
-   top of it, are a day's work between them.
-6. **5.18 adapter debug panel** — nine adapters now, one of them a CSS-selector
-   scrape that is *documented* as fragile, and no way to see a parse failure
-   without container logs. The cheapest row in section 5 by value delivered.
-
-Then, on the same reading of value against effort: **2.6 provider groups**,
-**4.3 config export/import** and **5.13 the accessibility pass** — which the
-visual harness can now catch regressions for.
+1. **2.6 provider groups / "my stack"** — the fleet is a flat list, so the
+   dashboard answers "is GitHub healthy" and never "is my deploy path healthy".
+   A group with a derived composite status is a new concept in the data model
+   but a small one, and 3.10's routing already has the shape a group-level rule
+   would slot into.
+2. **4.3 config export / import** — everything is now configurable from the
+   dashboard, which means everything is now trapped in one SQLite file. A
+   round-trip through the Light edition's own `config.yml` shape is the cheapest
+   honest backup, and it makes "try it in the UI edition, then run it in Light"
+   a supported path rather than retyping.
+3. **5.13 accessibility pass** — the visual harness (7.1) can now catch a
+   regression, which is what made this row worth doing rather than worth
+   promising. Keyboard reachability of the dialogs that have accumulated
+   (routing rules, service edit, remove, diagnose), focus order, and the
+   contrast of the status palette in both themes.
 
 The two items that most change *what IsItDown is*, and therefore deserve a
 decision rather than a slot in a queue, are **1.8 direct HTTP probes** (with

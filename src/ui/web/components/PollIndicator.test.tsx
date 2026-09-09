@@ -22,6 +22,23 @@ describe("PollIndicator", () => {
     expect(await screen.findByText("1m 4s")).toBeInTheDocument();
   });
 
+  // Same claim as the header's subtitle, in the countdown's own words: with no
+  // answer from /status there is no deadline to count down to and nothing to
+  // say about a poll that may well have happened. `secondsLeft === null`
+  // collapsed "no answer yet" into "answered, never polled".
+  it("says nothing while the read has not answered", async () => {
+    renderWithProviders(<PollIndicator />, { errors: { status: 500 } });
+    expect(await screen.findByText(i18n.t("meta.next-poll-label"))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("meta.never-polled"))).not.toBeInTheDocument();
+  });
+
+  it("says so once the server answers that it has never polled", async () => {
+    renderWithProviders(<PollIndicator />, {
+      status: { providers: [], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+    });
+    expect(await screen.findByText(i18n.t("meta.never-polled"))).toBeInTheDocument();
+  });
+
   // The countdown reaching zero used to be a dead end: nothing re-asked the
   // server for the new deadline until the flat 30s status refetch came round,
   // so "0s" sat on screen for up to half a minute after every cycle.

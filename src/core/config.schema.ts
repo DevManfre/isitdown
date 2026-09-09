@@ -111,3 +111,56 @@ export const routingRuleSchema = z.object({
 });
 
 export const routingRulesSchema = z.array(routingRuleSchema);
+
+/**
+ * A wall-clock time of day, as an operator writes one. Validated as a string
+ * rather than parsed into minutes here, because both editions store it as
+ * written — a config file an operator can read back is worth more than a
+ * normalised number.
+ */
+const clockTime = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be a 24-hour time such as 23:00");
+
+/**
+ * Quiet hours (roadmap 3.11). The floor defaults to `major_outage` rather than
+ * to `any`: an operator who switches quiet hours on and configures nothing else
+ * means "wake me only for something serious", not "wake me for everything".
+ */
+export const quietHoursSchema = z.object({
+  enabled: z.boolean().default(false),
+  start: clockTime.default("23:00"),
+  end: clockTime.default("07:00"),
+  /** An IANA zone name, or "auto" for the zone the process runs in. */
+  timeZone: z.string().trim().max(64).default("auto"),
+  minSeverity: z.enum(SEVERITY_FLOORS).default("major_outage"),
+});
+
+/**
+ * Digest mode (roadmap 3.12). The window is capped at a day and floored at a
+ * minute: below a minute it batches nothing (the poll cadence is longer), and
+ * beyond a day a "digest" is a report nobody is waiting for.
+ */
+export const digestSchema = z.object({
+  enabled: z.boolean().default(false),
+  windowMinutes: z.number().int().positive().max(1440).default(15),
+  immediateFloor: z.enum(SEVERITY_FLOORS).default("major_outage"),
+});
+
+/** Per-provider alert cap (roadmap 3.13). */
+export const alertCapSchema = z.object({
+  enabled: z.boolean().default(false),
+  maxPerHour: z.number().int().positive().max(1000).default(10),
+});
+
+/**
+ * The delivery policy as a whole, shared by the Light edition's `delivery:`
+ * block and the UI edition's settings rows, so the two editions cannot disagree
+ * about what a valid policy is.
+ */
+export const deliverySchema = z.object({
+  quietHours: quietHoursSchema.default({}),
+  digest: digestSchema.default({}),
+  cap: alertCapSchema.default({}),
+  updateInPlace: z.boolean().default(false),
+});

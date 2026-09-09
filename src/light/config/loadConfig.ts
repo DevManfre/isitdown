@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { parse } from "yaml";
-import { pollingSchema } from "../../core/config.schema.ts";
+import { deliverySchema, pollingSchema } from "../../core/config.schema.ts";
 import type { ChannelConfig, ConfigSource, RuntimeConfig } from "../../core/configSource.interface.ts";
 import { CATCH_ALL_RULE, type RoutingRule } from "../../core/routing.ts";
 import { fileConfigSchema, REQUIRED_CHANNEL_SETTINGS, type FileConfig } from "./schema.ts";
@@ -79,6 +79,10 @@ export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<
     services: file.services,
     channels,
     rules: buildRules(file, channels, path),
+    // Parsed through the shared schema even when the block is absent, so the
+    // "everything off" defaults come from one place rather than being restated
+    // as a literal here.
+    delivery: deliverySchema.parse(file.delivery ?? {}),
   };
 }
 

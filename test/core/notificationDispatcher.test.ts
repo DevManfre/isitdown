@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { createDispatcher, type SentRecord } from "../../src/core/notificationDispatcher.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import { CATCH_ALL_RULE } from "../../src/core/routing.ts";
+import { DELIVERY_DEFAULTS, type DeliveryConfig } from "../../src/core/delivery.ts";
+import type { MessageRefStore } from "../../src/core/messageRefStore.interface.ts";
 import type { Notifier } from "../../src/core/notifier.interface.ts";
 import type { ServiceDefinition } from "../../src/core/configSource.interface.ts";
 import type { NotificationPayload, StatusChange } from "../../src/core/types.ts";
@@ -483,4 +485,435 @@ test("a dead letter is logged as an error, its retried attempts only as warnings
 
   assert.equal(lines.filter((line) => line.includes("attempt failed")).length, 3);
   assert.equal(lines.filter((line) => line.includes("failed permanently")).length, 1);
+});
+
+/**
+ * A clock the test moves itself, so a digest window and the cap's rolling hour
+ * are asserted rather than waited out.
+ */
+function fakeClock(start = Date.parse("2026-09-08T14:00:00.000Z")): {
+  now: () => number;
+  advance: (ms: number) => void;
+} {
+  let at = start;
+  return { now: () => at, advance: (ms: number) => void (at += ms) };
+}
+
+const delivery = (over: Partial<DeliveryConfig> = {}): DeliveryConfig => ({
+  ...DELIVERY_DEFAULTS,
+  ...over,
+});
+
+test("quiet hours hold back a change under their floor, and let a worse one through", async () => {
+  const channel = recorder("telegram");
+  // 23:30 in Rome, which is inside 23:00–07:00 there and not inside it in UTC —
+  // so a zone read from the wrong place fails this rather than passing by luck.
+  const clock = fakeClock(Date.parse("2026-09-08T21:30:00.000Z"));
+  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({
+      quietHours: {
+        enabled: true,
+        start: "23:00",
+        end: "07:00",
+        timeZone: "Europe/Rome",
+        minSeverity: "major_outage",
+      },
+    }),
+  };
+
+  await dispatcher.dispatch([change({ currentStatus: "degraded" })], ctx);
+  assert.deepEqual(channel.seen, [], "a degradation at half past eleven wakes nobody");
+
+  await dispatcher.dispatch(
+    [change({ previousStatus: "operational", currentStatus: "major_outage" })],
+    ctx,
+  );
+  assert.equal(channel.seen.length, 1, "an outage clears the floor and is sent");
+});
+
+test("outside the window quiet hours change nothing", async () => {
+  const channel = recorder("telegram");
+  const clock = fakeClock(Date.parse("2026-09-08T10:00:00.000Z"));
+  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+
+  await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({
+      quietHours: {
+        enabled: true,
+        start: "23:00",
+        end: "07:00",
+        timeZone: "Europe/Rome",
+        minSeverity: "major_outage",
+      },
+    }),
+  });
+
+  assert.equal(channel.seen.length, 1);
+});
+
+test("the hourly cap stops a provider flooding, and the next message says how much it hid", async () => {
+  const channel = recorder("telegram");
+  const clock = fakeClock();
+  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ cap: { enabled: true, maxPerHour: 2 } }),
+  };
+
+  for (let index = 0; index < 5; index += 1) {
+    await dispatcher.dispatch([change()], ctx);
+    clock.advance(60_000);
+  }
+  assert.equal(channel.seen.length, 2, "two messages an hour is two messages an hour");
+
+  // An hour after the first, its slot comes back — and the message that takes
+  // it reports the three that were swallowed in between.
+  clock.advance(56 * 60_000);
+  await dispatcher.dispatch([change()], ctx);
+  assert.equal(channel.seen.length, 3);
+  assert.equal(channel.seen[2]?.suppressedCount, 3);
+
+  // Reported once, not on every message after it.
+  clock.advance(60_000);
+  await dispatcher.dispatch([change()], ctx);
+  assert.equal(channel.seen[3]?.suppressedCount, 0);
+});
+
+test("the cap counts one change once, however many channels it reaches", async () => {
+  const telegram = recorder("telegram");
+  const slack = recorder("slack");
+  const clock = fakeClock();
+  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier, slack.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ cap: { enabled: true, maxPerHour: 2 } }),
+  };
+
+  await dispatcher.dispatch([change()], ctx);
+  clock.advance(60_000);
+  await dispatcher.dispatch([change()], ctx);
+  clock.advance(60_000);
+  await dispatcher.dispatch([change()], ctx);
+
+  assert.equal(telegram.seen.length, 2, "two changes got through, not one");
+  assert.equal(slack.seen.length, 2);
+});
+
+test("a change under the digest floor waits for the window, then arrives as one message", async () => {
+  const channel = recorder("telegram");
+  const clock = fakeClock();
+  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({
+      digest: { enabled: true, windowMinutes: 15, immediateFloor: "major_outage" },
+    }),
+  };
+
+  await dispatcher.dispatch([change({ currentStatus: "degraded" })], ctx);
+  await dispatcher.dispatch([change({ currentStatus: "partial_outage" })], ctx);
+  assert.deepEqual(channel.seen, [], "nothing goes out while the window is collecting");
+
+
+  // A cycle in which nothing changed at all is exactly when a window runs out.
+  clock.advance(16 * 60_000);
+  const records = await dispatcher.dispatch([], ctx);
+
+  assert.equal(channel.seen.length, 1, "one message for the whole window");
+  assert.equal(records.length, 1);
+  assert.equal(channel.seen[0]?.digest?.items.length, 2);
+  // The most severe member stands in as the message's own change.
+  assert.equal(channel.seen[0]?.change.currentStatus, "partial_outage");
+});
+
+test("a change at or above the digest floor is sent immediately, batch or no batch", async () => {
+  const channel = recorder("telegram");
+  const clock = fakeClock();
+  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({
+      digest: { enabled: true, windowMinutes: 15, immediateFloor: "partial_outage" },
+    }),
+  };
+
+  await dispatcher.dispatch([change({ currentStatus: "degraded" })], ctx);
+  await dispatcher.dispatch([change({ currentStatus: "major_outage" })], ctx);
+
+  assert.equal(channel.seen.length, 1, "the outage did not wait for the batch");
+  assert.equal(channel.seen[0]?.change.currentStatus, "major_outage");
+  assert.equal(channel.seen[0]?.digest, undefined);
+  // And the degradation is still collecting: it arrives when the window ends.
+  clock.advance(16 * 60_000);
+  await dispatcher.dispatch([], ctx);
+  assert.equal(channel.seen.length, 2);
+  assert.equal(channel.seen[1]?.digest?.items.length, 1);
+});
+
+test("a digest for a channel switched off mid-window is dropped, not sent elsewhere", async () => {
+  const telegram = recorder("telegram");
+  const clock = fakeClock();
+  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const shared = {
+    services,
+    locale: "en",
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({
+      digest: { enabled: true, windowMinutes: 15, immediateFloor: "major_outage" },
+    }),
+  };
+
+  await dispatcher.dispatch([change({ currentStatus: "degraded" })], {
+    ...shared,
+    notifiers: [telegram.notifier],
+  });
+  clock.advance(16 * 60_000);
+  const records = await dispatcher.dispatch([], { ...shared, notifiers: [] });
+
+  assert.deepEqual(records, []);
+  assert.deepEqual(telegram.seen, []);
+
+  // And gone rather than held forever: the channel coming back does not
+  // deliver a batch from an hour ago.
+  clock.advance(16 * 60_000);
+  await dispatcher.dispatch([], { ...shared, notifiers: [telegram.notifier] });
+  assert.deepEqual(telegram.seen, []);
+});
+
+test("quiet hours and the digest compose: a held-back change never reaches the batch", async () => {
+  const channel = recorder("telegram");
+  const clock = fakeClock(Date.parse("2026-09-08T21:30:00.000Z"));
+  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({
+      quietHours: {
+        enabled: true,
+        start: "23:00",
+        end: "07:00",
+        timeZone: "Europe/Rome",
+        minSeverity: "major_outage",
+      },
+      digest: { enabled: true, windowMinutes: 15, immediateFloor: "major_outage" },
+    }),
+  };
+
+  await dispatcher.dispatch([change({ currentStatus: "degraded" })], ctx);
+
+  // Quiet hours drop it, they do not defer it: no batch forms, so the end of
+  // the window brings nothing.
+  clock.advance(16 * 60_000);
+  assert.deepEqual(await dispatcher.dispatch([], ctx), []);
+  assert.deepEqual(channel.seen, []);
+});
+
+/** An in-memory message reference store, the shape both editions persist. */
+function refStore(): MessageRefStore & { rows: Map<string, string> } {
+  const rows = new Map<string, string>();
+  const key = (channel: string, providerId: string, incidentId: string): string =>
+    `${channel}|${providerId}|${incidentId}`;
+  return {
+    rows,
+    async getRef(channel, providerId, incidentId) {
+      return rows.get(key(channel, providerId, incidentId)) ?? null;
+    },
+    async saveRef(channel, providerId, incidentId, ref) {
+      rows.set(key(channel, providerId, incidentId), ref);
+    },
+    async forgetRef(channel, providerId, incidentId) {
+      rows.delete(key(channel, providerId, incidentId));
+    },
+  };
+}
+
+/** A channel that names its messages and can edit them, like Telegram's. */
+function editable(id: string, behaviour: "ok" | "refuse-edit" = "ok"): {
+  notifier: Notifier;
+  sent: NotificationPayload[];
+  edited: { payload: NotificationPayload; ref: string }[];
+} {
+  const sent: NotificationPayload[] = [];
+  const edited: { payload: NotificationPayload; ref: string }[] = [];
+  let next = 0;
+  return {
+    sent,
+    edited,
+    notifier: {
+      id,
+      async send(payload) {
+        sent.push(payload);
+        next += 1;
+        return `m${next}`;
+      },
+      async update(payload, ref) {
+        if (behaviour === "refuse-edit") throw new Error("message can't be edited");
+        edited.push({ payload, ref });
+      },
+    },
+  };
+}
+
+const incidentChange = (kind: StatusChange["kind"], status = "investigating"): StatusChange =>
+  change({
+    kind,
+    currentStatus: "major_outage",
+    incident: { ...incident, status },
+  });
+
+test("with editing on, an incident's updates rewrite the message its opening sent", async () => {
+  const channel = editable("telegram");
+  const refs = refStore();
+  const dispatcher = createDispatcher({ logger: silent, messageRefs: refs });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ updateInPlace: true }),
+  };
+
+  await dispatcher.dispatch([incidentChange("incident_opened")], ctx);
+  await dispatcher.dispatch([incidentChange("incident_updated", "identified")], ctx);
+  await dispatcher.dispatch([incidentChange("incident_resolved")], ctx);
+
+  assert.equal(channel.sent.length, 1, "one message for the whole incident");
+  assert.deepEqual(
+    channel.edited.map((edit) => edit.ref),
+    ["m1", "m1"],
+    "the update and the resolution both edited it",
+  );
+  assert.equal(refs.rows.size, 0, "the closed incident's reference is let go");
+});
+
+test("with editing off, every update is its own message", async () => {
+  const channel = editable("telegram");
+  const dispatcher = createDispatcher({ logger: silent, messageRefs: refStore() });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery(),
+  };
+
+  await dispatcher.dispatch([incidentChange("incident_opened")], ctx);
+  await dispatcher.dispatch([incidentChange("incident_updated", "identified")], ctx);
+
+  assert.equal(channel.sent.length, 2);
+  assert.deepEqual(channel.edited, []);
+});
+
+test("a change that is not part of an incident is never folded into one", async () => {
+  const channel = editable("telegram");
+  const refs = refStore();
+  const dispatcher = createDispatcher({ logger: silent, messageRefs: refs });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ updateInPlace: true }),
+  };
+
+  await dispatcher.dispatch([incidentChange("incident_opened")], ctx);
+  await dispatcher.dispatch([change({ currentStatus: "degraded" })], ctx);
+
+  assert.equal(channel.sent.length, 2, "the status change got its own message");
+  assert.deepEqual(channel.edited, []);
+});
+
+test("an edit the channel refuses becomes a new message, and is not retried forever", async () => {
+  const channel = editable("telegram", "refuse-edit");
+  const refs = refStore();
+  const dispatcher = createDispatcher({ logger: silent, messageRefs: refs });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ updateInPlace: true }),
+  };
+
+  await dispatcher.dispatch([incidentChange("incident_opened")], ctx);
+  const records = await dispatcher.dispatch([incidentChange("incident_updated", "identified")], ctx);
+
+  assert.equal(channel.sent.length, 2, "the refused edit fell back to a send");
+  assert.equal(records[0]?.ok, true, "which is a delivered notification, not a failure");
+  // The new message replaced the reference, rather than the refused one being
+  // offered to the next update as well.
+  assert.equal(refs.rows.get("telegram|github|i1"), "m2");
+});
+
+test("a channel that cannot edit is simply sent to, with editing on", async () => {
+  const channel = recorder("slack");
+  const dispatcher = createDispatcher({ logger: silent, messageRefs: refStore() });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ updateInPlace: true }),
+  };
+
+  await dispatcher.dispatch([incidentChange("incident_opened")], ctx);
+  await dispatcher.dispatch([incidentChange("incident_updated", "identified")], ctx);
+
+  assert.equal(channel.seen.length, 2);
+});
+
+test("with nowhere to keep a reference, editing cannot silently drop updates", async () => {
+  const channel = editable("telegram");
+  // No messageRefs dependency at all: what an edition that has no store passes.
+  const dispatcher = createDispatcher({ logger: silent });
+
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ updateInPlace: true }),
+  };
+  await dispatcher.dispatch([incidentChange("incident_opened")], ctx);
+  await dispatcher.dispatch([incidentChange("incident_updated", "identified")], ctx);
+
+  assert.equal(channel.sent.length, 2);
+  assert.deepEqual(channel.edited, []);
 });
