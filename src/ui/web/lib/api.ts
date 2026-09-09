@@ -1,5 +1,6 @@
 import type {
   AdapterDebugResponse,
+  AdapterDetection,
   AdapterProbeResult,
   ComponentHistoryResponse,
   ComponentPreview,
@@ -88,6 +89,10 @@ export const getComponentHistory = (provider: string, days: number) =>
 export interface IncidentListQuery {
   provider?: string | undefined;
   state?: IncidentState | undefined;
+  /** Free text over incident names; the server searches, not the browser. */
+  q?: string | undefined;
+  /** Only incidents that started within this many days. Absent = every one. */
+  days?: number | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
 }
@@ -156,6 +161,9 @@ export const previewComponents = (body: unknown) =>
     "/config/services/preview-components",
     body,
   );
+/** Which adapter reads a pasted url, and the base url that adapter wants. */
+export const detectAdapter = (url: string) =>
+  request<AdapterDetection>("POST", "/config/services/detect", { url });
 export const patchService = (id: string, patch: unknown) =>
   request<unknown>("PATCH", `/config/services/${encodeURIComponent(id)}`, patch);
 /** Read before the remove, so the confirmation can name what the cascade takes. */

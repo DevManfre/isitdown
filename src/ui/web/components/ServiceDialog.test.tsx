@@ -131,6 +131,43 @@ describe("the service dialog's adapter choice", () => {
     expect(within(dialog).queryByText(i18n.t("add.note.statuspage"))).toBeNull();
   });
 
+  // Roadmap 1.14. Nine adapters and nine base-url conventions: the page itself
+  // knows which of them it is, so the form asks it rather than the operator.
+  it("fills in the adapter and the base URL from the page itself", async () => {
+    const { dialog } = await openAdd();
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "status.example.com");
+
+    interceptWrites({
+      "POST /config/services/detect": {
+        adapter: "rss",
+        baseUrl: "https://status.example.com/history.rss",
+        probes: [{ adapter: "rss", url: "https://status.example.com/history.rss", outcome: "match" }],
+      },
+    });
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.detect-adapter") }));
+
+    expect(await within(dialog).findByText(i18n.t("add.detect-ok", { adapter: "rss" }))).toBeInTheDocument();
+    expect(within(dialog).getByRole("radio", { name: "rss" })).toHaveAttribute("aria-checked", "true");
+    expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue(
+      "https://status.example.com/history.rss",
+    );
+  });
+
+  it("leaves the form alone when no adapter recognised the page", async () => {
+    const { dialog } = await openAdd();
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://example.com");
+
+    interceptWrites({
+      "POST /config/services/detect": { adapter: null, baseUrl: null, probes: [] },
+    });
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.detect-adapter") }));
+
+    expect(await within(dialog).findByText(i18n.t("add.detect-none"))).toBeInTheDocument();
+    // The typing survives: the operator is about to pick an adapter by hand.
+    expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue("https://example.com");
+    expect(within(dialog).getByRole("radio", { name: "statuspage" })).toHaveAttribute("aria-checked", "true");
+  });
+
   it("submits the adapter the operator picked", async () => {
     const { dialog } = await openAdd();
     const calls = interceptWrites({

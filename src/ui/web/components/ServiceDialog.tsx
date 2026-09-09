@@ -10,7 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentPicker, type ComponentPickerEntry, type ComponentPickerSelection } from "@/components/ComponentPicker.tsx";
 import { useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
-import { previewComponents } from "@/lib/api.ts";
+import { detectAdapter, previewComponents } from "@/lib/api.ts";
 import { slugify } from "@/lib/slugify.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
 
@@ -119,6 +119,7 @@ export function ServiceDialog({
     { supported: boolean; components: ComponentPickerEntry[] } | undefined
   >(undefined);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
@@ -166,6 +167,7 @@ export function ServiceDialog({
     setPreview(undefined);
     setMessage(undefined);
     setSaving(false);
+    setDetecting(false);
   };
 
   // Radix's own `onOpenChange` only fires from its wrapped setter — Escape,
@@ -199,6 +201,37 @@ export function ServiceDialog({
       setPreview({ supported: result.supported, components: result.components });
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  /**
+   * Asks the pasted url which adapter reads it, and fills in both fields from
+   * the answer (roadmap 1.14). Nine adapters and nine base-url conventions are
+   * only obvious to whoever wrote them; the page itself knows.
+   *
+   * A page nothing recognised leaves the form exactly as it was: the operator
+   * was going to pick by hand anyway, and clearing their typing would be the
+   * one outcome worse than not helping.
+   */
+  const runDetect = async (): Promise<void> => {
+    setDetecting(true);
+    setMessage(undefined);
+    try {
+      const result = await detectAdapter(baseUrl.trim());
+      if (result.adapter === null || result.baseUrl === null) {
+        setMessage({ text: t("add.detect-none"), tone: "error" });
+        return;
+      }
+      setAdapter(result.adapter);
+      setBaseUrl(result.baseUrl);
+      // The component list belongs to the adapter that was selected when it was
+      // loaded, so a detection that changes the adapter invalidates it.
+      setPreview(undefined);
+      setMessage({ text: t("add.detect-ok", { adapter: result.adapter }), tone: "info" });
+    } catch (error) {
+      setMessage({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+    } finally {
+      setDetecting(false);
     }
   };
 
@@ -306,7 +339,22 @@ export function ServiceDialog({
             )}
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="service-base-url">{t("field.base-url")}</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="service-base-url">{t("field.base-url")}</Label>
+                {/* Add mode only: an existing service already has both answers,
+                    and re-detecting one would offer to overwrite them. */}
+                {mode === "add" && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={detecting || baseUrl.trim() === ""}
+                    onClick={() => void runDetect()}
+                  >
+                    {t("action.detect-adapter")}
+                  </Button>
+                )}
+              </div>
               <Input
                 id="service-base-url"
                 className="font-mono"
