@@ -4,6 +4,7 @@ import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import { useComponentHistory } from "@/hooks/queries.ts";
 import type { ComponentHistory, ComponentStatus } from "@/lib/types.ts";
+import { statusLabelKey } from "@/lib/chartConfig.ts";
 
 const uptimeFor = (component: ComponentHistory, days: number) =>
   (days <= 7 ? component.uptime7 : days <= 30 ? component.uptime30 : component.uptime90);
@@ -55,7 +56,7 @@ export function ComponentRows({
                   gets squeezed to a two-line stub (or, before, an ellipsis).
                   The strip takes what is left, down to a strip's worth. */}
               <span className="flex shrink-0 items-center gap-2 text-sm">
-                <StatusDot status={live?.status ?? "unknown"} size={7} />
+                <StatusDot status={live?.status ?? "unknown"} size={7} label={t(statusLabelKey(live?.status ?? "unknown"))} />
                 <span className="break-words">{live?.name ?? component.name}</span>
               </span>
               <span className="min-w-16 flex-1">

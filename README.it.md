@@ -67,6 +67,7 @@ server) e **UI** (lo stesso motore più una dashboard locale, configurabile a ru
   - [8.1 Tema](#81-tema)
   - [8.2 Localizzazione](#82-localizzazione)
 - [9. Sviluppo](#9-sviluppo)
+  - [8.3 Accessibilità](#83-accessibilità)
   - [9.1 Struttura del repository](#91-struttura-del-repository)
   - [9.2 Stack tecnologico](#92-stack-tecnologico)
   - [9.3 Sviluppo live](#93-sviluppo-live)
@@ -1848,6 +1849,37 @@ isitdown/
 │   │   ├── healthcheck.ts             freschezza del file di stato
 │   │   ├── fileStateStore.ts          file JSON, scritture atomiche
 │   │   └── config/
+### 8.3 Accessibilità
+
+La dashboard è la console di un singolo operatore, e quell'operatore può usare
+una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tre
+(roadmap 5.13). Cosa è garantito, e verificato:
+
+- **Contrasto.** Ogni colore di stato usato come *testo* supera WCAG AA (4.5:1)
+  sia sulla pagina sia sulla card, in entrambi i temi — `src/ui/web/css/tokens.test.ts`
+  calcola i rapporti da `tokens.css`, così una modifica alla palette che ne rompe
+  uno fa fallire la suite invece di essere spedita. L'audit ha trovato due
+  difetti reali nel tema scuro: un'interruzione parziale e una grave avevano lo
+  stesso colore, e l'*etichetta* di stato leggeva dal grigio quasi-sfondo che
+  serve alle barre dei giorni non misurati (1,3:1 — non è testo). Entrambi
+  corretti; le barre mantengono quel grigio come token `-fill` separato.
+- **Tastiera.** Ogni dialog segue il contratto di Radix — il focus entra
+  all'apertura, il Tab resta dentro, Escape chiude, il focus torna al trigger — e
+  i dialog accumulati (aggiungi/modifica servizio, rimuovi, diagnostica, regole
+  di instradamento) hanno ognuno un test che lo dimostra invece di darlo per
+  scontato. Gli elementi cliccabili scritti a mano (una riga di provider, una
+  tile ad anello) ricevono un anello di focus visibile da `base.css` a
+  specificità zero, sotto quello che una primitiva ha già.
+- **Grafici.** Una fila di barre colorate non dice nulla ad alta voce: le barre
+  di uptime, la striscia dei componenti, quella dei poll, la sparkline e l'anello
+  del provider portano ognuno un riassunto di una frase ("Stato giornaliero su 90
+  giorni: 84 operativi, 3 con problemi, 3 non misurati"), nella lingua attiva. Un
+  pallino di stato è nascosto all'albero di accessibilità dove lo stato è scritto
+  accanto, e porta lo stato a parole dove non lo è.
+- **Movimento.** `prefers-reduced-motion: reduce` appiattisce ogni animazione di
+  ingresso, spostamento in hover e pulsazione in `motion.css`, e le view che
+  animano in JavaScript controllano la stessa query.
+
 │   │       ├── schema.ts              forma di config.yml
 │   │       ├── loadConfig.ts          YAML + sostituzione ${ENV} + validazione
 │   │       └── checkConfig.ts         tutti i problemi in una volta, non il primo

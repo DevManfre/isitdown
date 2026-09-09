@@ -1,10 +1,13 @@
 import { Bar, BarChart, Cell, YAxis } from "recharts";
+import { useTranslation } from "react-i18next";
 import { ChartContainer } from "@/components/ui/chart.tsx";
 import { chartConfigFor, severity, statusFill, statusMuted, trimToLatest } from "@/lib/chartConfig.ts";
+import { tallyStatuses } from "@/lib/chartSummary.ts";
 import type { SampleRow } from "@/lib/types.ts";
 
 /** The incident view's strip of the most recent polls, oldest on the left. */
 export function PollStrip({ samples, size = 24 }: { samples: SampleRow[]; size?: number }) {
+  const { t } = useTranslation();
   const data = trimToLatest(samples, size)
     .slice()
     .reverse()
@@ -15,7 +18,14 @@ export function PollStrip({ samples, size = 24 }: { samples: SampleRow[]; size?:
     }));
 
   return (
-    <ChartContainer config={chartConfigFor("poll")} className="anim-bar h-8 w-full">
+    <ChartContainer
+      config={chartConfigFor("poll")}
+      className="anim-bar h-8 w-full"
+      // Roadmap 5.13: the strip says how the last polls went, rather than
+      // being 24 unlabelled bars.
+      role="img"
+      aria-label={t("chart.polls-summary", tallyStatuses(data.map((entry) => entry.status)))}
+    >
       <BarChart data={data} barCategoryGap={2} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
         <YAxis domain={[0, 100]} hide />
         <Bar dataKey="value" isAnimationActive={false} radius={1}>

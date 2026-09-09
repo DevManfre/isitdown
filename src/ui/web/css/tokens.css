@@ -246,17 +246,30 @@
   --color-accent-800: #423a6a;
   --color-accent-900: #2b2741;
 
+  /* Roadmap 5.13, the contrast audit. Two things were wrong here and both
+     were invisible in a screenshot: a partial outage and a major one were the
+     same #d2694f, so the two worst readings a fleet has were the same colour
+     in every dark-theme label and bar; and `--status-unknown` was the
+     near-background grey the unsampled bars want, while the *text* tokens
+     (`statusColor`, the status word beside a provider) read from it too — a
+     provider that has never answered printed its status at 1.3:1, which is
+     no text at all. The bars keep that grey as their own `-fill`; the label
+     token is now a grey that reads. Every value below clears 4.5:1 on both
+     `--color-bg` and `--color-surface` (tokens.test.ts checks the arithmetic,
+     so a future palette tweak cannot quietly undo it). */
   --status-operational: #56a37f;
   --status-degraded: #d8a34a;
-  --status-partial-outage: #d2694f;
-  --status-major-outage: #d2694f;
-  --status-unknown: #2a2d3c;
+  --status-partial-outage: #de8c4f;
+  --status-major-outage: #e2685f;
+  --status-unknown: #9397ab;
   --status-accent: #9184d9;
 
   --status-operational-fill: #56a37f;
   --status-degraded-fill: #d8a34a;
-  --status-partial-outage-fill: #d2694f;
-  --status-major-outage-fill: #d2694f;
+  --status-partial-outage-fill: #de8c4f;
+  --status-major-outage-fill: #e2685f;
+  /* Deliberately near the page: an unsampled day in a bar row is absence, not
+     a status, and it must not read as one. Never used for text. */
   --status-unknown-fill: #2a2d3c;
 
   --status-operational-tint: rgba(86, 163, 122, 0.1);
@@ -399,15 +412,15 @@
 
     --status-operational: #56a37f;
     --status-degraded: #d8a34a;
-    --status-partial-outage: #d2694f;
-    --status-major-outage: #d2694f;
-    --status-unknown: #2a2d3c;
+    --status-partial-outage: #de8c4f;
+    --status-major-outage: #e2685f;
+    --status-unknown: #9397ab;
     --status-accent: #9184d9;
 
     --status-operational-fill: #56a37f;
     --status-degraded-fill: #d8a34a;
-    --status-partial-outage-fill: #d2694f;
-    --status-major-outage-fill: #d2694f;
+    --status-partial-outage-fill: #de8c4f;
+    --status-major-outage-fill: #e2685f;
     --status-unknown-fill: #2a2d3c;
 
     --status-operational-tint: rgba(86, 163, 122, 0.1);
