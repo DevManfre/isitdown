@@ -2,8 +2,8 @@ import type {
   AdapterDebugResponse,
   AdapterDetection,
   AdapterProbeResult,
-  ComponentHistoryResponse,
   CatalogProvider,
+  ComponentHistoryResponse,
   ComponentPreview,
   ConfigImportReport,
   DeliveryLogResponse,
@@ -167,13 +167,13 @@ export const previewComponents = (body: unknown) =>
     "/config/services/preview-components",
     body,
   );
-/** The bundled provider menu, with the ids already watched marked (roadmap 5.11). */
 /**
  * Reads a `config.yml` back into the dashboard (roadmap 4.3). Sent as text
  * rather than wrapped in JSON: what the operator picked is the file itself.
  */
 export const importConfig = (yaml: string) =>
   request<ConfigImportReport>("POST", "/config/import", yaml, "text/yaml");
+/** The bundled provider menu, with the ids already watched marked (roadmap 5.11). */
 export const getCatalog = () => request<{ providers: CatalogProvider[] }>("GET", "/config/catalog");
 /** Which adapter reads a pasted url, and the base url that adapter wants. */
 export const detectAdapter = (url: string) =>

@@ -133,9 +133,9 @@ export function Settings() {
   const patchPreferences = usePreferencesMutation();
   const settingsMutation = useSettingsMutation();
   const { data: storage } = useStorage();
-  const { patch: servicePatch, restore: serviceRestore, purge: servicePurge } = useServiceMutations();
   const configImport = useConfigImport();
   const [importStatus, setImportStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(undefined);
+  const { patch: servicePatch, restore: serviceRestore, purge: servicePurge } = useServiceMutations();
   // Above the early return below: a hook cannot be called conditionally.
   const fieldProps = useFieldProps();
 
@@ -301,7 +301,6 @@ export function Settings() {
     });
   };
 
-  const commitRetention = (days: number): void => {
   /**
    * Reads the picked file and hands it to the server as it stands (roadmap
    * 4.3): the validation that matters is the file schema's, and it lives on the
@@ -324,6 +323,7 @@ export function Settings() {
     }
   };
 
+  const commitRetention = (days: number): void => {
     if (!Number.isInteger(days) || days < RETENTION_BOUNDS.min || days > RETENTION_BOUNDS.max) {
       setRetentionStatus({
         text: t("settings.out-of-range", {
@@ -842,7 +842,6 @@ export function Settings() {
           />
           <span className="font-mono text-xs text-muted-foreground">{t("unit.days")}</span>
         </SettingRow>
-      </SettingsSection>
 
         {/* Roadmap 4.3. Everything above is configurable here and nowhere else,
             which until now meant it lived only inside one SQLite file. The
@@ -887,6 +886,7 @@ export function Settings() {
             }}
           />
         </SettingRow>
+      </SettingsSection>
 
       <SettingsSection title={t("settings.section.appearance")} delay={stagger(5, SECTION_CASCADE)}>
         <SettingRow
