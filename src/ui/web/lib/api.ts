@@ -5,6 +5,7 @@ import type {
   ComponentHistoryResponse,
   CatalogProvider,
   ComponentPreview,
+  ConfigImportReport,
   DeliveryLogResponse,
   DeliveryState,
   DescribedChannel,
