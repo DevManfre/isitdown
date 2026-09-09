@@ -195,6 +195,13 @@ describe("History", () => {
       .toBeInTheDocument();
     expect(screen.queryByText(/GET \/history/)).not.toBeInTheDocument();
   });
+
+  it("offers the same window as a CSV the server aggregates", async () => {
+    renderWithProviders(<History />, fixtures);
+
+    const link = await screen.findByRole("link", { name: i18n.t("history.download-csv", { days: 90 }) });
+    expect(link).toHaveAttribute("href", "/export/history.csv?days=90");
+  });
 });
 
 // Review Finding 5: providerFixture() defaults componentSelection to [], so
