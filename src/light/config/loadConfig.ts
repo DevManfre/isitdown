@@ -18,15 +18,46 @@ const ENV_REFERENCE = /\$\{([A-Z0-9_]+)\}/g;
  * the environment, and an unresolved reference is reported by variable name.
  */
 export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<RuntimeConfig> {
-  const raw = await readConfigFile(path);
+  const { problems, config } = await inspectConfig(path, env);
+  // The first problem is the one the container reports, exactly as it did when
+  // each check threw where it stood. `check` prints the whole list instead.
+  if (problems.length > 0 || config === null) {
+    throw new Error(problems[0] ?? `config file ${path} could not be read`);
+  }
+  return config;
+}
+
+export interface ConfigInspection {
+  /** Every problem found, in the order the loader would have thrown them. */
+  problems: string[];
+  /** Null when the file could not be read, parsed or validated at all. */
+  config: RuntimeConfig | null;
+}
+
+/**
+ * The same reading as `loadConfig`, reporting every problem instead of the
+ * first: an operator fixing a file wants the whole list, and the `check`
+ * command (roadmap 6.12) exists to print it. Kept here rather than beside the
+ * command so there is one definition of what a valid file is.
+ */
+export async function inspectConfig(path: string, env: NodeJS.ProcessEnv): Promise<ConfigInspection> {
+  let raw: string;
+  try {
+    raw = await readConfigFile(path);
+  } catch (error) {
+    return { problems: [error instanceof Error ? error.message : String(error)], config: null };
+  }
 
   let document: unknown;
   try {
     document = parse(raw);
   } catch (error) {
-    throw new Error(
-      `config file ${path} is not valid YAML: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return {
+      problems: [
+        `config file ${path} is not valid YAML: ${error instanceof Error ? error.message : String(error)}`,
+      ],
+      config: null,
+    };
   }
 
   const unresolved = new Map<string, string[]>();
@@ -36,34 +67,36 @@ export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<
   // behind, and the schema would then complain about the blank value rather than
   // about the variable that was never set. Channels are deferred until their
   // `enabled` flag is known, since a disabled channel needs no secret.
+  const problems: string[] = [];
   for (const [dotted, names] of unresolved) {
     if (dotted.startsWith("notifications.")) continue;
-    throw new Error(
+    problems.push(
       `config file ${path}: ${dotted} references ${names.join(", ")}, which is not set in the environment`,
     );
   }
 
   const result = fileConfigSchema.safeParse(substituted);
   if (!result.success) {
-    throw new Error(
+    problems.push(
       `config file ${path} is invalid: ${result.error.issues
         .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
         .join("; ")}`,
     );
+    return { problems, config: null };
   }
   const file = result.data;
 
   const seen = new Set<string>();
   for (const service of file.services) {
     if (seen.has(service.id)) {
-      throw new Error(`config file ${path} defines the service id "${service.id}" more than once`);
+      problems.push(`config file ${path} defines the service id "${service.id}" more than once`);
     }
     seen.add(service.id);
   }
 
-  const channels = buildChannels(file.notifications, unresolved, path);
+  const channels = buildChannels(file.notifications, unresolved, path, problems);
 
-  return {
+  const config: RuntimeConfig = {
     polling: pollingSchema.parse({
       ...(file.pollIntervalMinutes === undefined ? {} : { intervalMinutes: file.pollIntervalMinutes }),
       ...(file.requestTimeoutSeconds === undefined ? {} : { requestTimeoutSeconds: file.requestTimeoutSeconds }),
@@ -78,12 +111,14 @@ export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<
     locale: file.locale ?? "en",
     services: file.services,
     channels,
-    rules: buildRules(file, channels, path),
+    rules: buildRules(file, channels, path, problems),
     // Parsed through the shared schema even when the block is absent, so the
     // "everything off" defaults come from one place rather than being restated
     // as a literal here.
     delivery: deliverySchema.parse(file.delivery ?? {}),
   };
+
+  return { problems, config };
 }
 
 /**
@@ -92,7 +127,12 @@ export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<
  * routing rule shows up as alerts that never arrive, which is exactly the
  * failure this loader exists to refuse to start on.
  */
-function buildRules(file: FileConfig, channels: ChannelConfig[], path: string): RoutingRule[] {
+function buildRules(
+  file: FileConfig,
+  channels: ChannelConfig[],
+  path: string,
+  problems: string[],
+): RoutingRule[] {
   if (file.routing === undefined || file.routing.length === 0) return [CATCH_ALL_RULE];
 
   const knownChannels = new Set(channels.map((channel) => channel.id));
@@ -100,13 +140,13 @@ function buildRules(file: FileConfig, channels: ChannelConfig[], path: string): 
 
   return file.routing.map((rule, index) => {
     if (rule.provider !== "*" && !knownProviders.has(rule.provider)) {
-      throw new Error(
+      problems.push(
         `config file ${path}: routing rule ${index + 1} targets provider "${rule.provider}", which is not in services`,
       );
     }
     for (const channel of rule.channels) {
       if (channel === "*" || knownChannels.has(channel)) continue;
-      throw new Error(
+      problems.push(
         `config file ${path}: routing rule ${index + 1} targets channel "${channel}", which is not in notifications`,
       );
     }
@@ -136,6 +176,7 @@ function buildChannels(
   notifications: Record<string, RawChannel | undefined>,
   unresolved: Map<string, string[]>,
   path: string,
+  problems: string[],
 ): ChannelConfig[] {
   const channels: ChannelConfig[] = [];
 
@@ -150,7 +191,7 @@ function buildChannels(
       for (const required of REQUIRED_CHANNEL_SETTINGS[id] ?? []) {
         if ((settings[required] ?? "") !== "") continue;
         const names = unresolved.get(`notifications.${id}.${required}`);
-        throw new Error(
+        problems.push(
           names === undefined
             ? `config file ${path}: the ${id} channel is enabled but ${required} is empty`
             : `config file ${path}: the ${id} channel is enabled but ${names.join(", ")} is not set in the environment`,
