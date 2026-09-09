@@ -16,7 +16,14 @@ import type { DescribedChannel, QuietHoursPolicy, RoutingResponse, RoutingRule }
 // computed from a second copy of the matching logic could disagree with what
 // actually routes, and a preview that lies is worse than no preview. `@/`
 // only maps `src/ui/web/*`, so this one import stays relative.
-import { EVENT_CLASSES, SEVERITY_FLOORS, explain, type EventClass, type SeverityFloor } from "../../../core/routing.ts";
+import {
+  EVENT_CLASSES,
+  GROUP_PREFIX,
+  SEVERITY_FLOORS,
+  explain,
+  type EventClass,
+  type SeverityFloor,
+} from "../../../core/routing.ts";
 import type { StatusChange, StatusChangeKind } from "../../../core/types.ts";
 
 /**
@@ -60,6 +67,10 @@ function hasNoClasses(rule: RoutingRule): boolean {
  * `explain` takes. Fixed, not free text: the panel is teaching its evaluation
  * model with a worked example, not standing in for a real event feed.
  */
+/** The groups a fleet declares, in the order a select should list them. */
+const groupsOf = (services: { group?: string | null }[]): string[] =>
+  [...new Set(services.map((service) => service.group).filter((group): group is string => typeof group === "string" && group !== ""))].sort();
+
 const DRYRUN_EVENTS: { id: string; change: Omit<StatusChange, "providerId" | "at"> }[] = [
   {
     id: "major-outage",
@@ -95,7 +106,7 @@ function DryRun({
 }: {
   rules: RoutingRule[];
   channels: DescribedChannel[];
-  services: { id: string; name: string }[];
+  services: { id: string; name: string; group?: string | null }[];
   /**
    * The window as it stands, so the dry run answers the question an operator
    * is actually asking — "would this reach me?" — rather than "would it, if it
@@ -116,8 +127,12 @@ function DryRun({
   // Core's own evaluator, and now with the same quiet-hours window the
   // dispatcher reads: a preview that ignored it would say "Telegram" for an
   // event that, at this hour, reaches nobody.
+  // The picked provider's own group, so a `group:` rule wins the preview
+  // exactly where it would win a real change (roadmap 2.6).
+  const group = services.find((service) => service.id === providerId)?.group ?? undefined;
   const result = explain(change, rules, enabledChannelIds, {
     ...(quietHours === undefined ? {} : { quietHours }),
+    ...(group === null || group === undefined ? {} : { providerGroup: group }),
   });
 
   const won = result.winner === null ? undefined : rules[result.winner];
@@ -236,7 +251,7 @@ export function RoutingRules({
 }: {
   routing: RoutingResponse;
   channels: DescribedChannel[];
-  services: { id: string; name: string }[];
+  services: { id: string; name: string; group?: string | null }[];
   /** Passed through to the dry run, which evaluates with it — see `DryRun`. */
   quietHours?: QuietHoursPolicy | undefined;
   onSave?: (rules: RoutingRule[]) => void | Promise<unknown>;
@@ -330,6 +345,14 @@ export function RoutingRules({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="*">{t("routing.provider.any")}</SelectItem>
+                        {/* Groups above the providers (roadmap 2.6): a rule
+                            that had to name four ids to cover one stack went
+                            stale the moment the stack gained a fifth. */}
+                        {groupsOf(services).map((group) => (
+                          <SelectItem key={group} value={`${GROUP_PREFIX}${group}`}>
+                            {t("routing.provider.group", { group })}
+                          </SelectItem>
+                        ))}
                         {services.map((service) => (
                           <SelectItem key={service.id} value={service.id}>
                             {service.name}

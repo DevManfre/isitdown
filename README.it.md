@@ -45,6 +45,7 @@ server) e **UI** (lo stesso motore più una dashboard locale, configurabile a ru
   - [3.7 Instradamento delle notifiche](#37-instradamento-delle-notifiche)
   - [3.8 Politica di consegna — ore di silenzio, riepiloghi, limiti](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti)
   - [3.9 Validare un config.yml — il comando check](#39-validare-un-configyml--il-comando-check)
+  - [3.10 Gruppi di provider — il mio stack](#310-gruppi-di-provider--il-mio-stack)
 - [4. Docker](#4-docker)
   - [4.1 Immagini e target di build](#41-immagini-e-target-di-build)
   - [4.2 Profili compose](#42-profili-compose)
@@ -721,7 +722,7 @@ di un dato cambiamento. Ogni regola ha quattro parti:
 
 ```yaml
 routing:
-  - provider: "*"            # un id di servizio, o "*" per ogni provider
+  - provider: "*"            # un id di servizio, `group:<slug>` (§3.10), o "*" per ogni provider
     classes: [status, incident]  # una o più tra: status, incident, maintenance, monitoring
     minSeverity: major_outage  # any | degraded | partial_outage | major_outage
     channels: [telegram]       # id dei canali, o "*" per ogni canale abilitato; [] silenzia
@@ -868,6 +869,61 @@ una scelta difendibile per una pagina che pubblica anche un riepilogo Statuspage
 lasciati stare, perché il file lo dice già) e chiede quale adapter la riconosce,
 con la stessa detection usata dal form "aggiungi provider" dell'edizione UI. È
 disattivato per default: un controllo che va in rete non è qualcosa su cui una CI
+### 3.10 Gruppi di provider — "il mio stack"
+
+Una flotta piatta risponde a "GitHub sta bene" e mai a "il mio percorso di deploy
+sta bene", che è la domanda che un operatore ha davvero: quattro provider che
+singolarmente non gli interessano, e una risposta che gli interessa. Un gruppo è
+uno slug che il provider porta (roadmap 2.6) — in `config.yml`:
+
+```yaml
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    group: deploy-path
+  - name: Cloudflare
+    id: cloudflare
+    adapter: statuspage
+    baseUrl: https://www.cloudflarestatus.com
+    group: deploy-path
+```
+
+— e, nell'edizione UI, il campo **Gruppo** su un servizio, con i gruppi già
+esistenti proposti mentre si scrive.
+
+Ne derivano due cose:
+
+- **Uno stato combinato.** La Panoramica guadagna una banda "Il mio stack", una
+  tile per gruppo, nello stato del gruppo: vince il membro peggiore, e la tile
+  nomina i membri che stanno dietro a quello stato. `unknown` non è una severità
+  — la stessa regola che diff engine e soglie di instradamento seguono già —
+  quindi un provider silenzioso non può tenere uno stack sano su `unknown`, e
+  solo un gruppo di cui non si legge nulla si presenta così. Un provider
+  disattivato esce dal suo gruppo: nessuno lo interroga, quindi non può rendere
+  malato uno stack. Il composito è derivato dal server (il campo `groups` di
+  `/status`), mai ricalcolato nel browser, così la tile e le righe sotto non
+  possono contraddirsi.
+- **Una sola regola di instradamento per tutto lo stack.** Il campo `provider` di
+  una regola accetta `group:deploy-path`, che copre ogni membro — e continua a
+  coprirli quando lo stack guadagna un quinto provider, cosa che quattro id
+  scritti a mano non farebbero. La tabella di instradamento della dashboard
+  propone i gruppi sopra i singoli provider, e la prova a vuoto li valuta con il
+  gruppo del provider scelto.
+
+---
+
+## 4. Docker
+
+### 4.1 Immagini e target di build
+
+Un solo `Dockerfile`, quattro stage. `builder` compila tutto una volta sola;
+`light` e `ui` sono le due immagini di runtime distribuite; `dev` esiste solo per
+lo [sviluppo live](#93-sviluppo-live) e non viene mai costruito da
+`docker compose --profile ui up`.
+
+```
 possa contare, e ogni altra segnalazione qui sopra si risponde dal solo file.
 
 Codici di uscita: `0` valido, `1` almeno un errore, `2` comando invocato male
@@ -1283,7 +1339,7 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | Metodo | Percorso | Scopo |
 |---|---|---|
 | `GET` | `/health` | Liveness. `{ status, providers, lastCycleAt }`. |
-| `GET` | `/status` | Stato corrente di ogni provider, più ultimo e prossimo poll, più `maintenance: { active, upcoming }` — le finestre in corso adesso e quelle il cui `startsAt` è ancora nel futuro; una finestra già terminata ma ancora presente nel payload salvato non compare in nessuna delle due liste. Pura lettura dal database — si può interrogare ogni 30s, come fa la dashboard. Non raggiunge mai l'upstream. |
+| `GET` | `/status` | Stato corrente di ogni provider, più ultimo e prossimo poll, più `maintenance: { active, upcoming }` — le finestre in corso adesso e quelle il cui `startsAt` è ancora nel futuro; una finestra già terminata ma ancora presente nel payload salvato non compare in nessuna delle due liste. Pura lettura dal database — si può interrogare ogni 30s, come fa la dashboard. Non raggiunge mai l'upstream. Porta anche `groups` — una voce per gruppo di provider con lo stato derivato, i membri e i membri colpiti (roadmap 2.6, §3.10). |
 | `GET` | `/history?provider=&days=` | Bucket giornalieri pre-aggregati, uptime a 7/30/90 giorni, colonne dei mesi. `days` accetta `7`, `30` o `90`; altro è un 400 che li elenca. Senza `provider`, un riepilogo su tutti. |
 | `GET` | `/incidents?provider=&state=&q=&days=&page=&pageSize=` | Una pagina della lista incidenti: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` è `all` (default), `active` o `resolved`; `q` cerca nei nomi degli incidenti, senza distinguere maiuscole, e `days` tiene solo gli incidenti iniziati entro quella finestra (entrambi restringono la pagina **e** i conteggi); `pageSize` vale 20 di default, massimo 100. Un `page`, `pageSize`, `state`, `q` o `days` senza senso ricade sulla prima pagina di tutto invece di dare 400. `counts` porta tutti e tre gli stati qualunque sia il filtro, e `active` è la lista degli aperti che la card in evidenza della dashboard mostra su ogni pagina — fuori dalla ricerca, così la card non può sparire mentre l'operatore digita. |
 | `GET` | `/incidents/:providerId/:incidentId` | Dettaglio: l'incidente, la cronologia osservata, il log di ciò che è stato inviato, gli altri incidenti aperti del provider e gli ultimi 24 poll. |
@@ -1842,6 +1898,7 @@ isitdown/
 │   ├── notifiers/                     (condiviso)
 │   │   ├── formatting.ts              emoji, colori, etichette di severità, composizione del messaggio
 │   │   ├── settings.ts                validazione condivisa per i canali configurati con un solo URL
+│   │   ├── groups.ts                  gruppi di provider: lo stato composito di un gruppo (§3.10)
 │   │   ├── telegram.notifier.ts
 │   │   ├── webhook.notifier.ts
 │   │   └── index.ts                   registro per id di canale

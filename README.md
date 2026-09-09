@@ -45,6 +45,7 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
   - [3.7 Notification routing](#37-notification-routing)
   - [3.8 Delivery policy — quiet hours, digests, caps](#38-delivery-policy--quiet-hours-digests-caps)
   - [3.9 Validating a config.yml — the check command](#39-validating-a-configyml--the-check-command)
+  - [3.10 Provider groups — my stack](#310-provider-groups--my-stack)
 - [4. Docker](#4-docker)
   - [4.1 Images and build targets](#41-images-and-build-targets)
   - [4.2 Compose profiles](#42-compose-profiles)
@@ -713,7 +714,7 @@ change. Each rule has four parts:
 
 ```yaml
 routing:
-  - provider: "*"            # a service id, or "*" for every provider
+  - provider: "*"            # a service id, `group:<slug>` (§3.10), or "*" for every provider
     classes: [status, incident]  # any of: status, incident, maintenance, monitoring
     minSeverity: major_outage  # any | degraded | partial_outage | major_outage
     channels: [telegram]       # channel ids, or "*" for every enabled channel; [] mutes
@@ -850,6 +851,60 @@ defensible choice for a page that also serves a Statuspage summary.
 `--probe` reads each enabled provider's page (disabled ones are left alone, since
 the file already says to) and asks which adapter recognises it, using the same
 detection the UI edition's add-provider form uses. It is off by default: a check
+### 3.10 Provider groups — "my stack"
+
+A flat fleet answers "is GitHub healthy" and never "is my deploy path healthy",
+which is the question an operator actually has: four providers they do not care
+about individually, and one answer they do. A group is a slug a provider carries
+(roadmap 2.6) — in `config.yml`:
+
+```yaml
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    group: deploy-path
+  - name: Cloudflare
+    id: cloudflare
+    adapter: statuspage
+    baseUrl: https://www.cloudflarestatus.com
+    group: deploy-path
+```
+
+— and, in the UI edition, the **Group** field on a service, with the groups that
+already exist offered as you type.
+
+Two things follow from it:
+
+- **A combined status.** The Overview grows a "My stack" band, one tile per
+  group, in the group's own status: the worst member wins, and the tile names the
+  members behind it. `unknown` is not a severity — the same rule the diff engine
+  and the routing floors already follow — so one silent provider cannot hold a
+  healthy stack at `unknown`, and only a group with nothing readable at all reads
+  that way. A disabled provider leaves its group entirely: nobody is polling it,
+  so it cannot make a stack unhealthy. The composite is derived by the server
+  (`/status`'s `groups`), never recomputed in the browser, so the tile and the
+  rows under it cannot disagree.
+- **One routing rule for the whole stack.** A rule's `provider` accepts
+  `group:deploy-path`, which covers every member — and keeps covering them when
+  the stack gains a fifth provider, which four hard-coded ids never would. The
+  dashboard's routing table offers the groups above the individual providers, and
+  the dry run evaluates them with the picked provider's own group.
+
+---
+
+## 4. Docker
+
+### 4.1 Images and build targets
+
+One `Dockerfile`, four stages. `builder` compiles everything once; `light` and
+`ui` are the two shipped runtime images; `dev` exists only for
+[live development](#93-live-development) and is never built by
+`docker compose --profile ui up`.
+
+```
+builder  node:24-alpine   npm ci (incl. devDependencies), tsc, vite build, copy non-TS assets into dist
 that reaches the network is not something CI can depend on, and every other
 finding above is answerable from the file alone.
 
@@ -1259,7 +1314,7 @@ back reports a parse failure instead of the real problem.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/health` | Liveness. `{ status, providers, lastCycleAt }`. |
-| `GET` | `/status` | Current status of every provider, plus last and next poll, plus `maintenance: { active, upcoming }` — windows running now and windows whose `startsAt` is still in the future; a window that has already ended but is still in the stored payload appears in neither list. A pure database read — safe to poll every 30s, which the dashboard does. Never reaches upstream. |
+| `GET` | `/status` | Current status of every provider, plus last and next poll, plus `maintenance: { active, upcoming }` — windows running now and windows whose `startsAt` is still in the future; a window that has already ended but is still in the stored payload appears in neither list. A pure database read — safe to poll every 30s, which the dashboard does. Never reaches upstream. Also carries `groups` — one entry per provider group with its derived status, members and affected members (roadmap 2.6, §3.10). |
 | `GET` | `/history?provider=&days=` | Pre-aggregated daily buckets, 7/30/90-day uptime, month columns. `days` accepts `7`, `30` or `90`; anything else is a 400 naming them. Without `provider`, a summary across all of them. |
 | `GET` | `/incidents?provider=&state=&q=&days=&page=&pageSize=` | One page of the incident list: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` is `all` (default), `active` or `resolved`; `q` searches incident names, case-insensitively, and `days` keeps only incidents that started within that window (both narrow the page **and** the counts); `pageSize` defaults to 20 and is capped at 100. A nonsense `page`, `pageSize`, `state`, `q` or `days` falls back to the first page of everything rather than a 400. `counts` carries all three states whatever the filter, and `active` is the open list the dashboard's hero card shows on every page — outside the search, so a card cannot vanish while the operator types. |
 | `GET` | `/incidents/:providerId/:incidentId` | Detail: the incident, the observed timeline, the action log of what was sent, the provider's other open incidents, and the last 24 polls. |
@@ -1789,6 +1844,7 @@ isitdown/
 │   │   ├── severity.ts                 severity read from a provider's own wording
 │   │   └── index.ts                    registry keyed by adapter id
 │   ├── notifiers/                     (shared)
+│   │   ├── groups.ts                   provider groups: the composite status a group reports (§3.10)
 │   │   ├── formatting.ts               emoji, colours, severity labels, message assembly
 │   │   ├── settings.ts                 shared validation for URL-only channel settings
 │   │   ├── telegram.notifier.ts

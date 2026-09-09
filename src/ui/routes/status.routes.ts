@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { deriveGroups } from "../../core/groups.ts";
 import { isActive } from "../../core/maintenance.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 
@@ -62,8 +63,15 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
       }),
     );
 
+    // Roadmap 2.6. Derived here rather than in the browser for the same reason
+    // every other figure is: a composite the dashboard computed itself could
+    // disagree with the providers printed under it.
+    const byId = new Map(providers.map((provider) => [provider.id, provider.overallStatus]));
+    const groups = deriveGroups(services, (id) => byId.get(id) ?? "unknown");
+
     res.json({
       providers,
+      groups,
       pollIntervalMinutes: config.polling.intervalMinutes,
       lastPollAt: runtime.lastCycleAt(),
       // The scheduler's armed deadline, never `lastPollAt + interval`: the two
