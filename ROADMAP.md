@@ -210,41 +210,10 @@ not re-invented from scratch later.
 
 ## Suggested next slice
 
-Everything spent is marked ✅ in the tables above; nothing shipped is repeated
-here. Six rows, none of which needs a product decision first, and each of which
-makes an existing surface answer a question it cannot today.
+Every row that needed no product decision first is spent: the tables above are
+marked ✅ down to the ones that do. What is left is a choice, not a queue.
 
-1. **2.6 provider groups / "my stack"** — the fleet is a flat list, so the
-   dashboard answers "is GitHub healthy" and never "is my deploy path healthy".
-   A group with a derived composite status is a new concept in the data model
-   but a small one, and 3.10's routing already has the shape a group-level rule
-   would slot into.
-2. **4.3 config export / import** — everything is configurable from the
-   dashboard, which means everything is trapped in one SQLite file. A round-trip
-   through the Light edition's own `config.yml` shape is the cheapest honest
-   backup, and it makes "try it in the UI edition, then run it in Light" a
-   supported path rather than retyping.
-3. **5.13 accessibility pass** — the visual harness (7.1) can catch a
-   regression, which is what makes this row worth doing rather than worth
-   promising. Keyboard reachability of the dialogs that have accumulated
-   (routing rules, service edit, remove, diagnose), focus order,
-   `prefers-reduced-motion`, and the contrast of the status palette in both
-   themes.
-4. **5.11 provider catalog / onboarding wizard** — the first run is still a
-   form to fill rather than a menu to pick from. A bundled set of well-known
-   providers is the half that needs a list somebody maintains; adapter detection
-   (1.14) already covers everything the list does not have.
-5. **4.6 CSV / JSON export of history and incidents** — per provider, per
-   window, in the shape the incident search already produces, so the export is
-   that query's own result rather than a second reading of the database. Asked
-   for by anyone who has to report uptime to someone else.
-6. **6.12 a `check` command for a Light config** — load `config.yml`, resolve
-   every adapter, name each missing environment variable, say which base urls no
-   adapter recognises, and exit non-zero. CI-able for the operator rather than
-   only for us, and the detection module is edition-agnostic precisely so a
-   command outside the dashboard can use it.
-
-Cheap rows kept just behind that line, in case a slice has room: **7.6's CI
+The cheap rows are the ones to reach for if a slice needs filling: **7.6's CI
 gate** (the sync skill covers the writing, not a hand-edited push), **4.14 a
 committed Grafana dashboard**, **6.13 database maintenance from the UI**, and
 **5.20 the year heat calendar**, which is the view that makes a retention window
