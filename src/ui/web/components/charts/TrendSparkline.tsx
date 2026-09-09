@@ -1,6 +1,8 @@
 import { Area, AreaChart, ReferenceLine, YAxis } from "recharts";
+import { useTranslation } from "react-i18next";
 import { ChartContainer } from "@/components/ui/chart.tsx";
 import { statusFill, TREND_CHART, uptimeDomain } from "@/lib/chartConfig.ts";
+import { uptimeRange } from "@/lib/chartSummary.ts";
 import type { DayUptime } from "@/lib/types.ts";
 
 /**
@@ -14,10 +16,29 @@ import type { DayUptime } from "@/lib/types.ts";
  * two stops to read as anything but a muddy band.
  */
 export function TrendSparkline({ series }: { series: DayUptime[] }) {
+  const { t, i18n } = useTranslation();
   const domain = uptimeDomain(series.map((entry) => entry.uptime));
+  const range = uptimeRange(series);
+  const percent = (value: number): string =>
+    new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(value);
 
   return (
-    <ChartContainer config={{}} className="h-7 w-full">
+    <ChartContainer
+      config={{}}
+      className="h-7 w-full"
+      // The row is a button whose only content is this shape, so without a
+      // name the button announces nothing at all (roadmap 5.13).
+      role="img"
+      aria-label={
+        range === null
+          ? t("chart.trend-empty", { count: series.length })
+          : t("chart.trend-summary", {
+              count: series.length,
+              min: percent(range.min),
+              max: percent(range.max),
+            })
+      }
+    >
       <AreaChart data={series} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
         <YAxis domain={domain} hide />
         {/* A faint full-width track behind the line, in the `unknown` colour —

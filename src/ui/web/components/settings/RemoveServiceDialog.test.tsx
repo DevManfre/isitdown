@@ -93,4 +93,25 @@ describe("RemoveServiceDialog", () => {
     expect(within(dialog).getByText(i18n.t("providers.remove-confirm", { name: "GitHub" }))).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: i18n.t("action.remove") })).toBeEnabled();
   });
+
+  // Roadmap 5.13. Every dialog that has accumulated here rides Radix's
+  // keyboard contract, and "rides Radix" is worth exactly as much as a test
+  // that shows it: a destructive confirmation an operator cannot escape from,
+  // or that drops focus back on the page body, is the one dialog where that
+  // matters most.
+  it("takes focus, keeps Tab inside, and hands focus back on Escape", async () => {
+    renderWithProviders(<RemoveServiceDialog service={service} trigger={trigger} />, {
+      serviceImpact: impact({ samples: 12 }),
+    });
+    const triggerButton = screen.getByRole("button", { name: i18n.t("action.remove") });
+    const dialog = await open();
+
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    for (let i = 0; i < 6; i += 1) await userEvent.tab();
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(triggerButton);
+  });
 });

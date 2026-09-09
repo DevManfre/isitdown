@@ -1,5 +1,7 @@
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import { statusFill, statusMuted } from "@/lib/chartConfig.ts";
+import { tallyStatuses } from "@/lib/chartSummary.ts";
 import type { HistoryBucket } from "@/lib/types.ts";
 
 /**
@@ -21,11 +23,19 @@ import type { HistoryBucket } from "@/lib/types.ts";
  * query and keeps its identity — so a poll re-renders no strip at all.
  */
 export const UptimeStrip = memo(function UptimeStrip({ buckets }: { buckets: HistoryBucket[] }) {
+  const { t } = useTranslation();
   return (
     // `anim-bar anim-bar-strip` is motion.css's entry animation for a bar
     // (bar-grow out of the baseline, at the strip's own 0.45s); the wrapper has
     // to keep carrying it, and the transform-origin that goes with it.
-    <span className="anim-bar anim-bar-strip flex h-3 w-full items-center gap-[1.5px]">
+    <span
+      // A run of coloured rects is nothing to a screen reader, so the strip
+      // states what it draws (roadmap 5.13) and its bars stay out of the
+      // accessibility tree: the sentence is the whole content.
+      role="img"
+      aria-label={t("chart.days-summary", tallyStatuses(buckets.map((bucket) => bucket.status)))}
+      className="anim-bar anim-bar-strip flex h-3 w-full items-center gap-[1.5px]"
+    >
       {buckets.map((bucket) => (
         <span
           key={bucket.day}

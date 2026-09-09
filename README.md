@@ -67,6 +67,7 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
   - [8.1 Themes](#81-themes)
   - [8.2 Localisation](#82-localisation)
 - [9. Development](#9-development)
+  - [8.3 Accessibility](#83-accessibility)
   - [9.1 Repo structure](#91-repo-structure)
   - [9.2 Tech stack](#92-tech-stack)
   - [9.3 Live development](#93-live-development)
@@ -1795,6 +1796,36 @@ isitdown/
 │   │   └── index.ts                    registry keyed by channel id
 │   ├── light/                         (Light edition only)
 │   │   ├── index.ts                    entrypoint
+### 8.3 Accessibility
+
+The dashboard is one operator's console, and that operator may be using a
+keyboard, a screen reader, a high-contrast setting, or all three (roadmap 5.13).
+What is guaranteed, and checked:
+
+- **Contrast.** Every status colour used as *text* clears WCAG AA (4.5:1) against
+  both the page and the card, in both themes — `src/ui/web/css/tokens.test.ts`
+  computes the ratios from `tokens.css`, so a palette tweak that breaks one
+  fails the suite rather than shipping. The audit found two real defects in the
+  dark theme: a partial outage and a major one were the same colour, and the
+  status *label* read from the near-background grey the unsampled uptime bars
+  want (1.3:1 — no text at all). Both are fixed; the bars keep their grey as a
+  separate `-fill` token.
+- **Keyboard.** Every dialog rides Radix's contract — focus moves in on open,
+  Tab stays trapped, Escape closes, focus returns to the trigger — and the
+  dialogs that accumulated (service add/edit, remove, diagnose, routing rules)
+  each have a test that shows it rather than assuming it. Hand-written
+  clickables (a provider row, a ring tile) get a visible focus ring from
+  `base.css` at zero specificity, under whatever ring a primitive already has.
+- **Charts.** A run of coloured bars says nothing out loud, so the uptime bars,
+  the component strip, the poll strip, the sparkline and the provider ring each
+  carry a one-sentence summary ("Daily status over 90 days: 84 operational, 3
+  with issues, 3 not measured"), in the active locale. A status dot is hidden
+  from the accessibility tree wherever the status is written beside it, and
+  carries the status in words wherever it is not.
+- **Motion.** `prefers-reduced-motion: reduce` flattens every entry animation,
+  hover travel and pulse in `motion.css`, and the views that animate in
+  JavaScript check the same query.
+
 │   │   ├── runtime.ts                  wiring, shared with the end-to-end test
 │   │   ├── healthcheck.ts              state-file freshness
 │   │   ├── fileStateStore.ts           JSON file, atomic writes

@@ -95,3 +95,90 @@ describe("the shadcn theme contract", () => {
     expect(strip(css)).not.toMatch(/@custom-variant\s+dark\s*\(&:is\(\.dark/);
   });
 });
+
+/**
+ * The contrast audit (roadmap 5.13), as arithmetic rather than as a promise.
+ *
+ * Every status token here is used as *text*: `statusColor()` paints the status
+ * word beside a provider, in a table cell and in a ring's caption. The dark
+ * palette had two defects a screenshot could not show — a partial outage and a
+ * major one shared one colour, and `--status-unknown` was the near-background
+ * grey the unsampled bars need, which as text is not text. Both are fixed in
+ * tokens.css; this suite is what stops the next palette pass from undoing it.
+ */
+const CHANNEL = (value: number): number => {
+  const c = value / 255;
+  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+};
+
+function luminance(hex: string): number {
+  const value = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16));
+  return 0.2126 * CHANNEL(r as number) + 0.7152 * CHANNEL(g as number) + 0.0722 * CHANNEL(b as number);
+}
+
+/** WCAG 2.1 relative contrast, the (L+0.05) ratio. */
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** One literal hex value declared in a theme block. */
+function hexIn(block: string, token: string): string {
+  const open = css.indexOf("{", blockStart(block));
+  const body = strip(css.slice(open, css.indexOf("}", open)));
+  const match = body.match(new RegExp(`${token}\\s*:\\s*(#[0-9a-f]{6});`, "i"));
+  expect(match, `${block} does not declare ${token} as a hex literal`).not.toBeNull();
+  return (match?.[1] as string).toLowerCase();
+}
+
+/** The status words an operator reads, per theme block that declares a palette. */
+const STATUS_TEXT_TOKENS = [
+  "--status-operational",
+  "--status-degraded",
+  "--status-partial-outage",
+  "--status-major-outage",
+  "--status-unknown",
+  "--status-accent",
+];
+
+const PALETTE_BLOCKS = [":root {", ':root[data-theme="dark"] {', ':root:not([data-theme="light"]) {'];
+
+describe("the status palette's contrast", () => {
+  it("clears WCAG AA on both grounds, in every theme", () => {
+    for (const block of PALETTE_BLOCKS) {
+      const bg = hexIn(block, "--color-bg");
+      const surface = hexIn(block, "--color-surface");
+      for (const token of STATUS_TEXT_TOKENS) {
+        const colour = hexIn(block, token);
+        for (const [name, ground] of [
+          ["--color-bg", bg],
+          ["--color-surface", surface],
+        ] as [string, string][]) {
+          const ratio = contrast(colour, ground);
+          expect(ratio, `${block} ${token} on ${name} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    }
+  });
+
+  it("gives every severity its own colour, so two readings are never one", () => {
+    for (const block of PALETTE_BLOCKS) {
+      const values = STATUS_TEXT_TOKENS.map((token) => hexIn(block, token));
+      expect(new Set(values).size, `${block} paints two severities the same`).toBe(values.length);
+    }
+  });
+
+  it("keeps the unsampled-bar grey out of the text token", () => {
+    // The bars want a grey that disappears into the page; the label cannot
+    // have it. They are two tokens precisely so one can be unreadable.
+    for (const block of PALETTE_BLOCKS) {
+      const bg = hexIn(block, "--color-bg");
+      const fill = hexIn(block, "--status-unknown-fill");
+      const text = hexIn(block, "--status-unknown");
+      if (contrast(fill, bg) < 4.5) {
+        expect(text, `${block} reuses the unsampled grey as the status label`).not.toBe(fill);
+      }
+    }
+  });
+});
