@@ -203,6 +203,8 @@ export const useIncidents = (query: api.IncidentListQuery = {}) => {
       "incidents",
       query.provider ?? null,
       query.state ?? "all",
+      query.q ?? "",
+      query.days ?? null,
       query.page ?? 1,
       query.pageSize ?? null,
     ],
