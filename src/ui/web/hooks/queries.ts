@@ -401,6 +401,16 @@ export function useAdapterProbe() {
   return useMutation({ mutationFn: api.probeAdapter });
 }
 
+/**
+ * Reading a `config.yml` back in (roadmap 4.3) touches services, channels,
+ * routing and settings at once, so it invalidates everything rather than
+ * naming the keys it happens to have moved.
+ */
+export function useConfigImport() {
+  const invalidate = useInvalidateAll();
+  return useMutation({ mutationFn: api.importConfig, onSuccess: invalidate });
+}
+
 export function useSettingsMutation() {
   const invalidate = useInvalidateAll();
   return useMutation({ mutationFn: api.patchSettings, onSuccess: invalidate });

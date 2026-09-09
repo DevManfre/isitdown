@@ -32,6 +32,7 @@ import {
   writeSettings,
 } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
+import { exportConfigYaml, importConfigYaml } from "../configFile.ts";
 import { storageReport } from "../storageReport.ts";
 import { ensureVapidKeys } from "../vapidKeys.ts";
 
@@ -172,6 +173,58 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     res.json({
       providers: CATALOG.map((entry) => ({ ...entry, configured: taken.has(entry.id) })),
     });
+  });
+
+  /**
+   * The whole configuration as a Light edition `config.yml` (roadmap 4.3), as a
+   * download: everything the dashboard configures otherwise lives only inside
+   * one SQLite file, which makes a backup a database copy and "run this fleet in
+   * Light" a retyping exercise.
+   *
+   * Credentials leave as `${VAR}` references, never values — the same thing the
+   * database stores.
+   */
+  router.get("/config/export", (_req, res) => {
+    const day = new Date().toISOString().slice(0, 10);
+    res.setHeader("content-type", "text/yaml; charset=utf-8");
+    res.setHeader("content-disposition", `attachment; filename="isitdown-config-${day}.yml"`);
+    res.send(exportConfigYaml(db, runtime.logger));
+  });
+
+  /**
+   * The same file, read back (roadmap 4.3). Takes the YAML as a text body, or as
+   * `{ yaml }` for a browser that would rather send JSON.
+   *
+   * Validated through the Light edition's own file schema before anything is
+   * written, so a bad file changes nothing. A service the file does not mention
+   * is removed the way the dashboard removes one — soft, restorable, history
+   * intact — because an import is a configuration statement and must not be a
+   * data-loss event.
+   */
+  router.post("/config/import", (req, res) => {
+    const body = req.body;
+    const source =
+      typeof body === "string"
+        ? body
+        : typeof (body as { yaml?: unknown } | undefined)?.yaml === "string"
+          ? ((body as { yaml: string }).yaml)
+          : null;
+    if (source === null || source.trim() === "") {
+      res.status(400).json({ error: { message: "send the config.yml as the request body, or as { yaml }" } });
+      return;
+    }
+
+    let report;
+    try {
+      report = importConfigYaml(db, source, runtime.logger);
+    } catch (error) {
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      return;
+    }
+    res.json(report);
+    // Every provider the import added starts with no history, exactly as if it
+    // had been added through the form.
+    for (const id of report.added) void runtime.backfill.backfillOne(id);
   });
 
   router.post("/config/services", (req, res) => {

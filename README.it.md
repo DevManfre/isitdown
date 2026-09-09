@@ -1340,6 +1340,8 @@ IsItDown senza adattatori in mezzo:
 scrape_configs:
   - job_name: isitdown
     static_configs:
+| `GET` | `/config/export` | L'intera configurazione come un `config.yml` dell'edizione Light, come download (roadmap 4.3) — polling, consegna, servizi, instradamento e canali. Le credenziali escono come riferimenti `${VAR}`, mai come valori, e `webpush` viene saltato: una subscription del browser non ha senso in un'edizione senza browser. Il file avvia l'immagine Light così com'è. |
+| `POST` | `/config/import` | Lo stesso file, riletto. Accetta lo YAML come corpo della richiesta (`text/yaml`) o come `{ yaml }`. Validato con lo schema di file dell'edizione Light prima di scrivere qualsiasi cosa, così un file sbagliato non cambia nulla; una credenziale letterale viene rifiutata. Un servizio che il file non menziona viene rimosso come lo rimuove la dashboard — soft, ripristinabile, storico intatto — e un blocco `routing` assente lascia stare le regole. Risponde `{ added, updated, removed, channels, routingRules, settings }`. |
       - targets: ["isitdown-ui:3000"]
 | `GET` | `/config/catalog` | Il catalogo di provider incluso (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Risposto dalla memoria — la lista viaggia con l'immagine, quindi non c'è nessun upstream che possa essere giù né niente da tenere sincronizzato. `configured` segna un id già monitorato: la riga resta nel menu e lo dice, invece di sparire. La detection resta la strada per una pagina che la lista non ha. |
 ```
@@ -1944,6 +1946,7 @@ I test dei componenti e degli hook della dashboard vivono insieme al codice sott
 `web/`, come `*.test.tsx` accanto a ciò che testano, e sono raccolti da lì da
 │   │   ├── catalog.ts                 catalogo di provider noti incluso
 Vitest — il resto dell'albero segue la convenzione `test/` di sopra.
+│       ├── configFile.ts             export / import di config.yml (§4.3)
 
 **Regola d'oro:** `src/core`, `src/adapters` e `src/notifiers` non importano mai da
 `src/light` o `src/ui`. Il comportamento specifico dell'edizione viene iniettato

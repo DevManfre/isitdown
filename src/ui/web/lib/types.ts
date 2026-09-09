@@ -444,6 +444,15 @@ export interface AdapterDetection {
 
 export interface AdapterProbeResult {
   ok: boolean;
+/** What `POST /config/import` reports it did (roadmap 4.3). */
+export interface ConfigImportReport {
+  added: string[];
+  updated: string[];
+  removed: string[];
+  channels: string[];
+  routingRules: number;
+  settings: string[];
+}
   durationMs: number;
   error?: string;
   status?: {

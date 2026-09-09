@@ -1314,6 +1314,8 @@ adapter in between:
 ```yaml
 scrape_configs:
   - job_name: isitdown
+| `GET` | `/config/export` | The whole configuration as a Light edition `config.yml`, as a download (roadmap 4.3) — polling, delivery, services, routing and channels. Credentials leave as `${VAR}` references, never values, and `webpush` is skipped: a browser subscription has no meaning in an edition with no browser. The file starts the Light image as it stands. |
+| `POST` | `/config/import` | The same file, read back. Takes the YAML as the request body (`text/yaml`) or as `{ yaml }`. Validated through the Light edition's own file schema before anything is written, so a bad file changes nothing; a literal credential is refused outright. A service the file does not mention is removed the way the dashboard removes one — soft, restorable, history intact — and an absent `routing` block leaves the rules alone. Answers `{ added, updated, removed, channels, routingRules, settings }`. |
     static_configs:
 | `GET` | `/config/catalog` | The bundled provider catalog (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Answered from memory — the list ships with the image, so there is no upstream to be down and nothing to keep in sync. `configured` marks an id already watched: the row stays in the menu saying so rather than disappearing from it. Detection stays the path for a page the list does not have. |
       - targets: ["isitdown-ui:3000"]
@@ -1893,6 +1895,7 @@ What is guaranteed, and checked:
 ├── tsconfig.web.json                  the dashboard: DOM lib + react-jsx
 ├── vite.config.ts                     bundle, dev proxy, vitest config
 └── components.json                    shadcn CLI config
+│       ├── configFile.ts             config.yml export / import (§4.3)
 ```
 
 Dashboard component and hook tests are colocated under `web/` as `*.test.tsx`,
