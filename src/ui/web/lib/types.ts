@@ -425,6 +425,16 @@ export interface AdapterDebugResponse {
 
 /** What one live probe found: the whole reading, or why there was not one. */
 /** What the detect endpoint worked out about a pasted url (roadmap 1.14). */
+/** One row of the bundled provider catalog (roadmap 5.11). */
+export interface CatalogProvider {
+  id: string;
+  name: string;
+  adapter: string;
+  baseUrl: string;
+  /** Already watched: the row stays in the menu, saying so. */
+  configured: boolean;
+}
+
 export interface AdapterDetection {
   /** Null when no adapter recognised the page. */
   adapter: string | null;

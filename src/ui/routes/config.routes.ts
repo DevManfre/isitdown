@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { detectAdapter } from "../../adapters/detect.ts";
+import { CATALOG } from "../../adapters/catalog.ts";
 import { getAdapter } from "../../adapters/index.ts";
 import {
   alertCapSchema,
@@ -154,6 +155,22 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       // route of its own: the undo has to be visible on a page an operator
       // reloads tomorrow, not only in the seconds a toast lives for.
       removed: listRemovedServices(db),
+    });
+  });
+
+  /**
+   * The bundled provider catalog (roadmap 5.11), with the ids already in use
+   * marked rather than removed: a first run should read as a menu, and an
+   * entry missing from that menu because it is already watched would look like
+   * a catalog that forgot about it.
+   *
+   * No network and no upstream: the list ships with the image, so this answers
+   * from memory. Detection stays the path for a page the list does not have.
+   */
+  router.get("/config/catalog", (_req, res) => {
+    const taken = new Set(listServices(db).map((service) => service.id));
+    res.json({
+      providers: CATALOG.map((entry) => ({ ...entry, configured: taken.has(entry.id) })),
     });
   });
 

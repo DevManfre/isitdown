@@ -57,8 +57,16 @@ const config = {
   channels: [],
   routing: { rules: [], invalidRules: 0 },
 };
+const catalog = {
+  providers: [
+    { id: "vercel", name: "Vercel", adapter: "statuspage", baseUrl: "https://www.vercel-status.com", configured: false },
+    { id: "heroku", name: "Heroku", adapter: "rss", baseUrl: "https://status.heroku.com/feed", configured: false },
+    { id: "github", name: "GitHub", adapter: "statuspage", baseUrl: "https://www.githubstatus.com", configured: true },
+  ],
+};
 const fixtures = {
   config,
+  catalog,
   status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
   componentHistory: { provider: "github", days: 90, components: [] },
 };
@@ -323,5 +331,56 @@ describe("the service dialog's write path", () => {
       await within(dialog).findByText(i18n.t("add.test-failed", { error: "connection refused" })),
     ).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBe(dialog);
+  });
+});
+
+// Roadmap 5.11. A first run starts with a name ("I want to watch Vercel"),
+// not with a url, which is the half detection cannot cover.
+describe("the service dialog's bundled catalog", () => {
+  it("fills in the name, the adapter and the base URL from one pick", async () => {
+    const { dialog } = await openAdd();
+    const menu = within(await within(dialog).findByRole("group", { name: i18n.t("catalog.label") }));
+
+    await userEvent.click(await menu.findByRole("button", { name: "Heroku" }));
+
+    expect(within(dialog).getByLabelText(i18n.t("field.name"))).toHaveValue("Heroku");
+    expect(within(dialog).getByLabelText(i18n.t("field.id"))).toHaveValue("heroku");
+    expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue("https://status.heroku.com/feed");
+    // The pick carries the adapter too, so the base-url hint is the feed one.
+    expect(within(dialog).getByRole("radio", { name: "rss" })).toHaveAttribute("data-state", "on");
+  });
+
+  it("keeps an already-watched provider listed, but not pickable", async () => {
+    const { dialog } = await openAdd();
+    const menu = within(await within(dialog).findByRole("group", { name: i18n.t("catalog.label") }));
+
+    // Listed, so the menu never looks like it forgot GitHub — and disabled,
+    // because adding it again would only earn a 409.
+    expect(await menu.findByRole("button", { name: "GitHub" })).toBeDisabled();
+    expect(menu.getByRole("button", { name: "Vercel" })).toBeEnabled();
+  });
+
+  it("filters the menu by name, and says so when nothing matches", async () => {
+    const { dialog } = await openAdd();
+    const menu = () => within(within(dialog).getByRole("group", { name: i18n.t("catalog.label") }));
+    expect(await menu().findByRole("button", { name: "Vercel" })).toBeInTheDocument();
+
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("catalog.search-label")), "her");
+
+    await waitFor(() => expect(menu().queryByRole("button", { name: "Vercel" })).toBeNull());
+    expect(menu().getByRole("button", { name: "Heroku" })).toBeInTheDocument();
+
+    await userEvent.clear(within(dialog).getByLabelText(i18n.t("catalog.search-label")));
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("catalog.search-label")), "zzz");
+
+    expect(await within(dialog).findByText(i18n.t("catalog.empty"))).toBeInTheDocument();
+  });
+
+  it("offers no menu while editing: an existing service has every answer already", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.edit") }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).queryByRole("group", { name: i18n.t("catalog.label") })).toBeNull();
   });
 });

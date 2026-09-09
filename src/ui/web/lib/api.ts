@@ -3,6 +3,7 @@ import type {
   AdapterDetection,
   AdapterProbeResult,
   ComponentHistoryResponse,
+  CatalogProvider,
   ComponentPreview,
   DeliveryLogResponse,
   DeliveryState,
@@ -161,6 +162,8 @@ export const previewComponents = (body: unknown) =>
     "/config/services/preview-components",
     body,
   );
+/** The bundled provider menu, with the ids already watched marked (roadmap 5.11). */
+export const getCatalog = () => request<{ providers: CatalogProvider[] }>("GET", "/config/catalog");
 /** Which adapter reads a pasted url, and the base url that adapter wants. */
 export const detectAdapter = (url: string) =>
   request<AdapterDetection>("POST", "/config/services/detect", { url });
