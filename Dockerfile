@@ -55,14 +55,16 @@ CMD ["node", "dist/light/index.js"]
 #
 # NODE_ENV and the healthcheck are this stage's own, not inherited from
 # light/ui: the image says development rather than leaving it to the compose
-# override, and liveness is judged on the source tree the stage actually runs
+# override, and readiness is judged on the source tree the stage actually runs
 # (types stripped at load) rather than on a compiled artifact it never loads.
 FROM builder AS dev
 ENV NODE_ENV=development
 ENV DB_PATH=/app/data/isitdown.db
 ENV PORT=3000
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# Same start period as the ui stage, and for the same reason: the probe is
+# readiness, so it stays 503 until the first cycle has read the fleet.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD ["node", "src/ui/healthcheck.ts"]
 CMD ["sh", "-c", "npx vite build --watch & exec node --watch src/ui/server.ts"]
 
@@ -79,6 +81,9 @@ COPY --from=builder /app/dist/ui ./dist/ui
 RUN chown -R node:node /app/dist/ui
 USER node
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# The probe is readiness, not liveness (roadmap 6.9): it stays 503 until the
+# first cycle has actually read the fleet, so the start period covers the
+# history backfill plus that first cycle rather than just the listen.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD ["node", "dist/ui/healthcheck.js"]
 CMD ["node", "dist/ui/server.js"]
