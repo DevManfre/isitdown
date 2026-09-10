@@ -1107,6 +1107,14 @@ older was stored and never shown; the calendar is that year. A day nobody
 sampled is drawn muted rather than green, and hovering a cell says what the day
 was and how much of it was up.
 
+Above the list, **Compare** (roadmap 5.7) overlays two providers' daily uptime on
+one pair of axes — the question a vendor decision actually asks, and the one the
+worst-first ranking cannot answer because it never puts two rows on the same
+scale. It opens on the two worst providers, either picker changes a side, and
+picking the provider already on the other side swaps them. The two lines take
+their own colours rather than status colours: the chart says which measured
+better, not that one of them is operational and the other is not.
+
 The same data over HTTP:
 
 ```bash

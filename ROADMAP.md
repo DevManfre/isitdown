@@ -152,7 +152,7 @@ is additive and independently shippable.
 | 5.4 | **Command palette (⌘K)** | M | Jump to provider, switch view, run a poll, toggle theme. The console shell is already built for it. |
 | 5.5 | **Arbitrary date range on history** | M | 7/30/90 are fixed. A range picker plus zoom on the charts. |
 | 5.6 | **Provider detail page** | M | The drawer works, but a linkable full page per provider (uptime, incidents, components, map) is a natural home for everything currently scattered. |
-| 5.7 | **Compare two providers** | S | Overlay two uptime series. Useful when deciding between vendors. |
+| 5.7 ✅ | **Compare two providers** | S | Shipped on the History view: a compare card overlays two providers' daily series on one pair of axes, opening on the two worst — the ranking already sorts them, but never puts two rows on the same scale. Picking the provider already on the other side swaps the pair, and the two lines take their own `--compare-*` tokens rather than status colours, so the chart says which measured better rather than that one is operational. |
 | 5.8 | **Wallboard / kiosk mode** | M | Full-screen, oversized, auto-rotating, no chrome. Aimed at an office screen. Cheap given the components already exist. |
 | 5.9 ✅ | **Timezone preference** | S | Everything is UTC. Correct, defensible, and mildly annoying every single day. |
 | 5.10 ✅ | **Favicon and title reflect worst status** | S | Shipped as `useDocumentStatus` in the app shell: the title counts the providers in trouble and the favicon is redrawn from the brand mark with a dot in that severity's colour. A calm fleet restores the page's own icon and title, and `unknown` never counts as trouble. |

@@ -7,9 +7,18 @@ import { DeltaChip } from "@/components/DeltaChip.tsx";
 import { ProviderHistoryDrawer } from "@/components/ProviderHistoryDrawer.tsx";
 import { ProviderTrendRow } from "@/components/ProviderTrendRow.tsx";
 import { MonthColumns } from "@/components/charts/MonthColumns.tsx";
+import { UptimeCompareChart } from "@/components/charts/UptimeCompareChart.tsx";
 import { UptimeTrendChart } from "@/components/charts/UptimeTrendChart.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
-import { uptimeForRange } from "@/lib/history.ts";
+import { COMPARE_CHART } from "@/lib/chartConfig.ts";
+import { alignSeries, uptimeForRange } from "@/lib/history.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { HistorySummary, ProviderHistory } from "@/lib/types.ts";
 
@@ -53,6 +62,13 @@ export function History() {
   const { t, i18n } = useTranslation();
   const [days, setDays] = useState<number>(90);
   const [open, setOpen] = useState<string | null>(null);
+  // Null means "whichever the ordering picks": the fleet is not loaded yet on
+  // the first render, and a comparison the operator did choose must survive a
+  // range change that reorders the list under it.
+  const [compare, setCompare] = useState<{ left: string | null; right: string | null }>({
+    left: null,
+    right: null,
+  });
   const { data } = useHistory(days);
   const { data: status } = useStatus();
 
@@ -70,6 +86,54 @@ export function History() {
     (left, right) =>
       uptimeForRange(left, days) - uptimeForRange(right, days) ||
       left.providerId.localeCompare(right.providerId),
+  );
+
+  const nameOf = (providerId: string) => statusById.get(providerId)?.name ?? providerId;
+
+  /**
+   * The two worst by default (roadmap 5.7): the page already ranks worst first,
+   * and "how do these two compare" is a question about the two that are
+   * costing something, not about the two that happen to sort first.
+   */
+  const left = compare.left ?? ordered[0]?.providerId ?? null;
+  const right = compare.right ?? ordered[1]?.providerId ?? null;
+  const leftHistory = ordered.find((provider) => provider.providerId === left);
+  const rightHistory = ordered.find((provider) => provider.providerId === right);
+
+  const picker = (side: "left" | "right", value: string) => (
+    <div className="flex items-center gap-2">
+      <span
+        aria-hidden="true"
+        className="size-2 shrink-0 rounded-full"
+        style={{ backgroundColor: COMPARE_CHART[side] }}
+      />
+      <Select
+        value={value}
+        onValueChange={(next) => {
+          // Picking the provider that is already on the other side swaps them:
+          // a provider drawn against itself is the one comparison with nothing
+          // to say, and a click that silently did nothing would read as a
+          // broken control.
+          const other = side === "left" ? right : left;
+          if (next === other) {
+            setCompare({ left: right, right: left });
+            return;
+          }
+          setCompare({ left, right, [side]: next });
+        }}
+      >
+        <SelectTrigger size="sm" aria-label={t(`history.compare.${side}`)} className="w-44">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {ordered.map((provider) => (
+            <SelectItem key={provider.providerId} value={provider.providerId}>
+              {nameOf(provider.providerId)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 
   return (
@@ -142,6 +206,37 @@ export function History() {
           heading={t("history.months-title")}
         />
       </div>
+
+      {/* Two providers side by side is the question a vendor decision asks, and
+          the list of rows — which ranks them but never puts two on the same
+          axes — cannot answer it. Only rendered once there are two providers
+          to compare: one drawn against itself is a chart with nothing to say. */}
+      {leftHistory !== undefined && rightHistory !== undefined && left !== right ? (
+        <section
+          aria-label={t("history.compare.title")}
+          className="anim-rise flex flex-col gap-3"
+          style={{ animationDelay: "120ms" }}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs uppercase tracking-widest text-muted-foreground">
+              {t("history.compare.title")}
+            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {picker("left", leftHistory.providerId)}
+              {picker("right", rightHistory.providerId)}
+            </div>
+          </div>
+          <UptimeCompareChart
+            rows={alignSeries(leftHistory, rightHistory)}
+            leftLabel={nameOf(leftHistory.providerId)}
+            rightLabel={nameOf(rightHistory.providerId)}
+            label={t("history.compare.chart", {
+              left: nameOf(leftHistory.providerId),
+              right: nameOf(rightHistory.providerId),
+            })}
+          />
+        </section>
+      ) : null}
 
       <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "200ms" }} />
 

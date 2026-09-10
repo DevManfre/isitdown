@@ -54,6 +54,20 @@ export const STATUS_CHART = {
  */
 export const AGGREGATE_FILL = "var(--status-accent)";
 
+/**
+ * The two marks a comparison draws (roadmap 5.7).
+ *
+ * Identities, not verdicts: a severity colour would claim the greener of two
+ * vendors is operational and the other one is not, when the chart is only
+ * saying which measured better. Left keeps the accent the trend line already
+ * uses so the page reads as one chart layer; right is the token declared for
+ * the second series.
+ */
+export const COMPARE_CHART = {
+  left: "var(--compare-left)",
+  right: "var(--compare-right)",
+} as const;
+
 /** Which of the three bar rows a chart belongs to; each has its own scale. */
 export type BarScale = "row" | "compact" | "poll";
 
