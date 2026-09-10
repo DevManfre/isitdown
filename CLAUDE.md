@@ -128,6 +128,8 @@ the last step.
 npm test                 # unit tests: node:test (*.test.ts — adapters, diff engine, poller,
                           # scheduler, stores, API) and Vitest (*.test.tsx — dashboard
                           # components/hooks, since JSX needs a real transform)
+npm run coverage         # the same two suites under a coverage floor (server 95/88/93,
+                          # dashboard 85/75/80) — CI runs this instead of `npm test`
 npm run test:integration # end to end: *.itest.ts — fake provider and webhook receiver
 npm run typecheck        # tsc -p tsconfig.json (server + core) and
                           # tsc -p tsconfig.web.json (dashboard React tree)

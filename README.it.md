@@ -2180,6 +2180,7 @@ sviluppo; `docker inspect -f '{{.Config.Cmd}}' isitdown-ui` mostra
 
 ```bash
 npm test                 # suite node:test + vitest run
+npm run coverage         # le stesse due suite sotto una soglia minima di copertura
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
 npm run test:visual      # baseline visive: ogni vista, entrambi i temi, entrambe le lingue
 npm run check:readme     # questo file contro ogni README.<lang>.md
@@ -2187,6 +2188,15 @@ npm run typecheck        # tsconfig del server + tsconfig della dashboard (tscon
 npm run build:light      # tsc + copia asset, escludendo src/ui
 npm run build:ui         # tsc + vite build + copia asset
 ```
+
+La soglia di copertura (roadmap 7.2) è un pavimento, non un obiettivo da
+rincorrere. Sono due, perché le due suite coprono metà diverse: il server e il
+motore devono restare al 95% delle righe, all'88% dei rami e al 93% delle
+funzioni, e la dashboard a 85/75/80 — ciascuna qualche punto sotto il valore
+attuale, così il movimento ordinario passa e un sottosistema nuovo che arriva
+senza test propri trascina il totale sotto la soglia e fa fallire la CI. Alza una
+soglia quando la suite è davvero salita; non abbassarne mai una per far tornare
+verde una run rossa.
 
 **Nessun test raggiunge mai un provider reale.** Gli adapter sono testati contro
 payload registrati dalle status page vere e conservati sotto `test/fixtures/`; il
