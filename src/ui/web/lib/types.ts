@@ -535,6 +535,15 @@ export interface Preferences {
  * multiplies the last three itself so the projection tracks a half-typed
  * number without a request per keystroke.
  */
+export interface StorageReport {
+  dbBytes: number;
+  sampleCount: number;
+  bytesPerSample: number;
+  /** False when `bytesPerSample` is the server's built-in figure, not this database's. */
+  measured: boolean;
+  samplesPerDay: number;
+}
+
 /** One cell of the year heat calendar — roadmap 5.20. */
 export interface CalendarDay {
   day: string;
@@ -562,39 +571,4 @@ export interface DbMaintenanceReport {
   bytesAfter: number;
   reclaimed: number;
   durationMs: number;
-}
-
-export interface StorageReport {
-  dbBytes: number;
-  sampleCount: number;
-  bytesPerSample: number;
-  /** False when `bytesPerSample` is the server's built-in figure, not this database's. */
-  measured: boolean;
-  samplesPerDay: number;
-}
-
-/** One cell of the year heat calendar — roadmap 5.20. */
-export interface CalendarDay {
-  day: string;
-  status: OverallStatus;
-  /** How much of the day was up; `null` when it was never sampled. */
-  uptime: number | null;
-}
-
-/** What `GET /history/calendar?provider=` answers — roadmap 5.20. */
-export interface ProviderCalendar {
-  providerId: string;
-  days: number;
-  cells: CalendarDay[];
-  uptime: number;
-  measuredDays: number;
-}
-
-export interface StorageReport {
-  dbBytes: number;
-  sampleCount: number;
-  bytesPerSample: number;
-  /** False when `bytesPerSample` is the server's built-in figure, not this database's. */
-  measured: boolean;
-  samplesPerDay: number;
 }
