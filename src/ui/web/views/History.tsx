@@ -122,7 +122,14 @@ export function History() {
           setCompare({ left, right, [side]: next });
         }}
       >
-        <SelectTrigger size="sm" aria-label={t(`history.compare.${side}`)} className="w-44">
+        {/* Both keys spelled out rather than built from `side`: a key assembled
+            at runtime is invisible to the catalog guard, which is what keeps a
+            dead or missing string from shipping. */}
+        <SelectTrigger
+          size="sm"
+          aria-label={side === "left" ? t("history.compare.left") : t("history.compare.right")}
+          className="w-44"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
