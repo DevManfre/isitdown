@@ -16,7 +16,7 @@ Legend:
 - ✅ — shipped; kept listed so the phase reads as a whole.
 - ◐ — partly shipped; the row's note says what is left.
 
-Current state for reference (v1.7.0): Statuspage, generic RSS/Atom, generic
+Current state for reference (v1.9.0): Statuspage, generic RSS/Atom, generic
 HTML-scrape, Slack, AWS, Google Cloud, Azure, Instatus and Better Stack
 adapters, all covered by the shared adapter contract suite;
 every provider read through one HTTP helper that revalidates with `ETag` /
@@ -41,7 +41,13 @@ a delivery policy on top of the routing rules — quiet hours, a digest window, 
 hourly cap per provider, and an incident whose updates edit one message on the
 channels that can — a hash-anchored request stagger with `Retry-After` honoured
 per provider, an adapter diagnostics panel with the last reads and an on-demand
-one; `en` + `it`.
+one; adapter auto-detection and a 42-provider catalog behind the add dialog;
+provider groups with a derived composite status, addressable from a routing rule
+as `group:<slug>`; a configuration export and import through the Light edition's
+own `config.yml` shape; CSV / JSON exports of the incident search and the daily
+history; a `check` command that validates a Light config without starting the
+poller; a contrast- and keyboard-tested palette with the ratios asserted from
+`tokens.css`; `en` + `it`.
 
 ---
 
@@ -210,17 +216,46 @@ not re-invented from scratch later.
 
 ## Suggested next slice
 
-Every row that needed no product decision first is spent: the tables above are
-marked ✅ down to the ones that do. What is left is a choice, not a queue.
+Every row that needed no product decision is spent up to the ones that change
+what IsItDown is. What is left below that line is cheap and additive: six rows,
+each of which either makes a surface that already exists say more, or makes CI
+enforce something only discipline enforces today.
 
-The cheap rows are the ones to reach for if a slice needs filling: **7.6's CI
-gate** (the sync skill covers the writing, not a hand-edited push), **4.14 a
-committed Grafana dashboard**, **6.13 database maintenance from the UI**, and
-**5.20 the year heat calendar**, which is the view that makes a retention window
-past a year say something.
+1. **7.6 the CI translation gate** — the `readme-translation-sync` skill makes
+   the Italian README part of the same pass, which covers what we write and
+   nothing about what anyone else pushes. The parity commands the skill already
+   carries (heading skeleton, per-level fence counts, identifiers named in one
+   file but not the other) are exactly what a `verify` step can run, so an
+   unsynced hand edit cannot reach `main`.
+2. **5.20 the year heat calendar** — retention can go to 3650 days since 4.5,
+   and the widest view is still the 90-day bar row, so the extra data is stored
+   and never shown. 365 day cells per provider, coloured by the day's worst
+   status, read from the same daily rollup `/export/history` already produces.
+3. **6.13 database maintenance from the UI** — Settings reports the database's
+   real size from `GET /config/storage`, and the daily prune deletes rows
+   without ever returning the space. One button running `PRAGMA
+   integrity_check` and `VACUUM`, reporting bytes reclaimed, finishes the
+   sentence that view starts.
+4. **6.9 split readiness from liveness** — the container healthcheck hits one
+   `/health` that answers for the process, so an instance whose poll cycle has
+   been failing for a day still reports healthy. Liveness stays what it is;
+   readiness should say when the last cycle succeeded, which is the failure the
+   operator actually wants surfaced.
+5. **4.14 a committed Grafana dashboard** — 4.1 exposes the metrics and leaves
+   the panels as an exercise. One JSON file (fleet status, poll duration,
+   notification rate, delivery failures) turns the integration into a copy-paste
+   and costs nothing to keep, since the metric names are ours.
+6. **3.4 ntfy / Gotify** — the last notifier rows that are a single POST each,
+   and the two channels this project's own audience self-hosts. Additive at the
+   `Notifier` seam, with the credential path (5.17) and the routing, quiet
+   hours and digest layers already in place around them.
+
+Cheap rows kept just behind that line, in case a slice has room: **4.9 an RSS /
+iCal feed of incidents**, **7.2 a coverage floor**, **5.16 a bundle-size
+budget**, and **5.7 comparing two providers' uptime series**.
 
 The two items that most change *what IsItDown is*, and therefore deserve a
-decision rather than a slot in a queue, are **1.8 direct HTTP probes** (with
-1.9, 1.10 and 8.1 behind it) and **5.1 the public status page** (which drags
-4.15's token with it). **2.10 provider push** is a third, smaller one: it
+decision rather than a slot in a queue, are still **1.8 direct HTTP probes**
+(with 1.9, 1.10 and 8.1 behind it) and **5.1 the public status page** (which
+drags 4.15's token with it). **2.10 provider push** is a third, smaller one: it
 inverts the whole data flow for the subset of providers that support it.
