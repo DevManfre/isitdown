@@ -429,6 +429,16 @@ export function useConfigImport() {
   return useMutation({ mutationFn: api.importConfig, onSuccess: invalidate });
 }
 
+/**
+ * Integrity check plus vacuum, on demand — roadmap 6.13. A mutation rather than
+ * a query because two clicks must mean two runs, and it invalidates everything
+ * a write does so the size Settings prints is the one the vacuum left.
+ */
+export function useStorageMaintenance() {
+  const invalidate = useInvalidateAll();
+  return useMutation({ mutationFn: api.runStorageMaintenance, onSuccess: invalidate });
+}
+
 export function useSettingsMutation() {
   const invalidate = useInvalidateAll();
   return useMutation({ mutationFn: api.patchSettings, onSuccess: invalidate });
