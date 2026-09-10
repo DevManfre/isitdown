@@ -179,6 +179,9 @@
   "history.next-maintenance.kicker": "Prossima manutenzione",
   "history.next-maintenance.badge": "In programma",
   "history.drawer-bars": "Stato giornaliero",
+  "history.calendar-title": "L'anno a colpo d'occhio",
+  "history.calendar-summary": "{days} giorni, {measured} dei quali misurati, {uptime}% di uptime",
+  "history.calendar-day": "{day} · {status} · {uptime}% attivo",
   "history.legend-title": "Legenda colori",
 
   "settings.secret-note": "Scrivi una credenziale e salva: resta accanto al database, vale subito e non viene mai più mostrata. Quale variabile d'ambiente la porta sta dietro il pulsante della riga.",

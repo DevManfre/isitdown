@@ -179,6 +179,9 @@
   "history.next-maintenance.kicker": "Next maintenance",
   "history.next-maintenance.badge": "Upcoming",
   "history.drawer-bars": "Daily status",
+  "history.calendar-title": "Year at a glance",
+  "history.calendar-summary": "{days} days, {measured} of them measured, {uptime}% uptime",
+  "history.calendar-day": "{day} · {status} · {uptime}% up",
   "history.legend-title": "Colour key",
 
   "settings.secret-note": "Type a credential and save: it is kept beside the database, applies at once, and is never shown again. Which environment variable carries it sits behind the row's own button.",

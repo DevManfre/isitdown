@@ -171,6 +171,24 @@ export const useProviderHistory = (provider: string | null, days: number) => {
 };
 
 /**
+ * A year of day cells for one provider — roadmap 5.20. Mounts with the drawer
+ * like `useProviderHistory`, so nothing is fetched for a provider nobody
+ * opened, and never throws for the same reason: a missing calendar must not
+ * take down the drawer that opened it.
+ *
+ * No `refetchInterval`: a day cell only changes as the day it covers is polled,
+ * and the same cycle already refreshes the bar row above it through the shared
+ * `["history"]` invalidation.
+ */
+export const useProviderCalendar = (provider: string | null) =>
+  useQuery({
+    queryKey: ["history", "calendar", provider],
+    queryFn: () => api.getProviderCalendar(provider ?? ""),
+    throwOnError: false,
+    enabled: provider !== null,
+  });
+
+/**
  * Never throws. Vanilla's own reasoning (`history.js:70-82`): "the provider's
  * own uptime figures already rendered; a missing component breakdown is not
  * worth surfacing as a page-level error." `History`'s per-provider row (and

@@ -137,6 +137,45 @@ test("history for an unknown provider is a 404", async () => {
   }
 });
 
+test("the year calendar returns 365 day cells for one provider", async () => {
+  // Roadmap 5.20. A fixed window, so the answer names it rather than echoing a
+  // parameter the route does not take.
+  const app = await api();
+  try {
+    await save(app.runtime, "github", "major_outage", at(200));
+    await save(app.runtime, "github", "operational", at(0));
+
+    const { status, body } = await app.get("/history/calendar?provider=github");
+    assert.equal(status, 200);
+    const calendar = body as {
+      providerId: string;
+      days: number;
+      measuredDays: number;
+      cells: { day: string; status: string; uptime: number | null }[];
+    };
+    assert.equal(calendar.providerId, "github");
+    assert.equal(calendar.days, 365);
+    assert.equal(calendar.cells.length, 365);
+    assert.equal(calendar.measuredDays, 2);
+    assert.equal(calendar.cells.at(-1)?.status, "operational");
+    assert.equal(calendar.cells[0]?.uptime, null, "an unsampled day has no percentage");
+  } finally {
+    await app.close();
+  }
+});
+
+test("the year calendar needs a provider, and 404s one it does not know", async () => {
+  const app = await api();
+  try {
+    const missing = await app.get("/history/calendar");
+    assert.equal(missing.status, 400);
+    const unknown = await app.get("/history/calendar?provider=nope");
+    assert.equal(unknown.status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
 test("component history returns one entry per selected component", async () => {
   const app = await api();
   try {
