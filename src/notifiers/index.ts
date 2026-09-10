@@ -1,6 +1,8 @@
 import type { ChannelConfig } from "../core/configSource.interface.ts";
 import type { Notifier } from "../core/notifier.interface.ts";
 import { createDiscordNotifier } from "./discord.notifier.ts";
+import { createGotifyNotifier } from "./gotify.notifier.ts";
+import { createNtfyNotifier } from "./ntfy.notifier.ts";
 import { createSlackNotifier } from "./slack.notifier.ts";
 import { createTelegramNotifier } from "./telegram.notifier.ts";
 import { createWebhookNotifier } from "./webhook.notifier.ts";
@@ -9,6 +11,8 @@ export type NotifierFactory = (settings: Record<string, string>) => Notifier;
 
 const factories: Record<string, NotifierFactory> = {
   discord: createDiscordNotifier,
+  gotify: createGotifyNotifier,
+  ntfy: createNtfyNotifier,
   slack: createSlackNotifier,
   telegram: createTelegramNotifier,
   webhook: createWebhookNotifier,

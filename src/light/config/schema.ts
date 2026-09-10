@@ -41,12 +41,30 @@ const slackSchema = z.object({
   webhookUrl: z.string().default(""),
 });
 
+/**
+ * The topic URL carries the server, so ntfy.sh and a self-hosted instance are
+ * the same setting. The token is only needed on a server with access control.
+ */
+const ntfySchema = z.object({
+  enabled: z.boolean().default(false),
+  topicUrl: z.string().default(""),
+  token: z.string().default(""),
+});
+
+const gotifySchema = z.object({
+  enabled: z.boolean().default(false),
+  serverUrl: z.string().default(""),
+  token: z.string().default(""),
+});
+
 /** Required non-empty settings per channel, used to produce an actionable error. */
 export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   telegram: ["botToken", "chatId"],
   webhook: ["url"],
   discord: ["webhookUrl"],
   slack: ["webhookUrl"],
+  ntfy: ["topicUrl"],
+  gotify: ["serverUrl", "token"],
 };
 
 /**
@@ -61,6 +79,8 @@ const notificationsObject = z
     webhook: webhookSchema.optional(),
     discord: discordSchema.optional(),
     slack: slackSchema.optional(),
+    ntfy: ntfySchema.optional(),
+    gotify: gotifySchema.optional(),
   })
   .strict();
 

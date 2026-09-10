@@ -91,6 +91,18 @@ notifications:
     enabled: false
     # An incoming webhook of a Slack app installed in the target channel
     webhookUrl: "${SLACK_WEBHOOK_URL}"
+  ntfy:
+    enabled: false
+    # The topic URL, server included — ntfy.sh or an instance of your own
+    topicUrl: "${NTFY_TOPIC_URL}"
+    # Optional: only a server with access control needs a token
+    token: "${NTFY_TOKEN}"
+  gotify:
+    enabled: false
+    # The server itself, not a message path
+    serverUrl: "${GOTIFY_URL}"
+    # An application token, from the Gotify app you created for IsItDown
+    token: "${GOTIFY_TOKEN}"
 
 # Which channels hear about what. The first rule that matches a change decides,
 # rules below it are not consulted — put specific ones on top. Leave this
