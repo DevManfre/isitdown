@@ -1134,6 +1134,15 @@ veniva salvato e mai mostrato; il calendario è quell'anno. Un giorno che nessun
 ha campionato è disegnato smorzato e non verde, e passando sopra una cella si
 legge com'è andato quel giorno e quanto è stato attivo.
 
+Sopra la lista, **Confronta** (roadmap 5.7) sovrappone l'uptime giornaliero di
+due provider sugli stessi assi — la domanda che pone davvero una scelta tra
+fornitori, e quella a cui la classifica dal peggiore non può rispondere perché
+non mette mai due righe sulla stessa scala. Si apre sui due provider peggiori,
+ciascun selettore cambia il proprio lato, e scegliere il provider già presente
+sull'altro lato li scambia. Le due linee prendono colori propri e non colori di
+stato: il grafico dice chi ha misurato meglio, non che uno è operativo e l'altro
+no.
+
 Gli stessi dati via HTTP:
 
 ```bash
