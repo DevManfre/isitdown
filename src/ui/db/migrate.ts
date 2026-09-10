@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -378,6 +378,20 @@ export function migrate(db: DatabaseSync): void {
         PRIMARY KEY (channel, provider_id, incident_id)
       );
     `);
+  }
+
+  if (from < 16) {
+    // Provider groups — "my stack" (roadmap 2.6). A column rather than a table:
+    // a group is a name a provider carries, exactly as the Light edition's
+    // `config.yml` writes it, and a table would make the two editions describe
+    // the same thing two ways. Nullable, because a fleet is flat until an
+    // operator groups it.
+    const columns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!columns.includes("group_name")) {
+      db.exec("ALTER TABLE services ADD COLUMN group_name TEXT");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

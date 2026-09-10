@@ -1,20 +1,6 @@
 import { Router } from "express";
 import type { UiRuntimeCore } from "../runtime.ts";
-
-/** The only windows the dashboard offers, so the only ones the API serves. */
-const ALLOWED_DAYS = [7, 30, 90] as const;
-const DEFAULT_DAYS = 90;
-
-/**
- * Parsed by hand rather than through a coercing schema: a bad value must be told
- * which windows exist, and a coercion failure would answer "expected number,
- * received nan" instead.
- */
-function parseDays(raw: unknown): number | null {
-  if (raw === undefined) return DEFAULT_DAYS;
-  const value = Number(raw);
-  return (ALLOWED_DAYS as readonly number[]).includes(value) ? value : null;
-}
+import { ALLOWED_DAYS, parseDays } from "./historyWindow.ts";
 
 /**
  * Pre-aggregated history. The frontend never re-derives a percentage or a daily

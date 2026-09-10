@@ -25,11 +25,17 @@ services:
     # that changes twice a year do not deserve the same one. Omit to follow the
     # global interval.
     intervalMinutes: 2
+    # Optional: the group this provider belongs to — "my stack". Providers in
+    # the same group get a combined status (worst member wins), and one routing
+    # rule below can cover all of them with `provider: group:deploy-path`. A
+    # lowercase slug; omit it to leave the provider ungrouped.
+    group: deploy-path
 
   - name: Cloudflare
     id: cloudflare
     adapter: statuspage
     baseUrl: https://www.cloudflarestatus.com
+    group: deploy-path
     # Optional: watch only part of a provider. Component ids come from
     # <baseUrl>/api/v2/summary.json, where Cloudflare groups its data centres by
     # region. With scopeToComponents an incident attributed only to components
@@ -104,6 +110,12 @@ notifications:
 #   # A provider watched out of curiosity: on the dashboard, never in a message.
 #   - provider: anthropic
 #     channels: []
+#   # The whole deploy path, in one rule: it stays right when the stack gains a
+#   # fifth provider, which four provider ids never would.
+#   - provider: group:deploy-path
+#     classes: [status, incident]
+#     minSeverity: degraded
+#     channels: [telegram]
 #   # Real trouble, anywhere: every channel gets attention.
 #   - provider: "*"
 #     classes: [status, incident]

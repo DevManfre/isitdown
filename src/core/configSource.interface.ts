@@ -32,6 +32,8 @@ export interface ServiceDefinition {
   adapter: string;
   baseUrl: string;
   enabled: boolean;
+  /** The group this provider belongs to, or absent while the fleet is flat (roadmap 2.6). */
+  group?: string | undefined;
   /**
    * How often this provider is polled. Absent means the global cadence: a page
    * that publishes every few minutes and one that changes twice a year do not

@@ -77,3 +77,15 @@ body {
 *::-webkit-scrollbar {
   display: none;
 }
+
+/* Roadmap 5.13, keyboard reachability. The shadcn primitives each carry their
+   own focus ring, but the dashboard has hand-written interactive elements too —
+   a provider row is a plain `<button>`, a ring tile is a link — and those had
+   `outline: none` from the reset and nothing in its place, so tabbing through
+   the fleet moved an invisible cursor. `:where()` keeps this at zero
+   specificity, so every primitive's own ring still wins and this is only the
+   floor under the ones that have none. */
+:where(a, button, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

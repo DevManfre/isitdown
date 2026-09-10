@@ -3,6 +3,7 @@ import { badgeRoutes } from "./routes/badge.routes.ts";
 import { configRoutes } from "./routes/config.routes.ts";
 import { debugRoutes } from "./routes/debug.routes.ts";
 import { eventsRoutes } from "./routes/events.routes.ts";
+import { exportRoutes } from "./routes/export.routes.ts";
 import { historyRoutes } from "./routes/history.routes.ts";
 import { incidentsRoutes } from "./routes/incidents.routes.ts";
 import { mapRoutes } from "./routes/map.routes.ts";
@@ -24,6 +25,9 @@ export function createApp(runtime: UiRuntimeCore): Express {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "64kb" }));
+  // The config import (roadmap 4.3) takes a `config.yml` as it stands, so the
+  // YAML content types arrive as text rather than as a JSON string.
+  app.use(express.text({ limit: "256kb", type: ["text/yaml", "application/x-yaml", "text/plain"] }));
 
   app.use(statusRoutes(runtime));
   app.use(eventsRoutes(runtime));
@@ -32,6 +36,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(notificationsRoutes(runtime));
   app.use(configRoutes(runtime));
   app.use(preferencesRoutes(runtime));
+  app.use(exportRoutes(runtime));
   app.use(mapRoutes(runtime));
   app.use(maintenancesRoutes(runtime));
   app.use(metricsRoutes(runtime));

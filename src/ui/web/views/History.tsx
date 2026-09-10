@@ -122,6 +122,14 @@ export function History() {
             >
               {t("history.download", { days })}
             </Button>
+            {/* The CSV is the server's own aggregation rather than this summary
+                flattened here (roadmap 4.6): one row per provider per day is a
+                shape the JSON payload does not have, and deriving it in the
+                browser would be a second definition of a daily bucket. A link,
+                because the answer is a download. */}
+            <Button asChild variant="ghost" size="sm">
+              <a href={`/export/history.csv?days=${days}`}>{t("history.download-csv", { days })}</a>
+            </Button>
           </div>
         </div>
 

@@ -6,6 +6,7 @@ import { FleetGroups } from "@/components/FleetGroups.tsx";
 import { FleetRings } from "@/components/FleetRings.tsx";
 import { FLEET_ROW_STAGGER, FleetRows } from "@/components/FleetRows.tsx";
 import { FleetSummary } from "@/components/FleetSummary.tsx";
+import { StackBand } from "@/components/StackBand.tsx";
 import { GeoCard } from "@/components/GeoCard.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
@@ -173,6 +174,9 @@ export function Overview() {
             when `mapView` is `off`, which is the default, so the Overview's
             existing shape is unchanged for anyone who has not asked for it. */}
         <GeoCard />
+
+        {/* Roadmap 2.6: the groups, above the flat fleet they summarise. */}
+        <StackBand groups={status?.groups ?? []} providers={providers} />
 
         {providers.length === 0 ? (
           <p className="text-muted-foreground">

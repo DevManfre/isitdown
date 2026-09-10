@@ -244,3 +244,39 @@ test("with no quiet hours passed, routing behaves exactly as it did before them"
   assert.deepEqual(resolveTargets(night, [CATCH_ALL_RULE], ALL), ALL);
   assert.equal(explain(night, [CATCH_ALL_RULE], ALL).quieted, false);
 });
+
+// Roadmap 2.6. A rule that had to name four provider ids to cover one stack
+// went stale the moment the stack gained a fifth.
+test("a group rule covers every provider in that group, and nothing else", () => {
+  const rules = [rule({ provider: "group:deploy-path", channels: ["telegram"] }), CATCH_ALL_RULE];
+
+  assert.deepEqual(
+    resolveTargets(change({ providerId: "vercel" }), rules, ALL, { providerGroup: "deploy-path" }),
+    ["telegram"],
+  );
+  // Same provider, different group: the group rule is not theirs, so the
+  // catch-all below it decides.
+  assert.deepEqual(resolveTargets(change({ providerId: "vercel" }), rules, ALL, { providerGroup: "billing" }), ALL);
+  // A provider in no group at all matches no group rule.
+  assert.deepEqual(resolveTargets(change({ providerId: "vercel" }), rules, ALL), ALL);
+});
+
+test("a group rule can mute a whole stack, and says which rule did it", () => {
+  const rules = [rule({ provider: "group:noisy", channels: [] }), CATCH_ALL_RULE];
+
+  const explained = explain(change({ providerId: "aws" }), rules, ALL, { providerGroup: "noisy" });
+
+  assert.equal(explained.winner, 0);
+  assert.deepEqual(explained.targets, []);
+  assert.deepEqual(explained.outcomes[1], { kind: "unreached" });
+});
+
+test("a group that shares a provider id's name is still a group", () => {
+  // `group:github` must not be read as the provider `github`.
+  const rules = [rule({ provider: "group:github", channels: ["slack"] })];
+
+  assert.deepEqual(resolveTargets(change({ providerId: "github" }), rules, ALL), []);
+  assert.deepEqual(resolveTargets(change({ providerId: "github" }), rules, ALL, { providerGroup: "github" }), [
+    "slack",
+  ]);
+});

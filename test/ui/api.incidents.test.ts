@@ -73,9 +73,30 @@ async function openIncidents(runtime: UiRuntime): Promise<string[]> {
   return ids;
 }
 
+/**
+ * One named incident per provider, so a search has something to tell apart
+ * (roadmap 5.19). The names are deliberately different shapes: one plain, one
+ * carrying a `%` so the pattern language's own wildcard is exercised.
+ */
+async function namedIncidents(runtime: UiRuntime): Promise<string[]> {
+  const ids = runtime.listAllServices().map((service) => service.id);
+  const names = ["Database connections exhausted", "API errors above 50% of requests", "Dashboard slow to load"];
+  for (const [index, id] of ids.entries()) {
+    await runtime.store.saveStatus({
+      provider: id,
+      overallStatus: "major_outage",
+      activeIncidents: [incident(`${id}-1`, { name: names[index % names.length] as string })],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    });
+  }
+  return ids;
+}
+
 interface IncidentsBody {
   active: { providerId: string }[];
-  page: { items: { providerId: string }[]; total: number };
+  page: { items: { providerId: string; name: string }[]; total: number };
   counts: { all: number; active: number; resolved: number };
 }
 
@@ -155,6 +176,114 @@ test("the notification feed leaves out a disabled provider", async () => {
       payload.notifications.filter((record) => record.providerId === off),
       [],
     );
+  } finally {
+    await app.close();
+  }
+});
+
+test("a search narrows the page and the counts, and leaves the active card alone", async () => {
+  const app = await api();
+  try {
+    const ids = await namedIncidents(app.runtime);
+
+    const { status, body } = await app.get("/incidents?q=database");
+    assert.equal(status, 200);
+    const payload = body as IncidentsBody;
+
+    assert.deepEqual(
+      payload.page.items.map((row) => row.name),
+      ["Database connections exhausted"],
+    );
+    // The counts follow the search, or the pills would report the fleet's whole
+    // history beside one matching row.
+    assert.equal(payload.counts.all, 1);
+    assert.equal(payload.page.total, 1);
+    // The hero card is not part of the search: an operator typing must not
+    // watch an open incident disappear.
+    assert.equal(payload.active.length, ids.length);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a search matching nothing answers nothing rather than everything", async () => {
+  const app = await api();
+  try {
+    await namedIncidents(app.runtime);
+
+    const payload = (await app.get("/incidents?q=nothing-by-this-name")).body as IncidentsBody;
+    assert.deepEqual(payload.page.items, []);
+    assert.equal(payload.counts.all, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test("the pattern language's own wildcards are searched for as text", async () => {
+  const app = await api();
+  try {
+    await namedIncidents(app.runtime);
+
+    // A bare `%` is "match everything" in a LIKE pattern; here it is a literal
+    // the one incident that spells it out.
+    const percent = (await app.get("/incidents?q=50%25%20of")).body as IncidentsBody;
+    assert.deepEqual(
+      percent.page.items.map((row) => row.name),
+      ["API errors above 50% of requests"],
+    );
+
+    const underscore = (await app.get("/incidents?q=_")).body as IncidentsBody;
+    assert.deepEqual(underscore.page.items, []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("the window leaves out an incident that started before it", async () => {
+  const app = await api();
+  try {
+    const [id] = (await namedIncidents(app.runtime)) as [string, ...string[]];
+    const longAgo = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
+    await app.runtime.store.applyBackfill(id, {
+      samples: [],
+      incidents: [
+        {
+          id: `${id}-old`,
+          name: "Database maintenance overran",
+          impact: "minor",
+          status: "resolved",
+          startedAt: longAgo,
+          resolvedAt: longAgo,
+          updatedAt: longAgo,
+        },
+      ],
+    });
+
+    const everything = (await app.get("/incidents?q=database")).body as IncidentsBody;
+    assert.equal(everything.counts.all, 2);
+
+    const lastWeek = (await app.get("/incidents?q=database&days=7")).body as IncidentsBody;
+    assert.deepEqual(
+      lastWeek.page.items.map((row) => row.name),
+      ["Database connections exhausted"],
+    );
+    assert.equal(lastWeek.counts.all, 1);
+  } finally {
+    await app.close();
+  }
+});
+
+test("an unusable search or window shows the unfiltered list rather than an error", async () => {
+  const app = await api();
+  try {
+    const ids = await namedIncidents(app.runtime);
+
+    const blank = (await app.get("/incidents?q=%20%20&days=not-a-number")).body as IncidentsBody;
+    assert.equal(blank.page.items.length, ids.length);
+    assert.equal(blank.counts.all, ids.length);
+
+    const tooLong = (await app.get(`/incidents?q=${"x".repeat(400)}`)).body as IncidentsBody;
+    assert.equal(tooLong.counts.all, ids.length);
   } finally {
     await app.close();
   }

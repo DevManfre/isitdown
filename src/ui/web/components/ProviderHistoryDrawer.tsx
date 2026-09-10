@@ -9,6 +9,7 @@ import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
 import { useProviderHistory } from "@/hooks/queries.ts";
 import { formatDateTime, formatTime } from "@/lib/format.ts";
 import type { ComponentStatus, MaintenanceWindow, ProviderHistory } from "@/lib/types.ts";
+import { statusLabelKey } from "@/lib/chartConfig.ts";
 
 /**
  * The soonest-starting window in `upcoming`, or `undefined` when nothing is
@@ -62,7 +63,9 @@ export function ProviderHistoryDrawer({
       <SheetContent side="right" className="w-full gap-4 overflow-y-auto sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <StatusDot status={status} />
+            {/* The drawer's heading is the provider's name and this dot; the
+                status is nowhere else on it, so the dot carries it in words. */}
+            <StatusDot status={status} label={t(statusLabelKey(status))} />
             {name}
           </SheetTitle>
         </SheetHeader>

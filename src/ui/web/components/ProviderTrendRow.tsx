@@ -5,6 +5,7 @@ import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { TrendSparkline } from "@/components/charts/TrendSparkline.tsx";
 import { uptimeForRange } from "@/lib/history.ts";
 import type { ProviderHistory } from "@/lib/types.ts";
+import { statusLabelKey } from "@/lib/chartConfig.ts";
 
 /**
  * One provider's trend at a glance: current status, name, the shape of its
@@ -42,7 +43,7 @@ export function ProviderTrendRow({
       style={{ animationDelay: delay }}
     >
       <span className="flex items-center gap-2 text-sm">
-        <StatusDot status={status} />
+        <StatusDot status={status} label={t(statusLabelKey(status))} />
         <span className="provider-name break-words">{name}</span>
       </span>
       <TrendSparkline series={provider.dailySeries} />

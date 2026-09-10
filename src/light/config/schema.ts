@@ -49,6 +49,23 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   slack: ["webhookUrl"],
 };
 
+/**
+ * The channels this file format has a place for. Webpush is deliberately absent:
+ * a browser subscription belongs to a browser that visited the dashboard, and
+ * the Light edition has no dashboard to have visited. `FILE_CHANNEL_IDS` is what
+ * the UI edition's export filters on (roadmap 4.3), so the two cannot drift.
+ */
+const notificationsObject = z
+  .object({
+    telegram: telegramSchema.optional(),
+    webhook: webhookSchema.optional(),
+    discord: discordSchema.optional(),
+    slack: slackSchema.optional(),
+  })
+  .strict();
+
+export const FILE_CHANNEL_IDS: readonly string[] = Object.keys(notificationsObject.shape);
+
 export const fileConfigSchema = z.object({
   pollIntervalMinutes: positiveInt.max(1440).optional(),
   requestTimeoutSeconds: positiveInt.max(120).optional(),
@@ -65,15 +82,7 @@ export const fileConfigSchema = z.object({
   confirmSamples: positiveInt.max(10).optional(),
   locale: localeSchema.optional(),
   services: z.array(serviceDefinitionSchema).min(1, "at least one service is required"),
-  notifications: z
-    .object({
-      telegram: telegramSchema.optional(),
-      webhook: webhookSchema.optional(),
-      discord: discordSchema.optional(),
-      slack: slackSchema.optional(),
-    })
-    .strict()
-    .default({}),
+  notifications: notificationsObject.default({}),
   /**
    * Evaluation order is the file's order — first matching rule decides.
    * Absent means "everything to every enabled channel", the edition's

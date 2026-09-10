@@ -49,6 +49,10 @@ runAdapterContract("slack", () => ({
   },
 }));
 
+test("a body without an incident list at all is refused rather than read as calm", () => {
+  assert.throws(() => parseSlackStatus("{}", service), /not a current-status payload/);
+});
+
 test("an open Slack incident is reported, with its severity read from the title", () => {
   const status = parseSlackStatus(fixture("incident"), service);
 

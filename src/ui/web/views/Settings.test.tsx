@@ -1180,3 +1180,87 @@ describe("Settings retention", () => {
     expect(await screen.findByText(/7/)).toBeTruthy();
   });
 });
+
+// Roadmap 4.3. The export is a link (the response is a download), and the
+// import hands the picked file's own bytes to the server — so the body is
+// YAML text, which `interceptWrites` above would try to JSON.parse.
+describe("backup and migration", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("offers the export as a link to the server's own file", async () => {
+    renderWithProviders(<Settings />, fixtures);
+
+    const link = await screen.findByRole("link", { name: i18n.t("settings.backup.export") });
+    expect(link).toHaveAttribute("href", "/config/export");
+  });
+
+  it("sends a picked config.yml as text, and reports what the import did", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const input = await screen.findByLabelText(i18n.t("settings.backup.import"));
+
+    const base = globalThis.fetch as typeof fetch;
+    const sent: { body: string; contentType: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (target: string, init?: RequestInit) => {
+        if (String(target) === "/config/import") {
+          sent.push({
+            body: String(init?.body),
+            contentType: String((init?.headers as Record<string, string> | undefined)?.["content-type"]),
+          });
+          return {
+            ok: true,
+            status: 200,
+            text: async () =>
+              JSON.stringify({
+                added: ["vercel"],
+                updated: ["github"],
+                removed: [],
+                channels: ["telegram"],
+                routingRules: 1,
+                settings: ["pollIntervalMinutes"],
+              }),
+          };
+        }
+        return base(target, init);
+      }),
+    );
+
+    const yaml = "services:\n  - id: vercel\n    name: Vercel\n";
+    await userEvent.upload(input, new File([yaml], "config.yml", { type: "text/yaml" }));
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.body).toBe(yaml);
+    expect(sent[0]?.contentType).toBe("text/yaml");
+    expect(
+      await screen.findByText(i18n.t("settings.backup.imported", { added: 1, updated: 1, removed: 0 })),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the server's own refusal rather than a generic failure", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const input = await screen.findByLabelText(i18n.t("settings.backup.import"));
+
+    const base = globalThis.fetch as typeof fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (target: string, init?: RequestInit) => {
+        if (String(target) === "/config/import") {
+          return {
+            ok: false,
+            status: 400,
+            text: async () =>
+              JSON.stringify({ error: { message: "telegram.botToken must be an environment reference" } }),
+          };
+        }
+        return base(target, init);
+      }),
+    );
+
+    await userEvent.upload(input, new File(["services: []"], "config.yml", { type: "text/yaml" }));
+
+    expect(
+      await screen.findByText(/telegram.botToken must be an environment reference/),
+    ).toBeInTheDocument();
+  });
+});

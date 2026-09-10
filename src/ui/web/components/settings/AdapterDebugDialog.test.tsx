@@ -135,4 +135,21 @@ describe("AdapterDebugDialog", () => {
 
     expect(await screen.findByText(i18n.t("adapter.debug.unknown-warning"))).toBeTruthy();
   });
+
+  // Roadmap 5.13: the diagnose dialog is reachable and escapable by keyboard,
+  // shown rather than assumed from "it is a Radix dialog".
+  it("takes focus, keeps Tab inside, and hands focus back on Escape", async () => {
+    renderWithProviders(<AdapterDebugDialog service={service} />, { adapterDebug });
+    const trigger = screen.getByRole("button", { name: i18n.t("action.debug-adapter") });
+    await userEvent.click(trigger);
+    const dialog = await screen.findByRole("dialog");
+
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    for (let i = 0; i < 6; i += 1) await userEvent.tab();
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.activeElement).toBe(trigger);
+  });
 });

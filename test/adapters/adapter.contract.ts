@@ -69,6 +69,85 @@ async function assertRejectsWithin(promise: Promise<unknown>, deadlineMs: number
   assert.equal(await Promise.race([settled, hung]), "rejected", message);
 }
 
+type Outcome =
+  | { kind: "resolved"; value: unknown }
+  | { kind: "rejected"; error: unknown }
+  | { kind: "hung" };
+
+/**
+ * Both outcomes, rather than one asserted one: a mutated payload may honestly
+ * reject *or* honestly degrade, and only never settling is out of contract.
+ */
+async function settle(promise: Promise<unknown>, deadlineMs: number): Promise<Outcome> {
+  const settled: Promise<Outcome> = promise.then(
+    (value) => ({ kind: "resolved", value }) as const,
+    (error: unknown) => ({ kind: "rejected", error }) as const,
+  );
+  const hung = new Promise<Outcome>((resolve) =>
+    setTimeout(() => resolve({ kind: "hung" }), deadlineMs).unref(),
+  );
+  return Promise.race([settled, hung]);
+}
+
+/**
+ * Swaps the type of every value in the document, leaving its structure alone:
+ * the field an adapter reads is still there, and still where it was, but it now
+ * holds the wrong kind of thing. This is the shape of a provider that changed
+ * its API without changing its endpoint, which is the mutation a hand-written
+ * fixture never covers.
+ *
+ * A document that is not JSON is flattened to its own text instead — the same
+ * failure for a feed or a scraped page: everything the adapter navigates by is
+ * gone, everything it reads is still on screen.
+ */
+function retype(body: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return body.replaceAll("<", " ").replaceAll(">", " ");
+  }
+  const swap = (value: unknown): unknown => {
+    if (Array.isArray(value)) return { items: value.map(swap) };
+    if (value !== null && typeof value === "object") {
+      return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, swap(inner)]));
+    }
+    if (typeof value === "string") return value.length;
+    if (typeof value === "number") return String(value);
+    if (typeof value === "boolean") return !value;
+    return "null";
+  };
+  return JSON.stringify(swap(parsed));
+}
+
+/**
+ * Malformed variants of an adapter's own well-formed body (roadmap 7.7). The
+ * contract kit above asserts the shapes we thought to write a fixture for; these
+ * are generated from the fixture instead, so every adapter is held to the same
+ * property against payloads nobody anticipated.
+ */
+const MUTATIONS: { name: string; mutate: (body: string) => string }[] = [
+  { name: "an empty body", mutate: () => "" },
+  { name: "whitespace alone", mutate: () => "\n  \n" },
+  { name: "a body cut in half", mutate: (body) => body.slice(0, Math.floor(body.length / 2)) },
+  { name: "a bare null", mutate: () => "null" },
+  { name: "an empty array", mutate: () => "[]" },
+  { name: "an empty object", mutate: () => "{}" },
+  { name: "every value re-typed", mutate: retype },
+];
+
+/**
+ * The mutations that leave nothing readable behind. Truncation and re-typing can
+ * legitimately still carry a status word — half a scraped page keeps its banner —
+ * so they assert the weaker property above; these cannot, and an adapter that
+ * answers `operational` to one of them is reporting health it never read.
+ *
+ * An empty *array* is deliberately not one of them: AWS and Google Cloud publish
+ * a flat list of current events, so `[]` is that document saying "nothing is
+ * open", which is a reading rather than an absence of one.
+ */
+const EMPTIED = new Set(["an empty body", "whitespace alone", "a bare null", "an empty object"]);
+
 interface Method {
   name: string;
   call: (service: ServiceRef) => Promise<unknown>;
@@ -225,5 +304,50 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
         );
       },
     );
+  });
+
+  test(`${name}: a malformed payload degrades or rejects, and never hangs`, TEST_OPTS, async () => {
+    const { adapter, service, ok } = harness();
+    for (const mutation of MUTATIONS) {
+      const routes: Routes = Object.fromEntries(
+        Object.entries(ok).map(([path, body]) => [path, mutation.mutate(body)]),
+      );
+      for (const method of methodsOf(adapter)) {
+        await withServer(serve(routes), async (baseUrl) => {
+          const outcome = await settle(method.call(service(baseUrl)), REJECT_DEADLINE_MS);
+          assert.notEqual(outcome.kind, "hung", `${method.name} never settled on ${mutation.name}`);
+          if (outcome.kind === "rejected") {
+            // The poller logs `error.message` and counts the failure; a thrown
+            // string or object would read as "undefined" in that log.
+            assert.ok(
+              outcome.error instanceof Error,
+              `${method.name} threw a non-Error on ${mutation.name}`,
+            );
+            return;
+          }
+          // Degrading is allowed, handing back an unvalidated shape is not.
+          method.schema.parse(outcome.value);
+        });
+      }
+    }
+  });
+
+  test(`${name}: an unreadable payload never reads as operational`, TEST_OPTS, async () => {
+    const { adapter, service, ok } = harness();
+    for (const mutation of MUTATIONS.filter((entry) => EMPTIED.has(entry.name))) {
+      const routes: Routes = Object.fromEntries(
+        Object.entries(ok).map(([path, body]) => [path, mutation.mutate(body)]),
+      );
+      await withServer(serve(routes), async (baseUrl) => {
+        const outcome = await settle(adapter.fetchStatus(service(baseUrl), ctx), REJECT_DEADLINE_MS);
+        if (outcome.kind !== "resolved") return;
+        const status = normalizedStatusSchema.parse(outcome.value);
+        assert.notEqual(
+          status.overallStatus,
+          "operational",
+          `fetchStatus read operational out of ${mutation.name}`,
+        );
+      });
+    }
   });
 }

@@ -1,30 +1,11 @@
 import { Router } from "express";
-import { z } from "zod";
 import type { IncidentRow } from "../historyStore.interface.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
+import { pageSchema, pageSizeSchema, readIncidentQuery } from "./incidentQuery.ts";
 
 /** How many recent polls the incident view's strip shows. */
 const POLL_STRIP_SIZE = 24;
 const ACTION_LOG_LIMIT = 50;
-const DEFAULT_PAGE_SIZE = 20;
-/** An unbounded page size would let one request undo the paging entirely. */
-const MAX_PAGE_SIZE = 100;
-
-/**
- * A bad page number is a stale bookmark or a hand-edited URL, not something
- * worth failing the whole list over: every one of these falls back to the first
- * page of everything rather than a 400, the way the notification feed's limit
- * does.
- */
-const pageSchema = z.coerce.number().int().positive().catch(1);
-const pageSizeSchema = z.coerce
-  .number()
-  .int()
-  .positive()
-  .catch(DEFAULT_PAGE_SIZE)
-  .transform((value) => Math.min(value, MAX_PAGE_SIZE));
-const stateSchema = z.enum(["all", "active", "resolved"]).catch("all");
-
 interface TimelineEntry {
   at: string;
   label: string;
@@ -57,27 +38,28 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
    * statement for all three), and the short active list.
    */
   router.get("/incidents", async (req, res) => {
-    const provider = req.query["provider"];
-    const scope = typeof provider === "string" && provider !== "" ? { providerId: provider } : {};
-    const state = stateSchema.parse(req.query["state"] ?? undefined);
+    // The search and the window narrow the page *and* the counts, so the pills
+    // report what the search found rather than what the fleet has ever had.
+    // The active list below is deliberately outside them: it is the hero card's
+    // data, and a card that vanished while an operator typed a search would
+    // read as "the incident resolved itself".
+    const { provider, state, filter } = readIncidentQuery(req.query, runtime);
     const page = pageSchema.parse(req.query["page"] ?? undefined);
     const pageSize = pageSizeSchema.parse(req.query["pageSize"] ?? undefined);
-    // A disabled provider is not being watched, so its incidents are not news:
-    // the allow-list goes into the query rather than over the answer, because
-    // the page, the pager's total and the pills' counts all come from the
-    // server and would otherwise still be counting it.
-    const providerIds = runtime.enabledProviderIds();
+    const activeScope = {
+      ...(provider === null ? {} : { providerId: provider }),
+      providerIds: runtime.enabledProviderIds(),
+    };
 
     const [active, items, counts] = await Promise.all([
-      runtime.store.listIncidents({ ...scope, providerIds, state: "active" }),
+      runtime.store.listIncidents({ ...activeScope, state: "active" }),
       runtime.store.listIncidents({
-        ...scope,
-        providerIds,
+        ...filter,
         ...(state === "all" ? {} : { state }),
         limit: pageSize,
         offset: (page - 1) * pageSize,
       }),
-      runtime.store.countIncidents({ ...scope, providerIds }),
+      runtime.store.countIncidents(filter),
     ]);
 
     res.json({ active, page: { items, page, pageSize, total: counts[state] }, counts });

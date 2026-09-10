@@ -38,6 +38,13 @@ export interface IncidentFilter {
   providerIds?: string[] | undefined;
   state?: "active" | "resolved" | undefined;
   days?: number | undefined;
+  /**
+   * Free text matched against the incident name, case-insensitively (roadmap
+   * 5.19). Applied in SQL for the same reason `providerIds` is: the list is
+   * paged and counted server-side, so searching a page already in hand would
+   * search 20 rows and report the result as the whole history.
+   */
+  query?: string | undefined;
   limit?: number | undefined;
   /** Rows to skip before the page starts. Honoured with or without a `limit`. */
   offset?: number | undefined;
