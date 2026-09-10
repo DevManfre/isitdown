@@ -133,6 +133,7 @@ npm run coverage         # the same two suites under a coverage floor (server 95
 npm run test:integration # end to end: *.itest.ts — fake provider and webhook receiver
 npm run typecheck        # tsc -p tsconfig.json (server + core) and
                           # tsc -p tsconfig.web.json (dashboard React tree)
+npm run check:bundle     # the built dashboard against its gzipped budget (needs build:ui)
 npm run test:visual      # every view, both themes, both locales, against
                           # test/visual/baseline/ (needs a fresh build:ui)
 ```

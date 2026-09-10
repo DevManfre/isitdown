@@ -55,6 +55,11 @@ jobs:
       - name: Build (smoke check)
         run: npm run build
 
+      # Roadmap 5.16. After the build, because it weighs what the build
+      # emitted: a dependency that quietly doubles the dashboard fails here.
+      - name: Bundle-size budget
+        run: npm run check:bundle
+
       # After the build, because it screenshots the bundle in dist/. The
       # browser is Playwright's cached Chromium, installed here rather than
       # carried as a dependency — the harness drives it over the DevTools

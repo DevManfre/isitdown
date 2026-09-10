@@ -2128,11 +2128,17 @@ npm test                 # node:test suites + vitest run
 npm run coverage         # the same two suites under a coverage floor
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
 npm run test:visual      # visual baselines: every view, both themes, both locales
+npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
 npm run build:light      # tsc + copy assets, excluding src/ui
 npm run build:ui         # tsc + vite build + copy assets
 ```
+
+The bundle budget (roadmap 5.16) weighs what `build:ui` emitted, gzipped,
+because that is what the browser downloads: `410 kB` of JavaScript and `20 kB` of
+CSS, both a little over today's build. It is a ceiling rather than a target —
+when it fails, the answer is to find what grew, not to raise the number.
 
 The coverage floor (roadmap 7.2) is a floor, not a target to game. Two of them,
 because the two suites cover different halves: the server and the engine must
