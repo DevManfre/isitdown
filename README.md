@@ -2125,6 +2125,7 @@ mode.
 
 ```bash
 npm test                 # node:test suites + vitest run
+npm run coverage         # the same two suites under a coverage floor
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
 npm run test:visual      # visual baselines: every view, both themes, both locales
 npm run check:readme     # this file against every README.<lang>.md
@@ -2132,6 +2133,14 @@ npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.js
 npm run build:light      # tsc + copy assets, excluding src/ui
 npm run build:ui         # tsc + vite build + copy assets
 ```
+
+The coverage floor (roadmap 7.2) is a floor, not a target to game. Two of them,
+because the two suites cover different halves: the server and the engine must
+stay at 95% of lines, 88% of branches and 93% of functions, and the dashboard at
+85/75/80 — each a few points under where it stands today, so ordinary movement
+passes and a new subsystem landing with no test of its own drags the total under
+and fails CI. Raise a floor when the suite has genuinely climbed; never lower one
+to make a red run green.
 
 **No test ever touches a live provider.** Adapters are tested against payloads
 recorded from the real status pages and kept under `test/fixtures/`; HTTP behaviour

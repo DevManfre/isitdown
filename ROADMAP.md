@@ -191,7 +191,7 @@ is additive and independently shippable.
 | # | Item | Size | Notes |
 |---|---|---|---|
 | 7.1 ✅ | **Visual regression tests** | M | Playwright screenshots per view, both themes, both locales. The dashboard is now large enough that a CSS token change can quietly wreck a view nobody opened. |
-| 7.2 | **Coverage reporting with a floor** | S | Not a target to game — just a floor that fails when a new subsystem lands untested. |
+| 7.2 ✅ | **Coverage reporting with a floor** | S | Shipped as two floors, because the two suites cover different halves: node:test holds the server and the engine at 95/88/93 (lines/branches/functions) and Vitest the dashboard at 85/75/80, each a few points under where it stands today. `npm run coverage` runs both, and CI runs it in place of the plain unit-test step. |
 | 7.3 | **Mutation testing on the diff engine** | M | The diff engine is the one place where a passing test suite that does not actually constrain behaviour would be dangerous. It is small enough that mutation testing is affordable exactly there. |
 | 7.4 | **Load / soak test** | M | 200 providers, a week of simulated history. Finds the point where the SQLite reads or the overview render fall over. |
 | 7.5 | **Docs split** | S | `README.md` is ~69k and has to be both a landing page and a manual. Splitting into `docs/` with a short README would make both jobs easier — at the cost of the current "everything is in one file" property, which is genuinely nice. |
