@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { DownloadMenu } from "@/components/DownloadMenu.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
@@ -253,31 +254,32 @@ export function Incidents() {
    */
   const feedHref = (format: "xml" | "ics"): string => `/feeds/incidents.${format}?${searchParams()}`;
 
-  const exportControl = (
-    <div className="flex items-center gap-1" role="group" aria-label={t("incidents.export.label")}>
-      <span className="text-xs text-muted-foreground">{t("incidents.export.label")}</span>
-      {(["csv", "json"] as const).map((format) => (
-        <Button key={format} asChild variant="ghost" size="sm" className="h-8 px-2 font-mono text-xs uppercase">
-          <a href={exportHref(format)}>{format}</a>
-        </Button>
-      ))}
-    </div>
-  );
-
-  const subscribeControl = (
-    <div className="flex items-center gap-1" role="group" aria-label={t("incidents.subscribe.label")}>
-      <span className="text-xs text-muted-foreground">{t("incidents.subscribe.label")}</span>
-      {(
-        [
-          ["rss", "xml"],
-          ["ics", "ics"],
-        ] as const
-      ).map(([label, format]) => (
-        <Button key={label} asChild variant="ghost" size="sm" className="h-8 px-2 font-mono text-xs uppercase">
-          <a href={feedHref(format)}>{label}</a>
-        </Button>
-      ))}
-    </div>
+  /**
+   * One menu rather than two rows of format pills (roadmap 4.6 and 4.9): the
+   * export and the feeds are both "take this search away with you", and as
+   * loose ghost buttons they had the same weight as the filters that change
+   * what is on screen. Two labelled sections keep the promises apart — a file
+   * as it is now, against a url that keeps answering.
+   */
+  const takeAwayControl = (
+    <DownloadMenu
+      groups={[
+        {
+          label: t("incidents.export.label"),
+          items: [
+            { format: "CSV", href: exportHref("csv"), description: t("incidents.export.csv") },
+            { format: "JSON", href: exportHref("json"), description: t("incidents.export.json") },
+          ],
+        },
+        {
+          label: t("incidents.subscribe.label"),
+          items: [
+            { format: "RSS", href: feedHref("xml"), description: t("incidents.subscribe.rss") },
+            { format: "ICS", href: feedHref("ics"), description: t("incidents.subscribe.ics") },
+          ],
+        },
+      ]}
+    />
   );
 
   const filterControl = (
@@ -429,8 +431,7 @@ export function Incidents() {
           <div className="flex flex-wrap items-center gap-3">
             {searchControl}
             {filterControl}
-            {exportControl}
-            {subscribeControl}
+            {takeAwayControl}
           </div>
         </div>
 

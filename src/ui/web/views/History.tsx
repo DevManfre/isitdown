@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { DeltaChip } from "@/components/DeltaChip.tsx";
+import { DownloadMenu } from "@/components/DownloadMenu.tsx";
 import { ProviderHistoryDrawer } from "@/components/ProviderHistoryDrawer.tsx";
 import { ProviderTrendRow } from "@/components/ProviderTrendRow.tsx";
 import { MonthColumns } from "@/components/charts/MonthColumns.tsx";
@@ -186,22 +186,31 @@ export function History() {
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => downloadHistoryJson(summary, days)}
-            >
-              {t("history.download", { days })}
-            </Button>
             {/* The CSV is the server's own aggregation rather than this summary
                 flattened here (roadmap 4.6): one row per provider per day is a
                 shape the JSON payload does not have, and deriving it in the
                 browser would be a second definition of a daily bucket. A link,
-                because the answer is a download. */}
-            <Button asChild variant="ghost" size="sm">
-              <a href={`/export/history.csv?days=${days}`}>{t("history.download-csv", { days })}</a>
-            </Button>
+                because the answer is a download; the JSON is built here because
+                the payload on screen already is the answer. */}
+            <DownloadMenu
+              groups={[
+                {
+                  label: t("history.range-active", { days }),
+                  items: [
+                    {
+                      format: "JSON",
+                      description: t("history.download", { days }),
+                      onSelect: () => downloadHistoryJson(summary, days),
+                    },
+                    {
+                      format: "CSV",
+                      description: t("history.download-csv", { days }),
+                      href: `/export/history.csv?days=${days}`,
+                    },
+                  ],
+                },
+              ]}
+            />
           </div>
         </div>
 

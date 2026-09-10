@@ -33,6 +33,7 @@
   "action.history-90d": "90-day history",
   "action.copy-payload": "Copy webhook payload",
   "action.retry": "Try again",
+  "action.download": "Download",
   "action.show-more": "Show more",
 
   "theme.light": "Light",
@@ -129,6 +130,10 @@
   "incidents.window.label": "Time window",
   "incidents.export.label": "Export",
   "incidents.subscribe.label": "Subscribe",
+  "incidents.export.csv": "Export as CSV",
+  "incidents.export.json": "Export as JSON",
+  "incidents.subscribe.rss": "Subscribe by RSS",
+  "incidents.subscribe.ics": "Subscribe by calendar",
   "incidents.window.all": "All time",
   "incidents.window.days": "{count}d",
   "incidents.state.open": "Open",
