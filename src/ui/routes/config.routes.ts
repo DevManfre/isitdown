@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
+import { detectAdapter } from "../../adapters/detect.ts";
+import { CATALOG } from "../../adapters/catalog.ts";
 import { getAdapter } from "../../adapters/index.ts";
 import {
   alertCapSchema,
@@ -30,10 +32,14 @@ import {
   writeSettings,
 } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
+import { exportConfigYaml, importConfigYaml } from "../configFile.ts";
 import { storageReport } from "../storageReport.ts";
 import { ensureVapidKeys } from "../vapidKeys.ts";
 
 const previewComponentsSchema = serviceDefinitionSchema.pick({ adapter: true, baseUrl: true });
+
+/** Whatever the operator pasted into the base url field, before it is a service. */
+const detectSchema = z.object({ url: z.string().min(1).max(2048) });
 
 /**
  * The delivery policy, patchable a field at a time. Partial at every level
@@ -153,6 +159,74 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     });
   });
 
+  /**
+   * The bundled provider catalog (roadmap 5.11), with the ids already in use
+   * marked rather than removed: a first run should read as a menu, and an
+   * entry missing from that menu because it is already watched would look like
+   * a catalog that forgot about it.
+   *
+   * No network and no upstream: the list ships with the image, so this answers
+   * from memory. Detection stays the path for a page the list does not have.
+   */
+  router.get("/config/catalog", (_req, res) => {
+    const taken = new Set(listServices(db).map((service) => service.id));
+    res.json({
+      providers: CATALOG.map((entry) => ({ ...entry, configured: taken.has(entry.id) })),
+    });
+  });
+
+  /**
+   * The whole configuration as a Light edition `config.yml` (roadmap 4.3), as a
+   * download: everything the dashboard configures otherwise lives only inside
+   * one SQLite file, which makes a backup a database copy and "run this fleet in
+   * Light" a retyping exercise.
+   *
+   * Credentials leave as `${VAR}` references, never values — the same thing the
+   * database stores.
+   */
+  router.get("/config/export", (_req, res) => {
+    const day = new Date().toISOString().slice(0, 10);
+    res.setHeader("content-type", "text/yaml; charset=utf-8");
+    res.setHeader("content-disposition", `attachment; filename="isitdown-config-${day}.yml"`);
+    res.send(exportConfigYaml(db, runtime.logger));
+  });
+
+  /**
+   * The same file, read back (roadmap 4.3). Takes the YAML as a text body, or as
+   * `{ yaml }` for a browser that would rather send JSON.
+   *
+   * Validated through the Light edition's own file schema before anything is
+   * written, so a bad file changes nothing. A service the file does not mention
+   * is removed the way the dashboard removes one — soft, restorable, history
+   * intact — because an import is a configuration statement and must not be a
+   * data-loss event.
+   */
+  router.post("/config/import", (req, res) => {
+    const body = req.body;
+    const source =
+      typeof body === "string"
+        ? body
+        : typeof (body as { yaml?: unknown } | undefined)?.yaml === "string"
+          ? ((body as { yaml: string }).yaml)
+          : null;
+    if (source === null || source.trim() === "") {
+      res.status(400).json({ error: { message: "send the config.yml as the request body, or as { yaml }" } });
+      return;
+    }
+
+    let report;
+    try {
+      report = importConfigYaml(db, source, runtime.logger);
+    } catch (error) {
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      return;
+    }
+    res.json(report);
+    // Every provider the import added starts with no history, exactly as if it
+    // had been added through the form.
+    for (const id of report.added) void runtime.backfill.backfillOne(id);
+  });
+
   router.post("/config/services", (req, res) => {
     const parsed = serviceDefinitionSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -199,6 +273,32 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       res.json({ supported: true, components });
     } catch (error) {
       res.status(502).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+    }
+  });
+
+  /**
+   * Which adapter reads the page at a given url, and the base url it wants
+   * (roadmap 1.14). Read-only upstream like the preview above: it records
+   * nothing and notifies nothing, and no service row exists yet.
+   *
+   * A page nothing recognised answers 200 with `adapter: null` and the probes
+   * it tried, the same way the connection test reports a provider that would
+   * not answer: the dashboard asked a question and got an answer, and the
+   * operator can still pick an adapter by hand.
+   */
+  router.post("/config/services/detect", async (req, res) => {
+    const parsed = detectSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+    const { requestTimeoutSeconds } = readSettings(db, runtime.logger);
+    try {
+      res.json(await detectAdapter(parsed.data.url, { timeoutMs: requestTimeoutSeconds * 1000 }));
+    } catch (error) {
+      // Only an unusable url reaches here — every probe failure is an outcome,
+      // not an exception — so this is the request's own fault.
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
     }
   });
 

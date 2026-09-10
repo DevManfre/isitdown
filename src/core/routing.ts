@@ -142,8 +142,14 @@ export function inQuietHours(quiet: QuietHours, at: Date): boolean {
       nowMinutes >= start || nowMinutes < end;
 }
 
+/** How a rule names a group rather than one provider (roadmap 2.6). */
+export const GROUP_PREFIX = "group:";
+
 export interface RoutingRule {
-  /** A provider id, or "*" for every provider. */
+  /**
+   * A provider id, `group:<slug>` for every provider in that group (roadmap
+   * 2.6), or "*" for every provider.
+   */
   provider: string;
   classes: EventClass[];
   minSeverity: SeverityFloor;
@@ -226,6 +232,23 @@ export interface RoutingOptions {
   quietHours?: QuietHours | undefined;
   /** When the change is being evaluated. Defaults to the change's own timestamp. */
   at?: Date | undefined;
+  /**
+   * The group the change's own provider belongs to (roadmap 2.6), so a
+   * `group:` rule can match without this pure evaluator having to be handed the
+   * service list. Absent means the provider is in no group, which no `group:`
+   * rule then matches.
+   */
+  providerGroup?: string | undefined;
+}
+
+/**
+ * Whether one rule's target covers this change's provider: the provider itself,
+ * every provider ("*"), or the group the provider is in.
+ */
+function coversProvider(target: string, providerId: string, group: string | undefined): boolean {
+  if (target === "*") return true;
+  if (target.startsWith(GROUP_PREFIX)) return group !== undefined && target.slice(GROUP_PREFIX.length) === group;
+  return target === providerId;
 }
 
 /**
@@ -264,7 +287,7 @@ export function explain(
       outcomes.push({ kind: "unreached" });
       continue;
     }
-    if (rule.provider !== "*" && rule.provider !== change.providerId) {
+    if (!coversProvider(rule.provider, change.providerId, options.providerGroup)) {
       outcomes.push({ kind: "skipped", because: "provider" });
       continue;
     }

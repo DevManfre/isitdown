@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { RadialBar, RadialBarChart, PolarAngleAxis } from "recharts";
 import { ChartContainer } from "@/components/ui/chart.tsx";
-import { chartConfigFor, statusColor, statusFill } from "@/lib/chartConfig.ts";
+import { chartConfigFor, statusColor, statusFill, statusLabelKey } from "@/lib/chartConfig.ts";
 import { faviconCandidates } from "@/lib/favicon.ts";
 import type { ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
@@ -21,6 +22,7 @@ import { cn } from "@/lib/utils.ts";
 export function UptimeRing({
   provider, delay, size = 80,
 }: { provider: ProviderStatus; delay?: string; size?: number }) {
+  const { t, i18n } = useTranslation();
   const candidates = faviconCandidates(provider.baseUrl);
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -57,6 +59,14 @@ export function UptimeRing({
           config={chartConfigFor()}
           className="anim-ring"
           style={{ width: size, height: size }}
+          // The ring's only statement is its colour and its arc, and the tile's
+          // visible text is the provider's name alone — so without this the
+          // status and the uptime were sighted-only (roadmap 5.13).
+          role="img"
+          aria-label={t("chart.ring-summary", {
+            status: t(statusLabelKey(provider.overallStatus)),
+            uptime: new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 2 }).format(provider.uptime90),
+          })}
         >
           <RadialBarChart
             data={[{ name: provider.id, value }]}

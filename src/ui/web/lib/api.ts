@@ -1,8 +1,11 @@
 import type {
   AdapterDebugResponse,
+  AdapterDetection,
   AdapterProbeResult,
+  CatalogProvider,
   ComponentHistoryResponse,
   ComponentPreview,
+  ConfigImportReport,
   DeliveryLogResponse,
   DeliveryState,
   DescribedChannel,
@@ -34,12 +37,16 @@ import type { PushSubscriptionBody } from "./push.ts";
  * routes like `/incidents/github/xyz`, where a relative `./status` would
  * resolve against the wrong base.
  */
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, contentType?: string): Promise<T> {
   const response = await fetch(path, {
     method,
     ...(body === undefined
       ? {}
-      : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+      : contentType === undefined
+        ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }
+        // The config import sends the file's own bytes (roadmap 4.3), so the
+        // body is text and the type says which text it is.
+        : { headers: { "content-type": contentType }, body: String(body) }),
   });
   const text = await response.text();
   // A non-JSON body (an empty string, an upstream proxy's HTML error page, a
@@ -88,6 +95,10 @@ export const getComponentHistory = (provider: string, days: number) =>
 export interface IncidentListQuery {
   provider?: string | undefined;
   state?: IncidentState | undefined;
+  /** Free text over incident names; the server searches, not the browser. */
+  q?: string | undefined;
+  /** Only incidents that started within this many days. Absent = every one. */
+  days?: number | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
 }
@@ -156,6 +167,17 @@ export const previewComponents = (body: unknown) =>
     "/config/services/preview-components",
     body,
   );
+/**
+ * Reads a `config.yml` back into the dashboard (roadmap 4.3). Sent as text
+ * rather than wrapped in JSON: what the operator picked is the file itself.
+ */
+export const importConfig = (yaml: string) =>
+  request<ConfigImportReport>("POST", "/config/import", yaml, "text/yaml");
+/** The bundled provider menu, with the ids already watched marked (roadmap 5.11). */
+export const getCatalog = () => request<{ providers: CatalogProvider[] }>("GET", "/config/catalog");
+/** Which adapter reads a pasted url, and the base url that adapter wants. */
+export const detectAdapter = (url: string) =>
+  request<AdapterDetection>("POST", "/config/services/detect", { url });
 export const patchService = (id: string, patch: unknown) =>
   request<unknown>("PATCH", `/config/services/${encodeURIComponent(id)}`, patch);
 /** Read before the remove, so the confirmation can name what the cascade takes. */

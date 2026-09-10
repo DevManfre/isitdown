@@ -249,3 +249,55 @@ test("status hands the dashboard the deadline the scheduler will actually fire o
     await app.close();
   }
 });
+
+// Roadmap 2.6. The composite is the server's, so the dashboard paints one
+// number rather than deriving a second one that can disagree with the rows.
+test("/status derives a group's status from its members' readings", async () => {
+  const app = await api();
+  try {
+    const ids = app.runtime.listAllServices().map((service) => service.id);
+    const [first, second] = ids as [string, string];
+    updateService(app.runtime.db, first, { group: "deploy-path" });
+    updateService(app.runtime.db, second, { group: "deploy-path" });
+
+    await app.runtime.store.saveStatus({
+      provider: first,
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    });
+    await app.runtime.store.saveStatus({
+      provider: second,
+      overallStatus: "partial_outage",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    });
+
+    const { body } = await app.get("/status");
+    const groups = (body as { groups: { id: string; status: string; providers: string[]; affected: string[] }[] })
+      .groups;
+
+    assert.deepEqual(
+      groups.map((group) => [group.id, group.status]),
+      [["deploy-path", "partial_outage"]],
+    );
+    assert.deepEqual(groups[0]?.providers.sort(), [first, second].sort());
+    assert.deepEqual(groups[0]?.affected, [second]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("/status reports no groups while the fleet is flat", async () => {
+  const app = await api();
+  try {
+    const { body } = await app.get("/status");
+    assert.deepEqual((body as { groups: unknown[] }).groups, []);
+  } finally {
+    await app.close();
+  }
+});

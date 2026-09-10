@@ -40,4 +40,14 @@ describe("base.css", () => {
   it("does not pretend to cover the role-based clickables", () => {
     expect(code).not.toMatch(/\[role="(option|menuitem)"\]/);
   });
+
+  it("gives everything focusable a visible focus ring, at zero specificity", () => {
+    // The floor under the hand-written clickables (a provider row, a ring
+    // tile), which carry no primitive's ring of their own. `:where()` matters:
+    // at any real specificity this would override the rings that do exist.
+    expect(css).toMatch(/:where\(a, button, summary, \[tabindex\][^)]*\)[^{]*:focus-visible/);
+    const rule = css.slice(css.indexOf(":focus-visible"));
+    expect(rule).toMatch(/outline:\s*2px solid var\(--ring\)/);
+    expect(rule).toMatch(/outline-offset/);
+  });
 });

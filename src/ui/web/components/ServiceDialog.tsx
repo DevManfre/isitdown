@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentPicker, type ComponentPickerEntry, type ComponentPickerSelection } from "@/components/ComponentPicker.tsx";
-import { useServiceMutations } from "@/hooks/queries.ts";
+import { useCatalog, useConfig, useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
-import { previewComponents } from "@/lib/api.ts";
+import { detectAdapter, previewComponents } from "@/lib/api.ts";
 import { slugify } from "@/lib/slugify.ts";
-import type { ServiceDefinition } from "@/lib/types.ts";
+import type { CatalogProvider, ServiceDefinition } from "@/lib/types.ts";
 
 const ADAPTERS = [
   "statuspage",
@@ -103,6 +103,7 @@ export function ServiceDialog({
   const { add, patch, test } = useServiceMutations();
 
   const [open, setOpen] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState("");
   const [name, setName] = useState(service?.name ?? "");
   const [adapter, setAdapter] = useState<string>(ADAPTERS[0]);
   const [baseUrl, setBaseUrl] = useState(service?.baseUrl ?? "");
@@ -111,6 +112,9 @@ export function ServiceDialog({
   // Kept as the typed string, not a number: an empty field is what "follow the
   // global cadence" looks like, and 0/NaN cannot express it.
   const [intervalMinutes, setIntervalMinutes] = useState(intervalValue(service));
+  // "My stack" (roadmap 2.6). A free-text slug rather than a picker: the first
+  // group has to be creatable, and a select with nothing in it cannot do that.
+  const [group, setGroup] = useState(service?.group ?? "");
   // Adapter-specific extras, of which the scrape adapter is so far the only
   // user. Kept as the raw record the service definition carries, rather than as
   // named fields, so an adapter that grows an option later needs no new state.
@@ -119,8 +123,20 @@ export function ServiceDialog({
     { supported: boolean; components: ComponentPickerEntry[] } | undefined
   >(undefined);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  // Only while adding, and only while the dialog is open: an edit already has
+  // every answer the menu would offer.
+  const { data: catalog } = useCatalog(open && mode === "add");
+  const { data: config } = useConfig();
+  const existingGroups = [
+    ...new Set(
+      (config?.services ?? [])
+        .map((entry) => entry.group)
+        .filter((entry): entry is string => typeof entry === "string" && entry !== ""),
+    ),
+  ].sort();
 
   // Hand-typing the id was busywork with a failure mode: the schema only
   // accepts `/^[a-z0-9][a-z0-9-]*$/`, so anything an operator typed naturally
@@ -156,16 +172,19 @@ export function ServiceDialog({
   // now), so a fresh open needs its own reset — otherwise a cancelled edit's
   // half-typed field would still be sitting there next time.
   const resetForm = (): void => {
+    setCatalogQuery("");
     setName(service?.name ?? "");
     setAdapter(ADAPTERS[0]);
     setBaseUrl(service?.baseUrl ?? "");
     setSelection(service?.components ?? []);
     setScopeToComponents(service?.scopeToComponents ?? false);
     setIntervalMinutes(intervalValue(service));
+    setGroup(service?.group ?? "");
     setOptions(service?.options ?? {});
     setPreview(undefined);
     setMessage(undefined);
     setSaving(false);
+    setDetecting(false);
   };
 
   // Radix's own `onOpenChange` only fires from its wrapped setter — Escape,
@@ -202,6 +221,60 @@ export function ServiceDialog({
     }
   };
 
+  /**
+   * A catalog pick fills in the three fields an operator cannot be expected to
+   * know (roadmap 5.11): the adapter, the base url that adapter wants, and the
+   * name the id is derived from. Nothing is saved by picking — the form is the
+   * same form, filled in, so an operator can still change any of it before
+   * adding.
+   */
+  const pick = (entry: CatalogProvider): void => {
+    setName(entry.name);
+    setAdapter(entry.adapter);
+    setBaseUrl(entry.baseUrl);
+    // The component list belongs to the adapter it was loaded for, the way a
+    // detection invalidates it.
+    setPreview(undefined);
+    setMessage(undefined);
+  };
+
+  const catalogMatches = (catalog?.providers ?? []).filter((entry) =>
+    catalogQuery.trim() === ""
+      ? true
+      : `${entry.name} ${entry.id}`.toLowerCase().includes(catalogQuery.trim().toLowerCase()),
+  );
+
+  /**
+   * Asks the pasted url which adapter reads it, and fills in both fields from
+   * the answer (roadmap 1.14). Nine adapters and nine base-url conventions are
+   * only obvious to whoever wrote them; the page itself knows.
+   *
+   * A page nothing recognised leaves the form exactly as it was: the operator
+   * was going to pick by hand anyway, and clearing their typing would be the
+   * one outcome worse than not helping.
+   */
+  const runDetect = async (): Promise<void> => {
+    setDetecting(true);
+    setMessage(undefined);
+    try {
+      const result = await detectAdapter(baseUrl.trim());
+      if (result.adapter === null || result.baseUrl === null) {
+        setMessage({ text: t("add.detect-none"), tone: "error" });
+        return;
+      }
+      setAdapter(result.adapter);
+      setBaseUrl(result.baseUrl);
+      // The component list belongs to the adapter that was selected when it was
+      // loaded, so a detection that changes the adapter invalidates it.
+      setPreview(undefined);
+      setMessage({ text: t("add.detect-ok", { adapter: result.adapter }), tone: "info" });
+    } catch (error) {
+      setMessage({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+    } finally {
+      setDetecting(false);
+    }
+  };
+
   const runConnectionTest = async (): Promise<void> => {
     if (service === undefined) return;
     const result = await test.mutateAsync(service.id);
@@ -220,6 +293,9 @@ export function ServiceDialog({
       if (mode === "add") {
         await add.mutateAsync({
           id, name, adapter, baseUrl, enabled: true, components: selection, scopeToComponents,
+          // Omitted rather than empty: "in no group" is the field being absent,
+          // and an empty string is not a slug the schema would take.
+          ...(slugify(group) === "" ? {} : { group: slugify(group) }),
           // Omitted entirely for the adapters that take none: an empty record
           // would be stored as one, and `undefined` is what "this adapter has
           // no extras" looks like everywhere else.
@@ -246,6 +322,9 @@ export function ServiceDialog({
             // Null, not omitted: a cleared field has to travel as an instruction
             // to forget the interval, or the row keeps the one it had.
             intervalMinutes: intervalMinutes.trim() === "" ? null : Number(intervalMinutes),
+            // Same rule for the group: cleared means "out of the group", which
+            // only null can say (roadmap 2.6).
+            group: slugify(group) === "" ? null : slugify(group),
           ...(scraping ? { options: usedOptions(options) } : {}),
           },
         });
@@ -267,6 +346,55 @@ export function ServiceDialog({
             {mode === "add" && <DialogDescription>{t("add.subtitle")}</DialogDescription>}
           </DialogHeader>
           <DialogBody>
+            {/* The menu the first run starts from: a bundled list is the half
+                of "add a provider" that detection cannot cover, since
+                detection needs a url and this needs only a name. Above the
+                fields rather than behind a tab, because filling them in by
+                hand is the fallback now, not the default. */}
+            {mode === "add" && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label id="catalog-label">{t("catalog.label")}</Label>
+                  <Input
+                    id="catalog-search"
+                    type="search"
+                    className="h-8 w-40"
+                    value={catalogQuery}
+                    placeholder={t("catalog.search-placeholder")}
+                    aria-label={t("catalog.search-label")}
+                    onChange={(event) => setCatalogQuery(event.target.value)}
+                  />
+                </div>
+                <div
+                  role="group"
+                  aria-labelledby="catalog-label"
+                  className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-dashed border-border p-2"
+                >
+                  {catalogMatches.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">{t("catalog.empty")}</span>
+                  ) : (
+                    catalogMatches.map((entry) => (
+                      <Button
+                        key={entry.id}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7"
+                        // Already watched: still listed, so the menu never
+                        // looks like it forgot a provider, but adding it again
+                        // would only earn a 409.
+                        disabled={entry.configured}
+                        onClick={() => pick(entry)}
+                      >
+                        {entry.name}
+                      </Button>
+                    ))
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">{t("catalog.hint")}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="service-name">{t("field.name")}</Label>
@@ -306,7 +434,22 @@ export function ServiceDialog({
             )}
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="service-base-url">{t("field.base-url")}</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="service-base-url">{t("field.base-url")}</Label>
+                {/* Add mode only: an existing service already has both answers,
+                    and re-detecting one would offer to overwrite them. */}
+                {mode === "add" && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={detecting || baseUrl.trim() === ""}
+                    onClick={() => void runDetect()}
+                  >
+                    {t("action.detect-adapter")}
+                  </Button>
+                )}
+              </div>
               <Input
                 id="service-base-url"
                 className="font-mono"
@@ -352,6 +495,31 @@ export function ServiceDialog({
                 </div>
               </div>
             )}
+
+            {/* Roadmap 2.6. Typed, not picked: the first group has to be
+                creatable, and a select with nothing in it cannot create one.
+                Slugified on the way out, the way the id is, so "Deploy path"
+                is a legal group rather than a rejected write. */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="service-group">{t("field.group")}</Label>
+              <Input
+                id="service-group"
+                list="service-group-options"
+                placeholder={t("field.group-placeholder")}
+                value={group}
+                onChange={(event) => setGroup(event.target.value)}
+                {...fieldProps}
+              />
+              {/* The groups that already exist, offered rather than imposed:
+                  an operator adding the fifth provider to a stack should not
+                  have to remember how they spelled it. */}
+              <datalist id="service-group-options">
+                {existingGroups.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+              <span className="text-xs text-muted-foreground">{t("field.group-hint")}</span>
+            </div>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="service-interval">{t("field.provider-interval")}</Label>

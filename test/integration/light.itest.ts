@@ -224,26 +224,43 @@ test("a broken configuration refuses to build and says why", async () => {
 
 test("the entrypoint stays alive between cycles and shuts down cleanly on SIGTERM", async () => {
   const h = await harness();
-  try {
-    const child = spawn(process.execPath, ["src/light/index.ts"], {
-      env: { ...process.env, CONFIG_PATH: h.configPath, DATA_PATH: h.dataPath, LOG_LEVEL: "info" },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    const exited = new Promise<number | null>((resolve) => child.on("exit", (code) => resolve(code)));
-    let output = "";
-    child.stdout.on("data", (chunk: Buffer) => {
-      output += chunk.toString("utf8");
-    });
+  const child = spawn(process.execPath, ["src/light/index.ts"], {
+    env: { ...process.env, CONFIG_PATH: h.configPath, DATA_PATH: h.dataPath, LOG_LEVEL: "info" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const exited = new Promise<number | null>((resolve) => child.on("exit", (code) => resolve(code)));
+  let output = "";
+  child.stdout.on("data", (chunk: Buffer) => {
+    output += chunk.toString("utf8");
+  });
 
-    // Long enough for the first cycle to finish, far short of the one-minute
-    // interval: a process that exits in this window has stopped polling for good.
-    await new Promise((resolve) => setTimeout(resolve, 2500));
+  try {
+    // Waited for, not slept through. A fixed window was both slower than it
+    // needed to be and wrong under load: a busy machine (a parallel build, the
+    // rest of this suite) took longer than 2.5s to finish the first cycle, and
+    // the assertion then failed on a poller that was working fine. Polling for
+    // the line the cycle actually prints is the same check without the race.
+    const deadline = Date.now() + 30_000;
+    while (!/poll cycle finished/.test(output) && child.exitCode === null && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    // Checked in this order on purpose: an early exit is a different failure
+    // from a cycle that never finished, and its own message names the reason.
     assert.equal(child.exitCode, null, `the poller exited early: ${output}`);
-    assert.match(output, /poll cycle finished/);
+    assert.match(output, /poll cycle finished/, `no cycle finished within 30s: ${output}`);
 
     child.kill("SIGTERM");
     assert.equal(await exited, 0, "SIGTERM must be a clean shutdown");
   } finally {
+    // Outside the assertions, and before the harness: a failed assertion used
+    // to leave this child polling, and node:test then waited on it forever
+    // instead of reporting the failure — one flaky assertion hung the whole
+    // integration run.
+    if (child.exitCode === null) {
+      child.kill("SIGKILL");
+      await exited;
+    }
     await h.close();
   }
 });

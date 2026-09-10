@@ -44,6 +44,8 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
   - [3.6 Notification channels](#36-notification-channels)
   - [3.7 Notification routing](#37-notification-routing)
   - [3.8 Delivery policy — quiet hours, digests, caps](#38-delivery-policy--quiet-hours-digests-caps)
+  - [3.9 Validating a config.yml — the check command](#39-validating-a-configyml--the-check-command)
+  - [3.10 Provider groups — my stack](#310-provider-groups--my-stack)
 - [4. Docker](#4-docker)
   - [4.1 Images and build targets](#41-images-and-build-targets)
   - [4.2 Compose profiles](#42-compose-profiles)
@@ -65,6 +67,7 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
 - [8. Theming and localisation](#8-theming-and-localisation)
   - [8.1 Themes](#81-themes)
   - [8.2 Localisation](#82-localisation)
+  - [8.3 Accessibility](#83-accessibility)
 - [9. Development](#9-development)
   - [9.1 Repo structure](#91-repo-structure)
   - [9.2 Tech stack](#92-tech-stack)
@@ -395,6 +398,17 @@ entry with `adapter: statuspage`. Verified:
 `status.anthropic.com` issues a 301 to `status.claude.com`. The adapter follows
 redirects so either works; the canonical host avoids the extra hop.
 
+The UI edition also ships a **bundled catalog** of well-known providers (roadmap
+5.11): the add dialog opens on a menu of names, and one pick fills in the
+adapter, the base URL and the id. Every entry in `src/adapters/catalog.ts` was
+confirmed by running the detection against the page, so what the menu offers is
+what an adapter actually reads. Providers whose status page refuses an automated
+read (Stripe, GitLab, Zendesk, Okta) are deliberately absent rather than listed
+and broken — for those, and for anything else the list does not have, paste the
+URL and let detection (`POST /config/services/detect`) name the adapter. An entry already
+watched stays in the menu, marked, rather than disappearing from it. Served as
+`GET /config/catalog`.
+
 The provider's own `status.indicator` maps onto the internal severity model:
 
 | Statuspage indicator | IsItDown status |
@@ -700,7 +714,7 @@ change. Each rule has four parts:
 
 ```yaml
 routing:
-  - provider: "*"            # a service id, or "*" for every provider
+  - provider: "*"            # a service id, `group:<slug>` (§3.10), or "*" for every provider
     classes: [status, incident]  # any of: status, incident, maintenance, monitoring
     minSeverity: major_outage  # any | degraded | partial_outage | major_outage
     channels: [telegram]       # channel ids, or "*" for every enabled channel; [] mutes
@@ -785,6 +799,98 @@ all, so it keeps receiving a message per update.
 The Light edition configures all four as the `delivery` block above; the UI
 edition edits them under **Settings → Delivery**, where each row applies on its
 own without a restart.
+
+### 3.9 Validating a `config.yml` — the `check` command
+
+Validating a file by starting the container and reading its logs tells you about
+the first problem only, and costs a container to learn it. `check` reads the same
+file through the same loader and prints *every* problem, then exits non-zero:
+
+```bash
+node dist/light/check.js ./config.yml
+#   ./config.yml is valid — 4 services (3 enabled), channels: telegram, file only, no provider read
+
+docker exec isitdown-light node dist/light/check.js; echo "exit=$?"
+#   /app/config/config.yml is valid — 4 services (4 enabled), channels: telegram, ...
+#   exit=0
+```
+
+With no path it reads `$CONFIG_PATH`, the way the container does. From a source
+checkout, `npm run check:config -- ./config.yml` runs the same command without a
+build.
+
+What it reports, all in one pass:
+
+| Finding | Level |
+|---|---|
+| File missing, unreadable, or not valid YAML | error |
+| Anything the schema rejects (missing key, bad interval, malformed base url) | error |
+| A `${VAR}` reference with no value in the environment — **every** one, named | error |
+| The same service `id` declared twice | error |
+| An enabled channel whose required setting is empty | error |
+| A routing rule naming a provider or channel the file does not define | error |
+| A service naming an `adapter` that does not exist, with the known ones listed | error |
+| With `--probe`: a base url no adapter recognises | error |
+| With `--probe`: a page that looks like a different adapter than the file names | warning |
+
+Warnings are printed and do not fail the check — the `html` adapter is a
+defensible choice for a page that also serves a Statuspage summary.
+
+`--probe` reads each enabled provider's page (disabled ones are left alone, since
+the file already says to) and asks which adapter recognises it, using the same
+detection the UI edition's add-provider form uses. It is off by default: a check
+that reaches the network is not something CI can depend on, and every other
+finding above is answerable from the file alone.
+
+Exit codes: `0` valid, `1` at least one error, `2` the command itself was called
+wrong (unknown option, two paths). That makes it CI-able for the operator rather
+than only for us:
+
+```yaml
+- run: docker run --rm -v ./config.yml:/app/config/config.yml:ro \
+    ghcr.io/devmanfre/isitdown:light-latest node dist/light/check.js
+```
+
+### 3.10 Provider groups — "my stack"
+
+A flat fleet answers "is GitHub healthy" and never "is my deploy path healthy",
+which is the question an operator actually has: four providers they do not care
+about individually, and one answer they do. A group is a slug a provider carries
+(roadmap 2.6) — in `config.yml`:
+
+```yaml
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    group: deploy-path
+  - name: Cloudflare
+    id: cloudflare
+    adapter: statuspage
+    baseUrl: https://www.cloudflarestatus.com
+    group: deploy-path
+```
+
+— and, in the UI edition, the **Group** field on a service, with the groups that
+already exist offered as you type.
+
+Two things follow from it:
+
+- **A combined status.** The Overview grows a "My stack" band, one tile per
+  group, in the group's own status: the worst member wins, and the tile names the
+  members behind it. `unknown` is not a severity — the same rule the diff engine
+  and the routing floors already follow — so one silent provider cannot hold a
+  healthy stack at `unknown`, and only a group with nothing readable at all reads
+  that way. A disabled provider leaves its group entirely: nobody is polling it,
+  so it cannot make a stack unhealthy. The composite is derived by the server
+  (`/status`'s `groups`), never recomputed in the browser, so the tile and the
+  rows under it cannot disagree.
+- **One routing rule for the whole stack.** A rule's `provider` accepts
+  `group:deploy-path`, which covers every member — and keeps covering them when
+  the stack gains a fifth provider, which four hard-coded ids never would. The
+  dashboard's routing table offers the groups above the individual providers, and
+  the dry run evaluates them with the picked provider's own group.
 
 ---
 
@@ -1196,15 +1302,23 @@ back reports a parse failure instead of the real problem.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/health` | Liveness. `{ status, providers, lastCycleAt }`. |
-| `GET` | `/status` | Current status of every provider, plus last and next poll, plus `maintenance: { active, upcoming }` — windows running now and windows whose `startsAt` is still in the future; a window that has already ended but is still in the stored payload appears in neither list. A pure database read — safe to poll every 30s, which the dashboard does. Never reaches upstream. |
+| `GET` | `/status` | Current status of every provider, plus last and next poll, plus `maintenance: { active, upcoming }` — windows running now and windows whose `startsAt` is still in the future; a window that has already ended but is still in the stored payload appears in neither list. A pure database read — safe to poll every 30s, which the dashboard does. Never reaches upstream. Also carries `groups` — one entry per provider group with its derived status, members and affected members (roadmap 2.6, §3.10). |
 | `GET` | `/history?provider=&days=` | Pre-aggregated daily buckets, 7/30/90-day uptime, month columns. `days` accepts `7`, `30` or `90`; anything else is a 400 naming them. Without `provider`, a summary across all of them. |
-| `GET` | `/incidents?provider=&state=&page=&pageSize=` | One page of the incident list: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` is `all` (default), `active` or `resolved`; `pageSize` defaults to 20 and is capped at 100. A nonsense `page`, `pageSize` or `state` falls back to the first page of everything rather than a 400. `counts` carries all three states whatever the filter, and `active` is the open list the dashboard's hero card shows on every page. |
+| `GET` | `/incidents?provider=&state=&q=&days=&page=&pageSize=` | One page of the incident list: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` is `all` (default), `active` or `resolved`; `q` searches incident names, case-insensitively, and `days` keeps only incidents that started within that window (both narrow the page **and** the counts); `pageSize` defaults to 20 and is capped at 100. A nonsense `page`, `pageSize`, `state`, `q` or `days` falls back to the first page of everything rather than a 400. `counts` carries all three states whatever the filter, and `active` is the open list the dashboard's hero card shows on every page — outside the search, so a card cannot vanish while the operator types. |
 | `GET` | `/incidents/:providerId/:incidentId` | Detail: the incident, the observed timeline, the action log of what was sent, the provider's other open incidents, and the last 24 polls. |
+| `GET` | `/export/incidents.csv?provider=&state=&q=&days=` | The incident search's own result as a download — the same filters `/incidents` takes, without paging: `provider_id,incident_id,name,impact,status,started_at,updated_at,resolved_at`. RFC 4180, so a name carrying a comma, a quote or a newline stays one field. Capped at 20 000 rows; a capped export answers with `X-IsItDown-Truncated: true` rather than looking complete. |
+| `GET` | `/export/incidents.json?provider=&state=&q=&days=` | The same rows as `{ generatedAt, filter, count, truncated, incidents }` — `filter` echoes what the export was taken with, so a file found later still says what it is. |
+| `GET` | `/export/history.csv?provider=&days=` | Uptime history as one row per provider per day: `provider_id,day,worst_status,uptime_pct`. `days` accepts `7`, `30` or `90`, like `/history`; `provider` narrows to one (`404` on an unknown id), and without it, every enabled provider. |
+| `GET` | `/export/history.json?provider=&days=` | The same window as `{ generatedAt, days, providers }`, each provider carrying the buckets, the daily series and the window's percentages the charts are drawn from. |
 | `GET` | `/maintenances?provider=&days=` | Declared maintenance windows — running, upcoming and past — as `{ maintenances }`. `days` bounds how far back a closed window is still returned (default 90, max 365); `provider` narrows to one. Without `provider`, every enabled provider. |
 | `GET` | `/notifications?limit=` | What was actually sent, newest first. Capped at 200. |
 | `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | One page of the delivery log: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` is `all` (default), `sent` or `failed`; `channel` narrows to one channel; `pageSize` defaults to 25 and is capped at 200. A nonsense `page`, `pageSize` or `state` falls back rather than 400s. `counts` carries every outcome whatever the filter. Each item carries `attempts`: a failed send with more than one is a dead letter. |
 | `GET` | `/config` | Services, polling settings (`adaptivePolling` and `adaptiveIntervalMinutes` included), `retention`, `delivery` (quiet hours, digest, cap, `updateInPlace` — see [3.8](#38-delivery-policy--quiet-hours-digests-caps)), channels, routing, and `removed` — providers taken out but still restorable. Channel credentials appear as variable **names** with an `isSet` flag — never values. |
+| `GET` | `/config/export` | The whole configuration as a Light edition `config.yml`, as a download (roadmap 4.3) — polling, delivery, services, routing and channels. Credentials leave as `${VAR}` references, never values, and `webpush` is skipped: a browser subscription has no meaning in an edition with no browser. The file starts the Light image as it stands. |
+| `POST` | `/config/import` | The same file, read back. Takes the YAML as the request body (`text/yaml`) or as `{ yaml }`. Validated through the Light edition's own file schema before anything is written, so a bad file changes nothing; a literal credential is refused outright. A service the file does not mention is removed the way the dashboard removes one — soft, restorable, history intact — and an absent `routing` block leaves the rules alone. Answers `{ added, updated, removed, channels, routingRules, settings }`. |
+| `GET` | `/config/catalog` | The bundled provider catalog (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Answered from memory — the list ships with the image, so there is no upstream to be down and nothing to keep in sync. `configured` marks an id already watched: the row stays in the menu saying so rather than disappearing from it. Detection stays the path for a page the list does not have. |
 | `POST` | `/config/services` | Add a service. `201`, or `409` on a duplicate id, or `400` naming the invalid field. |
+| `POST` | `/config/services/detect` | Which adapter reads the page at `{ url }`, and the base URL that adapter wants: `{ adapter, baseUrl, probes }`. Tries the shapes IsItDown already reads, in order (Statuspage's `/api/v2/summary.json`, Instatus's `/summary.json`, Better Stack's `/index.json`, then a feed), and recognises the four single-provider adapters by host with no request at all. A page nothing recognised is a `200` with `adapter: null` and the probes it tried — only an unusable URL is a `400`. Records nothing and notifies nothing. |
 | `PATCH` `DELETE` | `/config/services/:id` | Edit, or remove. A removal is a **soft delete**: the provider leaves the dashboard and the poll cycle at once, and the response says how long it stays restorable (`{ removed, removedAt, restoreUntil }`). `404` on an id that is unknown or already removed. |
 | `POST` | `/config/services/:id/restore` | Undo a removal inside its window. Nothing was taken, so nothing is rebuilt; the gap in history from the days it was removed is backfilled. `404` if it is not a removed service. |
 | `DELETE` | `/config/services/:id/permanently` | The destructive half, on its own path so nothing reaches it by accident: cascades to that provider's samples, incidents, maintenances, state and routing rules. This also happens on its own once the restore window closes. |
@@ -1682,6 +1796,36 @@ Shipping: `en` and `it`. Locale resolution is the stored preference, then `en`.
 > The Italian strings were written alongside the implementation and have not had a
 > native review.
 
+### 8.3 Accessibility
+
+The dashboard is one operator's console, and that operator may be using a
+keyboard, a screen reader, a high-contrast setting, or all three (roadmap 5.13).
+What is guaranteed, and checked:
+
+- **Contrast.** Every status colour used as *text* clears WCAG AA (4.5:1) against
+  both the page and the card, in both themes — `src/ui/web/css/tokens.test.ts`
+  computes the ratios from `tokens.css`, so a palette tweak that breaks one
+  fails the suite rather than shipping. The audit found two real defects in the
+  dark theme: a partial outage and a major one were the same colour, and the
+  status *label* read from the near-background grey the unsampled uptime bars
+  want (1.3:1 — no text at all). Both are fixed; the bars keep their grey as a
+  separate `-fill` token.
+- **Keyboard.** Every dialog rides Radix's contract — focus moves in on open,
+  Tab stays trapped, Escape closes, focus returns to the trigger — and the
+  dialogs that accumulated (service add/edit, remove, diagnose, routing rules)
+  each have a test that shows it rather than assuming it. Hand-written
+  clickables (a provider row, a ring tile) get a visible focus ring from
+  `base.css` at zero specificity, under whatever ring a primitive already has.
+- **Charts.** A run of coloured bars says nothing out loud, so the uptime bars,
+  the component strip, the poll strip, the sparkline and the provider ring each
+  carry a one-sentence summary ("Daily status over 90 days: 84 operational, 3
+  with issues, 3 not measured"), in the active locale. A status dot is hidden
+  from the accessibility tree wherever the status is written beside it, and
+  carries the status in words wherever it is not.
+- **Motion.** `prefers-reduced-motion: reduce` flattens every entry animation,
+  hover travel and pulse in `motion.css`, and the views that animate in
+  JavaScript check the same query.
+
 ---
 
 ## 9. Development
@@ -1700,6 +1844,7 @@ isitdown/
 │   │   ├── config.schema.ts            zod schemas shared by the file loader and the UI's settings writes
 │   │   ├── status.schema.ts            validation for a persisted NormalizedStatus
 │   │   ├── poller.ts                   one cycle: stagger, retry, isolation, failure accounting
+│   │   ├── groups.ts                   provider groups: the composite status a group reports (§3.10)
 │   │   ├── diffEngine.ts               the sole authority on whether a notification fires
 │   │   ├── notificationDispatcher.ts   the only caller of Notifier.send
 │   │   ├── scheduler.ts                the loop; re-reads config every cycle
@@ -1709,6 +1854,7 @@ isitdown/
 │   │       ├── en.json                 source locale
 │   │       └── it.json
 │   ├── adapters/                      (shared)
+│   │   ├── catalog.ts                  bundled catalog of well-known providers
 │   │   ├── statuspage.adapter.ts       generic Atlassian Statuspage adapter
 │   │   ├── rss.adapter.ts              generic RSS / Atom incident-feed adapter
 │   │   ├── slack.adapter.ts            Slack's own status API
@@ -1729,10 +1875,12 @@ isitdown/
 │   │   ├── index.ts                    entrypoint
 │   │   ├── runtime.ts                  wiring, shared with the end-to-end test
 │   │   ├── healthcheck.ts              state-file freshness
+│   │   ├── check.ts                    config.yml validation, CI-able (§3.9)
 │   │   ├── fileStateStore.ts           JSON file, atomic writes
 │   │   └── config/
 │   │       ├── schema.ts               config.yml shape
-│   │       └── loadConfig.ts           YAML + ${ENV} substitution + validation
+│   │       ├── loadConfig.ts           YAML + ${ENV} substitution + validation
+│   │       └── checkConfig.ts          every problem at once, not the first
 │   └── ui/                            (UI edition only)
 │       ├── server.ts                   entrypoint
 │       ├── runtime.ts                  wiring, shared with the API tests
@@ -1747,11 +1895,12 @@ isitdown/
 │       ├── secretsFile.ts              credentials saved from the dashboard: 0600 file beside the database, applied to the environment
 │       ├── metrics.ts                  the Prometheus scrape surface: gauges from the store, counters in memory
 │       ├── liveEvents.ts               the push hub behind /events: subscribe, publish, nothing transport-specific
+│       ├── configFile.ts             config.yml export / import (§4.3)
 │       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
 │       ├── geo/                        resolveLocation.ts + the IATA/cloud-region lookup tables it resolves against
 │       ├── db/                         open.ts, migrate.ts, seed.ts
-│       ├── routes/                     status, events, history, incidents, notifications, config, preferences, map, metrics
+│       ├── routes/                     status, events, history, incidents, exports, notifications, config, preferences, map, metrics
 │       └── web/                        the dashboard: react, vite, shadcn/ui
 │           ├── index.html              pre-paint theme script, fonts, #root
 │           ├── main.tsx                provider tree: i18n, query, theme, router

@@ -147,6 +147,7 @@ const serviceRowSchema = z.object({
   scope_to_components: z.number(),
   interval_minutes: z.number().nullable(),
   muted_until: z.string().nullable(),
+  group_name: z.string().nullable(),
 });
 
 const removedRowSchema = z.object({
@@ -260,7 +261,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -285,13 +286,16 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       ...(row.muted_until === null || Date.parse(row.muted_until) <= Date.now()
         ? {}
         : { mutedUntil: row.muted_until }),
+      // Absent rather than null, like the interval above: "in no group" is the
+      // normal state and the engine reads it from the field not being there.
+      ...(row.group_name === null ? {} : { group: row.group_name }),
     }));
 }
 
 export function insertService(db: DatabaseSync, definition: ServiceDefinition): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -303,6 +307,7 @@ export function insertService(db: DatabaseSync, definition: ServiceDefinition): 
     parsed.scopeToComponents ? 1 : 0,
     parsed.intervalMinutes ?? null,
     parsed.mutedUntil ?? null,
+    parsed.group ?? null,
     new Date().toISOString(),
   );
 }
@@ -320,6 +325,8 @@ export const servicePatchSchema = serviceDefinitionSchema
     // Null is how the dashboard lifts a mute early, for the same reason: on a
     // patch `undefined` already means "leave it alone".
     mutedUntil: z.string().datetime().nullable().optional(),
+    /** Null takes the provider out of its group (roadmap 2.6). */
+    group: serviceDefinitionSchema.shape.group.unwrap().nullable().optional(),
   });
 
 /** Returns false when there was no such service, so a route can answer 404. */
@@ -335,6 +342,9 @@ export function updateService(
   if (parsed.baseUrl !== undefined) columns["base_url"] = parsed.baseUrl;
   if (parsed.enabled !== undefined) columns["enabled"] = parsed.enabled ? 1 : 0;
   if (parsed.options !== undefined) columns["options"] = JSON.stringify(parsed.options);
+  // Null is how the dashboard takes a provider out of its group, the way it
+  // clears an interval: on a patch `undefined` already means "leave it alone".
+  if (parsed.group !== undefined) columns["group_name"] = parsed.group;
   if (parsed.components !== undefined) {
     columns["components"] = parsed.components.length === 0 ? null : JSON.stringify(parsed.components);
   }

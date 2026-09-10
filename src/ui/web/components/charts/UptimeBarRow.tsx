@@ -2,6 +2,7 @@ import { Bar, BarChart, Cell, XAxis, YAxis } from "recharts";
 import { useTranslation } from "react-i18next";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart.tsx";
 import { chartConfigFor, severity, statusFill, statusLabelKey, statusMuted, type BarScale } from "@/lib/chartConfig.ts";
+import { tallyStatuses } from "@/lib/chartSummary.ts";
 import { formatDay } from "@/lib/format.ts";
 import type { HistoryBucket } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
@@ -32,6 +33,11 @@ export function UptimeBarRow({
       // never applied it to the compact bar row, only to uptimeStrip(). Every
       // UptimeBarRow scale (row, compact, poll) keeps the base 0.5s `anim-bar`.
       className={cn("anim-bar w-full", className)}
+      // Roadmap 5.13. The tooltip answers "what about this day" on hover,
+      // which a keyboard or a screen reader never reaches; the label answers
+      // "how did the window go" without one.
+      role="img"
+      aria-label={t("chart.days-summary", tallyStatuses(data.map((entry) => entry.status)))}
       // The tick row is extra height, not a slice out of the bars': without the
       // 22px the axis would draw over the shortest of them.
       style={{ height: HEIGHT[scale] + (showAxis ? 22 : 0) }}

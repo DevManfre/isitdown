@@ -482,6 +482,10 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         const routed = explain(change, ctx.rules, enabledChannelIds, {
           quietHours: delivery.quietHours,
           at: new Date(at),
+          // What lets a rule target "my deploy path" rather than four provider
+          // ids (roadmap 2.6). Read off the service the change already resolved
+          // to, so the evaluator stays pure and knows nothing about the fleet.
+          ...(service.group === undefined ? {} : { providerGroup: service.group }),
         });
         if (routed.quieted) {
           logger.info("quiet hours held a change back", {

@@ -67,8 +67,22 @@ export interface ProviderStatus {
   maintenance: { active: MaintenanceWindow[]; upcoming: MaintenanceWindow[] };
 }
 
+/**
+ * A provider group and its derived status (roadmap 2.6). Derived by the server
+ * from the members' own readings — the dashboard paints it, never computes it.
+ */
+export interface ProviderGroupStatus {
+  id: string;
+  providers: string[];
+  status: OverallStatus;
+  /** Members worse than operational, worst first. */
+  affected: string[];
+}
+
 export interface StatusResponse {
   providers: ProviderStatus[];
+  /** Optional so a dashboard served by an older server still renders. */
+  groups?: ProviderGroupStatus[];
   pollIntervalMinutes: number;
   lastPollAt: string | null;
   nextPollAt: string | null;
@@ -274,6 +288,11 @@ export interface ServiceDefinition {
   components: { id: string; name: string }[];
   scopeToComponents: boolean;
   /**
+   * The group this provider belongs to (roadmap 2.6). Absent while it is in
+   * none; `null` is only ever sent, on a patch, to take it out of one.
+   */
+  group?: string | null;
+  /**
    * ISO 8601 while the provider is muted, absent when it is not. `null` is only
    * ever sent, on a patch, to lift a mute early.
    */
@@ -424,6 +443,34 @@ export interface AdapterDebugResponse {
 }
 
 /** What one live probe found: the whole reading, or why there was not one. */
+/** What the detect endpoint worked out about a pasted url (roadmap 1.14). */
+/** What `POST /config/import` reports it did (roadmap 4.3). */
+export interface ConfigImportReport {
+  added: string[];
+  updated: string[];
+  removed: string[];
+  channels: string[];
+  routingRules: number;
+  settings: string[];
+}
+
+/** One row of the bundled provider catalog (roadmap 5.11). */
+export interface CatalogProvider {
+  id: string;
+  name: string;
+  adapter: string;
+  baseUrl: string;
+  /** Already watched: the row stays in the menu, saying so. */
+  configured: boolean;
+}
+
+export interface AdapterDetection {
+  /** Null when no adapter recognised the page. */
+  adapter: string | null;
+  baseUrl: string | null;
+  probes: { adapter: string; url: string; outcome: "match" | "other-shape" | "unreachable" }[];
+}
+
 export interface AdapterProbeResult {
   ok: boolean;
   durationMs: number;

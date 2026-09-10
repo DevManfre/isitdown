@@ -203,6 +203,8 @@ export const useIncidents = (query: api.IncidentListQuery = {}) => {
       "incidents",
       query.provider ?? null,
       query.state ?? "all",
+      query.q ?? "",
+      query.days ?? null,
       query.page ?? 1,
       query.pageSize ?? null,
     ],
@@ -382,12 +384,31 @@ export function useAdapterDebug(enabled: boolean) {
 }
 
 /**
+ * The bundled provider catalog (roadmap 5.11). Fetched when the add dialog
+ * opens and then left alone: the list ships with the image, so it cannot go
+ * stale between two opens, and it has no polling interval for the same reason.
+ */
+export function useCatalog(enabled: boolean) {
+  return useQuery({ queryKey: ["catalog"], queryFn: api.getCatalog, enabled, staleTime: Infinity });
+}
+
+/**
  * One live read of a provider's page. A mutation rather than a query because
  * it is a request an operator makes, not state the panel reflects — and
  * because two clicks must mean two reads.
  */
 export function useAdapterProbe() {
   return useMutation({ mutationFn: api.probeAdapter });
+}
+
+/**
+ * Reading a `config.yml` back in (roadmap 4.3) touches services, channels,
+ * routing and settings at once, so it invalidates everything rather than
+ * naming the keys it happens to have moved.
+ */
+export function useConfigImport() {
+  const invalidate = useInvalidateAll();
+  return useMutation({ mutationFn: api.importConfig, onSuccess: invalidate });
 }
 
 export function useSettingsMutation() {
