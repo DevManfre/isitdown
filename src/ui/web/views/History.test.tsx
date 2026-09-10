@@ -188,10 +188,14 @@ describe("History", () => {
     expect(await screen.findByText(i18n.t("history.range-active", { days: 90 }))).toBeInTheDocument();
   });
 
-  it("offers the history download as a labelled control, not as a raw URL", async () => {
+  it("collects the downloads behind one labelled menu, not as raw URLs", async () => {
     renderWithProviders(<History />, fixtures);
 
-    expect(await screen.findByRole("button", { name: i18n.t("history.download", { days: 90 }) }))
+    // One button in the header row rather than two sentences competing with the
+    // range toggle beside them.
+    await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.download") }));
+
+    expect(await screen.findByRole("menuitem", { name: i18n.t("history.download", { days: 90 }) }))
       .toBeInTheDocument();
     expect(screen.queryByText(/GET \/history/)).not.toBeInTheDocument();
   });
@@ -199,7 +203,9 @@ describe("History", () => {
   it("offers the same window as a CSV the server aggregates", async () => {
     renderWithProviders(<History />, fixtures);
 
-    const link = await screen.findByRole("link", { name: i18n.t("history.download-csv", { days: 90 }) });
+    await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.download") }));
+
+    const link = await screen.findByRole("menuitem", { name: i18n.t("history.download-csv", { days: 90 }) });
     expect(link).toHaveAttribute("href", "/export/history.csv?days=90");
   });
 });
@@ -320,7 +326,7 @@ describe("a provider's component breakdown (ComponentRows)", () => {
     expect(await screen.findByText(/99[.,]42/)).toBeInTheDocument();
     expect(await screen.findByText(i18n.t("history.month-no-data"))).toBeInTheDocument();
     expect(await screen.findByText("GitHub")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: i18n.t("history.download", { days: 90 }) })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: i18n.t("action.download") })).toBeInTheDocument();
 
     // Asserted before the drawer opens on purpose: a modal sheet marks the rest
     // of the page `aria-hidden`, which takes it out of every `*ByRole` query.

@@ -1099,6 +1099,13 @@ means there is something to open. A provider that has never been read
 successfully is not "trouble" — a first cycle that has not landed yet must not
 show a red tab — and a disabled provider is off the dashboard entirely.
 
+Every view's toolbar follows one rule: a control that changes what is on screen
+is a segmented tray — joined buttons in a tinted, bordered strip, with the
+active one lifted out of it — and everything that takes the view away with you
+sits behind a single **Download** menu. Before, a range toggle, two download
+sentences and two format pairs were all ghost buttons of the same weight, and
+nothing said which of them belonged together.
+
 On **History**, clicking a provider's row opens its drawer: the three windows,
 the daily bars with their colour key, and — roadmap 5.20 — a **year heat
 calendar**, one cell per day coloured by that day's worst status. Retention can

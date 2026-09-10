@@ -1125,6 +1125,13 @@ aprire. Un provider mai letto con successo non è "difficoltà" — un primo cic
 non ancora arrivato non deve mostrare una linguetta rossa — e un provider
 disabilitato è fuori dalla dashboard del tutto.
 
+La barra dei controlli di ogni vista segue una regola sola: un controllo che
+cambia ciò che è a schermo è un gruppo segmentato — pulsanti uniti in una
+striscia con bordo e sfondo tenue, e quello attivo sollevato — mentre tutto ciò
+che porta via la vista sta dietro a un unico menu **Scarica**. Prima un toggle di
+intervallo, due frasi di download e due coppie di formati avevano tutti lo stesso
+peso, e niente diceva quali stessero insieme.
+
 Su **History**, cliccare la riga di un provider apre il suo drawer: le tre
 finestre, le barre giornaliere con la loro legenda di colori e — roadmap 5.20 —
 un **calendario annuale**, una cella per giorno colorata dallo stato peggiore di
