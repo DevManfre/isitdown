@@ -2183,11 +2183,17 @@ npm test                 # suite node:test + vitest run
 npm run coverage         # le stesse due suite sotto una soglia minima di copertura
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
 npm run test:visual      # baseline visive: ogni vista, entrambi i temi, entrambe le lingue
+npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
 npm run build:light      # tsc + copia asset, escludendo src/ui
 npm run build:ui         # tsc + vite build + copia asset
 ```
+
+Il budget del bundle (roadmap 5.16) pesa ciò che `build:ui` ha prodotto, in
+gzip, perché è quello che il browser scarica: `410 kB` di JavaScript e `20 kB` di
+CSS, entrambi poco sopra la build di oggi. È un tetto, non un obiettivo — quando
+fallisce la risposta è trovare cosa è cresciuto, non alzare il numero.
 
 La soglia di copertura (roadmap 7.2) è un pavimento, non un obiettivo da
 rincorrere. Sono due, perché le due suite coprono metà diverse: il server e il
