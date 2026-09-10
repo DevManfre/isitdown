@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
+import { Card } from "@/components/ui/card.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { DeltaChip } from "@/components/DeltaChip.tsx";
@@ -214,38 +215,44 @@ export function History() {
         />
       </div>
 
+      <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "200ms" }} />
+
       {/* Two providers side by side is the question a vendor decision asks, and
           the list of rows — which ranks them but never puts two on the same
-          axes — cannot answer it. Only rendered once there are two providers
-          to compare: one drawn against itself is a chart with nothing to say. */}
+          axes — cannot answer it. A card between the two rules rather than a
+          third full-width band: the headline and the month columns are one
+          reading of the fleet, and this is a tool the operator drives, so it
+          reads better as its own surface than as more of the hero. Only
+          rendered once there are two providers to compare: one drawn against
+          itself is a chart with nothing to say. */}
       {leftHistory !== undefined && rightHistory !== undefined && left !== right ? (
-        <section
-          aria-label={t("history.compare.title")}
-          className="anim-rise flex flex-col gap-3"
-          style={{ animationDelay: "120ms" }}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {t("history.compare.title")}
-            </span>
-            <div className="flex flex-wrap items-center gap-3">
-              {picker("left", leftHistory.providerId)}
-              {picker("right", rightHistory.providerId)}
-            </div>
-          </div>
-          <UptimeCompareChart
-            rows={alignSeries(leftHistory, rightHistory)}
-            leftLabel={nameOf(leftHistory.providerId)}
-            rightLabel={nameOf(rightHistory.providerId)}
-            label={t("history.compare.chart", {
-              left: nameOf(leftHistory.providerId),
-              right: nameOf(rightHistory.providerId),
-            })}
-          />
-        </section>
-      ) : null}
+        <>
+          <section aria-label={t("history.compare.title")} className="anim-rise" style={{ animationDelay: "120ms" }}>
+            <Card className="flex flex-col gap-3 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                  {t("history.compare.title")}
+                </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  {picker("left", leftHistory.providerId)}
+                  {picker("right", rightHistory.providerId)}
+                </div>
+              </div>
+              <UptimeCompareChart
+                rows={alignSeries(leftHistory, rightHistory)}
+                leftLabel={nameOf(leftHistory.providerId)}
+                rightLabel={nameOf(rightHistory.providerId)}
+                label={t("history.compare.chart", {
+                  left: nameOf(leftHistory.providerId),
+                  right: nameOf(rightHistory.providerId),
+                })}
+              />
+            </Card>
+          </section>
 
-      <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "200ms" }} />
+          <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "240ms" }} />
+        </>
+      ) : null}
 
       {summary.providers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("empty.no-data")}</p>
