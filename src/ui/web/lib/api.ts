@@ -6,6 +6,7 @@ import type {
   ComponentHistoryResponse,
   ComponentPreview,
   ConfigImportReport,
+  DbMaintenanceReport,
   DeliveryLogResponse,
   DeliveryState,
   DescribedChannel,
@@ -207,6 +208,9 @@ export const testService = (id: string) =>
   );
 export const patchSettings = (patch: unknown) => request<unknown>("PATCH", "/config/settings", patch);
 export const getStorage = () => request<StorageReport>("GET", "/config/storage");
+/** Integrity check then vacuum, on demand — roadmap 6.13. */
+export const runStorageMaintenance = () =>
+  request<DbMaintenanceReport>("POST", "/config/storage/maintenance");
 /** The adapter debug panel's two halves — roadmap 5.18. */
 export const getAdapterDebug = () => request<AdapterDebugResponse>("GET", "/debug/adapters");
 /** One read, right now. Records nothing and notifies nothing, like the connection test. */

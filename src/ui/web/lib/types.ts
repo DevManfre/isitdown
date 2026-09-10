@@ -552,6 +552,18 @@ export interface ProviderCalendar {
   measuredDays: number;
 }
 
+/** What `POST /config/storage/maintenance` answers — roadmap 6.13. */
+export interface DbMaintenanceReport {
+  /** False when the integrity check found something; nothing was rewritten. */
+  ok: boolean;
+  /** Sqlite's own words: `ok`, or the problems it found. */
+  integrity: string;
+  bytesBefore: number;
+  bytesAfter: number;
+  reclaimed: number;
+  durationMs: number;
+}
+
 export interface StorageReport {
   dbBytes: number;
   sampleCount: number;

@@ -33,6 +33,7 @@ import {
 } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { exportConfigYaml, importConfigYaml } from "../configFile.ts";
+import { runDbMaintenance } from "../dbMaintenance.ts";
 import { storageReport } from "../storageReport.ts";
 import { ensureVapidKeys } from "../vapidKeys.ts";
 
@@ -424,6 +425,22 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         intervalMinutes: settings.pollIntervalMinutes,
       }),
     );
+  });
+
+  /**
+   * Roadmap 6.13. `PRAGMA integrity_check` then `VACUUM`, in that order: a file
+   * whose pages are already wrong must not be rewritten. Answers with the bytes
+   * the vacuum returned, which is what finishes the sentence the storage report
+   * above starts — the daily prune deletes rows, and until this runs, sqlite
+   * keeps their pages.
+   *
+   * A `POST` because it rewrites the database, and on its own path rather than
+   * as a flag on the read for the same reason.
+   */
+  router.post("/config/storage/maintenance", (_req, res) => {
+    // A failed check is a real answer, not a request error: the operator asked
+    // whether the file is sound and now knows that it is not.
+    res.json(runDbMaintenance(db));
   });
 
   router.patch("/config/channels/:id", (req, res) => {
