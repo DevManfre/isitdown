@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { deriveGroups } from "../../core/groups.ts";
 import { isActive } from "../../core/maintenance.ts";
+import { readiness } from "../readiness.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 
 /**
@@ -14,12 +15,35 @@ import type { UiRuntimeCore } from "../runtime.ts";
 export function statusRoutes(runtime: UiRuntimeCore): Router {
   const router = Router();
 
+  /**
+   * Liveness, and only that: the process answers. It must never fail because a
+   * provider is unreachable — a restart is not the answer to someone else's
+   * outage — which is what `/ready` below is for (roadmap 6.9).
+   */
   router.get("/health", (_req, res) => {
     res.json({
       status: "ok",
       providers: runtime.providerCount(),
       lastCycleAt: runtime.lastCycleAt(),
     });
+  });
+
+  /**
+   * Readiness: whether polling is actually working. `503` when no cycle has
+   * completed, when the last one is more than three intervals old, or when
+   * every provider failed in it — the reading the container's healthcheck asks
+   * for, since an instance whose cycle has been failing all day was reporting
+   * healthy on `/health` alone.
+   */
+  router.get("/ready", async (_req, res) => {
+    const { polling } = await runtime.configSource.load();
+    const report = readiness({
+      cycle: runtime.lastCycleSummary(),
+      providerCount: runtime.providerCount(),
+      intervalMinutes: polling.intervalMinutes,
+      now: new Date(),
+    });
+    res.status(report.status === "ready" ? 200 : 503).json(report);
   });
 
   router.get("/status", async (_req, res) => {
