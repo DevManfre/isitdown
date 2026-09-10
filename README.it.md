@@ -349,6 +349,9 @@ tua lista non viene più sovrascritta in seguito.
 | `GOTIFY_TOKEN` | entrambe | — | Token applicativo di Gotify. Obbligatoria insieme alla precedente. |
 | `WEBHOOK_SECRET` | entrambe | — | Segreto condiviso opzionale per il webhook generico. Impostandolo ogni richiesta viene firmata (vedi [3.6](#36-canali-di-notifica)); lasciandolo vuoto le richieste partono non firmate, esattamente come prima. |
 | `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
+| `LOG_FILE` | entrambe | — | Accoda ogni riga di log anche a questo file, ruotato per dimensione. Se non è impostata, i log vanno solo su stdout. |
+| `LOG_MAX_BYTES` | entrambe | `5242880` | Dimensione alla quale `LOG_FILE` ruota. |
+| `LOG_MAX_FILES` | entrambe | `5` | Quante generazioni ruotate (`.1` … `.5`) sopravvivono accanto al file vivo. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Dove leggere `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Dove tenere il file di stato. |
 | `DB_PATH` | UI | `/app/data/isitdown.db` | Database SQLite. |
@@ -1368,6 +1371,15 @@ Per l'edizione Light imposta le stesse due variabili, `telegram.enabled: true` i
 
 Alza il dettaglio con `LOG_LEVEL=debug`, che logga ogni singolo tentativo di poll,
 retry compresi.
+
+I log vanno su stdout, che è ciò che vuole un container e ciò che non basta a
+un'installazione bare-metal: imposta `LOG_FILE=/var/log/isitdown/isitdown.log` e le
+stesse righe vengono accodate anche lì, ruotate a `LOG_MAX_BYTES` in
+`LOG_MAX_FILES` generazioni numerate. Il file è aggiuntivo — stdout continua a
+portare tutto, quindi `docker logs` funziona ancora su un container che ha
+entrambi. Un percorso non scrivibile disattiva il file dopo averlo detto una volta
+su stdout; polling e notifiche non vengono mai bloccati da un disco pieno o in
+sola lettura.
 
 ---
 
