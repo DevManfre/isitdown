@@ -37,6 +37,10 @@ export function httpUrlSetting(field: string, channel: string): z.ZodType<string
  */
 export const OPTIONAL_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   webhook: ["secret"],
+  // A public ntfy topic needs no credential at all; one on a server with
+  // access control does. Requiring it would disable the channel for everyone
+  // publishing to ntfy.sh, which is the common case.
+  ntfy: ["token"],
 };
 
 /** Whether a channel still works with this credential unset. */

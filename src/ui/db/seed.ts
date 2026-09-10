@@ -41,6 +41,11 @@ const DEFAULT_CHANNELS = [
   { id: "webhook", config: { urlEnv: "WEBHOOK_URL", secretEnv: "WEBHOOK_SECRET" } },
   { id: "discord", config: { webhookUrlEnv: "DISCORD_WEBHOOK_URL" } },
   { id: "slack", config: { webhookUrlEnv: "SLACK_WEBHOOK_URL" } },
+  // Self-hosted push (roadmap 3.4). ntfy's topic URL carries its server, so
+  // ntfy.sh and an instance of your own are the same field; its token is
+  // optional (see OPTIONAL_CHANNEL_SETTINGS), Gotify's is not.
+  { id: "ntfy", config: { topicUrlEnv: "NTFY_TOPIC_URL", tokenEnv: "NTFY_TOKEN" } },
+  { id: "gotify", config: { serverUrlEnv: "GOTIFY_URL", tokenEnv: "GOTIFY_TOKEN" } },
   // No `*Env` fields: the VAPID pair is generated on first use (src/ui/vapidKeys.ts).
   { id: "webpush", config: {} },
 ];
