@@ -214,37 +214,3 @@ not re-invented from scratch later.
 | 8.7 | **Incident postmortem export** | Generate a Markdown postmortem skeleton from an incident's timeline plus operator notes (5.3). Cute, narrow. |
 | 8.8 | **Plain-language incident summary** | Collapse a provider's twelve terse updates into one sentence an operator can act on. Wants a model call — a network dependency and an API key, in a project whose pitch is three dependencies and no key. A product decision, not a feature; listed so the "just add AI" reflex meets an argument rather than a blank page. |
 | 8.9 | **Watch a provider edit its own past** | Status pages quietly rewrite resolved incidents. Keeping the first version read here and diffing later ones would catch it. Same family as 8.1, about as inflammatory, and it needs 4.5's longer retention before it says anything. |
-
----
-
-## Suggested next slice
-
-The five rows of the previous slice all shipped (4.9, 5.7, 5.16, 6.11, 7.2), and
-with them the last of the work that was purely additive. Everything still open
-either needs a product decision first or is a piece of work rather than a slice —
-which is the honest shape of a roadmap this far in, not a gap in it.
-
-**What is left that needs neither a decision nor a rewrite** is thin, and worth
-saying out loud so it is not mistaken for a plan:
-
-1. **5.14 more locales** (`es`, `fr`, `de`, `pt`) — mechanical: the plumbing is
-   built, enforced by the catalog guard, and a new catalog is a translation
-   pass rather than a feature. The only real cost is that nobody here can
-   review the result, which is the same reason 5.15 is still open for Italian.
-2. **6.6 an Unraid template or a Home Assistant add-on** — distribution rather
-   than features, aimed at exactly the audience that runs this on a Pi.
-3. **6.5 a Helm chart** — the same shape of work for the other end of the
-   audience, and larger, because the UI edition needs a PVC for its SQLite file.
-
-**Rows that need a decision before they need an implementer**, unchanged: **1.8
-direct HTTP probes** (with 1.9, 1.10 and 8.1 behind it) and **5.1 the public
-status page** (which drags 4.15's read-only token with it). **2.10 provider
-push** is a third, smaller one: it inverts the data flow for the subset of
-providers that support it. **3.3 email (SMTP)** is the same shape of decision at
-notifier scale — the most-asked-for channel, and the only one that adds a real
-runtime dependency to a project whose pitch is three of them.
-
-**Rows that are work rather than a slice**: **7.5 the docs split** (a 70k README
-that is both landing page and manual — now with a translation gate to keep in
-step through the move), **4.13 SLO and error budget**, and **5.21 the PWA
-install plus phone layout**, which is where web push already points.
