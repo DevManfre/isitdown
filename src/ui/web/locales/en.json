@@ -128,6 +128,7 @@
   "incidents.search.placeholder": "Search by name",
   "incidents.window.label": "Time window",
   "incidents.export.label": "Export",
+  "incidents.subscribe.label": "Subscribe",
   "incidents.window.all": "All time",
   "incidents.window.days": "{count}d",
   "incidents.state.open": "Open",

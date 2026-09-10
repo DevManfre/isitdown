@@ -454,6 +454,27 @@ describe("Incidents", () => {
     );
   });
 
+  it("offers the same rows as a feed and as a calendar, filters included", async () => {
+    renderWithProviders(<Incidents />, fixtures);
+    expect(await list().findByText("API errors")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole("searchbox", { name: i18n.t("incidents.search.label") }), "api");
+
+    // A feed is subscribed to rather than downloaded, so it is its own control
+    // beside the export rather than two more formats inside it.
+    const group = within(screen.getByRole("group", { name: i18n.t("incidents.subscribe.label") }));
+    await waitFor(() => {
+      expect(group.getByRole("link", { name: "rss" })).toHaveAttribute(
+        "href",
+        "/feeds/incidents.xml?state=all&q=api",
+      );
+    });
+    expect(group.getByRole("link", { name: "ics" })).toHaveAttribute(
+      "href",
+      "/feeds/incidents.ics?state=all&q=api",
+    );
+  });
+
   it("carries the chosen state filter into the export", async () => {
     renderWithProviders(<Incidents />, fixtures);
     expect(await list().findByText("API errors")).toBeInTheDocument();

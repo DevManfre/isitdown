@@ -234,12 +234,24 @@ export function Incidents() {
    * fetch, because the response is a download and the browser already knows how
    * to save one.
    */
-  const exportHref = (format: "csv" | "json"): string => {
+  const searchParams = (): string => {
     const params = new URLSearchParams({ state: filter });
     if (query !== "") params.set("q", query);
     if (days !== 0) params.set("days", String(days));
-    return `/export/incidents.${format}?${params.toString()}`;
+    return params.toString();
   };
+
+  const exportHref = (format: "csv" | "json"): string =>
+    `/export/incidents.${format}?${searchParams()}`;
+
+  /**
+   * The feeds are the same rows in the shape a reader or a calendar consumes
+   * (roadmap 4.9), and they carry the search too — a subscription is a question
+   * left running, so it is worth being able to narrow it before copying the
+   * url. Their own group rather than two more formats inside the export: these
+   * are subscribed to, not saved.
+   */
+  const feedHref = (format: "xml" | "ics"): string => `/feeds/incidents.${format}?${searchParams()}`;
 
   const exportControl = (
     <div className="flex items-center gap-1" role="group" aria-label={t("incidents.export.label")}>
@@ -247,6 +259,22 @@ export function Incidents() {
       {(["csv", "json"] as const).map((format) => (
         <Button key={format} asChild variant="ghost" size="sm" className="h-8 px-2 font-mono text-xs uppercase">
           <a href={exportHref(format)}>{format}</a>
+        </Button>
+      ))}
+    </div>
+  );
+
+  const subscribeControl = (
+    <div className="flex items-center gap-1" role="group" aria-label={t("incidents.subscribe.label")}>
+      <span className="text-xs text-muted-foreground">{t("incidents.subscribe.label")}</span>
+      {(
+        [
+          ["rss", "xml"],
+          ["ics", "ics"],
+        ] as const
+      ).map(([label, format]) => (
+        <Button key={label} asChild variant="ghost" size="sm" className="h-8 px-2 font-mono text-xs uppercase">
+          <a href={feedHref(format)}>{label}</a>
         </Button>
       ))}
     </div>
@@ -402,6 +430,7 @@ export function Incidents() {
             {searchControl}
             {filterControl}
             {exportControl}
+            {subscribeControl}
           </div>
         </div>
 

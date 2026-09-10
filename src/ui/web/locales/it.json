@@ -128,6 +128,7 @@
   "incidents.search.placeholder": "Cerca per nome",
   "incidents.window.label": "Intervallo di tempo",
   "incidents.export.label": "Esporta",
+  "incidents.subscribe.label": "Iscriviti",
   "incidents.window.all": "Sempre",
   "incidents.window.days": "{count}g",
   "incidents.state.open": "Aperto",

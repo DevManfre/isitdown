@@ -4,6 +4,7 @@ import { configRoutes } from "./routes/config.routes.ts";
 import { debugRoutes } from "./routes/debug.routes.ts";
 import { eventsRoutes } from "./routes/events.routes.ts";
 import { exportRoutes } from "./routes/export.routes.ts";
+import { feedsRoutes } from "./routes/feeds.routes.ts";
 import { historyRoutes } from "./routes/history.routes.ts";
 import { incidentsRoutes } from "./routes/incidents.routes.ts";
 import { mapRoutes } from "./routes/map.routes.ts";
@@ -37,6 +38,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(configRoutes(runtime));
   app.use(preferencesRoutes(runtime));
   app.use(exportRoutes(runtime));
+  app.use(feedsRoutes(runtime));
   app.use(mapRoutes(runtime));
   app.use(maintenancesRoutes(runtime));
   app.use(metricsRoutes(runtime));
