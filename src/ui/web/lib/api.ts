@@ -16,6 +16,7 @@ import type {
   MapResponse,
   OverallStatus,
   Preferences,
+  ProviderCalendar,
   ProviderHistory,
   HistorySummary,
   RoutingResponse,
@@ -85,6 +86,10 @@ export const getHistory = (days: number, provider?: string): Promise<HistorySumm
   provider === undefined
     ? request<HistorySummary>("GET", `/history?days=${days}`)
     : request<ProviderHistory>("GET", `/history?days=${days}&provider=${encodeURIComponent(provider)}`);
+
+/** A year of day cells for one provider — roadmap 5.20. The window is the server's. */
+export const getProviderCalendar = (provider: string) =>
+  request<ProviderCalendar>("GET", `/history/calendar?provider=${encodeURIComponent(provider)}`);
 
 export const getComponentHistory = (provider: string, days: number) =>
   request<ComponentHistoryResponse>(

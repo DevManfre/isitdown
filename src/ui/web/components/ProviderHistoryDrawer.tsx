@@ -6,7 +6,8 @@ import { ComponentRows } from "@/components/ComponentRows.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { StatusLegend } from "@/components/charts/StatusLegend.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
-import { useProviderHistory } from "@/hooks/queries.ts";
+import { YearHeatCalendar } from "@/components/charts/YearHeatCalendar.tsx";
+import { useProviderCalendar, useProviderHistory } from "@/hooks/queries.ts";
 import { formatDateTime, formatTime } from "@/lib/format.ts";
 import type { ComponentStatus, MaintenanceWindow, ProviderHistory } from "@/lib/types.ts";
 import { statusLabelKey } from "@/lib/chartConfig.ts";
@@ -50,6 +51,7 @@ export function ProviderHistoryDrawer({
 }) {
   const { t, i18n } = useTranslation();
   const { data } = useProviderHistory(providerId, days);
+  const { data: calendar } = useProviderCalendar(providerId);
   const provider = data !== undefined && "providerId" in data ? (data as ProviderHistory) : undefined;
   const nextMaintenance = nextOf(upcoming);
 
@@ -121,6 +123,21 @@ export function ProviderHistoryDrawer({
                   strips underneath use the same five statuses. */}
               <StatusLegend />
             </div>
+
+            {/* Roadmap 5.20. Under the bar row and its legend, because it is the
+                same five colours over a longer window: retention may run to
+                3650 days, and until this shipped nothing showed a sample older
+                than ninety. Absent rather than empty while the year is still
+                loading, or if that one request failed — the drawer's own
+                figures above it are unaffected either way. */}
+            {calendar !== undefined && (
+              <YearHeatCalendar
+                cells={calendar.cells}
+                uptime={calendar.uptime}
+                measuredDays={calendar.measuredDays}
+                heading={t("history.calendar-title")}
+              />
+            )}
 
             <p className="font-mono text-xs text-muted-foreground">
               <Trans

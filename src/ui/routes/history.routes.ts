@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { UiRuntimeCore } from "../runtime.ts";
-import { ALLOWED_DAYS, parseDays } from "./historyWindow.ts";
+import { ALLOWED_DAYS, CALENDAR_DAYS, parseDays } from "./historyWindow.ts";
 
 /**
  * Pre-aggregated history. The frontend never re-derives a percentage or a daily
@@ -9,6 +9,25 @@ import { ALLOWED_DAYS, parseDays } from "./historyWindow.ts";
  */
 export function historyRoutes(runtime: UiRuntimeCore): Router {
   const router = Router();
+
+  /**
+   * A year of day cells for one provider — roadmap 5.20. Fixed at
+   * `CALENDAR_DAYS` rather than taking a `days`: the calendar is one view with
+   * one window, and the window it draws is in the answer so a stored response
+   * still says what it covers.
+   */
+  router.get("/history/calendar", async (req, res) => {
+    const provider = req.query["provider"];
+    if (typeof provider !== "string" || provider === "") {
+      res.status(400).json({ error: { message: "provider is required" } });
+      return;
+    }
+    if (!runtime.listAllServices().some((service) => service.id === provider)) {
+      res.status(404).json({ error: { message: `unknown provider: ${provider}` } });
+      return;
+    }
+    res.json(await runtime.history.getProviderCalendar(provider, CALENDAR_DAYS));
+  });
 
   router.get("/history/components", async (req, res) => {
     const days = parseDays(req.query["days"] ?? undefined);

@@ -21,6 +21,7 @@ type FixtureKey =
   | "notifications"
   | "deliveryLog"
   | "componentHistory"
+  | "providerCalendar"
   | "map"
   | "preferences"
   | "maintenances"
@@ -38,6 +39,8 @@ export interface Fixtures {
   /** `/notifications/log`, matched before `/notifications` — the log is a nested path with its own shape. */
   deliveryLog?: unknown;
   componentHistory?: unknown;
+  /** `/history/calendar`, matched before `/history` — the year heat calendar's own shape. */
+  providerCalendar?: unknown;
   map?: unknown;
   preferences?: unknown;
   maintenances?: unknown;
@@ -72,7 +75,9 @@ export function stubApi(fixtures: Fixtures): void {
     "fetch",
     vi.fn(async (input: string) => {
       const path = String(input);
-      const key: FixtureKey = path.startsWith("/history/components")
+      const key: FixtureKey = path.startsWith("/history/calendar")
+        ? "providerCalendar"
+        : path.startsWith("/history/components")
         ? "componentHistory"
         : path.startsWith("/history")
           ? "history"
@@ -108,7 +113,13 @@ export function stubApi(fixtures: Fixtures): void {
       // A fixture may be a function of the request path instead of a fixed
       // body, for an endpoint whose answer depends on its query string — a
       // paged, filtered list cannot be represented by one constant response.
-      const fixture = fixtures[key];
+      // An unset calendar fixture answers an empty year rather than `{}`: the
+      // drawer renders the calendar for every provider it opens, and a body
+      // with no `cells` is a shape no server ever sends.
+      const fixture =
+        key === "providerCalendar" && fixtures.providerCalendar === undefined
+          ? { providerId: "", days: 365, cells: [], uptime: 0, measuredDays: 0 }
+          : fixtures[key];
       const body = typeof fixture === "function" ? (fixture as (path: string) => unknown)(path) : fixture;
       return { ok: true, status: 200, text: async () => JSON.stringify(body ?? {}) };
     }),
