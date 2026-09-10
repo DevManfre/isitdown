@@ -219,29 +219,22 @@ not re-invented from scratch later.
 
 ## Suggested next slice
 
-The six rows of the previous slice all shipped (3.4, 4.14, 5.20, 6.9, 6.13,
-7.6), and with them every row that needed no product decision *and* fit an
-existing seam cleanly. What is left divides into three kinds, and the honest
-answer is that the next slice is smaller than the last one.
+The five rows of the previous slice all shipped (4.9, 5.7, 5.16, 6.11, 7.2), and
+with them the last of the work that was purely additive. Everything still open
+either needs a product decision first or is a piece of work rather than a slice —
+which is the honest shape of a roadmap this far in, not a gap in it.
 
-**Cheap and additive, in the order they earn their keep:**
+**What is left that needs neither a decision nor a rewrite** is thin, and worth
+saying out loud so it is not mistaken for a plan:
 
-1. **4.9 an RSS / iCal feed of incidents** — the incident history is already
-   paged, filtered and exported as CSV/JSON; a feed is the same rows in the one
-   shape a reader or a calendar consumes without an API client. It reuses
-   `readIncidentQuery` and adds no state.
-2. **7.2 a coverage floor** — not a target to game: a floor that fails when a
-   new subsystem lands untested. The suite is large enough now that a gap is
-   invisible without one, and the translation gate just showed how cheap a
-   `verify` step is.
-3. **5.16 a bundle-size budget** — the dashboard carries Recharts, motion, cobe
-   and dotted-map, and now a year calendar. A CI check that fails on a
-   regression keeps it from quietly becoming a megabyte.
-4. **5.7 comparing two providers' uptime series** — the history page ranks
-   providers worst-first but never puts two side by side, which is the question
-   a vendor decision actually asks.
-5. **6.11 log to file with rotation** — stdout is right for Docker and wrong for
-   the bare-metal install the Light edition is otherwise perfect for.
+1. **5.14 more locales** (`es`, `fr`, `de`, `pt`) — mechanical: the plumbing is
+   built, enforced by the catalog guard, and a new catalog is a translation
+   pass rather than a feature. The only real cost is that nobody here can
+   review the result, which is the same reason 5.15 is still open for Italian.
+2. **6.6 an Unraid template or a Home Assistant add-on** — distribution rather
+   than features, aimed at exactly the audience that runs this on a Pi.
+3. **6.5 a Helm chart** — the same shape of work for the other end of the
+   audience, and larger, because the UI edition needs a PVC for its SQLite file.
 
 **Rows that need a decision before they need an implementer**, unchanged: **1.8
 direct HTTP probes** (with 1.9, 1.10 and 8.1 behind it) and **5.1 the public
