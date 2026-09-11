@@ -121,7 +121,7 @@ Anthropic       operational    ████████████████�
 | Configuration | `config.yml`, re-read every cycle | SQLite, edited in the dashboard |
 | State store | JSON file, atomic writes | SQLite (also carries history) |
 | HTTP server | none | Express on :3000 |
-| Uptime history and charts | — | 7/30/90-day views |
+| Uptime history and charts | — | 7/30/90-day views, plus a year heat calendar per provider |
 | Theme | — | light / dark / system |
 | Localisation | notification text | notification text **and** the whole dashboard |
 | Footprint | 264MB image, no listening socket | 267MB — the Light image plus one layer |
@@ -317,6 +317,13 @@ Everything lives in SQLite at `/app/data/isitdown.db` and is edited from
   each credential, and — write-only — the credential itself
 - theme, dashboard language, notification language, time zone
 
+**Settings → Data** also carries the one maintenance job a SQLite file needs
+(roadmap 6.13): **Check and compact** runs `PRAGMA integrity_check` and then
+`VACUUM`, and reports the bytes it returned beside what the database weighs now.
+The order is deliberate — a file whose pages are already wrong is reported, not
+rewritten — and nothing is ever deleted: the daily prune is what removes rows
+past the retention window, and this is what gives their pages back.
+
 Writes take effect on the **next poll cycle**, with no restart, because the
 scheduler re-reads its configuration every pass. A fresh database is seeded with
 GitHub, Cloudflare and Anthropic so the dashboard is useful immediately; your own
@@ -331,6 +338,10 @@ list is never overwritten afterwards.
 | `WEBHOOK_URL` | both | — | Where the generic webhook POSTs. Required if that channel is enabled. |
 | `DISCORD_WEBHOOK_URL` | both | — | Discord incoming webhook. Required if the Discord channel is enabled. |
 | `SLACK_WEBHOOK_URL` | both | — | Slack incoming webhook. Required if the Slack channel is enabled. |
+| `NTFY_TOPIC_URL` | both | — | ntfy topic URL, server included (`https://ntfy.sh/my-topic`). Required if the ntfy channel is enabled. |
+| `NTFY_TOKEN` | both | — | Optional ntfy access token. Only a server with access control needs one. |
+| `GOTIFY_URL` | both | — | Gotify server (`https://gotify.example.com`). Required if the Gotify channel is enabled. |
+| `GOTIFY_TOKEN` | both | — | Gotify application token. Required with the above. |
 | `WEBHOOK_SECRET` | both | — | Optional shared secret for the generic webhook. Set it and every request is signed (see [3.6](#36-notification-channels)); leave it unset and requests go out unsigned, exactly as before. |
 | `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Where to read `config.yml`. |
@@ -652,6 +663,8 @@ validators all drop the cache entry rather than pin a stale reading.
 | Generic webhook | `webhook` | `WEBHOOK_URL` |
 | Discord | `discord` | `DISCORD_WEBHOOK_URL` |
 | Slack | `slack` | `SLACK_WEBHOOK_URL` |
+| ntfy | `ntfy` | `NTFY_TOPIC_URL` (`NTFY_TOKEN` optional) |
+| Gotify | `gotify` | `GOTIFY_URL`, `GOTIFY_TOKEN` |
 | Desktop (Web Push) | `webpush` | none |
 
 Desktop push needs nothing configured: the server generates its own VAPID key
@@ -705,6 +718,22 @@ links to the provider's status page, coloured by that severity; Slack as a
 Block Kit section plus an "Open status page" button, with the heading repeated
 as the notification preview text. Neither URL is ever logged or shown in the
 dashboard: a rejected send reports the HTTP status and the service's own
+reason.
+
+**ntfy and Gotify** are the self-hosted push pair (roadmap 3.4). ntfy is one
+POST: the topic URL carries the server, so `https://ntfy.sh/isitdown` and
+`https://ntfy.example.com/isitdown` are the same setting, the heading becomes the
+notification's title, the detail its body, and tapping it opens the provider's
+status page. `NTFY_TOKEN` is only needed on a server with access control — a
+public topic works without one. Gotify takes its server plus one application
+token, posted to `/message` with the token in `X-Gotify-Key` rather than in the
+URL, since a URL ends up in logs.
+
+Both map the severity onto the channel's own priority scale, so what is allowed
+to ring at night is a property of the reading rather than a rule rebuilt on every
+phone: on ntfy's 1–5 scale a major outage is `5` and a recovery is `2`; on
+Gotify's 0–10 scale, `9` and `3`. Neither credential is ever logged or shown in
+the dashboard, and a rejected send reports the HTTP status with the server's own
 reason.
 
 ### 3.7 Notification routing
@@ -978,12 +1007,23 @@ background as files change rather than requiring a fresh image — see
 |---|---|---|
 | Mounts | `./config.yml:/app/config/config.yml:ro`, volume on `/app/data` | volume on `/app/data` |
 | Ports | none | `3000:3000` |
-| Healthcheck | age of `state.json` — every cycle rewrites it, three intervals without a write is unhealthy | `GET /health` |
-| Start period | 40s | 20s |
+| Healthcheck | age of `state.json` — every cycle rewrites it, three intervals without a write is unhealthy | `GET /ready` |
+| Start period | 40s | 60s |
 | User | `node`, unprivileged | `node`, unprivileged |
 
 The Light edition has no server to probe, which is why its liveness signal is the
 freshness of the state file rather than an HTTP response.
+
+The UI edition's probe is **readiness**, not liveness. `GET /health` answers as
+long as the process is up, which is all a liveness probe may ever mean — a
+restart is not the answer to someone else's outage — and it left the one failure
+an operator actually wants surfaced reported by nothing: an instance whose poll
+cycle had been failing all day still looked healthy. `GET /ready` is that
+reading, on the same three-intervals-of-slack rule as the Light edition's state
+file, and it is what the container asks. Both are still there, so an
+orchestrator that wants the two probes apart can have them (`livenessProbe` on
+`/health`, `readinessProbe` on `/ready`). The longer start period is the cost:
+readiness stays 503 until the history backfill and the first cycle are done.
 
 Both containers stop cleanly on `SIGTERM`: the scheduler stops, the in-flight cycle
 is awaited, the store is closed, exit 0.
@@ -1056,9 +1096,18 @@ means there is something to open. A provider that has never been read
 successfully is not "trouble" — a first cycle that has not landed yet must not
 show a red tab — and a disabled provider is off the dashboard entirely.
 
+On **History**, clicking a provider's row opens its drawer: the three windows,
+the daily bars with their colour key, and — roadmap 5.20 — a **year heat
+calendar**, one cell per day coloured by that day's worst status. Retention can
+run to 3650 days, while the widest chart stayed a 90-day bar row, so everything
+older was stored and never shown; the calendar is that year. A day nobody
+sampled is drawn muted rather than green, and hovering a cell says what the day
+was and how much of it was up.
+
 The same data over HTTP:
 
 ```bash
+curl -s localhost:3000/history/calendar?provider=github | jq '.measuredDays, .uptime'
 curl -s localhost:3000/status | jq '.providers[] | {id, overallStatus, uptime90}'
 curl -s localhost:3000/history?days=7 | jq '{aggregateUptime, months}'
 curl -s localhost:3000/config | jq '.channels'        # variable names only, never values
@@ -1276,7 +1325,7 @@ For the Light edition, set the same two variables, `telegram.enabled: true` in
 |---|---|
 | Light container exits immediately, exit 1 | Configuration. `docker logs` names the file, the path and the reason. |
 | `the telegram channel is enabled but TELEGRAM_BOT_TOKEN is not set` | `.env` is not being passed. Check `env_file` and recreate the container — env is read at start. |
-| Container stuck `starting` forever | The healthcheck never passed. Light: `state.json` is not being written, so no cycle completed. UI: `/health` is not answering. |
+| Container stuck `starting` forever | The healthcheck never passed. Light: `state.json` is not being written, so no cycle completed. UI: `/ready` is answering 503 — its `reason` field names which of the three failures it is, and `docker inspect` carries it in the health log. |
 | Dashboard loads but the grid is empty | No cycle has run yet. `POST /poll`, or wait one interval. |
 | A provider shows `unknown` | It has never been polled successfully. UI edition: **Settings → the provider's row → Diagnose** shows the last reads with their errors and reads the page on demand (`GET /debug/adapters`, `POST /debug/adapters/<id>/probe`). A page that reads but parses into nothing — a scrape whose selector no longer matches — is called out there. |
 | No notifications during the night, or one message instead of several | The delivery policy is doing its job. Check **Settings → Delivery** (or the `delivery` block): quiet hours drop what is under their floor, and the digest holds it for its window. |
@@ -1301,8 +1350,10 @@ back reports a parse failure instead of the real problem.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/health` | Liveness. `{ status, providers, lastCycleAt }`. |
+| `GET` | `/health` | Liveness, and only that: the process answers. `{ status, providers, lastCycleAt }`. Never fails because a provider is unreachable. |
+| `GET` | `/ready` | Readiness: whether polling is working. `200` with `{ status: "ready", providers, failed, lastCycleAt, ageSeconds, staleAfterSeconds }`, or `503` with the same shape plus `reason` — no cycle has completed yet, the last one is more than three poll intervals old, or every provider failed in it. This is what the container's healthcheck asks. |
 | `GET` | `/status` | Current status of every provider, plus last and next poll, plus `maintenance: { active, upcoming }` — windows running now and windows whose `startsAt` is still in the future; a window that has already ended but is still in the stored payload appears in neither list. A pure database read — safe to poll every 30s, which the dashboard does. Never reaches upstream. Also carries `groups` — one entry per provider group with its derived status, members and affected members (roadmap 2.6, §3.10). |
+| `GET` | `/history/calendar?provider=` | A year of day cells for one provider — roadmap 5.20. `{ providerId, days, cells: [{ day, status, uptime }], uptime, measuredDays }`, oldest first, gap-filled: an unsampled day is `unknown` with `uptime: null`, never `0`. The window is fixed at 365 days and named in the answer, so it takes no `days`. `404` on an unknown provider. |
 | `GET` | `/history?provider=&days=` | Pre-aggregated daily buckets, 7/30/90-day uptime, month columns. `days` accepts `7`, `30` or `90`; anything else is a 400 naming them. Without `provider`, a summary across all of them. |
 | `GET` | `/incidents?provider=&state=&q=&days=&page=&pageSize=` | One page of the incident list: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` is `all` (default), `active` or `resolved`; `q` searches incident names, case-insensitively, and `days` keeps only incidents that started within that window (both narrow the page **and** the counts); `pageSize` defaults to 20 and is capped at 100. A nonsense `page`, `pageSize`, `state`, `q` or `days` falls back to the first page of everything rather than a 400. `counts` carries all three states whatever the filter, and `active` is the open list the dashboard's hero card shows on every page — outside the search, so a card cannot vanish while the operator types. |
 | `GET` | `/incidents/:providerId/:incidentId` | Detail: the incident, the observed timeline, the action log of what was sent, the provider's other open incidents, and the last 24 polls. |
@@ -1324,6 +1375,7 @@ back reports a parse failure instead of the real problem.
 | `DELETE` | `/config/services/:id/permanently` | The destructive half, on its own path so nothing reaches it by accident: cascades to that provider's samples, incidents, maintenances, state and routing rules. This also happens on its own once the restore window closes. |
 | `PATCH` | `/config/settings` | Polling settings — including `adaptivePolling` and `adaptiveIntervalMinutes` (1–1440) — `retentionDays`, how long history is kept, 7 to 3650 days, and `delivery`, the policy of [3.8](#38-delivery-policy--quiet-hours-digests-caps). The delivery patch is partial at every level, so one field can be changed without writing back the rest. |
 | `GET` | `/config/storage` | What retention costs: the database's size on disk, the sample count, measured bytes per sample (`measured: false` when the database is too small to measure and the server's own figure stands in), and samples a day at the current provider count and interval. |
+| `POST` | `/config/storage/maintenance` | `PRAGMA integrity_check`, then `VACUUM` — roadmap 6.13. Answers `{ ok, integrity, bytesBefore, bytesAfter, reclaimed, durationMs }`. A failed check is `200` with `ok: false` and sqlite's own words: the file was checked, not rewritten. Deletes nothing. |
 | `PATCH` | `/config/channels/:id` | Enable/disable, and set variable names. **Refuses** a literal secret. |
 | `PUT` | `/config/channels/:id/secrets` | Save credential **values** — `{"fields":{"<field>":"<value>"}}`. Write-only: the value goes to `secrets.env` beside the database and into the process environment, effective immediately, and the response is the usual names-and-`isSet` shape. `400` for an unknown field or an unusable value. |
 | `DELETE` | `/config/channels/:id/secrets/:field` | Forget a saved value. `409` if the variable came from the container's environment instead. |
@@ -1405,6 +1457,18 @@ groups:
       - alert: IsItDownStalled
         expr: time() - isitdown_last_cycle_timestamp_seconds > 900
 ```
+
+A Grafana dashboard is committed alongside them (roadmap 4.14):
+`docs/grafana/isitdown.json`. Import it with **Dashboards → New → Import →
+Upload JSON**, then pick the Prometheus that scrapes IsItDown — the file carries
+a datasource variable rather than a hardcoded uid, so nothing has to be edited
+first. Three rows: the fleet (providers polled, providers not operational, open
+incidents, time since the last cycle, providers we have gone blind on) over a
+per-provider status timeline, polling (duration and failure rate per provider),
+and notifications (deliveries per channel and outcome, and a day's failures per
+channel). A test checks every query in the file against the metric names
+`/metrics` actually exports, so a renamed series fails the build rather than
+quietly emptying a panel.
 
 There is no authentication: this is a local, single-operator dashboard. Do not
 publish port 3000 to a network you do not trust.
@@ -1917,8 +1981,9 @@ isitdown/
 │           ├── css/motion.css          keyframes, entry animations, transitions
 │           └── locales/                en.json (source) + it.json
 ├── tools/
-│   └── copy-assets.mjs                copies i18n and dashboard-locale catalogs into dist (the
-│                                       dashboard bundle itself is Vite's own output, not this script's)
+│   ├── copy-assets.mjs                copies i18n and dashboard-locale catalogs into dist (the
+│   │                                   dashboard bundle itself is Vite's own output, not this script's)
+│   └── readme-parity.mjs              README.md against every README.<lang>.md (npm run check:readme)
 ├── test/
 │   ├── core/                          diff engine, poller, scheduler, dispatcher, i18n, schemas
 │   │   └── stateStore.contract.ts     one suite every StateStore implementation must pass
@@ -1929,6 +1994,7 @@ isitdown/
 │   ├── fixtures/<provider>/            payloads recorded from the live pages, never fetched in a test
 │   ├── helpers/
 │   └── integration/                   *.itest.ts — fake provider and webhook receiver end to end
+├── docs/grafana/isitdown.json         the committed Grafana dashboard for /metrics
 ├── design/                            Claude Design prototypes (git-ignored: on disk, not in a clone)
 ├── Dockerfile                         builder → light → dev → ui (dev is FROM builder; ui is FROM light)
 ├── docker-compose.yml                 both editions as profiles
@@ -1990,7 +2056,7 @@ npm run dev:docker   # container: Vite watch-builds into dist/, Express serves :
 `dev:ui` runs the server and Vite as two local processes together (`concurrently`).
 The browser talks to Vite on **5173** — that is where HMR lives — and Vite's own
 dev-server proxy forwards every API path (`/status`, `/config`, `/history`,
-`/incidents`, `/notifications`, `/poll`, `/api`, `/health`) to the real Express
+`/incidents`, `/notifications`, `/poll`, `/api`, `/health`, `/ready`) to the real Express
 server on 3000. Visiting :3000 directly instead serves whatever is already sitting
 in `dist/ui/public`, which is not live.
 
@@ -2048,6 +2114,7 @@ mode.
 npm test                 # node:test suites + vitest run
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
 npm run test:visual      # visual baselines: every view, both themes, both locales
+npm run check:readme     # this file against every README.<lang>.md
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
 npm run build:light      # tsc + copy assets, excluding src/ui
 npm run build:ui         # tsc + vite build + copy assets
@@ -2093,6 +2160,13 @@ Notable suites:
   and it stays out of `package.json`. Run
   `node tools/visual-regression.mjs --update` to agree to an intended change, and
   `--only=<view>` while iterating on one.
+- **README translation parity** — the numbered heading skeleton, the per-level
+  heading, fence and table-row counts, and the identifiers (routes, shouted
+  variable names, npm scripts) each file names, compared between `README.md` and
+  every `README.<lang>.md`. Structure only, never meaning: an identifier is
+  copied verbatim in a translation, so one that appears in a single file is
+  either a section that was never ported or a flag someone translated. CI runs
+  it, so an edit that landed in only one of the two cannot reach `main`.
 - **End to end** — a fake provider and a webhook receiver: a transition delivers
   exactly one notification, an unchanged cycle none, a restart none, an unreachable
   provider keeps its last known state, and the entrypoint stays alive between cycles
@@ -2176,7 +2250,10 @@ Delivered:
 
 Since v1.4 (on `dev`): adapters for AWS, Google Cloud and Azure, conditional
 requests so most cycles are a `304`, a per-provider poll cadence, the delivery log
-view, and a provider removal that can be undone inside a restore window.
+view, a provider removal that can be undone inside a restore window, ntfy and
+Gotify alongside the other channels, a year heat calendar per provider,
+readiness split from liveness, an integrity check and vacuum on demand, and a
+committed Grafana dashboard.
 
 Still open:
 

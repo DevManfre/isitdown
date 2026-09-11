@@ -755,6 +755,37 @@ test("the storage report measures the database so a retention choice can be cost
   }
 });
 
+test("database maintenance checks the file, vacuums it, and reports what it reclaimed", async () => {
+  // Roadmap 6.13. Deleted rows leave their pages behind until a vacuum returns
+  // them, which is why the storage report never moved after a large prune.
+  const app = await api();
+  try {
+    const insert = app.runtime.db.prepare(
+      "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok) VALUES ('github', ?, 'operational', 1)",
+    );
+    for (let index = 0; index < 1500; index += 1) {
+      insert.run(new Date(Date.now() - index * 60_000).toISOString());
+    }
+    const { body: compact } = await app.request("POST", "/config/storage/maintenance");
+    app.runtime.db.prepare("DELETE FROM status_samples").run();
+    assert.equal((compact as { ok: boolean }).ok, true);
+
+    const { status, body } = await app.request("POST", "/config/storage/maintenance");
+    assert.equal(status, 200);
+    const report = body as { ok: boolean; integrity: string; bytesBefore: number; bytesAfter: number; reclaimed: number };
+    assert.equal(report.ok, true);
+    assert.equal(report.integrity, "ok");
+    assert.ok(report.reclaimed > 0, `expected reclaimed bytes, got ${report.reclaimed}`);
+    assert.equal(report.reclaimed, report.bytesBefore - report.bytesAfter);
+
+    // And the size the dashboard reports agrees with what the vacuum left.
+    const { body: storage } = await app.request("GET", "/config/storage");
+    assert.equal((storage as { dbBytes: number }).dbBytes, report.bytesAfter);
+  } finally {
+    await app.close();
+  }
+});
+
 test("adaptive polling can be switched off and given its own cadence from the dashboard", async () => {
   // Roadmap 2.3. Both fields travel on the same settings patch as the rest of
   // the engine, and take effect on the next config load — no restart.

@@ -543,3 +543,32 @@ export interface StorageReport {
   measured: boolean;
   samplesPerDay: number;
 }
+
+/** One cell of the year heat calendar — roadmap 5.20. */
+export interface CalendarDay {
+  day: string;
+  status: OverallStatus;
+  /** How much of the day was up; `null` when it was never sampled. */
+  uptime: number | null;
+}
+
+/** What `GET /history/calendar?provider=` answers — roadmap 5.20. */
+export interface ProviderCalendar {
+  providerId: string;
+  days: number;
+  cells: CalendarDay[];
+  uptime: number;
+  measuredDays: number;
+}
+
+/** What `POST /config/storage/maintenance` answers — roadmap 6.13. */
+export interface DbMaintenanceReport {
+  /** False when the integrity check found something; nothing was rewritten. */
+  ok: boolean;
+  /** Sqlite's own words: `ok`, or the problems it found. */
+  integrity: string;
+  bytesBefore: number;
+  bytesAfter: number;
+  reclaimed: number;
+  durationMs: number;
+}

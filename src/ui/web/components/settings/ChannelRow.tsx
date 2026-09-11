@@ -1,6 +1,16 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Bell, ChevronRight, Hash, MessagesSquare, MonitorSmartphone, Send, Webhook } from "lucide-react";
+import {
+  Bell,
+  BellRing,
+  ChevronRight,
+  Hash,
+  Megaphone,
+  MessagesSquare,
+  MonitorSmartphone,
+  Send,
+  Webhook,
+} from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -119,6 +129,8 @@ function PushDevices({
  */
 const CHANNEL_ICONS: Record<string, typeof Bell> = {
   discord: MessagesSquare,
+  gotify: BellRing,
+  ntfy: Megaphone,
   slack: Hash,
   telegram: Send,
   webhook: Webhook,
@@ -127,6 +139,8 @@ const CHANNEL_ICONS: Record<string, typeof Bell> = {
 
 const CHANNEL_NAME_KEYS: Record<string, string> = {
   discord: "channel.name.discord",
+  gotify: "channel.name.gotify",
+  ntfy: "channel.name.ntfy",
   slack: "channel.name.slack",
   telegram: "channel.name.telegram",
   webhook: "channel.name.webhook",

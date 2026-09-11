@@ -25,6 +25,17 @@ const slack: ChannelConfig = {
   settings: { webhookUrl: "https://hooks.slack.com/services/T0/B0/x" },
 };
 
+const ntfy: ChannelConfig = {
+  id: "ntfy",
+  enabled: true,
+  settings: { topicUrl: "https://ntfy.sh/isitdown" },
+};
+const gotify: ChannelConfig = {
+  id: "gotify",
+  enabled: true,
+  settings: { serverUrl: "https://gotify.example.com", token: "AppToken" },
+};
+
 test("only enabled channels are built", () => {
   const built = buildNotifiers([telegram, { ...webhook, enabled: false }]);
   assert.deepEqual(
@@ -35,8 +46,8 @@ test("only enabled channels are built", () => {
 
 test("every built-in channel can be built together", () => {
   assert.deepEqual(
-    buildNotifiers([telegram, webhook, discord, slack]).map((notifier) => notifier.id),
-    ["telegram", "webhook", "discord", "slack"],
+    buildNotifiers([telegram, webhook, discord, slack, ntfy, gotify]).map((notifier) => notifier.id),
+    ["telegram", "webhook", "discord", "slack", "ntfy", "gotify"],
   );
 });
 

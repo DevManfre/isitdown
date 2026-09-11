@@ -1,6 +1,6 @@
 {
   "name": "isitdown",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": true,
   "description": "Polls the public status pages of third-party providers and notifies on state transitions",
   "license": "MIT",
@@ -13,6 +13,7 @@
     "build:light": "tsc -p tsconfig.light.json && node tools/copy-assets.mjs",
     "build:ui": "tsc -p tsconfig.json && vite build && node tools/copy-assets.mjs",
     "check:config": "node src/light/check.ts",
+    "check:readme": "node tools/readme-parity.mjs",
     "dev:ui": "concurrently -n server,vite -c blue,magenta \"DB_PATH=./data/isitdown.db WEB_DIR=./dist/ui/public node --watch --env-file-if-exists=.env src/ui/server.ts\" \"vite\"",
     "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
     "preversion": "npm run typecheck && npm test && npm run test:integration",

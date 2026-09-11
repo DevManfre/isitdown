@@ -21,6 +21,7 @@ import {
   useServiceMutations,
   useSettingsMutation,
   useStorage,
+  useStorageMaintenance,
 } from "@/hooks/queries.ts";
 import { useFieldProps } from "@/hooks/useBusy.tsx";
 import { formatBytes, formatRelative, hostOf } from "@/lib/format.ts";
@@ -133,6 +134,10 @@ export function Settings() {
   const patchPreferences = usePreferencesMutation();
   const settingsMutation = useSettingsMutation();
   const { data: storage } = useStorage();
+  const storageMaintenance = useStorageMaintenance();
+  const [maintenanceStatus, setMaintenanceStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
+    undefined,
+  );
   const configImport = useConfigImport();
   const [importStatus, setImportStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(undefined);
   const { patch: servicePatch, restore: serviceRestore, purge: servicePurge } = useServiceMutations();
@@ -321,6 +326,40 @@ export function Settings() {
     } catch (error) {
       setImportStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" });
     }
+  };
+
+  /**
+   * Roadmap 6.13. The report is rendered rather than the query re-read for the
+   * figure: `reclaimed` is a number only the run knows — the storage report
+   * before and after it are two sizes, and subtracting them here would be a
+   * second definition of what a vacuum returned.
+   */
+  const runMaintenance = (): void => {
+    setMaintenanceStatus(undefined);
+    storageMaintenance.mutate(undefined, {
+      onSuccess: (report) => {
+        if (!report.ok) {
+          setMaintenanceStatus({
+            text: t("settings.maintenance.failed", { integrity: report.integrity }),
+            tone: "error",
+          });
+          return;
+        }
+        const current = formatBytes(i18n.language, report.bytesAfter);
+        setMaintenanceStatus({
+          text:
+            report.reclaimed === 0
+              ? t("settings.maintenance.nothing", { current })
+              : t("settings.maintenance.reclaimed", {
+                  reclaimed: formatBytes(i18n.language, report.reclaimed),
+                  current,
+                }),
+          tone: "ok",
+        });
+      },
+      onError: (error) =>
+        setMaintenanceStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+    });
   };
 
   const commitRetention = (days: number): void => {
@@ -841,6 +880,40 @@ export function Settings() {
             }}
           />
           <span className="font-mono text-xs text-muted-foreground">{t("unit.days")}</span>
+        </SettingRow>
+
+        {/* Roadmap 6.13. The row above says what the database weighs and the
+            daily prune deletes rows out of it — but sqlite keeps their pages,
+            so that figure never moved after a large prune. This is the button
+            that returns them, with the integrity check that has to pass first. */}
+        <SettingRow
+          label={t("settings.maintenance.label")}
+          description={
+            <>
+              {t("settings.maintenance.hint")}
+              {maintenanceStatus !== undefined && (
+                <span
+                  data-testid="maintenance-result"
+                  className={`mt-0.5 block ${
+                    maintenanceStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"
+                  }`}
+                >
+                  {maintenanceStatus.text}
+                </span>
+              )}
+            </>
+          }
+          align="top"
+        >
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={storageMaintenance.isPending}
+            onClick={runMaintenance}
+          >
+            {storageMaintenance.isPending ? t("settings.maintenance.running") : t("settings.maintenance.run")}
+          </Button>
         </SettingRow>
 
         {/* Roadmap 4.3. Everything above is configurable here and nowhere else,

@@ -96,6 +96,12 @@ export interface UiRuntimeCore {
   enabledProviderIds(): string[];
   providerCount(): number;
   lastCycleAt(): string | null;
+  /**
+   * The last cycle's own outcome, for readiness (roadmap 6.9): `lastCycleAt`
+   * answers "when", and a cycle that finished on time having read nothing is
+   * exactly the failure readiness exists to report. `null` until one completes.
+   */
+  lastCycleSummary(): { finishedAt: string; providers: number; failed: number } | null;
   notificationFeedLimit: number;
   close(): Promise<void>;
 }
@@ -266,6 +272,14 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
         .map((service) => service.id),
     providerCount: () => listServices(db).length,
     lastCycleAt: () => lastCycle?.finishedAt ?? null,
+    lastCycleSummary: () =>
+      lastCycle === undefined
+        ? null
+        : {
+            finishedAt: lastCycle.finishedAt,
+            providers: lastCycle.results.length,
+            failed: lastCycle.results.filter((entry) => !entry.ok).length,
+          },
     notificationFeedLimit: NOTIFICATION_FEED_LIMIT,
     async close(): Promise<void> {
       clearInterval(pruneTimer);

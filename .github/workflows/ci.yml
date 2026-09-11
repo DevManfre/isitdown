@@ -41,6 +41,12 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
+      # Roadmap 7.6. The Italian README is a translation of the English one,
+      # section for section; this fails a hand edit that landed in only one of
+      # them before it can reach main.
+      - name: README translation parity
+        run: npm run check:readme
+
       # Builds every edition once: a compile or bundling error must fail here,
       # not at release time.
       - name: Build (smoke check)
