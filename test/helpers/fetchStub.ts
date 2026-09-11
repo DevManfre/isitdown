@@ -36,7 +36,10 @@ export function stubFetch(respond: (request: CapturedRequest) => Response): Fetc
       url: String(input),
       method: init?.method ?? "GET",
       headers,
-      body: raw === undefined ? undefined : (JSON.parse(raw) as unknown),
+      // Not every channel speaks JSON: ntfy's body is the message text itself,
+      // so an unparseable body is kept as `rawBody` alone rather than throwing
+      // inside the stub and reporting it as the notifier's failure.
+      body: raw === undefined ? undefined : parseJson(raw),
       rawBody: raw,
     };
     requests.push(request);
@@ -49,6 +52,14 @@ export function stubFetch(respond: (request: CapturedRequest) => Response): Fetc
       globalThis.fetch = original;
     },
   };
+}
+
+function parseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 export const jsonResponse = (body: unknown, status = 200): Response =>

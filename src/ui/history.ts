@@ -53,6 +53,32 @@ export interface ProviderHistory {
   previousUptime: number | null;
 }
 
+/**
+ * One day in the year calendar — roadmap 5.20.
+ *
+ * `status` is the day's worst reading, which is what colours the cell, and
+ * `uptime` is how much of it was up, which is what the cell says on hover. The
+ * two are separate for the same reason `buckets` and `dailySeries` are: one bad
+ * sample out of a day's worth colours the cell exactly like a day that was down
+ * throughout, and only the percentage tells the two apart.
+ */
+export interface CalendarDay {
+  day: string;
+  status: OverallStatus;
+  uptime: number | null;
+}
+
+export interface ProviderCalendar {
+  providerId: string;
+  days: number;
+  /** Exactly `days` entries, oldest first, gap-filled with `unknown` / `null`. */
+  cells: CalendarDay[];
+  /** Uptime across the whole window, on the same rule as every other figure here. */
+  uptime: number;
+  /** Days with at least one sample — how much of the year is real rather than gap-filled. */
+  measuredDays: number;
+}
+
 export interface ComponentHistory {
   componentId: string;
   name: string;
@@ -280,6 +306,32 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
   }
 
   /**
+   * A year of day cells for one provider — roadmap 5.20.
+   *
+   * Reads `days` of buckets rather than the shared `WINDOW_DAYS`: that constant
+   * exists to cover a 90-day view and the window it is compared against, and a
+   * year is neither. Retention has been allowed to run to 3650 days since 4.5,
+   * so the samples are there; this is the view that shows them.
+   */
+  async function getProviderCalendar(providerId: string, days: number): Promise<ProviderCalendar> {
+    const today = now();
+    const buckets = await store.getDailyBuckets(providerId, days);
+    const uptimeByDay = new Map(dailySeriesOf(buckets, days, today).map((entry) => [entry.day, entry.uptime]));
+
+    return {
+      providerId,
+      days,
+      cells: fill(buckets, days, today).map((bucket) => ({
+        day: bucket.day,
+        status: bucket.status,
+        uptime: uptimeByDay.get(bucket.day) ?? null,
+      })),
+      uptime: uptimeOver(buckets, days, today),
+      measuredDays: [...uptimeByDay.values()].filter((uptime) => uptime !== null).length,
+    };
+  }
+
+  /**
    * `only` narrows the summary to a caller-supplied set of providers — how the
    * history page drops a disabled one. The store still keeps every provider's
    * samples, so an omitted provider is hidden rather than forgotten, and it
@@ -349,7 +401,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     };
   }
 
-  return { getProviderHistory, getComponentHistories, getSummary };
+  return { getProviderHistory, getProviderCalendar, getComponentHistories, getSummary };
 }
 
 const uptimeKey = (provider: ProviderHistory, days: number): number =>

@@ -6,6 +6,7 @@ import type {
   ComponentHistoryResponse,
   ComponentPreview,
   ConfigImportReport,
+  DbMaintenanceReport,
   DeliveryLogResponse,
   DeliveryState,
   DescribedChannel,
@@ -16,6 +17,7 @@ import type {
   MapResponse,
   OverallStatus,
   Preferences,
+  ProviderCalendar,
   ProviderHistory,
   HistorySummary,
   RoutingResponse,
@@ -85,6 +87,10 @@ export const getHistory = (days: number, provider?: string): Promise<HistorySumm
   provider === undefined
     ? request<HistorySummary>("GET", `/history?days=${days}`)
     : request<ProviderHistory>("GET", `/history?days=${days}&provider=${encodeURIComponent(provider)}`);
+
+/** A year of day cells for one provider — roadmap 5.20. The window is the server's. */
+export const getProviderCalendar = (provider: string) =>
+  request<ProviderCalendar>("GET", `/history/calendar?provider=${encodeURIComponent(provider)}`);
 
 export const getComponentHistory = (provider: string, days: number) =>
   request<ComponentHistoryResponse>(
@@ -202,6 +208,9 @@ export const testService = (id: string) =>
   );
 export const patchSettings = (patch: unknown) => request<unknown>("PATCH", "/config/settings", patch);
 export const getStorage = () => request<StorageReport>("GET", "/config/storage");
+/** Integrity check then vacuum, on demand — roadmap 6.13. */
+export const runStorageMaintenance = () =>
+  request<DbMaintenanceReport>("POST", "/config/storage/maintenance");
 /** The adapter debug panel's two halves — roadmap 5.18. */
 export const getAdapterDebug = () => request<AdapterDebugResponse>("GET", "/debug/adapters");
 /** One read, right now. Records nothing and notifies nothing, like the connection test. */

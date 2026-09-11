@@ -1051,6 +1051,56 @@ describe("Settings retention", () => {
   });
 
   /**
+   * Roadmap 6.13. The row's whole point is the figure it prints afterwards: the
+   * reclaimed bytes come from the run's own report, never from subtracting two
+   * storage reads in the browser.
+   */
+  it("runs the database maintenance and reports what it reclaimed", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const calls = interceptWrites({
+      "POST /config/storage/maintenance": {
+        ok: true,
+        integrity: "ok",
+        bytesBefore: 6_000_000,
+        bytesAfter: 4_500_000,
+        reclaimed: 1_500_000,
+        durationMs: 120,
+      },
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: i18n.t("settings.maintenance.run") }));
+
+    await waitFor(() =>
+      expect(writesIn(calls)).toEqual([
+        { path: "/config/storage/maintenance", method: "POST", body: undefined },
+      ]),
+    );
+    const result = await screen.findByTestId("maintenance-result");
+    expect(result.textContent).toMatch(/1\.5 MB/);
+    expect(result.textContent).toMatch(/4\.5 MB/);
+  });
+
+  it("reports a failed integrity check as an error, and says nothing was rewritten", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    interceptWrites({
+      "POST /config/storage/maintenance": {
+        ok: false,
+        integrity: "row 3 missing from index idx_status_samples_provider_time",
+        bytesBefore: 6_000_000,
+        bytesAfter: 6_000_000,
+        reclaimed: 0,
+        durationMs: 40,
+      },
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: i18n.t("settings.maintenance.run") }));
+
+    const result = await screen.findByTestId("maintenance-result");
+    expect(result.textContent).toMatch(/row 3 missing from index/);
+    expect(result).toHaveClass("text-destructive");
+  });
+
+  /**
    * The delivery section — roadmap 3.11, 3.12, 3.13 and 3.19. Each control is
    * its own instant-apply patch, and the assertion that matters in all four is
    * the same: the patch carries the field that was touched and nothing else,

@@ -16,12 +16,12 @@ Legend:
 - ✅ — shipped; kept listed so the phase reads as a whole.
 - ◐ — partly shipped; the row's note says what is left.
 
-Current state for reference (v1.7.0): Statuspage, generic RSS/Atom, generic
+Current state for reference (v1.9.0): Statuspage, generic RSS/Atom, generic
 HTML-scrape, Slack, AWS, Google Cloud, Azure, Instatus and Better Stack
 adapters, all covered by the shared adapter contract suite;
 every provider read through one HTTP helper that revalidates with `ETag` /
 `Last-Modified`, so most cycles are a 304; a global poll cadence plus an optional
-per-provider one; Telegram, webhook, Discord, Slack and web
+per-provider one; Telegram, webhook, Discord, Slack, ntfy, Gotify and web
 push channels; per-provider / per-severity notification routing rules, with a dry run
 and an explain that names the winning rule; scheduled-maintenance awareness (windows
 silence the diff engine and show on the dashboard and timeline); Prometheus
@@ -41,7 +41,16 @@ a delivery policy on top of the routing rules — quiet hours, a digest window, 
 hourly cap per provider, and an incident whose updates edit one message on the
 channels that can — a hash-anchored request stagger with `Retry-After` honoured
 per provider, an adapter diagnostics panel with the last reads and an on-demand
-one; `en` + `it`.
+one; adapter auto-detection and a 42-provider catalog behind the add dialog;
+provider groups with a derived composite status, addressable from a routing rule
+as `group:<slug>`; a configuration export and import through the Light edition's
+own `config.yml` shape; CSV / JSON exports of the incident search and the daily
+history; a `check` command that validates a Light config without starting the
+poller; a contrast- and keyboard-tested palette with the ratios asserted from
+`tokens.css`; a year heat calendar per provider behind the History drawer;
+readiness split from liveness, with the container's healthcheck on the former;
+an integrity check and vacuum on demand from Settings; a committed Grafana
+dashboard for `/metrics`; a CI gate on README translation parity; `en` + `it`.
 
 ---
 
@@ -95,7 +104,7 @@ is additive and independently shippable.
 | 3.1 ✅ | **Discord** | S | Webhook-shaped, rich embeds. On the README's open list. |
 | 3.2 ✅ | **Slack** | S | Incoming webhook + Block Kit. Same. |
 | 3.3 | **Email (SMTP)** | M | The most-asked-for channel in self-hosted tools, and the only one that adds a real runtime dependency (an SMTP client) to a project that currently has three. Weigh that against the principle. |
-| 3.4 | **ntfy / Gotify** | S each | Self-hosted push, exactly this project's audience. ntfy in particular is a single POST. |
+| 3.4 ✅ | **ntfy / Gotify** | S each | Self-hosted push, exactly this project's audience. Both shipped as one notifier each. ntfy is one POST whose body *is* the message: the topic URL carries the server, so ntfy.sh and a self-hosted instance are the same setting, the heading travels as an RFC 2047 `Title` header and the status page as `Click`; its token is optional, since a public topic needs none. Gotify takes its server plus an application token, posted to `/message` with the token in `X-Gotify-Key` rather than the query string a URL would carry into the logs. Both map severity onto the channel's own priority scale (ntfy 1–5, Gotify 0–10), so which alert is allowed to ring at night is a property of the reading rather than a rule rebuilt on every phone. |
 | 3.5 | **Pushover** | S | Paid but trivially simple; popular. |
 | 3.6 | **Matrix** | M | Homeserver + room id + access token. |
 | 3.7 | **PagerDuty / Opsgenie Events API** | M | Moves IsItDown from "notifier" to "part of an on-call chain". Needs dedupe keys and a resolve event, which maps cleanly onto the existing incident lifecycle. |
@@ -130,7 +139,7 @@ is additive and independently shippable.
 | 4.11 ✅ | **`homepage` / Dashy widget endpoint** | S | A single summary JSON in the shape those dashboards expect. Trivial, and it puts IsItDown on a lot of homelab home pages. |
 | 4.12 | **Home Assistant integration** | M | Expose providers as binary sensors (MQTT or REST). Same audience, deeper hook. |
 | 4.13 | **Per-provider SLA target and error budget** | M | A monthly target (`99.9`) per provider, the budget it implies, how much of it the month has spent, and an alert when the burn rate says the month will miss. Turns history from "what happened" into "does this vendor meet what we were promised", and the samples to compute it are already stored. |
-| 4.14 | **Ship a Grafana dashboard JSON** | S | 4.1 exposes the metrics and leaves the panels as an exercise. One committed dashboard file (fleet status, poll duration, notification rate) makes the integration a copy-paste instead of an afternoon. |
+| 4.14 ✅ | **Ship a Grafana dashboard JSON** | S | `docs/grafana/isitdown.json`, three rows: the fleet (providers polled, providers not operational, open incidents, time since the last cycle, providers we have gone blind on) over a per-provider status timeline, polling (duration and failure rate), and notifications (deliveries per channel and outcome, plus a day's failures). It carries a datasource variable rather than a hardcoded uid, so an import is upload-and-pick. A test checks every query in the file against the metric names `/metrics` actually renders, so a renamed series fails the build instead of quietly emptying a panel. |
 | 4.15 | **Read-only API token** | S ⚠️ | Every route is open, which is right on `127.0.0.1` and wrong the moment 4.11's widget or 5.1's page has to be reachable from another host. One bearer token granting read-only access is the smallest thing that unblocks those two without becoming user management. |
 
 ## 5. Dashboard
@@ -156,7 +165,7 @@ is additive and independently shippable.
 | 5.17 ✅ | **Set a channel credential from the dashboard** | M | Settings took only the *name* of the environment variable, so configuring a channel meant editing `.env` and recreating the container. A value now goes to `secrets.env` beside the database (`0600`, in the data volume) and into the process environment, live on the next request; the database still stores only the variable name and no route reads a value back. |
 | 5.18 ✅ | **Adapter debug panel** | S | Shipped as `GET /debug/adapters` plus a **Diagnose** dialog beside each provider's settings row: the last twenty read outcomes per provider (duration, attempts, whether it was a 304, and the error in full) and a **Read now** button that reports the whole parsed reading. A page that reads but parses into nothing — the scrape adapter's own failure mode — is called out rather than left looking healthy. |
 | 5.19 ✅ | **Incident search and filter** | S | The incident list is chronological and unfiltered. Free text over titles plus the existing status pills and a 7/30/90-day window, all three in SQL: the list is one page of 20 rows, so a search in the browser would search that page and report the result as the whole history. The counts follow the search; the hero card deliberately does not, so an open incident cannot vanish while an operator types. |
-| 5.20 | **Year heat calendar** | S | 365 day cells per provider, coloured by that day's worst status. The 90-day bars are the widest view today; retention can now go past a year (4.5), and this is the view that makes the extra data say something — and what 8.2 would read from. |
+| 5.20 ✅ | **Year heat calendar** | S | `GET /history/calendar?provider=` answers 365 gap-filled day cells — worst status plus how much of the day was up — and the History drawer draws them a week per column, under the bar row whose five colours it shares. An unsampled day is muted `unknown` with no percentage, never a green 0%. The window is fixed and named in the response rather than taken as a `days`, which kept a fourth pill off the 7/30/90 range control; the service reads its own window instead of the 180-day one the 90-day views share. |
 | 5.21 | **PWA install and a phone layout** | M | Web push already reaches a phone, then hands the notification to a dashboard laid out for a desktop and not installable. A manifest, a service worker and a narrow overview layout would make the alert lead somewhere usable. |
 
 ## 6. Operations and packaging
@@ -171,11 +180,11 @@ is additive and independently shippable.
 | 6.6 | **Unraid template / Home Assistant add-on** | S each | Distribution, not features. Reaches the exact audience. |
 | 6.7 | **Single-binary build (Node SEA)** | M | For people who want neither Docker nor a Node install. Light edition only, realistically. |
 | 6.8 ✅ | **SBOM + signed images** | S | `cosign` keyless signing plus SBOM/provenance on the release build. |
-| 6.9 | **Split readiness and liveness probes** | S | The current healthcheck conflates "the process is alive" with "polling is working". |
+| 6.9 ✅ | **Split readiness and liveness probes** | S | `/health` is now liveness and only that — it must never fail because a provider is unreachable, since a restart is not the answer to someone else's outage. `/ready` is the reading an operator actually wants: `503` when no cycle has completed, when the last one is more than three poll intervals old (the Light edition's own rule for its state file), or when every provider failed in it, each with the `reason` in the body. The container's healthcheck asks `/ready`, which is what closes the original hole — an instance whose cycle had been failing all day reported healthy — at the cost of a longer start period, since readiness stays 503 until the backfill and first cycle are done. |
 | 6.10 | **OpenTelemetry traces** | M ⚠️ | Useful for debugging a slow cycle, but it adds a runtime dependency to a project whose whole pitch is three of them. Probably a no. |
 | 6.11 | **Log to file with rotation** | S | Today logs go to stdout only, which is right for Docker and wrong for a bare-metal install. |
 | 6.12 ✅ | **`check` command for a Light config** | S | `node dist/light/check.js [--probe] [path]` reads the file through the loader itself and prints every problem rather than the first: unresolved `${VAR}` references by name, schema rejections, duplicate service ids, routing rules naming something the file does not define, and adapters the registry does not have. `--probe` also asks each enabled provider's page which adapter recognises it — off by default, since a check that reaches the network is not something CI can depend on. Exits `0`/`1`/`2`, so an operator can gate on it. Collecting the problems meant giving the loader an `inspectConfig` that reports all of them and leaving `loadConfig` to throw the first, so there is still one definition of what a valid file is. |
-| 6.13 | **Database maintenance from the UI** | S | `PRAGMA integrity_check` plus a `VACUUM` after a large prune, surfaced as one button that reports the bytes reclaimed. Pairs with 4.4: the two things anyone does to a SQLite file they care about. |
+| 6.13 ✅ | **Database maintenance from the UI** | S | **Settings → Data → Check and compact**, behind `POST /config/storage/maintenance`: `PRAGMA integrity_check` first and a `VACUUM` only if it passes, because a file whose pages are already wrong must be reported rather than rewritten. The answer carries the bytes reclaimed, which is the sentence the storage report above it could not finish — the daily prune deletes rows and sqlite keeps their pages. A failed check is a `200` with `ok: false` and sqlite's own words, since the operator asked a question and got the answer. |
 
 ## 7. Internal quality
 
@@ -186,7 +195,7 @@ is additive and independently shippable.
 | 7.3 | **Mutation testing on the diff engine** | M | The diff engine is the one place where a passing test suite that does not actually constrain behaviour would be dangerous. It is small enough that mutation testing is affordable exactly there. |
 | 7.4 | **Load / soak test** | M | 200 providers, a week of simulated history. Finds the point where the SQLite reads or the overview render fall over. |
 | 7.5 | **Docs split** | S | `README.md` is ~69k and has to be both a landing page and a manual. Splitting into `docs/` with a short README would make both jobs easier — at the cost of the current "everything is in one file" property, which is genuinely nice. |
-| 7.6 ◐ | **Keep `README.it.md` in sync automatically** | S | Two 70k documents drift. The `readme-translation-sync` skill now makes the sync part of the same pass and carries the parity commands (heading skeleton, per-level heading and fence counts, identifiers named in one file but not the other) — writing it found real drift already there: the Italian `confirmSamples` row and the whole web-push channel were missing. What is left is the CI check, so a hand-edited README cannot reach `main` unsynced. |
+| 7.6 ✅ | **Keep `README.it.md` in sync automatically** | S | The skill made the sync part of the same pass; `tools/readme-parity.mjs` (`npm run check:readme`, a step in the `verify` job) makes CI enforce it. It compares the numbered heading skeleton, the per-level heading, fence and table-row counts, and the identifiers each file names — routes, shouted variable names, npm scripts — which a translation copies verbatim, so one appearing in a single file is either a section that was never ported or a flag someone translated. Structure only: it never claims to check meaning, and a native review of the prose is still 5.15. |
 | 7.7 ✅ | **Fuzz the adapters with malformed payloads** | S | Shipped inside the contract kit (1.11), so every adapter is held to it: each one's own well-formed fixture is served back empty, blank, truncated, as a bare `null`/`[]`/`{}` and with every value re-typed, and the adapter must either reject with an `Error` or degrade to a reading that validates — never hang, and never read `operational` out of a document that says nothing. It found two real ones on the first run: Slack's `/current` schema defaulted a missing incident list to `[]`, so a `{}` read as healthy, and the assertion itself was wrong for AWS and Google Cloud, whose flat event feeds mean "nothing is open" by being empty. |
 
 ## 8. Speculative
@@ -210,17 +219,39 @@ not re-invented from scratch later.
 
 ## Suggested next slice
 
-Every row that needed no product decision first is spent: the tables above are
-marked ✅ down to the ones that do. What is left is a choice, not a queue.
+The six rows of the previous slice all shipped (3.4, 4.14, 5.20, 6.9, 6.13,
+7.6), and with them every row that needed no product decision *and* fit an
+existing seam cleanly. What is left divides into three kinds, and the honest
+answer is that the next slice is smaller than the last one.
 
-The cheap rows are the ones to reach for if a slice needs filling: **7.6's CI
-gate** (the sync skill covers the writing, not a hand-edited push), **4.14 a
-committed Grafana dashboard**, **6.13 database maintenance from the UI**, and
-**5.20 the year heat calendar**, which is the view that makes a retention window
-past a year say something.
+**Cheap and additive, in the order they earn their keep:**
 
-The two items that most change *what IsItDown is*, and therefore deserve a
-decision rather than a slot in a queue, are **1.8 direct HTTP probes** (with
-1.9, 1.10 and 8.1 behind it) and **5.1 the public status page** (which drags
-4.15's token with it). **2.10 provider push** is a third, smaller one: it
-inverts the whole data flow for the subset of providers that support it.
+1. **4.9 an RSS / iCal feed of incidents** — the incident history is already
+   paged, filtered and exported as CSV/JSON; a feed is the same rows in the one
+   shape a reader or a calendar consumes without an API client. It reuses
+   `readIncidentQuery` and adds no state.
+2. **7.2 a coverage floor** — not a target to game: a floor that fails when a
+   new subsystem lands untested. The suite is large enough now that a gap is
+   invisible without one, and the translation gate just showed how cheap a
+   `verify` step is.
+3. **5.16 a bundle-size budget** — the dashboard carries Recharts, motion, cobe
+   and dotted-map, and now a year calendar. A CI check that fails on a
+   regression keeps it from quietly becoming a megabyte.
+4. **5.7 comparing two providers' uptime series** — the history page ranks
+   providers worst-first but never puts two side by side, which is the question
+   a vendor decision actually asks.
+5. **6.11 log to file with rotation** — stdout is right for Docker and wrong for
+   the bare-metal install the Light edition is otherwise perfect for.
+
+**Rows that need a decision before they need an implementer**, unchanged: **1.8
+direct HTTP probes** (with 1.9, 1.10 and 8.1 behind it) and **5.1 the public
+status page** (which drags 4.15's read-only token with it). **2.10 provider
+push** is a third, smaller one: it inverts the data flow for the subset of
+providers that support it. **3.3 email (SMTP)** is the same shape of decision at
+notifier scale — the most-asked-for channel, and the only one that adds a real
+runtime dependency to a project whose pitch is three of them.
+
+**Rows that are work rather than a slice**: **7.5 the docs split** (a 70k README
+that is both landing page and manual — now with a translation gate to keep in
+step through the move), **4.13 SLO and error budget**, and **5.21 the PWA
+install plus phone layout**, which is where web push already points.

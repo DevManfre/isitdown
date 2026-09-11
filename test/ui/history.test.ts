@@ -261,6 +261,49 @@ test("a month with no samples reports no uptime rather than zero percent", async
   }
 });
 
+test("the year calendar returns one cell per day, oldest first, gap-filled", async () => {
+  // Roadmap 5.20. Retention may run to 3650 days, so a sample 300 days back is
+  // real data the 90-day views simply never showed.
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(300), "major_outage");
+  await sample(store, "github", daysAgo(0), "operational");
+
+  const calendar = await history.getProviderCalendar("github", 365);
+
+  assert.equal(calendar.cells.length, 365);
+  assert.equal(calendar.cells[0]?.day, daysAgo(364).slice(0, 10));
+  assert.equal(calendar.cells.at(-1)?.day, daysAgo(0).slice(0, 10));
+  assert.equal(calendar.cells[64]?.status, "major_outage", "the sample 300 days back");
+  assert.equal(calendar.cells.at(-1)?.status, "operational");
+  assert.equal(calendar.measuredDays, 2, "the rest of the year was never sampled");
+  await store.close();
+});
+
+test("a calendar day mixing readings is coloured by its worst and says how much of it was up", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(1, 8), "operational");
+  await sample(store, "github", daysAgo(1, 9), "major_outage");
+  await sample(store, "github", daysAgo(1, 10), "operational");
+
+  const calendar = await history.getProviderCalendar("github", 365);
+  const day = calendar.cells.find((cell) => cell.day === daysAgo(1).slice(0, 10));
+
+  assert.equal(day?.status, "major_outage", "the worst reading colours the cell");
+  assert.equal(day?.uptime, 66.67, "and the percentage is what tells it from a whole day down");
+  await store.close();
+});
+
+test("an unsampled calendar day is unknown with no percentage, never zero", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(0), "operational");
+
+  const calendar = await history.getProviderCalendar("github", 365);
+
+  assert.equal(calendar.cells[0]?.status, "unknown");
+  assert.equal(calendar.cells[0]?.uptime, null);
+  await store.close();
+});
+
 test("component histories are gap-filled and windowed like the provider's", async () => {
   const { store } = await harness();
   // "c1" gets a day of 20 component samples, 10 of them operational, one day

@@ -388,6 +388,34 @@ describe("a provider's detail drawer", () => {
     expect(await within(drawer).findByText(i18n.t("components.rows-title"))).toBeInTheDocument();
   });
 
+  /**
+   * Roadmap 5.20. The drawer is where a provider's own history lives, so it is
+   * where the year the retention window has been keeping shows up.
+   */
+  it("shows the year heat calendar under the daily bars", async () => {
+    renderWithProviders(<History />, {
+      ...withDrawer,
+      providerCalendar: {
+        providerId: "cloudflare",
+        days: 365,
+        uptime: 99.42,
+        measuredDays: 120,
+        cells: [
+          { day: "2026-08-19", status: "operational", uptime: 100 },
+          { day: "2026-08-20", status: "major_outage", uptime: 12.5 },
+        ],
+      },
+    });
+
+    const drawer = await openCloudflare();
+
+    expect(await within(drawer).findByText(i18n.t("history.calendar-title"))).toBeInTheDocument();
+    const calendar = await within(drawer).findByRole("img", {
+      name: i18n.t("history.calendar-summary", { days: 2, measured: 120, uptime: "99.42" }),
+    });
+    expect(calendar.querySelectorAll("[data-day]")).toHaveLength(2);
+  });
+
   it("gives the daily bars a colour legend they never had", async () => {
     renderWithProviders(<History />, withDrawer);
 
