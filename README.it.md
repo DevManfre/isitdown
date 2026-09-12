@@ -50,6 +50,7 @@ server) e **UI** (lo stesso motore più una dashboard locale, configurabile a ru
   - [4.1 Immagini e target di build](#41-immagini-e-target-di-build)
   - [4.2 Profili compose](#42-profili-compose)
   - [4.3 Volumi, healthcheck, utenti](#43-volumi-healthcheck-utenti)
+  - [4.4 Kubernetes](#44-kubernetes)
 - [5. Verificare un deployment](#5-verificare-un-deployment)
   - [5.1 Controlli rapidi](#51-controlli-rapidi)
   - [5.2 La dashboard](#52-la-dashboard)
@@ -1267,6 +1268,52 @@ Entrambi i container si fermano in modo pulito su `SIGTERM`: lo scheduler si arr
 il ciclo in corso viene atteso, lo store viene chiuso, exit 0.
 
 ---
+
+### 4.4 Kubernetes
+
+Entrambe le edizioni arrivano come manifest e come chart Helm, sotto `deploy/`:
+
+```bash
+# Manifest semplici, senza Helm
+kubectl apply -f deploy/k8s/ui.yaml
+kubectl port-forward svc/isitdown-ui 3000:3000
+
+# Oppure il chart, per una delle due edizioni
+helm install isitdown deploy/helm/isitdown --set edition=ui
+helm install isitdown-light deploy/helm/isitdown --set edition=light
+```
+
+Un chart solo e non due, perché le due edizioni sono un unico codebase e
+differiscono esattamente in tre punti che a un chart interessano: l'edizione UI
+serve HTTP e quindi ha un Service e delle probe HTTP, l'edizione Light legge un
+`config.yml` e quindi ha una ConfigMap, e ognuna ha il suo tag immagine.
+`edition` sceglie quale, e un valore che non esiste fa fallire il render invece
+di produrre mezza release.
+
+Tre proprietà sono volute e non default:
+
+- **Una sola replica, e `Recreate` invece di `RollingUpdate`.** Entrambe le
+  edizioni possiedono un file nel volume dati — il database SQLite dell'edizione
+  UI, il file di stato di quella Light — quindi una seconda replica è un secondo
+  poller che scrive lo stesso file, e un rolling update resterebbe fermo ad
+  aspettare un volume `ReadWriteOnce` che il pod uscente tiene ancora.
+- **`livenessProbe` su `/health`, `readinessProbe` su `/ready`** (§4.3). Un
+  provider irraggiungibile non deve mai far riavviare il pod, e un pod i cui
+  cicli stanno fallendo non deve ricevere traffico. L'edizione Light non espone
+  HTTP affatto, quindi la sua liveness probe esegue lo stesso script
+  dell'`HEALTHCHECK` dell'immagine.
+- **Il claim sopravvive alla release.** Il PVC porta
+  `helm.sh/resource-policy: keep`: la cronologia, gli incidenti e le credenziali
+  salvate dalla dashboard non sono roba che un `helm uninstall` debba portarsi
+  via.
+
+Le credenziali stanno in un Secret e arrivano al container come variabili
+d'ambiente, esattamente come sotto Docker — `secrets:` in `values.yaml` per
+partire in fretta, `existingSecret:` per un cluster dove i values finiscono in un
+repository. Il `config.yml` dell'edizione Light è `config:` in `values.yaml`,
+reso in una ConfigMap e montato in sola lettura; i riferimenti `${VAR}` al suo
+interno si risolvono contro quello stesso Secret. Una modifica fa ruotare il pod,
+perché una ConfigMap montata che cambia su disco non riavvia nulla da sola.
 
 ## 5. Verificare un deployment
 

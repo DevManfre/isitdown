@@ -1,0 +1,14 @@
+{{- if eq .Values.edition "light" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "isitdown.fullname" . }}-config
+  labels:
+    {{- include "isitdown.labels" . | nindent 4 }}
+data:
+  # Mounted read-only at /app/config/config.yml. Credentials belong in the
+  # Secret as `${VAR}` references, never as literals here: a ConfigMap is
+  # readable by anything that can read the namespace.
+  config.yml: |
+    {{- .Values.config | nindent 4 }}
+{{- end }}

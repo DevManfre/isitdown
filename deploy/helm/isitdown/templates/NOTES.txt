@@ -1,0 +1,25 @@
+IsItDown ({{ .Values.edition }} edition) is installed as {{ include "isitdown.fullname" . }}.
+
+{{ if eq .Values.edition "ui" -}}
+Reach the dashboard:
+
+{{ if .Values.ingress.enabled -}}
+{{- range .Values.ingress.hosts }}  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else -}}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "isitdown.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  open http://localhost:{{ .Values.service.port }}
+{{- end }}
+
+Everything else — providers, channels, routing — is configured in the dashboard.
+{{- else -}}
+This edition has no dashboard. It polls and notifies, and its configuration is
+the ConfigMap {{ include "isitdown.fullname" . }}-config:
+
+  kubectl --namespace {{ .Release.Namespace }} logs deploy/{{ include "isitdown.fullname" . }} -f
+{{- end }}
+
+{{ if not .Values.persistence.enabled -}}
+WARNING: persistence is disabled. Every sample, incident and saved credential
+goes away with the pod.
+{{- end }}

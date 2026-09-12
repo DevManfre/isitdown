@@ -50,6 +50,7 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
   - [4.1 Images and build targets](#41-images-and-build-targets)
   - [4.2 Compose profiles](#42-compose-profiles)
   - [4.3 Volumes, healthchecks, users](#43-volumes-healthchecks-users)
+  - [4.4 Kubernetes](#44-kubernetes)
 - [5. Verifying a deployment](#5-verifying-a-deployment)
   - [5.1 Smoke checks](#51-smoke-checks)
   - [5.2 The dashboard](#52-the-dashboard)
@@ -1235,6 +1236,51 @@ Both containers stop cleanly on `SIGTERM`: the scheduler stops, the in-flight cy
 is awaited, the store is closed, exit 0.
 
 ---
+
+### 4.4 Kubernetes
+
+Both editions ship as manifests and as a Helm chart, under `deploy/`:
+
+```bash
+# Plain manifests, no Helm
+kubectl apply -f deploy/k8s/ui.yaml
+kubectl port-forward svc/isitdown-ui 3000:3000
+
+# Or the chart, either edition
+helm install isitdown deploy/helm/isitdown --set edition=ui
+helm install isitdown-light deploy/helm/isitdown --set edition=light
+```
+
+One chart rather than two, because the two editions are one codebase and differ
+in exactly three ways a chart cares about: the UI edition serves HTTP and so has
+a Service and HTTP probes, the Light edition reads a `config.yml` and so has a
+ConfigMap, and each has its own image tag. `edition` picks which, and an
+unrecognised value fails the render rather than producing half a release.
+
+Three properties are deliberate rather than defaults:
+
+- **One replica, and `Recreate` rather than `RollingUpdate`.** Both editions own
+  a file in the data volume — the UI edition's SQLite database, the Light
+  edition's state file — so a second replica is a second poller writing the same
+  file, and a rolling update would stall waiting for a `ReadWriteOnce` volume the
+  outgoing pod still holds.
+- **`livenessProbe` on `/health`, `readinessProbe` on `/ready`** (§4.3). A
+  provider being unreachable must never restart the pod, and a pod whose cycles
+  have been failing must not be sent traffic. The Light edition has no HTTP
+  surface at all, so its liveness probe runs the same script the image's own
+  `HEALTHCHECK` does.
+- **The claim outlives the release.** The PVC carries
+  `helm.sh/resource-policy: keep`: the history, the incidents and the credentials
+  saved from the dashboard are not something a `helm uninstall` should take with
+  it.
+
+Credentials go in a Secret and reach the container as environment variables,
+exactly as they do under Docker — `secrets:` in `values.yaml` for a quick start,
+`existingSecret:` for a cluster where values end up in a repository. The Light
+edition's `config.yml` is `config:` in `values.yaml`, rendered into a ConfigMap
+and mounted read-only; `${VAR}` references in it resolve against that same Secret.
+An edit to it rolls the pod, because a mounted ConfigMap changing on disk
+restarts nothing on its own.
 
 ## 5. Verifying a deployment
 
