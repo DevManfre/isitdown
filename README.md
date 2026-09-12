@@ -344,6 +344,9 @@ list is never overwritten afterwards.
 | `GOTIFY_TOKEN` | both | — | Gotify application token. Required with the above. |
 | `WEBHOOK_SECRET` | both | — | Optional shared secret for the generic webhook. Set it and every request is signed (see [3.6](#36-notification-channels)); leave it unset and requests go out unsigned, exactly as before. |
 | `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
+| `LOG_FILE` | both | — | Also append every log line to this file, rotated by size. Unset, logs go to stdout only. |
+| `LOG_MAX_BYTES` | both | `5242880` | Size at which `LOG_FILE` rotates. |
+| `LOG_MAX_FILES` | both | `5` | How many rotated generations (`.1` … `.5`) survive beside the live file. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Where to read `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Where to keep the state file. |
 | `DB_PATH` | UI | `/app/data/isitdown.db` | SQLite database. |
@@ -1096,6 +1099,13 @@ means there is something to open. A provider that has never been read
 successfully is not "trouble" — a first cycle that has not landed yet must not
 show a red tab — and a disabled provider is off the dashboard entirely.
 
+Every view's toolbar follows one rule: a control that changes what is on screen
+is a segmented tray — joined buttons in a tinted, bordered strip, with the
+active one lifted out of it — and everything that takes the view away with you
+sits behind a single **Download** menu. Before, a range toggle, two download
+sentences and two format pairs were all ghost buttons of the same weight, and
+nothing said which of them belonged together.
+
 On **History**, clicking a provider's row opens its drawer: the three windows,
 the daily bars with their colour key, and — roadmap 5.20 — a **year heat
 calendar**, one cell per day coloured by that day's worst status. Retention can
@@ -1103,6 +1113,14 @@ run to 3650 days, while the widest chart stayed a 90-day bar row, so everything
 older was stored and never shown; the calendar is that year. A day nobody
 sampled is drawn muted rather than green, and hovering a cell says what the day
 was and how much of it was up.
+
+Above the list, **Compare** (roadmap 5.7) overlays two providers' daily uptime on
+one pair of axes — the question a vendor decision actually asks, and the one the
+worst-first ranking cannot answer because it never puts two rows on the same
+scale. It opens on the two worst providers, either picker changes a side, and
+picking the provider already on the other side swaps them. The two lines take
+their own colours rather than status colours: the chart says which measured
+better, not that one of them is operational and the other is not.
 
 The same data over HTTP:
 
@@ -1340,6 +1358,14 @@ For the Light edition, set the same two variables, `telegram.enabled: true` in
 Turn up the detail with `LOG_LEVEL=debug`, which logs every individual poll attempt
 including retries.
 
+Logs go to stdout, which is what a container wants and what a bare-metal install
+does not: set `LOG_FILE=/var/log/isitdown/isitdown.log` and the same lines are
+also appended there, rotated at `LOG_MAX_BYTES` into `LOG_MAX_FILES` numbered
+generations. The file is additional — stdout keeps carrying everything, so
+`docker logs` still works on a container that has both. A path that cannot be
+written disables the file after saying so once on stdout; polling and
+notifications are never held up by a full or read-only disk.
+
 ---
 
 ## 6. HTTP API
@@ -1361,6 +1387,8 @@ back reports a parse failure instead of the real problem.
 | `GET` | `/export/incidents.json?provider=&state=&q=&days=` | The same rows as `{ generatedAt, filter, count, truncated, incidents }` — `filter` echoes what the export was taken with, so a file found later still says what it is. |
 | `GET` | `/export/history.csv?provider=&days=` | Uptime history as one row per provider per day: `provider_id,day,worst_status,uptime_pct`. `days` accepts `7`, `30` or `90`, like `/history`; `provider` narrows to one (`404` on an unknown id), and without it, every enabled provider. |
 | `GET` | `/export/history.json?provider=&days=` | The same window as `{ generatedAt, days, providers }`, each provider carrying the buckets, the daily series and the window's percentages the charts are drawn from. |
+| `GET` | `/feeds/incidents.xml?provider=&state=&q=&days=` | The incident search's own result as an RSS 2.0 feed — roadmap 4.9. The same filters `/incidents` takes, newest 200, served inline so a reader subscribes instead of saving a file. Each item links back into the dashboard's own route for that incident, and its `guid` is the `provider/incident` pair rather than the link. |
+| `GET` | `/feeds/incidents.ics?provider=&state=&q=&days=` | The same rows as an iCalendar file, one `VEVENT` per incident: it starts when the incident was first seen and ends when it resolved, or at the last update while it is still `TENTATIVE`. |
 | `GET` | `/maintenances?provider=&days=` | Declared maintenance windows — running, upcoming and past — as `{ maintenances }`. `days` bounds how far back a closed window is still returned (default 90, max 365); `provider` narrows to one. Without `provider`, every enabled provider. |
 | `GET` | `/notifications?limit=` | What was actually sent, newest first. Capped at 200. |
 | `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | One page of the delivery log: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` is `all` (default), `sent` or `failed`; `channel` narrows to one channel; `pageSize` defaults to 25 and is capped at 200. A nonsense `page`, `pageSize` or `state` falls back rather than 400s. `counts` carries every outcome whatever the filter. Each item carries `attempts`: a failed send with more than one is a dead letter. |
@@ -2112,13 +2140,28 @@ mode.
 
 ```bash
 npm test                 # node:test suites + vitest run
+npm run coverage         # the same two suites under a coverage floor
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
 npm run test:visual      # visual baselines: every view, both themes, both locales
+npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
 npm run build:light      # tsc + copy assets, excluding src/ui
 npm run build:ui         # tsc + vite build + copy assets
 ```
+
+The bundle budget (roadmap 5.16) weighs what `build:ui` emitted, gzipped,
+because that is what the browser downloads: `410 kB` of JavaScript and `20 kB` of
+CSS, both a little over today's build. It is a ceiling rather than a target —
+when it fails, the answer is to find what grew, not to raise the number.
+
+The coverage floor (roadmap 7.2) is a floor, not a target to game. Two of them,
+because the two suites cover different halves: the server and the engine must
+stay at 95% of lines, 88% of branches and 93% of functions, and the dashboard at
+85/75/80 — each a few points under where it stands today, so ordinary movement
+passes and a new subsystem landing with no test of its own drags the total under
+and fails CI. Raise a floor when the suite has genuinely climbed; never lower one
+to make a red run green.
 
 **No test ever touches a live provider.** Adapters are tested against payloads
 recorded from the real status pages and kept under `test/fixtures/`; HTTP behaviour

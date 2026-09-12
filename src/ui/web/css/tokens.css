@@ -83,6 +83,14 @@
      accent button do not read as two different indigos. */
   --status-accent: #473c9e;
 
+  /* Roadmap 5.7. Two providers overlaid on one chart need two marks that read
+     as identities rather than as verdicts: a severity colour here would say
+     the greener vendor is operational and the other one is not. Left borrows
+     the accent the trend line already uses; right is a teal far enough from
+     both the accent and every status hue to stay apart at a one-pixel stroke. */
+  --compare-left: #473c9e;
+  --compare-right: #0e7490;
+
   /* The same severities painted, not written: a bar, ring or dot is a graphic
      (3:1), not text (4.5:1), so these sit one step brighter than the written
      set — light enough to stay apart from each other, dark enough to clear
@@ -264,6 +272,9 @@
   --status-unknown: #9397ab;
   --status-accent: #9184d9;
 
+  --compare-left: #9184d9;
+  --compare-right: #4bb3c9;
+
   --status-operational-fill: #56a37f;
   --status-degraded-fill: #d8a34a;
   --status-partial-outage-fill: #de8c4f;
@@ -416,6 +427,9 @@
     --status-major-outage: #e2685f;
     --status-unknown: #9397ab;
     --status-accent: #9184d9;
+
+    --compare-left: #9184d9;
+    --compare-right: #4bb3c9;
 
     --status-operational-fill: #56a37f;
     --status-degraded-fill: #d8a34a;

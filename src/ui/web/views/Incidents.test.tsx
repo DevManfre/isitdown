@@ -440,18 +440,41 @@ describe("Incidents", () => {
     await userEvent.type(screen.getByRole("searchbox", { name: i18n.t("incidents.search.label") }), "api");
     await userEvent.click(screen.getByRole("radio", { name: i18n.t("incidents.window.days", { count: 30 }) }));
 
-    const group = within(screen.getByRole("group", { name: i18n.t("incidents.export.label") }));
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("action.download") }));
+
     // The export is a link rather than a fetch: the response is a download.
     await waitFor(() => {
-      expect(group.getByRole("link", { name: "csv" })).toHaveAttribute(
+      expect(screen.getByRole("menuitem", { name: i18n.t("incidents.export.csv") })).toHaveAttribute(
         "href",
         "/export/incidents.csv?state=all&q=api&days=30",
       );
     });
-    expect(group.getByRole("link", { name: "json" })).toHaveAttribute(
+    expect(screen.getByRole("menuitem", { name: i18n.t("incidents.export.json") })).toHaveAttribute(
       "href",
       "/export/incidents.json?state=all&q=api&days=30",
     );
+  });
+
+  it("offers the same rows as a feed and as a calendar, filters included", async () => {
+    renderWithProviders(<Incidents />, fixtures);
+    expect(await list().findByText("API errors")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole("searchbox", { name: i18n.t("incidents.search.label") }), "api");
+
+    // A feed is subscribed to rather than downloaded, so it is its own labelled
+    // section of the menu rather than two more formats among the exports.
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("action.download") }));
+    await waitFor(() => {
+      expect(screen.getByRole("menuitem", { name: i18n.t("incidents.subscribe.rss") })).toHaveAttribute(
+        "href",
+        "/feeds/incidents.xml?state=all&q=api",
+      );
+    });
+    expect(screen.getByRole("menuitem", { name: i18n.t("incidents.subscribe.ics") })).toHaveAttribute(
+      "href",
+      "/feeds/incidents.ics?state=all&q=api",
+    );
+    expect(screen.getByText(i18n.t("incidents.subscribe.label"))).toBeInTheDocument();
   });
 
   it("carries the chosen state filter into the export", async () => {
@@ -460,9 +483,9 @@ describe("Incidents", () => {
 
     await userEvent.click(screen.getByRole("radio", radioNamed(i18n.t("filter.resolved"))));
 
-    const group = within(screen.getByRole("group", { name: i18n.t("incidents.export.label") }));
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("action.download") }));
     await waitFor(() => {
-      expect(group.getByRole("link", { name: "csv" })).toHaveAttribute(
+      expect(screen.getByRole("menuitem", { name: i18n.t("incidents.export.csv") })).toHaveAttribute(
         "href",
         "/export/incidents.csv?state=resolved",
       );

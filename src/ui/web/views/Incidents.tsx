@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { DownloadMenu } from "@/components/DownloadMenu.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
@@ -234,22 +235,51 @@ export function Incidents() {
    * fetch, because the response is a download and the browser already knows how
    * to save one.
    */
-  const exportHref = (format: "csv" | "json"): string => {
+  const searchParams = (): string => {
     const params = new URLSearchParams({ state: filter });
     if (query !== "") params.set("q", query);
     if (days !== 0) params.set("days", String(days));
-    return `/export/incidents.${format}?${params.toString()}`;
+    return params.toString();
   };
 
-  const exportControl = (
-    <div className="flex items-center gap-1" role="group" aria-label={t("incidents.export.label")}>
-      <span className="text-xs text-muted-foreground">{t("incidents.export.label")}</span>
-      {(["csv", "json"] as const).map((format) => (
-        <Button key={format} asChild variant="ghost" size="sm" className="h-8 px-2 font-mono text-xs uppercase">
-          <a href={exportHref(format)}>{format}</a>
-        </Button>
-      ))}
-    </div>
+  const exportHref = (format: "csv" | "json"): string =>
+    `/export/incidents.${format}?${searchParams()}`;
+
+  /**
+   * The feeds are the same rows in the shape a reader or a calendar consumes
+   * (roadmap 4.9), and they carry the search too — a subscription is a question
+   * left running, so it is worth being able to narrow it before copying the
+   * url. Their own group rather than two more formats inside the export: these
+   * are subscribed to, not saved.
+   */
+  const feedHref = (format: "xml" | "ics"): string => `/feeds/incidents.${format}?${searchParams()}`;
+
+  /**
+   * One menu rather than two rows of format pills (roadmap 4.6 and 4.9): the
+   * export and the feeds are both "take this search away with you", and as
+   * loose ghost buttons they had the same weight as the filters that change
+   * what is on screen. Two labelled sections keep the promises apart — a file
+   * as it is now, against a url that keeps answering.
+   */
+  const takeAwayControl = (
+    <DownloadMenu
+      groups={[
+        {
+          label: t("incidents.export.label"),
+          items: [
+            { format: "CSV", href: exportHref("csv"), description: t("incidents.export.csv") },
+            { format: "JSON", href: exportHref("json"), description: t("incidents.export.json") },
+          ],
+        },
+        {
+          label: t("incidents.subscribe.label"),
+          items: [
+            { format: "RSS", href: feedHref("xml"), description: t("incidents.subscribe.rss") },
+            { format: "ICS", href: feedHref("ics"), description: t("incidents.subscribe.ics") },
+          ],
+        },
+      ]}
+    />
   );
 
   const filterControl = (
@@ -401,7 +431,7 @@ export function Incidents() {
           <div className="flex flex-wrap items-center gap-3">
             {searchControl}
             {filterControl}
-            {exportControl}
+            {takeAwayControl}
           </div>
         </div>
 

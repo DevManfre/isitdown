@@ -35,8 +35,11 @@ jobs:
       - name: Typecheck (server + dashboard)
         run: npm run typecheck
 
-      - name: Unit tests (node:test + Vitest)
-        run: npm test
+      # Roadmap 7.2. The same two suites `npm test` runs, under a coverage
+      # floor: a new subsystem that lands without tests of its own drags the
+      # total under the floor and fails here rather than going unnoticed.
+      - name: Unit tests with a coverage floor (node:test + Vitest)
+        run: npm run coverage
 
       - name: Integration tests
         run: npm run test:integration
@@ -51,6 +54,11 @@ jobs:
       # not at release time.
       - name: Build (smoke check)
         run: npm run build
+
+      # Roadmap 5.16. After the build, because it weighs what the build
+      # emitted: a dependency that quietly doubles the dashboard fails here.
+      - name: Bundle-size budget
+        run: npm run check:bundle
 
       # After the build, because it screenshots the bundle in dist/. The
       # browser is Playwright's cached Chromium, installed here rather than
