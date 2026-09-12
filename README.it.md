@@ -261,11 +261,11 @@ notifications:
 | `confirmSamples` | `1` | 1–10. Smorzamento dei rimbalzi: quanti poll consecutivi devono concordare su una lettura prima che il cambio venga annunciato. `1` notifica subito; `2` ignora una pagina che si contraddice per un ciclo, al costo di un poll di ritardo. |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus` e `betterstack` coprono quelle due piattaforme; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider. |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus` e `betterstack` coprono quelle due piattaforme; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page (vedi sotto). |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
 | `services[].mutedUntil` | — | ISO 8601. Finché è nel futuro il provider viene interrogato e registrato come sempre ma non notifica nulla — "lo so, smetti di dirmelo, fino ad allora". Nell'edizione UI è ciò che scrive il comando **Silenzia** della dashboard. |
-| `services[].options` | — | Extra specifici dell'adapter. Oggi solo `html` ne accetta: `selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`. |
+| `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano due: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`) e `http` (vedi la sua sezione qui sotto). |
 
 #### L'adapter `html`
 
@@ -302,6 +302,69 @@ deliberati:
   else operational" legge come disservizio parziale;
 - non ci sono incidenti, componenti o finestre di manutenzione — una pagina che
   ha richiesto lo scraping non ha struttura da cui leggerli.
+
+#### L'adapter `http` — sondare un endpoint tuo
+
+Ogni altro adapter legge una pagina che un provider pubblica su se stesso.
+Questo legge il servizio direttamente: fa la richiesta, e la risposta è la
+lettura (roadmap 1.8).
+
+```yaml
+  - name: My API
+    id: my-api
+    adapter: http
+    baseUrl: https://app.example.com
+    options:
+      path: "/health"
+      expectStatus: "200-299"
+      expectBody: '"db":"up"'
+      slowMs: "1500"
+      header.Authorization: "Bearer ${API_TOKEN}"
+```
+
+| Opzione | Default | Significato |
+|---|---|---|
+| `method` | `GET` | `GET` o `HEAD`. `POST` è rifiutato: il poller ritenta una lettura fallita, e un `POST` ritentato non è la stessa richiesta due volte. |
+| `path` | — | Aggiunto a `baseUrl` così com'è. Le base URL sono salvate senza barra finale, quindi è così che un endpoint che ne ha bisogno la ottiene — e così che un host viene sondato su due percorsi da due servizi. |
+| `expectStatus` | `200-299` | Codici singoli o intervalli inclusivi, separati da virgola (`200-299,401`). Tutto il resto è letto come disservizio, così un'API viva che ci sta rifiutando può comunque risultare sana. |
+| `expectBody` | — | Testo semplice che deve comparire nella risposta. |
+| `absentBody` | — | Testo semplice che **non** deve comparire: così si intercetta una pagina di errore servita con un `200`. |
+| `slowMs` | — | Una risposta a questi millisecondi o oltre legge `degraded` invece di `operational`. |
+| `followRedirects` | `yes` | `no` legge un `3xx` per quello che è, così un'app morta che rimanda a una pagina di login non risulta sana. |
+| `header.<Nome>` | — | Un header di richiesta per opzione. Un `${VAR}` nel valore è risolto dall'ambiente al momento della richiesta; una variabile non impostata solleva un errore invece di inviare il letterale `${VAR}` e segnalare il tuo servizio giù per un `401`. |
+
+Le letture che ne escono:
+
+| Cos'è successo | Lettura |
+|---|---|
+| Stato accettato, corpo conforme, sotto `slowMs` | `operational` |
+| Stato e corpo accettati, a `slowMs` o oltre | `degraded` |
+| Stato fuori dall'insieme, testo mancante o vietato nel corpo | `major_outage` |
+| Connessione rifiutata, host non risolto, TLS respinto o timeout superato | `major_outage` |
+
+Quattro cose da sapere prima di affidarcisi:
+
+- un non-2xx e un host irraggiungibile sono **letture**, non letture fallite.
+  Ogni altro adapter solleva un errore in quei casi perché il poller possa
+  ritentare: una status page che non risponde non ci ha detto nulla, qui invece
+  ci ha detto tutto.
+- la lettura è una severità e nient'altro: niente incidenti, componenti o
+  finestre di manutenzione. Non c'è un documento da cui leggerli, e coniare un
+  incidente a ogni poll ne aprirebbe e chiuderebbe uno per ciclo. *Da quando* è
+  giù continua a venire dal cambio di stato e dallo storico.
+- è un solo punto di vista, questo container. Un guasto locale di DNS o di
+  uscita viene letto come tutti i servizi sondati giù insieme — usa
+  `confirmSamples` se un singolo sussulto non merita un messaggio.
+- sonda **qualunque cosa questo container riesca a raggiungere**, indirizzi
+  privati compresi, senza alcuna allowlist. È voluto per una dashboard a
+  operatore singolo in ascolto su `127.0.0.1`; è anche il motivo per cui un
+  token API in sola lettura o una pagina pubblica in sola lettura (roadmap 4.15
+  e 5.1) dovranno decidere chi può scrivere una definizione di servizio prima di
+  esistere.
+- un'opzione sbagliata (`expectStatus: 2xx`, un `${VAR}` senza nulla dietro, un
+  `expectBody` su un `HEAD`) solleva un errore a ogni ciclo e si vede come
+  provider che fallisce, mai come servizio che legge giù in silenzio. `node
+  dist/light/check.js --probe` lo intercetta prima del poller.
 
 Qualunque cosa non valida ferma il container all'avvio indicando motivo e percorso:
 file mancante, YAML malformato, base URL sbagliato, id duplicato, lista di servizi
@@ -881,7 +944,8 @@ Cosa segnala, tutto in una passata:
 | Un canale attivo con un'impostazione obbligatoria vuota | error |
 | Una regola di instradamento che nomina un provider o un canale che il file non definisce | error |
 | Un servizio che nomina un `adapter` inesistente, con l'elenco di quelli noti | error |
-| Con `--probe`: una base url che nessun adapter riconosce | error |
+| Un servizio `http` le cui opzioni di sonda non sono leggibili (`expectStatus` sbagliato, un `${VAR}` senza nulla dietro, un `expectBody` su un `HEAD`) — offline, quindi intercettato anche senza `--probe` | error |
+| Con `--probe`: una base url che nessun adapter riconosce. I servizi `http` qui vengono saltati: il bersaglio di una sonda non è una status page e non deve sembrarlo | error |
 | Con `--probe`: una pagina che sembra un adapter diverso da quello dichiarato | warning |
 
 I warning vengono stampati e non fanno fallire il controllo: l'adapter `html` è
