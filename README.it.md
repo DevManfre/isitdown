@@ -848,6 +848,7 @@ lettura vecchia.
 | Slack | `slack` | `SLACK_WEBHOOK_URL` |
 | ntfy | `ntfy` | `NTFY_TOPIC_URL` (`NTFY_TOKEN` opzionale) |
 | Gotify | `gotify` | `GOTIFY_URL`, `GOTIFY_TOKEN` |
+| Email (SMTP) | `email` | `SMTP_HOST`, `SMTP_FROM`, `SMTP_TO` (`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ALLOW_INSECURE_AUTH`, `SMTP_ALLOW_SELF_SIGNED` opzionali) |
 | Desktop (Web Push) | `webpush` | nessuna |
 
 Il push desktop non richiede alcuna configurazione: il server genera la propria
@@ -914,6 +915,33 @@ ogni telefono: sulla scala 1–5 di ntfy un major outage è `5` e un rientro è 
 su quella 0–10 di Gotify, `9` e `3`. Nessuna delle due credenziali finisce nei
 log o nella dashboard, e un invio rifiutato riporta lo stato HTTP con la
 motivazione del server stesso.
+
+**Email** è una submission SMTP, ed è scritta qui invece che presa da una
+libreria (roadmap 3.3): a una notifica serve una sola conversazione di
+submission — saluto, `EHLO`, `STARTTLS`, `AUTH`, envelope, `DATA` — ed è
+`src/notifiers/smtp.ts`, così il progetto ha ancora le tre dipendenze a runtime
+che dichiara. Quello che una libreria di posta ci metterebbe sopra — parsing
+degli indirizzi, allegati, pool di connessioni, una dozzina di trasporti — a un
+avviso di stato non serve.
+
+L'oggetto è l'intestazione che ogni altro canale mette per prima (`🔴 GitHub —
+MAJOR OUTAGE`), così una schermata di blocco mostra la stessa frase che
+mostrerebbe Telegram; il corpo è il dettaglio più la status page del provider,
+visto che un client di posta non ha dove appendere un link. `SMTP_TO` accetta un
+indirizzo o più d'uno separati da virgole, e parte un solo messaggio con un
+destinatario di envelope per ciascuno.
+
+I default sono quelli che un server di submission si aspetta: porta 587 con
+`STARTTLS` ogni volta che il server lo offre, e porta 465 trattata come TLS
+implicito che `SMTP_SECURE` lo dica o no. Due impostazioni esistono per il
+server sulla tua stessa macchina, ed entrambe sono spente se non impostate:
+`SMTP_ALLOW_INSECURE_AUTH` è ciò che serve per mandare credenziali su una
+connessione mai cifrata — senza, l'invio fallisce invece di mettere una password
+su un socket in chiaro — e `SMTP_ALLOW_SELF_SIGNED` accetta un certificato che
+nessuna CA pubblica ha firmato. Un relay che si fida di questa rete non vuole
+credenziali affatto, ed è per questo che entrambe sono opzionali. Un messaggio
+rifiutato riporta la risposta del server (`550 5.7.1 relay denied`) nel registro
+delle consegne.
 
 ### 3.7 Instradamento delle notifiche
 

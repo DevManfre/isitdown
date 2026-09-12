@@ -383,6 +383,7 @@
   "components.never-measured": "Ancora nessun campione",
 
   "channel.name.discord": "Discord",
+  "channel.name.email": "Email",
   "channel.name.gotify": "Gotify",
   "channel.name.ntfy": "ntfy",
   "channel.name.slack": "Slack",

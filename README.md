@@ -831,6 +831,7 @@ validators all drop the cache entry rather than pin a stale reading.
 | Slack | `slack` | `SLACK_WEBHOOK_URL` |
 | ntfy | `ntfy` | `NTFY_TOPIC_URL` (`NTFY_TOKEN` optional) |
 | Gotify | `gotify` | `GOTIFY_URL`, `GOTIFY_TOKEN` |
+| Email (SMTP) | `email` | `SMTP_HOST`, `SMTP_FROM`, `SMTP_TO` (`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ALLOW_INSECURE_AUTH`, `SMTP_ALLOW_SELF_SIGNED` optional) |
 | Desktop (Web Push) | `webpush` | none |
 
 Desktop push needs nothing configured: the server generates its own VAPID key
@@ -901,6 +902,31 @@ phone: on ntfy's 1–5 scale a major outage is `5` and a recovery is `2`; on
 Gotify's 0–10 scale, `9` and `3`. Neither credential is ever logged or shown in
 the dashboard, and a rejected send reports the HTTP status with the server's own
 reason.
+
+**Email** is SMTP submission, and it is written here rather than taken from a
+library (roadmap 3.3): what a notification needs is one submission conversation
+— greeting, `EHLO`, `STARTTLS`, `AUTH`, envelope, `DATA` — and that is
+`src/notifiers/smtp.ts`, so the project still has the three runtime dependencies
+it advertises. What a mail library would add on top of it — address parsing,
+attachments, connection pooling, a dozen transports — a status alert has no use
+for.
+
+The subject is the heading every other channel puts first (`🔴 GitHub — MAJOR
+OUTAGE`), so a lock screen shows the same sentence Telegram would; the body is
+the detail and the provider's own status page, since a mail client has no
+affordance to hang a link on. `SMTP_TO` takes one address or several separated
+by commas, and one message goes out with one envelope recipient each.
+
+Defaults are the ones a submission server expects: port 587 with `STARTTLS`
+whenever the server offers it, and port 465 treated as implicit TLS whether or
+not `SMTP_SECURE` says so. Two settings exist for the server on your own
+machine, and both are off unless set: `SMTP_ALLOW_INSECURE_AUTH` is what it
+takes to send credentials over a connection that was never encrypted — without
+it the send fails rather than putting a password on a cleartext socket — and
+`SMTP_ALLOW_SELF_SIGNED` accepts a certificate no public CA signed. A relay that
+trusts this network needs no credentials at all, which is why both are optional.
+A refused message reports the server's own reply (`550 5.7.1 relay denied`) into
+the delivery log.
 
 ### 3.7 Notification routing
 
