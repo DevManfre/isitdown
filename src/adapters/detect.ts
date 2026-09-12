@@ -4,7 +4,7 @@ import { fetchConditional } from "../core/http.ts";
  * Which adapter reads a given status page, worked out by asking it (roadmap
  * 1.14).
  *
- * Nine adapters exist now, and the add-provider form asks the operator to pick
+ * Twelve adapters exist now, and the add-provider form asks the operator to pick
  * one of them plus the base url each expects — two answers that are only
  * obvious to whoever wrote the adapters. Every shape read here announces itself
  * in a document at a known path, so the shapes can be tried in turn instead:
@@ -113,6 +113,44 @@ const CANDIDATES: Candidate[] = [
     accept: JSON_ACCEPT,
     baseUrl: (origin) => origin,
     matches: jsonShaped((body) => isObject(body["data"]) && Array.isArray(body["included"])),
+  },
+  {
+    adapter: "cachet",
+    path: "/api/v1/components?per_page=1",
+    accept: JSON_ACCEPT,
+    baseUrl: (origin) => origin,
+    // Cachet's envelope is a paginated `data` list, and `meta.pagination` is
+    // what separates it from every other API that happens to answer `data`.
+    matches: jsonShaped(
+      (body) =>
+        Array.isArray(body["data"]) &&
+        isObject(body["meta"]) &&
+        isObject((body["meta"] as Record<string, unknown>)["pagination"]),
+    ),
+  },
+  {
+    adapter: "uptimekuma",
+    // Kuma's own default slug. A page published under another one is not
+    // detected, which is the honest answer: the slug is the second thing the
+    // operator has to supply, and nothing in the origin says what it is.
+    path: "/api/status-page/default",
+    accept: JSON_ACCEPT,
+    baseUrl: (origin) => origin,
+    matches: jsonShaped((body) => isObject(body["config"]) && Array.isArray(body["publicGroupList"])),
+  },
+  {
+    adapter: "uptimecom",
+    // Only a page on its own domain is at the origin; one at
+    // `/statuspage/<slug>` is not detected from the host alone.
+    path: "/ajax",
+    accept: JSON_ACCEPT,
+    baseUrl: (origin) => origin,
+    matches: jsonShaped((body) => {
+      const data = body["data"];
+      if (!isObject(data)) return false;
+      const page = data as Record<string, unknown>;
+      return typeof page["global_is_operational"] === "boolean" && Array.isArray(page["components"]);
+    }),
   },
   // The feed adapter reads whatever url it is given, so a matching feed hands
   // back its own url rather than the origin.

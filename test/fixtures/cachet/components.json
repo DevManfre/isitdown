@@ -1,0 +1,125 @@
+{
+  "meta": {
+    "pagination": {
+      "total": 6,
+      "count": 6,
+      "per_page": 100,
+      "current_page": 1,
+      "total_pages": 1,
+      "links": {
+        "next_page": null,
+        "previous_page": null
+      }
+    }
+  },
+  "data": [
+    {
+      "id": 1,
+      "name": "API",
+      "description": "Used by third-parties to connect to us",
+      "link": "",
+      "status": 1,
+      "order": 0,
+      "group_id": 0,
+      "enabled": true,
+      "meta": null,
+      "created_at": "2026-09-12 13:00:03",
+      "updated_at": "2026-09-12 13:00:03",
+      "deleted_at": null,
+      "status_name": "Operational",
+      "tags": {
+        "1": "1"
+      }
+    },
+    {
+      "id": 2,
+      "name": "Documentation",
+      "description": "Kindly powered by Readme.io",
+      "link": "https://docs.cachethq.io",
+      "status": 1,
+      "order": 0,
+      "group_id": 1,
+      "enabled": true,
+      "meta": null,
+      "created_at": "2026-09-12 13:00:03",
+      "updated_at": "2026-09-12 13:00:03",
+      "deleted_at": null,
+      "status_name": "Operational",
+      "tags": {
+        "1": "1"
+      }
+    },
+    {
+      "id": 3,
+      "name": "Website",
+      "description": "",
+      "link": "https://cachethq.io",
+      "status": 1,
+      "order": 0,
+      "group_id": 1,
+      "enabled": true,
+      "meta": null,
+      "created_at": "2026-09-12 13:00:03",
+      "updated_at": "2026-09-12 13:00:03",
+      "deleted_at": null,
+      "status_name": "Operational",
+      "tags": {
+        "1": "1"
+      }
+    },
+    {
+      "id": 4,
+      "name": "Laravel Artisan Cheatsheet",
+      "description": "A searchable, bookmarkable cheatsheet for Laravel's Artisan commands.",
+      "link": "https://artisan.page",
+      "status": 1,
+      "order": 0,
+      "group_id": 2,
+      "enabled": true,
+      "meta": null,
+      "created_at": "2026-09-12 13:00:03",
+      "updated_at": "2026-09-12 13:00:03",
+      "deleted_at": null,
+      "status_name": "Operational",
+      "tags": {
+        "1": "1"
+      }
+    },
+    {
+      "id": 5,
+      "name": "Checkmango",
+      "description": "The Full-Stack A/B Testing Platform",
+      "link": "https://checkmango.com",
+      "status": 1,
+      "order": 1,
+      "group_id": 2,
+      "enabled": true,
+      "meta": null,
+      "created_at": "2026-09-12 13:00:03",
+      "updated_at": "2026-09-12 13:00:03",
+      "deleted_at": null,
+      "status_name": "Operational",
+      "tags": {
+        "1": "1"
+      }
+    },
+    {
+      "id": 6,
+      "name": "GitHub",
+      "description": "",
+      "link": "https://github.com/cachethq/cachet",
+      "status": 1,
+      "order": 0,
+      "group_id": 0,
+      "enabled": true,
+      "meta": null,
+      "created_at": "2026-09-12 13:00:03",
+      "updated_at": "2026-09-12 13:00:03",
+      "deleted_at": null,
+      "status_name": "Operational",
+      "tags": {
+        "1": "1"
+      }
+    }
+  ]
+}
