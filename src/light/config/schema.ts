@@ -51,6 +51,29 @@ const ntfySchema = z.object({
   token: z.string().default(""),
 });
 
+/**
+ * SMTP submission (roadmap 3.3). `port` and the two flags are strings here like
+ * every other channel setting: the file resolves `${VAR}` references into
+ * strings, and the notifier's own schema is the one place that reads them as a
+ * port and as booleans.
+ */
+const emailSchema = z.object({
+  enabled: z.boolean().default(false),
+  host: z.string().default(""),
+  port: z.string().default(""),
+  /** "true" for implicit TLS (port 465); otherwise STARTTLS is used when offered. */
+  secure: z.string().default(""),
+  /** Send credentials on an unencrypted connection — for an MTA on this machine. */
+  allowInsecureAuth: z.string().default(""),
+  /** Accept a certificate no public CA signed — a self-hosted server's own. */
+  allowSelfSigned: z.string().default(""),
+  username: z.string().default(""),
+  password: z.string().default(""),
+  from: z.string().default(""),
+  /** One address, or several separated by commas. */
+  to: z.string().default(""),
+});
+
 const gotifySchema = z.object({
   enabled: z.boolean().default(false),
   serverUrl: z.string().default(""),
@@ -65,6 +88,10 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   slack: ["webhookUrl"],
   ntfy: ["topicUrl"],
   gotify: ["serverUrl", "token"],
+  // Not the credentials: a relay on this machine, or one that trusts this
+  // network, needs none — and requiring them would disable the channel for
+  // exactly the setup this audience runs.
+  email: ["host", "from", "to"],
 };
 
 /**
@@ -81,6 +108,7 @@ const notificationsObject = z
     slack: slackSchema.optional(),
     ntfy: ntfySchema.optional(),
     gotify: gotifySchema.optional(),
+    email: emailSchema.optional(),
   })
   .strict();
 

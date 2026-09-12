@@ -46,6 +46,25 @@ const DEFAULT_CHANNELS = [
   // optional (see OPTIONAL_CHANNEL_SETTINGS), Gotify's is not.
   { id: "ntfy", config: { topicUrlEnv: "NTFY_TOPIC_URL", tokenEnv: "NTFY_TOKEN" } },
   { id: "gotify", config: { serverUrlEnv: "GOTIFY_URL", tokenEnv: "GOTIFY_TOKEN" } },
+  // SMTP submission (roadmap 3.3). Every setting is a `*Env` name like every
+  // other channel's — the dashboard only ever offers those, and 5.17 is what
+  // lets a value be typed into it rather than put in the environment by hand.
+  // Only the host and the two addresses are load-bearing; see
+  // OPTIONAL_CHANNEL_SETTINGS for why the rest are not.
+  {
+    id: "email",
+    config: {
+      hostEnv: "SMTP_HOST",
+      portEnv: "SMTP_PORT",
+      secureEnv: "SMTP_SECURE",
+      allowInsecureAuthEnv: "SMTP_ALLOW_INSECURE_AUTH",
+      allowSelfSignedEnv: "SMTP_ALLOW_SELF_SIGNED",
+      usernameEnv: "SMTP_USERNAME",
+      passwordEnv: "SMTP_PASSWORD",
+      fromEnv: "SMTP_FROM",
+      toEnv: "SMTP_TO",
+    },
+  },
   // No `*Env` fields: the VAPID pair is generated on first use (src/ui/vapidKeys.ts).
   { id: "webpush", config: {} },
 ];

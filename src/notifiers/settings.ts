@@ -41,6 +41,11 @@ export const OPTIONAL_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   // access control does. Requiring it would disable the channel for everyone
   // publishing to ntfy.sh, which is the common case.
   ntfy: ["token"],
+  // The host and the two addresses are the channel; everything else has a
+  // working default. A relay on this machine, or one that trusts this network,
+  // wants no credentials at all — and a submission server that does will refuse
+  // the envelope in words the delivery log can show.
+  email: ["port", "secure", "allowInsecureAuth", "allowSelfSigned", "username", "password"],
 };
 
 /** Whether a channel still works with this credential unset. */
