@@ -40,6 +40,7 @@ const TABLES = [
   "incidents",
   "maintenances",
   "notifications",
+  "incident_notes",
   "message_refs",
   "push_subscriptions",
   "map_points",
