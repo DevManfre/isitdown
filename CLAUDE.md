@@ -9,7 +9,7 @@ IsItDown is a Dockerized service that polls the public status pages of third-par
 - **Light**: polling + notifications only, config via `config.yml`, no HTTP server. Image: `ghcr.io/devmanfre/isitdown:light-latest`.
 - **UI**: adds a local web dashboard (status grid, uptime charts, incident timeline) and runtime configuration via SQLite instead of a static file. Image: `ghcr.io/devmanfre/isitdown:ui-latest`.
 
-Full architecture, data flow, and rationale live in `README.md` — read it before making structural changes.
+Full architecture, data flow, and rationale live in the manual: `README.md` is the landing page (what it is, how to start it), and `docs/` carries one file per section — `configuration.md`, `docker.md`, `verifying.md`, `api.md`, `how-it-works.md`, `theming.md`, `development.md` (roadmap 7.5). Each has an `.it.md` twin beside it. Read the relevant page before making structural changes.
 
 ## Repo layout (source of truth)
 
@@ -206,7 +206,7 @@ This repo ships with Claude Code skills under `.claude/skills/` tailored to recu
 - `ui-dashboard-charts` — implement status-page-style uptime charts/timeline in the UI edition dashboard, consistent with the Claude Design prototypes.
 - `shadcn-components` — add or modify a shadcn/ui primitive and wire it into the theme correctly.
 - `i18n-strings` — every user-facing string goes in an English source catalog and gets translated; no literals in code.
-- `readme-translation-sync` — an edit to `README.md` lands in `README.it.md` in the same pass, section for section.
+- `readme-translation-sync` — an edit to `README.md` or a `docs/` page lands in its `.it.md` twin in the same pass, section for section.
 - `git-commit-style` — write commit messages in the required `<emoji> <TITLE> - <description>` format.
 - `release-flow` — ship a release: push `dev`, gate on CI, bump the version, `mergeclean` into `main`, tag, verify the published images.
 - `writing-code` — write or modify production code (read neighbours first, exact scope, match conventions).

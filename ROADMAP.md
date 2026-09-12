@@ -11,8 +11,9 @@ Legend:
 - **M** — a few days, may need a new table, route or interface method.
 - **L** — a structural change: new subsystem, new concept in the data model, or a
   shift in what the product *is*.
-- ⚠️ — collides with a declared non-goal or a core principle in `README.md`;
-  needs a deliberate decision before it is planned, not just prioritised.
+- ⚠️ — collides with a declared non-goal or a core principle in `README.md` (or
+  in the manual under `docs/`); needs a deliberate decision before it is planned,
+  not just prioritised.
 - ✅ — shipped; kept listed so the phase reads as a whole.
 - ◐ — partly shipped; the row's note says what is left.
 
@@ -194,7 +195,7 @@ is additive and independently shippable.
 | 7.2 ✅ | **Coverage reporting with a floor** | S | Shipped as two floors, because the two suites cover different halves: node:test holds the server and the engine at 95/88/93 (lines/branches/functions) and Vitest the dashboard at 85/75/80, each a few points under where it stands today. `npm run coverage` runs both, and CI runs it in place of the plain unit-test step. |
 | 7.3 | **Mutation testing on the diff engine** | M | The diff engine is the one place where a passing test suite that does not actually constrain behaviour would be dangerous. It is small enough that mutation testing is affordable exactly there. |
 | 7.4 | **Load / soak test** | M | 200 providers, a week of simulated history. Finds the point where the SQLite reads or the overview render fall over. |
-| 7.5 | **Docs split** | S | `README.md` is ~69k and has to be both a landing page and a manual. Splitting into `docs/` with a short README would make both jobs easier — at the cost of the current "everything is in one file" property, which is genuinely nice. |
+| 7.5 ✅ | **Docs split** | S | 150 kB by the time it was done, and the same page had to be a landing page and a manual. `README.md` keeps what someone arriving needs — what it is, how to start it, the roadmap, the branch policy — and sections 3 to 9 became one file each under `docs/`, numbers intact so every "§3.7" in the prose still points at something. Every in-page link was rewritten to wherever its heading ended up and then checked: 0 dead anchors across both languages. The translation gate widened with it (7.6 compared two files; it now pairs each source with its own `.it.md` twin) and deliberately compares one pair at a time rather than the concatenation — a section moved between pages in one language only is a real drift, and summing would cancel it out. What the row warned about is real: "everything is in one file" is gone, and a reader now has to know which file. The index at the top of the README is the whole of the mitigation. |
 | 7.6 ✅ | **Keep `README.it.md` in sync automatically** | S | The skill made the sync part of the same pass; `tools/readme-parity.mjs` (`npm run check:readme`, a step in the `verify` job) makes CI enforce it. It compares the numbered heading skeleton, the per-level heading, fence and table-row counts, and the identifiers each file names — routes, shouted variable names, npm scripts — which a translation copies verbatim, so one appearing in a single file is either a section that was never ported or a flag someone translated. Structure only: it never claims to check meaning, and a native review of the prose is still 5.15. |
 | 7.7 ✅ | **Fuzz the adapters with malformed payloads** | S | Shipped inside the contract kit (1.11), so every adapter is held to it: each one's own well-formed fixture is served back empty, blank, truncated, as a bare `null`/`[]`/`{}` and with every value re-typed, and the adapter must either reject with an `Error` or degrade to a reading that validates — never hang, and never read `operational` out of a document that says nothing. It found two real ones on the first run: Slack's `/current` schema defaulted a missing incident list to `[]`, so a `{}` read as healthy, and the assertion itself was wrong for AWS and Google Cloud, whose flat event feeds mean "nothing is open" by being empty. |
 
