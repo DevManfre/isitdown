@@ -424,6 +424,8 @@ export interface AdapterProbe {
   /** A 304: a real round trip whose body was replayed from our own cache. */
   notModified?: boolean;
   error?: string;
+  /** Why a successful read still did not say "operational" — a probe's reason. */
+  note?: string;
 }
 
 export interface AdapterDebugProvider {

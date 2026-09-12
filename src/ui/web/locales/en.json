@@ -350,6 +350,8 @@
   "probe.absent-body-hint": "How an error page served with a healthy status line is caught.",
   "probe.slow-ms": "Slow after (ms)",
   "probe.slow-ms-hint": "An answer this slow or slower reads degraded instead of operational. Leave empty for no threshold.",
+  "probe.tls-warn-days": "Warn on certificate expiry (days)",
+  "probe.tls-warn-days-hint": "A certificate expiring within this many days reads degraded. Costs a second connection per poll, so leave it empty to skip the check.",
   "probe.follow-redirects": "Follow redirects",
   "probe.header-name": "Header name",
   "probe.header-value": "Header value",
