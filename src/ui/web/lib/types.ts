@@ -270,6 +270,15 @@ export interface IncidentDetail {
   actionLog: SentRecord[];
   polls: SampleRow[];
   otherActiveIncidents: IncidentRow[];
+  /** The operator's own notes on this incident, oldest first (roadmap 5.3). */
+  notes: IncidentNote[];
+}
+
+/** One note somebody here wrote about an incident (roadmap 5.3). */
+export interface IncidentNote {
+  id: number;
+  body: string;
+  createdAt: string;
 }
 
 export interface ServiceDefinition {

@@ -8,7 +8,8 @@ import { BentoTile } from "@/components/BentoTile.tsx";
 import { IncidentMap } from "@/components/IncidentMap.tsx";
 import { PollStrip } from "@/components/charts/PollStrip.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
-import { useIncident, useStatus } from "@/hooks/queries.ts";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import { useIncident, useIncidentNotes, useStatus } from "@/hooks/queries.ts";
 import { formatDateTime, formatDuration, formatTime } from "@/lib/format.ts";
 import {
   impactColor, impactKey, impactStatus, incidentStatusKey, INCIDENT_STEPS,
@@ -65,6 +66,10 @@ export function IncidentDetail() {
   const { data: status } = useStatus();
 
   const [copiedMessage, setCopiedMessage] = useState<string | undefined>(undefined);
+  // Roadmap 5.3. Held here rather than in the tile: the tile is rendered from
+  // the detail query, and a draft must survive the refetch an added note causes.
+  const [draft, setDraft] = useState("");
+  const notesMutations = useIncidentNotes(providerId, incidentId);
   const [actionLogExpanded, setActionLogExpanded] = useState(false);
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => {
@@ -77,7 +82,7 @@ export function IncidentDetail() {
   // catches it); while it is still in flight there is nothing to render yet.
   if (detail === undefined) return null;
 
-  const { incident, timeline, actionLog, polls, otherActiveIncidents } = detail;
+  const { incident, timeline, actionLog, polls, otherActiveIncidents, notes } = detail;
   const shownActionLog = actionLogExpanded ? actionLog : actionLog.slice(0, ACTION_LOG_COLLAPSED);
   const reached = incident.resolvedAt === null ? STEPS.indexOf(incident.status) : STEPS.length - 1;
 
@@ -93,6 +98,12 @@ export function IncidentDetail() {
     setCopiedMessage(t("incident.payload-copied"));
     if (toastTimeout.current !== undefined) clearTimeout(toastTimeout.current);
     toastTimeout.current = setTimeout(() => setCopiedMessage(undefined), TOAST_MS);
+  };
+
+  const saveNote = (): void => {
+    const body = draft.trim();
+    if (body === "") return;
+    notesMutations.add.mutate(body, { onSuccess: () => setDraft("") });
   };
 
   const first = polls.at(-1);
@@ -255,6 +266,62 @@ export function IncidentDetail() {
           )}
         </BentoTile>
 
+        {/* Roadmap 5.3. Full width, under what IsItDown observed and what it
+            sent, because it is the third account of the same incident and the
+            only one a person writes: why it mattered here. */}
+        <BentoTile title={t("incident.notes")} delay={stagger(2, TILE_CASCADE)} className="md:col-span-6">
+          {notes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("incident.notes.empty")}</p>
+          ) : (
+            notes.map((note, index) => (
+              <div
+                key={note.id}
+                className="anim-rise grid grid-cols-[70px_1fr_auto] items-baseline gap-3"
+                style={{ animationDelay: stagger(index, { base: 170, step: 38, cap: 420 }) }}
+              >
+                <span className="font-mono text-xs text-muted-foreground">
+                  {formatTime(i18n.language, note.createdAt)}
+                </span>
+                {/* Whitespace kept: a note is written as sentences and often as
+                    two of them, and collapsing the newlines would rewrite it. */}
+                <span className="whitespace-pre-wrap text-sm">{note.body}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="px-1 text-xs text-muted-foreground"
+                  aria-label={t("incident.notes.remove")}
+                  disabled={notesMutations.remove.isPending}
+                  onClick={() => notesMutations.remove.mutate(note.id)}
+                >
+                  {t("action.remove")}
+                </Button>
+              </div>
+            ))
+          )}
+          <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-end">
+            <Textarea
+              id="incident-note"
+              value={draft}
+              maxLength={2000}
+              rows={2}
+              aria-label={t("incident.notes.add")}
+              placeholder={t("incident.notes.placeholder")}
+              className="text-sm"
+              onChange={(event) => setDraft(event.target.value)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={draft.trim() === "" || notesMutations.add.isPending}
+              onClick={saveNote}
+            >
+              {t("incident.notes.add")}
+            </Button>
+          </div>
+        </BentoTile>
+
         <BentoTile
           title={
             <Trans
@@ -272,7 +339,7 @@ export function IncidentDetail() {
               </span>
             ) : undefined
           }
-          delay={stagger(2, TILE_CASCADE)}
+          delay={stagger(3, TILE_CASCADE)}
           className="md:col-span-4"
         >
           <PollStrip samples={polls} />
@@ -280,7 +347,7 @@ export function IncidentDetail() {
 
         <BentoTile
           title={t("column.status")}
-          delay={stagger(3, TILE_CASCADE)}
+          delay={stagger(4, TILE_CASCADE)}
           className="md:col-span-2"
         >
           {/* incident.js:214-221 — .service-row with exactly two children:
@@ -305,7 +372,7 @@ export function IncidentDetail() {
             grid was supposed to remove. */}
         <BentoTile
           title={t("incident.other-active")}
-          delay={stagger(4, TILE_CASCADE)}
+          delay={stagger(5, TILE_CASCADE)}
           className="md:col-span-3 md:self-start"
         >
           {otherActiveIncidents.length === 0 ? (
@@ -333,7 +400,7 @@ export function IncidentDetail() {
         <IncidentMap
           providerId={incident.providerId}
           providerName={nameOf(incident.providerId)}
-          delay={stagger(5, TILE_CASCADE)}
+          delay={stagger(6, TILE_CASCADE)}
           className="md:col-span-3"
         />
       </div>

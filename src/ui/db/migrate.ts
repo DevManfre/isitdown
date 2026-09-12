@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -392,6 +392,29 @@ export function migrate(db: DatabaseSync): void {
     if (!columns.includes("group_name")) {
       db.exec("ALTER TABLE services ADD COLUMN group_name TEXT");
     }
+  }
+
+  if (from < 17) {
+    // Operator notes on an incident — roadmap 5.3. "This is why our deploy
+    // failed on Tuesday" is the one thing about an incident that IsItDown can
+    // never observe and nobody else will write down.
+    //
+    // Cascaded with the provider like its samples and incidents, and keyed by
+    // the provider's own incident id rather than by a row in `incidents`: a note
+    // can be written about an incident the history service has not finished
+    // recording, and a foreign key there would turn that ordering into a failed
+    // insert.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS incident_notes (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider_id TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        incident_id TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_incident_notes_incident
+        ON incident_notes (provider_id, incident_id, created_at);
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

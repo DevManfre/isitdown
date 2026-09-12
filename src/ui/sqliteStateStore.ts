@@ -15,6 +15,7 @@ import type {
   HistoryStore,
   IncidentCounts,
   IncidentFilter,
+  IncidentNote,
   IncidentRow,
   MaintenanceFilter,
   MaintenanceRow,
@@ -63,6 +64,12 @@ const incidentRowSchema = z.object({
   started_at: z.string(),
   updated_at: z.string(),
   resolved_at: z.string().nullable(),
+});
+
+const incidentNoteRowSchema = z.object({
+  id: z.number(),
+  body: z.string(),
+  created_at: z.string(),
 });
 
 const maintenanceRowSchema = z.object({
@@ -662,6 +669,40 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         )
         .get(providerId, incidentId);
       return row === undefined ? null : toIncidentRow(incidentRowSchema.parse(row));
+    },
+
+    async listIncidentNotes(providerId: string, incidentId: string): Promise<IncidentNote[]> {
+      return (
+        db
+          .prepare(
+            `SELECT id, body, created_at FROM incident_notes
+             WHERE provider_id = ? AND incident_id = ?
+             ORDER BY created_at, id`,
+          )
+          .all(providerId, incidentId) as unknown[]
+      )
+        .map((row) => incidentNoteRowSchema.parse(row))
+        .map((row) => ({ id: row.id, body: row.body, createdAt: row.created_at }));
+    },
+
+    async addIncidentNote(providerId: string, incidentId: string, body: string): Promise<IncidentNote> {
+      const createdAt = now().toISOString();
+      const { lastInsertRowid } = db
+        .prepare(
+          "INSERT INTO incident_notes (provider_id, incident_id, body, created_at) VALUES (?, ?, ?, ?)",
+        )
+        .run(providerId, incidentId, body, createdAt);
+      return { id: Number(lastInsertRowid), body, createdAt };
+    },
+
+    async deleteIncidentNote(providerId: string, incidentId: string, id: number): Promise<boolean> {
+      // Scoped to the incident it was written on, not just to its own id: a
+      // delete addressed through the wrong incident is a mistake, not a match.
+      return (
+        db
+          .prepare("DELETE FROM incident_notes WHERE id = ? AND provider_id = ? AND incident_id = ?")
+          .run(id, providerId, incidentId).changes > 0
+      );
     },
 
     async listMaintenances(filter: MaintenanceFilter): Promise<MaintenanceRow[]> {

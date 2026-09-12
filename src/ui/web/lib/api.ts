@@ -7,6 +7,7 @@ import type {
   ComponentPreview,
   ConfigImportReport,
   DbRestoreReport,
+  IncidentNote,
   DbMaintenanceReport,
   DeliveryLogResponse,
   DeliveryState,
@@ -128,6 +129,23 @@ export const getIncident = (providerId: string, incidentId: string) =>
   request<IncidentDetail>(
     "GET",
     `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}`,
+  );
+
+/**
+ * An operator's note on one incident (roadmap 5.3) — the one thing about an
+ * incident nothing here can observe.
+ */
+export const addIncidentNote = (providerId: string, incidentId: string, body: string) =>
+  request<IncidentNote>(
+    "POST",
+    `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/notes`,
+    { body },
+  );
+
+export const deleteIncidentNote = (providerId: string, incidentId: string, id: number) =>
+  request<void>(
+    "DELETE",
+    `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/notes/${id}`,
   );
 
 export interface MaintenanceListQuery {
