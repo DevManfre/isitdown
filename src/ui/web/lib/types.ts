@@ -456,6 +456,17 @@ export interface ConfigImportReport {
   settings: string[];
 }
 
+/** What `POST /config/restore` reports it put back (roadmap 4.4). */
+export interface DbRestoreReport {
+  /** Rows written per table, so the operator sees what actually came back. */
+  tables: Record<string, number>;
+  /** The schema the uploaded file was at; it may be older, never newer. */
+  fromSchemaVersion: number;
+  schemaVersion: number;
+  /** A restore never replaces the credentials file beside the database. */
+  secretsKept: boolean;
+}
+
 /** One row of the bundled provider catalog (roadmap 5.11). */
 export interface CatalogProvider {
   id: string;

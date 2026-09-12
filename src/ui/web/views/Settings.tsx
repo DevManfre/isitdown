@@ -21,6 +21,7 @@ import {
   useServiceMutations,
   useSettingsMutation,
   useStorage,
+  useRestoreBackup,
   useStorageMaintenance,
 } from "@/hooks/queries.ts";
 import { useFieldProps } from "@/hooks/useBusy.tsx";
@@ -135,6 +136,10 @@ export function Settings() {
   const settingsMutation = useSettingsMutation();
   const { data: storage } = useStorage();
   const storageMaintenance = useStorageMaintenance();
+  const restoreBackup = useRestoreBackup();
+  const [restoreStatus, setRestoreStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
+    undefined,
+  );
   const [maintenanceStatus, setMaintenanceStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
     undefined,
   );
@@ -325,6 +330,27 @@ export function Settings() {
       });
     } catch (error) {
       setImportStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+    }
+  };
+
+  /**
+   * Roadmap 4.4. The one destructive control on this page: it replaces every row
+   * this edition stores. Confirmed in the browser's own dialog, for the same
+   * reason removing a provider is — the alternative is a second dialog
+   * component for a button nobody presses twice a year.
+   */
+  const runRestore = async (file: File): Promise<void> => {
+    setRestoreStatus(undefined);
+    if (!window.confirm(t("settings.restore.confirm", { file: file.name }))) return;
+    try {
+      const report = await restoreBackup.mutateAsync(file);
+      const rows = Object.values(report.tables).reduce((total, count) => total + count, 0);
+      setRestoreStatus({
+        text: t("settings.restore.done", { providers: report.tables["services"] ?? 0, rows }),
+        tone: "ok",
+      });
+    } catch (error) {
+      setRestoreStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" });
     }
   };
 
@@ -955,6 +981,48 @@ export function Settings() {
               if (file !== undefined) void runImport(file);
               // Cleared so picking the same file twice fires twice: a retry
               // after fixing the file is the common second pick.
+              event.target.value = "";
+            }}
+          />
+        </SettingRow>
+
+        {/* Roadmap 4.4. The row above carries the configuration; this one
+            carries everything — history, incidents, the delivery log — because
+            it is the database itself. What it does not carry is the credentials
+            file beside it, which the hint says outright rather than leaving to
+            be discovered on the day it matters. */}
+        <SettingRow
+          label={t("settings.restore.label")}
+          description={
+            <>
+              {t("settings.restore.hint")}
+              {restoreStatus !== undefined && (
+                <span
+                  data-testid="restore-result"
+                  className={`mt-0.5 block ${
+                    restoreStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"
+                  }`}
+                >
+                  {restoreStatus.text}
+                </span>
+              )}
+            </>
+          }
+          align="top"
+        >
+          <Button asChild variant="outline" size="sm">
+            <a href="/config/backup">{t("settings.restore.download")}</a>
+          </Button>
+          <Input
+            id="db-restore"
+            type="file"
+            accept=".db,application/octet-stream"
+            aria-label={t("settings.restore.upload")}
+            disabled={restoreBackup.isPending}
+            className="h-8 w-56 cursor-pointer py-1 text-xs"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file !== undefined) void runRestore(file);
               event.target.value = "";
             }}
           />

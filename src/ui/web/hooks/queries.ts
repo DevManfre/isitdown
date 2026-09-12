@@ -430,6 +430,15 @@ export function useConfigImport() {
 }
 
 /**
+ * A whole database put back from a file (roadmap 4.4). Invalidates everything a
+ * write does, because everything a write touches has just been replaced.
+ */
+export function useRestoreBackup() {
+  const invalidate = useInvalidateAll();
+  return useMutation({ mutationFn: api.restoreBackup, onSuccess: invalidate });
+}
+
+/**
  * Integrity check plus vacuum, on demand — roadmap 6.13. A mutation rather than
  * a query because two clicks must mean two runs, and it invalidates everything
  * a write does so the size Settings prints is the one the vacuum left.
