@@ -31,5 +31,17 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
     include: ["**/*.test.tsx", "**/*.test.ts"],
+    // Roadmap 7.2. A floor, not a target: these sit a few points under what
+    // the dashboard covers today, so ordinary movement passes and a new view
+    // or hook that lands with no test of its own drags the total under and
+    // fails. Raise them when the suite has genuinely climbed; never lower one
+    // to make a red run green.
+    coverage: {
+      provider: "v8",
+      reporter: ["text-summary"],
+      include: ["**/*.ts", "**/*.tsx"],
+      exclude: ["**/*.test.ts", "**/*.test.tsx", "vitest.setup.ts", "test/**"],
+      thresholds: { lines: 85, branches: 75, functions: 80, statements: 85 },
+    },
   },
 });
