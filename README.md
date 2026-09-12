@@ -260,11 +260,11 @@ notifications:
 | `confirmSamples` | `1` | 1–10. Flap damping: how many consecutive polls must agree on a reading before the change is announced. `1` notifies immediately; `2` ignores a page that disagrees with itself for one cycle, at the cost of one poll of delay. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus` and `betterstack` cover those two hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes. |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus` and `betterstack` cover those two hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page (see below). |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
-| `services[].options` | — | Adapter-specific extras. Only the `html` adapter takes any today: `selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists. |
+| `services[].options` | — | Adapter-specific extras. Two adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists) and `http` (see its own section below). |
 
 #### The `html` adapter
 
@@ -298,6 +298,67 @@ Reading markup is fragile by nature, so the failure modes are deliberate:
   operational" reads as the partial outage;
 - there are no incidents, components or maintenance windows — a page that needed
   scraping has no structure to read them out of.
+
+#### The `http` adapter — probing your own endpoint
+
+Every other adapter reads a page a provider publishes about itself. This one
+reads the service directly: it makes the request, and the answer is the reading
+(roadmap 1.8).
+
+```yaml
+  - name: My API
+    id: my-api
+    adapter: http
+    baseUrl: https://app.example.com
+    options:
+      path: "/health"
+      expectStatus: "200-299"
+      expectBody: '"db":"up"'
+      slowMs: "1500"
+      header.Authorization: "Bearer ${API_TOKEN}"
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `method` | `GET` | `GET` or `HEAD`. `POST` is refused: the poller retries a failed read, and a retried `POST` is not the same request twice. |
+| `path` | — | Appended to `baseUrl` verbatim. Base URLs are stored without a trailing slash, so this is how an endpoint that needs one gets it — and how one host is probed at two paths from two services. |
+| `expectStatus` | `200-299` | Single codes or inclusive ranges, comma-separated (`200-299,401`). Anything outside reads as an outage, so an API that is up and refusing us can still be healthy. |
+| `expectBody` | — | Plain text that must appear anywhere in the response. |
+| `absentBody` | — | Plain text that must **not** appear: how an error page served with a `200` is caught. |
+| `slowMs` | — | An answer at or over this many milliseconds reads `degraded` instead of `operational`. |
+| `followRedirects` | `yes` | `no` reads a `3xx` as itself, so a dead app redirecting to a login page is not read as healthy. |
+| `header.<Name>` | — | One request header per option. A `${VAR}` in the value is resolved from the environment at request time; an unset variable throws rather than sending the literal `${VAR}` and reporting your service down over a `401`. |
+
+The readings this produces:
+
+| What happened | Reading |
+|---|---|
+| Accepted status, body matches, under `slowMs` | `operational` |
+| Accepted status and body, at or over `slowMs` | `degraded` |
+| Status outside the set, missing/forbidden body text | `major_outage` |
+| Refused, unresolvable, TLS rejected, or past the request timeout | `major_outage` |
+
+Four things worth knowing before relying on it:
+
+- a non-2xx and an unreachable host are **readings**, not failed reads. Every
+  other adapter throws on those so the poller can retry, because a status page
+  that will not answer has told us nothing; here it has told us everything.
+- the reading is a severity and nothing more: no incidents, no components, no
+  maintenance windows. There is no document to read them out of, and minting an
+  incident per poll would open and resolve one every cycle. *When* it went down
+  still comes from the status change and the history.
+- it is one vantage point, this container. A local DNS or egress failure reads
+  as every probed service being down at once — set `confirmSamples` if a single
+  blip is not worth a message.
+- it will probe **anything this container can reach**, private addresses
+  included, and it does so with no allowlist. That is deliberate for a
+  single-operator dashboard bound to `127.0.0.1`; it is also the reason a
+  read-only API token or a public read-only page (roadmap 4.15 and 5.1) would
+  have to decide who may write a service definition before either ships.
+- a wrong option (`expectStatus: 2xx`, a `${VAR}` with nothing behind it, an
+  `expectBody` on a `HEAD`) throws every cycle and shows up as a failing
+  provider, never as a service quietly reading down. `node dist/light/check.js
+  --probe` catches it before the poller does.
 
 Anything invalid stops the container at boot with the reason and the offending
 path — a missing file, malformed YAML, a bad base URL, a duplicate service id, an
@@ -862,7 +923,8 @@ What it reports, all in one pass:
 | An enabled channel whose required setting is empty | error |
 | A routing rule naming a provider or channel the file does not define | error |
 | A service naming an `adapter` that does not exist, with the known ones listed | error |
-| With `--probe`: a base url no adapter recognises | error |
+| An `http` service whose probe options cannot be read (bad `expectStatus`, a `${VAR}` with nothing behind it, an `expectBody` on a `HEAD`) — offline, so it is caught without `--probe` | error |
+| With `--probe`: a base url no adapter recognises. `http` services are skipped here: a probe's target is not a status page and is not meant to look like one | error |
 | With `--probe`: a page that looks like a different adapter than the file names | warning |
 
 Warnings are printed and do not fail the check — the `html` adapter is a
