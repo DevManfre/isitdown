@@ -1,0 +1,129 @@
+# IsItDown, either edition, on Kubernetes — roadmap 6.5.
+#
+# One chart rather than two, because the two editions are one codebase and
+# differ in exactly three ways a chart cares about: the UI edition serves HTTP
+# and so has a Service and probes, the Light edition reads a `config.yml` and so
+# has a ConfigMap, and each has its own image tag. `edition` picks which.
+#
+# Both keep state in one volume at /app/data — the UI edition's SQLite database
+# and its `secrets.env`, the Light edition's state file — so both want a PVC and
+# neither can be scaled past one replica.
+
+# "ui" or "light".
+edition: ui
+
+image:
+  repository: ghcr.io/devmanfre/isitdown
+  # Empty means "<edition>-latest", the floating tag. Pin a release with
+  # `ui-v1.11.0` or `light-v1.11.0` — the chart appends nothing to a tag you set.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# One at a time, always: both editions own a file in the volume below, and a
+# second replica would be a second poller writing the same SQLite database.
+# Recreate rather than RollingUpdate for the same reason.
+replicaCount: 1
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+# The images already run as `node` (uid 1000); this states it to the cluster so
+# a PodSecurity policy admits the pod on its own terms.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  # UI edition only; the Light edition serves nothing.
+  type: ClusterIP
+  port: 3000
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: isitdown.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+persistence:
+  enabled: true
+  # Leave empty for the cluster's default class.
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  # Use a volume that already exists instead of creating one.
+  existingClaim: ""
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 96Mi
+  limits:
+    memory: 256Mi
+
+# Readiness is deliberately `/ready` and liveness `/health` (roadmap 6.9): a
+# provider being unreachable must never restart the pod, and a pod whose cycles
+# have been failing all day must not be sent traffic. The Light edition has no
+# HTTP surface and uses the image's own healthcheck script as an exec probe.
+probes:
+  enabled: true
+  liveness:
+    initialDelaySeconds: 20
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 20
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Plain environment variables — LOG_LEVEL, TZ, anything the editions read.
+env: {}
+
+# Channel credentials. Written into a Secret this chart owns, and mounted as
+# environment variables. Prefer `existingSecret` in a real cluster: values are
+# what ends up in `helm get values` and in whatever repository holds them.
+secrets: {}
+existingSecret: ""
+
+# Light edition only: the contents of `config.yml`, rendered into a ConfigMap
+# and mounted read-only at /app/config/config.yml. `${VAR}` references resolve
+# against the environment above, exactly as they do in Docker.
+config: |
+  pollIntervalMinutes: 3
+  services:
+    - id: github
+      name: GitHub
+      adapter: statuspage
+      baseUrl: https://www.githubstatus.com
+  notifications:
+    telegram:
+      enabled: false
+      botToken: "${TELEGRAM_BOT_TOKEN}"
+      chatId: "${TELEGRAM_CHAT_ID}"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
