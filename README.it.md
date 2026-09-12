@@ -331,6 +331,7 @@ lettura (roadmap 1.8).
 | `absentBody` | — | Testo semplice che **non** deve comparire: così si intercetta una pagina di errore servita con un `200`. |
 | `slowMs` | — | Una risposta a questi millisecondi o oltre legge `degraded` invece di `operational`. |
 | `followRedirects` | `yes` | `no` legge un `3xx` per quello che è, così un'app morta che rimanda a una pagina di login non risulta sana. |
+| `tlsWarnDays` | — | Un certificato che scade entro questi giorni legge `degraded`. Spento se non impostato: `fetch` non espone nulla della connessione che ha fatto, quindi la scadenza costa un secondo handshake, chiesto solo dopo una richiesta già riuscita. |
 | `header.<Nome>` | — | Un header di richiesta per opzione. Un `${VAR}` nel valore è risolto dall'ambiente al momento della richiesta; una variabile non impostata solleva un errore invece di inviare il letterale `${VAR}` e segnalare il tuo servizio giù per un `401`. |
 
 Le letture che ne escono:
@@ -339,6 +340,7 @@ Le letture che ne escono:
 |---|---|
 | Stato accettato, corpo conforme, sotto `slowMs` | `operational` |
 | Stato e corpo accettati, a `slowMs` o oltre | `degraded` |
+| Stato e corpo accettati, certificato entro `tlsWarnDays` | `degraded` |
 | Stato fuori dall'insieme, testo mancante o vietato nel corpo | `major_outage` |
 | Connessione rifiutata, host non risolto, TLS respinto o timeout superato | `major_outage` |
 
@@ -353,8 +355,20 @@ Quattro cose da sapere prima di affidarcisi:
   incidente a ogni poll ne aprirebbe e chiuderebbe uno per ciclo. *Da quando* è
   giù continua a venire dal cambio di stato e dallo storico.
 - è un solo punto di vista, questo container. Un guasto locale di DNS o di
-  uscita viene letto come tutti i servizi sondati giù insieme — usa
-  `confirmSamples` se un singolo sussulto non merita un messaggio.
+  uscita viene letto come tutti i servizi sondati giù insieme. Il poller lo dice
+  quando può: un ciclo in cui *ogni* provider è fallito o non ha risposto logga
+  un warning e aggiunge "sembra un guasto dalla nostra parte" a quelle letture
+  in **Diagnose** — basta una status page che risponde normalmente per
+  escluderlo. Non cambia nessuna lettura e non zittisce nessun messaggio, perché
+  da qui quei servizi sono davvero irraggiungibili; comprimere la raffica in un
+  unico avviso di flotta richiede un evento che non riguardi un singolo provider
+  (roadmap 2.7). `confirmSamples` resta l'impostazione per "un singolo sussulto
+  non merita un messaggio".
+- una sonda non operativa dice *perché*: **Impostazioni → riga del provider →
+  Diagnose** porta la frase che la lettura non ha dove tenere — `answered HTTP
+  503, outside the accepted 200-299`, `no answer from …: connect ECONNREFUSED`,
+  `the TLS certificate expires in 9 day(s)`. "Giù" e "giù perché il nome non si
+  risolve più" sono la stessa severità e due problemi diversi.
 - sonda **qualunque cosa questo container riesca a raggiungere**, indirizzi
   privati compresi, senza alcuna allowlist. È voluto per una dashboard a
   operatore singolo in ascolto su `127.0.0.1`; è anche il motivo per cui un

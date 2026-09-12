@@ -327,6 +327,7 @@ reads the service directly: it makes the request, and the answer is the reading
 | `absentBody` | — | Plain text that must **not** appear: how an error page served with a `200` is caught. |
 | `slowMs` | — | An answer at or over this many milliseconds reads `degraded` instead of `operational`. |
 | `followRedirects` | `yes` | `no` reads a `3xx` as itself, so a dead app redirecting to a login page is not read as healthy. |
+| `tlsWarnDays` | — | A certificate expiring within this many days reads `degraded`. Off unless set: `fetch` exposes nothing about the connection it made, so the expiry costs a second handshake, and it is only asked for after a request that already succeeded. |
 | `header.<Name>` | — | One request header per option. A `${VAR}` in the value is resolved from the environment at request time; an unset variable throws rather than sending the literal `${VAR}` and reporting your service down over a `401`. |
 
 The readings this produces:
@@ -335,6 +336,7 @@ The readings this produces:
 |---|---|
 | Accepted status, body matches, under `slowMs` | `operational` |
 | Accepted status and body, at or over `slowMs` | `degraded` |
+| Accepted status and body, certificate inside `tlsWarnDays` | `degraded` |
 | Status outside the set, missing/forbidden body text | `major_outage` |
 | Refused, unresolvable, TLS rejected, or past the request timeout | `major_outage` |
 
@@ -348,8 +350,20 @@ Four things worth knowing before relying on it:
   incident per poll would open and resolve one every cycle. *When* it went down
   still comes from the status change and the history.
 - it is one vantage point, this container. A local DNS or egress failure reads
-  as every probed service being down at once — set `confirmSamples` if a single
-  blip is not worth a message.
+  as every probed service being down at once. The poller says so when it can: a
+  cycle in which *every* provider either failed or never answered logs a warning
+  and adds "this looks like a failure on our side" to those reads in
+  **Diagnose** — one status page answering normally is enough to rule it out. It
+  changes no reading and silences no message, because from here those services
+  really are unreachable; collapsing the burst into a single fleet-wide alert
+  needs an event that is not about one provider (roadmap 2.7). `confirmSamples`
+  is still the setting for "a single blip is not worth a message".
+- a probe that is not operational says why: **Settings → the provider's row →
+  Diagnose** carries the sentence the reading has nowhere to hold — `answered
+  HTTP 503, outside the accepted 200-299`, `no answer from …: connect
+  ECONNREFUSED`, `the TLS certificate expires in 9 day(s)`. "Down" and "down
+  because the name no longer resolves" are the same severity and different
+  problems.
 - it will probe **anything this container can reach**, private addresses
   included, and it does so with no allowlist. That is deliberate for a
   single-operator dashboard bound to `127.0.0.1`; it is also the reason a
