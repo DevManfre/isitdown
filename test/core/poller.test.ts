@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPoller, staggerOffsetMs } from "../../src/core/poller.ts";
+import { createPoller, looksLikeOurOwnNetwork, staggerOffsetMs, type ProviderResult } from "../../src/core/poller.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import { getAdapter } from "../../src/adapters/index.ts";
 import { createFileStateStore } from "../../src/light/fileStateStore.ts";
@@ -1196,4 +1196,50 @@ test("a muted provider is polled and recorded, and reports nothing", async () =>
     await store.close();
     await provider.close();
   }
+});
+
+const outcome = (over: Partial<ProviderResult>): ProviderResult => ({
+  providerId: "p",
+  ok: true,
+  attempts: 1,
+  durationMs: 5,
+  ...over,
+});
+
+test("a cycle where nothing answered is read as our own network, not as the fleet", () => {
+  assert.equal(
+    looksLikeOurOwnNetwork([
+      outcome({ providerId: "api", unreachable: true }),
+      outcome({ providerId: "db", unreachable: true }),
+      outcome({ providerId: "github", ok: false, error: "getaddrinfo ENOTFOUND" }),
+    ]),
+    true,
+  );
+});
+
+test("one provider still answering rules our own network out, whatever the probes say", () => {
+  // The whole point of looking at the fleet: if a status page came back
+  // normally, the container's network is fine and those probes really are down.
+  assert.equal(
+    looksLikeOurOwnNetwork([
+      outcome({ providerId: "api", unreachable: true }),
+      outcome({ providerId: "github" }),
+    ]),
+    false,
+  );
+});
+
+test("a single failing probe is a single failing probe", () => {
+  assert.equal(looksLikeOurOwnNetwork([outcome({ providerId: "api", unreachable: true })]), false);
+});
+
+test("providers that answered badly are not evidence of a network failure of ours", () => {
+  // Two endpoints answering 503 answered: the sockets worked.
+  assert.equal(
+    looksLikeOurOwnNetwork([
+      outcome({ providerId: "api", note: "answered HTTP 503, outside the accepted 200-299" }),
+      outcome({ providerId: "db", note: "answered HTTP 500, outside the accepted 200-299" }),
+    ]),
+    false,
+  );
 });

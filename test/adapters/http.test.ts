@@ -1,15 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
+import type { AddressInfo } from "node:net";
 import {
+  certificateDaysLeft,
+  failureReason,
   httpAdapter,
+  noteFromOutcome,
   parseStatusSpec,
   probeConfig,
   readingFromOutcome,
   severityFromOutcome,
   type ProbeConfig,
 } from "../../src/adapters/http.adapter.ts";
-import type { FetchContext, ServiceRef } from "../../src/core/adapter.interface.ts";
+import type { FetchContext, ReadingNote, ServiceRef } from "../../src/core/adapter.interface.ts";
 import type { StatusPageRead } from "../../src/core/http.ts";
 import { withServer } from "../helpers/localServer.ts";
 import { runAdapterContract } from "./adapter.contract.ts";
@@ -64,7 +70,7 @@ test("a status outside the accepted set reads as an outage, not as a failed read
 test("an endpoint that did not answer at all reads as an outage", () => {
   // The inversion this adapter exists for: for a status page this is us going
   // blind, for a probe it is the answer.
-  assert.equal(severityFromOutcome({ answered: false }, config()), "major_outage");
+  assert.equal(severityFromOutcome({ answered: false, reason: "connect ECONNREFUSED" }, config()), "major_outage");
 });
 
 test("the operator's own accepted statuses decide, so a 401 from a live API is healthy", () => {
@@ -125,7 +131,8 @@ test("an unreadable option throws, so a misconfigured check never quietly reads 
   assert.deepEqual(config({ expectStatus: "  " }).accepted, [[200, 299]]);
   assert.throws(() => config({ method: "DELETE" }), /is not one of GET, HEAD/);
   assert.throws(() => config({ slowMs: "soon" }), /positive whole number/);
-  assert.throws(() => config({ slowMs: "0" }), /positive whole number/);
+  assert.throws(() => config({ slowMs: "0" }), /positive whole number of milliseconds/);
+  assert.throws(() => config({ tlsWarnDays: "soon" }), /positive whole number of days/);
   assert.throws(() => config({ followRedirects: "maybe" }), /must be yes or no/);
 });
 
@@ -240,4 +247,156 @@ test("configured headers reach the endpoint", async () => {
   );
 
   assert.equal(seen, "abc");
+});
+
+test("a certificate close to expiry reads degraded, and one with time left does not", () => {
+  const probe = config({ tlsWarnDays: "14" });
+  const answered = { answered: true, status: 200, body: null, latencyMs: 5 } as const;
+
+  assert.equal(severityFromOutcome({ ...answered, tlsDaysLeft: 9 }, probe), "degraded");
+  assert.equal(severityFromOutcome({ ...answered, tlsDaysLeft: 40 }, probe), "operational");
+  // Asked for, but the handshake said nothing: not a reason to call a service
+  // anything at all.
+  assert.equal(severityFromOutcome(answered, probe), "operational");
+  // Not asked for: an expiring certificate the operator never asked about
+  // cannot change the reading.
+  assert.equal(severityFromOutcome({ ...answered, tlsDaysLeft: 1 }, config()), "operational");
+});
+
+test("an endpoint that is already down is not reported as a certificate problem", () => {
+  const probe = config({ tlsWarnDays: "14" });
+
+  assert.equal(
+    severityFromOutcome({ answered: true, status: 500, body: null, latencyMs: 5, tlsDaysLeft: 2 }, probe),
+    "major_outage",
+  );
+  assert.match(
+    noteFromOutcome({ answered: true, status: 500, body: null, latencyMs: 5, tlsDaysLeft: 2 }, probe)?.text ?? "",
+    /outside the accepted/,
+  );
+});
+
+test("the note says why the reading is not operational, and nothing when it is", () => {
+  assert.equal(noteFromOutcome({ answered: true, status: 200, body: null, latencyMs: 5 }, config()), null);
+
+  assert.deepEqual(noteFromOutcome({ answered: false, reason: "fetch failed" }, config()), {
+    text: "no answer from https://app.example.com: fetch failed",
+    unreachable: true,
+  });
+  assert.match(
+    noteFromOutcome({ answered: true, status: 503, body: null, latencyMs: 5 }, config())?.text ?? "",
+    /answered HTTP 503, outside the accepted 200-299/,
+  );
+  assert.match(
+    noteFromOutcome({ answered: true, status: 200, body: "nope", latencyMs: 5 }, config({ expectBody: "ok" }))?.text ??
+      "",
+    /without the expected "ok"/,
+  );
+  assert.match(
+    noteFromOutcome(
+      { answered: true, status: 200, body: "Application error", latencyMs: 5 },
+      config({ absentBody: "Application error" }),
+    )?.text ?? "",
+    /carrying the forbidden "Application error"/,
+  );
+  assert.match(
+    noteFromOutcome({ answered: true, status: 200, body: null, latencyMs: 900 }, config({ slowMs: "500" }))?.text ?? "",
+    /answered in 900 ms, at or over the 500 ms threshold/,
+  );
+});
+
+test("only a failure to answer is reported as unreachable: a 503 answered", () => {
+  assert.equal(noteFromOutcome({ answered: false, reason: "boom" }, config())?.unreachable, true);
+  assert.equal(
+    noteFromOutcome({ answered: true, status: 503, body: null, latencyMs: 1 }, config())?.unreachable,
+    undefined,
+  );
+});
+
+test("a probe that cannot reach the endpoint reports the reason to the poller", async () => {
+  const notes: ReadingNote[] = [];
+
+  const reading = await httpAdapter.fetchStatus(service({}, "http://127.0.0.1:1"), {
+    ...ctx,
+    onNote: (note) => notes.push(note),
+  });
+
+  assert.equal(reading.overallStatus, "major_outage");
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0]?.unreachable, true);
+  assert.match(notes[0]?.text ?? "", /no answer from http:\/\/127\.0\.0\.1:1/);
+});
+
+test("a healthy probe reports no note at all", async () => {
+  const notes: ReadingNote[] = [];
+
+  await withServer(answering(200, "ok"), async (baseUrl) => {
+    await httpAdapter.fetchStatus(service({}, baseUrl), { ...ctx, onNote: (note) => notes.push(note) });
+  });
+
+  assert.deepEqual(notes, []);
+});
+
+test("the certificate expiry is read off the host that served the answer", async () => {
+  const key = readFileSync(new URL("../fixtures/tls/key.pem", import.meta.url));
+  const cert = readFileSync(new URL("../fixtures/tls/cert.pem", import.meta.url));
+  const server = createHttpsServer({ key, cert }, (_req, res) => {
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("ok");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+
+  try {
+    const daysLeft = await certificateDaysLeft(`https://127.0.0.1:${port}/`, 2000);
+
+    assert.equal(typeof daysLeft, "number");
+    // The fixture is issued for 7300 days; the assertion is that a real
+    // handshake yields a real date, not the exact number of days left in it.
+    assert.ok((daysLeft ?? 0) > 3000, `expected a far-future expiry, got ${daysLeft}`);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("a host that cannot be asked for a certificate reports none rather than an outage", async () => {
+  // Plain HTTP, and a url that is not one: both are "no expiry to read", never
+  // a reason to call the service down.
+  assert.equal(await certificateDaysLeft("http://127.0.0.1:1/", 500), null);
+  assert.equal(await certificateDaysLeft("not a url", 500), null);
+  assert.equal(await certificateDaysLeft("https://127.0.0.1:1/", 500), null);
+});
+
+test("the reason names the transport failure, not fetch's three-word summary", () => {
+  const wrapped = new Error("fetch failed", { cause: new Error("connect ECONNREFUSED 10.0.0.4:8080") });
+  assert.equal(failureReason(wrapped), "connect ECONNREFUSED 10.0.0.4:8080");
+
+  const abort = new Error("The operation was aborted");
+  abort.name = "TimeoutError";
+  assert.equal(failureReason(abort), "timed out");
+
+  assert.equal(failureReason(new Error("plain")), "plain");
+  assert.equal(failureReason("not an error"), "not an error");
+});
+
+test("a probe that times out says so rather than reporting an empty reason", async () => {
+  const notes: ReadingNote[] = [];
+
+  await withServer(
+    () => {
+      /* never answers */
+    },
+    async (baseUrl) => {
+      const reading = await httpAdapter.fetchStatus(service({}, baseUrl), {
+        timeoutMs: 150,
+        onNote: (note) => notes.push(note),
+      });
+
+      assert.equal(reading.overallStatus, "major_outage");
+    },
+  );
+
+  assert.match(notes[0]?.text ?? "", /timed out|aborted/);
+  assert.equal(notes[0]?.unreachable, true);
 });
