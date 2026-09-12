@@ -642,6 +642,19 @@ export function ServiceDialog({
                   <span className="text-xs text-muted-foreground">{t("probe.slow-ms-hint")}</span>
                 </div>
 
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="service-probe-tls">{t("probe.tls-warn-days")}</Label>
+                  <Input
+                    id="service-probe-tls"
+                    type="number"
+                    min={1}
+                    value={options["tlsWarnDays"] ?? ""}
+                    onChange={(event) => setOption("tlsWarnDays", event.target.value)}
+                    {...fieldProps}
+                  />
+                  <span className="text-xs text-muted-foreground">{t("probe.tls-warn-days-hint")}</span>
+                </div>
+
                 <div className="flex items-center gap-2">
                   {/* Stored only when switched off: following is the default,
                       and an option repeating the default is noise in the

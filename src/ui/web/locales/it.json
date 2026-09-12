@@ -350,6 +350,8 @@
   "probe.absent-body-hint": "Così si intercetta una pagina di errore servita con uno stato sano.",
   "probe.slow-ms": "Lento oltre (ms)",
   "probe.slow-ms-hint": "Una risposta a questa soglia o oltre viene letta come degradata invece che operativa. Lascia vuoto per nessuna soglia.",
+  "probe.tls-warn-days": "Avvisa alla scadenza del certificato (giorni)",
+  "probe.tls-warn-days-hint": "Un certificato che scade entro questi giorni legge come degradato. Costa una seconda connessione per ciclo: lascia vuoto per saltare il controllo.",
   "probe.follow-redirects": "Segui i redirect",
   "probe.header-name": "Nome header",
   "probe.header-value": "Valore header",
