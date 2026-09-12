@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentPicker, type ComponentPickerEntry, type ComponentPickerSelection } from "@/components/ComponentPicker.tsx";
 import { useCatalog, useConfig, useServiceMutations } from "@/hooks/queries.ts";
@@ -24,6 +25,7 @@ const ADAPTERS = [
   "aws",
   "gcp",
   "azure",
+  "http",
   "custom",
 ] as const;
 
@@ -46,6 +48,7 @@ const ADAPTER_NOTES: Record<string, string> = {
   aws: "add.note.aws",
   gcp: "add.note.gcp",
   azure: "add.note.azure",
+  http: "add.note.http",
   custom: "add.note.custom",
 };
 
@@ -66,9 +69,35 @@ const SCRAPE_SEVERITIES: { key: string; label: string; example: string }[] = [
   { key: "operational", label: "status.operational", example: "all systems operational" },
 ];
 
+/**
+ * The probe (roadmap 1.8): the adapter that reads the operator's own endpoint
+ * rather than a page a provider publishes. Like the scraper, its configuration
+ * cannot be inferred from a URL — only the operator knows which answer counts
+ * as healthy — so it is the second adapter this dialog grows fields for.
+ */
+const PROBE_ADAPTER = "http";
+
+/** Only the two methods a poller may safely repeat; the adapter refuses the rest. */
+const PROBE_METHODS = ["GET", "HEAD"] as const;
+
+/** The prefix an option carrying a request header is stored under. */
+const HEADER_PREFIX = "header.";
+
 /** Drops the fields the operator left empty, so a blank never travels as a mapping. */
 const usedOptions = (options: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(options).filter(([, value]) => value.trim() !== ""));
+
+/**
+ * The probe's stored header, read back into the two fields that edit it. The
+ * option key carries the header's own name (`header.Authorization`), so a
+ * half-typed name would otherwise keep renaming the key it is stored under.
+ */
+const storedHeader = (options: Record<string, string> | undefined): { name: string; value: string } => {
+  const entry = Object.entries(options ?? {}).find(([key]) => key.startsWith(HEADER_PREFIX));
+  return entry === undefined
+    ? { name: "", value: "" }
+    : { name: entry[0].slice(HEADER_PREFIX.length), value: entry[1] };
+};
 
 /**
  * Add/edit dialog for a monitored service, on shadcn's Radix `Dialog`. Port of
@@ -119,6 +148,10 @@ export function ServiceDialog({
   // user. Kept as the raw record the service definition carries, rather than as
   // named fields, so an adapter that grows an option later needs no new state.
   const [options, setOptions] = useState<Record<string, string>>(service?.options ?? {});
+  // The probe's single header, held apart from `options` and folded back in on
+  // save: see `storedHeader`.
+  const [headerName, setHeaderName] = useState(storedHeader(service?.options).name);
+  const [headerValue, setHeaderValue] = useState(storedHeader(service?.options).value);
   const [preview, setPreview] = useState<
     { supported: boolean; components: ComponentPickerEntry[] } | undefined
   >(undefined);
@@ -147,9 +180,29 @@ export function ServiceDialog({
   // adapter the service already has.
   const activeAdapter = mode === "add" ? adapter : (service?.adapter ?? "");
   const scraping = activeAdapter === SCRAPE_ADAPTER;
+  const probing = activeAdapter === PROBE_ADAPTER;
   const setOption = (key: string, value: string): void => {
     setOptions((current) => ({ ...current, [key]: value }));
   };
+
+  /**
+   * What a probe saves: the plain fields, plus the header pair put back under
+   * the key the adapter reads. A header with no name is dropped rather than
+   * stored under an empty one, which the adapter rejects on the next poll.
+   */
+  const probeOptions = (): Record<string, string> => {
+    const base = Object.fromEntries(
+      Object.entries(usedOptions(options)).filter(([key]) => !key.startsWith(HEADER_PREFIX)),
+    );
+    const name = headerName.trim();
+    return name === "" || headerValue.trim() === ""
+      ? base
+      : { ...base, [`${HEADER_PREFIX}${name}`]: headerValue.trim() };
+  };
+
+  /** The options block a save carries, or nothing for the adapters that take none. */
+  const savedOptions = (): { options?: Record<string, string> } =>
+    scraping ? { options: usedOptions(options) } : probing ? { options: probeOptions() } : {};
 
   // Claim-it-release-it: every close path above releases the busy state this
   // dialog claimed on open, but an unmount is not a close path — it runs no
@@ -181,6 +234,8 @@ export function ServiceDialog({
     setIntervalMinutes(intervalValue(service));
     setGroup(service?.group ?? "");
     setOptions(service?.options ?? {});
+    setHeaderName(storedHeader(service?.options).name);
+    setHeaderValue(storedHeader(service?.options).value);
     setPreview(undefined);
     setMessage(undefined);
     setSaving(false);
@@ -299,7 +354,7 @@ export function ServiceDialog({
           // Omitted entirely for the adapters that take none: an empty record
           // would be stored as one, and `undefined` is what "this adapter has
           // no extras" looks like everywhere else.
-          ...(scraping ? { options: usedOptions(options) } : {}),
+          ...savedOptions(),
           // Omitted rather than null on an add: the schema behind the POST takes
           // the field as optional, and absent already means the global cadence.
           ...(intervalMinutes.trim() === "" ? {} : { intervalMinutes: Number(intervalMinutes) }),
@@ -325,7 +380,7 @@ export function ServiceDialog({
             // Same rule for the group: cleared means "out of the group", which
             // only null can say (roadmap 2.6).
             group: slugify(group) === "" ? null : slugify(group),
-          ...(scraping ? { options: usedOptions(options) } : {}),
+            ...savedOptions(),
           },
         });
       }
@@ -493,6 +548,136 @@ export function ServiceDialog({
                   ))}
                   <span className="text-xs text-muted-foreground">{t("scrape.words-hint")}</span>
                 </div>
+              </div>
+            )}
+
+            {probing && (
+              <div className="flex flex-col gap-3 rounded-md border border-dashed border-border p-3">
+                <p className="text-xs text-muted-foreground">{t("probe.warning")}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label>{t("probe.method")}</Label>
+                    <ToggleGroup
+                      type="single"
+                      spacing={1}
+                      className="w-full"
+                      value={options["method"] ?? "GET"}
+                      onValueChange={(next) => {
+                        if (next !== "") setOption("method", next);
+                      }}
+                    >
+                      {PROBE_METHODS.map((option) => (
+                        <ToggleGroupItem key={option} value={option}>
+                          {option}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="service-probe-path">{t("probe.path")}</Label>
+                    <Input
+                      id="service-probe-path"
+                      className="font-mono"
+                      value={options["path"] ?? ""}
+                      onChange={(event) => setOption("path", event.target.value)}
+                      {...fieldProps}
+                    />
+                  </div>
+                </div>
+                <span className="text-xs text-muted-foreground">{t("probe.path-hint")}</span>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="service-probe-status">{t("probe.expect-status")}</Label>
+                  <Input
+                    id="service-probe-status"
+                    className="font-mono"
+                    placeholder={t("probe.expect-status-placeholder")}
+                    value={options["expectStatus"] ?? ""}
+                    onChange={(event) => setOption("expectStatus", event.target.value)}
+                    {...fieldProps}
+                  />
+                  <span className="text-xs text-muted-foreground">{t("probe.expect-status-hint")}</span>
+                </div>
+
+                {/* Only a GET downloads a body to match against, so the two
+                    body fields are not offered against a HEAD the adapter
+                    would reject the moment it polled. */}
+                {(options["method"] ?? "GET") === "GET" && (
+                  <>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="service-probe-expect-body">{t("probe.expect-body")}</Label>
+                      <Input
+                        id="service-probe-expect-body"
+                        className="font-mono"
+                        value={options["expectBody"] ?? ""}
+                        onChange={(event) => setOption("expectBody", event.target.value)}
+                        {...fieldProps}
+                      />
+                      <span className="text-xs text-muted-foreground">{t("probe.expect-body-hint")}</span>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="service-probe-absent-body">{t("probe.absent-body")}</Label>
+                      <Input
+                        id="service-probe-absent-body"
+                        className="font-mono"
+                        value={options["absentBody"] ?? ""}
+                        onChange={(event) => setOption("absentBody", event.target.value)}
+                        {...fieldProps}
+                      />
+                      <span className="text-xs text-muted-foreground">{t("probe.absent-body-hint")}</span>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="service-probe-slow">{t("probe.slow-ms")}</Label>
+                  <Input
+                    id="service-probe-slow"
+                    type="number"
+                    min={1}
+                    value={options["slowMs"] ?? ""}
+                    onChange={(event) => setOption("slowMs", event.target.value)}
+                    {...fieldProps}
+                  />
+                  <span className="text-xs text-muted-foreground">{t("probe.slow-ms-hint")}</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Stored only when switched off: following is the default,
+                      and an option repeating the default is noise in the
+                      exported config file. */}
+                  <Switch
+                    id="service-probe-redirects"
+                    checked={(options["followRedirects"] ?? "yes") !== "no"}
+                    onCheckedChange={(next) => setOption("followRedirects", next ? "" : "no")}
+                  />
+                  <Label htmlFor="service-probe-redirects">{t("probe.follow-redirects")}</Label>
+                </div>
+
+                <div className="grid grid-cols-[1fr_1fr] gap-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="service-probe-header-name">{t("probe.header-name")}</Label>
+                    <Input
+                      id="service-probe-header-name"
+                      className="font-mono"
+                      value={headerName}
+                      onChange={(event) => setHeaderName(event.target.value)}
+                      {...fieldProps}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="service-probe-header-value">{t("probe.header-value")}</Label>
+                    <Input
+                      id="service-probe-header-value"
+                      className="font-mono"
+                      placeholder={t("probe.header-value-placeholder")}
+                      value={headerValue}
+                      onChange={(event) => setHeaderValue(event.target.value)}
+                      {...fieldProps}
+                    />
+                  </div>
+                </div>
+                <span className="text-xs text-muted-foreground">{t("probe.header-hint")}</span>
               </div>
             )}
 
