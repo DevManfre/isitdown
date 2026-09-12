@@ -349,6 +349,9 @@ tua lista non viene più sovrascritta in seguito.
 | `GOTIFY_TOKEN` | entrambe | — | Token applicativo di Gotify. Obbligatoria insieme alla precedente. |
 | `WEBHOOK_SECRET` | entrambe | — | Segreto condiviso opzionale per il webhook generico. Impostandolo ogni richiesta viene firmata (vedi [3.6](#36-canali-di-notifica)); lasciandolo vuoto le richieste partono non firmate, esattamente come prima. |
 | `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
+| `LOG_FILE` | entrambe | — | Accoda ogni riga di log anche a questo file, ruotato per dimensione. Se non è impostata, i log vanno solo su stdout. |
+| `LOG_MAX_BYTES` | entrambe | `5242880` | Dimensione alla quale `LOG_FILE` ruota. |
+| `LOG_MAX_FILES` | entrambe | `5` | Quante generazioni ruotate (`.1` … `.5`) sopravvivono accanto al file vivo. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Dove leggere `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Dove tenere il file di stato. |
 | `DB_PATH` | UI | `/app/data/isitdown.db` | Database SQLite. |
@@ -1122,6 +1125,13 @@ aprire. Un provider mai letto con successo non è "difficoltà" — un primo cic
 non ancora arrivato non deve mostrare una linguetta rossa — e un provider
 disabilitato è fuori dalla dashboard del tutto.
 
+La barra dei controlli di ogni vista segue una regola sola: un controllo che
+cambia ciò che è a schermo è un gruppo segmentato — pulsanti uniti in una
+striscia con bordo e sfondo tenue, e quello attivo sollevato — mentre tutto ciò
+che porta via la vista sta dietro a un unico menu **Scarica**. Prima un toggle di
+intervallo, due frasi di download e due coppie di formati avevano tutti lo stesso
+peso, e niente diceva quali stessero insieme.
+
 Su **History**, cliccare la riga di un provider apre il suo drawer: le tre
 finestre, le barre giornaliere con la loro legenda di colori e — roadmap 5.20 —
 un **calendario annuale**, una cella per giorno colorata dallo stato peggiore di
@@ -1130,6 +1140,15 @@ restava una riga di barre a 90 giorni, quindi tutto ciò che era più vecchio
 veniva salvato e mai mostrato; il calendario è quell'anno. Un giorno che nessuno
 ha campionato è disegnato smorzato e non verde, e passando sopra una cella si
 legge com'è andato quel giorno e quanto è stato attivo.
+
+Sopra la lista, **Confronta** (roadmap 5.7) sovrappone l'uptime giornaliero di
+due provider sugli stessi assi — la domanda che pone davvero una scelta tra
+fornitori, e quella a cui la classifica dal peggiore non può rispondere perché
+non mette mai due righe sulla stessa scala. Si apre sui due provider peggiori,
+ciascun selettore cambia il proprio lato, e scegliere il provider già presente
+sull'altro lato li scambia. Le due linee prendono colori propri e non colori di
+stato: il grafico dice chi ha misurato meglio, non che uno è operativo e l'altro
+no.
 
 Gli stessi dati via HTTP:
 
@@ -1369,6 +1388,15 @@ Per l'edizione Light imposta le stesse due variabili, `telegram.enabled: true` i
 Alza il dettaglio con `LOG_LEVEL=debug`, che logga ogni singolo tentativo di poll,
 retry compresi.
 
+I log vanno su stdout, che è ciò che vuole un container e ciò che non basta a
+un'installazione bare-metal: imposta `LOG_FILE=/var/log/isitdown/isitdown.log` e le
+stesse righe vengono accodate anche lì, ruotate a `LOG_MAX_BYTES` in
+`LOG_MAX_FILES` generazioni numerate. Il file è aggiuntivo — stdout continua a
+portare tutto, quindi `docker logs` funziona ancora su un container che ha
+entrambi. Un percorso non scrivibile disattiva il file dopo averlo detto una volta
+su stdout; polling e notifiche non vengono mai bloccati da un disco pieno o in
+sola lettura.
+
 ---
 
 ## 6. API HTTP
@@ -1390,6 +1418,8 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `GET` | `/export/incidents.json?provider=&state=&q=&days=` | Le stesse righe come `{ generatedAt, filter, count, truncated, incidents }` — `filter` riporta con quali filtri l'export è stato preso, così un file ritrovato dopo dice ancora cosa contiene. |
 | `GET` | `/export/history.csv?provider=&days=` | Storico di uptime, una riga per provider per giorno: `provider_id,day,worst_status,uptime_pct`. `days` accetta `7`, `30` o `90`, come `/history`; `provider` restringe a uno (`404` se l'id è sconosciuto), e senza di esso ogni provider attivo. |
 | `GET` | `/export/history.json?provider=&days=` | La stessa finestra come `{ generatedAt, days, providers }`, con per ogni provider i bucket, la serie giornaliera e le percentuali della finestra da cui sono disegnati i grafici. |
+| `GET` | `/feeds/incidents.xml?provider=&state=&q=&days=` | Il risultato della ricerca incidenti come feed RSS 2.0 — roadmap 4.9. Gli stessi filtri di `/incidents`, i 200 più recenti, servito inline così un reader si iscrive invece di salvare un file. Ogni item rimanda alla rotta del dashboard per quell'incidente, e il suo `guid` è la coppia `provider/incidente`, non il link. |
+| `GET` | `/feeds/incidents.ics?provider=&state=&q=&days=` | Le stesse righe come file iCalendar, un `VEVENT` per incidente: inizia quando l'incidente è stato visto la prima volta e finisce quando si è risolto, oppure all'ultimo aggiornamento finché resta `TENTATIVE`. |
 | `GET` | `/maintenances?provider=&days=` | Le finestre di manutenzione dichiarate — in corso, future e passate — come `{ maintenances }`. `days` limita quanto indietro nel tempo resta visibile una finestra chiusa (default 90, massimo 365); `provider` restringe a uno solo. Senza `provider`, ogni provider abilitato. |
 | `GET` | `/notifications?limit=` | Ciò che è stato inviato davvero, dal più recente. Massimo 200. |
 | `GET` | `/notifications/log?state=&channel=&page=&pageSize=` | Una pagina del log invii: `{ page: { items, page, pageSize, total }, counts: { all, sent, failed } }`. `state` è `all` (default), `sent` o `failed`; `channel` restringe a un canale; `pageSize` vale 25 di default, massimo 200. Un `page`, `pageSize` o `state` senza senso ricade sui valori di default invece di dare 400. `counts` porta ogni esito qualunque sia il filtro. Ogni elemento porta `attempts`: un invio fallito con più di uno è una notifica non recapitata. |
@@ -2166,13 +2196,29 @@ sviluppo; `docker inspect -f '{{.Config.Cmd}}' isitdown-ui` mostra
 
 ```bash
 npm test                 # suite node:test + vitest run
+npm run coverage         # le stesse due suite sotto una soglia minima di copertura
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
 npm run test:visual      # baseline visive: ogni vista, entrambi i temi, entrambe le lingue
+npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
 npm run build:light      # tsc + copia asset, escludendo src/ui
 npm run build:ui         # tsc + vite build + copia asset
 ```
+
+Il budget del bundle (roadmap 5.16) pesa ciò che `build:ui` ha prodotto, in
+gzip, perché è quello che il browser scarica: `410 kB` di JavaScript e `20 kB` di
+CSS, entrambi poco sopra la build di oggi. È un tetto, non un obiettivo — quando
+fallisce la risposta è trovare cosa è cresciuto, non alzare il numero.
+
+La soglia di copertura (roadmap 7.2) è un pavimento, non un obiettivo da
+rincorrere. Sono due, perché le due suite coprono metà diverse: il server e il
+motore devono restare al 95% delle righe, all'88% dei rami e al 93% delle
+funzioni, e la dashboard a 85/75/80 — ciascuna qualche punto sotto il valore
+attuale, così il movimento ordinario passa e un sottosistema nuovo che arriva
+senza test propri trascina il totale sotto la soglia e fa fallire la CI. Alza una
+soglia quando la suite è davvero salita; non abbassarne mai una per far tornare
+verde una run rossa.
 
 **Nessun test raggiunge mai un provider reale.** Gli adapter sono testati contro
 payload registrati dalle status page vere e conservati sotto `test/fixtures/`; il

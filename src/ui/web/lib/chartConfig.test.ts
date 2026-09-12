@@ -8,7 +8,7 @@
 // src/ui/web/css/tokens.test.ts for the precedent.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { AGGREGATE_FILL, chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, statusTier, tierColor, tierFill, trimToLatest, worstStatus, worstTier } from "./chartConfig.ts";
+import { AGGREGATE_FILL, COMPARE_CHART, chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, statusTier, tierColor, tierFill, trimToLatest, worstStatus, worstTier } from "./chartConfig.ts";
 import en from "@/locales/en.json";
 
 const STATUSES = ["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const;
@@ -27,6 +27,19 @@ describe("chartConfig", () => {
         expect(tokens, `${name} is not declared in tokens.css`).toContain(`${name}:`);
       }
     }
+  });
+
+  // Roadmap 5.7. The comparison overlays two providers; borrowing a status
+  // colour for either would turn "measured better" into "is operational".
+  it("gives the two compared series their own tokens, and never a status colour", () => {
+    const severities = STATUSES.flatMap((status) => [statusColor(status), statusFill(status)]);
+    for (const value of [COMPARE_CHART.left, COMPARE_CHART.right]) {
+      const name = value.match(/var\((--[\w-]+)\)/)?.[1];
+      expect(name, `a compared series must use var(), got ${value}`).toBeDefined();
+      expect(tokens, `${name} is not declared in tokens.css`).toContain(`${name}:`);
+      expect(severities).not.toContain(value);
+    }
+    expect(COMPARE_CHART.left).not.toEqual(COMPARE_CHART.right);
   });
 
   // The Overview's dense shape draws one aggregate uptime ring for the whole

@@ -134,7 +134,7 @@ is additive and independently shippable.
 | 4.6 ✅ | **CSV / JSON export of history and incidents** | S | Four endpoints, all served as downloads: `/export/incidents.csv|json` runs the incident search's own filter (`readIncidentQuery`, shared with `/incidents`) with the paging removed, so an export cannot disagree with the screen it was taken from; `/export/history.csv|json` is one row per provider per day — status beside uptime, since a worst-status cannot say how much of the day was up. CSV is RFC 4180, which the provider-supplied incident names needed: they carry commas, quotes and newlines. Capped at 20 000 rows, and a capped export says so in a header rather than looking complete. In the dashboard the incident export is two links carrying the live filters, and the History view offers the CSV beside the JSON it already had. |
 | 4.7 | **Monthly uptime report** | M | Generated Markdown (or print-styled HTML) summarising the month: uptime per provider, incident count, worst day. Pairs with 4.6. |
 | 4.8 ✅ | **Shields.io-compatible badge endpoint** | S | `/badge/github.svg` → a green/red badge for a README. Fun, viral, ~40 lines. |
-| 4.9 | **RSS / iCal feed of incidents** | S | Lets people consume IsItDown with tools it will never integrate with directly. |
+| 4.9 ✅ | **RSS / iCal feed of incidents** | S | Shipped: `/feeds/incidents.xml` and `/feeds/incidents.ics` serve the incident search's own result — the same `readIncidentQuery` filters the list and the exports use — as RSS 2.0 and iCalendar, newest 200, inline rather than as a download so a reader subscribes to it. The Incidents view carries the two links beside the export, so the url a reader is given is the search the operator was looking at. |
 | 4.10 | **OpenAPI spec** | M | The API is documented in prose in `README.md` and nowhere machine-readable. A spec enables generated clients and keeps the docs honest. |
 | 4.11 ✅ | **`homepage` / Dashy widget endpoint** | S | A single summary JSON in the shape those dashboards expect. Trivial, and it puts IsItDown on a lot of homelab home pages. |
 | 4.12 | **Home Assistant integration** | M | Expose providers as binary sensors (MQTT or REST). Same audience, deeper hook. |
@@ -152,7 +152,7 @@ is additive and independently shippable.
 | 5.4 | **Command palette (⌘K)** | M | Jump to provider, switch view, run a poll, toggle theme. The console shell is already built for it. |
 | 5.5 | **Arbitrary date range on history** | M | 7/30/90 are fixed. A range picker plus zoom on the charts. |
 | 5.6 | **Provider detail page** | M | The drawer works, but a linkable full page per provider (uptime, incidents, components, map) is a natural home for everything currently scattered. |
-| 5.7 | **Compare two providers** | S | Overlay two uptime series. Useful when deciding between vendors. |
+| 5.7 ✅ | **Compare two providers** | S | Shipped on the History view: a compare card overlays two providers' daily series on one pair of axes, opening on the two worst — the ranking already sorts them, but never puts two rows on the same scale. Picking the provider already on the other side swaps the pair, and the two lines take their own `--compare-*` tokens rather than status colours, so the chart says which measured better rather than that one is operational. |
 | 5.8 | **Wallboard / kiosk mode** | M | Full-screen, oversized, auto-rotating, no chrome. Aimed at an office screen. Cheap given the components already exist. |
 | 5.9 ✅ | **Timezone preference** | S | Everything is UTC. Correct, defensible, and mildly annoying every single day. |
 | 5.10 ✅ | **Favicon and title reflect worst status** | S | Shipped as `useDocumentStatus` in the app shell: the title counts the providers in trouble and the favicon is redrawn from the brand mark with a dot in that severity's colour. A calm fleet restores the page's own icon and title, and `unknown` never counts as trouble. |
@@ -161,7 +161,7 @@ is additive and independently shippable.
 | 5.13 ✅ | **Accessibility pass** | M | The contrast audit found two real dark-theme defects, both invisible in a screenshot: a partial outage and a major one were the same `#d2694f`, and the status *label* read from `--status-unknown`, the near-background grey the unsampled bars want — a never-answered provider printed its status at 1.3:1. Fixed, with `tokens.test.ts` now computing WCAG ratios from `tokens.css` so a palette pass cannot undo it (4.5:1 on both grounds, every theme, every severity distinct). Keyboard: the accumulated dialogs (add/edit, remove, diagnose, routing) each got the focus-in / trap / Escape / focus-back test rather than an assumption about Radix, and `base.css` puts a zero-specificity focus ring under the hand-written clickables that had none. Charts: uptime bars, component strip, poll strip, sparkline and provider ring each carry a translated one-sentence summary, and a status dot is `aria-hidden` where the status is written beside it and labelled where it is not. `prefers-reduced-motion` was already honoured throughout, which is why this row cost less than its size suggested. |
 | 5.14 | **More locales** | S each | `es`, `fr`, `de`, `pt`. The i18n plumbing exists and is enforced; adding a catalog is mechanical. |
 | 5.15 | **Native review of the Italian catalog** | S | On the README's open list already. |
-| 5.16 | **Bundle-size budget** | S | The dashboard has grown Recharts, motion, cobe, dotted-map. A CI check that fails on regression keeps it from quietly becoming a megabyte. |
+| 5.16 ✅ | **Bundle-size budget** | S | Shipped as `npm run check:bundle`: it weighs `dist/ui/public/assets` gzipped, because that is what the browser downloads, against 410 kB of JavaScript and 20 kB of CSS — a little over today's 367 kB and 14 kB. CI runs it after the build, so a dependency that doubles the dashboard fails there rather than being noticed a year later. |
 | 5.17 ✅ | **Set a channel credential from the dashboard** | M | Settings took only the *name* of the environment variable, so configuring a channel meant editing `.env` and recreating the container. A value now goes to `secrets.env` beside the database (`0600`, in the data volume) and into the process environment, live on the next request; the database still stores only the variable name and no route reads a value back. |
 | 5.18 ✅ | **Adapter debug panel** | S | Shipped as `GET /debug/adapters` plus a **Diagnose** dialog beside each provider's settings row: the last twenty read outcomes per provider (duration, attempts, whether it was a 304, and the error in full) and a **Read now** button that reports the whole parsed reading. A page that reads but parses into nothing — the scrape adapter's own failure mode — is called out rather than left looking healthy. |
 | 5.19 ✅ | **Incident search and filter** | S | The incident list is chronological and unfiltered. Free text over titles plus the existing status pills and a 7/30/90-day window, all three in SQL: the list is one page of 20 rows, so a search in the browser would search that page and report the result as the whole history. The counts follow the search; the hero card deliberately does not, so an open incident cannot vanish while an operator types. |
@@ -182,7 +182,7 @@ is additive and independently shippable.
 | 6.8 ✅ | **SBOM + signed images** | S | `cosign` keyless signing plus SBOM/provenance on the release build. |
 | 6.9 ✅ | **Split readiness and liveness probes** | S | `/health` is now liveness and only that — it must never fail because a provider is unreachable, since a restart is not the answer to someone else's outage. `/ready` is the reading an operator actually wants: `503` when no cycle has completed, when the last one is more than three poll intervals old (the Light edition's own rule for its state file), or when every provider failed in it, each with the `reason` in the body. The container's healthcheck asks `/ready`, which is what closes the original hole — an instance whose cycle had been failing all day reported healthy — at the cost of a longer start period, since readiness stays 503 until the backfill and first cycle are done. |
 | 6.10 | **OpenTelemetry traces** | M ⚠️ | Useful for debugging a slow cycle, but it adds a runtime dependency to a project whose whole pitch is three of them. Probably a no. |
-| 6.11 | **Log to file with rotation** | S | Today logs go to stdout only, which is right for Docker and wrong for a bare-metal install. |
+| 6.11 ✅ | **Log to file with rotation** | S | Shipped: `LOG_FILE` appends every line to a file as well as stdout, rotating at `LOG_MAX_BYTES` into `LOG_MAX_FILES` numbered generations. Additional rather than instead — a container that has both keeps answering `docker logs` — and a path that cannot be written disables itself after one line on stdout rather than holding up a poll. |
 | 6.12 ✅ | **`check` command for a Light config** | S | `node dist/light/check.js [--probe] [path]` reads the file through the loader itself and prints every problem rather than the first: unresolved `${VAR}` references by name, schema rejections, duplicate service ids, routing rules naming something the file does not define, and adapters the registry does not have. `--probe` also asks each enabled provider's page which adapter recognises it — off by default, since a check that reaches the network is not something CI can depend on. Exits `0`/`1`/`2`, so an operator can gate on it. Collecting the problems meant giving the loader an `inspectConfig` that reports all of them and leaving `loadConfig` to throw the first, so there is still one definition of what a valid file is. |
 | 6.13 ✅ | **Database maintenance from the UI** | S | **Settings → Data → Check and compact**, behind `POST /config/storage/maintenance`: `PRAGMA integrity_check` first and a `VACUUM` only if it passes, because a file whose pages are already wrong must be reported rather than rewritten. The answer carries the bytes reclaimed, which is the sentence the storage report above it could not finish — the daily prune deletes rows and sqlite keeps their pages. A failed check is a `200` with `ok: false` and sqlite's own words, since the operator asked a question and got the answer. |
 
@@ -191,7 +191,7 @@ is additive and independently shippable.
 | # | Item | Size | Notes |
 |---|---|---|---|
 | 7.1 ✅ | **Visual regression tests** | M | Playwright screenshots per view, both themes, both locales. The dashboard is now large enough that a CSS token change can quietly wreck a view nobody opened. |
-| 7.2 | **Coverage reporting with a floor** | S | Not a target to game — just a floor that fails when a new subsystem lands untested. |
+| 7.2 ✅ | **Coverage reporting with a floor** | S | Shipped as two floors, because the two suites cover different halves: node:test holds the server and the engine at 95/88/93 (lines/branches/functions) and Vitest the dashboard at 85/75/80, each a few points under where it stands today. `npm run coverage` runs both, and CI runs it in place of the plain unit-test step. |
 | 7.3 | **Mutation testing on the diff engine** | M | The diff engine is the one place where a passing test suite that does not actually constrain behaviour would be dangerous. It is small enough that mutation testing is affordable exactly there. |
 | 7.4 | **Load / soak test** | M | 200 providers, a week of simulated history. Finds the point where the SQLite reads or the overview render fall over. |
 | 7.5 | **Docs split** | S | `README.md` is ~69k and has to be both a landing page and a manual. Splitting into `docs/` with a short README would make both jobs easier — at the cost of the current "everything is in one file" property, which is genuinely nice. |
@@ -214,44 +214,3 @@ not re-invented from scratch later.
 | 8.7 | **Incident postmortem export** | Generate a Markdown postmortem skeleton from an incident's timeline plus operator notes (5.3). Cute, narrow. |
 | 8.8 | **Plain-language incident summary** | Collapse a provider's twelve terse updates into one sentence an operator can act on. Wants a model call — a network dependency and an API key, in a project whose pitch is three dependencies and no key. A product decision, not a feature; listed so the "just add AI" reflex meets an argument rather than a blank page. |
 | 8.9 | **Watch a provider edit its own past** | Status pages quietly rewrite resolved incidents. Keeping the first version read here and diffing later ones would catch it. Same family as 8.1, about as inflammatory, and it needs 4.5's longer retention before it says anything. |
-
----
-
-## Suggested next slice
-
-The six rows of the previous slice all shipped (3.4, 4.14, 5.20, 6.9, 6.13,
-7.6), and with them every row that needed no product decision *and* fit an
-existing seam cleanly. What is left divides into three kinds, and the honest
-answer is that the next slice is smaller than the last one.
-
-**Cheap and additive, in the order they earn their keep:**
-
-1. **4.9 an RSS / iCal feed of incidents** — the incident history is already
-   paged, filtered and exported as CSV/JSON; a feed is the same rows in the one
-   shape a reader or a calendar consumes without an API client. It reuses
-   `readIncidentQuery` and adds no state.
-2. **7.2 a coverage floor** — not a target to game: a floor that fails when a
-   new subsystem lands untested. The suite is large enough now that a gap is
-   invisible without one, and the translation gate just showed how cheap a
-   `verify` step is.
-3. **5.16 a bundle-size budget** — the dashboard carries Recharts, motion, cobe
-   and dotted-map, and now a year calendar. A CI check that fails on a
-   regression keeps it from quietly becoming a megabyte.
-4. **5.7 comparing two providers' uptime series** — the history page ranks
-   providers worst-first but never puts two side by side, which is the question
-   a vendor decision actually asks.
-5. **6.11 log to file with rotation** — stdout is right for Docker and wrong for
-   the bare-metal install the Light edition is otherwise perfect for.
-
-**Rows that need a decision before they need an implementer**, unchanged: **1.8
-direct HTTP probes** (with 1.9, 1.10 and 8.1 behind it) and **5.1 the public
-status page** (which drags 4.15's read-only token with it). **2.10 provider
-push** is a third, smaller one: it inverts the data flow for the subset of
-providers that support it. **3.3 email (SMTP)** is the same shape of decision at
-notifier scale — the most-asked-for channel, and the only one that adds a real
-runtime dependency to a project whose pitch is three of them.
-
-**Rows that are work rather than a slice**: **7.5 the docs split** (a 70k README
-that is both landing page and manual — now with a translation gate to keep in
-step through the move), **4.13 SLO and error budget**, and **5.21 the PWA
-install plus phone layout**, which is where web push already points.

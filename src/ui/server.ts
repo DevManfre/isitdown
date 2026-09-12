@@ -1,10 +1,14 @@
+import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { buildUiRuntime } from "./runtime.ts";
 
 const DB_PATH = process.env["DB_PATH"] ?? "/app/data/isitdown.db";
 const PORT = Number(process.env["PORT"] ?? 3000);
 
-const logger = createLogger(parseLogLevel(process.env["LOG_LEVEL"]));
+const logger = createLogger(
+  parseLogLevel(process.env["LOG_LEVEL"]),
+  createLogWriter(readFileLogOptions(process.env)),
+);
 
 let runtime: Awaited<ReturnType<typeof buildUiRuntime>> | undefined;
 try {
