@@ -428,6 +428,26 @@ test("purging a service deletes the rules that named it and leaves the others", 
   db.close();
 });
 
+test("purging a service takes its components' rules with it, and counts them first", async () => {
+  // `github#api` names this provider as surely as `github` does (roadmap 2.9),
+  // so a removal that left it behind would leave a rule matching nothing.
+  const db = await freshDb();
+  replaceRoutingRules(db, [
+    { provider: "github#api", classes: ["status"], minSeverity: "any", channels: ["telegram"] },
+    { provider: "github", classes: ["status"], minSeverity: "any", channels: [] },
+    { provider: "gitlab#api", classes: ["status"], minSeverity: "any", channels: ["slack"] },
+  ]);
+
+  assert.equal(describeServiceImpact(db, "github")?.routingRules, 2);
+  assert.equal(purgeService(db, "github"), true);
+
+  assert.deepEqual(
+    describeRouting(db, silent).rules.map((rule) => rule.provider),
+    ["gitlab#api"],
+  );
+  db.close();
+});
+
 test("a database at the previous schema version gains the catch-all on migration", async () => {
   // The one test that shows nobody loses notifications by upgrading.
   const dir = await mkdtemp(join(tmpdir(), "isitdown-upgrade-"));

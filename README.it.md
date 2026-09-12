@@ -922,7 +922,7 @@ di un dato cambiamento. Ogni regola ha quattro parti:
 
 ```yaml
 routing:
-  - provider: "*"            # un id di servizio, `group:<slug>` (§3.10), o "*" per ogni provider
+  - provider: "*"            # un id di servizio, `group:<slug>` (§3.10), `<id>#<componente>`, o "*"
     classes: [status, incident]  # una o più tra: status, incident, maintenance, monitoring
     minSeverity: major_outage  # any | degraded | partial_outage | major_outage
     channels: [telegram]       # id dei canali, o "*" per ogni canale abilitato; [] silenzia
@@ -945,12 +945,26 @@ canale abilitato — il comportamento che entrambe le edizioni avevano prima
 dell'esistenza dell'instradamento, così l'aggiornamento non diventa mai muto
 per caso.
 
+Una regola può anche nominare **un componente di un provider**, come
+`<id>#<componente>` — `github#8l4ygp009s5s`. La transizione di un componente
+porta già la severità del componente e non quella del provider, quindi bastava
+questo per instradarla in modo indipendente: metti `github#api` sopra `github` e
+quel componente va su un telefono mentre tutto il resto della pagina va su
+Slack, oppure dagli `channels: []` e silenzia un componente rumoroso senza
+ammutolire il provider. Un target di componente corrisponde solo alle
+transizioni di quel componente, quindi un cambio di stato del provider non lo
+incontra mai. L'id del componente è quello del provider — lo stesso che salva il
+selettore dei componenti — e rimuovere un provider elimina anche le regole dei
+suoi componenti.
+
 L'edizione Light configura la tabella come l'elenco `routing` in
 `config.yml`, mostrato sopra; l'edizione UI la modifica da **Impostazioni**,
-dove l'editor delle regole di instradamento offre anche una prova a secco
-(dry run): scegli un provider e un evento campione e ti dice quale regola
-vincerebbe e quali non sono mai state raggiunte, valutate contro le regole
-che hai effettivamente salvato, non un insieme ipotetico.
+dove la colonna del provider elenca sotto ciascuno i componenti selezionati e
+l'editor delle regole di instradamento offre anche una prova a secco
+(dry run): scegli un provider (e, dove ce n'è uno selezionato, un componente)
+più un evento campione e ti dice quale regola vincerebbe e quali non sono mai
+state raggiunte, valutate contro le regole che hai effettivamente salvato, non
+un insieme ipotetico.
 
 ### 3.8 Politica di consegna — ore di silenzio, riepiloghi, limiti
 
