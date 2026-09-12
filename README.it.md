@@ -261,7 +261,7 @@ notifications:
 | `confirmSamples` | `1` | 1–10. Smorzamento dei rimbalzi: quanti poll consecutivi devono concordare su una lettura prima che il cambio venga annunciato. `1` notifica subito; `2` ignora una pagina che si contraddice per un ciclo, al costo di un poll di ritardo. |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus` e `betterstack` coprono quelle due piattaforme; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page (vedi sotto). |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page (vedi sotto). |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
 | `services[].mutedUntil` | — | ISO 8601. Finché è nel futuro il provider viene interrogato e registrato come sempre ma non notifica nulla — "lo so, smetti di dirmelo, fino ad allora". Nell'edizione UI è ciò che scrive il comando **Silenzia** della dashboard. |
@@ -733,6 +733,96 @@ Sorry™, la terza pagina di questa famiglia, non pubblica alcun JSON senza
 autenticazione: le pagine pubbliche sono HTML e la sua API richiede una chiave,
 quindi serve l'adapter generico di scraping HTML (roadmap 1.6) e non un parser
 tutto suo.
+
+#### Cachet, Uptime Kuma e Uptime.com
+
+Altre tre forme JSON piccole, e le prime due sono quelle che il pubblico di
+questo progetto si ospita da sé — una flotta può includere la status page del
+vicino:
+
+```yaml
+  - id: neighbour
+    name: Il Cachet del vicino
+    adapter: cachet
+    baseUrl: https://status.neighbour.example
+
+  - id: homelab
+    name: Homelab
+    adapter: uptimekuma
+    baseUrl: https://uptime.example.com/status/demo
+
+  - id: uptimecom
+    name: Uptime.com
+    adapter: uptimecom
+    baseUrl: https://status.uptime.com/statuspage/uptime-status
+```
+
+**Cachet** — tre letture per ciclo, perché Cachet pubblica le tre metà di una
+status page in tre documenti e nessuno sostituisce gli altri:
+`/api/v1/components`, `/api/v1/incidents` e `/api/v1/schedules`. Si rivalidano
+con l'`ETag` come ogni altra lettura qui, quindi un ciclo tranquillo sono tre
+`304`. Cachet non ha una parola aggregata — `/api/v1/status` risponde un
+`success`/`info`/`danger` a tre vie che non distingue un disservizio parziale da
+uno grave — quindi la lettura si ripiega dai componenti, che è anche da dove si
+ripiega un provider ristretto alla selezione.
+
+| Payload | Lettura |
+|---|---|
+| Lo `status` di un componente | `1` operativo, `2` → degradato, `3` → disservizio parziale, `4` → disservizio grave |
+| Un numero che non conosciamo | Disservizio grave; mai declassato in silenzio |
+| `enabled: false` | Fuori dalla lettura: un componente disabilitato non è sulla pagina |
+| L'`is_resolved` di un incidente | Aperto finché non è vero; un Cachet troppo vecchio per pubblicarlo si chiude su un aggiornamento `Fixed` |
+| `component_id: 0` | Un incidente di pagina, che raggiunge anche un provider ristretto |
+| Uno schedule | Una finestra di manutenzione; `status: 2` (completata) viene scartata |
+| Un timestamp | Scritto senza alcun fuso, quindi letto come UTC — che è quello su cui gira un'installazione in container |
+
+Ogni lista viene chiesta al tetto dell'API di 100 righe: un'istanza con più di
+100 componenti viene letta come i suoi primi cento, invece di percorrere la
+paginazione a ogni ciclo. Il selettore dei componenti risolve i nomi dei gruppi
+da `/api/v1/components/groups`, che solo la dashboard chiede.
+
+**Uptime Kuma** — una sonda più che una pagina scritta da qualcuno, quindi non
+pubblica nemmeno lui una parola aggregata. Due letture per ciclo, entrambe
+necessarie: il documento della status page nomina i monitor e non dice mai come
+stanno, quello degli heartbeat dice come stanno e non li nomina mai. Indica l'URL
+della pagina come lo vedi nel browser (`…/status/<slug>`) e lo slug viene letto da
+lì; un host nudo legge la pagina `default` di Kuma, e `options.slug` ha comunque
+la precedenza.
+
+| Payload | Lettura |
+|---|---|
+| L'heartbeat più recente di un monitor | `1` operativo, `0` → disservizio grave, `2` (in ritentativo) → degradato, `3` (manutenzione) → sconosciuto |
+| Tutti i monitor su | Operativo |
+| Alcuni su, alcuni giù | Disservizio parziale — la regola dell'intestazione di Kuma, non un peggiore-di-tutti: un monitor giù su dieci non si legge come un disservizio grave |
+| Tutti i monitor giù | Disservizio grave |
+| Nessun heartbeat, o tutti astenuti | Sconosciuto |
+| L'incidente in evidenza (`incident`, o `incidents` su 2.x) | Un incidente aperto con la parola `style` di Kuma |
+| `maintenanceList[]` | Una finestra, collocata sull'orologio con il `timezoneOffset` della voce stessa; non dice quali monitor copre |
+
+Non c'è cronologia degli incidenti da recuperare: una pagina Kuma pubblica gli
+heartbeat e l'unico avviso in evidenza, e nulla che equivalga a un incidente
+chiuso con un inizio e una fine.
+
+**Uptime.com** — la pagina è renderizzata dal server e il payload da cui è
+renderizzata viene servito in JSON accanto: `<pagina>/ajax` per lo stato attuale,
+`<pagina>/history` per gli incidenti chiusi. Entrambi rispondono dentro una busta
+`{ error, fields, data }`. Il base URL è la status page stessa e non l'host,
+perché un account può pubblicarne diverse, una per `/statuspage/<slug>`.
+
+| Payload | Lettura |
+|---|---|
+| Lo `status` di un componente | `operational`, `degraded-performance` → degradato, `partial-outage`, `major-outage`; punteggiatura e maiuscole vengono ignorate |
+| `under-maintenance` | Sconosciuto: si astiene invece di dirsi su |
+| Un gruppo | Letto attraverso i suoi sottocomponenti, mai due volte: lo stato di un gruppo è il riassunto esatto di quelli |
+| `global_is_operational: false` | Alza a degradata una lettura altrimenti operativa — una pagina può portare un incidente che non ha mosso alcun componente — ma non abbassa mai |
+| `incident_type: INCIDENT` | Un incidente aperto |
+| `incident_type: SCHEDULED_MAINTENANCE`, o `upcoming_maintenance[]` | Una finestra di manutenzione, non un incidente |
+| Lo stato di un incidente | `latest_update_incident_state`, oppure lo stato dell'aggiornamento più recente — i due endpoint riempiono campi diversi |
+
+Freshstatus, la quarta pagina considerata per questa famiglia, non è leggibile
+senza credenziali: le sue pagine si renderizzano lato client e la sua API
+pubblica risponde `403` a tutto ciò che non sia il suo stesso front end, quindi
+serve l'adapter di scraping HTML e non un parser tutto suo.
 
 Per un provider che non sta su nessuno di questi, aggiungi un adapter sotto
 `src/adapters/`.
@@ -1506,7 +1596,7 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `POST` | `/config/import` | Lo stesso file, riletto. Accetta lo YAML come corpo della richiesta (`text/yaml`) o come `{ yaml }`. Validato con lo schema di file dell'edizione Light prima di scrivere qualsiasi cosa, così un file sbagliato non cambia nulla; una credenziale letterale viene rifiutata. Un servizio che il file non menziona viene rimosso come lo rimuove la dashboard — soft, ripristinabile, storico intatto — e un blocco `routing` assente lascia stare le regole. Risponde `{ added, updated, removed, channels, routingRules, settings }`. |
 | `GET` | `/config/catalog` | Il catalogo di provider incluso (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Risposto dalla memoria — la lista viaggia con l'immagine, quindi non c'è nessun upstream che possa essere giù né niente da tenere sincronizzato. `configured` segna un id già monitorato: la riga resta nel menu e lo dice, invece di sparire. La detection resta la strada per una pagina che la lista non ha. |
 | `POST` | `/config/services` | Aggiunge un servizio. `201`, oppure `409` su id duplicato, oppure `400` col nome del campo non valido. |
-| `POST` | `/config/services/detect` | Quale adapter legge la pagina all'URL `{ url }`, e la base URL che quell'adapter si aspetta: `{ adapter, baseUrl, probes }`. Prova le forme che IsItDown già legge, in ordine (`/api/v2/summary.json` di Statuspage, `/summary.json` di Instatus, `/index.json` di Better Stack, poi un feed), e riconosce dall'host i quattro adapter dedicati a un solo provider senza fare alcuna richiesta. Una pagina che nessuno riconosce è un `200` con `adapter: null` e le prove tentate — solo un URL inutilizzabile dà `400`. Non registra e non notifica nulla. |
+| `POST` | `/config/services/detect` | Quale adapter legge la pagina all'URL `{ url }`, e la base URL che quell'adapter si aspetta: `{ adapter, baseUrl, probes }`. Prova le forme che IsItDown già legge, in ordine (`/api/v2/summary.json` di Statuspage, `/summary.json` di Instatus, `/index.json` di Better Stack, `/api/v1/components` di Cachet, `/api/status-page/default` di Uptime Kuma, l'`/ajax` di una pagina Uptime.com, poi un feed), e riconosce dall'host i quattro adapter dedicati a un solo provider senza fare alcuna richiesta. Una pagina che nessuno riconosce è un `200` con `adapter: null` e le prove tentate — solo un URL inutilizzabile dà `400`. Non registra e non notifica nulla. |
 | `PATCH` `DELETE` | `/config/services/:id` | Modifica, o rimozione. La rimozione è una **cancellazione morbida**: il provider esce subito dalla dashboard e dal ciclo di polling, e la risposta dice per quanto resta ripristinabile (`{ removed, removedAt, restoreUntil }`). `404` su un id sconosciuto o già rimosso. |
 | `POST` | `/config/services/:id/restore` | Annulla una rimozione entro la finestra. Non era stato portato via nulla, quindi non si ricostruisce nulla; il buco nella cronologia dei giorni da rimosso viene ricostruito. `404` se non è un servizio rimosso. |
 | `DELETE` | `/config/services/:id/permanently` | La metà distruttiva, su un percorso a sé perché non ci si arrivi per sbaglio: propaga a campioni, incidenti, manutenzioni, stato e regole di routing di quel provider. Succede comunque da sé alla scadenza della finestra di ripristino. |

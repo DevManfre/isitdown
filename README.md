@@ -260,7 +260,7 @@ notifications:
 | `confirmSamples` | `1` | 1–10. Flap damping: how many consecutive polls must agree on a reading before the change is announced. `1` notifies immediately; `2` ignores a page that disagrees with itself for one cycle, at the cost of one poll of delay. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus` and `betterstack` cover those two hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page (see below). |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page (see below). |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
@@ -720,6 +720,94 @@ come out of a single read.
 Sorry™, the third page in this family, publishes no unauthenticated JSON at all:
 its public pages are HTML and its API needs a key, so it needs the generic
 HTML-scrape adapter (roadmap 1.6) rather than a small parser of its own.
+
+#### Cachet, Uptime Kuma and Uptime.com
+
+Three more small JSON shapes, and the first two are the ones this project's own
+audience self-hosts — a fleet can include the status page next door:
+
+```yaml
+  - id: neighbour
+    name: The neighbour's Cachet
+    adapter: cachet
+    baseUrl: https://status.neighbour.example
+
+  - id: homelab
+    name: Homelab
+    adapter: uptimekuma
+    baseUrl: https://uptime.example.com/status/demo
+
+  - id: uptimecom
+    name: Uptime.com
+    adapter: uptimecom
+    baseUrl: https://status.uptime.com/statuspage/uptime-status
+```
+
+**Cachet** — three reads per cycle, because Cachet publishes the three halves of
+a status page in three documents and none stands in for another:
+`/api/v1/components`, `/api/v1/incidents` and `/api/v1/schedules`. They
+revalidate with `ETag` like every other read here, so a quiet cycle is three
+`304`s. Cachet has no aggregate word — `/api/v1/status` answers a three-way
+`success`/`info`/`danger` that cannot tell a partial outage from a major one —
+so the reading is folded from the components, which is also what a scoped
+provider is folded from.
+
+| Payload | Reading |
+|---|---|
+| A component's `status` | `1` operational, `2` → degraded, `3` → partial outage, `4` → major outage |
+| A number we do not know | Major outage; never silently downgraded |
+| `enabled: false` | Not part of the reading: a disabled component is not on the page |
+| An incident's `is_resolved` | Open until it is true; a Cachet too old to publish it closes on a `Fixed` update instead |
+| `component_id: 0` | A page-wide incident, which reaches a scoped provider too |
+| A schedule | A maintenance window; `status: 2` (completed) is dropped |
+| A timestamp | Written with no zone at all, so it is read as UTC — which is what a container install runs on |
+
+Every list is asked for at the API's ceiling of 100 rows: an instance with more
+than 100 components is read as its first hundred, rather than walking the
+pagination on every cycle. The component picker resolves group names from
+`/api/v1/components/groups`, which only the dashboard ever fetches.
+
+**Uptime Kuma** — a prober rather than a page someone writes, so it publishes no
+aggregate word either. Two reads per cycle, both needed: the status page document
+names the monitors and never says how they are doing, and the heartbeat document
+says how they are doing and never names them. Give the page URL as you see it in
+the browser (`…/status/<slug>`) and the slug is read out of it; a bare host reads
+Kuma's own `default` page, and `options.slug` overrides either.
+
+| Payload | Reading |
+|---|---|
+| A monitor's newest beat | `1` operational, `0` → major outage, `2` (retrying) → degraded, `3` (maintenance) → unknown |
+| Every monitor up | Operational |
+| Some up, some down | Partial outage — Kuma's own header rule, not a worst-of, so one monitor down out of ten does not read as a major outage |
+| Every monitor down | Major outage |
+| No beat at all, or all abstaining | Unknown |
+| The pinned incident (`incident`, or `incidents` on 2.x) | One open incident carrying Kuma's own `style` word |
+| `maintenanceList[]` | A window, placed on the clock with the entry's own `timezoneOffset`; it does not say which monitors it covers |
+
+There is no incident history to backfill from: a Kuma page publishes beats and
+one pinned notice, and nothing that amounts to a closed incident with a start and
+an end.
+
+**Uptime.com** — the page is server-rendered and the payload it is rendered from
+is served as JSON beside it: `<page>/ajax` for the current state, `<page>/history`
+for the closed incidents. Both answer inside a `{ error, fields, data }`
+envelope. The base URL is the status page itself rather than the host, because an
+account can publish several at `/statuspage/<slug>` each.
+
+| Payload | Reading |
+|---|---|
+| A component's `status` | `operational`, `degraded-performance` → degraded, `partial-outage`, `major-outage`; punctuation and case are ignored |
+| `under-maintenance` | Unknown — abstains rather than claiming to be up |
+| A group | Read through its subcomponents, never twice: a group's status is a summary of exactly those |
+| `global_is_operational: false` | Raises an otherwise operational reading to degraded — a page can carry an incident that has moved no component — but never lowers one |
+| `incident_type: INCIDENT` | An open incident |
+| `incident_type: SCHEDULED_MAINTENANCE`, or `upcoming_maintenance[]` | A maintenance window, not an incident |
+| An incident's state | `latest_update_incident_state`, or the newest update's own state — the two endpoints fill in different ones |
+
+Freshstatus, the fourth page considered for this family, is not readable without
+credentials: its pages render client-side and its public API answers `403` to
+anything but its own front end, so it needs the HTML-scrape adapter rather than a
+parser of its own.
 
 For a provider on none of these, add an adapter under `src/adapters/`.
 
@@ -1473,7 +1561,7 @@ back reports a parse failure instead of the real problem.
 | `POST` | `/config/import` | The same file, read back. Takes the YAML as the request body (`text/yaml`) or as `{ yaml }`. Validated through the Light edition's own file schema before anything is written, so a bad file changes nothing; a literal credential is refused outright. A service the file does not mention is removed the way the dashboard removes one — soft, restorable, history intact — and an absent `routing` block leaves the rules alone. Answers `{ added, updated, removed, channels, routingRules, settings }`. |
 | `GET` | `/config/catalog` | The bundled provider catalog (roadmap 5.11): `{ providers: [{ id, name, adapter, baseUrl, configured }] }`. Answered from memory — the list ships with the image, so there is no upstream to be down and nothing to keep in sync. `configured` marks an id already watched: the row stays in the menu saying so rather than disappearing from it. Detection stays the path for a page the list does not have. |
 | `POST` | `/config/services` | Add a service. `201`, or `409` on a duplicate id, or `400` naming the invalid field. |
-| `POST` | `/config/services/detect` | Which adapter reads the page at `{ url }`, and the base URL that adapter wants: `{ adapter, baseUrl, probes }`. Tries the shapes IsItDown already reads, in order (Statuspage's `/api/v2/summary.json`, Instatus's `/summary.json`, Better Stack's `/index.json`, then a feed), and recognises the four single-provider adapters by host with no request at all. A page nothing recognised is a `200` with `adapter: null` and the probes it tried — only an unusable URL is a `400`. Records nothing and notifies nothing. |
+| `POST` | `/config/services/detect` | Which adapter reads the page at `{ url }`, and the base URL that adapter wants: `{ adapter, baseUrl, probes }`. Tries the shapes IsItDown already reads, in order (Statuspage's `/api/v2/summary.json`, Instatus's `/summary.json`, Better Stack's `/index.json`, Cachet's `/api/v1/components`, Uptime Kuma's `/api/status-page/default`, an Uptime.com page's `/ajax`, then a feed), and recognises the four single-provider adapters by host with no request at all. A page nothing recognised is a `200` with `adapter: null` and the probes it tried — only an unusable URL is a `400`. Records nothing and notifies nothing. |
 | `PATCH` `DELETE` | `/config/services/:id` | Edit, or remove. A removal is a **soft delete**: the provider leaves the dashboard and the poll cycle at once, and the response says how long it stays restorable (`{ removed, removedAt, restoreUntil }`). `404` on an id that is unknown or already removed. |
 | `POST` | `/config/services/:id/restore` | Undo a removal inside its window. Nothing was taken, so nothing is rebuilt; the gap in history from the days it was removed is backfilled. `404` if it is not a removed service. |
 | `DELETE` | `/config/services/:id/permanently` | The destructive half, on its own path so nothing reaches it by accident: cascades to that provider's samples, incidents, maintenances, state and routing rules. This also happens on its own once the restore window closes. |
