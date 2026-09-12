@@ -20,6 +20,18 @@ export interface AdapterHarness {
    * still resolve: a provider dropping a field is not an outage of our own.
    */
   degraded: Routes;
+  /**
+   * Set by the probe adapter (roadmap 1.8), the only one whose subject is a
+   * service rather than a document about one. It inverts the contract's
+   * failure rules rather than escaping them: where a document adapter must
+   * *throw* on a 503, an unreachable host or a timeout so the poller can
+   * retry, a probe must *resolve* those into a non-operational reading, since
+   * for it they are the answer rather than the absence of one. The tests below
+   * assert that inverted form, and skip the two that only make sense against a
+   * parsed document — a probe has none, and its body handling is pinned by its
+   * own mapping tests instead.
+   */
+  readsResponseNotBody?: boolean | undefined;
 }
 
 const ctx: FetchContext = { timeoutMs: 2000 };
@@ -148,6 +160,19 @@ const MUTATIONS: { name: string; mutate: (body: string) => string }[] = [
  */
 const EMPTIED = new Set(["an empty body", "whitespace alone", "a bare null", "an empty object"]);
 
+/**
+ * The probe form of "this must not be swallowed": the reading has to arrive,
+ * validate, and say something other than healthy. Same guarantee the rejection
+ * assertions give a document adapter — a target that misbehaves stays visible —
+ * expressed in the terms of an adapter for which misbehaviour *is* the reading.
+ */
+async function assertReadsUnhealthy(adapter: Adapter, ref: ServiceRef, what: string): Promise<void> {
+  const outcome = await settle(adapter.fetchStatus(ref, ctx), REJECT_DEADLINE_MS);
+  assert.equal(outcome.kind, "resolved", `fetchStatus did not turn ${what} into a reading`);
+  const status = normalizedStatusSchema.parse((outcome as { value: unknown }).value);
+  assert.notEqual(status.overallStatus, "operational", `fetchStatus read operational out of ${what}`);
+}
+
 interface Method {
   name: string;
   call: (service: ServiceRef) => Promise<unknown>;
@@ -239,8 +264,8 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
     }
   });
 
-  test(`${name}: a non-2xx response rejects so the poller can retry`, TEST_OPTS, async () => {
-    const { adapter, service } = harness();
+  test(`${name}: a non-2xx response is never swallowed`, TEST_OPTS, async () => {
+    const { adapter, service, readsResponseNotBody } = harness();
     for (const method of methodsOf(adapter)) {
       await withServer(
         (_req, res) => {
@@ -248,6 +273,10 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
           res.end("nope");
         },
         async (baseUrl) => {
+          if (readsResponseNotBody === true) {
+            await assertReadsUnhealthy(adapter, service(baseUrl), "a 503");
+            return;
+          }
           await assertRejectsWithin(
             method.call(service(baseUrl)),
             REJECT_DEADLINE_MS,
@@ -259,7 +288,10 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
   });
 
   test(`${name}: an unparseable body rejects rather than yielding an empty reading`, TEST_OPTS, async () => {
-    const { adapter, service } = harness();
+    const { adapter, service, readsResponseNotBody } = harness();
+    // A probe parses no document, so there is no such thing as an unparseable
+    // one: a body it was not told to match against is not evidence of anything.
+    if (readsResponseNotBody === true) return;
     for (const method of methodsOf(adapter)) {
       await withServer(
         (_req, res) => {
@@ -277,10 +309,14 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
     }
   });
 
-  test(`${name}: an unreachable provider rejects`, TEST_OPTS, async () => {
-    const { adapter, service } = harness();
+  test(`${name}: an unreachable provider is never read as healthy`, TEST_OPTS, async () => {
+    const { adapter, service, readsResponseNotBody } = harness();
     for (const method of methodsOf(adapter)) {
       await withDeadServer(async (baseUrl) => {
+        if (readsResponseNotBody === true) {
+          await assertReadsUnhealthy(adapter, service(baseUrl), "nothing listening");
+          return;
+        }
         await assertRejectsWithin(
           method.call(service(baseUrl)),
           REJECT_DEADLINE_MS,
@@ -291,12 +327,21 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
   });
 
   test(`${name}: a provider that never answers gives up on the timeout`, TEST_OPTS, async () => {
-    const { adapter, service } = harness();
+    const { adapter, service, readsResponseNotBody } = harness();
     await withServer(
       () => {
         /* never responds */
       },
       async (baseUrl) => {
+        if (readsResponseNotBody === true) {
+          // Still has to give up on `timeoutMs`: settling inside the deadline
+          // is the assertion, and the reading it settles on says down.
+          const outcome = await settle(adapter.fetchStatus(service(baseUrl), { timeoutMs: 150 }), REJECT_DEADLINE_MS);
+          assert.equal(outcome.kind, "resolved", "fetchStatus never gave up on a provider that does not answer");
+          const status = normalizedStatusSchema.parse((outcome as { value: unknown }).value);
+          assert.notEqual(status.overallStatus, "operational", "fetchStatus read operational out of a timeout");
+          return;
+        }
         await assertRejectsWithin(
           adapter.fetchStatus(service(baseUrl), { timeoutMs: 150 }),
           REJECT_DEADLINE_MS,
