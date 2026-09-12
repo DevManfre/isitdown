@@ -4,6 +4,7 @@ import { azureAdapter } from "./azure.adapter.ts";
 import { betterStackAdapter } from "./betterstack.adapter.ts";
 import { gcpAdapter } from "./gcp.adapter.ts";
 import { htmlAdapter } from "./html.adapter.ts";
+import { httpAdapter } from "./http.adapter.ts";
 import { instatusAdapter } from "./instatus.adapter.ts";
 import { rssAdapter } from "./rss.adapter.ts";
 import { slackAdapter } from "./slack.adapter.ts";
@@ -19,6 +20,7 @@ export const adapters: Record<string, Adapter> = {
   [instatusAdapter.id]: instatusAdapter,
   [betterStackAdapter.id]: betterStackAdapter,
   [htmlAdapter.id]: htmlAdapter,
+  [httpAdapter.id]: httpAdapter,
 };
 
 export function getAdapter(id: string): Adapter {
