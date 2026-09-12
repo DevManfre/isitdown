@@ -1,10 +1,14 @@
+import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { buildLightRuntime } from "./runtime.ts";
 
 const CONFIG_PATH = process.env["CONFIG_PATH"] ?? "/app/config/config.yml";
 const DATA_PATH = process.env["DATA_PATH"] ?? "/app/data/state.json";
 
-const logger = createLogger(parseLogLevel(process.env["LOG_LEVEL"]));
+const logger = createLogger(
+  parseLogLevel(process.env["LOG_LEVEL"]),
+  createLogWriter(readFileLogOptions(process.env)),
+);
 
 let runtime: Awaited<ReturnType<typeof buildLightRuntime>> | undefined;
 

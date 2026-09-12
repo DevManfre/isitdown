@@ -1,15 +1,25 @@
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button.tsx";
+import { Card } from "@/components/ui/card.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { DeltaChip } from "@/components/DeltaChip.tsx";
+import { DownloadMenu } from "@/components/DownloadMenu.tsx";
 import { ProviderHistoryDrawer } from "@/components/ProviderHistoryDrawer.tsx";
 import { ProviderTrendRow } from "@/components/ProviderTrendRow.tsx";
 import { MonthColumns } from "@/components/charts/MonthColumns.tsx";
+import { UptimeCompareChart } from "@/components/charts/UptimeCompareChart.tsx";
 import { UptimeTrendChart } from "@/components/charts/UptimeTrendChart.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
-import { uptimeForRange } from "@/lib/history.ts";
+import { COMPARE_CHART } from "@/lib/chartConfig.ts";
+import { alignSeries, uptimeForRange } from "@/lib/history.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { HistorySummary, ProviderHistory } from "@/lib/types.ts";
 
@@ -53,6 +63,13 @@ export function History() {
   const { t, i18n } = useTranslation();
   const [days, setDays] = useState<number>(90);
   const [open, setOpen] = useState<string | null>(null);
+  // Null means "whichever the ordering picks": the fleet is not loaded yet on
+  // the first render, and a comparison the operator did choose must survive a
+  // range change that reorders the list under it.
+  const [compare, setCompare] = useState<{ left: string | null; right: string | null }>({
+    left: null,
+    right: null,
+  });
   const { data } = useHistory(days);
   const { data: status } = useStatus();
 
@@ -70,6 +87,61 @@ export function History() {
     (left, right) =>
       uptimeForRange(left, days) - uptimeForRange(right, days) ||
       left.providerId.localeCompare(right.providerId),
+  );
+
+  const nameOf = (providerId: string) => statusById.get(providerId)?.name ?? providerId;
+
+  /**
+   * The two worst by default (roadmap 5.7): the page already ranks worst first,
+   * and "how do these two compare" is a question about the two that are
+   * costing something, not about the two that happen to sort first.
+   */
+  const left = compare.left ?? ordered[0]?.providerId ?? null;
+  const right = compare.right ?? ordered[1]?.providerId ?? null;
+  const leftHistory = ordered.find((provider) => provider.providerId === left);
+  const rightHistory = ordered.find((provider) => provider.providerId === right);
+
+  const picker = (side: "left" | "right", value: string) => (
+    <div className="flex items-center gap-2">
+      <span
+        aria-hidden="true"
+        className="size-2 shrink-0 rounded-full"
+        style={{ backgroundColor: COMPARE_CHART[side] }}
+      />
+      <Select
+        value={value}
+        onValueChange={(next) => {
+          // Picking the provider that is already on the other side swaps them:
+          // a provider drawn against itself is the one comparison with nothing
+          // to say, and a click that silently did nothing would read as a
+          // broken control.
+          const other = side === "left" ? right : left;
+          if (next === other) {
+            setCompare({ left: right, right: left });
+            return;
+          }
+          setCompare({ left, right, [side]: next });
+        }}
+      >
+        {/* Both keys spelled out rather than built from `side`: a key assembled
+            at runtime is invisible to the catalog guard, which is what keeps a
+            dead or missing string from shipping. */}
+        <SelectTrigger
+          size="sm"
+          aria-label={side === "left" ? t("history.compare.left") : t("history.compare.right")}
+          className="w-44"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {ordered.map((provider) => (
+            <SelectItem key={provider.providerId} value={provider.providerId}>
+              {nameOf(provider.providerId)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 
   return (
@@ -114,22 +186,31 @@ export function History() {
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => downloadHistoryJson(summary, days)}
-            >
-              {t("history.download", { days })}
-            </Button>
             {/* The CSV is the server's own aggregation rather than this summary
                 flattened here (roadmap 4.6): one row per provider per day is a
                 shape the JSON payload does not have, and deriving it in the
                 browser would be a second definition of a daily bucket. A link,
-                because the answer is a download. */}
-            <Button asChild variant="ghost" size="sm">
-              <a href={`/export/history.csv?days=${days}`}>{t("history.download-csv", { days })}</a>
-            </Button>
+                because the answer is a download; the JSON is built here because
+                the payload on screen already is the answer. */}
+            <DownloadMenu
+              groups={[
+                {
+                  label: t("history.range-active", { days }),
+                  items: [
+                    {
+                      format: "JSON",
+                      description: t("history.download", { days }),
+                      onSelect: () => downloadHistoryJson(summary, days),
+                    },
+                    {
+                      format: "CSV",
+                      description: t("history.download-csv", { days }),
+                      href: `/export/history.csv?days=${days}`,
+                    },
+                  ],
+                },
+              ]}
+            />
           </div>
         </div>
 
@@ -144,6 +225,43 @@ export function History() {
       </div>
 
       <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "200ms" }} />
+
+      {/* Two providers side by side is the question a vendor decision asks, and
+          the list of rows — which ranks them but never puts two on the same
+          axes — cannot answer it. A card between the two rules rather than a
+          third full-width band: the headline and the month columns are one
+          reading of the fleet, and this is a tool the operator drives, so it
+          reads better as its own surface than as more of the hero. Only
+          rendered once there are two providers to compare: one drawn against
+          itself is a chart with nothing to say. */}
+      {leftHistory !== undefined && rightHistory !== undefined && left !== right ? (
+        <>
+          <section aria-label={t("history.compare.title")} className="anim-rise" style={{ animationDelay: "120ms" }}>
+            <Card className="flex flex-col gap-3 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                  {t("history.compare.title")}
+                </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  {picker("left", leftHistory.providerId)}
+                  {picker("right", rightHistory.providerId)}
+                </div>
+              </div>
+              <UptimeCompareChart
+                rows={alignSeries(leftHistory, rightHistory)}
+                leftLabel={nameOf(leftHistory.providerId)}
+                rightLabel={nameOf(rightHistory.providerId)}
+                label={t("history.compare.chart", {
+                  left: nameOf(leftHistory.providerId),
+                  right: nameOf(rightHistory.providerId),
+                })}
+              />
+            </Card>
+          </section>
+
+          <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "240ms" }} />
+        </>
+      ) : null}
 
       {summary.providers.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("empty.no-data")}</p>
