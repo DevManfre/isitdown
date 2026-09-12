@@ -23,6 +23,28 @@ export interface ServiceRef {
   scopeToComponents?: boolean | undefined;
 }
 
+/**
+ * Something the adapter learned that the reading itself has nowhere to carry.
+ *
+ * A `NormalizedStatus` is a severity plus the provider's own incidents, and for
+ * a status page that is the whole truth: the reason it says "degraded" is the
+ * incident sitting next to the word. A probe has no incidents, so "down" and
+ * "down because it answered 503 instead of 2xx" look identical in the data —
+ * and the second is the one an operator can act on. The note is that sentence,
+ * shown verbatim in the diagnostics panel beside the failed reads.
+ */
+export interface ReadingNote {
+  /** Free text, in English, shown as written. */
+  text: string;
+  /**
+   * The target never answered at all — no status line, as opposed to a bad
+   * one. The poller reads this across the whole fleet: a cycle in which
+   * nothing anywhere answered is far more likely to be our own network than
+   * every provider failing at once.
+   */
+  unreachable?: boolean | undefined;
+}
+
 export interface FetchContext {
   timeoutMs: number;
   /**
@@ -32,6 +54,12 @@ export interface FetchContext {
    * caller that supplies one.
    */
   onRead?: ((read: StatusPageRead) => void) | undefined;
+  /**
+   * Reports what the reading amounted to when the severity alone does not say
+   * it. Optional on both sides: most adapters never call it, and the poller is
+   * the only caller that supplies one.
+   */
+  onNote?: ((note: ReadingNote) => void) | undefined;
 }
 
 export interface IncidentHistoryResult {

@@ -1,4 +1,5 @@
-import type { Adapter, FetchContext, ServiceRef } from "../core/adapter.interface.ts";
+import { connect as tlsConnect } from "node:tls";
+import type { Adapter, FetchContext, ReadingNote, ServiceRef } from "../core/adapter.interface.ts";
 import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
 
 /**
@@ -62,6 +63,13 @@ export interface ProbeConfig {
   absentBody?: string | undefined;
   /** An answer at or over this reads `degraded` rather than `operational`. */
   slowMs?: number | undefined;
+  /**
+   * A certificate this close to expiry reads `degraded`. Off unless configured:
+   * reading it costs a second connection, since `fetch` exposes nothing about
+   * the one it made, and a check nobody asked for should not double the
+   * requests a probe sends.
+   */
+  tlsWarnDays?: number | undefined;
   headers: Record<string, string>;
 }
 
@@ -74,6 +82,7 @@ export const PROBE_OPTION_KEYS = [
   "absentBody",
   "slowMs",
   "followRedirects",
+  "tlsWarnDays",
 ] as const;
 
 /** Prefix of an option carrying a request header, e.g. `header.Authorization`. */
@@ -148,13 +157,13 @@ function parseFlag(raw: string | undefined, fallback: boolean, service: ServiceR
   throw new Error(`http probe for ${service.id}: ${key} must be yes or no, not "${raw}"`);
 }
 
-function parseSlowMs(raw: string | undefined, service: ServiceRef): number | undefined {
+function parseCount(raw: string | undefined, service: ServiceRef, key: string, unit: string): number | undefined {
   if (raw === undefined) return undefined;
-  const ms = Number(raw);
-  if (!Number.isInteger(ms) || ms <= 0) {
-    throw new Error(`http probe for ${service.id}: slowMs must be a positive whole number of milliseconds`);
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`http probe for ${service.id}: ${key} must be a positive whole number of ${unit}`);
   }
-  return ms;
+  return value;
 }
 
 /**
@@ -194,7 +203,8 @@ export function probeConfig(service: ServiceRef): ProbeConfig {
     followRedirects: parseFlag(trimmed(options["followRedirects"]), true, service, "followRedirects"),
     expectBody,
     absentBody,
-    slowMs: parseSlowMs(trimmed(options["slowMs"]), service),
+    slowMs: parseCount(trimmed(options["slowMs"]), service, "slowMs", "milliseconds"),
+    tlsWarnDays: parseCount(trimmed(options["tlsWarnDays"]), service, "tlsWarnDays", "days"),
     headers,
   };
 }
@@ -205,8 +215,19 @@ export const readsBody = (config: ProbeConfig): boolean =>
 
 /** What came back, or the fact that nothing did. */
 export type ProbeOutcome =
-  | { answered: true; status: number; body: string | null; latencyMs: number }
-  | { answered: false };
+  | {
+      answered: true;
+      status: number;
+      body: string | null;
+      latencyMs: number;
+      /**
+       * Whole days until the certificate expires, when the check was asked for
+       * and the answer could be read. Absent means not asked, or asked and the
+       * handshake told us nothing — neither is a reason to call a service down.
+       */
+      tlsDaysLeft?: number | undefined;
+    }
+  | { answered: false; reason: string };
 
 /**
  * The severity an outcome reads as. Pure, and the whole decision: an endpoint
@@ -230,7 +251,134 @@ export function severityFromOutcome(outcome: ProbeOutcome, config: ProbeConfig):
   if (config.absentBody !== undefined && body.includes(config.absentBody)) return "major_outage";
 
   if (config.slowMs !== undefined && outcome.latencyMs >= config.slowMs) return "degraded";
+  // A certificate about to expire is a service that works today and stops on a
+  // known date. `degraded` is the only reading that says both — and it is
+  // checked last, so it can never mask an endpoint that is already down.
+  if (
+    config.tlsWarnDays !== undefined &&
+    outcome.tlsDaysLeft !== undefined &&
+    outcome.tlsDaysLeft <= config.tlsWarnDays
+  ) {
+    return "degraded";
+  }
   return "operational";
+}
+
+/**
+ * The sentence the reading cannot carry: why this probe is not operational.
+ * Null when it is — a healthy check has nothing to explain, and a note on every
+ * cycle would bury the ones that matter.
+ */
+export function noteFromOutcome(outcome: ProbeOutcome, config: ProbeConfig): ReadingNote | null {
+  if (!outcome.answered) {
+    return { text: `no answer from ${config.url}: ${outcome.reason}`, unreachable: true };
+  }
+
+  const accepted = config.accepted.some(([from, to]) => outcome.status >= from && outcome.status <= to);
+  if (!accepted) {
+    return { text: `answered HTTP ${outcome.status}, outside the accepted ${describe(config.accepted)}` };
+  }
+
+  const body = outcome.body ?? "";
+  if (config.expectBody !== undefined && !body.includes(config.expectBody)) {
+    return { text: `answered HTTP ${outcome.status} without the expected "${config.expectBody}" in the body` };
+  }
+  if (config.absentBody !== undefined && body.includes(config.absentBody)) {
+    return { text: `answered HTTP ${outcome.status} carrying the forbidden "${config.absentBody}" in the body` };
+  }
+
+  if (config.slowMs !== undefined && outcome.latencyMs >= config.slowMs) {
+    return { text: `answered in ${outcome.latencyMs} ms, at or over the ${config.slowMs} ms threshold` };
+  }
+  if (
+    config.tlsWarnDays !== undefined &&
+    outcome.tlsDaysLeft !== undefined &&
+    outcome.tlsDaysLeft <= config.tlsWarnDays
+  ) {
+    return { text: `the TLS certificate expires in ${outcome.tlsDaysLeft} day(s)` };
+  }
+  return null;
+}
+
+const describe = (ranges: StatusRange[]): string =>
+  ranges.map(([from, to]) => (from === to ? String(from) : `${from}-${to}`)).join(", ");
+
+/**
+ * Whole days until the certificate the host is serving expires, or null when
+ * that could not be read.
+ *
+ * A second connection, because `fetch` exposes nothing about the one it made:
+ * no socket, no peer certificate, by design in the spec. Only reached when the
+ * operator configured `tlsWarnDays`, and only after a successful request — the
+ * chain has already been validated by then, so this handshake is asking for a
+ * date, not for trust.
+ */
+export function certificateDaysLeft(url: string, timeoutMs: number, now: number = Date.now()): Promise<number | null> {
+  let target: URL;
+  try {
+    target = new URL(url);
+  } catch {
+    return Promise.resolve(null);
+  }
+  if (target.protocol !== "https:") return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    const socket = tlsConnect(
+      {
+        host: target.hostname,
+        port: Number(target.port === "" ? 443 : target.port),
+        servername: target.hostname,
+        // The chain was accepted by the request that just succeeded. Refusing
+        // it here would turn "we could not read the expiry" into a failure of
+        // its own on a host with a private CA the runtime trusts differently.
+        rejectUnauthorized: false,
+        timeout: timeoutMs,
+      },
+      () => {
+        const validTo = socket.getPeerCertificate()?.valid_to;
+        socket.destroy();
+        const expiresAt = validTo === undefined ? Number.NaN : Date.parse(validTo);
+        resolve(Number.isNaN(expiresAt) ? null : Math.floor((expiresAt - now) / 86_400_000));
+      },
+    );
+    const giveUp = (): void => {
+      socket.destroy();
+      resolve(null);
+    };
+    socket.once("error", giveUp);
+    socket.once("timeout", giveUp);
+  });
+}
+
+/**
+ * What to call a request that never completed.
+ *
+ * `fetch` reports every transport failure as the same three words — "fetch
+ * failed" — and hangs the real one off `cause`. That is the difference between
+ * a note worth reading and a note worth nothing: "connect ECONNREFUSED
+ * 10.0.0.4:8080" and "getaddrinfo ENOTFOUND api.internal" are two different
+ * afternoons.
+ */
+export function failureReason(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = error.cause;
+  if (cause instanceof Error && cause.message !== "") return cause.message;
+  // An abort carries no cause worth printing, and its own message is the bare
+  // word "The operation was aborted"; say which limit it hit instead.
+  if (error.name === "TimeoutError") return "timed out";
+  return error.message;
+}
+
+/** The reading, plus the note that says why it is not operational. */
+function reading(
+  service: ServiceRef,
+  config: ProbeConfig,
+  outcome: ProbeOutcome,
+  ctx: FetchContext,
+): NormalizedStatus {
+  const note = noteFromOutcome(outcome, config);
+  if (note !== null) ctx.onNote?.(note);
+  return readingFromOutcome(service, config, outcome);
 }
 
 /** The reading an outcome produces, in the shape every other adapter returns. */
@@ -267,11 +415,14 @@ export const httpAdapter: Adapter = {
         redirect: config.followRedirects ? "follow" : "manual",
         signal: AbortSignal.timeout(ctx.timeoutMs),
       });
-    } catch {
+    } catch (error) {
       // Refused, unresolvable, TLS rejected, or past the timeout. All four are
       // the endpoint failing to answer, which is a reading — and none of them
-      // is a latency worth recording, so nothing is reported to `onRead`.
-      return readingFromOutcome(service, config, { answered: false });
+      // is a latency worth recording, so nothing is reported to `onRead`. The
+      // reason travels as a note instead: "down" and "down because the name
+      // does not resolve" are the same severity and different problems.
+      const reason = failureReason(error);
+      return reading(service, config, { answered: false, reason }, ctx);
     }
 
     // To the headers, like every other read here: `fetch` resolves on them, and
@@ -295,11 +446,24 @@ export const httpAdapter: Adapter = {
     }
 
     ctx.onRead?.({ latencyMs, notModified: false });
-    return readingFromOutcome(service, config, {
-      answered: true,
-      status: response.status,
-      body,
-      latencyMs,
-    });
+
+    // Only after the request succeeded: the chain has been validated by then,
+    // so this asks the host for a date rather than for trust. A host that will
+    // not answer the second handshake reports no expiry rather than an outage.
+    const tlsDaysLeft =
+      config.tlsWarnDays === undefined ? null : await certificateDaysLeft(config.url, ctx.timeoutMs);
+
+    return reading(
+      service,
+      config,
+      {
+        answered: true,
+        status: response.status,
+        body,
+        latencyMs,
+        ...(tlsDaysLeft === null ? {} : { tlsDaysLeft }),
+      },
+      ctx,
+    );
   },
 };
