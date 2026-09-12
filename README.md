@@ -909,7 +909,7 @@ change. Each rule has four parts:
 
 ```yaml
 routing:
-  - provider: "*"            # a service id, `group:<slug>` (§3.10), or "*" for every provider
+  - provider: "*"            # a service id, `group:<slug>` (§3.10), `<id>#<component>`, or "*" 
     classes: [status, incident]  # any of: status, incident, maintenance, monitoring
     minSeverity: major_outage  # any | degraded | partial_outage | major_outage
     channels: [telegram]       # channel ids, or "*" for every enabled channel; [] mutes
@@ -928,11 +928,24 @@ behaves exactly as if one catch-all rule existed: every class, any severity,
 every enabled channel — the behaviour both editions had before routing
 existed, so upgrading never goes silent by accident.
 
+A rule can also name **one component of one provider**, as `<id>#<component>`
+— `github#8l4ygp009s5s`. A component's transition already carries the
+component's own severity rather than the provider's, so this is all that was
+needed to route one independently: put `github#api` above `github` and that one
+component goes to a phone while everything else on the page goes to Slack, or
+give it `channels: []` and mute one noisy component without going quiet about
+the provider. A component target matches only that component's own transitions,
+so a provider-level status change never matches one. The component id is the
+provider's own — the same id the component picker stores — and removing a
+provider deletes its components' rules along with its own.
+
 The Light edition configures the table as the `routing` list in `config.yml`,
-shown above; the UI edition edits it from **Settings**, where a routing rules
-editor also offers a dry run — pick a provider and a canned event and it names
-which rule would win and which ones were never reached, evaluated against the
-rules you currently have saved, not a hypothetical set.
+shown above; the UI edition edits it from **Settings**, where the provider
+column lists each provider's selected components beneath it and a routing rules
+editor also offers a dry run — pick a provider (and, where one is selected, a
+component) plus a canned event, and it names which rule would win and which ones
+were never reached, evaluated against the rules you currently have saved, not a
+hypothetical set.
 
 ### 3.8 Delivery policy — quiet hours, digests, caps
 

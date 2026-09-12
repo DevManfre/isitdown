@@ -145,10 +145,27 @@ export function inQuietHours(quiet: QuietHours, at: Date): boolean {
 /** How a rule names a group rather than one provider (roadmap 2.6). */
 export const GROUP_PREFIX = "group:";
 
+/**
+ * How a rule names one component of one provider (roadmap 2.9):
+ * `github#8l4ygp009s5s`. A component transition already carries its own
+ * severity — the diff engine ranks it on the component's statuses, not the
+ * provider's — so all a rule needed to route one independently was a way to say
+ * which one.
+ */
+export const COMPONENT_SEPARATOR = "#";
+
+/** The provider and component a `provider#component` target names, or null. */
+export function componentTargetOf(target: string): { providerId: string; componentId: string } | null {
+  const at = target.indexOf(COMPONENT_SEPARATOR);
+  if (at <= 0 || at === target.length - 1) return null;
+  return { providerId: target.slice(0, at), componentId: target.slice(at + 1) };
+}
+
 export interface RoutingRule {
   /**
    * A provider id, `group:<slug>` for every provider in that group (roadmap
-   * 2.6), or "*" for every provider.
+   * 2.6), `<provider>#<component>` for one component of one provider (roadmap
+   * 2.9), or "*" for every provider.
    */
   provider: string;
   classes: EventClass[];
@@ -242,13 +259,23 @@ export interface RoutingOptions {
 }
 
 /**
- * Whether one rule's target covers this change's provider: the provider itself,
- * every provider ("*"), or the group the provider is in.
+ * Whether one rule's target covers this change: the provider itself, every
+ * provider ("*"), the group the provider is in, or one named component of it.
+ *
+ * A component target is the only one that narrows *within* a provider, so it is
+ * also the only one that can fail to match a change from the provider it names:
+ * `github#api` covers that component's own transitions and nothing else, which
+ * is what lets it sit above a `github` rule and route one component elsewhere
+ * without taking the rest of the provider with it.
  */
-function coversProvider(target: string, providerId: string, group: string | undefined): boolean {
+function coversChange(target: string, change: StatusChange, group: string | undefined): boolean {
   if (target === "*") return true;
   if (target.startsWith(GROUP_PREFIX)) return group !== undefined && target.slice(GROUP_PREFIX.length) === group;
-  return target === providerId;
+  const component = componentTargetOf(target);
+  if (component !== null) {
+    return component.providerId === change.providerId && component.componentId === change.component?.id;
+  }
+  return target === change.providerId;
 }
 
 /**
@@ -287,7 +314,7 @@ export function explain(
       outcomes.push({ kind: "unreached" });
       continue;
     }
-    if (!coversProvider(rule.provider, change.providerId, options.providerGroup)) {
+    if (!coversChange(rule.provider, change, options.providerGroup)) {
       outcomes.push({ kind: "skipped", because: "provider" });
       continue;
     }

@@ -193,6 +193,24 @@ test("a routing rule accepts a provider slug, an empty channel list and a wildca
   );
 });
 
+test("a routing rule accepts the two targets that are not plain provider ids", () => {
+  // Both were evaluated by core before this schema knew about them, which meant
+  // a `group:` rule in a Light config.yml was rejected at load (roadmap 2.6/2.9).
+  assert.equal(routingRuleSchema.parse({ provider: "group:deploy-path" }).provider, "group:deploy-path");
+  assert.equal(routingRuleSchema.parse({ provider: "github#8l4ygp009s5s" }).provider, "github#8l4ygp009s5s");
+  // A component id is the provider's own: Better Stack and Uptime Kuma write
+  // numbers, Statuspage writes hex, a scraper writes whatever the page called it.
+  assert.equal(routingRuleSchema.safeParse({ provider: "homelab#42" }).success, true);
+  assert.equal(routingRuleSchema.safeParse({ provider: "betterstack#Uptime.API" }).success, true);
+});
+
+test("a routing rule refuses a half-written group or component target", () => {
+  assert.equal(routingRuleSchema.safeParse({ provider: "group:" }).success, false);
+  assert.equal(routingRuleSchema.safeParse({ provider: "github#" }).success, false);
+  assert.equal(routingRuleSchema.safeParse({ provider: "#api" }).success, false);
+  assert.equal(routingRuleSchema.safeParse({ provider: "GitHub#api" }).success, false);
+});
+
 test("a routing rule refuses an unknown class, an unknown floor and a bad provider", () => {
   assert.equal(routingRuleSchema.safeParse({ provider: "*", classes: ["outage"] }).success, false);
   assert.equal(routingRuleSchema.safeParse({ provider: "*", minSeverity: "critical" }).success, false);
