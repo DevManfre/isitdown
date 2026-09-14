@@ -1,0 +1,122 @@
+# IsItDown, Light edition, as plain manifests — roadmap 6.5.
+#
+#   kubectl apply -f deploy/k8s/light.yaml
+#   kubectl logs deploy/isitdown-light -f
+#
+# This edition serves no HTTP: it polls and notifies, so there is no Service and
+# no Ingress, and its liveness probe is the same script the image's own
+# HEALTHCHECK runs.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: isitdown-light
+  labels:
+    app.kubernetes.io/name: isitdown
+    app.kubernetes.io/component: light
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 256Mi
+---
+# The whole configuration of this edition. Credentials belong in the Secret
+# below as `${VAR}` references, never as literals here: a ConfigMap is readable
+# by anything that can read the namespace.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: isitdown-light-config
+  labels:
+    app.kubernetes.io/name: isitdown
+    app.kubernetes.io/component: light
+data:
+  config.yml: |
+    pollIntervalMinutes: 3
+    services:
+      - id: github
+        name: GitHub
+        adapter: statuspage
+        baseUrl: https://www.githubstatus.com
+      - id: cloudflare
+        name: Cloudflare
+        adapter: statuspage
+        baseUrl: https://www.cloudflarestatus.com
+    notifications:
+      telegram:
+        enabled: false
+        botToken: "${TELEGRAM_BOT_TOKEN}"
+        chatId: "${TELEGRAM_CHAT_ID}"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: isitdown-light-secrets
+  labels:
+    app.kubernetes.io/name: isitdown
+    app.kubernetes.io/component: light
+type: Opaque
+stringData:
+  TELEGRAM_BOT_TOKEN: ""
+  TELEGRAM_CHAT_ID: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: isitdown-light
+  labels:
+    app.kubernetes.io/name: isitdown
+    app.kubernetes.io/component: light
+spec:
+  # One, always: the state file in the volume below is this edition's memory of
+  # what it has already notified about.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: isitdown
+      app.kubernetes.io/component: light
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: isitdown
+        app.kubernetes.io/component: light
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: isitdown
+          image: ghcr.io/devmanfre/isitdown:light-latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: isitdown-light-secrets
+          livenessProbe:
+            exec:
+              command: ["node", "dist/light/healthcheck.js"]
+            initialDelaySeconds: 40
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 192Mi
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            - name: config
+              mountPath: /app/config/config.yml
+              subPath: config.yml
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: isitdown-light
+        - name: config
+          configMap:
+            name: isitdown-light-config

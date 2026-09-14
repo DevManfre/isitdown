@@ -15,6 +15,7 @@ const silent = createLogger("error", () => {});
 interface Api {
   runtime: UiRuntime;
   get: (path: string) => Promise<{ status: number; body: unknown }>;
+  send: (method: string, path: string, body?: unknown) => Promise<{ status: number; body: unknown }>;
   close: () => Promise<void>;
 }
 
@@ -29,6 +30,16 @@ async function api(): Promise<Api> {
     runtime,
     get: async (path) => {
       const response = await fetch(`http://127.0.0.1:${port}${path}`);
+      const text = await response.text();
+      return { status: response.status, body: text === "" ? undefined : (JSON.parse(text) as unknown) };
+    },
+    send: async (method, path, body) => {
+      const response = await fetch(`http://127.0.0.1:${port}${path}`, {
+        method,
+        ...(body === undefined
+          ? {}
+          : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+      });
       const text = await response.text();
       return { status: response.status, body: text === "" ? undefined : (JSON.parse(text) as unknown) };
     },
@@ -284,6 +295,72 @@ test("an unusable search or window shows the unfiltered list rather than an erro
 
     const tooLong = (await app.get(`/incidents?q=${"x".repeat(400)}`)).body as IncidentsBody;
     assert.equal(tooLong.counts.all, ids.length);
+  } finally {
+    await app.close();
+  }
+});
+
+// Roadmap 5.3. The one account of an incident that nothing here can observe:
+// why it mattered in this fleet.
+test("a note written on an incident comes back with its detail, oldest first", async () => {
+  const app = await api();
+  try {
+    const [providerId] = await openIncidents(app.runtime);
+    const path = `/incidents/${providerId}/${providerId}-1/notes`;
+
+    const first = await app.send("POST", path, { body: "Our deploy failed on this." });
+    const second = await app.send("POST", path, { body: "Vendor confirmed at 14:10." });
+
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+    const detail = (await app.get(`/incidents/${providerId}/${providerId}-1`)).body as {
+      notes: { id: number; body: string; createdAt: string }[];
+    };
+    assert.deepEqual(
+      detail.notes.map((note) => note.body),
+      ["Our deploy failed on this.", "Vendor confirmed at 14:10."],
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("a note is removed by the incident it was written on, and only by that one", async () => {
+  const app = await api();
+  try {
+    const [providerId, otherId] = await openIncidents(app.runtime);
+    const path = `/incidents/${providerId}/${providerId}-1/notes`;
+    const created = (await app.send("POST", path, { body: "Worth keeping for a minute." })).body as {
+      id: number;
+    };
+
+    // The same note id, addressed through a different incident: a mistake, not
+    // a match.
+    const wrong = await app.send("DELETE", `/incidents/${otherId}/${otherId}-1/notes/${created.id}`);
+    assert.equal(wrong.status, 404);
+
+    const removed = await app.send("DELETE", `${path}/${created.id}`);
+    assert.equal(removed.status, 204);
+    const detail = (await app.get(`/incidents/${providerId}/${providerId}-1`)).body as { notes: unknown[] };
+    assert.deepEqual(detail.notes, []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("an empty note, an oversized one, and one about an unknown incident are all refused", async () => {
+  const app = await api();
+  try {
+    const [providerId] = await openIncidents(app.runtime);
+    const path = `/incidents/${providerId}/${providerId}-1/notes`;
+
+    assert.equal((await app.send("POST", path, { body: "   " })).status, 400);
+    assert.equal((await app.send("POST", path, { body: "x".repeat(2001) })).status, 400);
+    // A typo in a url must not quietly accumulate notes about nothing.
+    assert.equal(
+      (await app.send("POST", `/incidents/${providerId}/nope/notes`, { body: "orphan" })).status,
+      404,
+    );
   } finally {
     await app.close();
   }

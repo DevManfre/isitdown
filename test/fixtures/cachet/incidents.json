@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "pagination": {
+      "total": 2,
+      "count": 2,
+      "per_page": 100,
+      "current_page": 1,
+      "total_pages": 1,
+      "links": {
+        "next_page": null,
+        "previous_page": null
+      }
+    }
+  },
+  "data": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "component_id": 0,
+      "name": "Our monkeys aren't performing",
+      "status": 1,
+      "visible": 1,
+      "stickied": false,
+      "notifications": false,
+      "message": "We're investigating an issue with our monkeys not performing as they should be.",
+      "occurred_at": "2026-09-12 13:00:03",
+      "created_at": "2026-09-12 13:00:03",
+      "updated_at": "2026-09-12 13:00:03",
+      "deleted_at": null,
+      "is_resolved": true,
+      "meta": {
+        "seo": {
+          "title": "monkeys-not-performing"
+        }
+      },
+      "updates": [
+        {
+          "id": 1,
+          "incident_id": 1,
+          "status": 4,
+          "message": "The monkeys are back and rested!",
+          "user_id": 1,
+          "created_at": "2026-09-12 13:00:03",
+          "updated_at": "2026-09-12 13:00:03",
+          "human_status": "Fixed",
+          "permalink": "https://demo.cachethq.io/incidents/1#update-1"
+        },
+        {
+          "id": 2,
+          "incident_id": 1,
+          "status": 3,
+          "message": "Our monkeys need a break from performing. They'll be back after a good rest.",
+          "user_id": 1,
+          "created_at": "2026-09-12 13:00:03",
+          "updated_at": "2026-09-12 13:00:03",
+          "human_status": "Watching",
+          "permalink": "https://demo.cachethq.io/incidents/1#update-2"
+        },
+        {
+          "id": 3,
+          "incident_id": 1,
+          "status": 2,
+          "message": "We have identified the issue with our lovely performing monkeys.",
+          "user_id": 1,
+          "created_at": "2026-09-12 13:00:03",
+          "updated_at": "2026-09-12 13:00:03",
+          "human_status": "Identified",
+          "permalink": "https://demo.cachethq.io/incidents/1#update-3"
+        }
+      ],
+      "human_status": "Investigating",
+      "latest_update_id": 1,
+      "latest_status": 4,
+      "latest_human_status": "Fixed",
+      "latest_icon": "icon ion-checkmark greens",
+      "permalink": "https://demo.cachethq.io/incidents/1",
+      "duration": 1639
+    },
+    {
+      "id": 2,
+      "user_id": 1,
+      "component_id": 0,
+      "name": "This is an unresolved incident",
+      "status": 1,
+      "visible": 1,
+      "stickied": false,
+      "notifications": false,
+      "message": "Unresolved incidents are left without a **Fixed** update.",
+      "occurred_at": "2026-09-12 13:00:03",
+      "created_at": "2026-09-12 13:00:03",
+      "updated_at": "2026-09-12 13:00:03",
+      "deleted_at": null,
+      "is_resolved": false,
+      "meta": [],
+      "updates": [
+        {
+          "id": 4,
+          "incident_id": 2,
+          "status": 3,
+          "message": "We're actively watching this issue, so it remains unresolved.",
+          "user_id": 1,
+          "created_at": "2026-09-12 13:00:03",
+          "updated_at": "2026-09-12 13:00:03",
+          "human_status": "Watching",
+          "permalink": "https://demo.cachethq.io/incidents/2#update-4"
+        }
+      ],
+      "human_status": "Investigating",
+      "latest_update_id": 4,
+      "latest_status": 3,
+      "latest_human_status": "Watching",
+      "latest_icon": "icon ion-eye blues",
+      "permalink": "https://demo.cachethq.io/incidents/2",
+      "duration": 1639
+    }
+  ]
+}

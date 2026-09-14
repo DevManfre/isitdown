@@ -117,6 +117,12 @@ export function AdapterDebugDialog({ service }: { service: ServiceDefinition }) 
                     {entry.error !== undefined && (
                       <span className="font-mono text-[11px] break-words text-destructive">{entry.error}</span>
                     )}
+                    {/* A read that worked and still did not say "operational".
+                        Not destructive-coloured: nothing failed here, the
+                        answer itself was the problem. */}
+                    {entry.note !== undefined && (
+                      <span className="font-mono text-[11px] break-words text-muted-foreground">{entry.note}</span>
+                    )}
                   </div>
                 ))}
               </div>

@@ -103,6 +103,25 @@ notifications:
     serverUrl: "${GOTIFY_URL}"
     # An application token, from the Gotify app you created for IsItDown
     token: "${GOTIFY_TOKEN}"
+  email:
+    enabled: false
+    # An SMTP submission server. STARTTLS is used whenever the server offers it.
+    host: "${SMTP_HOST}"
+    # Optional, 587 by default. 465 is implicit TLS and is treated as such.
+    port: "${SMTP_PORT}"
+    # Optional: "true" forces TLS from the first byte, as on port 465
+    secure: "${SMTP_SECURE}"
+    # Optional. Credentials are never sent over an unencrypted connection
+    # unless this says "true" — meant for a relay on this machine.
+    allowInsecureAuth: "${SMTP_ALLOW_INSECURE_AUTH}"
+    # Optional: "true" accepts a certificate no public CA signed
+    allowSelfSigned: "${SMTP_ALLOW_SELF_SIGNED}"
+    # Optional: a relay that trusts this network needs no credentials
+    username: "${SMTP_USERNAME}"
+    password: "${SMTP_PASSWORD}"
+    from: "${SMTP_FROM}"
+    # One address, or several separated by commas
+    to: "${SMTP_TO}"
 
 # Which channels hear about what. The first rule that matches a change decides,
 # rules below it are not consulted — put specific ones on top. Leave this

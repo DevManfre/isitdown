@@ -1,5 +1,6 @@
 import { adapters } from "../../adapters/index.ts";
 import { detectAdapter } from "../../adapters/detect.ts";
+import { httpAdapter, probeConfig } from "../../adapters/http.adapter.ts";
 import type { RuntimeConfig } from "../../core/configSource.interface.ts";
 import { inspectConfig } from "./loadConfig.ts";
 
@@ -59,11 +60,24 @@ export async function checkConfig(options: CheckOptions): Promise<CheckReport> {
 
   const known = Object.keys(adapters);
   for (const service of config.services) {
-    if (known.includes(service.adapter)) continue;
-    findings.push({
-      level: "error",
-      message: `service "${service.id}" names adapter "${service.adapter}", which does not exist (known: ${known.join(", ")})`,
-    });
+    if (!known.includes(service.adapter)) {
+      findings.push({
+        level: "error",
+        message: `service "${service.id}" names adapter "${service.adapter}", which does not exist (known: ${known.join(", ")})`,
+      });
+      continue;
+    }
+    // The probe is the one adapter whose options decide what it even asks for,
+    // and a wrong one only shows up as a provider failing every cycle. Reading
+    // the configuration is offline, so it is checked here rather than behind
+    // `--probe`.
+    if (service.adapter === PROBE_ADAPTER) {
+      try {
+        probeConfig(service);
+      } catch (error) {
+        findings.push({ level: "error", message: error instanceof Error ? error.message : String(error) });
+      }
+    }
   }
 
   const probed = options.probe === true;
@@ -88,12 +102,18 @@ export async function checkConfig(options: CheckOptions): Promise<CheckReport> {
  *
  * Disabled services are left alone: the file says not to read them.
  */
+const PROBE_ADAPTER = httpAdapter.id;
+
 async function probeServices(config: RuntimeConfig): Promise<CheckFinding[]> {
   const timeoutMs = config.polling.requestTimeoutSeconds * 1000;
   const findings: CheckFinding[] = [];
 
   for (const service of config.services) {
     if (!service.enabled) continue;
+    // A probe's target is not a status page and is not meant to look like one:
+    // asking detection about it would report every healthy probe as an
+    // unrecognised provider. Its own options are checked offline above.
+    if (service.adapter === PROBE_ADAPTER) continue;
     let detected: Awaited<ReturnType<typeof detectAdapter>>;
     try {
       detected = await detectAdapter(service.baseUrl, { timeoutMs });

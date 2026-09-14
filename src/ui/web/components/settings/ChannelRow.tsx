@@ -5,6 +5,7 @@ import {
   BellRing,
   ChevronRight,
   Hash,
+  Mail,
   Megaphone,
   MessagesSquare,
   MonitorSmartphone,
@@ -129,6 +130,7 @@ function PushDevices({
  */
 const CHANNEL_ICONS: Record<string, typeof Bell> = {
   discord: MessagesSquare,
+  email: Mail,
   gotify: BellRing,
   ntfy: Megaphone,
   slack: Hash,
@@ -139,6 +141,7 @@ const CHANNEL_ICONS: Record<string, typeof Bell> = {
 
 const CHANNEL_NAME_KEYS: Record<string, string> = {
   discord: "channel.name.discord",
+  email: "channel.name.email",
   gotify: "channel.name.gotify",
   ntfy: "channel.name.ntfy",
   slack: "channel.name.slack",

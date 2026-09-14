@@ -260,6 +260,50 @@ describe("RoutingRules", () => {
       expect(screen.getByText(/matches — evaluation stops here/i)).toBeInTheDocument();
     });
 
+    it("previews one component's own transition, which a component rule wins and a sibling's does not", async () => {
+      // Roadmap 2.9: a rule can name one component, so the dry run has to be
+      // able to ask about one — otherwise the panel cannot show what it does.
+      const user = userEvent.setup();
+      const withComponents = [
+        {
+          id: "github",
+          name: "GitHub",
+          components: [
+            { id: "api", name: "API Requests" },
+            { id: "pages", name: "Pages" },
+          ],
+        },
+      ];
+      const componentRule: RoutingRule[] = [
+        { provider: "github#api", classes: ["status"], minSeverity: "any", channels: ["telegram"] },
+      ];
+      mount(
+        <RoutingRules
+          routing={{ rules: componentRule, invalidRules: 0 }}
+          channels={channels}
+          services={withComponents}
+        />,
+      );
+
+      // The provider's own status change carries no component, so the rule
+      // does not match it.
+      expect(screen.getByText(/no rule matches — nobody is notified/i)).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "API Requests" }));
+      expect(screen.getByTestId("routing-dryrun-verdict")).toHaveTextContent(/telegram/i);
+
+      await user.click(screen.getByRole("button", { name: "Pages" }));
+      expect(screen.getByText(/no rule matches — nobody is notified/i)).toBeInTheDocument();
+    });
+
+    it("offers no component row for a provider with nothing selected", () => {
+      mount(
+        <RoutingRules routing={{ rules, invalidRules: 0 }} channels={channels} services={dryRunServices} />,
+      );
+
+      expect(screen.queryByRole("button", { name: /whole provider/i })).toBeNull();
+    });
+
     it("renders the muted verdict naming the winning rule when it has no channels", () => {
       const muted: RoutingRule[] = [
         { provider: "github", classes: ["status"], minSeverity: "any", channels: [] },

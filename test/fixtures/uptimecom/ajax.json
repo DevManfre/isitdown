@@ -1,0 +1,92 @@
+{
+  "error": null,
+  "fields": {},
+  "data": {
+    "id": 1,
+    "name": "Uptime.com Status",
+    "public_url": "/statuspage/uptime-status",
+    "slug": "uptime-status",
+    "show_overall_status": true,
+    "global_is_operational": true,
+    "has_components_under_maintenance_state": false,
+    "has_components_under_critical_state": false,
+    "components": [
+      {
+        "id": 2,
+        "is_group": false,
+        "name": "API",
+        "description": "",
+        "status": "operational",
+        "status_display": "Operational",
+        "group": null,
+        "sorting_weight": 0,
+        "last_updated_at": "2026-09-03T09:38:30.642518+00:00",
+        "subcomponents": []
+      },
+      {
+        "id": 3,
+        "is_group": false,
+        "name": "Background Processing",
+        "description": "",
+        "status": "operational",
+        "status_display": "Operational",
+        "group": null,
+        "sorting_weight": 1,
+        "last_updated_at": null,
+        "subcomponents": []
+      },
+      {
+        "id": 4,
+        "is_group": false,
+        "name": "Database",
+        "description": "",
+        "status": "operational",
+        "status_display": "Operational",
+        "group": null,
+        "sorting_weight": 6,
+        "last_updated_at": null,
+        "subcomponents": []
+      },
+      {
+        "id": 39,
+        "is_group": true,
+        "name": "Check Servers",
+        "description": "",
+        "status": "operational",
+        "status_display": "Operational",
+        "group": null,
+        "sorting_weight": 2,
+        "last_updated_at": null,
+        "subcomponents": [
+          {
+            "id": 141,
+            "is_group": false,
+            "name": "AUTO (SingleLocationChecks)",
+            "description": "",
+            "status": "operational",
+            "status_display": "Operational",
+            "group": 39,
+            "sorting_weight": 0,
+            "last_updated_at": null,
+            "subcomponents": []
+          },
+          {
+            "id": 44,
+            "is_group": false,
+            "name": "Austria-Vienna",
+            "description": "",
+            "status": "operational",
+            "status_display": "Operational",
+            "group": 39,
+            "sorting_weight": 1,
+            "last_updated_at": "2026-09-10T14:05:04.544625+00:00",
+            "subcomponents": []
+          }
+        ]
+      }
+    ],
+    "metrics": [],
+    "active_incidents": [],
+    "upcoming_maintenance": []
+  }
+}
