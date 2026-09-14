@@ -390,8 +390,11 @@ export interface ServiceImpact {
  */
 export function describeServiceImpact(db: DatabaseSync, id: string): ServiceImpact | null {
   if (!exists(db, id)) return null;
-  const count = (sql: string): number =>
-    z.object({ n: z.number() }).parse(db.prepare(sql).get(id)).n;
+  const count = (sql: string, ...extra: string[]): number =>
+    z.object({ n: z.number() }).parse(db.prepare(sql).get(id, ...extra)).n;
+  // A component rule names this provider too (roadmap 2.9). A service id is a
+  // lowercase slug by schema, so it can carry no LIKE wildcard of its own.
+  const componentRules = `${id}#%`;
   const oldest = z
     .object({ oldest: z.string().nullable() })
     .parse(db.prepare("SELECT MIN(observed_at) AS oldest FROM status_samples WHERE provider_id = ?").get(id))
@@ -402,7 +405,12 @@ export function describeServiceImpact(db: DatabaseSync, id: string): ServiceImpa
     componentSamples: count("SELECT COUNT(*) AS n FROM component_samples WHERE provider_id = ?"),
     incidents: count("SELECT COUNT(*) AS n FROM incidents WHERE provider_id = ?"),
     maintenances: count("SELECT COUNT(*) AS n FROM maintenances WHERE provider_id = ?"),
-    routingRules: count("SELECT COUNT(*) AS n FROM routing_rules WHERE provider = ?"),
+    // Its own rules and its components' (roadmap 2.9): `github#api` names this
+    // provider as surely as `github` does, and a removal takes both.
+    routingRules: count(
+      "SELECT COUNT(*) AS n FROM routing_rules WHERE provider = ? OR provider LIKE ?",
+      componentRules,
+    ),
     // Rounded up: a provider polled for an hour has lost "a day of history",
     // not zero. An unparseable timestamp counts as no history rather than NaN.
     historyDays:
@@ -496,7 +504,9 @@ export function purgeService(db: DatabaseSync, id: string): boolean {
     // No FK could do this: "*" is not a service id. A rule left naming a deleted
     // provider would match nothing and quietly sit in the list forever. Only
     // when a row actually went away — a 404 on an unknown id must not mutate.
-    db.prepare("DELETE FROM routing_rules WHERE provider = ?").run(id);
+    // Its components' rules go with it: `github#api` names this provider as
+    // surely as `github` does (roadmap 2.9).
+    db.prepare("DELETE FROM routing_rules WHERE provider = ? OR provider LIKE ?").run(id, `${id}#%`);
   }
   return deleted;
 }

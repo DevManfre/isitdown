@@ -1,4 +1,4 @@
-import type { Adapter } from "./adapter.interface.ts";
+import type { Adapter, ReadingNote } from "./adapter.interface.ts";
 import type { RuntimeConfig, ServiceDefinition } from "./configSource.interface.ts";
 import { confirmedChanges } from "./diffEngine.ts";
 import { RetryAfterError, type StatusPageRead } from "./http.ts";
@@ -68,6 +68,41 @@ export interface ProviderResult {
    */
   notModified?: boolean | undefined;
   error?: string | undefined;
+  /**
+   * What the reading amounted to, when the severity does not say it — a probe
+   * reporting *why* it is down (roadmap 1.8). Absent on a healthy read and on
+   * every adapter that reports none.
+   */
+  note?: string | undefined;
+  /**
+   * The target never answered. Set only by an adapter that tells the two apart,
+   * and read across the cycle: see `looksLikeOurOwnNetwork`.
+   */
+  unreachable?: boolean | undefined;
+}
+
+/**
+ * Whether a cycle's results are better explained by our own network than by the
+ * fleet (roadmap 1.8, phase B).
+ *
+ * A probe reads a refused connection as an outage, correctly — from here, the
+ * service is unreachable. But a container that has lost DNS or egress reads
+ * *every* target that way at once, and three simultaneous outages across
+ * unrelated providers is the least likely explanation on offer. The evidence is
+ * the rest of the fleet: a cycle in which a status page answered normally rules
+ * our own network out, whatever the probes say.
+ *
+ * Deliberately narrow. It needs at least two providers, since one probe failing
+ * is simply one probe failing, and at least one of them unreachable rather than
+ * merely reading badly — an endpoint answering 503 answered. It changes no
+ * reading and silences no message: turning this into one fleet-wide alert
+ * instead of N is roadmap 2.7's shape, and needs a change kind that is not
+ * about a single provider.
+ */
+export function looksLikeOurOwnNetwork(results: ProviderResult[]): boolean {
+  if (results.length < 2) return false;
+  const blind = results.filter((result) => !result.ok || result.unreachable === true);
+  return blind.length === results.length && results.some((result) => result.unreachable === true);
 }
 
 export interface CycleResult {
@@ -154,6 +189,7 @@ export function createPoller(deps: PollerDeps): Poller {
     attempts: number;
     latencyMs?: number | undefined;
     notModified?: boolean | undefined;
+    note?: ReadingNote | undefined;
   }> {
     const adapter = getAdapter(service.adapter);
     const timeoutMs = config.polling.requestTimeoutSeconds * 1000;
@@ -169,6 +205,7 @@ export function createPoller(deps: PollerDeps): Poller {
       // The read the successful attempt made; a retried attempt's own timing
       // describes the failure, not the page we ended up reading.
       let read: StatusPageRead | undefined;
+      let note: ReadingNote | undefined;
       try {
         const status = await adapter.fetchStatus(
           {
@@ -181,6 +218,11 @@ export function createPoller(deps: PollerDeps): Poller {
           },
           {
             timeoutMs,
+            // The last note wins: an adapter that reports one reports it once
+            // per reading, and a retry's note describes the attempt that stuck.
+            onNote: (reported) => {
+              note = reported;
+            },
             onRead: (observed) => {
               read = observed;
             },
@@ -191,6 +233,7 @@ export function createPoller(deps: PollerDeps): Poller {
           attempts: attempt + 1,
           latencyMs: read?.latencyMs,
           notModified: read?.notModified,
+          note,
         };
       } catch (error) {
         lastError = error;
@@ -305,6 +348,8 @@ export function createPoller(deps: PollerDeps): Poller {
         attempts: outcome.attempts,
         durationMs: Date.now() - startedAt,
         ...(outcome.notModified === undefined ? {} : { notModified: outcome.notModified }),
+        ...(outcome.note === undefined ? {} : { note: outcome.note.text }),
+        ...(outcome.note?.unreachable === true ? { unreachable: true } : {}),
       },
       changes,
     };
@@ -435,6 +480,21 @@ export function createPoller(deps: PollerDeps): Poller {
           durationMs: 0,
           error: message,
         });
+      }
+
+      if (looksLikeOurOwnNetwork(results)) {
+        // Said once, with the fleet as the evidence. Every reading in the cycle
+        // still stands on its own — nothing here suppresses an alert, because
+        // from this container those services really are unreachable — but the
+        // operator reading three "down" messages at once deserves to find this
+        // line in the log and this sentence in the diagnostics panel.
+        logger.warn("every provider in this cycle failed or never answered — this looks like a local network failure", {
+          providers: results.length,
+        });
+        for (const result of results) {
+          if (result.unreachable !== true) continue;
+          result.note = `${result.note ?? ""} — and nothing else answered in this cycle either, so this looks like a failure on our side rather than theirs`.trim();
+        }
       }
 
       const finishedAt = new Date().toISOString();

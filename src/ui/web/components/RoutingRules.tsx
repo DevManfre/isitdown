@@ -17,9 +17,11 @@ import type { DescribedChannel, QuietHoursPolicy, RoutingResponse, RoutingRule }
 // actually routes, and a preview that lies is worse than no preview. `@/`
 // only maps `src/ui/web/*`, so this one import stays relative.
 import {
+  COMPONENT_SEPARATOR,
   EVENT_CLASSES,
   GROUP_PREFIX,
   SEVERITY_FLOORS,
+  componentTargetOf,
   explain,
   type EventClass,
   type SeverityFloor,
@@ -49,7 +51,12 @@ function shadowedBy(rules: RoutingRule[], index: number): number | undefined {
   for (let above = 0; above < index; above += 1) {
     const earlier = rules[above];
     if (earlier === undefined) continue;
-    if (earlier.provider !== "*" && earlier.provider !== rule.provider) continue;
+    // A provider rule above a rule for one of that provider's components covers
+    // everything the narrower one would (roadmap 2.9): the component change is
+    // the provider's change too, so the earlier rule wins it first.
+    const component = componentTargetOf(rule.provider);
+    const coversComponent = component !== null && earlier.provider === component.providerId;
+    if (earlier.provider !== "*" && earlier.provider !== rule.provider && !coversComponent) continue;
     if (!rule.classes.every((eventClass) => earlier.classes.includes(eventClass))) continue;
     if (SEVERITY_FLOORS.indexOf(earlier.minSeverity) > SEVERITY_FLOORS.indexOf(rule.minSeverity)) continue;
     return above;
@@ -98,6 +105,29 @@ const DRYRUN_EVENTS: { id: string; change: Omit<StatusChange, "providerId" | "at
   },
 ];
 
+/** A provider as this panel needs it: enough to name it, group it and address its components. */
+interface RoutedService {
+  id: string;
+  name: string;
+  group?: string | null;
+  /** The operator's selected components, which are the ones a rule can name. */
+  components?: { id: string; name: string }[];
+}
+
+/**
+ * The same canned event, rephrased as one component's transition (roadmap 2.9).
+ * Only a status change has a component form — an incident or a maintenance
+ * window belongs to the provider, and pretending otherwise here would preview a
+ * change the diff engine never emits.
+ */
+function asComponentChange(
+  change: Omit<StatusChange, "providerId" | "at">,
+  component: { id: string; name: string },
+): Omit<StatusChange, "providerId" | "at"> {
+  if (change.kind !== "status_change") return change;
+  return { ...change, kind: "component_status_change" as StatusChangeKind, component };
+}
+
 function DryRun({
   rules,
   channels,
@@ -106,7 +136,7 @@ function DryRun({
 }: {
   rules: RoutingRule[];
   channels: DescribedChannel[];
-  services: { id: string; name: string; group?: string | null }[];
+  services: RoutedService[];
   /**
    * The window as it stands, so the dry run answers the question an operator
    * is actually asking — "would this reach me?" — rather than "would it, if it
@@ -118,18 +148,27 @@ function DryRun({
   const { t } = useTranslation();
   const [providerId, setProviderId] = useState<string | undefined>(services[0]?.id);
   const [eventId, setEventId] = useState(DRYRUN_EVENTS[0]!.id);
+  /** Undefined is the provider as a whole; a component id previews that component's own transition. */
+  const [componentId, setComponentId] = useState<string | undefined>(undefined);
 
   if (providerId === undefined) return null;
 
   const enabledChannelIds = channels.filter((channel) => channel.enabled).map((channel) => channel.id);
   const event = DRYRUN_EVENTS.find((candidate) => candidate.id === eventId) ?? DRYRUN_EVENTS[0]!;
-  const change: StatusChange = { ...event.change, providerId, at: new Date().toISOString() };
+  const picked = services.find((service) => service.id === providerId);
+  const components = picked?.components ?? [];
+  const component = components.find((candidate) => candidate.id === componentId);
+  const change: StatusChange = {
+    ...(component === undefined ? event.change : asComponentChange(event.change, component)),
+    providerId,
+    at: new Date().toISOString(),
+  };
   // Core's own evaluator, and now with the same quiet-hours window the
   // dispatcher reads: a preview that ignored it would say "Telegram" for an
   // event that, at this hour, reaches nobody.
   // The picked provider's own group, so a `group:` rule wins the preview
   // exactly where it would win a real change (roadmap 2.6).
-  const group = services.find((service) => service.id === providerId)?.group ?? undefined;
+  const group = picked?.group ?? undefined;
   const result = explain(change, rules, enabledChannelIds, {
     ...(quietHours === undefined ? {} : { quietHours }),
     ...(group === null || group === undefined ? {} : { providerGroup: group }),
@@ -176,12 +215,44 @@ function DryRun({
               type="button"
               size="sm"
               variant={service.id === providerId ? "default" : "outline"}
-              onClick={() => setProviderId(service.id)}
+              onClick={() => {
+                setProviderId(service.id);
+                // The component belonged to the provider that was picked before.
+                setComponentId(undefined);
+              }}
             >
               {service.name}
             </Button>
           ))}
         </div>
+        {/* Only for a provider with components selected: a rule can name one
+            (roadmap 2.9), so the preview has to be able to ask about one. */}
+        {components.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
+              {t("routing.dryrun.component")}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant={component === undefined ? "default" : "outline"}
+              onClick={() => setComponentId(undefined)}
+            >
+              {t("routing.dryrun.component.whole")}
+            </Button>
+            {components.map((candidate) => (
+              <Button
+                key={candidate.id}
+                type="button"
+                size="sm"
+                variant={candidate.id === componentId ? "default" : "outline"}
+                onClick={() => setComponentId(candidate.id)}
+              >
+                {candidate.name}
+              </Button>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
             {t("routing.dryrun.event")}
@@ -251,7 +322,7 @@ export function RoutingRules({
 }: {
   routing: RoutingResponse;
   channels: DescribedChannel[];
-  services: { id: string; name: string; group?: string | null }[];
+  services: RoutedService[];
   /** Passed through to the dry run, which evaluates with it — see `DryRun`. */
   quietHours?: QuietHoursPolicy | undefined;
   onSave?: (rules: RoutingRule[]) => void | Promise<unknown>;
@@ -353,11 +424,27 @@ export function RoutingRules({
                             {t("routing.provider.group", { group })}
                           </SelectItem>
                         ))}
-                        {services.map((service) => (
+                        {services.flatMap((service) => [
                           <SelectItem key={service.id} value={service.id}>
                             {service.name}
-                          </SelectItem>
-                        ))}
+                          </SelectItem>,
+                          // One component of one provider (roadmap 2.9): the
+                          // transition already carries the component's own
+                          // severity, and this is how a rule says which one it
+                          // wants. Only selected components are offered — those
+                          // are the only ones a reading ever reports.
+                          ...(service.components ?? []).map((component) => (
+                            <SelectItem
+                              key={`${service.id}${COMPONENT_SEPARATOR}${component.id}`}
+                              value={`${service.id}${COMPONENT_SEPARATOR}${component.id}`}
+                            >
+                              {t("routing.provider.component", {
+                                service: service.name,
+                                component: component.name,
+                              })}
+                            </SelectItem>
+                          )),
+                        ])}
                       </SelectContent>
                     </Select>
                   </TableCell>

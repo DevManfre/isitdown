@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "pagination": {
+      "total": 1,
+      "count": 1,
+      "per_page": 100,
+      "current_page": 1,
+      "total_pages": 1,
+      "links": {
+        "next_page": null,
+        "previous_page": null
+      }
+    }
+  },
+  "data": [
+    {
+      "id": 2,
+      "name": "Services",
+      "order": 2,
+      "visible": 1,
+      "collapsed": 1,
+      "created_at": "2026-09-12 13:00:03",
+      "updated_at": "2026-09-12 13:00:03",
+      "enabled_components": [
+        {
+          "id": 4,
+          "name": "Laravel Artisan Cheatsheet",
+          "description": "A searchable, bookmarkable cheatsheet for Laravel's Artisan commands.",
+          "link": "https://artisan.page",
+          "status": 1,
+          "order": 0,
+          "group_id": 2,
+          "enabled": true,
+          "meta": null,
+          "created_at": "2026-09-12 13:00:03",
+          "updated_at": "2026-09-12 13:00:03",
+          "deleted_at": null,
+          "status_name": "Operational",
+          "tags": {
+            "1": "1"
+          }
+        },
+        {
+          "id": 5,
+          "name": "Checkmango",
+          "description": "The Full-Stack A/B Testing Platform",
+          "link": "https://checkmango.com",
+          "status": 1,
+          "order": 1,
+          "group_id": 2,
+          "enabled": true,
+          "meta": null,
+          "created_at": "2026-09-12 13:00:03",
+          "updated_at": "2026-09-12 13:00:03",
+          "deleted_at": null,
+          "status_name": "Operational",
+          "tags": {
+            "1": "1"
+          }
+        }
+      ],
+      "enabled_components_lowest": [
+        {
+          "id": 4,
+          "name": "Laravel Artisan Cheatsheet",
+          "description": "A searchable, bookmarkable cheatsheet for Laravel's Artisan commands.",
+          "link": "https://artisan.page",
+          "status": 1,
+          "order": 0,
+          "group_id": 2,
+          "enabled": true,
+          "meta": null,
+          "created_at": "2026-09-12 13:00:03",
+          "updated_at": "2026-09-12 13:00:03",
+          "deleted_at": null,
+          "status_name": "Operational",
+          "tags": {
+            "1": "1"
+          }
+        },
+        {
+          "id": 5,
+          "name": "Checkmango",
+          "description": "The Full-Stack A/B Testing Platform",
+          "link": "https://checkmango.com",
+          "status": 1,
+          "order": 1,
+          "group_id": 2,
+          "enabled": true,
+          "meta": null,
+          "created_at": "2026-09-12 13:00:03",
+          "updated_at": "2026-09-12 13:00:03",
+          "deleted_at": null,
+          "status_name": "Operational",
+          "tags": {
+            "1": "1"
+          }
+        }
+      ],
+      "lowest_human_status": "Operational"
+    }
+  ]
+}
