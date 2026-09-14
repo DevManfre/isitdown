@@ -241,7 +241,7 @@ describe("operator notes", () => {
       vi.fn(async (target: string, init?: RequestInit) => {
         if (String(target).includes("/notes/")) {
           calls.push({ method: String(init?.method), target: String(target) });
-          return { ok: true, status: 204, text: async () => "" };
+          return { ok: true, status: 204, text: async (): Promise<string> => "" };
         }
         return base(target, init);
       }),
