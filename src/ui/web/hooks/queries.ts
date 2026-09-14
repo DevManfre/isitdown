@@ -242,6 +242,26 @@ export const useIncident = (providerId: string, incidentId: string) => {
   });
 };
 
+/**
+ * Adding and removing an operator's notes on one incident (roadmap 5.3). Both
+ * invalidate that incident's own query, which is where the notes are served
+ * from — there is no second endpoint to keep in step.
+ */
+export function useIncidentNotes(providerId: string, incidentId: string) {
+  const client = useQueryClient();
+  const refresh = () => client.invalidateQueries({ queryKey: ["incident", providerId, incidentId] });
+  return {
+    add: useMutation({
+      mutationFn: (body: string) => api.addIncidentNote(providerId, incidentId, body),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: (id: number) => api.deleteIncidentNote(providerId, incidentId, id),
+      onSuccess: refresh,
+    }),
+  };
+}
+
 /** Newest first by `startsAt`, scoped to enabled providers server-side. */
 export const useMaintenances = (query: api.MaintenanceListQuery = {}) => {
   const busy = useBusy();
@@ -427,6 +447,15 @@ export function useAdapterProbe() {
 export function useConfigImport() {
   const invalidate = useInvalidateAll();
   return useMutation({ mutationFn: api.importConfig, onSuccess: invalidate });
+}
+
+/**
+ * A whole database put back from a file (roadmap 4.4). Invalidates everything a
+ * write does, because everything a write touches has just been replaced.
+ */
+export function useRestoreBackup() {
+  const invalidate = useInvalidateAll();
+  return useMutation({ mutationFn: api.restoreBackup, onSuccess: invalidate });
 }
 
 /**

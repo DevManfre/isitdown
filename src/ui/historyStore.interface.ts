@@ -101,6 +101,13 @@ export interface DailyBucket {
   totalSamples: number;
 }
 
+/** One operator note on one incident (roadmap 5.3). */
+export interface IncidentNote {
+  id: number;
+  body: string;
+  createdAt: string;
+}
+
 export interface HistoryStore extends StateStore, MessageRefStore {
   /** One row per day that has samples, oldest first. Days with none are absent. */
   getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]>;
@@ -139,6 +146,17 @@ export interface HistoryStore extends StateStore, MessageRefStore {
    */
   countIncidents(filter: Omit<IncidentFilter, "state" | "limit" | "offset">): Promise<IncidentCounts>;
   getIncident(providerId: string, incidentId: string): Promise<IncidentRow | null>;
+  /**
+   * The operator's own notes on one incident, oldest first — roadmap 5.3. The
+   * one thing about an incident IsItDown can never observe: why it mattered
+   * here. Oldest first because they read as a small log, the way the timeline
+   * beside them does.
+   */
+  listIncidentNotes(providerId: string, incidentId: string): Promise<IncidentNote[]>;
+  /** Returns the stored note, so the caller never has to re-read to render it. */
+  addIncidentNote(providerId: string, incidentId: string, body: string): Promise<IncidentNote>;
+  /** False when the note is not this incident's, or is already gone. */
+  deleteIncidentNote(providerId: string, incidentId: string, id: number): Promise<boolean>;
   /** Newest first by `startsAt`. */
   listMaintenances(filter: MaintenanceFilter): Promise<MaintenanceRow[]>;
   /** Newest first, for the incident view's poll strip. */

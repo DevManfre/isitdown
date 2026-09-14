@@ -1,0 +1,126 @@
+{{- include "isitdown.validateEdition" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "isitdown.fullname" . }}
+  labels:
+    {{- include "isitdown.labels" . | nindent 4 }}
+spec:
+  # Never more than one: both editions own a file in the volume below, and a
+  # second replica would be a second poller writing the same database.
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    # Recreate, not RollingUpdate: a ReadWriteOnce volume cannot be held by the
+    # old pod and the new one at once, and the rollout would stall waiting.
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "isitdown.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if eq .Values.edition "light" }}
+        # The config is mounted, and a mounted ConfigMap update does not restart
+        # anything; this makes an edited config.yml roll the pod.
+        checksum/config: {{ .Values.config | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "isitdown.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "isitdown.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: isitdown
+          image: {{ include "isitdown.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if eq .Values.edition "ui" }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          {{- end }}
+          {{- if or .Values.env .Values.secrets .Values.existingSecret }}
+          env:
+            {{- range $name, $value := .Values.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if or .Values.secrets .Values.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret | default (printf "%s-secrets" (include "isitdown.fullname" .)) }}
+          {{- end }}
+          {{- if .Values.probes.enabled }}
+          {{- if eq .Values.edition "ui" }}
+          # Liveness is `/health` and nothing else: it must never fail because a
+          # provider is unreachable, since restarting is not the answer to
+          # somebody else's outage (roadmap 6.9).
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            {{- toYaml .Values.probes.liveness | nindent 12 }}
+          # Readiness is `/ready`: no cycle completed yet, a cycle far older
+          # than the poll interval, or one in which every provider failed.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            {{- toYaml .Values.probes.readiness | nindent 12 }}
+          {{- else }}
+          # The Light edition serves no HTTP at all, so its probe is the same
+          # script the image's own HEALTHCHECK runs.
+          livenessProbe:
+            exec:
+              command: ["node", "dist/light/healthcheck.js"]
+            {{- toYaml .Values.probes.liveness | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            {{- if eq .Values.edition "light" }}
+            - name: config
+              mountPath: /app/config/config.yml
+              subPath: config.yml
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "isitdown.claimName" . }}
+          {{- else }}
+          # Explicitly ephemeral: every sample, incident and credential saved
+          # from the dashboard goes with the pod.
+          emptyDir: {}
+          {{- end }}
+        {{- if eq .Values.edition "light" }}
+        - name: config
+          configMap:
+            name: {{ include "isitdown.fullname" . }}-config
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

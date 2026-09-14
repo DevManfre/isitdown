@@ -64,4 +64,4 @@ Never require secrets to be written directly into `config.yml` — always suppor
 
 ## Step 5 — Document
 
-Add the new channel to the notifications table in `README.md` and to `config.example.yml` (disabled by default, with placeholder env var names).
+Add the new channel to the notifications table in `docs/configuration.md` (§3.6) and to `config.example.yml` (disabled by default, with placeholder env var names).

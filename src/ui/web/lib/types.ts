@@ -270,6 +270,15 @@ export interface IncidentDetail {
   actionLog: SentRecord[];
   polls: SampleRow[];
   otherActiveIncidents: IncidentRow[];
+  /** The operator's own notes on this incident, oldest first (roadmap 5.3). */
+  notes: IncidentNote[];
+}
+
+/** One note somebody here wrote about an incident (roadmap 5.3). */
+export interface IncidentNote {
+  id: number;
+  body: string;
+  createdAt: string;
 }
 
 export interface ServiceDefinition {
@@ -454,6 +463,17 @@ export interface ConfigImportReport {
   channels: string[];
   routingRules: number;
   settings: string[];
+}
+
+/** What `POST /config/restore` reports it put back (roadmap 4.4). */
+export interface DbRestoreReport {
+  /** Rows written per table, so the operator sees what actually came back. */
+  tables: Record<string, number>;
+  /** The schema the uploaded file was at; it may be older, never newer. */
+  fromSchemaVersion: number;
+  schemaVersion: number;
+  /** A restore never replaces the credentials file beside the database. */
+  secretsKept: boolean;
 }
 
 /** One row of the bundled provider catalog (roadmap 5.11). */

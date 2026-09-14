@@ -110,8 +110,31 @@ export const localeSchema = z
  * what a valid rule is. Order is the array's order — there is no position
  * field to contradict it.
  */
+/**
+ * A rule's target, which is not simply a provider id: `group:<slug>` covers a
+ * whole stack (roadmap 2.6) and `<provider>#<component>` covers one component of
+ * one provider (roadmap 2.9). Both were evaluated by `core/routing.ts` before
+ * this schema knew about them, which meant a `group:` rule written into a Light
+ * `config.yml` was rejected at load — so the two forms are spelled out here, in
+ * the one place both editions validate a rule through.
+ *
+ * A component id is the provider's, not ours: Statuspage writes hex, Better
+ * Stack and Uptime Kuma write numbers, and a scraper writes whatever the page
+ * called it. The charset is therefore wide where the provider half stays a slug.
+ */
+const groupTarget = z
+  .string()
+  .regex(/^group:[a-z0-9][a-z0-9-]*$/, "must be group: followed by a lowercase slug");
+
+const componentTarget = z
+  .string()
+  .regex(
+    /^[a-z0-9][a-z0-9-]*#[A-Za-z0-9._:-]{1,128}$/,
+    "must be a provider id, then #, then the component id the provider publishes",
+  );
+
 export const routingRuleSchema = z.object({
-  provider: z.union([z.literal("*"), slug]),
+  provider: z.union([z.literal("*"), groupTarget, componentTarget, slug]),
   classes: z.array(z.enum(EVENT_CLASSES)).default([...EVENT_CLASSES]),
   minSeverity: z.enum(SEVERITY_FLOORS).default("any"),
   /** `["*"]` means every enabled channel; `[]` mutes. */
