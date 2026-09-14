@@ -1,0 +1,85 @@
+{
+  "config": {
+    "slug": "demo",
+    "title": "Demo",
+    "description": "A recorded status page",
+    "icon": "/icon.svg",
+    "theme": "light",
+    "published": true,
+    "showTags": false,
+    "customCSS": "",
+    "footerText": null,
+    "showPoweredBy": false,
+    "googleAnalyticsId": null,
+    "showCertificateExpiry": false
+  },
+  "incident": {
+    "id": 1,
+    "style": "warning",
+    "title": "Elevated error rates",
+    "content": "We are investigating elevated error rates on the API.",
+    "pin": 1,
+    "createdDate": "2026-09-12 12:24:51",
+    "lastUpdatedDate": null
+  },
+  "publicGroupList": [
+    {
+      "id": 1,
+      "name": "Services",
+      "weight": 1,
+      "monitorList": [
+        {
+          "id": 1,
+          "name": "API",
+          "sendUrl": 0,
+          "type": "http"
+        },
+        {
+          "id": 2,
+          "name": "Webhooks",
+          "sendUrl": 0,
+          "type": "http"
+        }
+      ]
+    }
+  ],
+  "maintenanceList": [
+    {
+      "id": 2,
+      "title": "Database upgrade",
+      "description": "Rolling upgrade of the primary database.",
+      "strategy": "single",
+      "intervalDay": 1,
+      "active": true,
+      "dateRange": [
+        "2026-09-12 11:26",
+        "2026-09-12 13:26"
+      ],
+      "timeRange": [
+        {
+          "hours": 0,
+          "minutes": 0
+        },
+        {
+          "hours": 0,
+          "minutes": 0
+        }
+      ],
+      "weekdays": [],
+      "daysOfMonth": [],
+      "timeslotList": [
+        {
+          "startDate": "2026-09-12 11:26",
+          "endDate": "2026-09-12 13:26"
+        }
+      ],
+      "cron": "",
+      "duration": null,
+      "durationMinutes": 0,
+      "timezone": "UTC",
+      "timezoneOption": "UTC",
+      "timezoneOffset": "+00:00",
+      "status": "under-maintenance"
+    }
+  ]
+}

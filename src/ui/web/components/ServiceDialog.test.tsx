@@ -234,6 +234,65 @@ describe("the service dialog's scrape adapter fields", () => {
   });
 });
 
+describe("the service dialog's probe fields", () => {
+  it("asks what a healthy answer looks like, only for the probe adapter", async () => {
+    const { dialog } = await openAdd();
+    expect(within(dialog).queryByLabelText(i18n.t("probe.expect-status"))).toBeNull();
+
+    await userEvent.click(within(dialog).getByRole("radio", { name: "http" }));
+
+    expect(within(dialog).getByLabelText(i18n.t("probe.expect-status"))).toBeInTheDocument();
+    expect(within(dialog).getByText(i18n.t("probe.warning"))).toBeInTheDocument();
+  });
+
+  it("offers no body match against a HEAD, which downloads no body", async () => {
+    const { dialog } = await openAdd();
+    await userEvent.click(within(dialog).getByRole("radio", { name: "http" }));
+    expect(within(dialog).getByLabelText(i18n.t("probe.expect-body"))).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("radio", { name: "HEAD" }));
+
+    expect(within(dialog).queryByLabelText(i18n.t("probe.expect-body"))).toBeNull();
+  });
+
+  it("submits the probe options, with the header folded under its own name", async () => {
+    const { dialog } = await openAdd();
+    const calls = interceptWrites({
+      "POST /config/services": {},
+      "POST /config/services/my-api/test": { ok: true, overallStatus: "operational" },
+    });
+
+    await userEvent.click(within(dialog).getByRole("radio", { name: "http" }));
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "My API");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://app.example.com");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("probe.path")), "/health");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("probe.expect-body")), "\"db\":\"up\"");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("probe.slow-ms")), "1500");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("probe.header-name")), "Authorization");
+    // `{{` is how user-event types a literal brace: a bare `{` opens one of its
+    // own key descriptors.
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("probe.header-value")), "Bearer ${{API_TOKEN}");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const addCall = calls.find((call) => call.method === "POST" && call.path === "/config/services");
+    // The fields left alone are absent rather than sent as blanks, and the
+    // secret travels as the `${VAR}` reference the operator typed — the value
+    // itself is never stored here.
+    expect(addCall?.body).toMatchObject({
+      adapter: "http",
+      options: {
+        path: "/health",
+        expectBody: "\"db\":\"up\"",
+        slowMs: "1500",
+        "header.Authorization": "Bearer ${API_TOKEN}",
+      },
+    });
+    expect(Object.keys((addCall?.body as { options: Record<string, string> }).options)).not.toContain("expectStatus");
+  });
+});
+
 describe("the service dialog's write path", () => {
   it("a successful add calls the mutation with the expected body, component selection included", async () => {
     const { dialog } = await openAdd();

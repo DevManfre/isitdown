@@ -62,6 +62,32 @@ describe("AdapterDebugDialog", () => {
     expect(within(dialog).getByText(i18n.t("adapter.debug.not-modified"))).toBeTruthy();
   });
 
+  it("shows why a read that succeeded still did not say operational", async () => {
+    // A probe's own account of itself: the read worked, the answer was the
+    // problem, and the severity alone cannot say which answer (roadmap 1.8).
+    const dialog = await open({
+      adapterDebug: {
+        providers: [
+          {
+            ...adapterDebug.providers[0],
+            adapter: "http",
+            probes: [
+              {
+                at: "2026-09-08T12:00:00.000Z",
+                ok: true,
+                attempts: 1,
+                durationMs: 40,
+                note: "answered HTTP 503, outside the accepted 200-299",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(await within(dialog).findByText(/answered HTTP 503, outside the accepted 200-299/)).toBeTruthy();
+  });
+
   it("says so plainly when nothing has been polled yet", async () => {
     const dialog = await open({ adapterDebug: { providers: [] } });
     expect(await within(dialog).findByText(i18n.t("adapter.debug.empty"))).toBeTruthy();

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { compareReadmes, counts, identifiers, sectionSkeleton } from "../../tools/readme-parity.mjs";
+import { compareReadmes, counts, identifiers, pairsOf, sectionSkeleton } from "../../tools/readme-parity.mjs";
 
 test("the section skeleton is the numbered headings, in order, with their level", () => {
   const skeleton = sectionSkeleton(["# IsItDown", "## 1. What it does", "### 1.2 Editions", "## Contents"].join("\n"));
@@ -63,4 +63,30 @@ test("the repository's own READMEs are in sync", async () => {
   ]);
 
   assert.deepEqual(compareReadmes(source, italian), []);
+});
+
+// Roadmap 7.5. The manual is one file per section now, so the gate pairs each
+// source with its own translation rather than comparing one README to another.
+test("a directory listing pairs every source with the translations beside it", () => {
+  const pairs = pairsOf(["README.md", "README.it.md", "CHANGELOG.md"]);
+
+  assert.deepEqual(pairs, [{ source: "README.md", translations: ["README.it.md"] }]);
+});
+
+test("a source with no translation is not a pair: there is nothing to compare it to", () => {
+  assert.deepEqual(pairsOf(["docs/orphan.md"]), []);
+});
+
+test("a prefix is carried into both halves, so docs/ pairs read as paths", () => {
+  const pairs = pairsOf(["api.md", "api.it.md", "api.fr.md"], "docs/");
+
+  assert.deepEqual(pairs, [
+    { source: "docs/api.md", translations: ["docs/api.fr.md", "docs/api.it.md"] },
+  ]);
+});
+
+test("the source file is named in a finding, so a drift says which pair drifted", () => {
+  const findings = compareReadmes("## 1. Start\n## 2. Next", "## 1. Avvio", "docs/api.md");
+
+  assert.match(findings.join("\n"), /section only in docs\/api\.md: ## 2/);
 });
