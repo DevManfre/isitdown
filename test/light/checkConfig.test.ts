@@ -233,3 +233,43 @@ services:
     assert.equal(report.enabledServices, 0);
   });
 });
+
+test("a probe's own options are read offline, so a wrong one is not left for the poller to find", async () => {
+  const path = await configFile(`
+services:
+  - name: My API
+    id: my-api
+    adapter: http
+    baseUrl: https://app.example.com
+    options:
+      expectStatus: "2xx"
+`);
+
+  const report = await checkConfig({ path, env: {} });
+
+  assert.equal(report.ok, false);
+  assert.match(messages(report), /expectStatus has an unreadable part "2xx"/);
+});
+
+test("a probe is not asked to look like a status page", async () => {
+  resetValidators();
+  // Nothing recognisable is served here on purpose: the target of a probe is
+  // the operator's own endpoint, and detection saying so is not a finding.
+  await withServer(serve({ "/health": "ok" }), async (baseUrl) => {
+    const path = await configFile(`
+requestTimeoutSeconds: 2
+services:
+  - name: My API
+    id: my-api
+    adapter: http
+    baseUrl: ${baseUrl}
+    options:
+      path: "/health"
+      expectBody: "ok"
+`);
+
+    const report = await checkConfig({ path, env: {}, probe: true });
+
+    assert.equal(report.ok, true, messages(report));
+  });
+});

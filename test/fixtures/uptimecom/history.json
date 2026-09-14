@@ -1,0 +1,171 @@
+{
+  "error": null,
+  "fields": {},
+  "data": {
+    "global_metrics": {
+      "uptime_pct": 0.995361464710615,
+      "outages": 1,
+      "downtime_secs": 12229.551
+    },
+    "component_history": {
+      "1": {
+        "uptime_pct": 1,
+        "outages": 0,
+        "downtime_secs": 0,
+        "response_time_avg": null,
+        "major_outage": 0,
+        "partial_outage": 0,
+        "degraded_performance": 0
+      },
+      "2": {
+        "uptime_pct": 1,
+        "outages": 0,
+        "downtime_secs": 0,
+        "response_time_avg": null,
+        "major_outage": 0,
+        "partial_outage": 0,
+        "degraded_performance": 1
+      }
+    },
+    "date_history": {
+      "2026-08-13": {
+        "uptime_pct": 1,
+        "outages": 0,
+        "downtime_secs": 0,
+        "affected_components": []
+      },
+      "2026-08-14": {
+        "uptime_pct": 1,
+        "outages": 0,
+        "downtime_secs": 0,
+        "affected_components": []
+      },
+      "2026-08-15": {
+        "uptime_pct": 1,
+        "outages": 0,
+        "downtime_secs": 0,
+        "affected_components": []
+      }
+    },
+    "past_incidents": [
+      {
+        "id": 722,
+        "name": "Delayed check state updates in the M2 locations",
+        "starts_at": "2026-09-08T08:51:10.449000Z",
+        "ends_at": "2026-09-08T12:15:00Z",
+        "duration": 12229.551,
+        "affected_components": [
+          {
+            "id": 101,
+            "obj_id": 959,
+            "name": "Sweden-Stockholm",
+            "status": "degraded-performance",
+            "status_display": "Degraded Performance"
+          },
+          {
+            "id": 116,
+            "obj_id": 960,
+            "name": "US-GA-Atlanta",
+            "status": "degraded-performance",
+            "status_display": "Degraded Performance"
+          }
+        ],
+        "updates": [
+          {
+            "id": 1290,
+            "updated_at": "2026-09-10T13:51:03.887154Z",
+            "description": "This incident is now resolved. The corrective patch released to tolerate intermediate failures on a large amount of state transitions has been deployed and validated under normal production load.\n\nThank you for your patience. If you continue to experience any issues, please contact our support team.",
+            "incident_state": "resolved",
+            "incident_state_display": "Resolved"
+          }
+        ],
+        "update_component_status": true,
+        "incident_type": "INCIDENT",
+        "include_in_global_metrics": true,
+        "send_maintenance_start_notification": false,
+        "latest_update_incident_state": null,
+        "latest_update_description": null
+      },
+      {
+        "id": 720,
+        "name": "Intermittent slowness when pausing, resuming, or saving checks",
+        "starts_at": "2026-09-01T17:00:00Z",
+        "ends_at": "2026-09-02T23:59:59.999000Z",
+        "duration": 111599.999,
+        "affected_components": [
+          {
+            "id": 2,
+            "obj_id": 945,
+            "name": "API",
+            "status": "degraded-performance",
+            "status_display": "Degraded Performance"
+          },
+          {
+            "id": 11,
+            "obj_id": 944,
+            "name": "Web Application",
+            "status": "degraded-performance",
+            "status_display": "Degraded Performance"
+          }
+        ],
+        "updates": [
+          {
+            "id": 1286,
+            "updated_at": "2026-09-03T09:38:30.575384Z",
+            "description": "The system has stabilized.",
+            "incident_state": "resolved",
+            "incident_state_display": "Resolved"
+          }
+        ],
+        "update_component_status": true,
+        "incident_type": "INCIDENT",
+        "include_in_global_metrics": false,
+        "send_maintenance_start_notification": false,
+        "latest_update_incident_state": null,
+        "latest_update_description": null
+      }
+    ],
+    "period_start": 1786579200,
+    "period_end": 1789215711,
+    "active_incidents": [
+      {
+        "id": 721,
+        "name": "Monitoring Location Decommissioning: Bolivia, Ghana, Panama, and Puerto Rico",
+        "starts_at": "2026-09-22T12:00:00Z",
+        "ends_at": "2026-09-22T13:00:00Z",
+        "duration": 3600,
+        "affected_components": [
+          {
+            "id": 86,
+            "obj_id": 947,
+            "name": "Panama-Panama City",
+            "status": "under-maintenance",
+            "status_display": "Under Maintenance"
+          },
+          {
+            "id": 53,
+            "obj_id": 949,
+            "name": "Bolivia-La Paz",
+            "status": "under-maintenance",
+            "status_display": "Under Maintenance"
+          }
+        ],
+        "updates": [
+          {
+            "id": 1287,
+            "updated_at": "2026-09-22T12:00:00Z",
+            "description": "We will be decommissioning the following monitoring locations:\n\n- **Bolivia-La Paz**\n- **Ghana-Accra**\n- **Panama-Panama City**\n- **Puerto Rico-San Juan**\n\nCustomers with checks currently using any of these locations should update those checks to use an alternative monitoring location before **22 September 2026 at 12:00 UTC**.\n\nAfter this time, these locations will no longer be available, and checks will no longer run from them. Checks using multiple monitoring locations will continue to run from their remaining configured locations.\n\nOnce the locations have been decommissioned, the following probe server IP addresses can be removed from any firewall or allowlist configurations:\n\n- **BO-La Paz(EdgeUno)-1:** `200.25.80.73` / `2800:1e0:2430:2::7`\n- **GH-Accra(PAIX)-1:** `102.213.153.193` / `2c0f:edb0:4000:1::1c1`\n- **PA-Panama City(Movistar)-1:** `138.186.142.56` / `2800:ba0:14:e1::5030`\n- **PR-San Juan(EdgeUno)-1:** `200.25.18.81` / `2800:1e0:2410:1::11`\n\nA list of available monitoring locations can be found here: [https://uptime.com/probe-server-locations](https://uptime.com/probe-server-locations)\n\nPlease contact [support@uptime.com](mailto:support@uptime.com) if you have any questions.\n\nWe apologise for any inconvenience caused.",
+            "incident_state": "maintenance",
+            "incident_state_display": "Scheduled Maintenance"
+          }
+        ],
+        "update_component_status": true,
+        "incident_type": "SCHEDULED_MAINTENANCE",
+        "include_in_global_metrics": false,
+        "send_maintenance_start_notification": true,
+        "latest_update_incident_state": null,
+        "latest_update_description": null
+      }
+    ]
+  }
+}

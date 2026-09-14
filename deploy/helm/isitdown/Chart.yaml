@@ -1,0 +1,22 @@
+apiVersion: v2
+name: isitdown
+description: Polls the public status pages of third-party providers and notifies on state transitions
+type: application
+# The chart's own version. Bumped when the templates change, independently of
+# the application: a values-only fix should not claim a new IsItDown.
+version: 0.1.0
+# The image tag used when `image.tag` is left empty. The published images are
+# `ghcr.io/devmanfre/isitdown:{light,ui}-latest` and `-vX.Y.Z`; this is the
+# floating half of that pair, and pinning a release means setting `image.tag`.
+appVersion: latest
+home: https://github.com/DevManfre/isitdown
+sources:
+  - https://github.com/DevManfre/isitdown
+keywords:
+  - status
+  - monitoring
+  - notifications
+  - self-hosted
+maintainers:
+  - name: DevManfre
+    url: https://github.com/DevManfre

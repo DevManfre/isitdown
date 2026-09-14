@@ -1314,3 +1314,119 @@ describe("backup and migration", () => {
     ).toBeInTheDocument();
   });
 });
+
+// Roadmap 4.4. The whole database rather than the configuration: the one
+// control on this page that replaces everything the edition stores, so it is
+// also the only one behind a confirmation.
+describe("database backup and restore", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("offers the download as a link to the server's own snapshot", async () => {
+    renderWithProviders(<Settings />, fixtures);
+
+    const link = await screen.findByRole("link", { name: i18n.t("settings.restore.download") });
+    expect(link).toHaveAttribute("href", "/config/backup");
+  });
+
+  it("says in the row itself that the credentials are not in the file", async () => {
+    renderWithProviders(<Settings />, fixtures);
+
+    expect(await screen.findByText(/secrets\.env/)).toBeInTheDocument();
+  });
+
+  it("sends the picked file's bytes and reports what came back", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const input = await screen.findByLabelText(i18n.t("settings.restore.upload"));
+    vi.stubGlobal("confirm", vi.fn(() => true));
+
+    const base = globalThis.fetch as typeof fetch;
+    const sent: { contentType: string; bytes: number }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (target: string, init?: RequestInit) => {
+        if (String(target) === "/config/restore") {
+          sent.push({
+            contentType: String((init?.headers as Record<string, string> | undefined)?.["content-type"]),
+            bytes: (init?.body as ArrayBuffer).byteLength,
+          });
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              tables: { services: 3, status_samples: 40 },
+              fromSchemaVersion: 16,
+              schemaVersion: 16,
+              secretsKept: true,
+            }),
+            text: async () =>
+              JSON.stringify({
+                tables: { services: 3, status_samples: 40 },
+                fromSchemaVersion: 16,
+                schemaVersion: 16,
+                secretsKept: true,
+              }),
+          };
+        }
+        return base(target, init);
+      }),
+    );
+
+    await userEvent.upload(
+      input,
+      new File([new Uint8Array([1, 2, 3, 4])], "isitdown.db", { type: "application/octet-stream" }),
+    );
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.contentType).toBe("application/octet-stream");
+    expect(sent[0]?.bytes).toBe(4);
+    expect(
+      await screen.findByText(i18n.t("settings.restore.done", { providers: 3, rows: 43 })),
+    ).toBeInTheDocument();
+  });
+
+  it("sends nothing when the confirmation is declined", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const input = await screen.findByLabelText(i18n.t("settings.restore.upload"));
+    vi.stubGlobal("confirm", vi.fn(() => false));
+
+    const base = globalThis.fetch as typeof fetch;
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (target: string, init?: RequestInit) => {
+        calls.push(String(target));
+        return base(target, init);
+      }),
+    );
+
+    await userEvent.upload(input, new File([new Uint8Array([1])], "isitdown.db"));
+
+    expect(calls).not.toContain("/config/restore");
+  });
+
+  it("shows the server's own refusal rather than a generic failure", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const input = await screen.findByLabelText(i18n.t("settings.restore.upload"));
+    vi.stubGlobal("confirm", vi.fn(() => true));
+
+    const base = globalThis.fetch as typeof fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (target: string, init?: RequestInit) => {
+        if (String(target) === "/config/restore") {
+          return {
+            ok: false,
+            status: 400,
+            json: async () => ({ error: { message: "that database is not an IsItDown backup" } }),
+            text: async () => JSON.stringify({ error: { message: "that database is not an IsItDown backup" } }),
+          };
+        }
+        return base(target, init);
+      }),
+    );
+
+    await userEvent.upload(input, new File([new Uint8Array([1])], "other.db"));
+
+    expect(await screen.findByText(/not an IsItDown backup/)).toBeInTheDocument();
+  });
+});

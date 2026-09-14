@@ -280,3 +280,68 @@ test("a group that shares a provider id's name is still a group", () => {
     "slack",
   ]);
 });
+
+// Roadmap 2.9. A component transition already carried the component's own
+// severity — the diff engine ranks it on the component's statuses — so what it
+// lacked was a way for a rule to name one and route it apart from its provider.
+const componentChange = (over: Partial<StatusChange> = {}): StatusChange =>
+  change({
+    kind: "component_status_change",
+    previousStatus: "operational",
+    currentStatus: "major_outage",
+    component: { id: "api", name: "API Requests" },
+    ...over,
+  });
+
+test("a component rule covers that component's own transition and nothing else", () => {
+  const rules = [rule({ provider: "github#api", channels: ["telegram"] }), CATCH_ALL_RULE];
+
+  assert.deepEqual(resolveTargets(componentChange(), rules, ALL), ["telegram"]);
+  // Another component of the same provider is not this rule's.
+  assert.deepEqual(
+    resolveTargets(componentChange({ component: { id: "actions", name: "Actions" } }), rules, ALL),
+    ALL,
+  );
+  // Nor is the provider's own status change, which carries no component at all.
+  assert.deepEqual(resolveTargets(change(), rules, ALL), ALL);
+});
+
+test("a component rule belongs to its own provider, not to the same name elsewhere", () => {
+  const rules = [rule({ provider: "github#api", channels: ["telegram"] }), CATCH_ALL_RULE];
+
+  assert.deepEqual(resolveTargets(componentChange({ providerId: "gitlab" }), rules, ALL), ALL);
+});
+
+test("a component rule ranks on the component's own severity", () => {
+  const rules = [rule({ provider: "github#api", minSeverity: "major_outage", channels: ["telegram"] })];
+
+  assert.deepEqual(resolveTargets(componentChange(), rules, ALL), ["telegram"]);
+  assert.deepEqual(
+    resolveTargets(componentChange({ currentStatus: "degraded" }), rules, ALL),
+    [],
+  );
+});
+
+test("a component rule above a provider rule routes one component elsewhere", () => {
+  const rules = [
+    rule({ provider: "github#api", channels: ["telegram"] }),
+    rule({ provider: "github", channels: ["slack"] }),
+  ];
+
+  assert.deepEqual(resolveTargets(componentChange(), rules, ALL), ["telegram"]);
+  assert.deepEqual(
+    resolveTargets(componentChange({ component: { id: "pages", name: "Pages" } }), rules, ALL),
+    ["slack"],
+  );
+  assert.deepEqual(resolveTargets(change(), rules, ALL), ["slack"]);
+});
+
+test("a component rule can mute one component while the provider stays loud", () => {
+  const rules = [rule({ provider: "github#pages", channels: [] }), CATCH_ALL_RULE];
+
+  const explained = explain(componentChange({ component: { id: "pages", name: "Pages" } }), rules, ALL);
+
+  assert.equal(explained.winner, 0);
+  assert.deepEqual(explained.targets, []);
+  assert.deepEqual(resolveTargets(change(), rules, ALL), ALL);
+});

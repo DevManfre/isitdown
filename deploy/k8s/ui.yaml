@@ -1,0 +1,123 @@
+# IsItDown, UI edition, as plain manifests — roadmap 6.5.
+#
+#   kubectl apply -f deploy/k8s/ui.yaml
+#   kubectl port-forward svc/isitdown-ui 3000:3000
+#
+# The Helm chart beside this (deploy/helm/isitdown) is the same thing with the
+# knobs pulled out; this file is for a cluster that does not run Helm, and it is
+# meant to be readable end to end rather than parameterised.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: isitdown-ui
+  labels:
+    app.kubernetes.io/name: isitdown
+    app.kubernetes.io/component: ui
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# Channel credentials. Every value here is an environment variable one of the
+# notifiers reads; the dashboard stores only the *name* of each, never a value.
+# Leave the ones you do not use out rather than empty.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: isitdown-ui-secrets
+  labels:
+    app.kubernetes.io/name: isitdown
+    app.kubernetes.io/component: ui
+type: Opaque
+stringData:
+  TELEGRAM_BOT_TOKEN: ""
+  TELEGRAM_CHAT_ID: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: isitdown-ui
+  labels:
+    app.kubernetes.io/name: isitdown
+    app.kubernetes.io/component: ui
+spec:
+  # One, always: the poller writes one SQLite file in the volume below, and a
+  # second replica would be a second poller writing it.
+  replicas: 1
+  strategy:
+    # A ReadWriteOnce volume cannot be held by the old pod and the new one at
+    # once, so a rolling update would stall waiting for itself.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: isitdown
+      app.kubernetes.io/component: ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: isitdown
+        app.kubernetes.io/component: ui
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: isitdown
+          image: ghcr.io/devmanfre/isitdown:ui-latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: isitdown-ui-secrets
+          # Liveness is `/health` and only that: it must never fail because a
+          # provider is unreachable, since a restart is not the answer to
+          # somebody else's outage. Readiness is `/ready`, which is 503 until a
+          # cycle has completed and again if every provider fails in one.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 20m
+              memory: 96Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: isitdown-ui
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: isitdown-ui
+  labels:
+    app.kubernetes.io/name: isitdown
+    app.kubernetes.io/component: ui
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: http
+      name: http
+  selector:
+    app.kubernetes.io/name: isitdown
+    app.kubernetes.io/component: ui

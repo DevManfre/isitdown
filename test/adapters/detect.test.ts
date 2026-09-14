@@ -64,6 +64,35 @@ test("a Better Stack page is recognised by its index document", async () => {
   });
 });
 
+test("a Cachet instance is recognised by its paginated component list", async () => {
+  resetValidators();
+  const components = JSON.stringify({
+    meta: { pagination: { total: 1, count: 1, per_page: 1, current_page: 1 } },
+    data: [{ id: 1, name: "API", status: 1 }],
+  });
+  await withServer(serve({ "/api/v1/components?per_page=1": components }), async (baseUrl) => {
+    const detected = await detectAdapter(baseUrl, ctx);
+    assert.equal(detected.adapter, "cachet");
+    assert.equal(detected.baseUrl, baseUrl);
+  });
+});
+
+test("an Uptime Kuma instance is recognised by its default status page", async () => {
+  resetValidators();
+  const page = JSON.stringify({ config: { slug: "default" }, incident: null, publicGroupList: [] });
+  await withServer(serve({ "/api/status-page/default": page }), async (baseUrl) => {
+    assert.equal((await detectAdapter(baseUrl, ctx)).adapter, "uptimekuma");
+  });
+});
+
+test("an Uptime.com page on its own domain is recognised by the payload it renders from", async () => {
+  resetValidators();
+  const ajax = JSON.stringify({ error: null, data: { global_is_operational: true, components: [] } });
+  await withServer(serve({ "/ajax": ajax }), async (baseUrl) => {
+    assert.equal((await detectAdapter(baseUrl, ctx)).adapter, "uptimecom");
+  });
+});
+
 test("a page that only publishes a feed hands back the feed's own url", async () => {
   resetValidators();
   const feed = '<?xml version="1.0"?><rss version="2.0"><channel><title>Status</title></channel></rss>';

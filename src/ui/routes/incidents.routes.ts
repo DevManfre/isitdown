@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import type { IncidentRow } from "../historyStore.interface.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { pageSchema, pageSizeSchema, readIncidentQuery } from "./incidentQuery.ts";
@@ -6,6 +7,13 @@ import { pageSchema, pageSizeSchema, readIncidentQuery } from "./incidentQuery.t
 /** How many recent polls the incident view's strip shows. */
 const POLL_STRIP_SIZE = 24;
 const ACTION_LOG_LIMIT = 50;
+
+/**
+ * One note. Capped at a paragraph or two: this is "why our deploy failed on
+ * Tuesday", and a field with no ceiling is a field somebody eventually pastes a
+ * log into.
+ */
+const noteSchema = z.object({ body: z.string().trim().min(1).max(2000) });
 interface TimelineEntry {
   at: string;
   label: string;
@@ -73,10 +81,11 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       return;
     }
 
-    const [polls, notifications, active] = await Promise.all([
+    const [polls, notifications, active, notes] = await Promise.all([
       runtime.store.getRecentSamples(providerId, POLL_STRIP_SIZE),
       runtime.store.listNotifications(ACTION_LOG_LIMIT),
       runtime.store.listIncidents({ providerId, state: "active" }),
+      runtime.store.listIncidentNotes(providerId, incidentId),
     ]);
 
     res.json({
@@ -85,7 +94,47 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       actionLog: notifications.filter((record) => record.providerId === providerId),
       polls,
       otherActiveIncidents: active.filter((row) => row.incidentId !== incidentId),
+      // Roadmap 5.3. Part of the detail payload rather than a fetch of its own:
+      // the view that shows an incident is the only thing that reads them.
+      notes,
     });
+  });
+
+  /**
+   * An operator's note on one incident — roadmap 5.3. The one thing about an
+   * incident nothing here can observe: why it mattered *here*, which is what
+   * turns an incident log into a small institutional memory.
+   *
+   * Written against an incident that has to exist, so a typo in a url does not
+   * quietly accumulate notes about nothing.
+   */
+  router.post("/incidents/:providerId/:incidentId/notes", async (req, res) => {
+    const { providerId, incidentId } = req.params;
+    const parsed = noteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: "a note needs a body of 1 to 2000 characters" } });
+      return;
+    }
+    if ((await runtime.store.getIncident(providerId, incidentId)) === null) {
+      res.status(404).json({ error: { message: `unknown incident: ${providerId}/${incidentId}` } });
+      return;
+    }
+    res.status(201).json(await runtime.store.addIncidentNote(providerId, incidentId, parsed.data.body));
+  });
+
+  /** Removing one is an edit, not a history rewrite: only the operator ever wrote it. */
+  router.delete("/incidents/:providerId/:incidentId/notes/:noteId", async (req, res) => {
+    const id = Number(req.params.noteId);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: { message: "a note id is a number" } });
+      return;
+    }
+    const removed = await runtime.store.deleteIncidentNote(req.params.providerId, req.params.incidentId, id);
+    if (!removed) {
+      res.status(404).json({ error: { message: `unknown note: ${req.params.noteId}` } });
+      return;
+    }
+    res.status(204).end();
   });
 
   return router;

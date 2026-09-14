@@ -49,6 +49,13 @@ export interface UiRuntimeOptions {
  */
 export interface UiRuntimeCore {
   db: DatabaseSync;
+  /**
+   * Where the database file lives, which is also where `secrets.env` sits
+   * beside it. Carried so the backup route can say which of the two a download
+   * covers (roadmap 4.4) without rebuilding the path from an environment
+   * variable the runtime already read.
+   */
+  dbPath: string;
   /** The process environment secrets are resolved from; never serialised. */
   env: NodeJS.ProcessEnv;
   /**
@@ -127,7 +134,8 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   // Before anything reads the environment: an entry saved from the dashboard on
   // a previous run has to be in place for the first cycle, exactly as it would
   // be had the container supplied it.
-  const secrets = await loadSecretsFile(join(dirname(options.dbPath), "secrets.env"), options.env, logger);
+  const secretsPath = join(dirname(options.dbPath), "secrets.env");
+  const secrets = await loadSecretsFile(secretsPath, options.env, logger);
 
   const store = createSqliteStateStore(db);
   const history = createHistoryService(store);
@@ -249,6 +257,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
 
   const core: UiRuntimeCore = {
     db,
+    dbPath: options.dbPath,
     env: options.env,
     secrets,
     dispatcher,

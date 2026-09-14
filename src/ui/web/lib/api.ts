@@ -6,6 +6,8 @@ import type {
   ComponentHistoryResponse,
   ComponentPreview,
   ConfigImportReport,
+  DbRestoreReport,
+  IncidentNote,
   DbMaintenanceReport,
   DeliveryLogResponse,
   DeliveryState,
@@ -129,6 +131,23 @@ export const getIncident = (providerId: string, incidentId: string) =>
     `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}`,
   );
 
+/**
+ * An operator's note on one incident (roadmap 5.3) — the one thing about an
+ * incident nothing here can observe.
+ */
+export const addIncidentNote = (providerId: string, incidentId: string, body: string) =>
+  request<IncidentNote>(
+    "POST",
+    `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/notes`,
+    { body },
+  );
+
+export const deleteIncidentNote = (providerId: string, incidentId: string, id: number) =>
+  request<void>(
+    "DELETE",
+    `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/notes/${id}`,
+  );
+
 export interface MaintenanceListQuery {
   provider?: string | undefined;
   days?: number | undefined;
@@ -179,6 +198,27 @@ export const previewComponents = (body: unknown) =>
  */
 export const importConfig = (yaml: string) =>
   request<ConfigImportReport>("POST", "/config/import", yaml, "text/yaml");
+/**
+ * Puts a whole database back (roadmap 4.4). The file's own bytes, as
+ * `application/octet-stream` — the validation that matters is the server's, and
+ * the browser has no business deciding whether a `.db` is one of ours.
+ */
+export const restoreBackup = async (file: File): Promise<DbRestoreReport> => {
+  const response = await fetch("/config/restore", {
+    method: "POST",
+    headers: { "content-type": "application/octet-stream" },
+    body: await file.arrayBuffer(),
+  });
+  const payload = (await response.json().catch(() => undefined)) as
+    | { error?: { message?: string } }
+    | DbRestoreReport
+    | undefined;
+  if (!response.ok) {
+    throw new Error((payload as { error?: { message?: string } })?.error?.message ?? `HTTP ${response.status}`);
+  }
+  return payload as DbRestoreReport;
+};
+
 /** The bundled provider menu, with the ids already watched marked (roadmap 5.11). */
 export const getCatalog = () => request<{ providers: CatalogProvider[] }>("GET", "/config/catalog");
 /** Which adapter reads a pasted url, and the base url that adapter wants. */

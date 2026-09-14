@@ -28,6 +28,12 @@ export interface AdapterProbe {
   notModified?: boolean | undefined;
   /** Present only on a failure, and it is the whole point of the panel. */
   error?: string | undefined;
+  /**
+   * Why a read that succeeded still did not say "operational" — a probe's own
+   * account of itself (roadmap 1.8). A status page never sets one: its reading
+   * comes with the provider's incidents attached, which say it already.
+   */
+  note?: string | undefined;
 }
 
 export interface AdapterDebugStore {
@@ -49,6 +55,7 @@ export function createAdapterDebugStore(): AdapterDebugStore {
     durationMs: result.durationMs,
     ...(result.notModified === undefined ? {} : { notModified: result.notModified }),
     ...(result.error === undefined ? {} : { error: result.error }),
+    ...(result.note === undefined ? {} : { note: result.note }),
   });
 
   return {
