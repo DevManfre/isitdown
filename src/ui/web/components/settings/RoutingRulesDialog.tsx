@@ -33,7 +33,7 @@ export function RoutingRulesDialog({
 }: {
   routing: RoutingResponse;
   channels: DescribedChannel[];
-  services: { id: string; name: string }[];
+  services: { id: string; name: string; group?: string | null; components?: { id: string; name: string }[] }[];
   /** The window the dry run evaluates with — see `DryRun` in RoutingRules. */
   quietHours?: QuietHoursPolicy | undefined;
 }) {

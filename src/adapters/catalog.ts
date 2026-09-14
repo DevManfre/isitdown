@@ -70,4 +70,12 @@ export const CATALOG: readonly CatalogEntry[] = [
   { id: "cloudinary", name: "Cloudinary", adapter: "statuspage", baseUrl: "https://status.cloudinary.com" },
   { id: "reddit", name: "Reddit", adapter: "statuspage", baseUrl: "https://www.redditstatus.com" },
   { id: "twitch", name: "Twitch", adapter: "statuspage", baseUrl: "https://status.twitch.com" },
+  // The one page here addressed by path rather than by host: an Uptime.com
+  // account publishes several, and the host alone does not name one.
+  {
+    id: "uptimecom",
+    name: "Uptime.com",
+    adapter: "uptimecom",
+    baseUrl: "https://status.uptime.com/statuspage/uptime-status",
+  },
 ];

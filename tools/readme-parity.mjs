@@ -1,9 +1,13 @@
-// README translation gate — roadmap 7.6.
+// Documentation translation gate — roadmap 7.6, widened by 7.5.
 //
-// `README.md` is the source; every `README.<lang>.md` is a translation of it,
-// section for section. The `readme-translation-sync` skill already carries the
-// three commands that catch a drifted translation; this is those commands as a
-// check CI can run, so an unsynced hand edit cannot reach `main`.
+// `README.md` and every file under `docs/` are the source; each has a
+// `<name>.<lang>.md` beside it, a translation of it section for section. The
+// `readme-translation-sync` skill already carries the three commands that catch a
+// drifted translation; this is those commands as a check CI can run, so an
+// unsynced hand edit cannot reach `main`.
+//
+// One pair at a time rather than the whole manual concatenated: a section moved
+// from one file to another is a real drift, and comparing the sum would hide it.
 //
 // It compares structure, never meaning: the numbered heading skeleton, the
 // per-level heading, fence and table-row counts, and the identifiers each file
@@ -15,6 +19,9 @@
 import { readdir, readFile } from "node:fs/promises";
 
 const SOURCE = "README.md";
+
+/** `docs/api.it.md` is a translation of `docs/api.md`; `docs/api.md` is not. */
+const TRANSLATION = /^(.+)\.([a-z]{2})\.md$/;
 
 /** `## 3.` / `### 3.1` — the level and the number, which is what must line up. */
 const NUMBERED_HEADING = /^(#+) ([0-9]+(?:\.[0-9]+)*)\.?(?=\s|$)/;
@@ -68,12 +75,12 @@ export function identifiers(markdown) {
  * @param {string} translation one `README.<lang>.md`
  * @returns {string[]} one line per drift, empty when the two are in sync
  */
-export function compareReadmes(source, translation) {
+export function compareReadmes(source, translation, sourceName = SOURCE) {
   const findings = [];
 
   const [left, right] = [sectionSkeleton(source), sectionSkeleton(translation)];
   for (const heading of left) {
-    if (!right.includes(heading)) findings.push(`section only in ${SOURCE}: ${heading}`);
+    if (!right.includes(heading)) findings.push(`section only in ${sourceName}: ${heading}`);
   }
   for (const heading of right) {
     if (!left.includes(heading)) findings.push(`section only in the translation: ${heading}`);
@@ -81,7 +88,7 @@ export function compareReadmes(source, translation) {
   // Order matters as much as membership: a section ported into the wrong place
   // reads as a different document even though every heading is present.
   if (findings.length === 0 && left.join("\n") !== right.join("\n")) {
-    findings.push(`the numbered sections are in a different order (${SOURCE} leads with ${left[0]})`);
+    findings.push(`the numbered sections are in a different order (${sourceName} leads with ${left[0]})`);
   }
 
   const [sourceCounts, translationCounts] = [counts(source), counts(translation)];
@@ -94,30 +101,60 @@ export function compareReadmes(source, translation) {
   const [sourceIds, translationIds] = [identifiers(source), identifiers(translation)];
   const missing = sourceIds.filter((id) => !translationIds.includes(id));
   const extra = translationIds.filter((id) => !sourceIds.includes(id));
-  if (missing.length > 0) findings.push(`only in ${SOURCE}: ${missing.join(", ")}`);
+  if (missing.length > 0) findings.push(`only in ${sourceName}: ${missing.join(", ")}`);
   if (extra.length > 0) findings.push(`only in the translation: ${extra.join(", ")}`);
 
   return findings;
 }
 
+/**
+ * Every source file that has at least one translation beside it, as
+ * `{ source, translations }` pairs — `README.md` and each `docs/*.md`.
+ *
+ * @param {string[]} names every file in one directory
+ * @param {string} prefix how to write a name relative to the repository root
+ * @returns {{ source: string, translations: string[] }[]}
+ */
+export function pairsOf(names, prefix = "") {
+  const markdown = names.filter((name) => name.endsWith(".md"));
+  const sources = markdown.filter((name) => !TRANSLATION.test(name)).sort();
+  return sources
+    .map((source) => ({
+      source: `${prefix}${source}`,
+      translations: markdown
+        .filter((name) => {
+          const match = TRANSLATION.exec(name);
+          return match !== null && `${match[1]}.md` === source;
+        })
+        .sort()
+        .map((name) => `${prefix}${name}`),
+    }))
+    .filter((pair) => pair.translations.length > 0);
+}
+
 if (process.argv[1]?.endsWith("readme-parity.mjs")) {
   const root = new URL("../", import.meta.url);
-  const source = await readFile(new URL(SOURCE, root), "utf8");
-  const translations = (await readdir(root)).filter((name) => /^README\.[a-z]{2}\.md$/.test(name)).sort();
+  const pairs = [
+    ...pairsOf(await readdir(root)),
+    ...pairsOf(await readdir(new URL("docs/", root)), "docs/"),
+  ];
 
   let failed = false;
-  for (const name of translations) {
-    const findings = compareReadmes(source, await readFile(new URL(name, root), "utf8"));
-    if (findings.length === 0) {
-      process.stdout.write(`${name} is in sync with ${SOURCE}\n`);
-      continue;
+  for (const { source, translations } of pairs) {
+    const left = await readFile(new URL(source, root), "utf8");
+    for (const name of translations) {
+      const findings = compareReadmes(left, await readFile(new URL(name, root), "utf8"), source);
+      if (findings.length === 0) {
+        process.stdout.write(`${name} is in sync with ${source}\n`);
+        continue;
+      }
+      failed = true;
+      process.stdout.write(`${name} has drifted from ${source}:\n`);
+      for (const finding of findings) process.stdout.write(`  ${finding}\n`);
     }
-    failed = true;
-    process.stdout.write(`${name} has drifted from ${SOURCE}:\n`);
-    for (const finding of findings) process.stdout.write(`  ${finding}\n`);
   }
-  if (translations.length === 0) {
-    process.stdout.write(`no README.<lang>.md beside ${SOURCE} — nothing to compare\n`);
+  if (pairs.length === 0) {
+    process.stdout.write("no translated markdown found — nothing to compare\n");
   }
   process.exit(failed ? 1 : 0);
 }

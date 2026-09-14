@@ -29,6 +29,11 @@ export function createApp(runtime: UiRuntimeCore): Express {
   // The config import (roadmap 4.3) takes a `config.yml` as it stands, so the
   // YAML content types arrive as text rather than as a JSON string.
   app.use(express.text({ limit: "256kb", type: ["text/yaml", "application/x-yaml", "text/plain"] }));
+  // A database restore (roadmap 4.4) uploads the whole file. The cap is
+  // generous because a year of history on a large fleet legitimately is: the
+  // limit that matters is the operator's own disk, and a smaller one here would
+  // refuse exactly the backup worth restoring.
+  app.use(express.raw({ limit: "512mb", type: ["application/octet-stream", "application/x-sqlite3"] }));
 
   app.use(statusRoutes(runtime));
   app.use(eventsRoutes(runtime));

@@ -19,6 +19,9 @@ const detail = {
                 text: "GitHub — MAJOR OUTAGE", sentAt: "2026-08-21T09:01:00Z", ok: true }],
   polls: [{ observedAt: "2026-08-21T09:20:00Z", overallStatus: "major_outage" as const, ok: true }],
   otherActiveIncidents: [],
+  // Roadmap 5.3: the operator's own account of the incident, which the detail
+  // payload carries beside the two IsItDown writes itself.
+  notes: [{ id: 1, body: "Our deploy failed on this.", createdAt: "2026-08-21T09:05:00Z" }],
 };
 
 const mount = () =>
@@ -171,5 +174,84 @@ describe("IncidentDetail", () => {
     // read after the view has actually rendered rather than before it.
     await screen.findByText("API errors");
     expect(screen.queryByText(i18n.t("incident.map.title", { name: "GitHub" }))).toBeNull();
+  });
+});
+
+// Roadmap 5.3. The third account of an incident, beside what IsItDown observed
+// and what it sent: the one a person writes.
+describe("operator notes", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows the notes already written on this incident", async () => {
+    mount();
+
+    expect(await screen.findByText("Our deploy failed on this.")).toBeInTheDocument();
+  });
+
+  it("posts a typed note to this incident and clears the draft", async () => {
+    mount();
+    const field = await screen.findByLabelText(i18n.t("incident.notes.add"));
+
+    const base = globalThis.fetch as typeof fetch;
+    const sent: { target: string; body: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (target: string, init?: RequestInit) => {
+        if (String(target).endsWith("/notes")) {
+          sent.push({ target: String(target), body: String(init?.body) });
+          return {
+            ok: true,
+            status: 201,
+            text: async () => JSON.stringify({ id: 2, body: "Vendor confirmed", createdAt: "2026-08-21T10:00:00Z" }),
+          };
+        }
+        return base(target, init);
+      }),
+    );
+
+    await userEvent.type(field, "Vendor confirmed");
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("incident.notes.add") }));
+
+    expect(sent).toHaveLength(1);
+    // The harness mounts the route *pattern* as the location, so the ids in the
+    // url are the pattern's own; what this pins is that the note is posted to
+    // the incident the view was opened on, and nowhere else.
+    expect(sent[0]?.target.endsWith("/notes")).toBe(true);
+    expect(JSON.parse(sent[0]!.body)).toEqual({ body: "Vendor confirmed" });
+    expect(field).toHaveValue("");
+  });
+
+  it("will not post a note that is only whitespace", async () => {
+    mount();
+    const field = await screen.findByLabelText(i18n.t("incident.notes.add"));
+
+    await userEvent.type(field, "   ");
+
+    expect(screen.getByRole("button", { name: i18n.t("incident.notes.add") })).toBeDisabled();
+  });
+
+  it("removes a note through the incident it was written on", async () => {
+    mount();
+    const remove = await screen.findByRole("button", { name: i18n.t("incident.notes.remove") });
+
+    const base = globalThis.fetch as typeof fetch;
+    const calls: { method: string; target: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (target: string, init?: RequestInit) => {
+        if (String(target).includes("/notes/")) {
+          calls.push({ method: String(init?.method), target: String(target) });
+          return { ok: true, status: 204, text: async () => "" };
+        }
+        return base(target, init);
+      }),
+    );
+
+    await userEvent.click(remove);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.method).toBe("DELETE");
+    // The note's own id, under the incident it was written on.
+    expect(calls[0]?.target.endsWith("/notes/1")).toBe(true);
   });
 });

@@ -100,4 +100,4 @@ runAdapterContract("<provider-id>", () => ({
 
 ## Step 6 — Document
 
-Add a one-line entry to `README.md`'s list of supported providers, noting whether it uses the generic Statuspage adapter or a custom one.
+Add a one-line entry to `docs/configuration.md`'s list of supported providers (§3.5), noting whether it uses the generic Statuspage adapter or a custom one.
