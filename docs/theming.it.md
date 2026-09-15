@@ -109,6 +109,14 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   scontato. Gli elementi cliccabili scritti a mano (una riga di provider, una
   tile ad anello) ricevono un anello di focus visibile da `base.css` a
   specificità zero, sotto quello che una primitiva ha già.
+- **La palette dei comandi.** `⌘K` (o `Ctrl+K`) su qualsiasi schermata apre una
+  sola casella di ricerca sopra la console (roadmap 5.4): ogni vista che elenca
+  la rail, ogni provider abilitato — cercabile con il nome a schermo o con l'id
+  con cui è stato configurato — più **Poll now** e il tema. Un provider apre il
+  drawer della vista History, che è dove vive il dettaglio di un provider finché
+  la 5.6 non gli darà una pagina sua. È montata nella shell e non in una vista,
+  così la scorciatoia risponde ovunque, e si apre con le sue viste e le sue
+  azioni anche quando la lettura dello stato è fallita.
 - **Grafici.** Una fila di barre colorate non dice nulla ad alta voce: le barre
   di uptime, la striscia dei componenti, quella dei poll, la sparkline e l'anello
   del provider portano ognuno un riassunto di una frase ("Stato giornaliero su 90

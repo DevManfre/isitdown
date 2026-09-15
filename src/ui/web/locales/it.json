@@ -13,6 +13,15 @@
   "nav.sidebar-toggle": "Apri o chiudi la barra laterale",
   "nav.sidebar-mobile": "Mostra la barra laterale su schermo stretto.",
 
+  "palette.title": "Palette dei comandi",
+  "palette.description": "Vai a una vista o a un provider, lancia un poll, o cambia il tema.",
+  "palette.placeholder": "Scrivi una vista, un provider o un'azione\u2026",
+  "palette.empty": "Non corrisponde nulla.",
+  "palette.views": "Viste",
+  "palette.providers": "Provider",
+  "palette.actions": "Azioni",
+  "palette.cycle-theme": "Cambia il tema",
+
   "action.add-service": "Aggiungi servizio",
   "action.poll-now": "Aggiorna ora",
   "action.edit": "Modifica",

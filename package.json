@@ -49,6 +49,7 @@
     "@vitest/coverage-v8": "^4.1.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "concurrently": "^10.0.5",
     "dotted-map": "^3.1.0",
     "happy-dom": "^20.11.6",
