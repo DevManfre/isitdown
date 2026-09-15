@@ -702,6 +702,25 @@
   animation: beam-travel linear infinite;
 }
 
+/* The caret at the end of the headline while it types itself in
+   (components/ui/typing-animation.tsx). It blinks only while characters are
+   still arriving: the component drops the caret on the last one, and under
+   reduced motion it never renders a caret at all, so the block at the foot of
+   this file has nothing to stop. */
+@keyframes caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0;
+  }
+}
+.typing-caret {
+  animation: caret-blink 1s steps(1, end) infinite;
+}
+
 /* A tile that lifts under the pointer. Same travel as .ring-tile so the two
    fleet shapes do not hover differently. */
 .tile-lit {
