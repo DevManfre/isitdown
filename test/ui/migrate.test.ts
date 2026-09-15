@@ -200,7 +200,18 @@ test("seedDefaults registers every channel, disabled, referencing environment va
   }[];
   assert.deepEqual(
     rows.map((row) => row.id),
-    ["discord", "email", "gotify", "ntfy", "slack", "telegram", "webhook", "webpush"],
+    [
+      "discord",
+      "email",
+      "gotify",
+      "ntfy",
+      "pushover",
+      "slack",
+      "teams",
+      "telegram",
+      "webhook",
+      "webpush",
+    ],
   );
   assert.ok(rows.every((row) => row.enabled === 0), "a seeded channel must start disabled");
 
@@ -215,6 +226,13 @@ test("seedDefaults registers every channel, disabled, referencing environment va
   // The self-hosted push pair — roadmap 3.4.
   assert.deepEqual(byId.get("ntfy"), { topicUrlEnv: "NTFY_TOPIC_URL", tokenEnv: "NTFY_TOKEN" });
   assert.deepEqual(byId.get("gotify"), { serverUrlEnv: "GOTIFY_URL", tokenEnv: "GOTIFY_TOKEN" });
+  // Pushover (roadmap 3.5) and Teams (3.8).
+  assert.deepEqual(byId.get("pushover"), {
+    tokenEnv: "PUSHOVER_TOKEN",
+    userKeyEnv: "PUSHOVER_USER_KEY",
+    deviceEnv: "PUSHOVER_DEVICE",
+  });
+  assert.deepEqual(byId.get("teams"), { webhookUrlEnv: "TEAMS_WEBHOOK_URL" });
   // SMTP submission (roadmap 3.3): every setting is an env name, because those
   // are the only fields the dashboard offers — the host and the addresses no
   // less than the password.
@@ -269,7 +287,7 @@ test("seedDefaults run twice does not duplicate anything", async () => {
   const [services] = db.prepare("SELECT COUNT(*) AS n FROM services").all() as { n: number }[];
   const [channels] = db.prepare("SELECT COUNT(*) AS n FROM channels").all() as { n: number }[];
   assert.equal(services?.n, 3);
-  assert.equal(channels?.n, 8);
+  assert.equal(channels?.n, 10);
   db.close();
 });
 
