@@ -13,6 +13,15 @@
   "nav.sidebar-toggle": "Toggle the sidebar",
   "nav.sidebar-mobile": "Shows the sidebar on a narrow screen.",
 
+  "palette.title": "Command palette",
+  "palette.description": "Jump to a view or a provider, run a poll, or change the theme.",
+  "palette.placeholder": "Type a view, a provider or an action\u2026",
+  "palette.empty": "Nothing matches that.",
+  "palette.views": "Views",
+  "palette.providers": "Providers",
+  "palette.actions": "Actions",
+  "palette.cycle-theme": "Change the theme",
+
   "action.add-service": "Add service",
   "action.poll-now": "Poll now",
   "action.edit": "Edit",
