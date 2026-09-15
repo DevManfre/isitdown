@@ -87,13 +87,7 @@ export function IncidentDetail() {
   const { incident, timeline, actionLog, polls, otherActiveIncidents, notes } = detail;
   const shownActionLog = actionLogExpanded ? actionLog : actionLog.slice(0, ACTION_LOG_COLLAPSED);
   const reached = incident.resolvedAt === null ? STEPS.indexOf(incident.status) : STEPS.length - 1;
-
-  const elapsed =
-    incident.resolvedAt === null
-      ? t("incident.elapsed", { duration: durationSince(i18n.language, incident.startedAt) })
-      : t("incident.closed-after", {
-          duration: durationBetween(i18n.language, incident.startedAt, incident.resolvedAt),
-        });
+  const failedSends = actionLog.filter((record) => !record.ok).length;
 
   const copyPayload = async (): Promise<void> => {
     await navigator.clipboard.writeText(JSON.stringify(detail, null, 2));
@@ -168,19 +162,75 @@ export function IncidentDetail() {
             className="anim-rise anim-rise-hero font-mono text-sm text-muted-foreground"
             style={{ animationDelay: "160ms" }}
           >
-            {nameOf(incident.providerId)} · {elapsed}
+            {nameOf(incident.providerId)}
           </span>
         </div>
 
-        <div className="anim-rise anim-rise-column flex flex-col items-end gap-1" style={{ animationDelay: "200ms" }}>
-          <Button type="button" variant="ghost" className="mono" onClick={() => void copyPayload()}>
-            {t("action.copy-payload")}
-          </Button>
-          {copiedMessage !== undefined && (
-            <span role="status" className="text-xs text-muted-foreground">
-              {copiedMessage}
-            </span>
-          )}
+        {/* The three figures the page used to leave to be pieced together: when
+            it started, how long it has run, and how many sends went out on it.
+            Two of them were a single mono line under the headline and one was
+            only implied by the length of a list further down. Same grammar as
+            the Overview's hero, so the two lit bands read as one page. */}
+        <div
+          className="anim-rise anim-rise-column flex flex-col items-end gap-4"
+          style={{ animationDelay: "200ms" }}
+        >
+          <div
+            data-slot="incident-stats"
+            data-testid="incident-stats"
+            className="flex flex-wrap gap-6"
+          >
+            {[
+              {
+                id: "started",
+                label: t("incident.stat.started"),
+                value: formatDateTime(i18n.language, incident.startedAt),
+              },
+              {
+                id: "elapsed",
+                label: t(
+                  incident.resolvedAt === null ? "incident.stat.open-for" : "incident.stat.closed-in",
+                ),
+                value:
+                  incident.resolvedAt === null
+                    ? durationSince(i18n.language, incident.startedAt)
+                    : durationBetween(i18n.language, incident.startedAt, incident.resolvedAt),
+                accent: incident.resolvedAt === null,
+              },
+              {
+                id: "notified",
+                label: t("incident.stat.notified"),
+                value: String(actionLog.length),
+                note: t("incident.stat.notified-note", { count: failedSends }),
+              },
+            ].map((stat) => (
+              <div key={stat.id} data-stat={stat.id} className="flex flex-col gap-0.5">
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {stat.label}
+                </span>
+                <span
+                  className="font-mono text-base"
+                  style={stat.accent === true ? { color: impactColor(incident.impact) } : undefined}
+                >
+                  {stat.value}
+                </span>
+                {stat.note !== undefined && (
+                  <span className="text-[11px] text-muted-foreground">{stat.note}</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col items-end gap-1">
+            <Button type="button" variant="ghost" className="mono" onClick={() => void copyPayload()}>
+              {t("action.copy-payload")}
+            </Button>
+            {copiedMessage !== undefined && (
+              <span role="status" className="text-xs text-muted-foreground">
+                {copiedMessage}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -225,16 +275,30 @@ export function IncidentDetail() {
           delay={stagger(0, TILE_CASCADE)}
           className="md:col-span-2"
         >
+          {/* A rail, not two columns of text: the entries are one sequence and
+              the line between the dots is what says so. The connector stops at
+              the last entry rather than running off the end of an incident that
+              is still open — a line into nothing reads as a missing entry. */}
           {timeline.map((entry, index) => (
             <div
               key={`${entry.at}-${entry.label}`}
-              className="anim-rise grid grid-cols-[70px_1fr] gap-3"
+              className="anim-rise grid grid-cols-[14px_62px_1fr] gap-3"
               style={{ animationDelay: stagger(index, { base: 170, step: 38, cap: 420 }) }}
             >
+              <span className="flex flex-col items-center">
+                <StatusDot
+                  status={entry.label === "resolved" ? "operational" : impactStatus(incident.impact)}
+                  size={9}
+                  pulse={index === timeline.length - 1 && incident.resolvedAt === null}
+                />
+                {index < timeline.length - 1 && (
+                  <span aria-hidden="true" className="mt-1 w-px flex-1 bg-border" />
+                )}
+              </span>
               <span className="font-mono text-xs text-muted-foreground">
                 {formatTime(i18n.language, entry.at)}
               </span>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-0.5 pb-3">
                 <span className="text-xs uppercase tracking-widest text-muted-foreground">
                   {t(`incident.timeline.${entry.label}`)}
                 </span>

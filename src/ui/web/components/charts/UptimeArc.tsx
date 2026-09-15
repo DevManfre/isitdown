@@ -37,6 +37,11 @@ export function UptimeArc({
   // `UptimeRing` uses for the same reason; 0 is "never measured" and draws
   // nothing but the track.
   const drawn = value > 0 ? Math.max(2, Math.min(100, value)) : 0;
+  // The arc's own length, which is also how far the dash has to travel to be
+  // fully hidden: the pattern's period is `drawn + gap`, exactly the
+  // circumference, so offsetting by the circumference would be the identity
+  // and nothing would appear to animate at all.
+  const drawnLength = (drawn / 100) * circumference;
   const formatted = new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 2 }).format(value);
 
   return (
@@ -65,9 +70,16 @@ export function UptimeArc({
         stroke={color}
         strokeWidth={stroke}
         strokeLinecap="round"
-        strokeDasharray={`${((drawn / 100) * circumference).toFixed(2)} ${circumference.toFixed(2)}`}
+        strokeDasharray={`${drawnLength.toFixed(2)} ${circumference.toFixed(2)}`}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        className="anim-ring"
+        // Drawn on, not spun in. `.anim-ring` animates `transform` to `none`,
+        // and a CSS transform beats the `transform` attribute beside it — so
+        // the arc rotated about the SVG's own origin on the way in and then
+        // landed with its -90° start offset erased, beginning at 3 o'clock.
+        // `.anim-arc` travels the dash offset instead, which is the arc's own
+        // length and touches nothing else.
+        className="anim-arc"
+        style={{ "--arc-length": drawnLength.toFixed(2) } as React.CSSProperties}
       />
       <text
         x="50%"

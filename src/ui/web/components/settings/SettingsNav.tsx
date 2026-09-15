@@ -25,7 +25,7 @@ export interface NavSection {
  */
 export function SettingsNav({ sections }: { sections: NavSection[] }) {
   const { t } = useTranslation();
-  const { counts } = useSettingsChrome();
+  const { counts, query } = useSettingsChrome();
   const [active, setActive] = useState(sections[0]?.id);
 
   useEffect(() => {
@@ -57,8 +57,11 @@ export function SettingsNav({ sections }: { sections: NavSection[] }) {
     >
       {sections.map((section) => {
         const count = counts[section.id];
-        // A section the filter has emptied is not somewhere to navigate to.
-        if (count === 0) return null;
+        // A section the search field has emptied is not somewhere to navigate
+        // to. A section that emptied itself — the services list under its own
+        // state filter — is still on the page, so its row stays (see
+        // SettingsSection).
+        if (query !== "" && count === 0) return null;
         return (
           <a
             key={section.id}

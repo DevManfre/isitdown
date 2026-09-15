@@ -1532,6 +1532,25 @@ describe("finding a setting", () => {
     await waitFor(() => expect(screen.queryByText("GitHub")).toBeNull());
     expect(screen.getByText("Atlassian")).toBeInTheDocument();
   });
+
+  // The section hides itself when the page's search field empties it. Its own
+  // state chips are not that field: picking a state nothing is in used to take
+  // the whole card away — chips included — leaving no way back to "all".
+  it("keeps the services card, and its chips, when a chip matches nothing", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    expect(await screen.findByText("GitHub")).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: new RegExp(`^${i18n.t("service.filter.muted")}`) }),
+    );
+
+    expect(await screen.findByText(i18n.t("service.filter.none"))).toBeInTheDocument();
+    const chip = screen.getByRole("button", { name: new RegExp(`^${i18n.t("service.filter.all")}`) });
+    expect(chip).toBeVisible();
+
+    await userEvent.click(chip);
+    expect(await screen.findByText("GitHub")).toBeInTheDocument();
+  });
 });
 
 describe("the number steppers", () => {

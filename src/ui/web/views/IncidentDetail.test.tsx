@@ -255,3 +255,37 @@ describe("operator notes", () => {
     expect(calls[0]?.target.endsWith("/notes/1")).toBe(true);
   });
 });
+
+describe("the incident's own figures", () => {
+  it("says when it started, how long it has run and how many sends went out", async () => {
+    mount();
+
+    const stats = await screen.findByTestId("incident-stats");
+    expect(stats.textContent).toContain(i18n.t("incident.stat.started"));
+    // Still open in the fixture, so the label is the running one — never
+    // "Resolved in", which would claim the incident had closed.
+    expect(stats.textContent).toContain(i18n.t("incident.stat.open-for"));
+    expect(stats.textContent).not.toContain(i18n.t("incident.stat.closed-in"));
+    // One send in the action log, none of them failed.
+    expect(stats.querySelector("[data-stat='notified']")?.textContent).toContain("1");
+    expect(stats.textContent).toContain(i18n.t("incident.stat.notified-note", { count: 0 }));
+  });
+
+  it("switches to the closed figure once the incident is resolved", async () => {
+    renderWithProviders(
+      <IncidentDetail />,
+      {
+        incident: {
+          ...detail,
+          incident: { ...detail.incident, status: "resolved", resolvedAt: "2026-08-21T10:00:00Z" },
+        },
+        status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+      },
+      "/incidents/:providerId/:incidentId",
+    );
+
+    const stats = await screen.findByTestId("incident-stats");
+    expect(stats.textContent).toContain(i18n.t("incident.stat.closed-in"));
+    expect(stats.textContent).not.toContain(i18n.t("incident.stat.open-for"));
+  });
+});
