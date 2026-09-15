@@ -1,106 +1,28 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog.tsx";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
-import { Switch } from "@/components/ui/switch.tsx";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentPicker, type ComponentPickerEntry, type ComponentPickerSelection } from "@/components/ComponentPicker.tsx";
+import {
+  AdapterOptions, DNS_ADAPTER, hasAdapterOptions, PROBE_ADAPTER, SCRAPE_ADAPTER, TCP_ADAPTER,
+} from "@/components/service-dialog/AdapterOptions.tsx";
+import { DEFAULT_ADAPTER, SourceStep, type ServiceSource } from "@/components/service-dialog/SourceStep.tsx";
+import { ServiceIdentity } from "@/components/service-dialog/ServiceIdentity.tsx";
 import { useCatalog, useConfig, useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { detectAdapter, previewComponents } from "@/lib/api.ts";
 import { slugify } from "@/lib/slugify.ts";
 import type { CatalogProvider, ServiceDefinition } from "@/lib/types.ts";
 
-const ADAPTERS = [
-  "statuspage",
-  "instatus",
-  "betterstack",
-  "cachet",
-  "uptimekuma",
-  "uptimecom",
-  "rss",
-  "html",
-  "slack",
-  "aws",
-  "gcp",
-  "azure",
-  "http",
-  "tcp",
-  "dns",
-  "custom",
-] as const;
-
 /** The stored interval as a form value; empty when the provider follows the global cadence. */
 const intervalValue = (service: ServiceDefinition | undefined): string =>
   service?.intervalMinutes == null ? "" : String(service.intervalMinutes);
-
-/**
- * What the base URL means differs per adapter — Statuspage appends a path to
- * it, the feed adapter reads it verbatim — so the hint is keyed per adapter
- * rather than built from the adapter id at render time.
- */
-const ADAPTER_NOTES: Record<string, string> = {
-  statuspage: "add.note.statuspage",
-  instatus: "add.note.instatus",
-  betterstack: "add.note.betterstack",
-  cachet: "add.note.cachet",
-  uptimekuma: "add.note.uptimekuma",
-  uptimecom: "add.note.uptimecom",
-  rss: "add.note.rss",
-  html: "add.note.html",
-  slack: "add.note.slack",
-  aws: "add.note.aws",
-  gcp: "add.note.gcp",
-  azure: "add.note.azure",
-  http: "add.note.http",
-  tcp: "add.note.tcp",
-  dns: "add.note.dns",
-  custom: "add.note.custom",
-};
-
-/**
- * The adapter that reads a page's markup instead of a machine-readable
- * endpoint. It is the one adapter whose configuration cannot be inferred from a
- * base URL — an operator has to say which element to read and, when the page
- * uses unusual wording, which words mean what — so it is also the one adapter
- * this dialog grows fields for.
- */
-const SCRAPE_ADAPTER = "html";
-
-/** Worst first, the order the reading itself resolves them in. */
-const SCRAPE_SEVERITIES: { key: string; label: string; example: string }[] = [
-  { key: "major_outage", label: "status.major-outage", example: "major outage, down" },
-  { key: "partial_outage", label: "status.partial-outage", example: "partial outage" },
-  { key: "degraded", label: "status.degraded", example: "degraded, slow" },
-  { key: "operational", label: "status.operational", example: "all systems operational" },
-];
-
-/**
- * The probe (roadmap 1.8): the adapter that reads the operator's own endpoint
- * rather than a page a provider publishes. Like the scraper, its configuration
- * cannot be inferred from a URL — only the operator knows which answer counts
- * as healthy — so it is the second adapter this dialog grows fields for.
- */
-const PROBE_ADAPTER = "http";
-
-/** Only the two methods a poller may safely repeat; the adapter refuses the rest. */
-const PROBE_METHODS = ["GET", "HEAD"] as const;
-
-/**
- * The two probes that speak no HTTP at all (roadmap 1.9): a bare TCP connect
- * and a DNS resolution. Like the one above them, neither can be inferred from
- * a base url — only the operator knows which port, or which record, is the one
- * that matters — so each grows its own small block of fields.
- */
-const TCP_ADAPTER = "tcp";
-const DNS_ADAPTER = "dns";
-
-/** What the DNS probe can ask for; the adapter refuses anything else. */
-const DNS_RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"] as const;
 
 /** The prefix an option carrying a request header is stored under. */
 const HEADER_PREFIX = "header.";
@@ -116,9 +38,7 @@ const usedOptions = (options: Record<string, string>): Record<string, string> =>
  */
 const storedHeader = (options: Record<string, string> | undefined): { name: string; value: string } => {
   const entry = Object.entries(options ?? {}).find(([key]) => key.startsWith(HEADER_PREFIX));
-  return entry === undefined
-    ? { name: "", value: "" }
-    : { name: entry[0].slice(HEADER_PREFIX.length), value: entry[1] };
+  return entry === undefined ? { name: "", value: "" } : { name: entry[0].slice(HEADER_PREFIX.length), value: entry[1] };
 };
 
 /**
@@ -128,18 +48,27 @@ const storedHeader = (options: Record<string, string> | undefined): { name: stri
  * focus returns to the trigger — which Radix already provides, proven here
  * rather than merely assumed (ServiceDialog.test.tsx).
  *
- * The `trigger` renders inside this same `Dialog`, as a real `DialogTrigger`
- * — not a button elsewhere calling into some externally-lifted open state.
+ * `trigger` renders inside this same `Dialog`, as a real `DialogTrigger` —
+ * not as a button elsewhere calling into an externally-lifted open state.
  * Radix's own "return focus on close" behaviour is wired to the trigger *it*
- * renders (`context.triggerRef`, set only by an actual `DialogTrigger`), so
- * a button that merely toggles an external prop rather than sitting inside
- * this `Dialog` never gets focus back — Radix silently no-ops instead.
+ * renders (`context.triggerRef`, set only by an actual `DialogTrigger`), so a
+ * button that merely toggles an external prop rather than sitting inside this
+ * `Dialog` never gets focus back — Radix silently no-ops instead.
+ *
+ * **Add is two steps; edit is one.** They were one form for both, and the form
+ * asked everything at once: a chip row of catalog names, name, id, sixteen
+ * adapter ids, base URL, then whatever that adapter needed, all at the same
+ * volume in one scroll. But adding is one decision (where does the status come
+ * from?) followed by paperwork that the decision mostly fills in — so step one
+ * asks only that, and step two is the paperwork with the answer carried in at
+ * the top. Editing is neither of those: the service exists, its adapter is
+ * fixed, and what is left is tuning, so it stays the single page it was.
  *
  * `id` is never typed by hand: in add mode it is derived from the name
  * (`slugify`), in edit mode it is immutable. Either way the field is shown
  * read-only — vanilla's own edit dialog does not even offer it, but the brief
- * for this port asks that it stay visible so an operator can always see which
- * id they are adding or editing.
+ * for the port asks that it stay visible so an operator can always see the id
+ * they are adding or editing.
  */
 export function ServiceDialog({
   mode, service, trigger,
@@ -154,9 +83,16 @@ export function ServiceDialog({
   const { add, patch, test } = useServiceMutations();
 
   const [open, setOpen] = useState(false);
+  // Which half of an add is on screen, and which way it last travelled — the
+  // direction is what tells the entry animation whether to arrive from the
+  // right (going on) or from the left (going back).
+  const [step, setStep] = useState<1 | 2>(1);
+  const [stepBack, setStepBack] = useState(false);
+  const [source, setSource] = useState<ServiceSource>("catalog");
+  const [picked, setPicked] = useState<string | undefined>(undefined);
   const [catalogQuery, setCatalogQuery] = useState("");
   const [name, setName] = useState(service?.name ?? "");
-  const [adapter, setAdapter] = useState<string>(ADAPTERS[0]);
+  const [adapter, setAdapter] = useState<string>(DEFAULT_ADAPTER);
   const [baseUrl, setBaseUrl] = useState(service?.baseUrl ?? "");
   const [selection, setSelection] = useState<ComponentPickerSelection[]>(service?.components ?? []);
   const [scopeToComponents, setScopeToComponents] = useState(service?.scopeToComponents ?? false);
@@ -172,8 +108,8 @@ export function ServiceDialog({
   const [options, setOptions] = useState<Record<string, string>>(service?.options ?? {});
   // The probe's single header, held apart from `options` and folded back in on
   // save: see `storedHeader`.
-  const [headerName, setHeaderName] = useState(storedHeader(service?.options).name);
-  const [headerValue, setHeaderValue] = useState(storedHeader(service?.options).value);
+  const [header, setHeader] = useState(storedHeader(service?.options));
+  const [advanced, setAdvanced] = useState(false);
   const [preview, setPreview] = useState<
     { supported: boolean; components: ComponentPickerEntry[] } | undefined
   >(undefined);
@@ -182,7 +118,7 @@ export function ServiceDialog({
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   // Only while adding, and only while the dialog is open: an edit already has
-  // every answer the menu would offer.
+  // every answer the catalog would offer.
   const { data: catalog } = useCatalog(open && mode === "add");
   const { data: config } = useConfig();
   const existingGroups = [
@@ -201,8 +137,8 @@ export function ServiceDialog({
   // The adapter is only choosable while adding; an edit shows the fields of the
   // adapter the service already has.
   const activeAdapter = mode === "add" ? adapter : (service?.adapter ?? "");
-  const scraping = activeAdapter === SCRAPE_ADAPTER;
   const probing = activeAdapter === PROBE_ADAPTER;
+  const scraping = activeAdapter === SCRAPE_ADAPTER;
   const tcpProbing = activeAdapter === TCP_ADAPTER;
   const dnsProbing = activeAdapter === DNS_ADAPTER;
   const setOption = (key: string, value: string): void => {
@@ -218,10 +154,10 @@ export function ServiceDialog({
     const base = Object.fromEntries(
       Object.entries(usedOptions(options)).filter(([key]) => !key.startsWith(HEADER_PREFIX)),
     );
-    const name = headerName.trim();
-    return name === "" || headerValue.trim() === ""
+    const headerName = header.name.trim();
+    return headerName === "" || header.value.trim() === ""
       ? base
-      : { ...base, [`${HEADER_PREFIX}${name}`]: headerValue.trim() };
+      : { ...base, [`${HEADER_PREFIX}${headerName}`]: header.value.trim() };
   };
 
   /** The options block a save carries, or nothing for the adapters that take none. */
@@ -232,7 +168,7 @@ export function ServiceDialog({
         ? { options: usedOptions(options) }
         : {};
 
-  // Claim-it-release-it: every close path above releases the busy state this
+  // Claim-it-release-it: every close path below releases the busy state this
   // dialog claimed on open, but an unmount is not a close path — it runs no
   // click handler and fires neither `onOpenChange` nor a mutation callback.
   // An operator who opens this dialog and then navigates away via the Rail
@@ -240,8 +176,8 @@ export function ServiceDialog({
   // `true` in the global `BusyContext` for the rest of the session, with
   // nothing on screen to say why the poll has gone stale. React always runs
   // an unmount's cleanup regardless of why the component is going away, so
-  // this covers that path (and any other future one) that the four close
-  // paths above cannot.
+  // this covers that path (and any other future one) that the close paths
+  // below cannot.
   useEffect(() => {
     return () => {
       setDialogOpen(false);
@@ -253,17 +189,21 @@ export function ServiceDialog({
   // now), so a fresh open needs its own reset — otherwise a cancelled edit's
   // half-typed field would still be sitting there next time.
   const resetForm = (): void => {
+    setStep(1);
+    setStepBack(false);
+    setSource("catalog");
+    setPicked(undefined);
+    setAdvanced(false);
     setCatalogQuery("");
     setName(service?.name ?? "");
-    setAdapter(ADAPTERS[0]);
+    setAdapter(DEFAULT_ADAPTER);
     setBaseUrl(service?.baseUrl ?? "");
     setSelection(service?.components ?? []);
     setScopeToComponents(service?.scopeToComponents ?? false);
     setIntervalMinutes(intervalValue(service));
     setGroup(service?.group ?? "");
     setOptions(service?.options ?? {});
-    setHeaderName(storedHeader(service?.options).name);
-    setHeaderValue(storedHeader(service?.options).value);
+    setHeader(storedHeader(service?.options));
     setPreview(undefined);
     setMessage(undefined);
     setSaving(false);
@@ -294,11 +234,16 @@ export function ServiceDialog({
   const loadPreview = async (): Promise<void> => {
     setPreviewLoading(true);
     try {
-      const result = await previewComponents({ adapter, baseUrl: baseUrl.trim() });
+      const result = await previewComponents({ adapter: activeAdapter, baseUrl: baseUrl.trim() });
       // Keep `supported` alongside the (possibly empty) component list —
       // ComponentPicker needs both to tell "this adapter can't list
       // components at all" apart from "it can, and there are just none".
       setPreview({ supported: result.supported, components: result.components });
+    } catch (error) {
+      // Reaching step two is not a request the operator made, so a failed
+      // preload says so where every other failure in this dialog says it,
+      // and leaves the button below to retry rather than blocking the save.
+      setMessage({ text: error instanceof Error ? error.message : String(error), tone: "error" });
     } finally {
       setPreviewLoading(false);
     }
@@ -312,6 +257,7 @@ export function ServiceDialog({
    * adding.
    */
   const pick = (entry: CatalogProvider): void => {
+    setPicked(entry.id);
     setName(entry.name);
     setAdapter(entry.adapter);
     setBaseUrl(entry.baseUrl);
@@ -320,12 +266,6 @@ export function ServiceDialog({
     setPreview(undefined);
     setMessage(undefined);
   };
-
-  const catalogMatches = (catalog?.providers ?? []).filter((entry) =>
-    catalogQuery.trim() === ""
-      ? true
-      : `${entry.name} ${entry.id}`.toLowerCase().includes(catalogQuery.trim().toLowerCase()),
-  );
 
   /**
    * Asks the pasted url which adapter reads it, and fills in both fields from
@@ -368,8 +308,34 @@ export function ServiceDialog({
     );
   };
 
+  /**
+   * Stepping forward also fetches the component list, which used to wait
+   * behind a button an operator had to know to press: arriving at the fields
+   * is the moment the list is wanted, and asking for it then is the difference
+   * between a picker that is there and one that has to be summoned.
+   */
+  const goToDetails = (): void => {
+    setStepBack(false);
+    setStep(2);
+    setMessage(undefined);
+    if (preview === undefined && baseUrl.trim() !== "") void loadPreview();
+  };
+
+  const goToSource = (): void => {
+    setStepBack(true);
+    setStep(1);
+    setMessage(undefined);
+  };
+
   const save = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
+    // Step one has no submit button, but a form with a text field in it still
+    // submits on Enter — which posted a service with no name at all and came
+    // back with the schema's own complaint about the id and the name. Worse
+    // than noise: the rejection landed *after* the operator had stepped on,
+    // so step two opened carrying an error about fields it had not yet been
+    // given. The form is only submittable from the step that can fill it in.
+    if (mode === "add" && step === 1) return;
     setSaving(true);
     setMessage(undefined);
     try {
@@ -419,470 +385,230 @@ export function ServiceDialog({
     }
   };
 
+  const adding = mode === "add";
+  const onSource = adding && step === 1;
+  // Nothing downstream of step one works without a base URL — the catalog
+  // fills one in, detection answers with one, and a hand-picked adapter needs
+  // one typed — so it is the single condition on going on.
+  const ready = baseUrl.trim() !== "";
+
+  /**
+   * The fields both an add's second step and an edit put on screen.
+   *
+   * Grouped rather than stacked. Run flat they were eight labels of the same
+   * weight in one scroll, and the component picker — which brings its own
+   * search box, its own select-all and its own group headings — read as more
+   * of the same list rather than as a block with a job. Each block says what
+   * it is for, so the eye can skip the two it does not need.
+   */
+  const details = (
+    <>
+      <Section title={t("add.section-identity")}>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="service-name">{t("field.name")}</Label>
+            <Input id="service-name" value={name} onChange={(event) => setName(event.target.value)} {...fieldProps} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="service-id">{t("field.id")}</Label>
+            <Input id="service-id" className="font-mono" value={id} readOnly />
+          </div>
+        </div>
+        {mode === "edit" && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="service-base-url">{t("field.base-url")}</Label>
+            <Input
+              id="service-base-url"
+              className="font-mono"
+              value={baseUrl}
+              onChange={(event) => setBaseUrl(event.target.value)}
+              {...fieldProps}
+            />
+          </div>
+        )}
+      </Section>
+
+      <Section title={t("add.section-watching")}>
+        {/* Roadmap 2.6. Typed, not picked: the first group has to be
+            creatable, and a select with nothing in it cannot create one.
+            Slugified on the way out, the way the id is, so "Deploy path"
+            is a legal group rather than a rejected write. */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-group">{t("field.group")}</Label>
+          <Input
+            id="service-group"
+            list="service-group-options"
+            placeholder={t("field.group-placeholder")}
+            value={group}
+            onChange={(event) => setGroup(event.target.value)}
+            {...fieldProps}
+          />
+          {/* The groups that already exist, offered rather than imposed:
+              an operator adding the fifth provider to a stack should not
+              have to remember how they spelled it. */}
+          <datalist id="service-group-options">
+            {existingGroups.map((option) => (
+              <option key={option} value={option} />
+            ))}
+          </datalist>
+          <span className="text-xs text-muted-foreground">{t("field.group-hint")}</span>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-interval">{t("field.provider-interval")}</Label>
+          <Input
+            id="service-interval"
+            type="number"
+            min={1}
+            max={1440}
+            placeholder={t("field.provider-interval-placeholder")}
+            value={intervalMinutes}
+            onChange={(event) => setIntervalMinutes(event.target.value)}
+            {...fieldProps}
+          />
+          <span className="text-xs text-muted-foreground">{t("field.provider-interval-hint")}</span>
+        </div>
+      </Section>
+
+      <Section
+        title={t("components.field")}
+        action={
+          <Button type="button" variant="ghost" size="sm" disabled={previewLoading} onClick={() => void loadPreview()}>
+            {t("components.load")}
+          </Button>
+        }
+      >
+        {preview === undefined ? (
+          <span className="text-xs text-muted-foreground">{t("components.hint")}</span>
+        ) : (
+          <ComponentPicker
+            available={preview.components}
+            supported={preview.supported}
+            value={selection}
+            onChange={setSelection}
+            loading={previewLoading}
+            scopeToComponents={scopeToComponents}
+            onScopeChange={setScopeToComponents}
+          />
+        )}
+      </Section>
+    </>
+  );
+
+  const adapterFields = (
+    <AdapterOptions
+      adapter={activeAdapter}
+      options={options}
+      setOption={setOption}
+      header={header}
+      setHeader={setHeader}
+      fieldProps={fieldProps}
+    />
+  );
+
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? openDialog() : close())}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent>
-        <form className="flex min-h-0 flex-1 flex-col gap-4" onSubmit={(event) => void save(event)}>
+      <DialogContent className={adding ? "sm:max-w-2xl" : undefined}>
+        <form
+          className="flex min-h-0 flex-1 flex-col gap-4"
+          onSubmit={(event) => void save(event)}
+          // And Enter in a step-one field does what pressing it there means:
+          // goes on. Only from a field — on a catalog tile or a source button
+          // Enter is that control's own click, which must keep working.
+          onKeyDown={(event) => {
+            if (!onSource || event.key !== "Enter") return;
+            if (!(event.target instanceof HTMLInputElement)) return;
+            event.preventDefault();
+            if (ready) goToDetails();
+          }}
+        >
           <DialogHeader>
-            <DialogTitle>{mode === "add" ? t("add.title") : name}</DialogTitle>
-            {mode === "add" && <DialogDescription>{t("add.subtitle")}</DialogDescription>}
+            {adding ? (
+              <>
+                <DialogTitle>{t("add.title")}</DialogTitle>
+                <DialogDescription>{t(onSource ? "add.subtitle-source" : "add.subtitle-details")}</DialogDescription>
+                <StepRail step={step} />
+              </>
+            ) : (
+              <>
+                <DialogTitle>{name}</DialogTitle>
+                <DialogDescription className="font-mono">
+                  {`${id} · ${activeAdapter}`}
+                </DialogDescription>
+              </>
+            )}
           </DialogHeader>
+
           <DialogBody>
-            {/* The menu the first run starts from: a bundled list is the half
-                of "add a provider" that detection cannot cover, since
-                detection needs a url and this needs only a name. Above the
-                fields rather than behind a tab, because filling them in by
-                hand is the fallback now, not the default. */}
-            {mode === "add" && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label id="catalog-label">{t("catalog.label")}</Label>
-                  <Input
-                    id="catalog-search"
-                    type="search"
-                    className="h-8 w-40"
-                    value={catalogQuery}
-                    placeholder={t("catalog.search-placeholder")}
-                    aria-label={t("catalog.search-label")}
-                    onChange={(event) => setCatalogQuery(event.target.value)}
-                  />
-                </div>
-                <div
-                  role="group"
-                  aria-labelledby="catalog-label"
-                  className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-dashed border-border p-2"
-                >
-                  {catalogMatches.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">{t("catalog.empty")}</span>
+            {adding ? (
+              <div key={step} className={stepBack ? "anim-step-back" : "anim-step"}>
+                <div className="flex flex-col gap-4">
+                  {onSource ? (
+                    <SourceStep
+                      source={source}
+                      onSourceChange={setSource}
+                      catalog={catalog?.providers}
+                      query={catalogQuery}
+                      onQueryChange={setCatalogQuery}
+                      onPick={pick}
+                      picked={picked}
+                      baseUrl={baseUrl}
+                      onBaseUrlChange={setBaseUrl}
+                      onDetect={() => void runDetect()}
+                      detecting={detecting}
+                      adapter={adapter}
+                      onAdapterChange={(next) => {
+                        setAdapter(next);
+                        // Choosing an adapter by hand is choosing something
+                        // other than the catalog entry, so the grid stops
+                        // claiming one is still picked.
+                        setPicked(undefined);
+                        setPreview(undefined);
+                      }}
+                      fieldProps={fieldProps}
+                    />
                   ) : (
-                    catalogMatches.map((entry) => (
-                      <Button
-                        key={entry.id}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7"
-                        // Already watched: still listed, so the menu never
-                        // looks like it forgot a provider, but adding it again
-                        // would only earn a 409.
-                        disabled={entry.configured}
-                        onClick={() => pick(entry)}
-                      >
-                        {entry.name}
-                      </Button>
-                    ))
+                    <>
+                      <ServiceIdentity name={name} adapter={adapter} baseUrl={baseUrl} onChange={goToSource} />
+                      {details}
+                      {/* Everything only one adapter can use, folded away. For
+                          a Statuspage site it is empty and stays shut; for the
+                          http probe it is where ten extra fields live instead
+                          of in the middle of the form. */}
+                      {hasAdapterOptions(activeAdapter) && (
+                        <Collapsible
+                          className="panel-advanced rounded-md border border-border"
+                          open={advanced}
+                          onOpenChange={setAdvanced}
+                        >
+                          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md px-3.5 py-3 text-left">
+                            <span className="flex flex-col gap-1">
+                              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                {t("add.advanced")}
+                              </span>
+                              <span className="text-xs text-muted-foreground">{t("add.advanced-hint")}</span>
+                            </span>
+                            <ChevronDown
+                              className={advanced ? "size-4 rotate-180 text-muted-foreground transition-transform" : "size-4 text-muted-foreground transition-transform"}
+                            />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="border-t border-border p-3">{adapterFields}</div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      )}
+                    </>
                   )}
                 </div>
-                <span className="text-xs text-muted-foreground">{t("catalog.hint")}</span>
               </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="service-name">{t("field.name")}</Label>
-                <Input id="service-name" value={name} onChange={(event) => setName(event.target.value)} {...fieldProps} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="service-id">{t("field.id")}</Label>
-                <Input id="service-id" className="font-mono" value={id} readOnly />
-              </div>
-            </div>
-
-            {mode === "add" && (
-              <div className="flex flex-col gap-1.5">
-                <Label>{t("field.adapter")}</Label>
-                {/* Ten adapters do not fit one line of a dialog: unwrapped,
-                    the row ran under the dialog's own edge and the last three
-                    were unreachable. Wrapped *and* spaced — a segmented bar
-                    broken over two lines shows square corners where the rows
-                    break, while spaced items are individually rounded chips
-                    that read the same on every line. */}
-                <ToggleGroup
-                  type="single"
-                  spacing={1}
-                  className="w-full flex-wrap"
-                  value={adapter}
-                  onValueChange={(next) => {
-                    if (next !== "") setAdapter(next);
-                  }}
-                >
-                  {ADAPTERS.map((option) => (
-                    <ToggleGroupItem key={option} value={option}>
-                      {option}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="service-base-url">{t("field.base-url")}</Label>
-                {/* Add mode only: an existing service already has both answers,
-                    and re-detecting one would offer to overwrite them. */}
-                {mode === "add" && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={detecting || baseUrl.trim() === ""}
-                    onClick={() => void runDetect()}
-                  >
-                    {t("action.detect-adapter")}
-                  </Button>
-                )}
-              </div>
-              <Input
-                id="service-base-url"
-                className="font-mono"
-                value={baseUrl}
-                onChange={(event) => setBaseUrl(event.target.value)}
-                {...fieldProps}
-              />
-              {mode === "add" && <span className="font-mono text-xs text-muted-foreground">{t(ADAPTER_NOTES[adapter] ?? "add.note.custom")}</span>}
-            </div>
-
-            {scraping && (
-              <div className="flex flex-col gap-3 rounded-md border border-dashed border-border p-3">
-                <p className="text-xs text-muted-foreground">{t("scrape.warning")}</p>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="service-selector">{t("scrape.selector")}</Label>
-                  <Input
-                    id="service-selector"
-                    className="font-mono"
-                    value={options["selector"] ?? ""}
-                    onChange={(event) => setOption("selector", event.target.value)}
-                    {...fieldProps}
-                  />
-                  <span className="text-xs text-muted-foreground">{t("scrape.selector-hint")}</span>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>{t("scrape.words")}</Label>
-                  {SCRAPE_SEVERITIES.map((severity) => (
-                    <div key={severity.key} className="grid grid-cols-[8rem_1fr] items-center gap-2">
-                      <Label className="text-xs font-normal text-muted-foreground" htmlFor={`service-words-${severity.key}`}>
-                        {t(severity.label)}
-                      </Label>
-                      <Input
-                        id={`service-words-${severity.key}`}
-                        className="font-mono"
-                        placeholder={t("scrape.words-placeholder", { example: severity.example })}
-                        value={options[severity.key] ?? ""}
-                        onChange={(event) => setOption(severity.key, event.target.value)}
-                        {...fieldProps}
-                      />
-                    </div>
-                  ))}
-                  <span className="text-xs text-muted-foreground">{t("scrape.words-hint")}</span>
-                </div>
-              </div>
-            )}
-
-            {probing && (
-              <div className="flex flex-col gap-3 rounded-md border border-dashed border-border p-3">
-                <p className="text-xs text-muted-foreground">{t("probe.warning")}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <Label>{t("probe.method")}</Label>
-                    <ToggleGroup
-                      type="single"
-                      spacing={1}
-                      className="w-full"
-                      value={options["method"] ?? "GET"}
-                      onValueChange={(next) => {
-                        if (next !== "") setOption("method", next);
-                      }}
-                    >
-                      {PROBE_METHODS.map((option) => (
-                        <ToggleGroupItem key={option} value={option}>
-                          {option}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="service-probe-path">{t("probe.path")}</Label>
-                    <Input
-                      id="service-probe-path"
-                      className="font-mono"
-                      value={options["path"] ?? ""}
-                      onChange={(event) => setOption("path", event.target.value)}
-                      {...fieldProps}
-                    />
-                  </div>
-                </div>
-                <span className="text-xs text-muted-foreground">{t("probe.path-hint")}</span>
-
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="service-probe-status">{t("probe.expect-status")}</Label>
-                  <Input
-                    id="service-probe-status"
-                    className="font-mono"
-                    placeholder={t("probe.expect-status-placeholder")}
-                    value={options["expectStatus"] ?? ""}
-                    onChange={(event) => setOption("expectStatus", event.target.value)}
-                    {...fieldProps}
-                  />
-                  <span className="text-xs text-muted-foreground">{t("probe.expect-status-hint")}</span>
-                </div>
-
-                {/* Only a GET downloads a body to match against, so the two
-                    body fields are not offered against a HEAD the adapter
-                    would reject the moment it polled. */}
-                {(options["method"] ?? "GET") === "GET" && (
-                  <>
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="service-probe-expect-body">{t("probe.expect-body")}</Label>
-                      <Input
-                        id="service-probe-expect-body"
-                        className="font-mono"
-                        value={options["expectBody"] ?? ""}
-                        onChange={(event) => setOption("expectBody", event.target.value)}
-                        {...fieldProps}
-                      />
-                      <span className="text-xs text-muted-foreground">{t("probe.expect-body-hint")}</span>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="service-probe-absent-body">{t("probe.absent-body")}</Label>
-                      <Input
-                        id="service-probe-absent-body"
-                        className="font-mono"
-                        value={options["absentBody"] ?? ""}
-                        onChange={(event) => setOption("absentBody", event.target.value)}
-                        {...fieldProps}
-                      />
-                      <span className="text-xs text-muted-foreground">{t("probe.absent-body-hint")}</span>
-                    </div>
-                  </>
-                )}
-
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="service-probe-slow">{t("probe.slow-ms")}</Label>
-                  <Input
-                    id="service-probe-slow"
-                    type="number"
-                    min={1}
-                    value={options["slowMs"] ?? ""}
-                    onChange={(event) => setOption("slowMs", event.target.value)}
-                    {...fieldProps}
-                  />
-                  <span className="text-xs text-muted-foreground">{t("probe.slow-ms-hint")}</span>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="service-probe-tls">{t("probe.tls-warn-days")}</Label>
-                  <Input
-                    id="service-probe-tls"
-                    type="number"
-                    min={1}
-                    value={options["tlsWarnDays"] ?? ""}
-                    onChange={(event) => setOption("tlsWarnDays", event.target.value)}
-                    {...fieldProps}
-                  />
-                  <span className="text-xs text-muted-foreground">{t("probe.tls-warn-days-hint")}</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* Stored only when switched off: following is the default,
-                      and an option repeating the default is noise in the
-                      exported config file. */}
-                  <Switch
-                    id="service-probe-redirects"
-                    checked={(options["followRedirects"] ?? "yes") !== "no"}
-                    onCheckedChange={(next) => setOption("followRedirects", next ? "" : "no")}
-                  />
-                  <Label htmlFor="service-probe-redirects">{t("probe.follow-redirects")}</Label>
-                </div>
-
-                <div className="grid grid-cols-[1fr_1fr] gap-2">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="service-probe-header-name">{t("probe.header-name")}</Label>
-                    <Input
-                      id="service-probe-header-name"
-                      className="font-mono"
-                      value={headerName}
-                      onChange={(event) => setHeaderName(event.target.value)}
-                      {...fieldProps}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="service-probe-header-value">{t("probe.header-value")}</Label>
-                    <Input
-                      id="service-probe-header-value"
-                      className="font-mono"
-                      placeholder={t("probe.header-value-placeholder")}
-                      value={headerValue}
-                      onChange={(event) => setHeaderValue(event.target.value)}
-                      {...fieldProps}
-                    />
-                  </div>
-                </div>
-                <span className="text-xs text-muted-foreground">{t("probe.header-hint")}</span>
-              </div>
-            )}
-
-            {tcpProbing && (
-              <div className="flex flex-col gap-3 rounded-md border border-dashed border-border p-3">
-                <p className="text-xs text-muted-foreground">{t("tcp.warning")}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="service-tcp-port">{t("tcp.port")}</Label>
-                    <Input
-                      id="service-tcp-port"
-                      type="number"
-                      min={1}
-                      max={65535}
-                      className="font-mono"
-                      value={options["port"] ?? ""}
-                      onChange={(event) => setOption("port", event.target.value)}
-                      {...fieldProps}
-                    />
-                    <span className="text-xs text-muted-foreground">{t("tcp.port-hint")}</span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="service-tcp-slow">{t("probe.slow-ms")}</Label>
-                    <Input
-                      id="service-tcp-slow"
-                      type="number"
-                      min={1}
-                      value={options["slowMs"] ?? ""}
-                      onChange={(event) => setOption("slowMs", event.target.value)}
-                      {...fieldProps}
-                    />
-                    <span className="text-xs text-muted-foreground">{t("tcp.slow-ms-hint")}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {dnsProbing && (
-              <div className="flex flex-col gap-3 rounded-md border border-dashed border-border p-3">
-                <p className="text-xs text-muted-foreground">{t("dns.warning")}</p>
-                <div className="flex flex-col gap-1.5">
-                  <Label>{t("dns.record-type")}</Label>
-                  <ToggleGroup
-                    type="single"
-                    spacing={1}
-                    className="w-full"
-                    value={options["recordType"] ?? "A"}
-                    onValueChange={(next) => {
-                      if (next !== "") setOption("recordType", next);
-                    }}
-                  >
-                    {DNS_RECORD_TYPES.map((option) => (
-                      <ToggleGroupItem key={option} value={option}>
-                        {option}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="service-dns-expect">{t("dns.expect-value")}</Label>
-                  <Input
-                    id="service-dns-expect"
-                    className="font-mono"
-                    value={options["expectValue"] ?? ""}
-                    onChange={(event) => setOption("expectValue", event.target.value)}
-                    {...fieldProps}
-                  />
-                  <span className="text-xs text-muted-foreground">{t("dns.expect-value-hint")}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="service-dns-resolver">{t("dns.resolver")}</Label>
-                    <Input
-                      id="service-dns-resolver"
-                      className="font-mono"
-                      placeholder={t("dns.resolver-placeholder")}
-                      value={options["resolver"] ?? ""}
-                      onChange={(event) => setOption("resolver", event.target.value)}
-                      {...fieldProps}
-                    />
-                    <span className="text-xs text-muted-foreground">{t("dns.resolver-hint")}</span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="service-dns-slow">{t("probe.slow-ms")}</Label>
-                    <Input
-                      id="service-dns-slow"
-                      type="number"
-                      min={1}
-                      value={options["slowMs"] ?? ""}
-                      onChange={(event) => setOption("slowMs", event.target.value)}
-                      {...fieldProps}
-                    />
-                    <span className="text-xs text-muted-foreground">{t("dns.slow-ms-hint")}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Roadmap 2.6. Typed, not picked: the first group has to be
-                creatable, and a select with nothing in it cannot create one.
-                Slugified on the way out, the way the id is, so "Deploy path"
-                is a legal group rather than a rejected write. */}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="service-group">{t("field.group")}</Label>
-              <Input
-                id="service-group"
-                list="service-group-options"
-                placeholder={t("field.group-placeholder")}
-                value={group}
-                onChange={(event) => setGroup(event.target.value)}
-                {...fieldProps}
-              />
-              {/* The groups that already exist, offered rather than imposed:
-                  an operator adding the fifth provider to a stack should not
-                  have to remember how they spelled it. */}
-              <datalist id="service-group-options">
-                {existingGroups.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-              <span className="text-xs text-muted-foreground">{t("field.group-hint")}</span>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="service-interval">{t("field.provider-interval")}</Label>
-              <Input
-                id="service-interval"
-                type="number"
-                min={1}
-                max={1440}
-                placeholder={t("field.provider-interval-placeholder")}
-                value={intervalMinutes}
-                onChange={(event) => setIntervalMinutes(event.target.value)}
-                {...fieldProps}
-              />
-              <span className="text-xs text-muted-foreground">{t("field.provider-interval-hint")}</span>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label>{t("components.field")}</Label>
-                <Button type="button" variant="ghost" size="sm" disabled={previewLoading} onClick={() => void loadPreview()}>
-                  {t("components.load")}
-                </Button>
-              </div>
-              {preview !== undefined && (
-                <ComponentPicker
-                  available={preview.components}
-                  supported={preview.supported}
-                  value={selection}
-                  onChange={setSelection}
-                  loading={previewLoading}
-                  scopeToComponents={scopeToComponents}
-                  onScopeChange={setScopeToComponents}
-                />
-              )}
-            </div>
-
-            {mode === "edit" && (
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="ghost" size="sm" disabled={test.isPending} onClick={() => void runConnectionTest()}>
-                  {t("action.test-connection")}
-                </Button>
-              </div>
+            ) : (
+              <>
+                {details}
+                {/* No disclosure while editing: tuning these is most of why an
+                    operator opens an existing service at all. */}
+                {hasAdapterOptions(activeAdapter) && <Section title={t("add.advanced")}>{adapterFields}</Section>}
+              </>
             )}
 
             {message !== undefined && (
@@ -892,16 +618,101 @@ export function ServiceDialog({
             )}
           </DialogBody>
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={close}>
-              {t("action.cancel")}
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {mode === "add" ? t("action.add") : t("action.save")}
-            </Button>
+          <DialogFooter className="sm:justify-between">
+            <div className="flex items-center gap-2">
+              {mode === "edit" && (
+                <Button type="button" variant="outline" size="sm" disabled={test.isPending} onClick={() => void runConnectionTest()}>
+                  {t("action.test-connection")}
+                </Button>
+              )}
+              {adding && (
+                <span className="text-xs text-muted-foreground">
+                  {t(onSource ? (ready ? "add.foot-ready" : "add.foot-pick") : "add.foot-tested")}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {adding && !onSource && (
+                <Button type="button" variant="ghost" className="back-link" onClick={goToSource}>
+                  {t("action.previous-step")}
+                </Button>
+              )}
+              <Button type="button" variant="ghost" onClick={close}>
+                {t("action.cancel")}
+              </Button>
+              {onSource ? (
+                <Button type="button" disabled={!ready} onClick={goToDetails}>
+                  {t("action.continue")}
+                </Button>
+              ) : (
+                <Button type="submit" disabled={saving}>
+                  {adding ? t("action.add") : t("action.save")}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * One named block of the form. The dialog's second step is four of these, and
+ * the naming is the point: an operator who only came to change the poll
+ * interval should be able to find it without reading the component picker.
+ */
+function Section({
+  title, action, children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-3 rounded-md border border-border p-3.5">
+      <div className="flex min-h-7 items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{title}</span>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Two steps, and which one you are on — the whole of the wizard's chrome. */
+function StepRail({ step }: { step: 1 | 2 }) {
+  const { t } = useTranslation();
+  const steps = [
+    { index: 1, label: "add.step-source" },
+    { index: 2, label: "add.step-details" },
+  ];
+
+  return (
+    <ol className="flex items-center gap-2.5 pt-1">
+      {steps.map((entry, position) => (
+        <li key={entry.index} className="flex flex-1 items-center gap-2.5 last:flex-none">
+          <span className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className={
+                entry.index === step
+                  ? "flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground transition-colors"
+                  : "flex size-5 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-muted-foreground transition-colors"
+              }
+            >
+              {entry.index}
+            </span>
+            <span
+              aria-current={entry.index === step ? "step" : undefined}
+              className={entry.index === step ? "text-xs font-medium" : "text-xs font-medium text-muted-foreground"}
+            >
+              {t(entry.label)}
+            </span>
+          </span>
+          {position === 0 && <span className="h-px flex-1 bg-border" />}
+        </li>
+      ))}
+    </ol>
   );
 }
