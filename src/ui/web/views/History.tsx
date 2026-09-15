@@ -8,6 +8,7 @@ import { DeltaChip } from "@/components/DeltaChip.tsx";
 import { DownloadMenu } from "@/components/DownloadMenu.tsx";
 import { ProviderHistoryDrawer } from "@/components/ProviderHistoryDrawer.tsx";
 import { ProviderTrendRow } from "@/components/ProviderTrendRow.tsx";
+import { StatTiles } from "@/components/StatTiles.tsx";
 import { MonthColumns } from "@/components/charts/MonthColumns.tsx";
 import { UptimeCompareChart } from "@/components/charts/UptimeCompareChart.tsx";
 import { UptimeTrendChart } from "@/components/charts/UptimeTrendChart.tsx";
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/select.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { COMPARE_CHART } from "@/lib/chartConfig.ts";
+import { formatDuration } from "@/lib/format.ts";
 import { alignSeries, uptimeForRange } from "@/lib/history.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { HistorySummary, ProviderHistory } from "@/lib/types.ts";
@@ -100,6 +102,17 @@ export function History() {
   );
 
   const nameOf = (providerId: string) => statusById.get(providerId)?.name ?? providerId;
+
+  // `ordered` is worst-first, so the two ends of it are the two tiles; the
+  // other two are sums over the window. Empty fleets never reach the tiles
+  // (the block is gated on `ordered.length`), so the non-null assertions here
+  // are the same guard read twice.
+  const worst = ordered[0] as ProviderHistory;
+  const best = ordered[ordered.length - 1] as ProviderHistory;
+  const totalIncidents = summary.providers.reduce((sum, p) => sum + p.incidentCount, 0);
+  const totalDowntime = summary.providers.reduce((sum, p) => sum + p.downtimeMinutes, 0);
+  const percent = (value: number): string =>
+    `${new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 2 }).format(value)}%`;
 
   /**
    * The two worst by default (roadmap 5.7): the page already ranks worst first,
@@ -240,6 +253,49 @@ export function History() {
           </div>
         </div>
 
+        {/* The window's four figures, before the first chart. The aggregate is
+            deliberately not among them — it is the page's headline two lines
+            up, and a tile repeating it would be the same number twice. These
+            are the ones the charts below make you read a shape to recover:
+            which provider was best, which was worst, how many incidents that
+            came to, and how long the fleet was actually down. */}
+        {ordered.length > 0 && (
+          <StatTiles
+            stats={[
+              {
+                id: "best",
+                label: t("history.stat.best"),
+                value: nameOf(best.providerId),
+                note: percent(uptimeForRange(best, days)),
+                accent: "var(--status-operational)",
+              },
+              {
+                id: "worst",
+                label: t("history.stat.worst"),
+                value: nameOf(worst.providerId),
+                note: percent(uptimeForRange(worst, days)),
+                accent: "var(--status-major-outage)",
+              },
+              {
+                id: "incidents",
+                label: t("history.stat.incidents"),
+                value: (
+                  <NumberTicker locale={i18n.language} value={totalIncidents} />
+                ),
+                note: t("history.stat.incidents-note", { days }),
+                accent: "var(--status-degraded)",
+              },
+              {
+                id: "downtime",
+                label: t("history.stat.downtime"),
+                value: formatDuration(i18n.language, totalDowntime),
+                note: t("history.stat.downtime-note", { days }),
+                accent: "var(--color-accent)",
+              },
+            ]}
+          />
+        )}
+
         <UptimeTrendChart series={summary.dailyUptime} label={t("history.trend-title")} />
 
         <MonthColumns
@@ -299,7 +355,13 @@ export function History() {
         // labelled nothing — the exact defect this list was rebuilt to fix. A
         // delta cell is also empty whenever a provider has no previous window,
         // and only shared tracks keep the columns straight through that.
-        <div className="history-list grid grid-cols-[minmax(8rem,1fr)_minmax(6rem,2fr)_auto_auto_auto] items-center gap-x-4">
+        // A named region, so a query can be scoped to the list: the stat tiles
+        // at the top of the page name the best and the worst provider, so a
+        // provider's name is deliberately on the page twice.
+        <div
+          role="region"
+          aria-label={t("history.list")}
+          className="history-list grid grid-cols-[minmax(8rem,1fr)_minmax(6rem,2fr)_auto_auto_auto] items-center gap-x-4">
           <div className="col-span-full grid grid-cols-subgrid items-center px-2 text-xs uppercase tracking-widest text-muted-foreground">
             <span>{t("history.col-provider")}</span>
             <span>{t("history.col-trend")}</span>

@@ -270,6 +270,15 @@ const NON_TOKEN_PROPERTIES: Record<string, string> = {
   // that reads it: `style={{ "--gap": spacing }}`. A component-local variable
   // passing a prop into a utility class, not a palette entry.
   "--gap": "declared inline by toggle-group.tsx itself, from its `spacing` prop",
+  // The spotlight's pointer position, written onto the element by
+  // components/ui/spotlight-card.tsx on every pointermove and cleared on
+  // leave. Component-local state expressed as custom properties so the paint
+  // itself stays in CSS; not palette entries, and never declared in a
+  // stylesheet — the fallbacks in the `var()` calls are what an untouched card
+  // renders.
+  "--spot-x": "written by spotlight-card.tsx on pointermove",
+  "--spot-y": "written by spotlight-card.tsx on pointermove",
+  "--spot-opacity": "written by spotlight-card.tsx on pointer enter and leave",
 };
 
 test("every custom property the dashboard references is declared in tokens.css", async () => {

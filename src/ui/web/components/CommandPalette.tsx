@@ -32,6 +32,14 @@ import { useTheme } from "@/hooks/useTheme.tsx";
  * there is no per-provider route yet (roadmap 5.6 is where that goes). The
  * effect is what a click on that row does, reached from the keyboard.
  */
+/** What the header's search button dispatches to open the palette. */
+export const PALETTE_EVENT = "isitdown:open-palette";
+
+/** Opens the palette from anywhere in the shell. */
+export function openCommandPalette(): void {
+  window.dispatchEvent(new Event(PALETTE_EVENT));
+}
+
 export function CommandPalette() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -52,7 +60,18 @@ export function CommandPalette() {
       setOpen((current) => !current);
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    // The header carries a search affordance that says "⌘K" on it, and a
+    // keystroke nobody can discover is a keystroke most operators never use.
+    // The button asks for the palette through an event rather than through a
+    // lifted state: the palette is a sibling of the header in `App`, and
+    // hoisting `open` into the shell would put a re-render of the whole console
+    // behind every keystroke typed into the palette's own input.
+    const onRequest = (): void => setOpen(true);
+    window.addEventListener(PALETTE_EVENT, onRequest);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener(PALETTE_EVENT, onRequest);
+    };
   }, []);
 
   /** Every item closes the palette first: the action it runs changes the screen. */

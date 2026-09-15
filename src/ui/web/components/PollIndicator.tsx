@@ -52,9 +52,9 @@ export function PollIndicator() {
             : t("meta.countdown-seconds", { seconds: remainderSeconds });
 
   return (
-    <div className="header-poll flex items-center gap-4">
-      <div className="poll-next flex flex-col">
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+    <div className="header-poll flex items-center gap-3 rounded-full border border-border bg-card/60 py-1 pl-3 pr-1">
+      <div className="poll-next flex flex-col leading-tight">
+        <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
           {t("meta.next-poll-label")}
           {/* Says where the freshness comes from: with the stream connected the
               dashboard is told about a cycle, it no longer asks on a timer. */}
@@ -68,10 +68,30 @@ export function PollIndicator() {
           <span
             className={cn("poll-next-dot size-1.5 rounded-full bg-primary", polling && "dot-pulse")}
           />
-          <span className="poll-next-time font-mono text-sm">{label}</span>
+          <span className="poll-next-time font-mono text-xs">{label}</span>
         </span>
       </div>
-      <Button type="button" disabled={polling} aria-busy={polling} onClick={() => poll.mutate()}>
+      {/* The countdown says how long; this says the poller is alive. A number
+          that has not moved for a second and a number that will never move
+          again read identically, and the beam is the difference. It runs only
+          while there is a cycle to wait for — with nothing scheduled the track
+          stays dark rather than animating over a dead poller. */}
+      <span
+        aria-hidden="true"
+        className="poll-meter h-1.5 w-9 overflow-hidden rounded-full bg-muted"
+      >
+        {secondsLeft !== null && (
+          <span className="poll-meter-beam block h-full w-1/3 rounded-full bg-linear-to-r from-transparent via-primary to-transparent" />
+        )}
+      </span>
+      <Button
+        type="button"
+        size="sm"
+        className="rounded-full"
+        disabled={polling}
+        aria-busy={polling}
+        onClick={() => poll.mutate()}
+      >
         {polling && <LoaderCircle className="animate-spin" aria-hidden="true" />}
         {t("action.poll-now")}
       </Button>

@@ -82,6 +82,16 @@ export function SettingsNav({ sections }: { sections: NavSection[] }) {
           </a>
         );
       })}
+
+      {/* The one sentence that governs every control on the page, moved out of
+          the column and into the rail: it answers "will this restart anything"
+          once, where it stays in view for the whole scroll, instead of sitting
+          above the first section and scrolling away from the forty rows it
+          actually describes. */}
+      <p className="mt-3 rounded-lg border border-primary/25 bg-primary/8 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+        <span className="mb-1 block font-medium text-primary">{t("settings.applied-live")}</span>
+        {t("settings.subtitle")}
+      </p>
     </nav>
   );
 }

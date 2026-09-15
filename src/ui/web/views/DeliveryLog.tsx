@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/pagination.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ProviderIcon } from "@/components/ProviderIcon.tsx";
+import { NumberTicker } from "@/components/ui/number-ticker.tsx";
+import { StatTiles } from "@/components/StatTiles.tsx";
 import { useConfig, useDeliveryLog, useStatus } from "@/hooks/queries.ts";
 import { formatDateTime, notificationHeadline } from "@/lib/format.ts";
 import { pageWindow } from "@/lib/incidents.ts";
@@ -90,6 +92,13 @@ export function DeliveryLog() {
   // selectable.
   const channels = (config?.channels ?? []).map((entry) => entry.id);
 
+  // Share of attempts that landed. Zero sends is not 0% delivered — nothing
+  // has been tried — so it reads as a dash rather than as a failure.
+  const deliveredShare =
+    counts.all === 0
+      ? "—"
+      : `${new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format((counts.sent / counts.all) * 100)}%`;
+
   const pick = (next: DeliveryState): void => {
     setState(next);
     setPage(1);
@@ -106,6 +115,45 @@ export function DeliveryLog() {
           {t("delivery.total", { count: counts.all })}
         </span>
       </div>
+
+      {/* The three counts the state filter already carries, read as figures
+          rather than as numbers beside a pill: the filter says which rows are
+          on screen, these say whether the alerting works at all. The delivered
+          share is the one figure neither the filter nor a row can state — a log
+          full of green rows and a log with four dead letters in it look the
+          same from a page of rows. */}
+      <StatTiles
+        className="anim-rise"
+        stats={[
+          {
+            id: "recorded",
+            label: t("delivery.stat.recorded"),
+            value: <NumberTicker locale={i18n.language} value={counts.all} />,
+            note: t("delivery.stat.recorded-note"),
+          },
+          {
+            id: "sent",
+            label: t("delivery.state.sent"),
+            value: <NumberTicker locale={i18n.language} value={counts.sent} />,
+            note: t("delivery.stat.delivered-share", { share: deliveredShare }),
+            accent: "var(--status-operational)",
+          },
+          {
+            id: "failed",
+            label: t("delivery.state.failed"),
+            value: <NumberTicker locale={i18n.language} value={counts.failed} />,
+            note: t("delivery.stat.failed-note"),
+            accent: "var(--status-major-outage)",
+          },
+          {
+            id: "channels",
+            label: t("nav.channels"),
+            value: <NumberTicker locale={i18n.language} value={channels.length} />,
+            note: t("delivery.stat.channels-note"),
+            accent: "var(--color-accent)",
+          },
+        ]}
+      />
 
       <div className="anim-rise flex flex-wrap items-center justify-between gap-3" style={{ animationDelay: "60ms" }}>
         <ToggleGroup type="single" aria-label={t("delivery.filter.state")} value={state} onValueChange={(next) => {

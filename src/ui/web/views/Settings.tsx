@@ -489,8 +489,14 @@ function SettingsView() {
       <SettingsNav sections={navSections} />
 
       <div className="flex min-w-0 max-w-3xl flex-1 flex-col gap-8">
+      {/* The subtitle moved into the rail (SettingsNav), where it stays in view
+          for the whole page rather than scrolling off above the first section.
+          Below the `lg` breakpoint the rail is hidden, so it is said here
+          instead — the sentence is never absent, only ever in one place. */}
       <div className="flex flex-col gap-3">
-        <span className="text-xs leading-relaxed text-muted-foreground">{t("settings.subtitle")}</span>
+        <span className="text-xs leading-relaxed text-muted-foreground lg:hidden">
+          {t("settings.subtitle")}
+        </span>
         <SettingsToolbar />
       </div>
 

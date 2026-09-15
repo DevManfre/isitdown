@@ -36,6 +36,17 @@ Edizione UI. Tre stati: **chiaro / scuro / sistema**, ciclati dall'header.
   stesse rampe tonali dall'altro capo — nessun colore è stato inventato, comprese le
   cinque tinte di severità, che hanno un valore proprio per tema.
 
+- **Chrome illuminata** (roadmap 7.6). Ogni vista si apre su una fascia illuminata
+  e non solo velata: il bagliore dell'accento che la palette ha sempre avuto, una
+  griglia di punti sotto, un fascio lungo il bordo superiore e — solo mentre
+  qualcosa è davvero giù — un secondo bagliore nel colore della severità e un
+  fascio che percorre il bordo della card. Le tile dei provider si illuminano
+  sotto il puntatore invece di limitarsi a sollevarsi. È tutto token
+  (`--gradient-primary`, `--gradient-hero-live`, `--shadow-glow`) più tre regole
+  CSS in `motion.css`; il fascio è un'animazione CSS su `offset-path`, non un
+  componente motion, ed è questo che lo tiene fuori dal budget del bundle.
+  `prefers-reduced-motion` ferma il fascio e il misuratore di poll nell'header.
+
 ### 8.2 Localizzazione
 
 Due livelli, con `en` come lingua di partenza e fallback in entrambi:
@@ -109,7 +120,9 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   scontato. Gli elementi cliccabili scritti a mano (una riga di provider, una
   tile ad anello) ricevono un anello di focus visibile da `base.css` a
   specificità zero, sotto quello che una primitiva ha già.
-- **La palette dei comandi.** `⌘K` (o `Ctrl+K`) su qualsiasi schermata apre una
+- **La palette dei comandi.** `⌘K` (o `Ctrl+K`) su qualsiasi schermata — oppure
+  il pulsante di ricerca nell'header, che porta scritta la scorciatoia perché il
+  secondo utilizzo sia da tastiera — apre una
   sola casella di ricerca sopra la console (roadmap 5.4): ogni vista che elenca
   la rail, ogni provider abilitato — cercabile con il nome a schermo o con l'id
   con cui è stato configurato — più **Poll now** e il tema. Un provider apre il

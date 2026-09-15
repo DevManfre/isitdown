@@ -618,6 +618,82 @@
   animation: channel-fold 0.2s ease;
 }
 
+/* ── roadmap 7.6, the cinematic chrome ──────────────────────────────────────
+   Three effects the redesign leans on, all of them here rather than in markup
+   because each one is a state the operator's pointer (or the poller) drives,
+   and none of them survives as a Tailwind utility.
+
+   The spotlight is the wash under the pointer on a provider tile. The
+   component writes --spot-x/--spot-y on pointermove and drops --spot-opacity
+   to 0 on leave (components/ui/spotlight-card.tsx); everything else is here, so
+   a card that is never hovered costs one unpainted pseudo-element. */
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+  opacity: var(--spot-opacity, 0);
+  transition: opacity 0.24s var(--ease-out);
+  background: radial-gradient(
+    240px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    color-mix(in srgb, var(--color-accent) 16%, transparent),
+    transparent 70%
+  );
+}
+.spotlight > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* The poll meter in the header: a band of light crossing a short track, once
+   per second, for as long as the poller is armed. It is the one looping
+   animation in the chrome, and it says the same thing the countdown beside it
+   says — which is why reduced motion is allowed to stop it dead (the block at
+   the foot of this file pins every iteration count to 1). */
+@keyframes meter-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(200%);
+  }
+}
+.poll-meter-beam {
+  animation: meter-sweep 2.4s var(--ease-out) infinite;
+}
+
+/* The beam that travels a lit card's border (components/ui/border-beam.tsx).
+   The element rides an `offset-path` the component sets inline — the path is
+   the card's own rounded rectangle, which only the call site knows the radius
+   of — and this moves it along that path. Duration and start offset are
+   inline too, so two beams on one screen do not travel in lockstep. */
+@keyframes beam-travel {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+.border-beam-run {
+  animation: beam-travel linear infinite;
+}
+
+/* A tile that lifts under the pointer. Same travel as .ring-tile so the two
+   fleet shapes do not hover differently. */
+.tile-lit {
+  transition:
+    transform 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out);
+}
+.tile-lit:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
 /* Reduced motion keeps every state change, and none of the travel. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -627,6 +703,12 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+  /* The beam is decoration with no still frame worth keeping: stopped at one
+     iteration it would park a bright square in a corner of the card. */
+  .border-beam-run {
+    display: none;
+  }
+  .tile-lit:hover,
   .ring-tile:hover,
   .service-row:hover,
   .back-link:hover,
