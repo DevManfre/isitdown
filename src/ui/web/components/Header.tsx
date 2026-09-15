@@ -1,5 +1,7 @@
+import { useCallback } from "react";
 import { Monitor, Moon, Search, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler.tsx";
 import { PollIndicator } from "./PollIndicator.tsx";
 import { openCommandPalette } from "./CommandPalette.tsx";
 import { usePreferencesMutation, useStatusChrome } from "@/hooks/queries.ts";
@@ -44,6 +46,12 @@ export function Header({ view }: { view: string }) {
   // theme.mode's template needs {mode}; an empty call would leak the raw
   // "{mode} mode" placeholder into the aria-label instead of "Light mode".
   const themeTitle = t("theme.mode", { mode: t(`theme.${mode}`) });
+  // cycle() both applies the local choice and hands back the mode it switched
+  // to, so the persisted preference can never drift from what the button just
+  // did. The toggler calls this inside the view transition.
+  const onToggleTheme = useCallback(() => {
+    savePreferences.mutate({ theme: cycle() });
+  }, [cycle, savePreferences]);
   const ThemeIcon = THEME_ICONS[mode];
 
   return (
@@ -97,18 +105,16 @@ export function Header({ view }: { view: string }) {
           ))}
         </div>
 
-        <button
-          type="button"
+        {/* The switch reveals itself: the next theme is wiped over the page
+            through a circle growing out of this button, so the operator sees
+            where the change came from instead of the whole screen flipping at
+            once. Browsers without View Transitions, and operators who asked
+            for reduced motion, get the plain swap. */}
+        <AnimatedThemeToggler
           className="theme-btn rounded-md border border-border bg-card/60 p-1.5 text-primary"
           aria-label={themeTitle}
           title={themeTitle}
-          onClick={() => {
-            // cycle() both applies the local choice and hands back the mode
-            // it switched to, so the persisted preference can never drift
-            // from what the button just did.
-            const next = cycle();
-            savePreferences.mutate({ theme: next });
-          }}
+          onToggle={onToggleTheme}
         >
           {/* Keyed on the mode so every swap mounts a fresh element and plays
               the entry animation — two different icons are two different
@@ -122,7 +128,7 @@ export function Header({ view }: { view: string }) {
             strokeWidth={1.6}
             aria-hidden="true"
           />
-        </button>
+        </AnimatedThemeToggler>
 
         {/* The separator is gone with the rule that drew it: the poll cluster
             carries its own outline now, which is a stronger edge than a

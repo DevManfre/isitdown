@@ -104,3 +104,18 @@ body {
   position: relative;
   z-index: 1;
 }
+
+/* The theme reveal, drawn by `AnimatedThemeToggler`. The browser's default
+   cross-fade is off so the clip-path is the whole transition; while one runs,
+   the incoming snapshot is pinned at its collapsed clip until the JS animation
+   takes over, or Firefox paints the new theme unclipped for a frame first. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html[data-magicui-theme-vt="active"]::view-transition-new(root) {
+  clip-path: var(--magicui-theme-vt-clip-from);
+  animation-duration: var(--magicui-theme-toggle-vt-duration, 400ms);
+}
