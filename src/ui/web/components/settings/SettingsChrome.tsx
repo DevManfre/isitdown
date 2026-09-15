@@ -149,7 +149,7 @@ export function useSectionCount(section: string): number | undefined {
  * "where is the setting called…" without the operator having to know which
  * section owns it, which was the question the old page had no answer to.
  */
-export function SettingsToolbar() {
+export function SettingsToolbar({ density: showDensity = true }: { density?: boolean } = {}) {
   const { t } = useTranslation();
   const { query, setQuery, density, setDensity } = useSettingsChrome();
 
@@ -167,6 +167,9 @@ export function SettingsToolbar() {
           onChange={(event) => setQuery(event.target.value)}
         />
       </div>
+      {/* The launcher has no rows to fold hints away from, so it carries
+          the filter alone; the switch belongs to a category page. */}
+      {showDensity && (
       <ToggleGroup
         type="single"
         size="sm"
@@ -186,6 +189,7 @@ export function SettingsToolbar() {
           {t("settings.density.compact")}
         </ToggleGroupItem>
       </ToggleGroup>
+      )}
     </div>
   );
 }

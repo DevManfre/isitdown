@@ -1,7 +1,7 @@
 import { matchPath, NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Activity, History, Send, Server, Settings, TriangleAlert, type LucideIcon } from "lucide-react";
-import { NAV_ROUTES, ROUTE_PATHS, type RouteName } from "../../routePaths.ts";
+import { NAV_ROUTES, ROUTE_PATHS, type NavRouteName, type RouteName } from "../../routePaths.ts";
 import { BrandMark } from "@/components/BrandMark.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import {
@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils.ts";
  * is what makes a row findable without reading. They are the lucide set the
  * rest of the dashboard already draws from, so nothing new ships for this.
  */
-const NAV_ICONS: Record<RouteName, LucideIcon> = {
+const NAV_ICONS: Record<NavRouteName, LucideIcon> = {
   overview: Activity,
   providers: Server,
   incidents: TriangleAlert,
@@ -32,8 +32,9 @@ const NAV_ICONS: Record<RouteName, LucideIcon> = {
   deliveryLog: Send,
   settings: Settings,
   // Never rendered: the detail route is not in NAV_ROUTES. Declared so the
-  // record stays exhaustive over RouteName and a new route cannot be added to
-  // the rail without a glyph.
+  // record stays exhaustive over NavRouteName and a new rail route cannot be
+  // added without a glyph. `settingsSection` is outside that type: it is a
+  // Settings page, lighting the Settings row, not a rail destination of its own.
   incidentDetail: TriangleAlert,
 };
 

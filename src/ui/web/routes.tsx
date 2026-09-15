@@ -41,6 +41,7 @@ export const router = createHashRouter([
           { path: ROUTE_PATHS.history, element: <History /> },
           { path: ROUTE_PATHS.deliveryLog, element: <DeliveryLog /> },
           { path: ROUTE_PATHS.settings, element: <Settings /> },
+          { path: ROUTE_PATHS.settingsSection, element: <Settings /> },
         ],
       },
     ],
