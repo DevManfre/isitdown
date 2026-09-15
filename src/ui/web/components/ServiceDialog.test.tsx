@@ -83,7 +83,7 @@ const fixtures = {
 };
 
 const openAdd = async () => {
-  renderWithProviders(<Settings />, fixtures);
+  renderWithProviders(<Settings />, fixtures, "/settings/services");
   const trigger = await screen.findByRole("button", { name: i18n.t("action.add-service") });
   await userEvent.click(trigger);
   return { trigger, dialog: await screen.findByRole("dialog") };
@@ -164,7 +164,7 @@ describe("the service dialog's keyboard contract", () => {
   });
 
   it("refuses to edit the id of an existing service", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
     await openEdit();
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByLabelText(i18n.t("field.id"))).toHaveAttribute("readonly");
@@ -462,7 +462,7 @@ describe("the service dialog's write path", () => {
     // Review item 2: the only edit-mode test on record asserts the id field is
     // read-only but never actually submits — patch.mutateAsync and its body
     // have never been exercised until now.
-    renderWithProviders(<Settings />, fixtures);
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
     await openEdit();
     const dialog = await screen.findByRole("dialog");
     const calls = interceptWrites({ "PATCH /config/services/github": {} });
@@ -574,7 +574,7 @@ describe("the service dialog's bundled catalog", () => {
   });
 
   it("offers no catalog while editing: an existing service has every answer already", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
     await openEdit();
     const dialog = await screen.findByRole("dialog");
 

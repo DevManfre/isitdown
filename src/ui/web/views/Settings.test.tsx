@@ -139,9 +139,56 @@ const fixtures = {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/**
+ * Settings is a launcher now: the grid of categories lives at `/settings`, and
+ * a category's rows at `/settings/<id>`. A test that is about rows therefore
+ * has to say which category it opened — the rows are not all on one page any
+ * more.
+ */
+const renderSettings = (section: string, routeFixtures: Fixtures = fixtures) =>
+  renderWithProviders(<Settings />, routeFixtures, `/settings/${section}`);
+
+/** The grid itself, with no category open. */
+const renderLauncher = (routeFixtures: Fixtures = fixtures) =>
+  renderWithProviders(<Settings />, routeFixtures, "/settings");
+
+describe("the settings launcher", () => {
+  it("shows one tile per category, each a link to that category's own page", async () => {
+    renderLauncher();
+    expect(await screen.findByText(i18n.t("settings.section.engine.blurb"))).toBeInTheDocument();
+    const engine = screen
+      .getAllByRole("link")
+      .find((link) => link.getAttribute("href")?.endsWith("/settings/engine"));
+    expect(engine).toBeDefined();
+    // The rows themselves are behind that link, not on the grid.
+    expect(screen.queryByLabelText(i18n.t("field.interval"))).toBeNull();
+  });
+
+  it("leaves out the removals tile while nothing is restorable", async () => {
+    renderLauncher();
+    await screen.findByText(i18n.t("settings.section.engine.blurb"));
+    expect(screen.queryByText(i18n.t("settings.section.removed.blurb"))).toBeNull();
+  });
+
+  it("finds a single setting by name and says which category holds it", async () => {
+    const user = userEvent.setup();
+    renderLauncher();
+    await user.type(await screen.findByLabelText(i18n.t("settings.filter.label")), "retention");
+    const hit = await screen.findByRole("link", { name: new RegExp(i18n.t("field.retention"), "i") });
+    expect(hit).toHaveAttribute("href", expect.stringContaining("/settings/data"));
+  });
+
+  it("says nothing matched rather than leaving the grid blank", async () => {
+    const user = userEvent.setup();
+    renderLauncher();
+    await user.type(await screen.findByLabelText(i18n.t("settings.filter.label")), "zzzz");
+    expect(await screen.findByText(i18n.t("settings.filter.empty", { query: "zzzz" }))).toBeInTheDocument();
+  });
+});
+
 describe("Settings", () => {
   it("shows the polling fields with their current values", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("engine", fixtures);
     expect(await screen.findByLabelText(i18n.t("field.interval"))).toHaveValue(5);
     expect(await screen.findByLabelText(i18n.t("field.timeout"))).toHaveValue(10);
     expect(await screen.findByLabelText(i18n.t("field.retries"))).toHaveValue(3);
@@ -150,7 +197,7 @@ describe("Settings", () => {
   it("saves the adaptive cadence on blur, and only that field", async () => {
     // Roadmap 2.3. The switch and its cadence are their own patch: sending the
     // three engine numbers along would write fields nobody touched.
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("engine", fixtures);
     const calls = interceptWrites({
       "PATCH /config/settings": {
         polling: { ...config.polling, adaptiveIntervalMinutes: 2 },
@@ -168,7 +215,7 @@ describe("Settings", () => {
   });
 
   it("switching adaptive polling off takes its cadence field with it", async () => {
-    renderWithProviders(<Settings />, {
+    renderSettings("engine", {
       ...fixtures,
       config: { ...config, polling: { ...config.polling, adaptivePolling: false } },
     });
@@ -179,7 +226,7 @@ describe("Settings", () => {
   });
 
   it("saves a polling field when it loses focus, with no Save button in sight", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("engine", fixtures);
     const calls = interceptWrites({
       "PATCH /config/settings": {
         polling: { intervalMinutes: 7, requestTimeoutSeconds: 10, maxRetries: 3, failureThreshold: 3 },
@@ -202,7 +249,7 @@ describe("Settings", () => {
 
   it("saves 600ms after typing stops, without waiting for a blur", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("engine", fixtures);
     const calls = interceptWrites({
       "PATCH /config/settings": {
         polling: { intervalMinutes: 5, requestTimeoutSeconds: 20, maxRetries: 3, failureThreshold: 3 },
@@ -223,7 +270,7 @@ describe("Settings", () => {
   });
 
   it("refuses an out-of-range value in the section footer and sends nothing", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("engine", fixtures);
     const calls = interceptWrites({});
 
     const retries = await screen.findByLabelText(i18n.t("field.retries"));
@@ -240,7 +287,7 @@ describe("Settings", () => {
   });
 
   it("keeps a service row to its switch, with edit and remove one disclosure away", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("services", fixtures);
     // Five controls per provider is what made the list unreadable: the switch
     // is the one reached for often, so it is the one that stays out.
     expect(await screen.findByRole("switch", { name: "GitHub — enabled" })).toBeInTheDocument();
@@ -253,7 +300,7 @@ describe("Settings", () => {
   });
 
   it("shows one box per channel field — the credential, write-only", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("notifications", fixtures);
     const card = await openChannel(i18n.t("channel.name.telegram"));
     // Write-only: the box renders empty for a field that is already set,
     // because no route ever sends a credential back.
@@ -298,6 +345,7 @@ describe("Settings", () => {
         <BusyProbe />
       </>,
       fixtures,
+      "/settings/services",
     );
     const probe = await screen.findByTestId("busy-probe");
     expect(probe).toHaveTextContent("false");
@@ -361,10 +409,11 @@ describe("Settings", () => {
   // (see the comment on that test).
   function renderRouted(element: ReactNode, routeFixtures: Fixtures) {
     stubApi(routeFixtures);
-    window.location.hash = "/settings";
+    // The services category, because the dialogs under test live in it.
+    window.location.hash = "/settings/services";
     const client = createQueryClient({ retry: false });
     const router = createHashRouter([
-      { path: "/settings", element },
+      { path: "/settings/services", element },
       { path: "/elsewhere", element: null },
     ]);
     function BusyProbe() {
@@ -434,7 +483,7 @@ describe("Settings", () => {
   // route has always accepted `enabled`, but nothing in the browser could set
   // it — the add dialog hard-codes `enabled: true` and edit never sends it.
   it("a service toggle issues its patch", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("services", fixtures);
     const toggle = await screen.findByRole("switch", { name: "GitHub — enabled" });
     const calls = interceptWrites({ "PATCH /config/services/github": {} });
 
@@ -450,12 +499,12 @@ describe("Settings", () => {
 
   it("reads a disabled service as off, so the row states it rather than only tinting a dot", async () => {
     const services = [{ ...config.services[0], enabled: false }];
-    renderWithProviders(<Settings />, { ...fixtures, config: { ...config, services } });
+    renderSettings("services", { ...fixtures, config: { ...config, services } });
     expect(await screen.findByRole("switch", { name: "GitHub — disabled" })).not.toBeChecked();
   });
 
   it("a channel toggle issues its patch", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("notifications", fixtures);
     const toggle = await screen.findByRole("switch", { name: "Telegram — enabled" });
     const calls = interceptWrites({ "PATCH /config/channels/telegram": {} });
 
@@ -470,7 +519,7 @@ describe("Settings", () => {
   });
 
   it("says that configuration changes need no restart", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("engine", fixtures);
     // Twice in the DOM, once per breakpoint: the sentence lives in the
     // settings rail (lg and up) and above the toolbar below it, and CSS — not
     // the markup — decides which one an operator sees.
@@ -491,7 +540,7 @@ describe("Settings", () => {
     const listFixtures = { ...fixtures, config: { ...config, channels: manyChannels } };
 
     it("keeps every row shut until one is opened, so no credential field is on screen", async () => {
-      renderWithProviders(<Settings />, listFixtures);
+      renderSettings("notifications", listFixtures);
       await revealAllChannels();
       expect(await screen.findByText(i18n.t("channel.name.discord"))).toBeInTheDocument();
       expect(screen.queryByLabelText("webhookUrl")).toBeNull();
@@ -501,7 +550,7 @@ describe("Settings", () => {
     });
 
     it("opening one row shuts the one already open", async () => {
-      renderWithProviders(<Settings />, listFixtures);
+      renderSettings("notifications", listFixtures);
       await revealAllChannels();
       await openChannel(i18n.t("channel.name.discord"));
       expect(await screen.findByLabelText("webhookUrl")).toBeInTheDocument();
@@ -514,7 +563,7 @@ describe("Settings", () => {
     });
 
     it("orders the rows by state: active, then configured, then missing its variables", async () => {
-      renderWithProviders(<Settings />, listFixtures);
+      renderSettings("notifications", listFixtures);
       await revealAllChannels();
       await screen.findByText(i18n.t("channel.name.webpush"));
       // Scoped to the channel rows: the service list has switches too.
@@ -528,7 +577,7 @@ describe("Settings", () => {
     });
 
     it("says which of the two reasons keeps a channel from sending", async () => {
-      renderWithProviders(<Settings />, listFixtures);
+      renderSettings("notifications", listFixtures);
       await revealAllChannels();
       const discord = (await screen.findByText(i18n.t("channel.name.discord"))).closest(
         ".panel-channel",
@@ -545,7 +594,7 @@ describe("Settings", () => {
     });
 
     it("summarises what is on without the operator reading the rows", async () => {
-      renderWithProviders(<Settings />, listFixtures);
+      renderSettings("notifications", listFixtures);
       expect(
         await screen.findByText(i18n.t("channel.summary.count", { active: 1, total: 3 })),
       ).toBeInTheDocument();
@@ -556,7 +605,7 @@ describe("Settings", () => {
 
     it("says plainly when nothing is on, rather than listing nobody", async () => {
       const channels = manyChannels.map((channel) => ({ ...channel, enabled: false }));
-      renderWithProviders(<Settings />, { ...fixtures, config: { ...config, channels } });
+      renderSettings("notifications", { ...fixtures, config: { ...config, channels } });
       expect(await screen.findByText(i18n.t("channel.summary.none"))).toBeInTheDocument();
     });
   });
@@ -565,7 +614,7 @@ describe("Settings", () => {
   // only the enable/disable Switch (above) was exercised.
   describe("a channel card's own write path", () => {
     it("a channel's env-var name edit calls the save mutation with the expected body", async () => {
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("notifications", fixtures);
       const calls = interceptWrites({ "PATCH /config/channels/telegram": {} });
 
       const card = await openChannel(i18n.t("channel.name.telegram"));
@@ -582,7 +631,7 @@ describe("Settings", () => {
     });
 
     it("saving a channel whose fields were left untouched writes nothing", async () => {
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("notifications", fixtures);
       const calls = interceptWrites({ "PATCH /config/channels/telegram": {} });
 
       const card = await openChannel(i18n.t("channel.name.telegram"));
@@ -594,7 +643,7 @@ describe("Settings", () => {
     });
 
     it("a typed credential is saved to the secrets route, not to the channel row", async () => {
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("notifications", fixtures);
       const calls = interceptWrites({ "PUT /config/channels/telegram/secrets": config.channels[0] });
 
       const card = await openChannel(i18n.t("channel.name.telegram"));
@@ -616,7 +665,7 @@ describe("Settings", () => {
     });
 
     it("renaming the variable and filling it in one click renames first", async () => {
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("notifications", fixtures);
       const calls = interceptWrites({
         "PATCH /config/channels/telegram": {},
         "PUT /config/channels/telegram/secrets": config.channels[0],
@@ -637,7 +686,7 @@ describe("Settings", () => {
     });
 
     it("clearing a set field asks the secrets route to forget it", async () => {
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("notifications", fixtures);
       const calls = interceptWrites({
         "DELETE /config/channels/telegram/secrets/botToken": {
           id: "telegram",
@@ -656,7 +705,7 @@ describe("Settings", () => {
     });
 
     it("send-test reports success and shows channel.test-ok", async () => {
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("notifications", fixtures);
       const calls = interceptWrites({ "POST /config/channels/telegram/test": { ok: true } });
       const card = await openChannel(i18n.t("channel.name.telegram"));
 
@@ -669,7 +718,7 @@ describe("Settings", () => {
     });
 
     it("send-test reports failure and shows channel.test-failed with the error", async () => {
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("notifications", fixtures);
       interceptWrites({ "POST /config/channels/telegram/test": { ok: false, error: "timeout" } });
       const card = await openChannel(i18n.t("channel.name.telegram"));
 
@@ -708,7 +757,7 @@ describe("Settings", () => {
       Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { register: vi.fn() } });
       vi.stubGlobal("PushManager", class {});
       vi.stubGlobal("Notification", { requestPermission: vi.fn() });
-      renderWithProviders(<Settings />, pushFixtures);
+      renderSettings("notifications", pushFixtures);
 
       const card = await openChannel(i18n.t("channel.name.webpush"));
       // The VAPID pair is the server's own, so neither variable name is asked
@@ -726,7 +775,7 @@ describe("Settings", () => {
       Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { register: vi.fn() } });
       vi.stubGlobal("PushManager", class {});
       vi.stubGlobal("Notification", { requestPermission: vi.fn() });
-      renderWithProviders(<Settings />, pushFixtures);
+      renderSettings("notifications", pushFixtures);
 
       await openChannel(i18n.t("channel.name.webpush"));
       const enable = await screen.findByRole("button", { name: i18n.t("push.enable") });
@@ -761,7 +810,7 @@ describe("Settings", () => {
       });
       vi.stubGlobal("PushManager", class {});
 
-      renderWithProviders(<Settings />, pushFixtures);
+      renderSettings("notifications", pushFixtures);
       // `stubApi`'s fixture router has no dedicated bucket for `/config/push`
       // (it falls under the same prefix as `/config`, the whole-config
       // fixture), so the key this card actually needs — `publicKey` — is
@@ -830,7 +879,7 @@ describe("Settings", () => {
       });
       vi.stubGlobal("PushManager", class {});
 
-      renderWithProviders(<Settings />, pushFixtures);
+      renderSettings("notifications", pushFixtures);
       const calls = interceptWrites({
         "GET /config/push": { publicKey: "dGVzdC12YXBpZC1wdWJsaWMta2V5LTEyMzQ1Njc4OTA" },
         "POST /config/push/subscriptions": { devices: [] },
@@ -881,7 +930,7 @@ describe("Settings", () => {
       });
       vi.stubGlobal("PushManager", class {});
 
-      renderWithProviders(<Settings />, pushFixtures);
+      renderSettings("notifications", pushFixtures);
       interceptWrites({
         "GET /config/push": { publicKey: "dGVzdC12YXBpZC1wdWJsaWMta2V5LTEyMzQ1Njc4OTA" },
         "POST /config/push/subscriptions": { devices: [] },
@@ -915,7 +964,7 @@ describe("Settings", () => {
         ...fixtures,
         config: { ...config, channels: [...config.channels, { ...webpushChannel, enabled: true }] },
       };
-      renderWithProviders(<Settings />, enabledFixtures);
+      renderSettings("notifications", enabledFixtures);
       interceptWrites({
         "GET /config/push": { publicKey: "dGVzdC12YXBpZC1wdWJsaWMta2V5LTEyMzQ1Njc4OTA" },
         "POST /config/push/subscriptions": { devices: [] },
@@ -946,7 +995,7 @@ describe("Settings", () => {
       Object.defineProperty(navigator, "brave", { configurable: true, value: { isBrave: vi.fn() } });
       vi.stubGlobal("PushManager", class {});
 
-      renderWithProviders(<Settings />, pushFixtures);
+      renderSettings("notifications", pushFixtures);
       interceptWrites({
         "GET /config/push": { publicKey: "dGVzdC12YXBpZC1wdWJsaWMta2V5LTEyMzQ1Njc4OTA" },
         "POST /config/push/subscriptions": { devices: [] },
@@ -961,7 +1010,7 @@ describe("Settings", () => {
 
     it("explains itself instead of offering a button the browser cannot honour", async () => {
       Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: undefined });
-      renderWithProviders(<Settings />, pushFixtures);
+      renderSettings("notifications", pushFixtures);
       await openChannel(i18n.t("channel.name.webpush"));
       expect(await screen.findByText(i18n.t("push.unsupported"))).toBeInTheDocument();
     });
@@ -972,7 +1021,7 @@ describe("Settings", () => {
   // §7.4), so the control must both read that default and fire a patch that
   // carries exactly the value picked — not on mount, not some other key.
   it("offers the three geographic view options and saves the choice", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("appearance", fixtures);
     await screen.findByLabelText(/geographic view/i);
     const calls = interceptWrites({ "PATCH /api/preferences": { mapView: "map" } });
 
@@ -995,7 +1044,7 @@ describe("Settings", () => {
   // fall back to `off`. Asserted on the rendered label a person reads, not
   // on the internal value passed to `Select`.
   it("reads a stored preference back into the control instead of always showing the default", async () => {
-    renderWithProviders(<Settings />, { ...fixtures, preferences: { mapView: "globe" } });
+    renderSettings("appearance", { ...fixtures, preferences: { mapView: "globe" } });
 
     const trigger = await screen.findByLabelText(/geographic view/i);
     expect(within(trigger).getByText(i18n.t("settings.map-view.globe"))).toBeInTheDocument();
@@ -1006,7 +1055,7 @@ describe("Settings", () => {
   // right in its row — the rule count is readable without opening the editor,
   // which is now behind RoutingRulesDialog's own trigger button.
   it("says how many routing rules there are without opening the editor", async () => {
-    renderWithProviders(<Settings />, {
+    renderSettings("notifications", {
       ...fixtures,
       config: {
         ...config,
@@ -1022,18 +1071,16 @@ describe("Settings", () => {
 
   describe("recently removed", () => {
     it("says nothing at all when no removal is waiting", async () => {
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("services", fixtures);
 
-      // The section is not empty chrome for a state that is normally absent —
-      // and neither is the rail entry that would scroll to it. Both names
-      // appear twice when a section is on the page (rail and kicker), so this
-      // counts rather than looks one up.
-      expect(await screen.findAllByText(i18n.t("settings.section.services"))).toHaveLength(2);
+      // Not empty chrome for a state that is normally absent: the category has
+      // no tile on the launcher and no entry in the rail beside its siblings.
+      expect(await screen.findAllByText(i18n.t("settings.section.services"))).not.toHaveLength(0);
       expect(screen.queryAllByText(i18n.t("settings.section.removed"))).toHaveLength(0);
     });
 
     it("offers a restore for a removed provider, with the window it has left", async () => {
-      renderWithProviders(<Settings />, { ...fixtures, config: { ...config, removed: [removedService] } });
+      renderSettings("removed", { ...fixtures, config: { ...config, removed: [removedService] } });
       const calls = interceptWrites({ "POST /config/services/cloudflare/restore": {} });
 
       // In the rail and as the section's own kicker, once a removal is waiting.
@@ -1046,7 +1093,7 @@ describe("Settings", () => {
     });
 
     it("removing now is a separate call from the removal that scheduled it", async () => {
-      renderWithProviders(<Settings />, { ...fixtures, config: { ...config, removed: [removedService] } });
+      renderSettings("removed", { ...fixtures, config: { ...config, removed: [removedService] } });
       const calls = interceptWrites({ "DELETE /config/services/cloudflare/permanently": {} });
 
       await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.remove-now") }));
@@ -1060,7 +1107,7 @@ describe("Settings", () => {
 
 describe("Settings retention", () => {
   it("shows the retention setting with what it costs on disk", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
 
     expect(await screen.findByLabelText(i18n.t("field.retention"))).toHaveValue(120);
     // 864 samples a day x 101 bytes x 120 days is ~10.5 MB of history, on a 6 MB database.
@@ -1072,7 +1119,7 @@ describe("Settings retention", () => {
   it("saves the retention when the field loses focus", async () => {
     // `renderWithProviders` installs the fixture-driven fetch, so the write
     // recorder has to wrap it — same order as the polling tests above.
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
     const calls = interceptWrites({ "PATCH /config/settings": { retention: { days: 365 } } });
 
     const field = await screen.findByLabelText(i18n.t("field.retention"));
@@ -1093,7 +1140,7 @@ describe("Settings retention", () => {
    * storage reads in the browser.
    */
   it("runs the database maintenance and reports what it reclaimed", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
     const calls = interceptWrites({
       "POST /config/storage/maintenance": {
         ok: true,
@@ -1118,7 +1165,7 @@ describe("Settings retention", () => {
   });
 
   it("reports a failed integrity check as an error, and says nothing was rewritten", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
     interceptWrites({
       "POST /config/storage/maintenance": {
         ok: false,
@@ -1145,7 +1192,7 @@ describe("Settings retention", () => {
    */
   describe("the delivery policy", () => {
     it("switches quiet hours on, and only then offers the window", async () => {
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("delivery", fixtures);
       const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
 
       // Off in the fixture, so the four fields the window needs are absent.
@@ -1183,7 +1230,7 @@ describe("Settings retention", () => {
           },
         },
       };
-      renderWithProviders(<Settings />, on);
+      renderSettings("delivery", on);
 
       expect(await screen.findByLabelText(i18n.t("field.quiet-hours.from"))).toHaveValue("23:00");
       expect(await screen.findByLabelText(i18n.t("field.quiet-hours.to"))).toHaveValue("07:00");
@@ -1210,7 +1257,7 @@ describe("Settings retention", () => {
           },
         },
       };
-      renderWithProviders(<Settings />, on);
+      renderSettings("delivery", on);
       const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
 
       const field = await screen.findByLabelText(i18n.t("field.digest.window"));
@@ -1230,7 +1277,7 @@ describe("Settings retention", () => {
     });
 
     it("turns message editing on with one patch", async () => {
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("delivery", fixtures);
       const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
 
       await userEvent.click(await screen.findByLabelText(i18n.t("field.update-in-place")));
@@ -1245,7 +1292,7 @@ describe("Settings retention", () => {
     it("reads a server that answers without a delivery policy as everything off", async () => {
       // A payload from before the policy existed. The section still renders,
       // and renders as off rather than as a page of undefined controls.
-      renderWithProviders(<Settings />, fixtures);
+      renderSettings("delivery", fixtures);
 
       expect(await screen.findByLabelText(i18n.t("field.quiet-hours"))).not.toBeChecked();
       expect(await screen.findByLabelText(i18n.t("field.digest"))).not.toBeChecked();
@@ -1255,7 +1302,7 @@ describe("Settings retention", () => {
   });
 
   it("refuses a retention outside its bounds without calling the server", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
     const calls = interceptWrites({});
 
     const field = await screen.findByLabelText(i18n.t("field.retention"));
@@ -1275,14 +1322,14 @@ describe("backup and migration", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("offers the export as a link to the server's own file", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
 
     const link = await screen.findByRole("link", { name: i18n.t("settings.backup.export") });
     expect(link).toHaveAttribute("href", "/config/export");
   });
 
   it("sends a picked config.yml as text, and reports what the import did", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
     const input = await screen.findByLabelText(i18n.t("settings.backup.import"));
 
     const base = globalThis.fetch as typeof fetch;
@@ -1325,7 +1372,7 @@ describe("backup and migration", () => {
   });
 
   it("shows the server's own refusal rather than a generic failure", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
     const input = await screen.findByLabelText(i18n.t("settings.backup.import"));
 
     const base = globalThis.fetch as typeof fetch;
@@ -1359,20 +1406,20 @@ describe("database backup and restore", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("offers the download as a link to the server's own snapshot", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
 
     const link = await screen.findByRole("link", { name: i18n.t("settings.restore.download") });
     expect(link).toHaveAttribute("href", "/config/backup");
   });
 
   it("says in the row itself that the credentials are not in the file", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
 
     expect(await screen.findByText(/secrets\.env/)).toBeInTheDocument();
   });
 
   it("sends the picked file's bytes and reports what came back", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
     const input = await screen.findByLabelText(i18n.t("settings.restore.upload"));
     vi.stubGlobal("confirm", vi.fn(() => true));
 
@@ -1422,7 +1469,7 @@ describe("database backup and restore", () => {
   });
 
   it("sends nothing when the confirmation is declined", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
     const input = await screen.findByLabelText(i18n.t("settings.restore.upload"));
     vi.stubGlobal("confirm", vi.fn(() => false));
 
@@ -1442,7 +1489,7 @@ describe("database backup and restore", () => {
   });
 
   it("shows the server's own refusal rather than a generic failure", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("data", fixtures);
     const input = await screen.findByLabelText(i18n.t("settings.restore.upload"));
     vi.stubGlobal("confirm", vi.fn(() => true));
 
@@ -1475,24 +1522,18 @@ describe("database backup and restore", () => {
  * state chips over the provider list.
  */
 describe("finding a setting", () => {
-  it("narrows the page to the rows that match, and takes the emptied sections with it", async () => {
-    renderWithProviders(<Settings />, fixtures);
+  it("narrows an open category to the rows that match", async () => {
+    renderSettings("engine");
     await screen.findByLabelText(i18n.t("field.interval"));
 
-    await userEvent.type(screen.getByLabelText(i18n.t("settings.filter.label")), "retention");
+    await userEvent.type(screen.getByLabelText(i18n.t("settings.filter.label")), "retries");
 
     await waitFor(() => expect(screen.queryByLabelText(i18n.t("field.interval"))).toBeNull());
-    expect(screen.getByLabelText(i18n.t("field.retention"))).toBeInTheDocument();
-    // Not an empty card with a kicker over it: the whole section goes off the
-    // page, and so does its entry in the rail — the one remaining match is the
-    // hidden section itself, which no reader and no screen reader reaches.
-    const engine = screen.getAllByText(i18n.t("settings.section.engine"));
-    expect(engine).toHaveLength(1);
-    expect(engine[0]).not.toBeVisible();
+    expect(screen.getByLabelText(i18n.t("field.retries"))).toBeInTheDocument();
   });
 
-  it("says nothing matched rather than leaving the page blank", async () => {
-    renderWithProviders(<Settings />, fixtures);
+  it("says nothing matched rather than leaving an open category blank", async () => {
+    renderSettings("engine");
     await screen.findByLabelText(i18n.t("field.interval"));
 
     await userEvent.type(screen.getByLabelText(i18n.t("settings.filter.label")), "qqqq");
@@ -1501,7 +1542,7 @@ describe("finding a setting", () => {
   });
 
   it("folds every hint away in compact density, and puts them back", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("engine");
     expect(await screen.findByText(i18n.t("field.interval.hint"))).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("radio", { name: i18n.t("settings.density.compact") }));
@@ -1519,7 +1560,7 @@ describe("finding a setting", () => {
       config.services[0]!,
       { ...config.services[0]!, id: "atlassian", name: "Atlassian", enabled: false },
     ];
-    renderWithProviders(<Settings />, { ...fixtures, config: { ...config, services } });
+    renderSettings("services", { ...fixtures, config: { ...config, services } });
     expect(await screen.findByText("Atlassian")).toBeInTheDocument();
     expect(screen.getByText("GitHub")).toBeInTheDocument();
 
@@ -1537,7 +1578,7 @@ describe("finding a setting", () => {
   // state chips are not that field: picking a state nothing is in used to take
   // the whole card away — chips included — leaving no way back to "all".
   it("keeps the services card, and its chips, when a chip matches nothing", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("services");
     expect(await screen.findByText("GitHub")).toBeInTheDocument();
 
     await userEvent.click(
@@ -1555,7 +1596,7 @@ describe("finding a setting", () => {
 
 describe("the number steppers", () => {
   it("saves the stepped value on the click, without waiting for a blur", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("engine", fixtures);
     const field = await screen.findByLabelText(i18n.t("field.confirm-samples"));
     const calls = interceptWrites({ "PATCH /config/settings": {} });
 
@@ -1570,7 +1611,7 @@ describe("the number steppers", () => {
   });
 
   it("cannot be stepped past the bound the server would refuse", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderSettings("engine", fixtures);
     await screen.findByLabelText(i18n.t("field.confirm-samples"));
 
     // One is the floor: a confirmation count of zero is not a thing to send.

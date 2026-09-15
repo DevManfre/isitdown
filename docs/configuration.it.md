@@ -264,10 +264,19 @@ ignorato. Tutto vive in SQLite in `/app/data/isitdown.db` e si modifica da
   credenziale e — in sola scrittura — la credenziale stessa
 - tema, lingua della dashboard, lingua delle notifiche, fuso orario
 
-La pagina è una colonna di sezioni con una barra di navigazione a fianco, e tre
-controlli sopra quella colonna: un **filtro** che la restringe alle righe le cui
-parole corrispondono a quanto digitato (le sezioni rimaste vuote escono dalla
-pagina, e con loro la voce nella barra), un interruttore **Dettagliata /
+La pagina si apre come un bento di riquadri per categoria — Motore, Servizi
+monitorati, Notifiche, Consegna, Dati, Aspetto, e Rimossi di recente finché c'è
+qualcosa da ripristinare. Ogni riquadro porta una breve banda in movimento che
+mostra cosa fa quella categoria (il motore che spazza i provider, il fascio che
+parte verso ogni canale di consegna, la retention che pota il giorno più
+vecchio), disegnata con i colori del tema e tenuta ferma per chi chiede meno
+animazioni al sistema. Cliccando un riquadro quella categoria si apre su una
+pagina propria — `#/settings/engine`, quindi collegabile e chiudibile con il
+tasto indietro del browser — con le sue righe, una barra che elenca le altre
+categorie e **Tutte le impostazioni** per tornare alla griglia. Tre controlli le
+accompagnano: un **filtro** sulla griglia che trova una singola impostazione per
+nome e dice quale categoria la contiene (su una pagina di categoria lo stesso
+campo restringe le righe di quella categoria), un interruttore **Dettagliata /
 Compatta** che richiude tutti i suggerimenti una volta letti e — sopra la lista
 dei provider — le etichette **Tutti / Attivi / In pausa / Silenziati** con i
 rispettivi conteggi. Ogni riga di provider tiene il suo interruttore in linea;

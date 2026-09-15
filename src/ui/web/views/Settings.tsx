@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link, useLocation } from "react-router";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
@@ -7,6 +9,9 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
 import { SettingRow } from "@/components/SettingRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
+import { SECTION_REELS } from "@/components/settings/reels.ts";
+import { SettingsLauncher } from "@/components/settings/SettingsLauncher.tsx";
+import { openCategory, SETTINGS_CATEGORIES } from "@/components/settings/sectionIndex.ts";
 import { Reveal } from "@/components/settings/Reveal.tsx";
 import { ChannelRow, ChannelSummary, channelRank } from "@/components/settings/ChannelRow.tsx";
 import { NumberSetting } from "@/components/settings/NumberSetting.tsx";
@@ -18,7 +23,7 @@ import {
   useSettingsChrome,
   useSettingVisible,
 } from "@/components/settings/SettingsChrome.tsx";
-import { SettingsNav, type NavSection } from "@/components/settings/SettingsNav.tsx";
+import { SettingsNav } from "@/components/settings/SettingsNav.tsx";
 import {
   useConfig,
   useConfigImport,
@@ -134,16 +139,6 @@ function FloorSelect({
   );
 }
 
-/** The rail's contents, in the order the column renders them. */
-const NAV_SECTIONS: NavSection[] = [
-  { id: "engine", labelKey: "settings.section.engine" },
-  { id: "services", labelKey: "settings.section.services" },
-  { id: "removed", labelKey: "settings.section.removed" },
-  { id: "notifications", labelKey: "settings.section.notifications" },
-  { id: "delivery", labelKey: "settings.section.delivery" },
-  { id: "data", labelKey: "settings.section.data" },
-  { id: "appearance", labelKey: "settings.section.appearance" },
-];
 
 /** Which providers the services card lists — the state, not the search. */
 type ServiceFilter = "all" | "enabled" | "disabled" | "muted";
@@ -176,6 +171,7 @@ function FilterableChannel({
 
 function SettingsView() {
   const { t, i18n } = useTranslation();
+  const { pathname } = useLocation();
   const { query, counts } = useSettingsChrome();
   const { data: config } = useConfig();
   const { data: preferences } = usePreferences();
@@ -252,10 +248,6 @@ function SettingsView() {
   // never been configured, which is most of the ten on a typical instance.
   const rankedChannels = [...config.channels].sort((a, b) => channelRank(a) - channelRank(b));
   const unsetChannels = rankedChannels.filter((channel) => channelRank(channel) === 2).length;
-  // "Recently removed" only exists while something is restorable, so the rail
-  // must not list it the rest of the time: a link to a section that is not on
-  // the page is worse than no link.
-  const navSections = NAV_SECTIONS.filter((section) => section.id !== "removed" || removed.length > 0);
   const shownChannels =
     showAllChannels || query.trim() !== ""
       ? rankedChannels
@@ -481,14 +473,23 @@ function SettingsView() {
     );
   };
 
+  // The launcher grid, or one category's rows. The category comes from the URL
+  // rather than component state, so a category is a place: it can be linked to,
+  // reloaded, and left with the browser's own back button.
+  const open = openCategory(pathname);
+  const categories = SETTINGS_CATEGORIES.filter(
+    // "Recently removed" is a category only while something is restorable.
+    (category) => category.id !== "removed" || removed.length > 0,
+  );
+
   return (
     // Not centred as a pair: the rail belongs against the view's own left
     // edge, under the page title, rather than floating in the gutter between
     // the sidebar and a centred column.
     <div className="flex w-full gap-10">
-      <SettingsNav sections={navSections} />
+      {open !== undefined && <SettingsNav categories={categories} active={open} />}
 
-      <div className="flex min-w-0 max-w-3xl flex-1 flex-col gap-8">
+      <div className="flex min-w-0 max-w-5xl flex-1 flex-col gap-8">
       {/* The subtitle moved into the rail (SettingsNav), where it stays in view
           for the whole page rather than scrolling off above the first section.
           Below the `lg` breakpoint the rail is hidden, so it is said here
@@ -497,11 +498,31 @@ function SettingsView() {
         <span className="text-xs leading-relaxed text-muted-foreground lg:hidden">
           {t("settings.subtitle")}
         </span>
-        <SettingsToolbar />
+        {open === undefined ? (
+          <SettingsToolbar density={false} />
+        ) : (
+          <div className="flex flex-col gap-3">
+            <Link
+              to="/settings"
+              className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              {t("settings.back")}
+            </Link>
+            <SettingsToolbar />
+          </div>
+        )}
       </div>
 
+      {open === undefined && (
+        <SettingsLauncher categories={categories} query={query} counts={{ services: config.services.length }} />
+      )}
+
+      {open === "engine" && (
       <SettingsSection
         id="engine"
+        reel={SECTION_REELS.engine}
+        className="lg:col-span-6"
         title={t("settings.section.engine")}
         status={
           pollingStatus === undefined ? undefined : (
@@ -619,9 +640,16 @@ function SettingsView() {
           />
         </SettingRow>
       </SettingsSection>
+      )}
 
+      {open === "services" && (
       <SettingsSection
         id="services"
+        reel={SECTION_REELS.services}
+        // The services list gives up two columns to "Recently removed" only while
+        // something is restorable; on its own it takes the whole row rather
+        // than leaving a hole beside itself.
+        className={removed.length > 0 ? "lg:col-span-4" : "lg:col-span-6"}
         title={t("settings.section.services")}
         action={<ServiceDialog mode="add" trigger={<Button type="button" size="sm">{t("action.add-service")}</Button>} />}
         delay={stagger(1, SECTION_CASCADE)}
@@ -670,12 +698,16 @@ function SettingsView() {
           </div>
         )}
       </SettingsSection>
+      )}
 
       {/* Only while something is restorable: an empty "recently removed" card
-          would be permanent chrome for a state that is normally absent. */}
-      {removed.length > 0 && (
+          would be permanent chrome for a state that is normally absent — and
+          the launcher drops its tile for the same reason. */}
+      {open === "removed" && removed.length > 0 && (
         <SettingsSection
           id="removed"
+          reel={SECTION_REELS.removed}
+          className="lg:col-span-2"
           title={t("settings.section.removed")}
           note={t("settings.removed-note")}
           delay={stagger(2, SECTION_CASCADE)}
@@ -715,8 +747,11 @@ function SettingsView() {
         </SettingsSection>
       )}
 
+      {open === "notifications" && (
       <SettingsSection
         id="notifications"
+        reel={SECTION_REELS.notifications}
+        className="lg:col-span-3"
         title={t("settings.section.notifications")}
         note={t("settings.secret-note")}
         delay={stagger(2, SECTION_CASCADE)}
@@ -772,9 +807,13 @@ function SettingsView() {
           />
         </SettingRow>
       </SettingsSection>
+      )}
 
+      {open === "delivery" && (
       <SettingsSection
         id="delivery"
+        reel={SECTION_REELS.delivery}
+        className="lg:col-span-3"
         title={t("settings.section.delivery")}
         note={t("settings.delivery.note")}
         status={
@@ -940,9 +979,13 @@ function SettingsView() {
           />
         </SettingRow>
       </SettingsSection>
+      )}
 
+      {open === "data" && (
       <SettingsSection
         id="data"
+        reel={SECTION_REELS.data}
+        className="lg:col-span-3"
         title={t("settings.section.data")}
         status={
           retentionStatus === undefined ? undefined : (
@@ -1101,8 +1144,16 @@ function SettingsView() {
           />
         </SettingRow>
       </SettingsSection>
+      )}
 
-      <SettingsSection id="appearance" title={t("settings.section.appearance")} delay={stagger(5, SECTION_CASCADE)}>
+      {open === "appearance" && (
+      <SettingsSection
+        id="appearance"
+        title={t("settings.section.appearance")}
+        reel={SECTION_REELS.appearance}
+        className="lg:col-span-3"
+        delay={stagger(5, SECTION_CASCADE)}
+      >
         <SettingRow
           label={t("settings.timezone.label")}
           description={t("settings.timezone.hint", { zone: effectiveTimeZone() })}
@@ -1150,10 +1201,11 @@ function SettingsView() {
           </Select>
         </SettingRow>
       </SettingsSection>
+      )}
 
-      {/* Only once every section has reported nothing: a filter that matches
-          one row in Data must not also announce that nothing matched. */}
-      {query.trim() !== "" && navSections.every((section) => (counts[section.id] ?? 0) === 0) && (
+      {/* The filter can empty the category being read, and the launcher says so
+          itself — this is the same sentence for the one open category. */}
+      {open !== undefined && query.trim() !== "" && (counts[open] ?? 0) === 0 && (
         <p className="px-1 text-sm text-muted-foreground">{t("settings.filter.empty", { query: query.trim() })}</p>
       )}
       </div>

@@ -42,6 +42,28 @@ describe("SettingsSection", () => {
     expect(container.querySelectorAll("[data-slot='settings-section-footer']")).toHaveLength(0);
   });
 
+  it("keeps the plain card, and no motion band, when no reel is given", () => {
+    const { container } = render(
+      <SettingsSection id="engine" title="Engine" delay="0ms">
+        <div>row</div>
+      </SettingsSection>,
+    );
+    expect(container.querySelectorAll("[data-slot='settings-reel']")).toHaveLength(0);
+  });
+
+  it("puts the reel behind the tile, hidden from assistive technology, with the rows still shown", () => {
+    const { container } = render(
+      <SettingsSection id="engine" title="Engine" reel={() => {}} note="Applied live." delay="0ms">
+        <div>row</div>
+      </SettingsSection>,
+    );
+    const reel = container.querySelector("[data-slot='settings-reel']");
+    expect(reel).not.toBeNull();
+    expect(reel).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("row")).toBeInTheDocument();
+    expect(screen.getByText("Applied live.")).toBeInTheDocument();
+  });
+
   it("carries the cascade delay it was given", () => {
     const { container } = render(
       <SettingsSection id="engine" title="Engine" delay="120ms">

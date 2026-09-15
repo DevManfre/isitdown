@@ -256,10 +256,18 @@ Everything lives in SQLite at `/app/data/isitdown.db` and is edited from
   each credential, and — write-only — the credential itself
 - theme, dashboard language, notification language, time zone
 
-The page is one column of sections with a rail beside it, and three controls
-over that column: a **filter** that narrows it to the rows whose words match
-what is typed (sections left with nothing leave the page, and so do their rail
-entries), a **Detailed / Compact** switch that folds every hint away once they
+The page opens as a bento of category tiles — Engine, Monitored services,
+Notifications, Delivery, Data, Appearance, and Recently removed while anything
+is restorable. Each tile carries a short motion band showing what that category
+does (the engine sweeping its providers, the beam leaving for each delivery
+channel, retention pruning its oldest day), drawn from the theme's own colours
+and held still for anyone whose system asks for reduced motion. Clicking a tile
+opens that category on its own page — `#/settings/engine`, so it can be linked
+to and left with the browser's back button — with its rows, a rail listing the
+other categories, and **All settings** back to the grid. Three controls go with
+them: a **filter** over the grid that finds a single setting by name and says
+which category holds it (on a category page the same field narrows that
+category's rows), a **Detailed / Compact** switch that folds every hint away once they
 have been read, and — over the provider list — **All / Polling / Paused /
 Muted** chips carrying their own counts. Each provider row keeps its switch on
 the line; **Mute**, **Diagnose**, **Edit** and **Remove** are one click away
