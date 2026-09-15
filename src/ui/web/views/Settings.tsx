@@ -7,12 +7,18 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
 import { SettingRow } from "@/components/SettingRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
-import { AdapterDebugDialog } from "@/components/settings/AdapterDebugDialog.tsx";
 import { Reveal } from "@/components/settings/Reveal.tsx";
 import { ChannelRow, ChannelSummary, channelRank } from "@/components/settings/ChannelRow.tsx";
-import { MuteMenu } from "@/components/settings/MuteMenu.tsx";
-import { RemoveServiceDialog } from "@/components/settings/RemoveServiceDialog.tsx";
+import { NumberSetting } from "@/components/settings/NumberSetting.tsx";
 import { RoutingRulesDialog } from "@/components/settings/RoutingRulesDialog.tsx";
+import { ServiceRow } from "@/components/settings/ServiceRow.tsx";
+import {
+  SettingsChromeProvider,
+  SettingsToolbar,
+  useSettingsChrome,
+  useSettingVisible,
+} from "@/components/settings/SettingsChrome.tsx";
+import { SettingsNav, type NavSection } from "@/components/settings/SettingsNav.tsx";
 import {
   useConfig,
   useConfigImport,
@@ -29,7 +35,7 @@ import { formatBytes, formatRelative, hostOf } from "@/lib/format.ts";
 import { isMuted } from "@/lib/mute.ts";
 import { effectiveTimeZone, setTimeZone, TIME_ZONES } from "@/lib/timeZone.ts";
 import { stagger } from "@/lib/stagger.ts";
-import type { DeliveryPolicy, MapView, SeverityFloorName } from "@/lib/types.ts";
+import type { DeliveryPolicy, DescribedChannel, MapView, ServiceDefinition, SeverityFloorName } from "@/lib/types.ts";
 // The floors come from core's own list rather than a copy: a floor added there
 // has to appear here, and a literal array would silently not.
 import { SEVERITY_FLOORS } from "../../../core/routing.ts";
@@ -128,8 +134,49 @@ function FloorSelect({
   );
 }
 
-export function Settings() {
+/** The rail's contents, in the order the column renders them. */
+const NAV_SECTIONS: NavSection[] = [
+  { id: "engine", labelKey: "settings.section.engine" },
+  { id: "services", labelKey: "settings.section.services" },
+  { id: "removed", labelKey: "settings.section.removed" },
+  { id: "notifications", labelKey: "settings.section.notifications" },
+  { id: "delivery", labelKey: "settings.section.delivery" },
+  { id: "data", labelKey: "settings.section.data" },
+  { id: "appearance", labelKey: "settings.section.appearance" },
+];
+
+/** Which providers the services card lists — the state, not the search. */
+type ServiceFilter = "all" | "enabled" | "disabled" | "muted";
+
+const SERVICE_FILTERS: { id: ServiceFilter; labelKey: string; of: (service: ServiceDefinition) => boolean }[] = [
+  { id: "all", labelKey: "service.filter.all", of: () => true },
+  { id: "enabled", labelKey: "service.filter.enabled", of: (service) => service.enabled },
+  { id: "disabled", labelKey: "service.filter.disabled", of: (service) => !service.enabled },
+  { id: "muted", labelKey: "service.filter.muted", of: (service) => isMuted(service.mutedUntil) },
+];
+
+/**
+ * A channel row the page's filter can take off the page. `ChannelRow` is shared
+ * with nothing else, but it is long enough that giving it a second job — being
+ * searchable — belongs out here rather than inside it.
+ */
+function FilterableChannel({
+  channel,
+  open,
+  onOpenChange,
+}: {
+  channel: DescribedChannel;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const visible = useSettingVisible(`${channel.id} ${channel.fields.map((field) => field.name).join(" ")}`);
+  if (!visible) return null;
+  return <ChannelRow channel={channel} open={open} onOpenChange={onOpenChange} />;
+}
+
+function SettingsView() {
   const { t, i18n } = useTranslation();
+  const { query, counts } = useSettingsChrome();
   const { data: config } = useConfig();
   const { data: preferences } = usePreferences();
   const patchPreferences = usePreferencesMutation();
@@ -145,7 +192,7 @@ export function Settings() {
   );
   const configImport = useConfigImport();
   const [importStatus, setImportStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(undefined);
-  const { patch: servicePatch, restore: serviceRestore, purge: servicePurge } = useServiceMutations();
+  const { restore: serviceRestore, purge: servicePurge } = useServiceMutations();
   // Above the early return below: a hook cannot be called conditionally.
   const fieldProps = useFieldProps();
 
@@ -161,6 +208,13 @@ export function Settings() {
   );
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [openChannel, setOpenChannel] = useState<string | undefined>(undefined);
+  // One provider's actions open at a time, same rule as the channel rows: every
+  // row expanded is the layout this replaced.
+  const [openService, setOpenService] = useState<string | undefined>(undefined);
+  const [serviceFilter, setServiceFilter] = useState<ServiceFilter>("all");
+  // Ten channels, seven of them typically never configured. The list leads with
+  // what can actually send and keeps the rest behind one row.
+  const [showAllChannels, setShowAllChannels] = useState(false);
   const [digestWindow_, setDigestWindow] = useState<number | undefined>(undefined);
   const [capPerHour_, setCapPerHour] = useState<number | undefined>(undefined);
   const [deliveryStatus, setDeliveryStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
@@ -190,6 +244,22 @@ export function Settings() {
   // Defaulted rather than assumed: the section only exists when a removal is
   // waiting, and an older payload carries no list at all.
   const removed = config.removed ?? [];
+  // The state chips filter the list; the search field above filters the rows
+  // inside it. They compose — "muted" and "cloud" together is a fair question.
+  const stateFilter = SERVICE_FILTERS.find((entry) => entry.id === serviceFilter);
+  const shownServices = stateFilter === undefined ? config.services : config.services.filter(stateFilter.of);
+  // Rank 2 is "its environment variables are not set" — a channel that has
+  // never been configured, which is most of the ten on a typical instance.
+  const rankedChannels = [...config.channels].sort((a, b) => channelRank(a) - channelRank(b));
+  const unsetChannels = rankedChannels.filter((channel) => channelRank(channel) === 2).length;
+  // "Recently removed" only exists while something is restorable, so the rail
+  // must not list it the rest of the time: a link to a section that is not on
+  // the page is worse than no link.
+  const navSections = NAV_SECTIONS.filter((section) => section.id !== "removed" || removed.length > 0);
+  const shownChannels =
+    showAllChannels || query.trim() !== ""
+      ? rankedChannels
+      : rankedChannels.filter((channel) => channelRank(channel) < 2);
   const delivery = config.delivery ?? DELIVERY_OFF;
   const digestWindow = digestWindow_ ?? delivery.digest.windowMinutes;
   const capPerHour = capPerHour_ ?? delivery.cap.maxPerHour;
@@ -412,12 +482,20 @@ export function Settings() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
-      <div className="flex flex-col gap-1.5">
+    // Not centred as a pair: the rail belongs against the view's own left
+    // edge, under the page title, rather than floating in the gutter between
+    // the sidebar and a centred column.
+    <div className="flex w-full gap-10">
+      <SettingsNav sections={navSections} />
+
+      <div className="flex min-w-0 max-w-3xl flex-1 flex-col gap-8">
+      <div className="flex flex-col gap-3">
         <span className="text-xs leading-relaxed text-muted-foreground">{t("settings.subtitle")}</span>
+        <SettingsToolbar />
       </div>
 
       <SettingsSection
+        id="engine"
         title={t("settings.section.engine")}
         status={
           pollingStatus === undefined ? undefined : (
@@ -429,44 +507,42 @@ export function Settings() {
         delay={stagger(0, SECTION_CASCADE)}
       >
         <SettingRow label={t("field.interval")} description={t("field.interval.hint")} align="top">
-          <Input
+          <NumberSetting
             id="polling-interval"
-            aria-label={t("field.interval")}
-            type="number"
-            className="w-20 text-right font-mono"
+            label={t("field.interval")}
+            unit={t("unit.minutes")}
+            min={POLLING_BOUNDS.intervalMinutes.min}
+            max={POLLING_BOUNDS.intervalMinutes.max}
             value={interval}
-            onChange={(event) => {
-              const value = Number(event.target.value);
+            onChange={(value) => {
               setInterval_(value);
               schedulePolling({ intervalMinutes: value, requestTimeoutSeconds: timeout, maxRetries });
             }}
+            onCommit={(value) =>
+              commitPolling({ intervalMinutes: value, requestTimeoutSeconds: timeout, maxRetries })
+            }
             onFocus={fieldProps.onFocus}
-            onBlur={() => {
-              fieldProps.onBlur();
-              commitPolling({ intervalMinutes: interval, requestTimeoutSeconds: timeout, maxRetries });
-            }}
+            onBlur={fieldProps.onBlur}
           />
-          <span className="font-mono text-xs text-muted-foreground">{t("unit.minutes")}</span>
         </SettingRow>
         <SettingRow label={t("field.timeout")} description={t("field.timeout.hint")} align="top">
-          <Input
+          <NumberSetting
             id="polling-timeout"
-            aria-label={t("field.timeout")}
-            type="number"
-            className="w-20 text-right font-mono"
+            label={t("field.timeout")}
+            unit={t("unit.seconds")}
+            min={POLLING_BOUNDS.requestTimeoutSeconds.min}
+            max={POLLING_BOUNDS.requestTimeoutSeconds.max}
             value={timeout}
-            onChange={(event) => {
-              const value = Number(event.target.value);
+            onChange={(value) => {
               setTimeout_(value);
               schedulePolling({ intervalMinutes: interval, requestTimeoutSeconds: value, maxRetries });
             }}
+            onCommit={(value) =>
+              commitPolling({ intervalMinutes: interval, requestTimeoutSeconds: value, maxRetries })
+            }
             onFocus={fieldProps.onFocus}
-            onBlur={() => {
-              fieldProps.onBlur();
-              commitPolling({ intervalMinutes: interval, requestTimeoutSeconds: timeout, maxRetries });
-            }}
+            onBlur={fieldProps.onBlur}
           />
-          <span className="font-mono text-xs text-muted-foreground">{t("unit.seconds")}</span>
         </SettingRow>
         <SettingRow label={t("field.adaptive")} description={t("field.adaptive.hint")} align="top">
           <Switch
@@ -486,20 +562,18 @@ export function Settings() {
             description={t("field.adaptive-interval.hint")}
             align="top"
           >
-            <Input
+            <NumberSetting
               id="adaptive-interval"
-              aria-label={t("field.adaptive-interval")}
-              type="number"
-              className="w-20 text-right font-mono"
+              label={t("field.adaptive-interval")}
+              unit={t("unit.minutes")}
+              min={ADAPTIVE_BOUNDS.min}
+              max={ADAPTIVE_BOUNDS.max}
               value={adaptiveInterval}
-              onChange={(event) => setAdaptiveInterval(Number(event.target.value))}
+              onChange={setAdaptiveInterval}
+              onCommit={(value) => commitAdaptive({ adaptiveIntervalMinutes: value })}
               onFocus={fieldProps.onFocus}
-              onBlur={() => {
-                fieldProps.onBlur();
-                commitAdaptive({ adaptiveIntervalMinutes: adaptiveInterval });
-              }}
+              onBlur={fieldProps.onBlur}
             />
-            <span className="font-mono text-xs text-muted-foreground">{t("unit.minutes")}</span>
           </SettingRow>
         </Reveal>
         <SettingRow
@@ -507,43 +581,41 @@ export function Settings() {
           description={t("field.confirm-samples.hint")}
           align="top"
         >
-          <Input
+          <NumberSetting
             id="confirm-samples"
-            aria-label={t("field.confirm-samples")}
-            type="number"
-            className="w-20 text-right font-mono"
+            label={t("field.confirm-samples")}
+            unit={t("unit.polls")}
+            min={CONFIRM_BOUNDS.min}
+            max={CONFIRM_BOUNDS.max}
             value={confirmSamples}
-            onChange={(event) => setConfirmSamples(Number(event.target.value))}
+            onChange={setConfirmSamples}
+            onCommit={commitConfirm}
             onFocus={fieldProps.onFocus}
-            onBlur={() => {
-              fieldProps.onBlur();
-              commitConfirm(confirmSamples);
-            }}
+            onBlur={fieldProps.onBlur}
           />
-          <span className="font-mono text-xs text-muted-foreground">{t("unit.polls")}</span>
         </SettingRow>
         <SettingRow label={t("field.retries")} description={t("field.retries.hint")} align="top">
-          <Input
+          <NumberSetting
             id="polling-retries"
-            aria-label={t("field.retries")}
-            type="number"
-            className="w-20 text-right font-mono"
+            label={t("field.retries")}
+            min={POLLING_BOUNDS.maxRetries.min}
+            max={POLLING_BOUNDS.maxRetries.max}
             value={maxRetries}
-            onChange={(event) => {
-              const value = Number(event.target.value);
+            onChange={(value) => {
               setRetries(value);
               schedulePolling({ intervalMinutes: interval, requestTimeoutSeconds: timeout, maxRetries: value });
             }}
+            onCommit={(value) =>
+              commitPolling({ intervalMinutes: interval, requestTimeoutSeconds: timeout, maxRetries: value })
+            }
             onFocus={fieldProps.onFocus}
-            onBlur={() => {
-              fieldProps.onBlur();
-              commitPolling({ intervalMinutes: interval, requestTimeoutSeconds: timeout, maxRetries });
-            }}
+            onBlur={fieldProps.onBlur}
           />
         </SettingRow>
       </SettingsSection>
 
       <SettingsSection
+        id="services"
         title={t("settings.section.services")}
         action={<ServiceDialog mode="add" trigger={<Button type="button" size="sm">{t("action.add-service")}</Button>} />}
         delay={stagger(1, SECTION_CASCADE)}
@@ -551,54 +623,45 @@ export function Settings() {
         {config.services.length === 0 ? (
           <p className="px-4 py-3 text-sm text-muted-foreground">{t("providers.empty")}</p>
         ) : (
-          config.services.map((service) => (
-            <SettingRow
-              key={service.id}
-              className="service-row"
-              label={service.name}
-              description={`${service.adapter} · ${hostOf(service.baseUrl)}`}
-              leading={
-                <span
-                  className="size-1.5 shrink-0 rounded-full"
-                  style={{
-                    background: service.enabled ? "var(--status-operational-fill)" : "var(--color-neutral-700)",
-                  }}
-                />
-              }
-              // A live mute outranks "enabled" here: both describe whether the
-              // provider will say anything, and the mute is the one with an end
-              // the operator wants to read.
-              meta={
-                isMuted(service.mutedUntil)
-                  ? t("service.muted-until", { when: formatRelative(i18n.language, service.mutedUntil ?? "") })
-                  : t(service.enabled ? "service.enabled" : "service.disabled")
-              }
-            >
-              {/* Taking a provider out of the rotation is not deleting it:
-                  the poller already skips a disabled service, and this is
-                  the only place in the dashboard that can set the flag. */}
-              <Switch
-                aria-label={`${service.name} — ${t(service.enabled ? "service.enabled" : "service.disabled")}`}
-                checked={service.enabled}
-                onCheckedChange={(next) => servicePatch.mutate({ id: service.id, patch: { enabled: next } })}
-              />
-              {/* The variants are the ones these two buttons already carry — the
-                  row shape changes, the actions do not. */}
-              <MuteMenu service={service} />
-              {/* Beside Edit rather than in the Providers table: an operator
-                  looking at why a page will not parse is already in this row. */}
-              <AdapterDebugDialog service={service} />
-              <ServiceDialog
-                mode="edit"
-                service={service}
-                trigger={<Button type="button" variant="secondary" size="sm">{t("action.edit")}</Button>}
-              />
-              <RemoveServiceDialog
-                service={service}
-                trigger={<Button type="button" variant="destructive" size="sm">{t("action.remove")}</Button>}
-              />
-            </SettingRow>
-          ))
+          <div className="flex flex-col">
+            {/* The other half of what the filter field cannot answer: typing a
+                name finds one provider, and this finds the ones whose state is
+                the question — which of them am I currently hearing nothing
+                from, and why. The counts are on the chips because "muted: 0"
+                is itself the answer often enough. */}
+            <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5">
+              {SERVICE_FILTERS.map((filter) => (
+                <Button
+                  key={filter.id}
+                  type="button"
+                  size="sm"
+                  variant={serviceFilter === filter.id ? "secondary" : "ghost"}
+                  aria-pressed={serviceFilter === filter.id}
+                  className="h-7 rounded-full px-3 text-xs"
+                  onClick={() => setServiceFilter(filter.id)}
+                >
+                  {t(filter.labelKey)}
+                  <span className="font-mono text-[11px] tabular-nums opacity-70">
+                    {config.services.filter(filter.of).length}
+                  </span>
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-col divide-y divide-border border-t border-border">
+              {shownServices.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-muted-foreground">{t("service.filter.none")}</p>
+              ) : (
+                shownServices.map((service) => (
+                  <ServiceRow
+                    key={service.id}
+                    service={service}
+                    open={openService === service.id}
+                    onOpenChange={(next) => setOpenService(next ? service.id : undefined)}
+                  />
+                ))
+              )}
+            </div>
+          </div>
         )}
       </SettingsSection>
 
@@ -606,6 +669,7 @@ export function Settings() {
           would be permanent chrome for a state that is normally absent. */}
       {removed.length > 0 && (
         <SettingsSection
+          id="removed"
           title={t("settings.section.removed")}
           note={t("settings.removed-note")}
           delay={stagger(2, SECTION_CASCADE)}
@@ -646,6 +710,7 @@ export function Settings() {
       )}
 
       <SettingsSection
+        id="notifications"
         title={t("settings.section.notifications")}
         note={t("settings.secret-note")}
         delay={stagger(2, SECTION_CASCADE)}
@@ -656,19 +721,35 @@ export function Settings() {
           <div className="flex flex-col px-4 pt-3">
             <ChannelSummary channels={config.channels} />
             {/* One row open at a time: the panel exists to be scannable, and
-                every row expanded is the layout this replaced. */}
+                every row expanded is the layout this replaced. Ten channels
+                ship, and an instance typically configures two or three — the
+                seven that have never been given a variable are a list of
+                things that are not set up, so they wait behind one row. A
+                typed filter overrides that: nothing is findable while it is
+                hidden behind a disclosure. */}
             <div className="divide-y divide-border border-t border-border">
-              {[...config.channels]
-                .sort((a, b) => channelRank(a) - channelRank(b))
-                .map((channel) => (
-                  <ChannelRow
-                    key={channel.id}
-                    channel={channel}
-                    open={openChannel === channel.id}
-                    onOpenChange={(next) => setOpenChannel(next ? channel.id : undefined)}
-                  />
-                ))}
+              {shownChannels.map((channel) => (
+                <FilterableChannel
+                  key={channel.id}
+                  channel={channel}
+                  open={openChannel === channel.id}
+                  onOpenChange={(next) => setOpenChannel(next ? channel.id : undefined)}
+                />
+              ))}
             </div>
+            {unsetChannels > 0 && query.trim() === "" && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="my-1 self-start px-1 text-xs text-muted-foreground"
+                onClick={() => setShowAllChannels((previous) => !previous)}
+              >
+                {showAllChannels
+                  ? t("channel.show-configured")
+                  : t("channel.show-all", { count: unsetChannels })}
+              </Button>
+            )}
           </div>
         )}
         <SettingRow
@@ -687,6 +768,7 @@ export function Settings() {
       </SettingsSection>
 
       <SettingsSection
+        id="delivery"
         title={t("settings.section.delivery")}
         note={t("settings.delivery.note")}
         status={
@@ -790,20 +872,18 @@ export function Settings() {
 
         <Reveal open={delivery.digest.enabled}>
             <SettingRow label={t("field.digest.window")} align="top">
-              <Input
+              <NumberSetting
                 id="digest-window"
-                aria-label={t("field.digest.window")}
-                type="number"
-                className="w-20 text-right font-mono"
+                label={t("field.digest.window")}
+                unit={t("unit.minutes")}
+                min={DELIVERY_BOUNDS.windowMinutes.min}
+                max={DELIVERY_BOUNDS.windowMinutes.max}
                 value={digestWindow}
-                onChange={(event) => setDigestWindow(Number(event.target.value))}
+                onChange={setDigestWindow}
+                onCommit={(value) => commitDeliveryNumber("windowMinutes", value)}
                 onFocus={fieldProps.onFocus}
-                onBlur={() => {
-                  fieldProps.onBlur();
-                  commitDeliveryNumber("windowMinutes", digestWindow);
-                }}
+                onBlur={fieldProps.onBlur}
               />
-              <span className="font-mono text-xs text-muted-foreground">{t("unit.minutes")}</span>
             </SettingRow>
             <SettingRow label={t("field.digest.floor")} align="top">
               <FloorSelect
@@ -826,18 +906,17 @@ export function Settings() {
 
         <Reveal open={delivery.cap.enabled}>
           <SettingRow label={t("field.cap.max")} align="top">
-            <Input
+            <NumberSetting
               id="alert-cap-max"
-              aria-label={t("field.cap.max")}
-              type="number"
-              className="w-20 text-right font-mono"
+              label={t("field.cap.max")}
+              unit={t("unit.per-hour")}
+              min={DELIVERY_BOUNDS.maxPerHour.min}
+              max={DELIVERY_BOUNDS.maxPerHour.max}
               value={capPerHour}
-              onChange={(event) => setCapPerHour(Number(event.target.value))}
+              onChange={setCapPerHour}
+              onCommit={(value) => commitDeliveryNumber("maxPerHour", value)}
               onFocus={fieldProps.onFocus}
-              onBlur={() => {
-                fieldProps.onBlur();
-                commitDeliveryNumber("maxPerHour", capPerHour);
-              }}
+              onBlur={fieldProps.onBlur}
             />
           </SettingRow>
         </Reveal>
@@ -857,6 +936,7 @@ export function Settings() {
       </SettingsSection>
 
       <SettingsSection
+        id="data"
         title={t("settings.section.data")}
         status={
           retentionStatus === undefined ? undefined : (
@@ -871,41 +951,38 @@ export function Settings() {
       >
         <SettingRow
           label={t("field.retention")}
-          description={
-            <>
-              {t("field.retention.hint")}
-              {/* The number that makes the choice a decision rather than a
-                  guess: what this window costs, beside what the database
-                  already weighs. */}
-              <span data-testid="retention-cost" className="mt-0.5 block font-mono">
-                {storage === undefined
-                  ? "—"
-                  : t(storage.measured ? "settings.retention.cost" : "settings.retention.cost-estimated", {
-                      projected: formatBytes(
-                        i18n.language,
-                        storage.bytesPerSample * storage.samplesPerDay * retentionDays,
-                      ),
-                      current: formatBytes(i18n.language, storage.dbBytes),
-                    })}
-              </span>
-            </>
+          description={t("field.retention.hint")}
+          // The number that makes the choice a decision rather than a guess:
+          // what this window costs, beside what the database already weighs.
+          // A `status` rather than part of the hint, so compact density folds
+          // the sentence away and leaves the figure.
+          status={
+            <span data-testid="retention-cost" className="block font-mono text-muted-foreground">
+              {storage === undefined
+                ? "—"
+                : t(storage.measured ? "settings.retention.cost" : "settings.retention.cost-estimated", {
+                    projected: formatBytes(
+                      i18n.language,
+                      storage.bytesPerSample * storage.samplesPerDay * retentionDays,
+                    ),
+                    current: formatBytes(i18n.language, storage.dbBytes),
+                  })}
+            </span>
           }
           align="top"
         >
-          <Input
+          <NumberSetting
             id="retention-days"
-            aria-label={t("field.retention")}
-            type="number"
-            className="w-20 text-right font-mono"
+            label={t("field.retention")}
+            unit={t("unit.days")}
+            min={RETENTION_BOUNDS.min}
+            max={RETENTION_BOUNDS.max}
             value={retentionDays}
-            onChange={(event) => setRetentionDays(Number(event.target.value))}
+            onChange={setRetentionDays}
+            onCommit={commitRetention}
             onFocus={fieldProps.onFocus}
-            onBlur={() => {
-              fieldProps.onBlur();
-              commitRetention(retentionDays);
-            }}
+            onBlur={fieldProps.onBlur}
           />
-          <span className="font-mono text-xs text-muted-foreground">{t("unit.days")}</span>
         </SettingRow>
 
         {/* Roadmap 6.13. The row above says what the database weighs and the
@@ -914,20 +991,18 @@ export function Settings() {
             that returns them, with the integrity check that has to pass first. */}
         <SettingRow
           label={t("settings.maintenance.label")}
-          description={
-            <>
-              {t("settings.maintenance.hint")}
-              {maintenanceStatus !== undefined && (
-                <span
-                  data-testid="maintenance-result"
-                  className={`mt-0.5 block ${
-                    maintenanceStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"
-                  }`}
-                >
-                  {maintenanceStatus.text}
-                </span>
-              )}
-            </>
+          description={t("settings.maintenance.hint")}
+          status={
+            maintenanceStatus === undefined ? undefined : (
+              <span
+                data-testid="maintenance-result"
+                className={
+                  maintenanceStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"
+                }
+              >
+                {maintenanceStatus.text}
+              </span>
+            )
           }
           align="top"
         >
@@ -948,19 +1023,15 @@ export function Settings() {
             path in the same file — and the import is that file read back. */}
         <SettingRow
           label={t("settings.backup.label")}
-          description={
-            <>
-              {t("settings.backup.hint")}
-              {importStatus !== undefined && (
-                <span
-                  className={`mt-0.5 block ${
-                    importStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"
-                  }`}
-                >
-                  {importStatus.text}
-                </span>
-              )}
-            </>
+          description={t("settings.backup.hint")}
+          status={
+            importStatus === undefined ? undefined : (
+              <span
+                className={importStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}
+              >
+                {importStatus.text}
+              </span>
+            )
           }
           align="top"
         >
@@ -993,20 +1064,16 @@ export function Settings() {
             be discovered on the day it matters. */}
         <SettingRow
           label={t("settings.restore.label")}
-          description={
-            <>
-              {t("settings.restore.hint")}
-              {restoreStatus !== undefined && (
-                <span
-                  data-testid="restore-result"
-                  className={`mt-0.5 block ${
-                    restoreStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"
-                  }`}
-                >
-                  {restoreStatus.text}
-                </span>
-              )}
-            </>
+          description={t("settings.restore.hint")}
+          status={
+            restoreStatus === undefined ? undefined : (
+              <span
+                data-testid="restore-result"
+                className={restoreStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}
+              >
+                {restoreStatus.text}
+              </span>
+            )
           }
           align="top"
         >
@@ -1029,7 +1096,7 @@ export function Settings() {
         </SettingRow>
       </SettingsSection>
 
-      <SettingsSection title={t("settings.section.appearance")} delay={stagger(5, SECTION_CASCADE)}>
+      <SettingsSection id="appearance" title={t("settings.section.appearance")} delay={stagger(5, SECTION_CASCADE)}>
         <SettingRow
           label={t("settings.timezone.label")}
           description={t("settings.timezone.hint", { zone: effectiveTimeZone() })}
@@ -1077,6 +1144,27 @@ export function Settings() {
           </Select>
         </SettingRow>
       </SettingsSection>
+
+      {/* Only once every section has reported nothing: a filter that matches
+          one row in Data must not also announce that nothing matched. */}
+      {query.trim() !== "" && navSections.every((section) => (counts[section.id] ?? 0) === 0) && (
+        <p className="px-1 text-sm text-muted-foreground">{t("settings.filter.empty", { query: query.trim() })}</p>
+      )}
+      </div>
     </div>
+  );
+}
+
+/**
+ * The page, with the filter, the density switch and the section rail wrapped
+ * around it — they are one piece of chrome shared by every section, and the
+ * provider is what lets a row decide its own visibility without the query being
+ * threaded through seven sections to reach it.
+ */
+export function Settings() {
+  return (
+    <SettingsChromeProvider>
+      <SettingsView />
+    </SettingsChromeProvider>
   );
 }

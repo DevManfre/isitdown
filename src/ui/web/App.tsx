@@ -1,5 +1,6 @@
 import { Outlet, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
+import { CommandPalette } from "@/components/CommandPalette.tsx";
 import { Rail } from "@/components/Rail.tsx";
 import { Header } from "@/components/Header.tsx";
 import { ViewFrame } from "@/components/ViewFrame.tsx";
@@ -72,6 +73,10 @@ export function App() {
     // no way to reach a collapsed rail nothing is styled for.
     <SidebarProvider className="console" open data-ready={ready ? "" : undefined}>
       <Rail />
+      {/* Roadmap 5.4. A sibling of the rail rather than of the view: the
+          shortcut has to answer on every screen, and a palette mounted inside
+          a view would take its own key listener away with it on navigation. */}
+      <CommandPalette />
       {/* `SidebarInset` is the page's one <main>, so the animated view below is
           a div. Its stock `bg-background` is dropped: the body carries
           --gradient-page, and an opaque fill here would paint over it. */}

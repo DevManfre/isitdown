@@ -353,6 +353,81 @@
   animation: modal-out 0.22s ease both;
 }
 
+/* — the service dialog's wizard — */
+/* Step one and step two are two panels in one dialog, not two dialogs, so the
+   travel has to say which way the operator is going: forward arrives from the
+   right, Back arrives from the left. React's `key` on the step remounts the
+   panel, which is what plays these at all. Shorter than the dialog's own entry
+   — the panel is moving inside a frame that is already on screen. */
+@keyframes step-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes step-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-step {
+  animation: step-in-next 0.26s var(--ease-entry) both;
+}
+.anim-step-back {
+  animation: step-in-back 0.26s var(--ease-entry) both;
+}
+
+/* Switching source inside step one swaps a panel without moving the three
+   buttons above it, so this one only fades up — a sideways travel would read
+   as a step change, which it is not. */
+.anim-panel {
+  animation: rise 0.24s var(--ease-entry) both;
+}
+
+/* The catalog grid cascades in, the way every other list on the dashboard
+   does. Delays are set inline by the grid (`stagger`), which caps the tail so
+   a forty-five provider catalog still settles with the rest of the page.
+
+   `backwards`, not `both`: this fades opacity, and a filled animation keeps
+   its last keyframe applied for the life of the element — which outranks every
+   normal declaration, including the `disabled:opacity-45` that dims a provider
+   already being watched. With `both` the tile animated to 1 and stayed there,
+   so the whole catalog looked pickable and only the caption underneath said
+   otherwise. `backwards` still holds the tile invisible through its stagger
+   delay, and hands opacity back to the cascade the moment it lands. */
+.anim-tile {
+  animation: fade 0.2s ease backwards;
+}
+
+/* The Advanced disclosure, on the channel list's mechanism: Radix measures the
+   panel and publishes its height as a custom property, which is what lets a
+   keyframe travel to a height no stylesheet can know. Scoped, like that one,
+   so the fleet groups' own collapsibles keep animating themselves. */
+.panel-advanced [data-slot="collapsible-content"] {
+  overflow: hidden;
+}
+.panel-advanced [data-slot="collapsible-content"][data-state="open"] {
+  animation: channel-unfold 0.26s var(--ease-entry);
+}
+.panel-advanced [data-slot="collapsible-content"][data-state="closed"] {
+  animation: channel-fold 0.2s ease;
+}
+.panel-advanced [data-slot="collapsible-trigger"] {
+  transition: background-color 0.18s ease;
+}
+.panel-advanced [data-slot="collapsible-trigger"]:hover {
+  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
 /* — rail — */
 /* Hovering nudges the label 4px further in, pressing settles at 2px.
 

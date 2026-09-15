@@ -233,3 +233,73 @@ test("an unknown provider is a 404 rather than an empty export that looks valid"
     await app.close();
   }
 });
+
+/** The monthly report — roadmap 4.7. */
+
+test("the monthly report is served as a dated Markdown download", async () => {
+  const app = await api();
+  try {
+    await seed(app.runtime);
+    const month = new Date().toISOString().slice(0, 7);
+
+    const { status, headers, text } = await app.get("/export/monthly.md");
+
+    assert.equal(status, 200);
+    assert.match(headers.get("content-type") ?? "", /^text\/markdown/);
+    assert.match(
+      headers.get("content-disposition") ?? "",
+      new RegExp(`^attachment; filename="isitdown-uptime-${month}-\\d{4}-\\d{2}-\\d{2}\\.md"$`),
+    );
+    assert.match(text, /^# Uptime report — /);
+    // The month is still running, and the document has to say so rather than
+    // reading as a finished one three weeks later.
+    assert.match(text, /still running/);
+  } finally {
+    await app.close();
+  }
+});
+
+test("the report names providers as the dashboard does, and lists the month's incidents", async () => {
+  const app = await api();
+  try {
+    await seed(app.runtime, ["Elevated 500s, API"]);
+
+    const { text } = await app.get("/export/monthly.md");
+
+    const [first] = app.runtime.listAllServices();
+    assert.ok(text.includes(first?.name ?? ""), text.slice(0, 400));
+    // A comma in a provider's incident name must not break the table row.
+    assert.match(text, /\| Elevated 500s, API \|/);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a month that is not a month is refused by name rather than reported empty", async () => {
+  const app = await api();
+  try {
+    const { status, text } = await app.get("/export/monthly.md?month=2026-13");
+
+    assert.equal(status, 400);
+    assert.match(text, /YYYY-MM/);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a month long past reports itself as complete and measures nothing", async () => {
+  const app = await api();
+  try {
+    await seed(app.runtime);
+
+    const { status, text } = await app.get("/export/monthly.md?month=2020-02");
+
+    assert.equal(status, 200);
+    assert.ok(!text.includes("still running"), text.slice(0, 400));
+    // February 2020 ran to the 29th, and nothing here was polled in it.
+    assert.match(text, /Covering 2020-02-01 to 2020-02-29/);
+    assert.match(text, /Fleet uptime: \*\*—\*\*/);
+  } finally {
+    await app.close();
+  }
+});

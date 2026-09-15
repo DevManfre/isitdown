@@ -62,11 +62,11 @@ notifications:
 | `confirmSamples` | `1` | 1–10. Smorzamento dei rimbalzi: quanti poll consecutivi devono concordare su una lettura prima che il cambio venga annunciato. `1` notifica subito; `2` ignora una pagina che si contraddice per un ciclo, al costo di un poll di ritardo. |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page (vedi sotto). |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto (vedi sotto). |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
 | `services[].mutedUntil` | — | ISO 8601. Finché è nel futuro il provider viene interrogato e registrato come sempre ma non notifica nulla — "lo so, smetti di dirmelo, fino ad allora". Nell'edizione UI è ciò che scrive il comando **Silenzia** della dashboard. |
-| `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano due: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`) e `http` (vedi la sua sezione qui sotto). |
+| `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano quattro: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`), e `http`, `tcp` e `dns` (vedi le loro sezioni qui sotto). |
 
 #### L'adapter `html`
 
@@ -165,8 +165,8 @@ Quattro cose da sapere prima di affidarcisi:
   unico avviso di flotta richiede un evento che non riguardi un singolo provider
   (roadmap 2.7). `confirmSamples` resta l'impostazione per "un singolo sussulto
   non merita un messaggio".
-- una sonda non operativa dice *perché*: **Impostazioni → riga del provider →
-  Diagnose** porta la frase che la lettura non ha dove tenere — `answered HTTP
+- una sonda non operativa dice *perché*: **Impostazioni → riga del provider,
+  espansa → Diagnostica** porta la frase che la lettura non ha dove tenere — `answered HTTP
   503, outside the accepted 200-299`, `no answer from …: connect ECONNREFUSED`,
   `the TLS certificate expires in 9 day(s)`. "Giù" e "giù perché il nome non si
   risolve più" sono la stessa severità e due problemi diversi.
@@ -180,6 +180,71 @@ Quattro cose da sapere prima di affidarcisi:
   `expectBody` su un `HEAD`) solleva un errore a ogni ciclo e si vede come
   provider che fallisce, mai come servizio che legge giù in silenzio. `node
   dist/light/check.js --probe` lo intercetta prima del poller.
+
+#### Gli adapter `tcp` e `dns` — sondare ciò che non parla HTTP
+
+La sonda qui sopra ha bisogno di una risposta da leggere. Un database, un relay
+SMTP o un message broker non ne manda mai una, e un nome che ha smesso di
+risolversi non arriva nemmeno fin lì — quindi a quei due tocca un adapter a
+testa (roadmap 1.9).
+
+```yaml
+  - name: Primary database
+    id: primary-db
+    adapter: tcp
+    baseUrl: https://db.internal
+    options:
+      port: "5432"
+      slowMs: "250"
+
+  - name: Our apex record
+    id: apex-dns
+    adapter: dns
+    baseUrl: https://example.com
+    options:
+      recordType: "A"
+      expectValue: "203.0.113.7"
+      resolver: "1.1.1.1"
+```
+
+Entrambi prendono il bersaglio da `baseUrl`, perché è il campo che lo schema
+valida e un URL `http`/`https` è ciò che accetta: `tcp` ne usa l'host e ignora
+lo schema, `dns` ne risolve l'host e da lì non scarica nulla.
+
+| Opzione | Adapter | Default | Significato |
+|---|---|---|---|
+| `port` | `tcp` | quella dell'URL, altrimenti quella dello schema | La porta a cui connettersi. Un valore che non è una porta solleva un errore invece di ripiegare: una sonda puntata in silenzio alla 443 leggerebbe sana la cosa sbagliata. |
+| `slowMs` | entrambi | — | Un handshake o una risposta a questi millisecondi o oltre legge `degraded` invece di `operational`. |
+| `recordType` | `dns` | `A` | `A`, `AAAA`, `CNAME`, `MX`, `NS` o `TXT`. Una risposta `MX` viene confrontata come `"<preferenza> <exchange>"` e una `TXT` con i suoi pezzi uniti — il modo in cui entrambe si scrivono quando qualcuno dice come dovrebbero essere. |
+| `expectValue` | `dns` | — | Testo che uno dei record deve contenere. Un record puntato a un indirizzo dismesso si risolve comunque, ed è una brutta giornata diversa dal non risolversi affatto. |
+| `resolver` | `dns` | quello di sistema | `1.1.1.1`, oppure `127.0.0.1:5353`. Interroga un server direttamente — per esempio uno autoritativo — invece di ciò che il resolver di questo container ha in cache. Non impostato legge ciò che sperimenta il resto della flotta. |
+
+Le letture che producono:
+
+| Cosa è successo | Lettura |
+|---|---|
+| `tcp`: la porta ha accettato la connessione, sotto `slowMs` | `operational` |
+| `tcp`: ha accettato, a `slowMs` o oltre | `degraded` |
+| `tcp`: rifiutata, resettata, host irrisolvibile, o oltre il timeout | `major_outage` |
+| `dns`: sono tornati record, che soddisfano `expectValue`, sotto `slowMs` | `operational` |
+| `dns`: sono tornati a `slowMs` o oltre | `degraded` |
+| `dns`: NXDOMAIN, SERVFAIL, nessun record, o nulla che soddisfi `expectValue` | `major_outage` |
+
+Tutto ciò che la sezione `http` dice di una sonda vale anche per questi due —
+letture invece che letture fallite, una severità e nulla più, un solo punto di
+osservazione, una nota in **Diagnose** che dice perché, e un'opzione sbagliata
+che solleva un errore invece di leggere giù. Due cose sono solo loro:
+
+- `tcp` si connette e chiude **senza inviare un byte**. Un handshake di
+  protocollo vorrebbe dire conoscere il protocollo, e ogni servizio che vale la
+  pena sondare ne parla uno diverso. "La porta è aperta" è un'affermazione più
+  piccola di "il servizio è sano", e dire solo la più piccola è ciò che tiene
+  onesta la lettura.
+- `dns` tratta una risposta vuota come un disservizio e non come un campo
+  mancante. Ogni altro adapter degrada su un campo mancante, perché un provider
+  che ne lascia cadere uno non è un disservizio nostro — ma qui la risposta *è*
+  la lettura, e un record tornato vuoto significa che nessuno può raggiungere
+  ciò che nomina.
 
 Qualunque cosa non valida ferma il container all'avvio indicando motivo e percorso:
 file mancante, YAML malformato, base URL sbagliato, id duplicato, lista di servizi
@@ -198,6 +263,18 @@ ignorato. Tutto vive in SQLite in `/app/data/isitdown.db` e si modifica da
 - quali canali di notifica sono attivi, quale variabile d'ambiente porta ogni
   credenziale e — in sola scrittura — la credenziale stessa
 - tema, lingua della dashboard, lingua delle notifiche, fuso orario
+
+La pagina è una colonna di sezioni con una barra di navigazione a fianco, e tre
+controlli sopra quella colonna: un **filtro** che la restringe alle righe le cui
+parole corrispondono a quanto digitato (le sezioni rimaste vuote escono dalla
+pagina, e con loro la voce nella barra), un interruttore **Dettagliata /
+Compatta** che richiude tutti i suggerimenti una volta letti e — sopra la lista
+dei provider — le etichette **Tutti / Attivi / In pausa / Silenziati** con i
+rispettivi conteggi. Ogni riga di provider tiene il suo interruttore in linea;
+**Silenzia**, **Diagnostica**, **Modifica** e **Rimuovi** stanno a un clic,
+dentro la riga. I canali senza variabile d'ambiente impostata restano dietro
+un'unica riga "mostra quelli non configurati", a meno che il filtro non li
+stia cercando.
 
 **Settings → Dati** porta anche l'unico lavoro di manutenzione che un file
 SQLite richiede (roadmap 6.13): **Verifica e compatta** esegue `PRAGMA
@@ -225,6 +302,10 @@ tua lista non viene più sovrascritta in seguito.
 | `NTFY_TOKEN` | entrambe | — | Token di accesso ntfy, opzionale. Serve solo su un server con controllo degli accessi. |
 | `GOTIFY_URL` | entrambe | — | Server Gotify (`https://gotify.example.com`). Obbligatoria se il canale Gotify è attivo. |
 | `GOTIFY_TOKEN` | entrambe | — | Token applicativo di Gotify. Obbligatoria insieme alla precedente. |
+| `PUSHOVER_TOKEN` | entrambe | — | Token API dell'applicazione Pushover. Obbligatoria se il canale Pushover è attivo. |
+| `PUSHOVER_USER_KEY` | entrambe | — | User key (o group key) di Pushover. Obbligatoria insieme alla precedente. |
+| `PUSHOVER_DEVICE` | entrambe | — | Opzionale. Un singolo dispositivo registrato; se vuota la notifica arriva su tutti. |
+| `TEAMS_WEBHOOK_URL` | entrambe | — | Webhook del canale Microsoft Teams. Obbligatoria se il canale Teams è attivo. |
 | `WEBHOOK_SECRET` | entrambe | — | Segreto condiviso opzionale per il webhook generico. Impostandolo ogni richiesta viene firmata (vedi [3.6](#36-canali-di-notifica)); lasciandolo vuoto le richieste partono non firmate, esattamente come prima. |
 | `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
 | `LOG_FILE` | entrambe | — | Accoda ogni riga di log anche a questo file, ruotato per dimensione. Se non è impostata, i log vanno solo su stdout. |
@@ -297,15 +378,24 @@ una voce con `adapter: statuspage`. Verificati:
 `status.anthropic.com` risponde con un 301 verso `status.claude.com`. L'adapter segue
 i redirect, quindi funzionano entrambi; l'host canonico evita il salto in più.
 
-L'edizione UI include anche un **catalogo** di provider noti (roadmap 5.11): il
-dialog di aggiunta si apre su un menu di nomi, e una scelta riempie adapter,
-base URL e id. Ogni voce in `src/adapters/catalog.ts` è stata confermata
-eseguendo la detection sulla pagina, quindi ciò che il menu offre è ciò che un
-adapter legge davvero. I provider la cui status page rifiuta una lettura
-automatica (Stripe, GitLab, Zendesk, Okta) sono volutamente assenti invece che
-elencati e rotti — per quelli, e per tutto ciò che la lista non ha, si incolla
-l'URL e si lascia che la detection (`POST /config/services/detect`) nomini l'adapter. Una voce già monitorata
-resta nel menu, segnata, invece di sparire. Servito come `GET /config/catalog`.
+Nell'edizione UI il dialog di aggiunta lo chiede in due passi. Il primo chiede
+soltanto da dove arriva lo stato, e offre i tre modi di rispondere: il
+**catalogo** incluso, un URL incollato, o un adapter scelto a mano. Il secondo
+sono i campi — nome, gruppo, intervallo di polling, componenti — con la risposta
+del primo riportata in testa e tutto ciò che è specifico dell'adapter raccolto
+sotto **Avanzate**. Modificare un servizio esistente resta una pagina sola: il
+suo adapter è fissato, e ciò che resta è la messa a punto.
+
+Il catalogo (roadmap 5.11) è una griglia di provider noti, cercabile per nome, e
+una scelta riempie adapter, base URL e id. Ogni voce in
+`src/adapters/catalog.ts` è stata confermata eseguendo la detection sulla
+pagina, quindi ciò che la griglia offre è ciò che un adapter legge davvero. I
+provider la cui status page rifiuta una lettura automatica (Stripe, GitLab,
+Zendesk, Okta) sono volutamente assenti invece che elencati e rotti — per
+quelli, e per tutto ciò che la lista non ha, si incolla l'URL e si lascia che la
+detection (`POST /config/services/detect`) nomini l'adapter. Una voce già
+monitorata resta nella griglia, in grigio, invece di sparire. Servito come
+`GET /config/catalog`.
 
 Lo `status.indicator` del provider viene mappato sul modello di severità interno:
 
@@ -649,6 +739,8 @@ lettura vecchia.
 | Slack | `slack` | `SLACK_WEBHOOK_URL` |
 | ntfy | `ntfy` | `NTFY_TOPIC_URL` (`NTFY_TOKEN` opzionale) |
 | Gotify | `gotify` | `GOTIFY_URL`, `GOTIFY_TOKEN` |
+| Pushover | `pushover` | `PUSHOVER_TOKEN`, `PUSHOVER_USER_KEY` (`PUSHOVER_DEVICE` opzionale) |
+| Microsoft Teams | `teams` | `TEAMS_WEBHOOK_URL` |
 | Email (SMTP) | `email` | `SMTP_HOST`, `SMTP_FROM`, `SMTP_TO` (`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ALLOW_INSECURE_AUTH`, `SMTP_ALLOW_SELF_SIGNED` opzionali) |
 | Desktop (Web Push) | `webpush` | nessuna |
 
@@ -716,6 +808,34 @@ ogni telefono: sulla scala 1–5 di ntfy un major outage è `5` e un rientro è 
 su quella 0–10 di Gotify, `9` e `3`. Nessuna delle due credenziali finisce nei
 log o nella dashboard, e un invio rifiutato riporta lo stato HTTP con la
 motivazione del server stesso.
+
+**Pushover** (roadmap 3.5) è la metà ospitata della stessa famiglia: due
+credenziali — il token API dell'applicazione e la user key (o group key) — e una
+sola POST form-encoded verso `api.pushover.net`. Entrambe viaggiano nel corpo e
+non nella query string, perché un URL finisce nei log. L'intestazione è il
+titolo della notifica, il dettaglio è il corpo, e la pagina di stato è il
+bersaglio del tap invece di una riga di testo. La severità decide la priorità:
+un outage parziale o totale esce a `1`, che scavalca le ore di silenzio del
+destinatario; tutto il resto a `0`, e una lettura che non siamo riusciti a fare
+a `-1`. La priorità `2` non viene usata di proposito — la priorità emergency
+riallerta finché qualcuno non conferma, che è un'escalation di reperibilità e
+non un cambio di stato. `PUSHOVER_DEVICE` restringe la consegna a un singolo
+dispositivo registrato; se non è impostata la sentono tutti i dispositivi
+dell'account.
+
+**Microsoft Teams** (roadmap 3.8) è un solo incoming webhook, come Discord e
+Slack, che porta una Adaptive Card. La card viaggia nella busta `attachments` e
+non come il vecchio `MessageCard`: Microsoft ha ritirato i connettori di Office
+365 in favore di Workflows, e un trigger di workflow capisce solo questa forma —
+un connettore ancora vivo la renderizza comunque, quindi c'è un solo corpo invece
+di un'impostazione che chiede all'operatore a quale epoca appartenga il suo
+webhook. L'URL si crea nel canale con **Workflows → "Post to a channel when a
+webhook request is received"**. La severità è il colore dell'intestazione,
+nominato (`good` / `warning` / `attention`) invece che inviato come esadecimale,
+così la card resta leggibile in entrambi i temi di Teams, e la stessa emoji che
+mostra ogni altro canale lo ripete per un client che renderizza in monocromia.
+La pagina di stato è un pulsante, non una riga di testo. L'URL è la credenziale,
+quindi non compare mai in un errore.
 
 **Email** è una submission SMTP, ed è scritta qui invece che presa da una
 libreria (roadmap 3.3): a una notifica serve una sola conversazione di

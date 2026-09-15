@@ -347,6 +347,17 @@ test("an unparseable mute is no mute, so a bad value cannot silence a provider f
   assert.equal(changes[0]?.kind, "status_change");
 });
 
+test("a mute ends at the instant it names, so a reading stamped exactly then is news", () => {
+  // The reading is stamped 14:05, and the mute runs *until* 14:05 — the moment
+  // it ends, not one it still covers. An inclusive boundary here would hold a
+  // change back by one whole poll for no reason anybody stated.
+  const changes = diff(snap("operational"), snap("degraded"), {
+    mutedUntil: "2026-08-19T14:05:00.000Z",
+  });
+
+  assert.equal(changes[0]?.kind, "status_change");
+});
+
 /** Flap damping (roadmap 2.5), the gate the poller actually calls. */
 
 const undamped = { pending: null, confirmations: 1 };
@@ -407,6 +418,24 @@ test("a different reading restarts the streak rather than inheriting it", () => 
 
   assert.equal(other.pending?.count, 1);
   assert.deepEqual(other.changes, []);
+});
+
+test("a threshold that is not a whole number fails open rather than holding forever", () => {
+  const baseline = snap("operational");
+  const flap = snap("degraded");
+
+  // Damping trades latency for trust, and these two lose the trade: 2.5 polls
+  // is not a number of polls, and `NaN` is what a missing setting arrives as.
+  // Held against either, a real transition would never reach the threshold and
+  // the alert would be swallowed silently — which is the one outcome this
+  // feature must never produce.
+  for (const confirmations of [2.5, Number.NaN]) {
+    const result = confirmedChanges(flap, { baseline, last: baseline, pending: null, confirmations });
+
+    assert.equal(result.changes[0]?.kind, "status_change", `confirmations: ${confirmations}`);
+    assert.equal(result.pending, null);
+    assert.deepEqual(result.baseline, flap);
+  }
 });
 
 test("a store with no baseline of its own damps against the last sample", () => {

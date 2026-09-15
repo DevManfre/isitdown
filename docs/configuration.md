@@ -62,11 +62,11 @@ notifications:
 | `confirmSamples` | `1` | 1–10. Flap damping: how many consecutive polls must agree on a reading before the change is announced. `1` notifies immediately; `2` ignores a page that disagrees with itself for one cycle, at the cost of one poll of delay. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page (see below). |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
-| `services[].options` | — | Adapter-specific extras. Two adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists) and `http` (see its own section below). |
+| `services[].options` | — | Adapter-specific extras. Four adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), and `http`, `tcp` and `dns` (see their own sections below). |
 
 #### The `html` adapter
 
@@ -160,8 +160,8 @@ Four things worth knowing before relying on it:
   really are unreachable; collapsing the burst into a single fleet-wide alert
   needs an event that is not about one provider (roadmap 2.7). `confirmSamples`
   is still the setting for "a single blip is not worth a message".
-- a probe that is not operational says why: **Settings → the provider's row →
-  Diagnose** carries the sentence the reading has nowhere to hold — `answered
+- a probe that is not operational says why: **Settings → the provider's row,
+  expanded → Diagnose** carries the sentence the reading has nowhere to hold — `answered
   HTTP 503, outside the accepted 200-299`, `no answer from …: connect
   ECONNREFUSED`, `the TLS certificate expires in 9 day(s)`. "Down" and "down
   because the name no longer resolves" are the same severity and different
@@ -175,6 +175,68 @@ Four things worth knowing before relying on it:
   `expectBody` on a `HEAD`) throws every cycle and shows up as a failing
   provider, never as a service quietly reading down. `node dist/light/check.js
   --probe` catches it before the poller does.
+
+#### The `tcp` and `dns` adapters — probing what speaks no HTTP
+
+The probe above needs a response to read. A database, an SMTP relay or a message
+broker never sends one, and a name that has stopped resolving never gets that
+far — so those two get an adapter each (roadmap 1.9).
+
+```yaml
+  - name: Primary database
+    id: primary-db
+    adapter: tcp
+    baseUrl: https://db.internal
+    options:
+      port: "5432"
+      slowMs: "250"
+
+  - name: Our apex record
+    id: apex-dns
+    adapter: dns
+    baseUrl: https://example.com
+    options:
+      recordType: "A"
+      expectValue: "203.0.113.7"
+      resolver: "1.1.1.1"
+```
+
+Both take their target from `baseUrl`, because that is the field the schema
+validates and an `http`/`https` URL is what it accepts: `tcp` uses its host and
+ignores the scheme, `dns` resolves its host and fetches nothing from it.
+
+| Option | Adapter | Default | Meaning |
+|---|---|---|---|
+| `port` | `tcp` | the URL's, else the scheme's | The port to connect to. A value that is not a port throws rather than falling back, since a probe silently aimed at 443 would read healthy about the wrong thing. |
+| `slowMs` | both | — | A handshake or an answer at or over this many milliseconds reads `degraded` instead of `operational`. |
+| `recordType` | `dns` | `A` | `A`, `AAAA`, `CNAME`, `MX`, `NS` or `TXT`. An `MX` answer is matched as `"<preference> <exchange>"` and a `TXT` one with its chunks joined — the way both are written down when someone says what they should be. |
+| `expectValue` | `dns` | — | Text one of the records must contain. A record pointed at a decommissioned address still resolves, which is a different kind of bad day from not resolving at all. |
+| `resolver` | `dns` | the system's | `1.1.1.1`, or `127.0.0.1:5353`. Asks one server directly — an authoritative one, say — instead of whatever this container's resolver has cached. Unset reads what the rest of the fleet experiences. |
+
+The readings they produce:
+
+| What happened | Reading |
+|---|---|
+| `tcp`: the port accepted the connection, under `slowMs` | `operational` |
+| `tcp`: it accepted, at or over `slowMs` | `degraded` |
+| `tcp`: refused, reset, unresolvable, or past the timeout | `major_outage` |
+| `dns`: records came back, matching `expectValue`, under `slowMs` | `operational` |
+| `dns`: they came back at or over `slowMs` | `degraded` |
+| `dns`: NXDOMAIN, SERVFAIL, no records at all, or nothing matching `expectValue` | `major_outage` |
+
+Everything the `http` section says about a probe applies to these two as well —
+readings rather than failed reads, a severity and nothing more, one vantage
+point, a note in **Diagnose** saying why, and a wrong option throwing rather
+than reading down. Two things are theirs alone:
+
+- `tcp` connects and hangs up **without sending a byte**. A protocol handshake
+  would mean knowing the protocol, and every service worth probing speaks a
+  different one. "The port is open" is a smaller claim than "the service is
+  healthy", and saying only the smaller one is what keeps the reading honest.
+- `dns` treats an empty answer as an outage rather than as a missing field.
+  Every other adapter degrades on a missing field, because a provider dropping
+  one is not an outage of ours — but here the answer *is* the reading, and a
+  record that came back empty means nobody can reach the thing it names.
 
 Anything invalid stops the container at boot with the reason and the offending
 path — a missing file, malformed YAML, a bad base URL, a duplicate service id, an
@@ -193,6 +255,16 @@ Everything lives in SQLite at `/app/data/isitdown.db` and is edited from
 - which notification channels are enabled, which environment variable carries
   each credential, and — write-only — the credential itself
 - theme, dashboard language, notification language, time zone
+
+The page is one column of sections with a rail beside it, and three controls
+over that column: a **filter** that narrows it to the rows whose words match
+what is typed (sections left with nothing leave the page, and so do their rail
+entries), a **Detailed / Compact** switch that folds every hint away once they
+have been read, and — over the provider list — **All / Polling / Paused /
+Muted** chips carrying their own counts. Each provider row keeps its switch on
+the line; **Mute**, **Diagnose**, **Edit** and **Remove** are one click away
+inside the row. Channels with no environment variable set wait behind a single
+"show the ones that are not set up" row, unless the filter is asking for them.
 
 **Settings → Data** also carries the one maintenance job a SQLite file needs
 (roadmap 6.13): **Check and compact** runs `PRAGMA integrity_check` and then
@@ -219,6 +291,10 @@ list is never overwritten afterwards.
 | `NTFY_TOKEN` | both | — | Optional ntfy access token. Only a server with access control needs one. |
 | `GOTIFY_URL` | both | — | Gotify server (`https://gotify.example.com`). Required if the Gotify channel is enabled. |
 | `GOTIFY_TOKEN` | both | — | Gotify application token. Required with the above. |
+| `PUSHOVER_TOKEN` | both | — | Pushover application API token. Required if the Pushover channel is enabled. |
+| `PUSHOVER_USER_KEY` | both | — | Pushover user or group key. Required with the above. |
+| `PUSHOVER_DEVICE` | both | — | Optional. One registered device; unset delivers to every device on the account. |
+| `TEAMS_WEBHOOK_URL` | both | — | Microsoft Teams channel webhook. Required if the Teams channel is enabled. |
 | `WEBHOOK_SECRET` | both | — | Optional shared secret for the generic webhook. Set it and every request is signed (see [3.6](#36-notification-channels)); leave it unset and requests go out unsigned, exactly as before. |
 | `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
 | `LOG_FILE` | both | — | Also append every log line to this file, rotated by size. Unset, logs go to stdout only. |
@@ -289,15 +365,23 @@ entry with `adapter: statuspage`. Verified:
 `status.anthropic.com` issues a 301 to `status.claude.com`. The adapter follows
 redirects so either works; the canonical host avoids the extra hop.
 
-The UI edition also ships a **bundled catalog** of well-known providers (roadmap
-5.11): the add dialog opens on a menu of names, and one pick fills in the
-adapter, the base URL and the id. Every entry in `src/adapters/catalog.ts` was
-confirmed by running the detection against the page, so what the menu offers is
-what an adapter actually reads. Providers whose status page refuses an automated
-read (Stripe, GitLab, Zendesk, Okta) are deliberately absent rather than listed
-and broken — for those, and for anything else the list does not have, paste the
-URL and let detection (`POST /config/services/detect`) name the adapter. An entry already
-watched stays in the menu, marked, rather than disappearing from it. Served as
+In the UI edition the add dialog asks this in two steps. The first asks only
+where the status comes from, and offers the three ways of answering that: the
+**bundled catalog**, a pasted URL, or an adapter picked by hand. The second is
+the fields — name, group, poll interval, components — with the answer to the
+first carried in at the top and everything adapter-specific folded under
+**Advanced**. Editing an existing service stays one page: its adapter is fixed,
+and what is left is tuning.
+
+The catalog (roadmap 5.11) is a grid of well-known providers, searchable by
+name, and one pick fills in the adapter, the base URL and the id. Every entry in
+`src/adapters/catalog.ts` was confirmed by running the detection against the
+page, so what the grid offers is what an adapter actually reads. Providers whose
+status page refuses an automated read (Stripe, GitLab, Zendesk, Okta) are
+deliberately absent rather than listed and broken — for those, and for anything
+else the list does not have, paste the URL and let detection
+(`POST /config/services/detect`) name the adapter. An entry already watched stays
+in the grid, dimmed, rather than disappearing from it. Served as
 `GET /config/catalog`.
 
 The provider's own `status.indicator` maps onto the internal severity model:
@@ -633,6 +717,8 @@ validators all drop the cache entry rather than pin a stale reading.
 | Slack | `slack` | `SLACK_WEBHOOK_URL` |
 | ntfy | `ntfy` | `NTFY_TOPIC_URL` (`NTFY_TOKEN` optional) |
 | Gotify | `gotify` | `GOTIFY_URL`, `GOTIFY_TOKEN` |
+| Pushover | `pushover` | `PUSHOVER_TOKEN`, `PUSHOVER_USER_KEY` (`PUSHOVER_DEVICE` optional) |
+| Microsoft Teams | `teams` | `TEAMS_WEBHOOK_URL` |
 | Email (SMTP) | `email` | `SMTP_HOST`, `SMTP_FROM`, `SMTP_TO` (`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ALLOW_INSECURE_AUTH`, `SMTP_ALLOW_SELF_SIGNED` optional) |
 | Desktop (Web Push) | `webpush` | none |
 
@@ -704,6 +790,31 @@ phone: on ntfy's 1–5 scale a major outage is `5` and a recovery is `2`; on
 Gotify's 0–10 scale, `9` and `3`. Neither credential is ever logged or shown in
 the dashboard, and a rejected send reports the HTTP status with the server's own
 reason.
+
+**Pushover** (roadmap 3.5) is the hosted half of the same family: two
+credentials — the application's API token and the user (or group) key — and one
+form-encoded POST to `api.pushover.net`. Both are sent in the body rather than
+the query string, since a URL ends up in logs. The heading is the notification's
+title, the detail its body, and the status page is the tap target rather than a
+line of text. Severity picks the priority: a partial or major outage goes out at
+`1`, which bypasses the recipient's quiet hours; everything else at `0`, and a
+reading we could not take at `-1`. Priority `2` is deliberately never used —
+emergency priority re-alerts until someone acknowledges it, which is an on-call
+escalation rather than a status change. `PUSHOVER_DEVICE` narrows delivery to one
+registered device; unset, every device on the account hears it.
+
+**Microsoft Teams** (roadmap 3.8) is one incoming webhook, like Discord and
+Slack, carrying an Adaptive Card. The card travels in the `attachments`
+envelope rather than as the older `MessageCard`: Microsoft retired the Office
+365 connectors in favour of Workflows, and a workflow trigger only understands
+this shape — a connector that is still alive renders it too, so there is one
+body rather than a setting asking which era the webhook belongs to. The webhook
+URL is created in the channel with **Workflows → "Post to a channel when a
+webhook request is received"**. Severity is the heading's own colour, named
+(`good` / `warning` / `attention`) rather than sent as a hex, so the card stays
+legible in both of Teams' themes, and the same emoji every other channel shows
+says it again for a client rendering in monochrome. The status page is a button,
+not a line of text. The URL is the credential, so it never appears in an error.
 
 **Email** is SMTP submission, and it is written here rather than taken from a
 library (roadmap 3.3): what a notification needs is one submission conversation

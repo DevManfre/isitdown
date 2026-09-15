@@ -6,16 +6,27 @@ import { providerFixture, renderWithProviders } from "@/test/harness.tsx";
 import { Settings } from "@/views/Settings.tsx";
 
 /**
+ * Edit lives in the service row's own disclosure now — the row carries its
+ * switch and nothing else until it is opened. Every test here that edits an
+ * existing service opens the row first, the way an operator does.
+ */
+async function openEdit(name = "GitHub"): Promise<void> {
+  const row = (await screen.findByText(name)).closest(".service-row") as HTMLElement;
+  await userEvent.click(within(row).getByText(name));
+  await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.edit") }));
+}
+
+/**
  * Review Finding 2: the write path (add.mutateAsync, the post-add auto
- * test-connection, ServiceDialog's own stay-open-on-failure) had no
- * coverage at all — only opening/closing was exercised.
+ * test-connection, and ServiceDialog's own stay-open-on-failure) had no
+ * coverage at all — only opening and closing was exercised.
  *
  * Takes over `fetch` once the dialog is already open, i.e. after
- * `renderWithProviders`'s own fixture-driven stub already answered the
- * initial status/config load. Records every call so a test can assert on
- * the body a write actually sent, answers the specific write endpoints a
- * test cares about, and delegates anything else (a GET refetch triggered by
- * a mutation's own `invalidateQueries`) to that already-installed stub.
+ * `renderWithProviders`'s own fixture-driven stub has already answered the
+ * initial status/config load. Records every call so a test can assert on the
+ * body a write actually sent, answers the specific write endpoints the test
+ * cares about, and delegates anything else (a GET refetch triggered by a
+ * mutation's own `invalidateQueries`) to the already-installed stub.
  */
 type RecordedCall = { path: string; method: string; body?: unknown };
 
@@ -78,6 +89,43 @@ const openAdd = async () => {
   return { trigger, dialog: await screen.findByRole("dialog") };
 };
 
+/** Step one is a choice between three named ways in; this picks one of them. */
+const chooseSource = async (dialog: HTMLElement, label: string): Promise<void> => {
+  await userEvent.click(within(dialog).getByRole("radio", { name: i18n.t(label) }));
+};
+
+/** Steps forward to the fields. Every add goes through here now. */
+const goOn = async (dialog: HTMLElement): Promise<void> => {
+  await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.continue") }));
+};
+
+/**
+ * The shortest legal add: paste a url by hand, step on. Most write-path tests
+ * only care about what the body looked like, not how the url got there.
+ */
+const addByUrl = async (dialog: HTMLElement, baseUrl: string): Promise<void> => {
+  await chooseSource(dialog, "source.url");
+  await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), baseUrl);
+  await goOn(dialog);
+};
+
+/**
+ * Picks an adapter by hand, which is the one path that shows the whole list.
+ * An empty `baseUrl` keeps whatever is already in the field — which is what a
+ * test that has stepped back to change only the adapter wants.
+ */
+const addByAdapter = async (dialog: HTMLElement, adapter: string, baseUrl: string): Promise<void> => {
+  await chooseSource(dialog, "source.manual");
+  await userEvent.click(within(dialog).getByRole("radio", { name: adapter }));
+  if (baseUrl !== "") await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), baseUrl);
+  await goOn(dialog);
+};
+
+/** The adapter's own fields live behind a disclosure on step two. */
+const openAdvanced = async (dialog: HTMLElement): Promise<void> => {
+  await userEvent.click(within(dialog).getByRole("button", { name: new RegExp(i18n.t("add.advanced")) }));
+};
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("the service dialog's keyboard contract", () => {
@@ -88,8 +136,7 @@ describe("the service dialog's keyboard contract", () => {
 
   it("keeps Tab inside the dialog", async () => {
     const { dialog } = await openAdd();
-    const focusable = within(dialog).getAllByRole("textbox");
-    for (let i = 0; i < focusable.length + 3; i += 1) await userEvent.tab();
+    for (let i = 0; i < 12; i += 1) await userEvent.tab();
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
   });
 
@@ -107,9 +154,10 @@ describe("the service dialog's keyboard contract", () => {
 
   it("derives the id from the name instead of asking for it", async () => {
     const { dialog } = await openAdd();
+    await addByUrl(dialog, "https://status.example.com");
     const idField = within(dialog).getByLabelText(i18n.t("field.id"));
-
     expect(idField).toHaveAttribute("readonly");
+
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "Città Cloud & Co.");
 
     expect(idField).toHaveValue("citta-cloud-co");
@@ -117,20 +165,79 @@ describe("the service dialog's keyboard contract", () => {
 
   it("refuses to edit the id of an existing service", async () => {
     renderWithProviders(<Settings />, fixtures);
-    await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.edit") }));
+    await openEdit();
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByLabelText(i18n.t("field.id"))).toHaveAttribute("readonly");
+  });
+});
+
+/**
+ * The half of the redesign that is structural rather than cosmetic: adding is
+ * one decision followed by paperwork, so the decision gets a step of its own
+ * and the paperwork cannot be reached until it is answered.
+ */
+describe("the service dialog's two steps", () => {
+  it("opens on the source step, with the fields not yet on screen", async () => {
+    const { dialog } = await openAdd();
+
+    expect(within(dialog).getByRole("group", { name: i18n.t("catalog.label") })).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText(i18n.t("field.name"))).toBeNull();
+  });
+
+  it("will not step on until it has a base URL to step on with", async () => {
+    const { dialog } = await openAdd();
+    expect(within(dialog).getByRole("button", { name: i18n.t("action.continue") })).toBeDisabled();
+
+    await chooseSource(dialog, "source.url");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://status.example.com");
+
+    expect(within(dialog).getByRole("button", { name: i18n.t("action.continue") })).toBeEnabled();
+  });
+
+  // A form with a text field in it submits on Enter even with no submit button
+  // on screen, which posted a nameless service and answered with the schema's
+  // complaint about the id and the name — arriving, because the rejection is a
+  // round trip, only once the operator had already stepped on.
+  it("steps on when Enter is pressed in a field, rather than submitting a nameless service", async () => {
+    const { dialog } = await openAdd();
+    const calls = interceptWrites({});
+
+    await chooseSource(dialog, "source.url");
+    const url = within(dialog).getByLabelText(i18n.t("field.base-url"));
+    await userEvent.type(url, "https://status.example.com{Enter}");
+
+    expect(calls.filter((call) => call.method === "POST" && call.path === "/config/services")).toEqual([]);
+    expect(within(dialog).getByLabelText(i18n.t("field.name"))).toBeInTheDocument();
+  });
+
+  it("carries the choice into the second step, and back out of it unchanged", async () => {
+    const { dialog } = await openAdd();
+    await addByAdapter(dialog, "rss", "https://status.example.com/history.rss");
+
+    // The premise of every field below it, stated once at the top rather than
+    // left to be read off a chip row.
+    expect(within(dialog).getByText("https://status.example.com/history.rss")).toBeInTheDocument();
+    expect(within(dialog).getByText("rss")).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.change") }));
+
+    expect(within(dialog).getByRole("radio", { name: "rss" })).toHaveAttribute("aria-checked", "true");
+    expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue(
+      "https://status.example.com/history.rss",
+    );
   });
 });
 
 describe("the service dialog's adapter choice", () => {
   it("offers the feed adapter alongside the Statuspage one", async () => {
     const { dialog } = await openAdd();
+    await chooseSource(dialog, "source.manual");
     expect(within(dialog).getByRole("radio", { name: "rss" })).toBeInTheDocument();
   });
 
   it("says what the base URL means for the adapter that is selected", async () => {
     const { dialog } = await openAdd();
+    await chooseSource(dialog, "source.manual");
     expect(within(dialog).getByText(i18n.t("add.note.statuspage"))).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole("radio", { name: "rss" }));
@@ -143,6 +250,7 @@ describe("the service dialog's adapter choice", () => {
   // knows which of them it is, so the form asks it rather than the operator.
   it("fills in the adapter and the base URL from the page itself", async () => {
     const { dialog } = await openAdd();
+    await chooseSource(dialog, "source.url");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "status.example.com");
 
     interceptWrites({
@@ -155,14 +263,18 @@ describe("the service dialog's adapter choice", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.detect-adapter") }));
 
     expect(await within(dialog).findByText(i18n.t("add.detect-ok", { adapter: "rss" }))).toBeInTheDocument();
-    expect(within(dialog).getByRole("radio", { name: "rss" })).toHaveAttribute("aria-checked", "true");
     expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue(
       "https://status.example.com/history.rss",
     );
+
+    // And the adapter it answered with is the one step two then proceeds on.
+    await goOn(dialog);
+    expect(within(dialog).getByText("rss")).toBeInTheDocument();
   });
 
   it("leaves the form alone when no adapter recognised the page", async () => {
     const { dialog } = await openAdd();
+    await chooseSource(dialog, "source.url");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://example.com");
 
     interceptWrites({
@@ -173,7 +285,6 @@ describe("the service dialog's adapter choice", () => {
     expect(await within(dialog).findByText(i18n.t("add.detect-none"))).toBeInTheDocument();
     // The typing survives: the operator is about to pick an adapter by hand.
     expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue("https://example.com");
-    expect(within(dialog).getByRole("radio", { name: "statuspage" })).toHaveAttribute("aria-checked", "true");
   });
 
   it("submits the adapter the operator picked", async () => {
@@ -183,12 +294,8 @@ describe("the service dialog's adapter choice", () => {
       "POST /config/services/feed-service/test": { ok: true, overallStatus: "operational" },
     });
 
-    await userEvent.click(within(dialog).getByRole("radio", { name: "rss" }));
+    await addByAdapter(dialog, "rss", "https://status.example.com/history.rss");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "Feed Service");
-    await userEvent.type(
-      within(dialog).getByLabelText(i18n.t("field.base-url")),
-      "https://status.example.com/history.rss",
-    );
     await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
@@ -200,9 +307,15 @@ describe("the service dialog's adapter choice", () => {
 describe("the service dialog's scrape adapter fields", () => {
   it("asks for a selector and warns about the reading breaking, only for the scrape adapter", async () => {
     const { dialog } = await openAdd();
+    await addByUrl(dialog, "https://status.example.com");
     expect(within(dialog).queryByLabelText(i18n.t("scrape.selector"))).toBeNull();
+    // A Statuspage site has no adapter fields at all, so there is no
+    // disclosure to open for it either.
+    expect(within(dialog).queryByRole("button", { name: new RegExp(i18n.t("add.advanced")) })).toBeNull();
 
-    await userEvent.click(within(dialog).getByRole("radio", { name: "html" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.change") }));
+    await addByAdapter(dialog, "html", "");
+    await openAdvanced(dialog);
 
     expect(within(dialog).getByLabelText(i18n.t("scrape.selector"))).toBeInTheDocument();
     expect(within(dialog).getByText(i18n.t("scrape.warning"))).toBeInTheDocument();
@@ -215,9 +328,9 @@ describe("the service dialog's scrape adapter fields", () => {
       "POST /config/services/scraped/test": { ok: true, overallStatus: "operational" },
     });
 
-    await userEvent.click(within(dialog).getByRole("radio", { name: "html" }));
+    await addByAdapter(dialog, "html", "https://status.example.com/");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "Scraped");
-    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://status.example.com/");
+    await openAdvanced(dialog);
     await userEvent.type(within(dialog).getByLabelText(i18n.t("scrape.selector")), ".status-banner");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("status.operational")), "tutto tranquillo");
 
@@ -237,9 +350,12 @@ describe("the service dialog's scrape adapter fields", () => {
 describe("the service dialog's probe fields", () => {
   it("asks what a healthy answer looks like, only for the probe adapter", async () => {
     const { dialog } = await openAdd();
+    await addByUrl(dialog, "https://app.example.com");
     expect(within(dialog).queryByLabelText(i18n.t("probe.expect-status"))).toBeNull();
 
-    await userEvent.click(within(dialog).getByRole("radio", { name: "http" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.change") }));
+    await addByAdapter(dialog, "http", "");
+    await openAdvanced(dialog);
 
     expect(within(dialog).getByLabelText(i18n.t("probe.expect-status"))).toBeInTheDocument();
     expect(within(dialog).getByText(i18n.t("probe.warning"))).toBeInTheDocument();
@@ -247,7 +363,8 @@ describe("the service dialog's probe fields", () => {
 
   it("offers no body match against a HEAD, which downloads no body", async () => {
     const { dialog } = await openAdd();
-    await userEvent.click(within(dialog).getByRole("radio", { name: "http" }));
+    await addByAdapter(dialog, "http", "https://app.example.com");
+    await openAdvanced(dialog);
     expect(within(dialog).getByLabelText(i18n.t("probe.expect-body"))).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole("radio", { name: "HEAD" }));
@@ -262,9 +379,9 @@ describe("the service dialog's probe fields", () => {
       "POST /config/services/my-api/test": { ok: true, overallStatus: "operational" },
     });
 
-    await userEvent.click(within(dialog).getByRole("radio", { name: "http" }));
+    await addByAdapter(dialog, "http", "https://app.example.com");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "My API");
-    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://app.example.com");
+    await openAdvanced(dialog);
     await userEvent.type(within(dialog).getByLabelText(i18n.t("probe.path")), "/health");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("probe.expect-body")), "\"db\":\"up\"");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("probe.slow-ms")), "1500");
@@ -305,8 +422,8 @@ describe("the service dialog's write path", () => {
       "POST /config/services/new-service/test": { ok: true, overallStatus: "operational" },
     });
 
+    await addByUrl(dialog, "https://example.com");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "New Service");
-    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://example.com");
     await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("components.load") }));
     await userEvent.click(await within(dialog).findByLabelText("Component One"));
 
@@ -326,11 +443,11 @@ describe("the service dialog's write path", () => {
   });
 
   it("a successful edit submits the patch mutation with the expected body", async () => {
-    // Review item 2: the only edit-mode test on record (line ~98) asserts
-    // the id field is read-only but never actually submits — patch.mutateAsync
-    // and its body have never been exercised until now.
+    // Review item 2: the only edit-mode test on record asserts the id field is
+    // read-only but never actually submits — patch.mutateAsync and its body
+    // have never been exercised until now.
     renderWithProviders(<Settings />, fixtures);
-    await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.edit") }));
+    await openEdit();
     const dialog = await screen.findByRole("dialog");
     const calls = interceptWrites({ "PATCH /config/services/github": {} });
 
@@ -363,8 +480,8 @@ describe("the service dialog's write path", () => {
       "POST /config/services/new-service/test": { ok: true, overallStatus: "operational" },
     });
 
+    await addByUrl(dialog, "https://example.com");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "New Service");
-    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://example.com");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.provider-interval")), "45");
     await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
 
@@ -381,14 +498,14 @@ describe("the service dialog's write path", () => {
       "POST /config/services/new-service/test": { ok: false, error: "connection refused" },
     });
 
+    await addByUrl(dialog, "https://example.com");
     await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "New Service");
-    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://example.com");
     await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
 
-    // The service was added; it simply did not answer. The dialog's own
-    // fix over vanilla (which flashed the message then closed anyway) is
-    // to stay open with the failure legible — assert that, not just that
-    // *a* dialog exists.
+    // The service was added; it simply did not answer. The dialog's own fix
+    // over vanilla (which flashed the message then closed anyway) is to stay
+    // open with the failure legible — assert that, not just that *a* dialog
+    // exists.
     expect(
       await within(dialog).findByText(i18n.t("add.test-failed", { error: "connection refused" })),
     ).toBeInTheDocument();
@@ -404,12 +521,14 @@ describe("the service dialog's bundled catalog", () => {
     const menu = within(await within(dialog).findByRole("group", { name: i18n.t("catalog.label") }));
 
     await userEvent.click(await menu.findByRole("button", { name: "Heroku" }));
+    await goOn(dialog);
 
     expect(within(dialog).getByLabelText(i18n.t("field.name"))).toHaveValue("Heroku");
     expect(within(dialog).getByLabelText(i18n.t("field.id"))).toHaveValue("heroku");
-    expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue("https://status.heroku.com/feed");
-    // The pick carries the adapter too, so the base-url hint is the feed one.
-    expect(within(dialog).getByRole("radio", { name: "rss" })).toHaveAttribute("data-state", "on");
+    // The pick carries the adapter and the url the adapter wants, both of
+    // which the second step states rather than asks for again.
+    expect(within(dialog).getByText("https://status.heroku.com/feed")).toBeInTheDocument();
+    expect(within(dialog).getByText("rss")).toBeInTheDocument();
   });
 
   it("keeps an already-watched provider listed, but not pickable", async () => {
@@ -438,11 +557,13 @@ describe("the service dialog's bundled catalog", () => {
     expect(await within(dialog).findByText(i18n.t("catalog.empty"))).toBeInTheDocument();
   });
 
-  it("offers no menu while editing: an existing service has every answer already", async () => {
+  it("offers no catalog while editing: an existing service has every answer already", async () => {
     renderWithProviders(<Settings />, fixtures);
-    await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.edit") }));
+    await openEdit();
     const dialog = await screen.findByRole("dialog");
 
     expect(within(dialog).queryByRole("group", { name: i18n.t("catalog.label") })).toBeNull();
+    // And no step rail either: editing is one page, not half of a wizard.
+    expect(within(dialog).queryByRole("button", { name: i18n.t("action.continue") })).toBeNull();
   });
 });

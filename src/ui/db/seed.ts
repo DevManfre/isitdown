@@ -46,6 +46,18 @@ const DEFAULT_CHANNELS = [
   // optional (see OPTIONAL_CHANNEL_SETTINGS), Gotify's is not.
   { id: "ntfy", config: { topicUrlEnv: "NTFY_TOPIC_URL", tokenEnv: "NTFY_TOKEN" } },
   { id: "gotify", config: { serverUrlEnv: "GOTIFY_URL", tokenEnv: "GOTIFY_TOKEN" } },
+  // Pushover (roadmap 3.5). Two credentials, plus a device name that narrows
+  // delivery to one phone and is optional (see OPTIONAL_CHANNEL_SETTINGS).
+  {
+    id: "pushover",
+    config: {
+      tokenEnv: "PUSHOVER_TOKEN",
+      userKeyEnv: "PUSHOVER_USER_KEY",
+      deviceEnv: "PUSHOVER_DEVICE",
+    },
+  },
+  // Microsoft Teams (roadmap 3.8). One incoming webhook, like Discord and Slack.
+  { id: "teams", config: { webhookUrlEnv: "TEAMS_WEBHOOK_URL" } },
   // SMTP submission (roadmap 3.3). Every setting is a `*Env` name like every
   // other channel's — the dashboard only ever offers those, and 5.17 is what
   // lets a value be typed into it rather than put in the environment by hand.

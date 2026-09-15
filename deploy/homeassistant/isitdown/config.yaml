@@ -1,0 +1,64 @@
+# Home Assistant add-on — the UI edition (roadmap 6.6).
+#
+# Distribution, not a feature: the add-on runs the same published image the
+# compose file does. Only the UI edition is offered, because an add-on with no
+# page to open would be a worse way to run the Light edition than a plain
+# container.
+name: IsItDown
+version: "2.0.0"
+slug: isitdown
+description: >-
+  Watch the status pages of the providers you depend on, and be told when one
+  of them changes state.
+url: https://github.com/DevManfre/isitdown
+# The published image is multi-arch under one tag, so every architecture the
+# project builds for is listed here and `build.yaml` points all of them at it.
+arch:
+  - aarch64
+  - amd64
+  - armv7
+
+# A published port rather than ingress, deliberately. Ingress serves an add-on
+# under a generated path prefix, and this dashboard is built against an absolute
+# one: its bundle and its API calls both start at `/`. Offering ingress would
+# mean a panel that opens to a blank page, which is worse than a link. The page
+# has no login either way — publish it only on a network you trust.
+ports:
+  3000/tcp: 3000
+ports_description:
+  3000/tcp: The dashboard
+webui: "http://[HOST]:[PORT:3000]/"
+init: false
+
+# `/data` is the add-on's own persistent volume, and the SQLite database in it
+# is the whole installation: providers, channels, history, incidents. Nothing
+# else needs mapping — the UI edition has no config file.
+map: []
+
+options:
+  log_level: info
+schema:
+  log_level: list(debug|info|warn|error)
+  # One optional entry per credential, named after the variable the channel asks
+  # for, so the dashboard's "env missing" row and this list say the same word.
+  # A channel left unconfigured simply stays disabled.
+  TELEGRAM_BOT_TOKEN: str?
+  TELEGRAM_CHAT_ID: str?
+  DISCORD_WEBHOOK_URL: str?
+  SLACK_WEBHOOK_URL: str?
+  NTFY_TOPIC_URL: str?
+  NTFY_TOKEN: str?
+  GOTIFY_URL: str?
+  GOTIFY_TOKEN: str?
+  PUSHOVER_TOKEN: str?
+  PUSHOVER_USER_KEY: str?
+  PUSHOVER_DEVICE: str?
+  TEAMS_WEBHOOK_URL: str?
+  WEBHOOK_URL: str?
+  WEBHOOK_SECRET: str?
+  SMTP_HOST: str?
+  SMTP_PORT: str?
+  SMTP_USERNAME: str?
+  SMTP_PASSWORD: str?
+  SMTP_FROM: str?
+  SMTP_TO: str?

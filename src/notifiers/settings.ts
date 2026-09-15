@@ -41,6 +41,10 @@ export const OPTIONAL_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   // access control does. Requiring it would disable the channel for everyone
   // publishing to ntfy.sh, which is the common case.
   ntfy: ["token"],
+  // A device name narrows delivery to one phone; unset means every device on
+  // the account, which is what most operators want and what Pushover defaults
+  // to. The two credentials beside it are not optional.
+  pushover: ["device"],
   // The host and the two addresses are the channel; everything else has a
   // working default. A relay on this machine, or one that trusts this network,
   // wants no credentials at all — and a submission server that does will refuse
