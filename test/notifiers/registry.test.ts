@@ -35,6 +35,16 @@ const gotify: ChannelConfig = {
   enabled: true,
   settings: { serverUrl: "https://gotify.example.com", token: "AppToken" },
 };
+const pushover: ChannelConfig = {
+  id: "pushover",
+  enabled: true,
+  settings: { token: "AppToken", userKey: "UserKey" },
+};
+const teams: ChannelConfig = {
+  id: "teams",
+  enabled: true,
+  settings: { webhookUrl: "https://example.logic.azure.com/workflows/a/triggers/manual/paths/invoke" },
+};
 
 test("only enabled channels are built", () => {
   const built = buildNotifiers([telegram, { ...webhook, enabled: false }]);
@@ -46,8 +56,10 @@ test("only enabled channels are built", () => {
 
 test("every built-in channel can be built together", () => {
   assert.deepEqual(
-    buildNotifiers([telegram, webhook, discord, slack, ntfy, gotify]).map((notifier) => notifier.id),
-    ["telegram", "webhook", "discord", "slack", "ntfy", "gotify"],
+    buildNotifiers([telegram, webhook, discord, slack, ntfy, gotify, pushover, teams]).map(
+      (notifier) => notifier.id,
+    ),
+    ["telegram", "webhook", "discord", "slack", "ntfy", "gotify", "pushover", "teams"],
   );
 });
 

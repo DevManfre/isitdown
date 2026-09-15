@@ -1,6 +1,6 @@
 {
   "name": "isitdown",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Polls the public status pages of third-party providers and notifies on state transitions",
   "license": "MIT",
@@ -23,6 +23,7 @@
     "release-notes": "node tools/release-notes.mjs",
     "test": "node --test \"test/**/*.test.ts\" && vitest run",
     "test:integration": "node --test \"test/**/*.itest.ts\"",
+    "test:mutation": "node tools/mutation.mjs",
     "test:visual": "node tools/visual-regression.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
@@ -49,6 +50,7 @@
     "@vitest/coverage-v8": "^4.1.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "concurrently": "^10.0.5",
     "dotted-map": "^3.1.0",
     "happy-dom": "^20.11.6",

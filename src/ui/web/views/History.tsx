@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router";
 import { Trans, useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
@@ -62,7 +63,16 @@ function downloadHistoryJson(summary: HistorySummary, days: number): void {
 export function History() {
   const { t, i18n } = useTranslation();
   const [days, setDays] = useState<number>(90);
-  const [open, setOpen] = useState<string | null>(null);
+  // The provider the command palette (roadmap 5.4) asked for, if any. Route
+  // state rather than a url because there is no per-provider route yet (5.6);
+  // read in an effect as well as initially, since navigating here from here
+  // re-renders this view rather than remounting it.
+  const location = useLocation();
+  const asked = (location.state as { openProvider?: string } | null)?.openProvider ?? null;
+  const [open, setOpen] = useState<string | null>(asked);
+  useEffect(() => {
+    if (asked !== null) setOpen(asked);
+  }, [asked]);
   // Null means "whichever the ordering picks": the fleet is not loaded yet on
   // the first render, and a comparison the operator did choose must survive a
   // range change that reorders the list under it.
@@ -208,6 +218,22 @@ export function History() {
                       href: `/export/history.csv?days=${days}`,
                     },
                   ],
+                },
+                {
+                  // Roadmap 4.7. Not another shape of the same rows: the
+                  // server writes the month up — uptime per provider, worst
+                  // day, the incidents behind it — because what somebody does
+                  // with a month of uptime is paste it into a ticket, not open
+                  // it in a spreadsheet. One entry per month the columns below
+                  // show, so the link is for the month being looked at.
+                  label: t("history.report-title"),
+                  items: summary.months.map((month) => ({
+                    format: monthLabel(i18n.language, month.month),
+                    description: t("history.report-download", {
+                      month: monthLabel(i18n.language, month.month),
+                    }),
+                    href: `/export/monthly.md?month=${month.month}`,
+                  })),
                 },
               ]}
             />

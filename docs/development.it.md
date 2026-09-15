@@ -220,6 +220,7 @@ npm test                 # suite node:test + vitest run
 npm run coverage         # le stesse due suite sotto una soglia minima di copertura
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
 npm run test:visual      # baseline visive: ogni vista, entrambi i temi, entrambe le lingue
+npm run test:mutation    # mutation testing sul diff engine
 npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
@@ -240,6 +241,33 @@ attuale, così il movimento ordinario passa e un sottosistema nuovo che arriva
 senza test propri trascina il totale sotto la soglia e fa fallire la CI. Alza una
 soglia quando la suite è davvero salita; non abbassarne mai una per far tornare
 verde una run rossa.
+
+Il mutation testing (roadmap 7.3) pone la domanda che la copertura non può
+porre: una riga eseguita non è una riga a cui un test avrebbe obiettato.
+`tools/mutation.mjs` cambia un operatore in `src/core/diffEngine.ts` — un
+confronto invertito, un confine spostato di uno, `&&` al posto di `||` — esegue
+la suite propria del motore e riporta ogni mutante che la suite continua a far
+passare. Quello è un comportamento del motore che nulla sta tenendo fermo, e il
+motore è l'unica autorità su se qualcuno viene avvisato di qualcosa: è per
+questo che qui vale la pena farlo e altrove no. Non prende dipendenze e costa
+circa un minuto.
+
+A un sopravvissuto si risponde con un test, non con una lista di mutazioni più
+corta. L'eccezione è una mutazione che non si può proprio osservare — scambiare
+il connettivo in `if (until === null || until === undefined) return false`
+quando la guardia sui NaN qui sotto risponde già `false` per entrambi. Quelle si
+dichiarano nel sorgente stesso, accanto al motivo:
+
+```ts
+// mutation-equivalent: || — `Date.parse` answers NaN for both, and the NaN
+// guard below already returns false, so the two connectives are one function.
+```
+
+Sopprime solo l'operatore nominato e solo sulla riga di codice successiva, e la
+run stampa comunque quante ne sono state scusate, perché un punteggio che
+nasconde ciò che ha escluso non è un punteggio. Gira su richiesta e non in CI: i
+mutanti vengono scritti sul file sorgente vero e poi ripristinati, il che va
+bene in un albero di lavoro ed è sbagliato prendere come abitudine a ogni push.
 
 **Nessun test raggiunge mai un provider reale.** Gli adapter sono testati contro
 payload registrati dalle status page vere e conservati sotto `test/fixtures/`; il

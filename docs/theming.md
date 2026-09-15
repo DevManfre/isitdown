@@ -98,6 +98,14 @@ What is guaranteed, and checked:
   each have a test that shows it rather than assuming it. Hand-written
   clickables (a provider row, a ring tile) get a visible focus ring from
   `base.css` at zero specificity, under whatever ring a primitive already has.
+- **The command palette.** `⌘K` (or `Ctrl+K`) on any screen opens one search
+  box over the console (roadmap 5.4): every view the rail lists, every enabled
+  provider — searchable by the name on screen or the id it was configured with
+  — plus **Poll now** and the theme. A provider opens the History view's
+  drawer, which is where a provider's detail lives until 5.6 gives it a page of
+  its own. It is mounted in the shell rather than in a view, so the keystroke
+  answers everywhere, and it opens with its views and actions even when the
+  status read has failed.
 - **Charts.** A run of coloured bars says nothing out loud, so the uptime bars,
   the component strip, the poll strip, the sparkline and the provider ring each
   carry a one-sentence summary ("Daily status over 90 days: 84 operational, 3

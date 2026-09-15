@@ -35,7 +35,10 @@ export function Reveal({ open, children }: { open: boolean; children: ReactNode 
 
   return (
     <div data-slot="setting-reveal" className={open ? "anim-unfold" : "anim-fold"}>
-      <div className="flex flex-col divide-y divide-border">{children}</div>
+      {/* Indented and tinted, so a revealed row reads as belonging to the
+          switch above it rather than as the next peer setting down the card:
+          "Incident cadence" only means anything while adaptive polling is on. */}
+      <div className="flex flex-col divide-y divide-border bg-primary/[0.04] pl-6">{children}</div>
     </div>
   );
 }

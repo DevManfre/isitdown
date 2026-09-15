@@ -5,7 +5,7 @@ import { SettingsSection } from "./SettingsSection.tsx";
 describe("SettingsSection", () => {
   it("renders the kicker, the action beside it and the rows inside", () => {
     render(
-      <SettingsSection title="Engine" action={<button type="button">Add</button>} delay="0ms">
+      <SettingsSection id="engine" title="Engine" action={<button type="button">Add</button>} delay="0ms">
         <div>row</div>
       </SettingsSection>,
     );
@@ -16,7 +16,7 @@ describe("SettingsSection", () => {
 
   it("shows the note in the footer when there is nothing to report", () => {
     render(
-      <SettingsSection title="Engine" note="Applied on the next cycle." delay="0ms">
+      <SettingsSection id="engine" title="Engine" note="Applied on the next cycle." delay="0ms">
         <div>row</div>
       </SettingsSection>,
     );
@@ -25,7 +25,7 @@ describe("SettingsSection", () => {
 
   it("replaces the note with the status while one is showing", () => {
     render(
-      <SettingsSection title="Engine" note="Applied on the next cycle." status="Saved" delay="0ms">
+      <SettingsSection id="engine" title="Engine" note="Applied on the next cycle." status="Saved" delay="0ms">
         <div>row</div>
       </SettingsSection>,
     );
@@ -35,7 +35,7 @@ describe("SettingsSection", () => {
 
   it("renders no footer at all when neither a note nor a status is given", () => {
     const { container } = render(
-      <SettingsSection title="Appearance" delay="0ms">
+      <SettingsSection id="engine" title="Appearance" delay="0ms">
         <div>row</div>
       </SettingsSection>,
     );
@@ -44,7 +44,7 @@ describe("SettingsSection", () => {
 
   it("carries the cascade delay it was given", () => {
     const { container } = render(
-      <SettingsSection title="Engine" delay="120ms">
+      <SettingsSection id="engine" title="Engine" delay="120ms">
         <div>row</div>
       </SettingsSection>,
     );

@@ -498,3 +498,97 @@ test("aggregateDelta is null when no provider has both a current and a previous 
   assert.equal(aggregateDelta, null, "no comparison exists, so none is claimed");
   await store.close();
 });
+
+/** The monthly report — roadmap 4.7. */
+
+test("a month's report aggregates that month alone, not a rolling window", async () => {
+  const { store, history } = await harness(["github", "cloudflare"]);
+
+  // August, up to "today" (the 19th): github has one bad day, cloudflare none.
+  await sample(store, "github", daysAgo(0), "operational");
+  await sample(store, "github", daysAgo(1), "major_outage");
+  await sample(store, "cloudflare", daysAgo(0), "operational");
+  // July, which the report must leave out entirely.
+  await sample(store, "github", daysAgo(40), "major_outage");
+
+  const report = await history.getMonthlyReport("2026-08", 3);
+
+  assert.equal(report.month, "2026-08");
+  assert.equal(report.from, "2026-08-01");
+  assert.equal(report.to, "2026-08-19");
+  assert.equal(report.partial, true);
+
+  const github = report.providers.find((provider) => provider.providerId === "github");
+  assert.equal(github?.measuredDays, 2);
+  assert.equal(github?.uptime, 50);
+  assert.equal(github?.downtimeMinutes, 3);
+  assert.equal(github?.worstDay?.day, daysAgo(1).slice(0, 10));
+  assert.equal(github?.worstDay?.uptime, 0);
+
+  // The fleet figure is the mean of the providers that were measured.
+  assert.equal(report.fleetUptime, 75);
+  await store.close();
+});
+
+test("a month nothing measured reports null rather than nought percent", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(0), "operational");
+
+  // June: inside retention, and no sample landed in it.
+  const report = await history.getMonthlyReport("2026-06", 3);
+
+  assert.equal(report.providers[0]?.uptime, null);
+  assert.equal(report.providers[0]?.measuredDays, 0);
+  assert.equal(report.providers[0]?.worstDay, null);
+  assert.equal(report.fleetUptime, null);
+  await store.close();
+});
+
+test("a month that is over is not flagged partial, and runs to its last day", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(40), "operational");
+
+  const report = await history.getMonthlyReport("2026-07", 3);
+
+  assert.equal(report.partial, false);
+  assert.equal(report.to, "2026-07-31");
+  await store.close();
+});
+
+test("an incident that ran into the month is counted by it, not only one that started in it", async () => {
+  const { store, history } = await harness();
+
+  // Opened on 10 July and never resolved: August's downtime has to have
+  // something causing it.
+  await store.saveStatus({
+    provider: "github",
+    overallStatus: "major_outage",
+    activeIncidents: [
+      { id: "long", name: "Rolling outage", impact: "major", status: "investigating", updatedAt: daysAgo(40) },
+    ],
+    components: [],
+    maintenances: [],
+    fetchedAt: daysAgo(40),
+  });
+
+  const report = await history.getMonthlyReport("2026-08", 3);
+
+  assert.equal(report.providers[0]?.incidentCount, 1);
+  assert.equal(report.incidents[0]?.incidentId, "long");
+  await store.close();
+});
+
+test("the report covers the providers it was given, and nothing else", async () => {
+  const { store, history } = await harness(["github", "cloudflare"]);
+  await sample(store, "github", daysAgo(0), "operational");
+  await sample(store, "cloudflare", daysAgo(0), "major_outage");
+
+  const report = await history.getMonthlyReport("2026-08", 3, ["github"]);
+
+  assert.deepEqual(
+    report.providers.map((provider) => provider.providerId),
+    ["github"],
+  );
+  assert.equal(report.fleetUptime, 100);
+  await store.close();
+});

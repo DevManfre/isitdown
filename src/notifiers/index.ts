@@ -4,7 +4,9 @@ import { createDiscordNotifier } from "./discord.notifier.ts";
 import { createEmailNotifier } from "./email.notifier.ts";
 import { createGotifyNotifier } from "./gotify.notifier.ts";
 import { createNtfyNotifier } from "./ntfy.notifier.ts";
+import { createPushoverNotifier } from "./pushover.notifier.ts";
 import { createSlackNotifier } from "./slack.notifier.ts";
+import { createTeamsNotifier } from "./teams.notifier.ts";
 import { createTelegramNotifier } from "./telegram.notifier.ts";
 import { createWebhookNotifier } from "./webhook.notifier.ts";
 
@@ -15,7 +17,9 @@ const factories: Record<string, NotifierFactory> = {
   email: createEmailNotifier,
   gotify: createGotifyNotifier,
   ntfy: createNtfyNotifier,
+  pushover: createPushoverNotifier,
   slack: createSlackNotifier,
+  teams: createTeamsNotifier,
   telegram: createTelegramNotifier,
   webhook: createWebhookNotifier,
 };

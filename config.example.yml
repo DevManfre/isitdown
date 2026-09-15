@@ -103,6 +103,19 @@ notifications:
     serverUrl: "${GOTIFY_URL}"
     # An application token, from the Gotify app you created for IsItDown
     token: "${GOTIFY_TOKEN}"
+  pushover:
+    enabled: false
+    # The API token of the Pushover application you created for IsItDown
+    token: "${PUSHOVER_TOKEN}"
+    # Your user key, or a group key, from the Pushover dashboard
+    userKey: "${PUSHOVER_USER_KEY}"
+    # Optional: one registered device; empty delivers to every device
+    device: "${PUSHOVER_DEVICE}"
+  teams:
+    enabled: false
+    # A Teams channel webhook: Workflows → "Post to a channel when a webhook
+    # request is received", or an Office 365 connector on an older tenant
+    webhookUrl: "${TEAMS_WEBHOOK_URL}"
   email:
     enabled: false
     # An SMTP submission server. STARTTLS is used whenever the server offers it.

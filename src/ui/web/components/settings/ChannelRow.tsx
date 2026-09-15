@@ -10,6 +10,8 @@ import {
   MessagesSquare,
   MonitorSmartphone,
   Send,
+  Smartphone,
+  Users,
   Webhook,
 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
@@ -133,7 +135,9 @@ const CHANNEL_ICONS: Record<string, typeof Bell> = {
   email: Mail,
   gotify: BellRing,
   ntfy: Megaphone,
+  pushover: Smartphone,
   slack: Hash,
+  teams: Users,
   telegram: Send,
   webhook: Webhook,
   webpush: MonitorSmartphone,
@@ -144,7 +148,9 @@ const CHANNEL_NAME_KEYS: Record<string, string> = {
   email: "channel.name.email",
   gotify: "channel.name.gotify",
   ntfy: "channel.name.ntfy",
+  pushover: "channel.name.pushover",
   slack: "channel.name.slack",
+  teams: "channel.name.teams",
   telegram: "channel.name.telegram",
   webhook: "channel.name.webhook",
   webpush: "channel.name.webpush",

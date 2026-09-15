@@ -1,4 +1,4 @@
-import type { DailyBucket, HistoryStore } from "./historyStore.interface.ts";
+import type { DailyBucket, HistoryStore, IncidentRow } from "./historyStore.interface.ts";
 import type { OverallStatus } from "../core/types.ts";
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -123,6 +123,52 @@ export interface HistorySummary {
   /** `uptime` is null for a month with no samples: 0% would read as an outage. */
   months: { month: string; uptime: number | null }[];
   providers: ProviderHistory[];
+}
+
+/**
+ * One provider's month, in the report of roadmap 4.7.
+ *
+ * `uptime` is `null` rather than 0 when the month holds no samples at all: a
+ * provider added halfway through, or one that was disabled, did not have a bad
+ * month — it had no month, and averaging a 0 into the fleet figure would say
+ * something untrue about everything else.
+ */
+export interface MonthlyProviderReport {
+  providerId: string;
+  uptime: number | null;
+  /** Days of the month with at least one sample — how much of it is real. */
+  measuredDays: number;
+  sampleCount: number;
+  downtimeMinutes: number;
+  /** Incidents open at any point in the month, not only those that started in it. */
+  incidentCount: number;
+  /**
+   * The measured day with the least uptime, which is the day worth looking up.
+   * `null` when nothing was measured. A month with no trouble still names one,
+   * at 100% — "which day was worst" and "was any day bad" are different
+   * questions, and the second is answered by the number rather than by absence.
+   */
+  worstDay: { day: string; uptime: number; status: OverallStatus } | null;
+}
+
+export interface MonthlyReport {
+  /** `YYYY-MM`, UTC, like every other day key here. */
+  month: string;
+  /** First and last day covered, inclusive. */
+  from: string;
+  to: string;
+  /**
+   * The month is not over, so the figures below cover part of it. Reported
+   * rather than refused: the useful time to read this month's report is during
+   * this month, and a report that hides that it is partial is the dangerous
+   * one.
+   */
+  partial: boolean;
+  /** Mean of the measured providers' uptime, on the same rule as the summary's. */
+  fleetUptime: number | null;
+  providers: MonthlyProviderReport[];
+  /** Every incident open at any point in the month, newest first. */
+  incidents: IncidentRow[];
 }
 
 export interface HistoryServiceDeps {
@@ -332,6 +378,103 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
   }
 
   /**
+   * One calendar month, per provider and for the fleet — roadmap 4.7.
+   *
+   * It reads the same daily buckets and the same incident rows every other
+   * figure here comes from, so a month's report can never disagree with the
+   * History view it was taken beside. What it adds is the shape of a month
+   * rather than of a rolling window: the 30-day view answers "how have we been
+   * doing lately", and this answers "how was August", which is the one somebody
+   * asks for in writing.
+   *
+   * `month` is `YYYY-MM`, UTC. A month still running is reported as far as
+   * today and flagged `partial`, rather than refused — the useful time to read
+   * this month's report is during this month.
+   */
+  async function getMonthlyReport(
+    month: string,
+    intervalMinutes: number,
+    only?: string[] | undefined,
+  ): Promise<MonthlyReport> {
+    const today = now();
+    const todayKey = dayKey(today);
+    const start = new Date(`${month}-01T00:00:00.000Z`);
+    // The last day of the month is the day before the first of the next one.
+    const nextMonth = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+    const lastDay = dayKey(new Date(nextMonth.getTime() - DAY_MS));
+    const to = lastDay > todayKey ? todayKey : lastDay;
+    const from = `${month}-01`;
+
+    // How far back the store has to reach for the month to be inside the
+    // window. `getDailyBuckets` counts days back from today, which is the one
+    // thing it knows how to do, so the month is selected from what comes back.
+    const daysBack = Math.max(1, Math.round((today.getTime() - start.getTime()) / DAY_MS) + 1);
+
+    const providerIds = only ?? (await store.listProviderIds());
+    const providers: MonthlyProviderReport[] = [];
+    const incidents: IncidentRow[] = [];
+
+    for (const providerId of providerIds) {
+      const buckets = (await store.getDailyBuckets(providerId, daysBack)).filter(
+        (bucket) => bucket.day >= from && bucket.day <= to,
+      );
+
+      let ok = 0;
+      let total = 0;
+      let measuredDays = 0;
+      let worstDay: MonthlyProviderReport["worstDay"] = null;
+      for (const bucket of buckets) {
+        ok += bucket.okSamples;
+        total += bucket.totalSamples;
+        if (bucket.totalSamples === 0) continue;
+        measuredDays += 1;
+        const uptime = round2((bucket.okSamples / bucket.totalSamples) * 100);
+        // Strictly less, so a tie keeps the earlier day: "the worst day" should
+        // be stable between two runs of the same report.
+        if (worstDay === null || uptime < worstDay.uptime) {
+          worstDay = { day: bucket.day, uptime, status: bucket.worstStatus };
+        }
+      }
+
+      // Open at any point in the month, not merely started in it: an outage
+      // that began in July and ran into August is part of August's story, and
+      // a report that dropped it would show downtime with nothing causing it.
+      const open = await store.listIncidents({ providerId, openFrom: from, openTo: to });
+      incidents.push(...open);
+
+      providers.push({
+        providerId,
+        uptime: total === 0 ? null : round2((ok / total) * 100),
+        measuredDays,
+        sampleCount: total,
+        downtimeMinutes: (total - ok) * intervalMinutes,
+        incidentCount: open.length,
+        worstDay,
+      });
+    }
+
+    // Measured means "has samples". Same rule as the summary's headline, and
+    // for the same reason: a provider nobody polled must not drag the fleet
+    // figure down as though it had been down.
+    const measured = providers.filter(
+      (provider): provider is MonthlyProviderReport & { uptime: number } => provider.uptime !== null,
+    );
+
+    return {
+      month,
+      from,
+      to,
+      partial: lastDay > todayKey,
+      fleetUptime:
+        measured.length === 0
+          ? null
+          : round2(measured.reduce((sum, provider) => sum + provider.uptime, 0) / measured.length),
+      providers,
+      incidents: incidents.sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
+    };
+  }
+
+  /**
    * `only` narrows the summary to a caller-supplied set of providers — how the
    * history page drops a disabled one. The store still keeps every provider's
    * samples, so an omitted provider is hidden rather than forgotten, and it
@@ -401,7 +544,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     };
   }
 
-  return { getProviderHistory, getProviderCalendar, getComponentHistories, getSummary };
+  return { getProviderHistory, getProviderCalendar, getComponentHistories, getSummary, getMonthlyReport };
 }
 
 const uptimeKey = (provider: ProviderHistory, days: number): number =>

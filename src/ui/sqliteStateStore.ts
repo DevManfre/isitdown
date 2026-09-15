@@ -606,6 +606,17 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         clauses.push("started_at >= ?");
         params.push(new Date(now().getTime() - filter.days * 24 * 3600 * 1000).toISOString());
       }
+      // "Open at any point in this range": it had started by the end of it, and
+      // it had not been resolved before the start of it. Compared against the
+      // day prefix of the stored timestamp, so a day bound means the whole day.
+      if (filter.openTo !== undefined) {
+        clauses.push("substr(started_at, 1, 10) <= ?");
+        params.push(filter.openTo);
+      }
+      if (filter.openFrom !== undefined) {
+        clauses.push("(resolved_at IS NULL OR substr(resolved_at, 1, 10) >= ?)");
+        params.push(filter.openFrom);
+      }
       const term = likeTerm(filter.query);
       if (term !== undefined) {
         clauses.push("name LIKE ? ESCAPE '\\'");

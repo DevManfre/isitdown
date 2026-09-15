@@ -151,3 +151,41 @@ edition's `config.yml` is `config:` in `values.yaml`, rendered into a ConfigMap
 and mounted read-only; `${VAR}` references in it resolve against that same Secret.
 An edit to it rolls the pod, because a mounted ConfigMap changing on disk
 restarts nothing on its own.
+
+### 4.5 Unraid and Home Assistant
+
+Distribution rather than features (roadmap 6.6): both reach an audience that
+runs exactly this kind of container, and neither changes a line of the
+application.
+
+**Unraid.** `deploy/unraid/isitdown-ui.xml` and `deploy/unraid/isitdown-light.xml`
+are Community Applications templates for the two published images. Add the
+template under **Docker → Add Container → Template repositories**, or point the
+URL at the raw file. Each one carries the port, the paths and one masked
+variable per channel credential, so the form asks the same questions the compose
+file answers — a port and a data volume for the UI edition, a read-only
+`config.yml` and a data volume for the Light edition.
+
+**Home Assistant.** `deploy/homeassistant/isitdown/` is an add-on for the UI
+edition. The Supervisor discovers an add-on repository from the root of a Git
+repository and this one is a folder inside a project, so it installs as a local
+add-on: copy the folder into the `addons` share, then **Settings → Add-ons →
+Add-on store → ⋮ → Check for updates**. It layers one file onto
+`ghcr.io/devmanfre/isitdown:ui-latest` rather than rebuilding anything, so
+installing it costs a `docker pull`.
+
+Two decisions worth knowing before installing it:
+
+- **It publishes a port instead of using ingress.** Ingress serves an add-on
+  under a generated path prefix, and the dashboard is built against an absolute
+  one — its bundle and its API calls both start at `/`. A panel would open to a
+  blank page, which is worse than a link.
+- **Only credentials are add-on options.** Everything else is set in the
+  dashboard, because the UI edition keeps its whole configuration in SQLite. The
+  option names are the variable names the channels ask for, so the dashboard's
+  "env missing" row and the add-on's configuration page say the same word. The
+  database lives in `/data`, the add-on's own persistent volume, which is what a
+  Home Assistant backup takes with it.
+
+The Light edition has no add-on. There would be no page to open in Home
+Assistant, which makes a plain container the better way to run it.

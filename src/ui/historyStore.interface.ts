@@ -39,6 +39,18 @@ export interface IncidentFilter {
   state?: "active" | "resolved" | undefined;
   days?: number | undefined;
   /**
+   * Open at any point between these two days (`YYYY-MM-DD`, inclusive), which
+   * is a different question from `days`: that one asks when an incident
+   * *started*, and a month's report needs the ones that were *running* in it —
+   * an outage that began in July and ran into August is part of August's
+   * downtime, and dropping it would leave the minutes with nothing causing
+   * them. Applied in SQL rather than by the caller for the usual reason: the
+   * alternative is reading a provider's whole incident history to filter four
+   * rows out of it.
+   */
+  openFrom?: string | undefined;
+  openTo?: string | undefined;
+  /**
    * Free text matched against the incident name, case-insensitively (roadmap
    * 5.19). Applied in SQL for the same reason `providerIds` is: the list is
    * paged and counted server-side, so searching a page already in hand would

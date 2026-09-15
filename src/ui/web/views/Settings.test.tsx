@@ -102,6 +102,22 @@ async function openChannel(label: string): Promise<HTMLElement> {
   return row;
 }
 
+/**
+ * A provider's own actions — mute, diagnose, edit, remove — live behind the
+ * row's disclosure now, so a test that wants one has to open the row the way
+ * an operator does.
+ */
+async function openService(name: string): Promise<HTMLElement> {
+  const row = (await screen.findByText(name)).closest(".service-row") as HTMLElement;
+  await userEvent.click(within(row).getByText(name));
+  return row;
+}
+
+/** The channels with no variables set wait behind one row; this is that row. */
+async function revealAllChannels(): Promise<void> {
+  await userEvent.click(await screen.findByRole("button", { name: /not set up/i }));
+}
+
 /** A provider whose removal is still undoable — the `removed` list `GET /config` carries. */
 const removedService = {
   id: "cloudflare",
@@ -223,10 +239,17 @@ describe("Settings", () => {
     expect(writesIn(calls)).toHaveLength(0);
   });
 
-  it("lists the configured services with edit and remove here, not in the table", async () => {
+  it("keeps a service row to its switch, with edit and remove one disclosure away", async () => {
     renderWithProviders(<Settings />, fixtures);
-    expect(await screen.findByRole("button", { name: i18n.t("action.edit") })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: i18n.t("action.remove") })).toBeInTheDocument();
+    // Five controls per provider is what made the list unreadable: the switch
+    // is the one reached for often, so it is the one that stays out.
+    expect(await screen.findByRole("switch", { name: "GitHub — enabled" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: i18n.t("action.edit") })).toBeNull();
+    expect(screen.queryByRole("button", { name: i18n.t("action.remove") })).toBeNull();
+
+    const row = await openService("GitHub");
+    expect(within(row).getByRole("button", { name: i18n.t("action.edit") })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: i18n.t("action.remove") })).toBeInTheDocument();
   });
 
   it("shows one box per channel field — the credential, write-only", async () => {
@@ -296,6 +319,9 @@ describe("Settings", () => {
     expect(probe).toHaveTextContent("false");
 
     // Path 3: a successful edit-service save (`patch.mutateAsync` resolving).
+    // Both dialogs this path and the next one open live in the service row's
+    // own disclosure, so the row is opened first, once, for both.
+    await openService("GitHub");
     await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.edit") }));
     const editDialog = await screen.findByRole("dialog");
     expect(probe).toHaveTextContent("true");
@@ -463,6 +489,7 @@ describe("Settings", () => {
 
     it("keeps every row shut until one is opened, so no credential field is on screen", async () => {
       renderWithProviders(<Settings />, listFixtures);
+      await revealAllChannels();
       expect(await screen.findByText(i18n.t("channel.name.discord"))).toBeInTheDocument();
       expect(screen.queryByLabelText("webhookUrl")).toBeNull();
 
@@ -472,6 +499,7 @@ describe("Settings", () => {
 
     it("opening one row shuts the one already open", async () => {
       renderWithProviders(<Settings />, listFixtures);
+      await revealAllChannels();
       await openChannel(i18n.t("channel.name.discord"));
       expect(await screen.findByLabelText("webhookUrl")).toBeInTheDocument();
 
@@ -484,6 +512,7 @@ describe("Settings", () => {
 
     it("orders the rows by state: active, then configured, then missing its variables", async () => {
       renderWithProviders(<Settings />, listFixtures);
+      await revealAllChannels();
       await screen.findByText(i18n.t("channel.name.webpush"));
       // Scoped to the channel rows: the service list has switches too.
       const names = Array.from(document.querySelectorAll(".panel-channel"))
@@ -497,6 +526,7 @@ describe("Settings", () => {
 
     it("says which of the two reasons keeps a channel from sending", async () => {
       renderWithProviders(<Settings />, listFixtures);
+      await revealAllChannels();
       const discord = (await screen.findByText(i18n.t("channel.name.discord"))).closest(
         ".panel-channel",
       ) as HTMLElement;
@@ -991,16 +1021,20 @@ describe("Settings", () => {
     it("says nothing at all when no removal is waiting", async () => {
       renderWithProviders(<Settings />, fixtures);
 
-      // The section is not empty chrome for a state that is normally absent.
-      expect(await screen.findByText(i18n.t("settings.section.services"))).toBeInTheDocument();
-      expect(screen.queryByText(i18n.t("settings.section.removed"))).not.toBeInTheDocument();
+      // The section is not empty chrome for a state that is normally absent —
+      // and neither is the rail entry that would scroll to it. Both names
+      // appear twice when a section is on the page (rail and kicker), so this
+      // counts rather than looks one up.
+      expect(await screen.findAllByText(i18n.t("settings.section.services"))).toHaveLength(2);
+      expect(screen.queryAllByText(i18n.t("settings.section.removed"))).toHaveLength(0);
     });
 
     it("offers a restore for a removed provider, with the window it has left", async () => {
       renderWithProviders(<Settings />, { ...fixtures, config: { ...config, removed: [removedService] } });
       const calls = interceptWrites({ "POST /config/services/cloudflare/restore": {} });
 
-      expect(await screen.findByText(i18n.t("settings.section.removed"))).toBeInTheDocument();
+      // In the rail and as the section's own kicker, once a removal is waiting.
+      expect(await screen.findAllByText(i18n.t("settings.section.removed"))).toHaveLength(2);
       await userEvent.click(screen.getByRole("button", { name: i18n.t("action.restore") }));
 
       expect(writesIn(calls)).toEqual([
@@ -1428,5 +1462,98 @@ describe("database backup and restore", () => {
     await userEvent.upload(input, new File([new Uint8Array([1])], "other.db"));
 
     expect(await screen.findByText(/not an IsItDown backup/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Forty rows in seven sections, and until this existed the only way to reach
+ * one was to know which section owned it and scroll. These cover the three
+ * pieces of chrome that answer that: the filter, the density switch and the
+ * state chips over the provider list.
+ */
+describe("finding a setting", () => {
+  it("narrows the page to the rows that match, and takes the emptied sections with it", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    await screen.findByLabelText(i18n.t("field.interval"));
+
+    await userEvent.type(screen.getByLabelText(i18n.t("settings.filter.label")), "retention");
+
+    await waitFor(() => expect(screen.queryByLabelText(i18n.t("field.interval"))).toBeNull());
+    expect(screen.getByLabelText(i18n.t("field.retention"))).toBeInTheDocument();
+    // Not an empty card with a kicker over it: the whole section goes off the
+    // page, and so does its entry in the rail — the one remaining match is the
+    // hidden section itself, which no reader and no screen reader reaches.
+    const engine = screen.getAllByText(i18n.t("settings.section.engine"));
+    expect(engine).toHaveLength(1);
+    expect(engine[0]).not.toBeVisible();
+  });
+
+  it("says nothing matched rather than leaving the page blank", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    await screen.findByLabelText(i18n.t("field.interval"));
+
+    await userEvent.type(screen.getByLabelText(i18n.t("settings.filter.label")), "qqqq");
+
+    expect(await screen.findByText(i18n.t("settings.filter.empty", { query: "qqqq" }))).toBeInTheDocument();
+  });
+
+  it("folds every hint away in compact density, and puts them back", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    expect(await screen.findByText(i18n.t("field.interval.hint"))).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("radio", { name: i18n.t("settings.density.compact") }));
+
+    // The setting itself stays: it is the sentence under it that folds.
+    await waitFor(() => expect(screen.queryByText(i18n.t("field.interval.hint"))).toBeNull());
+    expect(screen.getByLabelText(i18n.t("field.interval"))).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("radio", { name: i18n.t("settings.density.detailed") }));
+    expect(await screen.findByText(i18n.t("field.interval.hint"))).toBeInTheDocument();
+  });
+
+  it("lists only the providers in the state the chip names", async () => {
+    const services = [
+      config.services[0]!,
+      { ...config.services[0]!, id: "atlassian", name: "Atlassian", enabled: false },
+    ];
+    renderWithProviders(<Settings />, { ...fixtures, config: { ...config, services } });
+    expect(await screen.findByText("Atlassian")).toBeInTheDocument();
+    expect(screen.getByText("GitHub")).toBeInTheDocument();
+
+    // The chips carry their own counts, so "paused: 1" is readable before the
+    // list is filtered at all.
+    await userEvent.click(
+      screen.getByRole("button", { name: new RegExp(`^${i18n.t("service.filter.disabled")}`) }),
+    );
+
+    await waitFor(() => expect(screen.queryByText("GitHub")).toBeNull());
+    expect(screen.getByText("Atlassian")).toBeInTheDocument();
+  });
+});
+
+describe("the number steppers", () => {
+  it("saves the stepped value on the click, without waiting for a blur", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    const field = await screen.findByLabelText(i18n.t("field.confirm-samples"));
+    const calls = interceptWrites({ "PATCH /config/settings": {} });
+
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("action.increase", { field: i18n.t("field.confirm-samples") }) }));
+
+    expect(field).toHaveValue(2);
+    await waitFor(() => {
+      expect(writesIn(calls)).toEqual([
+        { path: "/config/settings", method: "PATCH", body: { confirmSamples: 2 } },
+      ]);
+    });
+  });
+
+  it("cannot be stepped past the bound the server would refuse", async () => {
+    renderWithProviders(<Settings />, fixtures);
+    await screen.findByLabelText(i18n.t("field.confirm-samples"));
+
+    // One is the floor: a confirmation count of zero is not a thing to send.
+    expect(
+      screen.getByRole("button", { name: i18n.t("action.decrease", { field: i18n.t("field.confirm-samples") }) }),
+    ).toBeDisabled();
   });
 });
