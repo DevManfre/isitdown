@@ -48,7 +48,7 @@ runAdapterContract("http", () => ({
   service: (baseUrl) => service({ expectBody: "ok" }, baseUrl),
   ok: { "/": "ok" },
   degraded: { "/": "ok" },
-  readsResponseNotBody: true,
+  subject: "response",
 }));
 
 test("an endpoint answering 200 reads operational, and reports nothing but a severity", () => {

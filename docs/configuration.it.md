@@ -62,11 +62,11 @@ notifications:
 | `confirmSamples` | `1` | 1–10. Smorzamento dei rimbalzi: quanti poll consecutivi devono concordare su una lettura prima che il cambio venga annunciato. `1` notifica subito; `2` ignora una pagina che si contraddice per un ciclo, al costo di un poll di ritardo. |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page (vedi sotto). |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto (vedi sotto). |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
 | `services[].mutedUntil` | — | ISO 8601. Finché è nel futuro il provider viene interrogato e registrato come sempre ma non notifica nulla — "lo so, smetti di dirmelo, fino ad allora". Nell'edizione UI è ciò che scrive il comando **Silenzia** della dashboard. |
-| `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano due: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`) e `http` (vedi la sua sezione qui sotto). |
+| `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano quattro: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`), e `http`, `tcp` e `dns` (vedi le loro sezioni qui sotto). |
 
 #### L'adapter `html`
 
@@ -180,6 +180,71 @@ Quattro cose da sapere prima di affidarcisi:
   `expectBody` su un `HEAD`) solleva un errore a ogni ciclo e si vede come
   provider che fallisce, mai come servizio che legge giù in silenzio. `node
   dist/light/check.js --probe` lo intercetta prima del poller.
+
+#### Gli adapter `tcp` e `dns` — sondare ciò che non parla HTTP
+
+La sonda qui sopra ha bisogno di una risposta da leggere. Un database, un relay
+SMTP o un message broker non ne manda mai una, e un nome che ha smesso di
+risolversi non arriva nemmeno fin lì — quindi a quei due tocca un adapter a
+testa (roadmap 1.9).
+
+```yaml
+  - name: Primary database
+    id: primary-db
+    adapter: tcp
+    baseUrl: https://db.internal
+    options:
+      port: "5432"
+      slowMs: "250"
+
+  - name: Our apex record
+    id: apex-dns
+    adapter: dns
+    baseUrl: https://example.com
+    options:
+      recordType: "A"
+      expectValue: "203.0.113.7"
+      resolver: "1.1.1.1"
+```
+
+Entrambi prendono il bersaglio da `baseUrl`, perché è il campo che lo schema
+valida e un URL `http`/`https` è ciò che accetta: `tcp` ne usa l'host e ignora
+lo schema, `dns` ne risolve l'host e da lì non scarica nulla.
+
+| Opzione | Adapter | Default | Significato |
+|---|---|---|---|
+| `port` | `tcp` | quella dell'URL, altrimenti quella dello schema | La porta a cui connettersi. Un valore che non è una porta solleva un errore invece di ripiegare: una sonda puntata in silenzio alla 443 leggerebbe sana la cosa sbagliata. |
+| `slowMs` | entrambi | — | Un handshake o una risposta a questi millisecondi o oltre legge `degraded` invece di `operational`. |
+| `recordType` | `dns` | `A` | `A`, `AAAA`, `CNAME`, `MX`, `NS` o `TXT`. Una risposta `MX` viene confrontata come `"<preferenza> <exchange>"` e una `TXT` con i suoi pezzi uniti — il modo in cui entrambe si scrivono quando qualcuno dice come dovrebbero essere. |
+| `expectValue` | `dns` | — | Testo che uno dei record deve contenere. Un record puntato a un indirizzo dismesso si risolve comunque, ed è una brutta giornata diversa dal non risolversi affatto. |
+| `resolver` | `dns` | quello di sistema | `1.1.1.1`, oppure `127.0.0.1:5353`. Interroga un server direttamente — per esempio uno autoritativo — invece di ciò che il resolver di questo container ha in cache. Non impostato legge ciò che sperimenta il resto della flotta. |
+
+Le letture che producono:
+
+| Cosa è successo | Lettura |
+|---|---|
+| `tcp`: la porta ha accettato la connessione, sotto `slowMs` | `operational` |
+| `tcp`: ha accettato, a `slowMs` o oltre | `degraded` |
+| `tcp`: rifiutata, resettata, host irrisolvibile, o oltre il timeout | `major_outage` |
+| `dns`: sono tornati record, che soddisfano `expectValue`, sotto `slowMs` | `operational` |
+| `dns`: sono tornati a `slowMs` o oltre | `degraded` |
+| `dns`: NXDOMAIN, SERVFAIL, nessun record, o nulla che soddisfi `expectValue` | `major_outage` |
+
+Tutto ciò che la sezione `http` dice di una sonda vale anche per questi due —
+letture invece che letture fallite, una severità e nulla più, un solo punto di
+osservazione, una nota in **Diagnose** che dice perché, e un'opzione sbagliata
+che solleva un errore invece di leggere giù. Due cose sono solo loro:
+
+- `tcp` si connette e chiude **senza inviare un byte**. Un handshake di
+  protocollo vorrebbe dire conoscere il protocollo, e ogni servizio che vale la
+  pena sondare ne parla uno diverso. "La porta è aperta" è un'affermazione più
+  piccola di "il servizio è sano", e dire solo la più piccola è ciò che tiene
+  onesta la lettura.
+- `dns` tratta una risposta vuota come un disservizio e non come un campo
+  mancante. Ogni altro adapter degrada su un campo mancante, perché un provider
+  che ne lascia cadere uno non è un disservizio nostro — ma qui la risposta *è*
+  la lettura, e un record tornato vuoto significa che nessuno può raggiungere
+  ciò che nomina.
 
 Qualunque cosa non valida ferma il container all'avvio indicando motivo e percorso:
 file mancante, YAML malformato, base URL sbagliato, id duplicato, lista di servizi

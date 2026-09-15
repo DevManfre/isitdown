@@ -62,11 +62,11 @@ notifications:
 | `confirmSamples` | `1` | 1–10. Flap damping: how many consecutive polls must agree on a reading before the change is announced. `1` notifies immediately; `2` ignores a page that disagrees with itself for one cycle, at the cost of one poll of delay. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page (see below). |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
-| `services[].options` | — | Adapter-specific extras. Two adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists) and `http` (see its own section below). |
+| `services[].options` | — | Adapter-specific extras. Four adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), and `http`, `tcp` and `dns` (see their own sections below). |
 
 #### The `html` adapter
 
@@ -175,6 +175,68 @@ Four things worth knowing before relying on it:
   `expectBody` on a `HEAD`) throws every cycle and shows up as a failing
   provider, never as a service quietly reading down. `node dist/light/check.js
   --probe` catches it before the poller does.
+
+#### The `tcp` and `dns` adapters — probing what speaks no HTTP
+
+The probe above needs a response to read. A database, an SMTP relay or a message
+broker never sends one, and a name that has stopped resolving never gets that
+far — so those two get an adapter each (roadmap 1.9).
+
+```yaml
+  - name: Primary database
+    id: primary-db
+    adapter: tcp
+    baseUrl: https://db.internal
+    options:
+      port: "5432"
+      slowMs: "250"
+
+  - name: Our apex record
+    id: apex-dns
+    adapter: dns
+    baseUrl: https://example.com
+    options:
+      recordType: "A"
+      expectValue: "203.0.113.7"
+      resolver: "1.1.1.1"
+```
+
+Both take their target from `baseUrl`, because that is the field the schema
+validates and an `http`/`https` URL is what it accepts: `tcp` uses its host and
+ignores the scheme, `dns` resolves its host and fetches nothing from it.
+
+| Option | Adapter | Default | Meaning |
+|---|---|---|---|
+| `port` | `tcp` | the URL's, else the scheme's | The port to connect to. A value that is not a port throws rather than falling back, since a probe silently aimed at 443 would read healthy about the wrong thing. |
+| `slowMs` | both | — | A handshake or an answer at or over this many milliseconds reads `degraded` instead of `operational`. |
+| `recordType` | `dns` | `A` | `A`, `AAAA`, `CNAME`, `MX`, `NS` or `TXT`. An `MX` answer is matched as `"<preference> <exchange>"` and a `TXT` one with its chunks joined — the way both are written down when someone says what they should be. |
+| `expectValue` | `dns` | — | Text one of the records must contain. A record pointed at a decommissioned address still resolves, which is a different kind of bad day from not resolving at all. |
+| `resolver` | `dns` | the system's | `1.1.1.1`, or `127.0.0.1:5353`. Asks one server directly — an authoritative one, say — instead of whatever this container's resolver has cached. Unset reads what the rest of the fleet experiences. |
+
+The readings they produce:
+
+| What happened | Reading |
+|---|---|
+| `tcp`: the port accepted the connection, under `slowMs` | `operational` |
+| `tcp`: it accepted, at or over `slowMs` | `degraded` |
+| `tcp`: refused, reset, unresolvable, or past the timeout | `major_outage` |
+| `dns`: records came back, matching `expectValue`, under `slowMs` | `operational` |
+| `dns`: they came back at or over `slowMs` | `degraded` |
+| `dns`: NXDOMAIN, SERVFAIL, no records at all, or nothing matching `expectValue` | `major_outage` |
+
+Everything the `http` section says about a probe applies to these two as well —
+readings rather than failed reads, a severity and nothing more, one vantage
+point, a note in **Diagnose** saying why, and a wrong option throwing rather
+than reading down. Two things are theirs alone:
+
+- `tcp` connects and hangs up **without sending a byte**. A protocol handshake
+  would mean knowing the protocol, and every service worth probing speaks a
+  different one. "The port is open" is a smaller claim than "the service is
+  healthy", and saying only the smaller one is what keeps the reading honest.
+- `dns` treats an empty answer as an outage rather than as a missing field.
+  Every other adapter degrades on a missing field, because a provider dropping
+  one is not an outage of ours — but here the answer *is* the reading, and a
+  record that came back empty means nobody can reach the thing it names.
 
 Anything invalid stops the container at boot with the reason and the offending
 path — a missing file, malformed YAML, a bad base URL, a duplicate service id, an

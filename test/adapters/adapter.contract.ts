@@ -21,17 +21,27 @@ export interface AdapterHarness {
    */
   degraded: Routes;
   /**
-   * Set by the probe adapter (roadmap 1.8), the only one whose subject is a
-   * service rather than a document about one. It inverts the contract's
-   * failure rules rather than escaping them: where a document adapter must
-   * *throw* on a 503, an unreachable host or a timeout so the poller can
-   * retry, a probe must *resolve* those into a non-operational reading, since
-   * for it they are the answer rather than the absence of one. The tests below
-   * assert that inverted form, and skip the two that only make sense against a
-   * parsed document — a probe has none, and its body handling is pinned by its
-   * own mapping tests instead.
+   * What the adapter is actually reading. Defaults to `"document"` — a page
+   * the provider publishes about itself, which is what every status-page
+   * adapter here parses.
+   *
+   * The probes (roadmap 1.8 and 1.9) invert the contract's failure rules
+   * rather than escaping them: where a document adapter must *throw* on a 503,
+   * an unreachable host or a timeout so the poller can retry, a probe must
+   * *resolve* those into a non-operational reading, since for it they are the
+   * answer rather than the absence of one.
+   *
+   * - `"response"` — the HTTP probe. The response *is* the subject, so a 503
+   *   reads as an outage and a body it was not told to match against is not
+   *   evidence of anything. The cases that only make sense against a parsed
+   *   document are skipped; its body handling is pinned by its own mapping
+   *   tests instead.
+   * - `"transport"` — the TCP probe. The connection is the subject, so what
+   *   the far end says afterwards is not read at all: every case built on a
+   *   status code or a body is skipped, and only "a target that is not there
+   *   never reads healthy" still applies.
    */
-  readsResponseNotBody?: boolean | undefined;
+  subject?: "document" | "response" | "transport" | undefined;
 }
 
 const ctx: FetchContext = { timeoutMs: 2000 };
@@ -265,7 +275,7 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
   });
 
   test(`${name}: a non-2xx response is never swallowed`, TEST_OPTS, async () => {
-    const { adapter, service, readsResponseNotBody } = harness();
+    const { adapter, service, subject } = harness();
     for (const method of methodsOf(adapter)) {
       await withServer(
         (_req, res) => {
@@ -273,7 +283,10 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
           res.end("nope");
         },
         async (baseUrl) => {
-          if (readsResponseNotBody === true) {
+          // A TCP probe never sees the status line: the handshake it reads
+          // already completed, and that is the whole answer it asked for.
+          if (subject === "transport") return;
+          if (subject === "response") {
             await assertReadsUnhealthy(adapter, service(baseUrl), "a 503");
             return;
           }
@@ -288,10 +301,10 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
   });
 
   test(`${name}: an unparseable body rejects rather than yielding an empty reading`, TEST_OPTS, async () => {
-    const { adapter, service, readsResponseNotBody } = harness();
+    const { adapter, service, subject } = harness();
     // A probe parses no document, so there is no such thing as an unparseable
     // one: a body it was not told to match against is not evidence of anything.
-    if (readsResponseNotBody === true) return;
+    if (subject !== undefined && subject !== "document") return;
     for (const method of methodsOf(adapter)) {
       await withServer(
         (_req, res) => {
@@ -310,10 +323,10 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
   });
 
   test(`${name}: an unreachable provider is never read as healthy`, TEST_OPTS, async () => {
-    const { adapter, service, readsResponseNotBody } = harness();
+    const { adapter, service, subject } = harness();
     for (const method of methodsOf(adapter)) {
       await withDeadServer(async (baseUrl) => {
-        if (readsResponseNotBody === true) {
+        if (subject !== undefined && subject !== "document") {
           await assertReadsUnhealthy(adapter, service(baseUrl), "nothing listening");
           return;
         }
@@ -327,13 +340,17 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
   });
 
   test(`${name}: a provider that never answers gives up on the timeout`, TEST_OPTS, async () => {
-    const { adapter, service, readsResponseNotBody } = harness();
+    const { adapter, service, subject } = harness();
     await withServer(
       () => {
         /* never responds */
       },
       async (baseUrl) => {
-        if (readsResponseNotBody === true) {
+        // A server that accepts the connection and then says nothing has, for a
+        // TCP probe, answered: the port is open. Its own timeout is pinned by
+        // its mapping tests, against a target that never completes a handshake.
+        if (subject === "transport") return;
+        if (subject === "response") {
           // Still has to give up on `timeoutMs`: settling inside the deadline
           // is the assertion, and the reading it settles on says down.
           const outcome = await settle(adapter.fetchStatus(service(baseUrl), { timeoutMs: 150 }), REJECT_DEADLINE_MS);
@@ -378,7 +395,10 @@ export function runAdapterContract(name: string, harness: () => AdapterHarness):
   });
 
   test(`${name}: an unreadable payload never reads as operational`, TEST_OPTS, async () => {
-    const { adapter, service, ok } = harness();
+    const { adapter, service, ok, subject } = harness();
+    // Nothing downloads a payload here: a TCP probe hangs up before the far end
+    // has said anything, so an emptied body is not a reading it can take.
+    if (subject === "transport") return;
     for (const mutation of MUTATIONS.filter((entry) => EMPTIED.has(entry.name))) {
       const routes: Routes = Object.fromEntries(
         Object.entries(ok).map(([path, body]) => [path, mutation.mutate(body)]),
