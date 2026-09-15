@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { BorderBeam } from "@/components/ui/border-beam.tsx";
 import { DotPattern } from "@/components/ui/dot-pattern.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
+import { TypingAnimation } from "@/components/ui/typing-animation.tsx";
 import { FleetGroups } from "@/components/FleetGroups.tsx";
 import { FleetRings } from "@/components/FleetRings.tsx";
 import { FLEET_ROW_STAGGER, FleetRows } from "@/components/FleetRows.tsx";
@@ -84,14 +85,23 @@ export function Overview() {
             ? t("overview.title.all-disabled")
             : down.length === 0
               ? t("overview.title.all-operational")
-              : (
-                  <Trans
-                    i18nKey="overview.title.down"
-                    count={down.length}
-                    values={{ count: down.length }}
-                    components={[<NumberTicker locale={i18n.language} value={down.length} />]}
-                  />
-                )}
+              : down.length === 1
+                ? (
+                    // The one-provider headline is a plain sentence — the plural
+                    // entry is the only one that carries a figure — so it types
+                    // itself in instead of arriving whole. The count-bearing
+                    // entry keeps the ticker: a number counting up inside a line
+                    // that is still being typed reads as two flourishes fighting.
+                    <TypingAnimation text={t("overview.title.down", { count: 1 })} />
+                  )
+                : (
+                    <Trans
+                      i18nKey="overview.title.down"
+                      count={down.length}
+                      values={{ count: down.length }}
+                      components={[<NumberTicker locale={i18n.language} value={down.length} />]}
+                    />
+                  )}
         </h2>
       </div>
       {/* Capped in `ch` rather than by its grid column: in the band shape the
