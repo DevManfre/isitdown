@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { toCsv } from "../csv.ts";
+import { renderMonthlyReport } from "../monthlyReport.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { ALLOWED_DAYS, parseDays } from "./historyWindow.ts";
 import { readIncidentQuery } from "./incidentQuery.ts";
@@ -104,6 +105,32 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
     );
   };
 
+  /**
+   * The month written up — roadmap 4.7. The exports above hand over rows;
+   * this hands over the paragraph somebody was going to write from them.
+   *
+   * `month` defaults to the current one rather than the last complete one: the
+   * common ask is "how are we doing this month", and a month still running is
+   * flagged inside the document rather than refused.
+   */
+  const monthly = async (req: Request, res: Response): Promise<void> => {
+    const asked = req.query["month"];
+    const month = typeof asked === "string" && asked !== "" ? asked : new Date().toISOString().slice(0, 7);
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+      res.status(400).json({ error: { message: `month must be YYYY-MM, e.g. ${new Date().toISOString().slice(0, 7)}` } });
+      return;
+    }
+
+    const { intervalMinutes } = (await runtime.configSource.load()).polling;
+    // The fleet as the dashboard shows it: a disabled provider is left out
+    // here for the same reason it is left out of the history page, and its
+    // samples stay in the store either way.
+    const report = await runtime.history.getMonthlyReport(month, intervalMinutes, runtime.enabledProviderIds());
+    const names = new Map(runtime.listAllServices().map((service) => [service.id, service.name]));
+
+    send(res, "md", `uptime-${month}`, "text/markdown; charset=utf-8", renderMonthlyReport(report, names));
+  };
+
   // Two paths per resource rather than one with a `format` parameter: the
   // extension in the url is what makes the downloaded file open in the right
   // application, and Express 5 no longer accepts an inline pattern to constrain
@@ -112,6 +139,7 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
   router.get("/export/incidents.json", incidents("json"));
   router.get("/export/history.csv", history("csv"));
   router.get("/export/history.json", history("json"));
+  router.get("/export/monthly.md", monthly);
 
   return router;
 }
@@ -119,7 +147,7 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
 /** `isitdown-incidents-2026-09-09.csv`: dated, so two exports never collide in a downloads folder. */
 function send(
   res: Response,
-  format: "csv" | "json",
+  format: "csv" | "json" | "md",
   name: string,
   contentType: string,
   body: string,

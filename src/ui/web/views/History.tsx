@@ -209,6 +209,22 @@ export function History() {
                     },
                   ],
                 },
+                {
+                  // Roadmap 4.7. Not another shape of the same rows: the
+                  // server writes the month up — uptime per provider, worst
+                  // day, the incidents behind it — because what somebody does
+                  // with a month of uptime is paste it into a ticket, not open
+                  // it in a spreadsheet. One entry per month the columns below
+                  // show, so the link is for the month being looked at.
+                  label: t("history.report-title"),
+                  items: summary.months.map((month) => ({
+                    format: monthLabel(i18n.language, month.month),
+                    description: t("history.report-download", {
+                      month: monthLabel(i18n.language, month.month),
+                    }),
+                    href: `/export/monthly.md?month=${month.month}`,
+                  })),
+                },
               ]}
             />
           </div>
