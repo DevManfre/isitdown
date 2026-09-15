@@ -226,6 +226,22 @@ describe("the service dialog's two steps", () => {
       "https://status.example.com/history.rss",
     );
   });
+
+  // The rail is a React Bits stepper, whose circles are buttons. Only the one
+  // behind the operator does anything: a circle that walked the wizard forward
+  // would skip the source form the second step is built out of.
+  it("steps back from the rail's first indicator, and offers no way forward from the second", async () => {
+    const { dialog } = await openAdd();
+    await addByAdapter(dialog, "rss", "https://status.example.com/history.rss");
+
+    expect(within(dialog).queryByRole("button", { name: i18n.t("add.step-details") })).toBeNull();
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("add.step-source") }));
+
+    expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue(
+      "https://status.example.com/history.rss",
+    );
+    expect(within(dialog).queryByLabelText(i18n.t("field.name"))).toBeNull();
+  });
 });
 
 describe("the service dialog's adapter choice", () => {
