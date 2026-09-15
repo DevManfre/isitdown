@@ -74,6 +74,21 @@ const emailSchema = z.object({
   to: z.string().default(""),
 });
 
+/** Two credentials: the application's API token and the user (or group) key. */
+const pushoverSchema = z.object({
+  enabled: z.boolean().default(false),
+  token: z.string().default(""),
+  userKey: z.string().default(""),
+  /** One registered device, or empty for every device on the account. */
+  device: z.string().default(""),
+});
+
+/** One incoming webhook — a Power Automate workflow trigger, or an old connector. */
+const teamsSchema = z.object({
+  enabled: z.boolean().default(false),
+  webhookUrl: z.string().default(""),
+});
+
 const gotifySchema = z.object({
   enabled: z.boolean().default(false),
   serverUrl: z.string().default(""),
@@ -88,6 +103,8 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   slack: ["webhookUrl"],
   ntfy: ["topicUrl"],
   gotify: ["serverUrl", "token"],
+  pushover: ["token", "userKey"],
+  teams: ["webhookUrl"],
   // Not the credentials: a relay on this machine, or one that trusts this
   // network, needs none — and requiring them would disable the channel for
   // exactly the setup this audience runs.
@@ -108,6 +125,8 @@ const notificationsObject = z
     slack: slackSchema.optional(),
     ntfy: ntfySchema.optional(),
     gotify: gotifySchema.optional(),
+    pushover: pushoverSchema.optional(),
+    teams: teamsSchema.optional(),
     email: emailSchema.optional(),
   })
   .strict();

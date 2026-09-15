@@ -623,11 +623,11 @@ test("PUT /config/routing refuses a rule naming a channel nothing knows about", 
   const app = await api();
   try {
     const { status, body } = await app.request("PUT", "/config/routing", {
-      rules: [{ provider: "*", channels: ["pushover"] }],
+      rules: [{ provider: "*", channels: ["carrier-pigeon"] }],
     });
 
     assert.equal(status, 400);
-    assert.match((body as { error: { message: string } }).error.message, /pushover/);
+    assert.match((body as { error: { message: string } }).error.message, /carrier-pigeon/);
   } finally {
     await app.close();
   }

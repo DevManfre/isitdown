@@ -219,6 +219,10 @@ list is never overwritten afterwards.
 | `NTFY_TOKEN` | both | — | Optional ntfy access token. Only a server with access control needs one. |
 | `GOTIFY_URL` | both | — | Gotify server (`https://gotify.example.com`). Required if the Gotify channel is enabled. |
 | `GOTIFY_TOKEN` | both | — | Gotify application token. Required with the above. |
+| `PUSHOVER_TOKEN` | both | — | Pushover application API token. Required if the Pushover channel is enabled. |
+| `PUSHOVER_USER_KEY` | both | — | Pushover user or group key. Required with the above. |
+| `PUSHOVER_DEVICE` | both | — | Optional. One registered device; unset delivers to every device on the account. |
+| `TEAMS_WEBHOOK_URL` | both | — | Microsoft Teams channel webhook. Required if the Teams channel is enabled. |
 | `WEBHOOK_SECRET` | both | — | Optional shared secret for the generic webhook. Set it and every request is signed (see [3.6](#36-notification-channels)); leave it unset and requests go out unsigned, exactly as before. |
 | `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
 | `LOG_FILE` | both | — | Also append every log line to this file, rotated by size. Unset, logs go to stdout only. |
@@ -633,6 +637,8 @@ validators all drop the cache entry rather than pin a stale reading.
 | Slack | `slack` | `SLACK_WEBHOOK_URL` |
 | ntfy | `ntfy` | `NTFY_TOPIC_URL` (`NTFY_TOKEN` optional) |
 | Gotify | `gotify` | `GOTIFY_URL`, `GOTIFY_TOKEN` |
+| Pushover | `pushover` | `PUSHOVER_TOKEN`, `PUSHOVER_USER_KEY` (`PUSHOVER_DEVICE` optional) |
+| Microsoft Teams | `teams` | `TEAMS_WEBHOOK_URL` |
 | Email (SMTP) | `email` | `SMTP_HOST`, `SMTP_FROM`, `SMTP_TO` (`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ALLOW_INSECURE_AUTH`, `SMTP_ALLOW_SELF_SIGNED` optional) |
 | Desktop (Web Push) | `webpush` | none |
 
@@ -704,6 +710,31 @@ phone: on ntfy's 1–5 scale a major outage is `5` and a recovery is `2`; on
 Gotify's 0–10 scale, `9` and `3`. Neither credential is ever logged or shown in
 the dashboard, and a rejected send reports the HTTP status with the server's own
 reason.
+
+**Pushover** (roadmap 3.5) is the hosted half of the same family: two
+credentials — the application's API token and the user (or group) key — and one
+form-encoded POST to `api.pushover.net`. Both are sent in the body rather than
+the query string, since a URL ends up in logs. The heading is the notification's
+title, the detail its body, and the status page is the tap target rather than a
+line of text. Severity picks the priority: a partial or major outage goes out at
+`1`, which bypasses the recipient's quiet hours; everything else at `0`, and a
+reading we could not take at `-1`. Priority `2` is deliberately never used —
+emergency priority re-alerts until someone acknowledges it, which is an on-call
+escalation rather than a status change. `PUSHOVER_DEVICE` narrows delivery to one
+registered device; unset, every device on the account hears it.
+
+**Microsoft Teams** (roadmap 3.8) is one incoming webhook, like Discord and
+Slack, carrying an Adaptive Card. The card travels in the `attachments`
+envelope rather than as the older `MessageCard`: Microsoft retired the Office
+365 connectors in favour of Workflows, and a workflow trigger only understands
+this shape — a connector that is still alive renders it too, so there is one
+body rather than a setting asking which era the webhook belongs to. The webhook
+URL is created in the channel with **Workflows → "Post to a channel when a
+webhook request is received"**. Severity is the heading's own colour, named
+(`good` / `warning` / `attention`) rather than sent as a hex, so the card stays
+legible in both of Teams' themes, and the same emoji every other channel shows
+says it again for a client rendering in monochrome. The status page is a button,
+not a line of text. The URL is the credential, so it never appears in an error.
 
 **Email** is SMTP submission, and it is written here rather than taken from a
 library (roadmap 3.3): what a notification needs is one submission conversation

@@ -225,6 +225,10 @@ tua lista non viene più sovrascritta in seguito.
 | `NTFY_TOKEN` | entrambe | — | Token di accesso ntfy, opzionale. Serve solo su un server con controllo degli accessi. |
 | `GOTIFY_URL` | entrambe | — | Server Gotify (`https://gotify.example.com`). Obbligatoria se il canale Gotify è attivo. |
 | `GOTIFY_TOKEN` | entrambe | — | Token applicativo di Gotify. Obbligatoria insieme alla precedente. |
+| `PUSHOVER_TOKEN` | entrambe | — | Token API dell'applicazione Pushover. Obbligatoria se il canale Pushover è attivo. |
+| `PUSHOVER_USER_KEY` | entrambe | — | User key (o group key) di Pushover. Obbligatoria insieme alla precedente. |
+| `PUSHOVER_DEVICE` | entrambe | — | Opzionale. Un singolo dispositivo registrato; se vuota la notifica arriva su tutti. |
+| `TEAMS_WEBHOOK_URL` | entrambe | — | Webhook del canale Microsoft Teams. Obbligatoria se il canale Teams è attivo. |
 | `WEBHOOK_SECRET` | entrambe | — | Segreto condiviso opzionale per il webhook generico. Impostandolo ogni richiesta viene firmata (vedi [3.6](#36-canali-di-notifica)); lasciandolo vuoto le richieste partono non firmate, esattamente come prima. |
 | `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
 | `LOG_FILE` | entrambe | — | Accoda ogni riga di log anche a questo file, ruotato per dimensione. Se non è impostata, i log vanno solo su stdout. |
@@ -649,6 +653,8 @@ lettura vecchia.
 | Slack | `slack` | `SLACK_WEBHOOK_URL` |
 | ntfy | `ntfy` | `NTFY_TOPIC_URL` (`NTFY_TOKEN` opzionale) |
 | Gotify | `gotify` | `GOTIFY_URL`, `GOTIFY_TOKEN` |
+| Pushover | `pushover` | `PUSHOVER_TOKEN`, `PUSHOVER_USER_KEY` (`PUSHOVER_DEVICE` opzionale) |
+| Microsoft Teams | `teams` | `TEAMS_WEBHOOK_URL` |
 | Email (SMTP) | `email` | `SMTP_HOST`, `SMTP_FROM`, `SMTP_TO` (`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ALLOW_INSECURE_AUTH`, `SMTP_ALLOW_SELF_SIGNED` opzionali) |
 | Desktop (Web Push) | `webpush` | nessuna |
 
@@ -716,6 +722,34 @@ ogni telefono: sulla scala 1–5 di ntfy un major outage è `5` e un rientro è 
 su quella 0–10 di Gotify, `9` e `3`. Nessuna delle due credenziali finisce nei
 log o nella dashboard, e un invio rifiutato riporta lo stato HTTP con la
 motivazione del server stesso.
+
+**Pushover** (roadmap 3.5) è la metà ospitata della stessa famiglia: due
+credenziali — il token API dell'applicazione e la user key (o group key) — e una
+sola POST form-encoded verso `api.pushover.net`. Entrambe viaggiano nel corpo e
+non nella query string, perché un URL finisce nei log. L'intestazione è il
+titolo della notifica, il dettaglio è il corpo, e la pagina di stato è il
+bersaglio del tap invece di una riga di testo. La severità decide la priorità:
+un outage parziale o totale esce a `1`, che scavalca le ore di silenzio del
+destinatario; tutto il resto a `0`, e una lettura che non siamo riusciti a fare
+a `-1`. La priorità `2` non viene usata di proposito — la priorità emergency
+riallerta finché qualcuno non conferma, che è un'escalation di reperibilità e
+non un cambio di stato. `PUSHOVER_DEVICE` restringe la consegna a un singolo
+dispositivo registrato; se non è impostata la sentono tutti i dispositivi
+dell'account.
+
+**Microsoft Teams** (roadmap 3.8) è un solo incoming webhook, come Discord e
+Slack, che porta una Adaptive Card. La card viaggia nella busta `attachments` e
+non come il vecchio `MessageCard`: Microsoft ha ritirato i connettori di Office
+365 in favore di Workflows, e un trigger di workflow capisce solo questa forma —
+un connettore ancora vivo la renderizza comunque, quindi c'è un solo corpo invece
+di un'impostazione che chiede all'operatore a quale epoca appartenga il suo
+webhook. L'URL si crea nel canale con **Workflows → "Post to a channel when a
+webhook request is received"**. La severità è il colore dell'intestazione,
+nominato (`good` / `warning` / `attention`) invece che inviato come esadecimale,
+così la card resta leggibile in entrambi i temi di Teams, e la stessa emoji che
+mostra ogni altro canale lo ripete per un client che renderizza in monocromia.
+La pagina di stato è un pulsante, non una riga di testo. L'URL è la credenziale,
+quindi non compare mai in un errore.
 
 **Email** è una submission SMTP, ed è scritta qui invece che presa da una
 libreria (roadmap 3.3): a una notifica serve una sola conversazione di
