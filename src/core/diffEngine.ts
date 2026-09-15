@@ -11,11 +11,15 @@ export interface DiffInputs {
 
 /** Whether a reading taken at `at` falls inside a mute running until `until`. */
 export function isMuted(until: string | null | undefined, at: string): boolean {
+  // mutation-equivalent: || — `Date.parse` answers NaN for both, and the NaN
+  // guard below already returns false, so the two connectives are one function.
   if (until === null || until === undefined) return false;
   const ends = Date.parse(until);
   const taken = Date.parse(at);
   // An unparseable mute is no mute: a bad value must not silence a provider
   // forever, which is the one failure mode of this feature that loses alerts.
+  // mutation-equivalent: || — a comparison against NaN is false whichever side
+  // it is on, so falling through instead of returning reaches the same answer.
   if (Number.isNaN(ends) || Number.isNaN(taken)) return false;
   return taken < ends;
 }
@@ -224,6 +228,8 @@ export function confirmedChanges(next: NormalizedStatus, inputs: ConfirmInputs):
   // Fail open on anything that is not a real threshold: damping trades latency
   // for trust, and a missing or nonsensical setting must lose the trade rather
   // than swallow alerts silently.
+  // mutation-equivalent: <= — a threshold of exactly 1 is met by the first
+  // sample below, so taking the damping path with it returns the same changes.
   if (!Number.isInteger(inputs.confirmations) || inputs.confirmations <= 1) {
     return { changes, baseline: next, pending: null };
   }
