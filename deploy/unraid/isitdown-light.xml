@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<!--
+  Unraid Community Applications template for the Light edition — roadmap 6.6.
+
+  Same container the compose file runs, described the way Unraid's form reads.
+  The difference from the UI template beside it is the whole difference between
+  the editions: no port, and a `config.yml` bind mount instead of a dashboard.
+-->
+<Container version="2">
+  <Name>isitdown-light</Name>
+  <Repository>ghcr.io/devmanfre/isitdown:light-latest</Repository>
+  <Registry>https://github.com/DevManfre/isitdown/pkgs/container/isitdown</Registry>
+  <Branch>
+    <Tag>light-latest</Tag>
+    <TagDescription>Polling and notifications only, configured by a file. No web server.</TagDescription>
+  </Branch>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/DevManfre/isitdown/issues</Support>
+  <Project>https://github.com/DevManfre/isitdown</Project>
+  <Overview>
+    IsItDown polls the public status pages of the providers you depend on — GitHub, Cloudflare, AWS, Anthropic and the rest — and tells you when one of them changes state.
+
+    This is the Light edition: polling and notifications, nothing else. There is no web interface and no port; everything it monitors and every channel it sends through is described in one config.yml.
+
+    Before starting it, put a config.yml in the path mapped below — copy config.example.yml from the repository and edit it. Credentials are never written in that file: it references ${ENV_VAR} names, and the values come from the variables here. An invalid file stops the container at boot with the reason, rather than starting half-configured and quietly alerting nobody.
+  </Overview>
+  <Category>Tools: Productivity: Network:Management</Category>
+  <TemplateURL>https://raw.githubusercontent.com/DevManfre/isitdown/main/deploy/unraid/isitdown-light.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/DevManfre/isitdown/main/src/ui/web/public/favicon.svg</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <DonateText/>
+  <DonateLink/>
+
+  <!--
+    Read-only on purpose: the container never writes its own configuration, and
+    a file it cannot rewrite is one an operator can keep in version control.
+  -->
+  <Config Name="config.yml" Target="/app/config/config.yml" Default="/mnt/user/appdata/isitdown-light/config.yml" Mode="ro" Description="The configuration file. Copy config.example.yml from the repository and edit it." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/isitdown-light/config.yml</Config>
+  <Config Name="Data" Target="/app/data" Default="/mnt/user/appdata/isitdown-light/data" Mode="rw" Description="The state file: what each provider last looked like, so a restart does not replay old news." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/isitdown-light/data</Config>
+
+  <Config Name="TZ" Target="TZ" Default="Europe/Rome" Mode="" Description="The container's timezone." Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Log level" Target="LOG_LEVEL" Default="info" Mode="" Description="debug, info, warn or error." Type="Variable" Display="advanced" Required="false" Mask="false">info</Config>
+
+  <!--
+    One credential per channel, all optional and all masked. Each is the value
+    behind a ${VAR} reference in config.yml; a channel the file does not enable
+    needs none of them.
+  -->
+  <Config Name="Telegram bot token" Target="TELEGRAM_BOT_TOKEN" Default="" Mode="" Description="Required if the Telegram channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Telegram chat id" Target="TELEGRAM_CHAT_ID" Default="" Mode="" Description="Required with the token above." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Discord webhook URL" Target="DISCORD_WEBHOOK_URL" Default="" Mode="" Description="Required if the Discord channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Slack webhook URL" Target="SLACK_WEBHOOK_URL" Default="" Mode="" Description="Required if the Slack channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="ntfy topic URL" Target="NTFY_TOPIC_URL" Default="" Mode="" Description="The topic URL, server included — ntfy.sh or an instance of your own." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Gotify server" Target="GOTIFY_URL" Default="" Mode="" Description="Required if the Gotify channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Gotify token" Target="GOTIFY_TOKEN" Default="" Mode="" Description="Required with the server above." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Pushover token" Target="PUSHOVER_TOKEN" Default="" Mode="" Description="Required if the Pushover channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Pushover user key" Target="PUSHOVER_USER_KEY" Default="" Mode="" Description="Required with the token above." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Teams webhook URL" Target="TEAMS_WEBHOOK_URL" Default="" Mode="" Description="Required if the Microsoft Teams channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Generic webhook URL" Target="WEBHOOK_URL" Default="" Mode="" Description="Required if the generic webhook channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Generic webhook secret" Target="WEBHOOK_SECRET" Default="" Mode="" Description="Optional. Set it and every request carries an HMAC signature." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+</Container>

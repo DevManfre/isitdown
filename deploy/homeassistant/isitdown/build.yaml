@@ -1,0 +1,9 @@
+# Every architecture points at the same tag: the published image is multi-arch,
+# so the Supervisor's own `docker pull` picks the right variant and there is no
+# per-arch tag to name here.
+build_from:
+  aarch64: ghcr.io/devmanfre/isitdown:ui-latest
+  amd64: ghcr.io/devmanfre/isitdown:ui-latest
+  armv7: ghcr.io/devmanfre/isitdown:ui-latest
+labels:
+  org.opencontainers.image.source: https://github.com/DevManfre/isitdown

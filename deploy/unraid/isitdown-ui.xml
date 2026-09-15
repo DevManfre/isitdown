@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!--
+  Unraid Community Applications template for the UI edition — roadmap 6.6.
+
+  Distribution, not a feature: the image is the one `docker compose` pulls, and
+  this file only says which ports, paths and variables it wants, so an Unraid
+  operator gets the same container without translating a compose file by hand.
+
+  Add it under Docker -> Add Container -> Template repositories, or install it
+  from the Apps tab once the template repository is listed.
+-->
+<Container version="2">
+  <Name>isitdown-ui</Name>
+  <Repository>ghcr.io/devmanfre/isitdown:ui-latest</Repository>
+  <Registry>https://github.com/DevManfre/isitdown/pkgs/container/isitdown</Registry>
+  <Branch>
+    <Tag>ui-latest</Tag>
+    <TagDescription>The dashboard edition: polling, notifications and a local web dashboard.</TagDescription>
+  </Branch>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/DevManfre/isitdown/issues</Support>
+  <Project>https://github.com/DevManfre/isitdown</Project>
+  <Overview>
+    IsItDown polls the public status pages of the providers you depend on — GitHub, Cloudflare, AWS, Anthropic and the rest — and tells you when one of them changes state.
+
+    This is the UI edition: everything the Light edition does, plus a local dashboard with a status grid, uptime charts and an incident timeline, and its whole configuration in SQLite rather than a file. Add providers and notification channels from the dashboard; nothing here needs a config file.
+
+    Secrets — bot tokens, webhook URLs — are read from the environment. Add one variable per credential below; the dashboard names the variable each channel is waiting for.
+  </Overview>
+  <Category>Tools: Productivity: Network:Management</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/DevManfre/isitdown/main/deploy/unraid/isitdown-ui.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/DevManfre/isitdown/main/src/ui/web/public/favicon.svg</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <DonateText/>
+  <DonateLink/>
+
+  <Config Name="WebUI" Target="3000" Default="3000" Mode="tcp" Description="The dashboard. It has no login: publish it only on a network you trust." Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+
+  <!--
+    One volume, and the whole installation is in it: the SQLite database holds
+    the providers, the channels, the history and the incidents. Back this up and
+    you have backed up everything.
+  -->
+  <Config Name="Data" Target="/app/data" Default="/mnt/user/appdata/isitdown" Mode="rw" Description="The SQLite database: providers, channels, history and incidents." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/isitdown</Config>
+
+  <Config Name="TZ" Target="TZ" Default="Europe/Rome" Mode="" Description="The container's timezone. The dashboard can also be told to show times in a zone of its own." Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Log level" Target="LOG_LEVEL" Default="info" Mode="" Description="debug, info, warn or error." Type="Variable" Display="advanced" Required="false" Mask="false">info</Config>
+
+  <!--
+    One credential per channel, all optional and all masked: a channel stays
+    disabled until the variable it names has a value.
+  -->
+  <Config Name="Telegram bot token" Target="TELEGRAM_BOT_TOKEN" Default="" Mode="" Description="Required if the Telegram channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Telegram chat id" Target="TELEGRAM_CHAT_ID" Default="" Mode="" Description="Required with the token above." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Discord webhook URL" Target="DISCORD_WEBHOOK_URL" Default="" Mode="" Description="Required if the Discord channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Slack webhook URL" Target="SLACK_WEBHOOK_URL" Default="" Mode="" Description="Required if the Slack channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="ntfy topic URL" Target="NTFY_TOPIC_URL" Default="" Mode="" Description="The topic URL, server included — ntfy.sh or an instance of your own." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Gotify server" Target="GOTIFY_URL" Default="" Mode="" Description="Required if the Gotify channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Gotify token" Target="GOTIFY_TOKEN" Default="" Mode="" Description="Required with the server above." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Pushover token" Target="PUSHOVER_TOKEN" Default="" Mode="" Description="Required if the Pushover channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Pushover user key" Target="PUSHOVER_USER_KEY" Default="" Mode="" Description="Required with the token above." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Teams webhook URL" Target="TEAMS_WEBHOOK_URL" Default="" Mode="" Description="Required if the Microsoft Teams channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Generic webhook URL" Target="WEBHOOK_URL" Default="" Mode="" Description="Required if the generic webhook channel is enabled." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Generic webhook secret" Target="WEBHOOK_SECRET" Default="" Mode="" Description="Optional. Set it and every request carries an HMAC signature." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+</Container>

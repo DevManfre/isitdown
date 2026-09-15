@@ -156,3 +156,41 @@ repository. Il `config.yml` dell'edizione Light è `config:` in `values.yaml`,
 reso in una ConfigMap e montato in sola lettura; i riferimenti `${VAR}` al suo
 interno si risolvono contro quello stesso Secret. Una modifica fa ruotare il pod,
 perché una ConfigMap montata che cambia su disco non riavvia nulla da sola.
+
+### 4.5 Unraid e Home Assistant
+
+Distribuzione più che funzionalità (roadmap 6.6): entrambe raggiungono un
+pubblico che fa girare esattamente questo tipo di container, e nessuna delle due
+cambia una riga dell'applicazione.
+
+**Unraid.** `deploy/unraid/isitdown-ui.xml` e `deploy/unraid/isitdown-light.xml`
+sono template Community Applications per le due immagini pubblicate. Aggiungi il
+template sotto **Docker → Add Container → Template repositories**, oppure punta
+l'URL al file raw. Ciascuno porta con sé la porta, i percorsi e una variabile
+mascherata per ogni credenziale di canale, così il form pone le stesse domande a
+cui risponde il compose — una porta e un volume dati per l'edizione UI, un
+`config.yml` in sola lettura e un volume dati per quella Light.
+
+**Home Assistant.** `deploy/homeassistant/isitdown/` è un add-on per l'edizione
+UI. Il Supervisor scopre un repository di add-on dalla radice di un repository
+Git e questo è una cartella dentro un progetto, quindi si installa come add-on
+locale: copia la cartella nella share `addons`, poi **Impostazioni → Add-on →
+Add-on store → ⋮ → Controlla aggiornamenti**. Sovrappone un solo file a
+`ghcr.io/devmanfre/isitdown:ui-latest` invece di ricostruire qualcosa, quindi
+installarlo costa un `docker pull`.
+
+Due decisioni da conoscere prima di installarlo:
+
+- **Pubblica una porta invece di usare l'ingress.** L'ingress serve un add-on
+  sotto un prefisso di percorso generato, e la dashboard è costruita contro uno
+  assoluto — il suo bundle e le sue chiamate API partono entrambi da `/`. Un
+  pannello si aprirebbe su una pagina bianca, che è peggio di un link.
+- **Solo le credenziali sono opzioni dell'add-on.** Tutto il resto si imposta
+  nella dashboard, perché l'edizione UI tiene l'intera configurazione in SQLite.
+  I nomi delle opzioni sono i nomi delle variabili che i canali chiedono, così la
+  riga "env mancante" della dashboard e la pagina di configurazione dell'add-on
+  dicono la stessa parola. Il database vive in `/data`, il volume persistente
+  dell'add-on, che è ciò che un backup di Home Assistant si porta dietro.
+
+L'edizione Light non ha un add-on. Non ci sarebbe una pagina da aprire in Home
+Assistant, il che rende un container semplice il modo migliore di eseguirla.
