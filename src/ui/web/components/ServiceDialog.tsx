@@ -29,6 +29,8 @@ const ADAPTERS = [
   "gcp",
   "azure",
   "http",
+  "tcp",
+  "dns",
   "custom",
 ] as const;
 
@@ -55,6 +57,8 @@ const ADAPTER_NOTES: Record<string, string> = {
   gcp: "add.note.gcp",
   azure: "add.note.azure",
   http: "add.note.http",
+  tcp: "add.note.tcp",
+  dns: "add.note.dns",
   custom: "add.note.custom",
 };
 
@@ -85,6 +89,18 @@ const PROBE_ADAPTER = "http";
 
 /** Only the two methods a poller may safely repeat; the adapter refuses the rest. */
 const PROBE_METHODS = ["GET", "HEAD"] as const;
+
+/**
+ * The two probes that speak no HTTP at all (roadmap 1.9): a bare TCP connect
+ * and a DNS resolution. Like the one above them, neither can be inferred from
+ * a base url — only the operator knows which port, or which record, is the one
+ * that matters — so each grows its own small block of fields.
+ */
+const TCP_ADAPTER = "tcp";
+const DNS_ADAPTER = "dns";
+
+/** What the DNS probe can ask for; the adapter refuses anything else. */
+const DNS_RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"] as const;
 
 /** The prefix an option carrying a request header is stored under. */
 const HEADER_PREFIX = "header.";
@@ -187,6 +203,8 @@ export function ServiceDialog({
   const activeAdapter = mode === "add" ? adapter : (service?.adapter ?? "");
   const scraping = activeAdapter === SCRAPE_ADAPTER;
   const probing = activeAdapter === PROBE_ADAPTER;
+  const tcpProbing = activeAdapter === TCP_ADAPTER;
+  const dnsProbing = activeAdapter === DNS_ADAPTER;
   const setOption = (key: string, value: string): void => {
     setOptions((current) => ({ ...current, [key]: value }));
   };
@@ -208,7 +226,11 @@ export function ServiceDialog({
 
   /** The options block a save carries, or nothing for the adapters that take none. */
   const savedOptions = (): { options?: Record<string, string> } =>
-    scraping ? { options: usedOptions(options) } : probing ? { options: probeOptions() } : {};
+    probing
+      ? { options: probeOptions() }
+      : scraping || tcpProbing || dnsProbing
+        ? { options: usedOptions(options) }
+        : {};
 
   // Claim-it-release-it: every close path above releases the busy state this
   // dialog claimed on open, but an unmount is not a close path — it runs no
@@ -697,6 +719,101 @@ export function ServiceDialog({
                   </div>
                 </div>
                 <span className="text-xs text-muted-foreground">{t("probe.header-hint")}</span>
+              </div>
+            )}
+
+            {tcpProbing && (
+              <div className="flex flex-col gap-3 rounded-md border border-dashed border-border p-3">
+                <p className="text-xs text-muted-foreground">{t("tcp.warning")}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="service-tcp-port">{t("tcp.port")}</Label>
+                    <Input
+                      id="service-tcp-port"
+                      type="number"
+                      min={1}
+                      max={65535}
+                      className="font-mono"
+                      value={options["port"] ?? ""}
+                      onChange={(event) => setOption("port", event.target.value)}
+                      {...fieldProps}
+                    />
+                    <span className="text-xs text-muted-foreground">{t("tcp.port-hint")}</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="service-tcp-slow">{t("probe.slow-ms")}</Label>
+                    <Input
+                      id="service-tcp-slow"
+                      type="number"
+                      min={1}
+                      value={options["slowMs"] ?? ""}
+                      onChange={(event) => setOption("slowMs", event.target.value)}
+                      {...fieldProps}
+                    />
+                    <span className="text-xs text-muted-foreground">{t("tcp.slow-ms-hint")}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {dnsProbing && (
+              <div className="flex flex-col gap-3 rounded-md border border-dashed border-border p-3">
+                <p className="text-xs text-muted-foreground">{t("dns.warning")}</p>
+                <div className="flex flex-col gap-1.5">
+                  <Label>{t("dns.record-type")}</Label>
+                  <ToggleGroup
+                    type="single"
+                    spacing={1}
+                    className="w-full"
+                    value={options["recordType"] ?? "A"}
+                    onValueChange={(next) => {
+                      if (next !== "") setOption("recordType", next);
+                    }}
+                  >
+                    {DNS_RECORD_TYPES.map((option) => (
+                      <ToggleGroupItem key={option} value={option}>
+                        {option}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="service-dns-expect">{t("dns.expect-value")}</Label>
+                  <Input
+                    id="service-dns-expect"
+                    className="font-mono"
+                    value={options["expectValue"] ?? ""}
+                    onChange={(event) => setOption("expectValue", event.target.value)}
+                    {...fieldProps}
+                  />
+                  <span className="text-xs text-muted-foreground">{t("dns.expect-value-hint")}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="service-dns-resolver">{t("dns.resolver")}</Label>
+                    <Input
+                      id="service-dns-resolver"
+                      className="font-mono"
+                      placeholder={t("dns.resolver-placeholder")}
+                      value={options["resolver"] ?? ""}
+                      onChange={(event) => setOption("resolver", event.target.value)}
+                      {...fieldProps}
+                    />
+                    <span className="text-xs text-muted-foreground">{t("dns.resolver-hint")}</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="service-dns-slow">{t("probe.slow-ms")}</Label>
+                    <Input
+                      id="service-dns-slow"
+                      type="number"
+                      min={1}
+                      value={options["slowMs"] ?? ""}
+                      onChange={(event) => setOption("slowMs", event.target.value)}
+                      {...fieldProps}
+                    />
+                    <span className="text-xs text-muted-foreground">{t("dns.slow-ms-hint")}</span>
+                  </div>
+                </div>
               </div>
             )}
 
