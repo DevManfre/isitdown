@@ -23,6 +23,7 @@
     "release-notes": "node tools/release-notes.mjs",
     "test": "node --test \"test/**/*.test.ts\" && vitest run",
     "test:integration": "node --test \"test/**/*.itest.ts\"",
+    "test:mutation": "node tools/mutation.mjs",
     "test:visual": "node tools/visual-regression.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },

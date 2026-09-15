@@ -223,6 +223,7 @@ npm test                 # node:test suites + vitest run
 npm run coverage         # the same two suites under a coverage floor
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
 npm run test:visual      # visual baselines: every view, both themes, both locales
+npm run test:mutation    # mutation testing on the diff engine
 npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
@@ -242,6 +243,32 @@ stay at 95% of lines, 88% of branches and 93% of functions, and the dashboard at
 passes and a new subsystem landing with no test of its own drags the total under
 and fails CI. Raise a floor when the suite has genuinely climbed; never lower one
 to make a red run green.
+
+Mutation testing (roadmap 7.3) asks the question coverage cannot: a line that
+ran is not a line a test would have objected to. `tools/mutation.mjs` swaps one
+operator in `src/core/diffEngine.ts` — a comparison inverted, a boundary moved
+by one, `&&` for `||` — runs the engine's own suite, and reports every mutant
+the suite still passes. That is a claim about the engine nothing is holding it
+to, and the engine is the single authority on whether anybody is told anything,
+which is why this is worth doing here and nowhere else. It takes no dependency
+and about a minute.
+
+A survivor is answered with a test, not with a smaller mutation list. The
+exception is a mutation that genuinely cannot be observed — swapping the
+connective in `if (until === null || until === undefined) return false` when the
+NaN guard below already answers `false` for both. Those are declared in the
+source itself, beside the reason:
+
+```ts
+// mutation-equivalent: || — `Date.parse` answers NaN for both, and the NaN
+// guard below already returns false, so the two connectives are one function.
+```
+
+It suppresses only the named operator on the next line of code, and the run
+still prints how many were excused, because a score that hides what it excluded
+is not a score. It runs on demand rather than in CI: the mutants are written to
+the real source file and restored afterwards, which is fine in a working tree
+and wrong to make a habit of on every push.
 
 **No test ever touches a live provider.** Adapters are tested against payloads
 recorded from the real status pages and kept under `test/fixtures/`; HTTP behaviour
