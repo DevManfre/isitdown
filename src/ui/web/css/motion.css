@@ -664,6 +664,27 @@
   animation: meter-sweep 2.4s var(--ease-out) infinite;
 }
 
+/* An arc drawing itself on, for the hero's aggregate figure
+   (components/charts/UptimeArc.tsx). It cannot use `.anim-ring` above: that
+   one animates `transform`, and the arc already carries a `transform`
+   attribute of its own (the -90° that starts it at twelve o'clock) which a CSS
+   transform silently overrides. Travelling the dash offset leaves the rotation
+   alone and reads better anyway — the arc grows from its start rather than
+   swinging into place. */
+@keyframes arc-draw {
+  from {
+    stroke-dashoffset: var(--arc-length);
+    opacity: 0;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+#view[data-animate] .anim-arc {
+  animation: arc-draw 0.62s var(--ease-entry) both;
+}
+
 /* The beam that travels a lit card's border (components/ui/border-beam.tsx).
    The element rides an `offset-path` the component sets inline — the path is
    the card's own rounded rectangle, which only the call site knows the radius

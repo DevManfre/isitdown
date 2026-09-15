@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card.tsx";
-import { SettingsSectionScope, useSectionCount } from "@/components/settings/SettingsChrome.tsx";
+import {
+  SettingsSectionScope,
+  useSectionCount,
+  useSettingsChrome,
+} from "@/components/settings/SettingsChrome.tsx";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -38,15 +42,22 @@ export function SettingsSection({
 }) {
   const footer = status ?? note;
   const count = useSectionCount(id);
+  const { query } = useSettingsChrome();
+  // Only the page's search field may empty a section off the page. The
+  // services section has a state filter of its own (all / polling / paused /
+  // muted), and picking a state nothing is in reported zero rows — which took
+  // the whole card away, chips included, leaving no way back to "all". A
+  // section that empties itself keeps its chrome and says so inside the card.
+  const emptied = query !== "" && count === 0;
 
   return (
     <SettingsSectionScope value={id}>
       <section
         id={`settings-${id}`}
         data-slot="settings-section"
-        // `count === 0` is "the filter emptied it"; `undefined` is "no row has
-        // reported yet", which is every section on the first render.
-        hidden={count === 0}
+        // `undefined` is "no row has reported yet", which is every section on
+        // the first render, and never a reason to hide.
+        hidden={emptied}
         className={cn("anim-rise scroll-mt-6 flex flex-col gap-2.5", className)}
         style={{ animationDelay: delay }}
       >
