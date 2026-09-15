@@ -160,8 +160,8 @@ Four things worth knowing before relying on it:
   really are unreachable; collapsing the burst into a single fleet-wide alert
   needs an event that is not about one provider (roadmap 2.7). `confirmSamples`
   is still the setting for "a single blip is not worth a message".
-- a probe that is not operational says why: **Settings → the provider's row →
-  Diagnose** carries the sentence the reading has nowhere to hold — `answered
+- a probe that is not operational says why: **Settings → the provider's row,
+  expanded → Diagnose** carries the sentence the reading has nowhere to hold — `answered
   HTTP 503, outside the accepted 200-299`, `no answer from …: connect
   ECONNREFUSED`, `the TLS certificate expires in 9 day(s)`. "Down" and "down
   because the name no longer resolves" are the same severity and different
@@ -255,6 +255,16 @@ Everything lives in SQLite at `/app/data/isitdown.db` and is edited from
 - which notification channels are enabled, which environment variable carries
   each credential, and — write-only — the credential itself
 - theme, dashboard language, notification language, time zone
+
+The page is one column of sections with a rail beside it, and three controls
+over that column: a **filter** that narrows it to the rows whose words match
+what is typed (sections left with nothing leave the page, and so do their rail
+entries), a **Detailed / Compact** switch that folds every hint away once they
+have been read, and — over the provider list — **All / Polling / Paused /
+Muted** chips carrying their own counts. Each provider row keeps its switch on
+the line; **Mute**, **Diagnose**, **Edit** and **Remove** are one click away
+inside the row. Channels with no environment variable set wait behind a single
+"show the ones that are not set up" row, unless the filter is asking for them.
 
 **Settings → Data** also carries the one maintenance job a SQLite file needs
 (roadmap 6.13): **Check and compact** runs `PRAGMA integrity_check` and then
@@ -355,15 +365,23 @@ entry with `adapter: statuspage`. Verified:
 `status.anthropic.com` issues a 301 to `status.claude.com`. The adapter follows
 redirects so either works; the canonical host avoids the extra hop.
 
-The UI edition also ships a **bundled catalog** of well-known providers (roadmap
-5.11): the add dialog opens on a menu of names, and one pick fills in the
-adapter, the base URL and the id. Every entry in `src/adapters/catalog.ts` was
-confirmed by running the detection against the page, so what the menu offers is
-what an adapter actually reads. Providers whose status page refuses an automated
-read (Stripe, GitLab, Zendesk, Okta) are deliberately absent rather than listed
-and broken — for those, and for anything else the list does not have, paste the
-URL and let detection (`POST /config/services/detect`) name the adapter. An entry already
-watched stays in the menu, marked, rather than disappearing from it. Served as
+In the UI edition the add dialog asks this in two steps. The first asks only
+where the status comes from, and offers the three ways of answering that: the
+**bundled catalog**, a pasted URL, or an adapter picked by hand. The second is
+the fields — name, group, poll interval, components — with the answer to the
+first carried in at the top and everything adapter-specific folded under
+**Advanced**. Editing an existing service stays one page: its adapter is fixed,
+and what is left is tuning.
+
+The catalog (roadmap 5.11) is a grid of well-known providers, searchable by
+name, and one pick fills in the adapter, the base URL and the id. Every entry in
+`src/adapters/catalog.ts` was confirmed by running the detection against the
+page, so what the grid offers is what an adapter actually reads. Providers whose
+status page refuses an automated read (Stripe, GitLab, Zendesk, Okta) are
+deliberately absent rather than listed and broken — for those, and for anything
+else the list does not have, paste the URL and let detection
+(`POST /config/services/detect`) name the adapter. An entry already watched stays
+in the grid, dimmed, rather than disappearing from it. Served as
 `GET /config/catalog`.
 
 The provider's own `status.indicator` maps onto the internal severity model:

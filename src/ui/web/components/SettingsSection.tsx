@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card.tsx";
+import { SettingsSectionScope, useSectionCount } from "@/components/settings/SettingsChrome.tsx";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -11,8 +12,13 @@ import { cn } from "@/lib/utils.ts";
  * Confirmation lives in this footer rather than on each row on purpose: with
  * instant-apply, three rows saved one after another would otherwise stack
  * three lines of chrome inside the card and move every row below them.
+ *
+ * `id` is what the section rail scrolls to and what the rows inside register
+ * their visibility against; a section whose rows the filter has all taken
+ * leaves the page rather than sitting there as an empty card.
  */
 export function SettingsSection({
+  id,
   title,
   action,
   note,
@@ -21,6 +27,7 @@ export function SettingsSection({
   className,
   children,
 }: {
+  id: string;
   title: ReactNode;
   action?: ReactNode;
   note?: ReactNode;
@@ -30,27 +37,34 @@ export function SettingsSection({
   children: ReactNode;
 }) {
   const footer = status ?? note;
+  const count = useSectionCount(id);
 
   return (
-    <section
-      data-slot="settings-section"
-      className={cn("anim-rise flex flex-col gap-2.5", className)}
-      style={{ animationDelay: delay }}
-    >
-      {/* `min-h-8` so a kicker without an action lines up with one that has a
-          small Button in it, instead of sitting 8px higher. */}
-      <div className="flex min-h-8 items-center justify-between gap-3">
-        <span className="text-xs uppercase tracking-widest text-primary">{title}</span>
-        {action}
-      </div>
-      <Card className="gap-0 divide-y divide-border py-0">
-        {children}
-        {footer !== undefined && footer !== null && (
-          <div data-slot="settings-section-footer" className="px-4 py-2.5 text-xs text-muted-foreground">
-            {footer}
-          </div>
-        )}
-      </Card>
-    </section>
+    <SettingsSectionScope value={id}>
+      <section
+        id={`settings-${id}`}
+        data-slot="settings-section"
+        // `count === 0` is "the filter emptied it"; `undefined` is "no row has
+        // reported yet", which is every section on the first render.
+        hidden={count === 0}
+        className={cn("anim-rise scroll-mt-6 flex flex-col gap-2.5", className)}
+        style={{ animationDelay: delay }}
+      >
+        {/* `min-h-8` so a kicker without an action lines up with one that has a
+            small Button in it, instead of sitting 8px higher. */}
+        <div className="flex min-h-8 items-center justify-between gap-3">
+          <span className="text-xs uppercase tracking-widest text-primary">{title}</span>
+          {action}
+        </div>
+        <Card className="gap-0 divide-y divide-border py-0">
+          {children}
+          {footer !== undefined && footer !== null && (
+            <div data-slot="settings-section-footer" className="px-4 py-2.5 text-xs text-muted-foreground">
+              {footer}
+            </div>
+          )}
+        </Card>
+      </section>
+    </SettingsSectionScope>
   );
 }

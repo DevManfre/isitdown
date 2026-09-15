@@ -165,8 +165,8 @@ Quattro cose da sapere prima di affidarcisi:
   unico avviso di flotta richiede un evento che non riguardi un singolo provider
   (roadmap 2.7). `confirmSamples` resta l'impostazione per "un singolo sussulto
   non merita un messaggio".
-- una sonda non operativa dice *perché*: **Impostazioni → riga del provider →
-  Diagnose** porta la frase che la lettura non ha dove tenere — `answered HTTP
+- una sonda non operativa dice *perché*: **Impostazioni → riga del provider,
+  espansa → Diagnostica** porta la frase che la lettura non ha dove tenere — `answered HTTP
   503, outside the accepted 200-299`, `no answer from …: connect ECONNREFUSED`,
   `the TLS certificate expires in 9 day(s)`. "Giù" e "giù perché il nome non si
   risolve più" sono la stessa severità e due problemi diversi.
@@ -263,6 +263,18 @@ ignorato. Tutto vive in SQLite in `/app/data/isitdown.db` e si modifica da
 - quali canali di notifica sono attivi, quale variabile d'ambiente porta ogni
   credenziale e — in sola scrittura — la credenziale stessa
 - tema, lingua della dashboard, lingua delle notifiche, fuso orario
+
+La pagina è una colonna di sezioni con una barra di navigazione a fianco, e tre
+controlli sopra quella colonna: un **filtro** che la restringe alle righe le cui
+parole corrispondono a quanto digitato (le sezioni rimaste vuote escono dalla
+pagina, e con loro la voce nella barra), un interruttore **Dettagliata /
+Compatta** che richiude tutti i suggerimenti una volta letti e — sopra la lista
+dei provider — le etichette **Tutti / Attivi / In pausa / Silenziati** con i
+rispettivi conteggi. Ogni riga di provider tiene il suo interruttore in linea;
+**Silenzia**, **Diagnostica**, **Modifica** e **Rimuovi** stanno a un clic,
+dentro la riga. I canali senza variabile d'ambiente impostata restano dietro
+un'unica riga "mostra quelli non configurati", a meno che il filtro non li
+stia cercando.
 
 **Settings → Dati** porta anche l'unico lavoro di manutenzione che un file
 SQLite richiede (roadmap 6.13): **Verifica e compatta** esegue `PRAGMA
@@ -366,15 +378,24 @@ una voce con `adapter: statuspage`. Verificati:
 `status.anthropic.com` risponde con un 301 verso `status.claude.com`. L'adapter segue
 i redirect, quindi funzionano entrambi; l'host canonico evita il salto in più.
 
-L'edizione UI include anche un **catalogo** di provider noti (roadmap 5.11): il
-dialog di aggiunta si apre su un menu di nomi, e una scelta riempie adapter,
-base URL e id. Ogni voce in `src/adapters/catalog.ts` è stata confermata
-eseguendo la detection sulla pagina, quindi ciò che il menu offre è ciò che un
-adapter legge davvero. I provider la cui status page rifiuta una lettura
-automatica (Stripe, GitLab, Zendesk, Okta) sono volutamente assenti invece che
-elencati e rotti — per quelli, e per tutto ciò che la lista non ha, si incolla
-l'URL e si lascia che la detection (`POST /config/services/detect`) nomini l'adapter. Una voce già monitorata
-resta nel menu, segnata, invece di sparire. Servito come `GET /config/catalog`.
+Nell'edizione UI il dialog di aggiunta lo chiede in due passi. Il primo chiede
+soltanto da dove arriva lo stato, e offre i tre modi di rispondere: il
+**catalogo** incluso, un URL incollato, o un adapter scelto a mano. Il secondo
+sono i campi — nome, gruppo, intervallo di polling, componenti — con la risposta
+del primo riportata in testa e tutto ciò che è specifico dell'adapter raccolto
+sotto **Avanzate**. Modificare un servizio esistente resta una pagina sola: il
+suo adapter è fissato, e ciò che resta è la messa a punto.
+
+Il catalogo (roadmap 5.11) è una griglia di provider noti, cercabile per nome, e
+una scelta riempie adapter, base URL e id. Ogni voce in
+`src/adapters/catalog.ts` è stata confermata eseguendo la detection sulla
+pagina, quindi ciò che la griglia offre è ciò che un adapter legge davvero. I
+provider la cui status page rifiuta una lettura automatica (Stripe, GitLab,
+Zendesk, Okta) sono volutamente assenti invece che elencati e rotti — per
+quelli, e per tutto ciò che la lista non ha, si incolla l'URL e si lascia che la
+detection (`POST /config/services/detect`) nomini l'adapter. Una voce già
+monitorata resta nella griglia, in grigio, invece di sparire. Servito come
+`GET /config/catalog`.
 
 Lo `status.indicator` del provider viene mappato sul modello di severità interno:
 
