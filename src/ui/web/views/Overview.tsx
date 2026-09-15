@@ -1,11 +1,14 @@
 import { useNavigate } from "react-router";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
+import { BorderBeam } from "@/components/ui/border-beam.tsx";
+import { DotPattern } from "@/components/ui/dot-pattern.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { FleetGroups } from "@/components/FleetGroups.tsx";
 import { FleetRings } from "@/components/FleetRings.tsx";
 import { FLEET_ROW_STAGGER, FleetRows } from "@/components/FleetRows.tsx";
 import { FleetSummary } from "@/components/FleetSummary.tsx";
+import { HeroStats } from "@/components/HeroStats.tsx";
 import { StackBand } from "@/components/StackBand.tsx";
 import { GeoCard } from "@/components/GeoCard.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
@@ -76,7 +79,7 @@ export function Overview() {
           separate claims. */}
       <div className="anim-rise anim-rise-hero flex items-center gap-3" style={{ animationDelay: "50ms" }}>
         <StatusBeacon tier={worstTier(providers.map((p) => p.overallStatus))} />
-        <h2 className="text-3xl font-medium">
+        <h2 className="text-4xl font-semibold tracking-tight text-balance">
           {allDisabled
             ? t("overview.title.all-disabled")
             : down.length === 0
@@ -137,38 +140,79 @@ export function Overview() {
   return (
     <>
       {/* The standard view padding is dropped here (there is no `.view` class
-          left to remove — the whole layer moved to Tailwind), so the hero's
-          own radial glow can bleed to the true edges of #view instead of
-          stopping at the console's usual 32px gutter, then restore the same
-          inset for its own content.
+          left to remove — the whole layer moved to Tailwind), so the hero's own
+          light can bleed to the true edges of #view instead of stopping at the
+          console's usual 32px gutter, then restore the same inset for its own
+          content.
 
-          `minmax(0,1fr) auto` where this used to say `grid-cols-2`: the copy
-          is four lines and never grew, so a fixed half handed the rings the
-          other half whatever their number — which is how eight providers left
-          450px of empty hero beside a stack four rows tall. */}
+          The band is lit rather than washed: the accent bloom the palette
+          always carried, a dot grid under it for texture, a beam along the top
+          edge, and — only while something is actually down — a second bloom in
+          the severity colour and a beam travelling the border. That last pair
+          is the whole point of the redesign's hero: the page says "something is
+          wrong" before a single word of it is read.
+
+          `minmax(0,1fr) auto` where this used to say `grid-cols-2`: the copy is
+          four lines and never grew, so a fixed half handed the right-hand
+          column the other half whatever it held.
+
+          The fleet's rings no longer live in here. They were what made the hero
+          grow with the fleet, and `HeroStats` is the fixed-height column that
+          replaces them — the rings moved below the rule, where a row of tiles
+          can wrap without pushing the headline around. */}
       <div
-        className={cn(
-          "view-hero -mx-8 -mt-6 px-8 pt-6 pb-6",
-          shape === "band"
-            ? "flex flex-col gap-6"
-            : "grid grid-cols-1 gap-8 md:grid-cols-[minmax(0,1fr)_auto]",
-        )}
-        style={{ background: "var(--gradient-hero)" }}
+        className="view-hero lit-band relative -mx-8 -mt-6 overflow-hidden border-b border-border px-8 pt-6 pb-7"
+        style={{
+          backgroundImage:
+            down.length === 0
+              ? "var(--gradient-hero)"
+              : "var(--gradient-hero-live), var(--gradient-hero)",
+        }}
       >
-        {heroCopy}
-        {shape !== "dense" && <FleetRings providers={providers} shape={shape} />}
-        {shape === "dense" && (
-          <FleetSummary
-            average={average}
-            operational={providers.length - down.length}
-            alarm={down.length}
+        <DotPattern className="text-foreground/8" />
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary to-transparent"
+        />
+        {down.length > 0 && (
+          <BorderBeam
+            size={160}
+            duration={9}
+            colorFrom="var(--status-major-outage)"
+            colorTo="var(--status-degraded)"
           />
         )}
+        <div
+          className={cn(
+            "relative grid gap-8",
+            shape === "band"
+              ? "grid-cols-1"
+              : "grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto]",
+          )}
+        >
+          {heroCopy}
+          {shape === "dense" ? (
+            <FleetSummary
+              average={average}
+              operational={providers.length - down.length}
+              alarm={down.length}
+            />
+          ) : (
+            providers.length > 0 && <HeroStats providers={providers} average={average} />
+          )}
+        </div>
       </div>
 
       <div className="overview-rows flex flex-col gap-4">
         {/* The rule sweeps in under the hero, before the rows arrive. */}
         <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "170ms" }} />
+
+        {/* The fleet as tiles, in the two shapes that still draw them. Out of
+            the hero (see above) and into the page's own column, where a wrap is
+            free. */}
+        {shape !== "dense" && providers.length > 0 && (
+          <FleetRings providers={providers} shape={shape} />
+        )}
 
         {/* A summary belongs above the detail. The card renders nothing at all
             when `mapView` is `off`, which is the default, so the Overview's

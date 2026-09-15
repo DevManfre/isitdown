@@ -1,7 +1,7 @@
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Search, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { PollIndicator } from "./PollIndicator.tsx";
-import { Separator } from "@/components/ui/separator.tsx";
+import { openCommandPalette } from "./CommandPalette.tsx";
 import { usePreferencesMutation, useStatusChrome } from "@/hooks/queries.ts";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme.tsx";
 import { supportedLocales, switchLocale } from "@/lib/i18n.ts";
@@ -47,7 +47,7 @@ export function Header({ view }: { view: string }) {
   const ThemeIcon = THEME_ICONS[mode];
 
   return (
-    <header className="header flex items-center justify-between gap-4 border-b border-border px-8 py-4">
+    <header className="header flex items-center justify-between gap-4 border-b border-border px-8 py-3">
       <div className="header-title flex flex-col">
         <h1 className="text-lg font-medium">{t(TITLE_KEYS[view] ?? "nav.overview")}</h1>
         <span className="header-meta min-h-4 text-xs text-muted-foreground">
@@ -62,13 +62,29 @@ export function Header({ view }: { view: string }) {
         </span>
       </div>
 
-      <div className="header-actions flex items-center gap-4">
-        <div className="lang-switch flex gap-1">
+      <div className="header-actions flex items-center gap-2">
+        {/* ⌘K existed before this button did, and nothing on screen said so.
+            The button is the palette's only visible surface; it carries the
+            shortcut on it so the second use is the keystroke. */}
+        <button
+          type="button"
+          className="header-search flex items-center gap-2 rounded-md border border-border bg-card/60 py-1.5 pl-3 pr-2 text-xs text-muted-foreground"
+          onClick={openCommandPalette}
+        >
+          <Search className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+          {t("palette.open")}
+          <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">⌘K</kbd>
+        </button>
+
+        <div className="lang-switch flex gap-1 rounded-md bg-muted/60 p-0.5">
           {supportedLocales.map((lang) => (
             <button
               key={lang}
               type="button"
-              className={cn("lang-opt rounded px-2 py-1 text-xs", i18n.language === lang && "text-primary")}
+              className={cn(
+                "lang-opt rounded px-2 py-1 text-xs",
+                i18n.language === lang && "bg-card text-primary shadow-sm",
+              )}
               aria-pressed={i18n.language === lang}
               onClick={() => {
                 void switchLocale(lang).then((applied) =>
@@ -83,7 +99,7 @@ export function Header({ view }: { view: string }) {
 
         <button
           type="button"
-          className="theme-btn rounded p-1.5 text-primary"
+          className="theme-btn rounded-md border border-border bg-card/60 p-1.5 text-primary"
           aria-label={themeTitle}
           title={themeTitle}
           onClick={() => {
@@ -108,7 +124,9 @@ export function Header({ view }: { view: string }) {
           />
         </button>
 
-        <Separator orientation="vertical" className="header-sep h-6" />
+        {/* The separator is gone with the rule that drew it: the poll cluster
+            carries its own outline now, which is a stronger edge than a
+            hairline between two groups of controls ever was. */}
         <PollIndicator />
       </div>
     </header>

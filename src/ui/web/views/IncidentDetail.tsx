@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Trans, useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
+import { BorderBeam } from "@/components/ui/border-beam.tsx";
+import { DotPattern } from "@/components/ui/dot-pattern.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { BentoTile } from "@/components/BentoTile.tsx";
@@ -121,7 +123,29 @@ export function IncidentDetail() {
         {t("action.back")}
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      {/* The detail page opens on the same lit band the Overview does, in the
+          incident's own impact colour: the two pages are the same claim at two
+          zoom levels, and one of them used to be a headline on bare ground. The
+          beam runs only while the incident is open — a resolved incident is a
+          record, and a record does not need to attract the eye. */}
+      <div
+        className="incident-band lit-band relative -mx-8 -mt-2 flex flex-wrap items-start justify-between gap-4 overflow-hidden border-b border-border px-8 pt-4 pb-6"
+        style={{
+          backgroundImage:
+            incident.resolvedAt === null
+              ? "var(--gradient-hero-live), var(--gradient-hero)"
+              : "var(--gradient-hero)",
+        }}
+      >
+        <DotPattern className="text-foreground/6" />
+        {incident.resolvedAt === null && (
+          <BorderBeam
+            size={150}
+            duration={9}
+            colorFrom="var(--status-major-outage)"
+            colorTo="var(--status-degraded)"
+          />
+        )}
         <div className="flex flex-col gap-2">
           <div className="anim-rise flex items-center gap-2" style={{ animationDelay: "40ms" }}>
             <span className="text-xs uppercase tracking-widest" style={{ color: impactColor(incident.impact) }}>

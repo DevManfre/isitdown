@@ -471,7 +471,10 @@ describe("Settings", () => {
 
   it("says that configuration changes need no restart", async () => {
     renderWithProviders(<Settings />, fixtures);
-    expect(await screen.findByText(i18n.t("settings.subtitle"))).toBeInTheDocument();
+    // Twice in the DOM, once per breakpoint: the sentence lives in the
+    // settings rail (lg and up) and above the toolbar below it, and CSS — not
+    // the markup — decides which one an operator sees.
+    expect(await screen.findAllByText(i18n.t("settings.subtitle"))).not.toHaveLength(0);
   });
 
   // The panel is a list of collapsed rows now: what it says with everything

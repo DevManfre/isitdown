@@ -18,6 +18,7 @@ import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentRows } from "@/components/ComponentRows.tsx";
+import { ProviderCards } from "@/components/ProviderCards.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
@@ -31,6 +32,13 @@ import type { ComponentStatus, HistoryBucket, OverallStatus, ProviderStatus } fr
 import { cn } from "@/lib/utils.ts";
 
 const WINDOW_DAYS = 90;
+
+/**
+ * How many providers still get a card grid above the table. Six cards are two
+ * rows; at ten they are five rows of chrome between the operator and the table,
+ * and the table is what a fleet that size is read through.
+ */
+const CARD_GRID_MAX = 6;
 
 /** How long a dropped row stays mounted; in step with `.anim-sink` in motion.css. */
 const EXIT_MS = 220;
@@ -447,6 +455,12 @@ export function Providers() {
           <ToggleGroupItem value="issues">{t("filter.issues")}</ToggleGroupItem>
         </ToggleGroup>
       </div>
+      {/* The cards, then the table of the same providers — the two readings the
+          one table used to be asked for at once (see ProviderCards). Capped at
+          CARD_GRID_MAX: past that the grid is a wall to scroll past on the way
+          to the table, which is the shape that actually serves a large fleet. */}
+      {data.length > 0 && data.length <= CARD_GRID_MAX && <ProviderCards providers={data} />}
+
       {data.length === 0 ? (
         <p className="text-muted-foreground">{t("providers.empty")}</p>
       ) : (

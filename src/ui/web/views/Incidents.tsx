@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { DownloadMenu } from "@/components/DownloadMenu.tsx";
 import { Card } from "@/components/ui/card.tsx";
+import { BorderBeam } from "@/components/ui/border-beam.tsx";
+import { DotPattern } from "@/components/ui/dot-pattern.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import {
@@ -319,9 +321,38 @@ export function Incidents() {
     <div className="flex flex-col gap-6">
       <div className={cn("grid grid-cols-1 gap-6", showActive && "lg:grid-cols-[2fr_1fr]")}>
         {showActive && (
-          <Card className="anim-rise flex flex-col gap-3 border-primary/40 bg-primary/5 p-4" style={{ animationDelay: "60ms" }}>
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase tracking-widest text-primary">{t("incidents.active")}</span>
+          // While an incident is actually open the card is drawn in the
+          // severity it reports, not in the accent: an active outage and a
+          // "nothing open right now" panel used to be the same violet box with
+          // different words in it. With nothing open it keeps the accent, since
+          // there is no severity to take a colour from.
+          <Card
+            className={cn(
+              "anim-rise lit-band relative flex flex-col gap-3 overflow-hidden p-4",
+              current === undefined
+                ? "border-primary/40 bg-primary/5"
+                : "border-destructive/40 bg-destructive/[0.07]",
+            )}
+            style={{ animationDelay: "60ms" }}
+          >
+            <DotPattern className="text-foreground/6" />
+            {current !== undefined && (
+              <BorderBeam
+                size={140}
+                duration={8}
+                colorFrom="var(--status-major-outage)"
+                colorTo="var(--status-degraded)"
+              />
+            )}
+            <div className="relative flex items-center justify-between">
+              <span
+                className={cn(
+                  "text-xs uppercase tracking-widest",
+                  current === undefined ? "text-primary" : "text-destructive",
+                )}
+              >
+                {t("incidents.active")}
+              </span>
               {current !== undefined && (
                 <span className="font-mono text-xs text-muted-foreground">
                   {current.incidentId} · {formatRelative(i18n.language, current.startedAt)}
@@ -338,7 +369,7 @@ export function Incidents() {
                     exact incident name (never concatenated with anything
                     else) must find a node whose own text is exactly that
                     name, not "Provider — Name" as one string. */}
-                <span className="text-base font-medium">
+                <span className="relative text-xl font-semibold tracking-tight text-balance">
                   <span>{nameOf(current.providerId)}</span> — <span>{current.name}</span>
                 </span>
                 <span className="text-sm text-muted-foreground">

@@ -37,18 +37,26 @@ const renderedOrder = (): string[] =>
 const sortBy = (user: ReturnType<typeof userEvent.setup>, columnKey: string) =>
   user.click(screen.getByRole("button", { name: i18n.t(columnKey) }));
 
+/**
+ * The table alone. The cards above it (roadmap 7.6) render the same provider
+ * names, hosts, status labels and uptime figures, so a bare `screen` query for
+ * any of them now matches twice — by design: the grid answers "what is wrong",
+ * the table answers "how do these compare".
+ */
+const inTable = async () => within(await screen.findByRole("table"));
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Providers", () => {
   it("renders one row per configured provider", async () => {
     renderWithProviders(<Providers />, { status, history });
-    expect(await screen.findByText("GitHub")).toBeInTheDocument();
-    expect(await screen.findByText("Cloudflare")).toBeInTheDocument();
+    expect(await (await inTable()).findByText("GitHub")).toBeInTheDocument();
+    expect(await (await inTable()).findByText("Cloudflare")).toBeInTheDocument();
   });
 
   it("is read-only: no edit or remove control lives here", async () => {
     renderWithProviders(<Providers />, { status, history });
-    await screen.findByText("GitHub");
+    await (await inTable()).findByText("GitHub");
     expect(screen.queryByRole("button", { name: i18n.t("action.edit") })).toBeNull();
     expect(screen.queryByRole("button", { name: i18n.t("action.remove") })).toBeNull();
   });
@@ -56,7 +64,7 @@ describe("Providers", () => {
   it("labels every column from the catalog", async () => {
     renderWithProviders(<Providers />, { status, history });
     for (const key of ["column.provider", "column.adapter", "column.status", "column.uptime", "column.incidents"]) {
-      expect(await screen.findByText(i18n.t(key))).toBeInTheDocument();
+      expect(await (await inTable()).findByText(i18n.t(key))).toBeInTheDocument();
     }
   });
 
@@ -81,8 +89,8 @@ describe("Providers", () => {
       },
       history,
     });
-    expect(await screen.findByText("GitHub")).toBeInTheDocument();
-    expect(screen.queryByText("Cloudflare")).toBeNull();
+    expect(await (await inTable()).findByText("GitHub")).toBeInTheDocument();
+    expect((await inTable()).queryByText("Cloudflare")).toBeNull();
   });
 
   // A window is "running" the moment the badge should appear — the drawer's
@@ -115,11 +123,11 @@ describe("Providers", () => {
       history,
     });
 
-    const githubRow = (await screen.findByText("GitHub")).closest("tr");
+    const githubRow = (await (await inTable()).findByText("GitHub")).closest("tr");
     expect(githubRow).not.toBeNull();
     expect(within(githubRow!).getByText(i18n.t("provider.maintenance.badge"))).toBeInTheDocument();
 
-    const cfRow = (await screen.findByText("Cloudflare")).closest("tr");
+    const cfRow = (await (await inTable()).findByText("Cloudflare")).closest("tr");
     expect(cfRow).not.toBeNull();
     expect(within(cfRow!).queryByText(i18n.t("provider.maintenance.badge"))).toBeNull();
   });
@@ -153,8 +161,8 @@ describe("Providers", () => {
       history,
     });
 
-    await screen.findByText("GitHub");
-    expect(screen.queryByText(i18n.t("provider.maintenance.badge"))).toBeNull();
+    await (await inTable()).findByText("GitHub");
+    expect((await inTable()).queryByText(i18n.t("provider.maintenance.badge"))).toBeNull();
   });
 
   // No test above asserts rendered copy against anything but t() itself,
@@ -171,7 +179,7 @@ describe("Providers", () => {
         providers: [{ providerId: "github", buckets: [], uptime90: 87.65, incidentCount: 0 }],
       },
     });
-    expect(await screen.findByText("87.65%")).toBeInTheDocument();
+    expect(await (await inTable()).findByText("87.65%")).toBeInTheDocument();
   });
 
   // The table follows the intro above it rather than starting at zero
@@ -179,8 +187,8 @@ describe("Providers", () => {
   // the delay value is caught, not just "some animation exists".
   it("starts the table after the intro and steps each row 30ms further", async () => {
     renderWithProviders(<Providers />, { status, history });
-    const first = (await screen.findByText("GitHub")).closest("tr");
-    const second = (await screen.findByText("Cloudflare")).closest("tr");
+    const first = (await (await inTable()).findByText("GitHub")).closest("tr");
+    const second = (await (await inTable()).findByText("Cloudflare")).closest("tr");
     expect(first).not.toBeNull();
     expect(second).not.toBeNull();
     expect(first).toHaveStyle({ animationDelay: "90ms" });
@@ -198,7 +206,7 @@ describe("Providers", () => {
   // field ({{ p.host }}).
   it("shows the provider's host beneath its name, matching providers.js's hostOf()", async () => {
     renderWithProviders(<Providers />, { status, history });
-    const row = (await screen.findByText("GitHub")).closest("tr");
+    const row = (await (await inTable()).findByText("GitHub")).closest("tr");
     if (row === null) throw new Error("expected a table row");
     expect(within(row).getByText("www.githubstatus.com")).toBeInTheDocument();
   });
@@ -216,13 +224,13 @@ describe("Providers", () => {
   it("filters to providers with an open issue when 'issues' is selected", async () => {
     const user = userEvent.setup();
     renderWithProviders(<Providers />, { status, history });
-    await screen.findByText("GitHub");
+    await (await inTable()).findByText("GitHub");
     await user.click(screen.getByRole("button", { name: i18n.t("filter.issues") }));
     // The dropped rows animate out first (see below), so they leave the DOM a
     // beat later rather than on the click itself.
-    await waitForElementToBeRemoved(() => screen.queryByText("GitHub"));
-    expect(screen.queryByText("Cloudflare")).toBeNull();
-    expect(await screen.findByText("Discord")).toBeInTheDocument();
+    await waitForElementToBeRemoved(() => within(screen.getByRole("table")).queryByText("GitHub"));
+    expect((await inTable()).queryByText("Cloudflare")).toBeNull();
+    expect(await (await inTable()).findByText("Discord")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: i18n.t("filter.issues") })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: i18n.t("filter.all") })).toHaveAttribute("aria-pressed", "false");
   });
@@ -233,17 +241,17 @@ describe("Providers", () => {
   it("animates a dropped row out instead of unmounting it on the spot", async () => {
     const user = userEvent.setup();
     renderWithProviders(<Providers />, { status, history });
-    await screen.findByText("GitHub");
+    await (await inTable()).findByText("GitHub");
     await user.click(screen.getByRole("button", { name: i18n.t("filter.issues") }));
 
-    const leaving = screen.getByText("GitHub").closest("tr");
+    const leaving = (await inTable()).getByText("GitHub").closest("tr");
     if (leaving === null) throw new Error("expected the dropped provider to still have a row");
     expect(leaving).toHaveClass("anim-sink");
     expect(leaving).not.toHaveClass("anim-rise");
     // No stagger on the way out: every dropped row goes at once.
     expect(leaving).toHaveStyle({ animationDelay: "0ms" });
 
-    await waitForElementToBeRemoved(() => screen.queryByText("GitHub"));
+    await waitForElementToBeRemoved(() => within(screen.getByRole("table")).queryByText("GitHub"));
   });
 
   // Coming back to "all" must not leave the outgoing rows stuck mid-fade: the
@@ -251,11 +259,11 @@ describe("Providers", () => {
   it("clears the leaving rows when the filter widens again", async () => {
     const user = userEvent.setup();
     renderWithProviders(<Providers />, { status, history });
-    await screen.findByText("GitHub");
+    await (await inTable()).findByText("GitHub");
     await user.click(screen.getByRole("button", { name: i18n.t("filter.issues") }));
     await user.click(screen.getByRole("button", { name: i18n.t("filter.all") }));
 
-    const row = (await screen.findByText("GitHub")).closest("tr");
+    const row = (await (await inTable()).findByText("GitHub")).closest("tr");
     expect(row).toHaveClass("anim-rise");
     expect(row).not.toHaveClass("anim-sink");
   });
@@ -268,8 +276,8 @@ describe("Providers", () => {
     const allButton = await screen.findByRole("button", { name: i18n.t("filter.all") });
     await user.click(allButton);
     expect(allButton).toHaveAttribute("aria-pressed", "true");
-    expect(await screen.findByText("GitHub")).toBeInTheDocument();
-    expect(await screen.findByText("Discord")).toBeInTheDocument();
+    expect(await (await inTable()).findByText("GitHub")).toBeInTheDocument();
+    expect(await (await inTable()).findByText("Discord")).toBeInTheDocument();
   });
 
   // Regression for the review finding: on an initial-load failure this view
@@ -330,10 +338,10 @@ describe("Providers", () => {
 
     it("offers an expand control only for a provider that monitors components", async () => {
       renderWithProviders(<Providers />, fixtures);
-      await screen.findByText("Anthropic");
+      await (await inTable()).findByText("Anthropic");
       expect(toggles()).toHaveLength(1);
 
-      const github = screen.getByText("GitHub").closest("tr");
+      const github = (await inTable()).getByText("GitHub").closest("tr");
       if (github === null) throw new Error("expected a table row");
       expect(within(github).queryByRole("button")).toBeNull();
     });
@@ -341,17 +349,17 @@ describe("Providers", () => {
     it("expands the row into its monitored components and how each is doing", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, fixtures);
-      await screen.findByText("Anthropic");
-      expect(screen.queryByText("API")).toBeNull();
+      await (await inTable()).findByText("Anthropic");
+      expect((await inTable()).queryByText("API")).toBeNull();
 
       await user.click(toggles()[0]!);
 
-      expect(await screen.findByText("API")).toBeInTheDocument();
-      expect(screen.getByText("Console")).toBeInTheDocument();
+      expect(await (await inTable()).findByText("API")).toBeInTheDocument();
+      expect((await inTable()).getByText("Console")).toBeInTheDocument();
       // The component's own 90-day uptime, not the provider's.
-      expect(screen.getByText("99.40%")).toBeInTheDocument();
+      expect((await inTable()).getByText("99.40%")).toBeInTheDocument();
       // Never sampled is not 0% uptime.
-      expect(screen.getByText(i18n.t("components.never-measured"))).toBeInTheDocument();
+      expect((await inTable()).getByText(i18n.t("components.never-measured"))).toBeInTheDocument();
     });
 
     // The breakdown costs a request, so it must not be paid for on load for
@@ -359,11 +367,11 @@ describe("Providers", () => {
     it("requests the component breakdown only once the row is expanded", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, fixtures);
-      await screen.findByText("Anthropic");
+      await (await inTable()).findByText("Anthropic");
       expect(fetched().filter((path) => path.startsWith("/history/components"))).toHaveLength(0);
 
       await user.click(toggles()[0]!);
-      await screen.findByText("API");
+      await (await inTable()).findByText("API");
       const breakdowns = fetched().filter((path) => path.startsWith("/history/components"));
       expect(breakdowns).toHaveLength(1);
       expect(breakdowns[0]).toContain("provider=anthropic");
@@ -374,7 +382,7 @@ describe("Providers", () => {
     it("wires the control to the panel it opens with aria-expanded and aria-controls", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, fixtures);
-      await screen.findByText("Anthropic");
+      await (await inTable()).findByText("Anthropic");
       expect(toggles()[0]).toHaveAttribute("aria-expanded", "false");
 
       await user.click(toggles()[0]!);
@@ -390,16 +398,16 @@ describe("Providers", () => {
     it("collapses the row again on a second click", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, fixtures);
-      await screen.findByText("Anthropic");
+      await (await inTable()).findByText("Anthropic");
 
       await user.click(toggles()[0]!);
-      await screen.findByText("API");
+      await (await inTable()).findByText("API");
       await user.click(toggles()[0]!);
 
       expect(toggles()[0]).toHaveAttribute("aria-expanded", "false");
       // Gone once the fold has played, the way a filtered-out row is gone once
       // `.anim-sink` has.
-      await waitForElementToBeRemoved(() => screen.queryByText("API"));
+      await waitForElementToBeRemoved(() => within(screen.getByRole("table")).queryByText("API"));
     });
 
     // The open was choreographed and the close was a cut: the panel went in a
@@ -408,10 +416,10 @@ describe("Providers", () => {
     it("folds the panel out on collapse instead of cutting it", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, fixtures);
-      await screen.findByText("Anthropic");
+      await (await inTable()).findByText("Anthropic");
 
       await user.click(toggles()[0]!);
-      await screen.findByText("API");
+      await (await inTable()).findByText("API");
       const panel = document.getElementById(panelIdOf(toggles()[0]!));
       if (panel === null) throw new Error("expected the chevron to have opened a panel");
       expect(panel.querySelector(".anim-unfold")).not.toBeNull();
@@ -420,7 +428,7 @@ describe("Providers", () => {
       expect(panel.querySelector(".anim-fold")).not.toBeNull();
       expect(panel.querySelector(".anim-unfold")).toBeNull();
 
-      await waitForElementToBeRemoved(() => screen.queryByText("API"));
+      await waitForElementToBeRemoved(() => within(screen.getByRole("table")).queryByText("API"));
     });
 
     // Two providers open at once: comparing a degraded provider against a
@@ -431,12 +439,12 @@ describe("Providers", () => {
     it("gives the panel no heading and no hover highlight", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, fixtures);
-      await screen.findByText("Anthropic");
+      await (await inTable()).findByText("Anthropic");
 
       await user.click(toggles()[0]!);
-      await screen.findByText("API");
+      await (await inTable()).findByText("API");
 
-      expect(screen.queryByText(i18n.t("components.rows-title"))).toBeNull();
+      expect((await inTable()).queryByText(i18n.t("components.rows-title"))).toBeNull();
       const panel = document.getElementById(panelIdOf(toggles()[0]!));
       expect(panel).toHaveClass("hover:bg-transparent");
     });
@@ -447,14 +455,14 @@ describe("Providers", () => {
     it("keeps a row expanded across a re-sort", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, fixtures);
-      await screen.findByText("Anthropic");
+      await (await inTable()).findByText("Anthropic");
 
       await user.click(toggles()[0]!);
-      await screen.findByText("API");
+      await (await inTable()).findByText("API");
       await sortBy(user, "column.provider");
 
       expect(toggles()[0]).toHaveAttribute("aria-expanded", "true");
-      expect(screen.getByText("API")).toBeInTheDocument();
+      expect((await inTable()).getByText("API")).toBeInTheDocument();
     });
 
     it("keeps more than one row expanded at a time", async () => {
@@ -477,7 +485,7 @@ describe("Providers", () => {
         history,
         componentHistory,
       });
-      await screen.findByText("Anthropic");
+      await (await inTable()).findByText("Anthropic");
 
       await user.click(toggles()[0]!);
       await user.click(toggles()[1]!);
@@ -486,7 +494,7 @@ describe("Providers", () => {
       expect(toggles()[1]).toHaveAttribute("aria-expanded", "true");
       // Both fixtures resolve to the same breakdown, so each open panel
       // contributes one "API" row.
-      expect(screen.getAllByText("API")).toHaveLength(2);
+      expect((await inTable()).getAllByText("API")).toHaveLength(2);
     });
   });
 
@@ -497,7 +505,7 @@ describe("Providers", () => {
     it("sorts by provider name, reverses, then returns to the configured order", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, { status, history });
-      await screen.findByText("GitHub");
+      await (await inTable()).findByText("GitHub");
       expect(renderedOrder()).toEqual(["GitHub", "Cloudflare", "Discord"]);
 
       await sortBy(user, "column.provider");
@@ -530,7 +538,7 @@ describe("Providers", () => {
         },
         history,
       });
-      await screen.findByText("GitHub");
+      await (await inTable()).findByText("GitHub");
 
       await sortBy(user, "column.status");
       expect(renderedOrder()).toEqual(["Discord", "Cloudflare", "GitHub"]);
@@ -563,7 +571,7 @@ describe("Providers", () => {
           ],
         },
       });
-      await screen.findByText("GitHub");
+      await (await inTable()).findByText("GitHub");
 
       // Worst uptime first: that is the row an operator is looking for.
       await sortBy(user, "column.uptime");
@@ -576,7 +584,7 @@ describe("Providers", () => {
     it("sorts by incident count, busiest provider first", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, { status, history });
-      await screen.findByText("GitHub");
+      await (await inTable()).findByText("GitHub");
 
       // Only GitHub has incidents in the history fixture (2).
       await sortBy(user, "column.incidents");
@@ -597,7 +605,7 @@ describe("Providers", () => {
         },
         history,
       });
-      await screen.findByText("GitHub");
+      await (await inTable()).findByText("GitHub");
 
       await sortBy(user, "column.adapter");
       expect(renderedOrder()).toEqual(["Cloudflare", "GitHub"]);
@@ -608,7 +616,7 @@ describe("Providers", () => {
     it("reports the sorted column and its direction with aria-sort", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, { status, history });
-      await screen.findByText("GitHub");
+      await (await inTable()).findByText("GitHub");
       const header = () => screen.getByRole("button", { name: i18n.t("column.provider") }).closest("th");
 
       expect(header()).toHaveAttribute("aria-sort", "none");

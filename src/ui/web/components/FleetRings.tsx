@@ -33,7 +33,7 @@ export function FleetRings({
       className={cn(
         "ring-grid",
         compact
-          ? "flex flex-wrap justify-end gap-4"
+          ? "flex flex-wrap gap-4"
           : "grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-3",
       )}
     >
