@@ -7,9 +7,13 @@ import {
   Hash,
   Mail,
   Megaphone,
+  MessageSquareCode,
   MessagesSquare,
   MonitorSmartphone,
+  Radio,
   Send,
+  Share2,
+  Siren,
   Smartphone,
   Users,
   Webhook,
@@ -131,10 +135,14 @@ function PushDevices({
  * of still renders a readable row instead of a blank one.
  */
 const CHANNEL_ICONS: Record<string, typeof Bell> = {
+  apprise: Share2,
   discord: MessagesSquare,
   email: Mail,
   gotify: BellRing,
+  matrix: MessageSquareCode,
   ntfy: Megaphone,
+  opsgenie: Radio,
+  pagerduty: Siren,
   pushover: Smartphone,
   slack: Hash,
   teams: Users,
@@ -144,10 +152,14 @@ const CHANNEL_ICONS: Record<string, typeof Bell> = {
 };
 
 const CHANNEL_NAME_KEYS: Record<string, string> = {
+  apprise: "channel.name.apprise",
   discord: "channel.name.discord",
   email: "channel.name.email",
   gotify: "channel.name.gotify",
+  matrix: "channel.name.matrix",
   ntfy: "channel.name.ntfy",
+  opsgenie: "channel.name.opsgenie",
+  pagerduty: "channel.name.pagerduty",
   pushover: "channel.name.pushover",
   slack: "channel.name.slack",
   teams: "channel.name.teams",

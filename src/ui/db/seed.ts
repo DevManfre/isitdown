@@ -56,6 +56,36 @@ const DEFAULT_CHANNELS = [
       deviceEnv: "PUSHOVER_DEVICE",
     },
   },
+  // Matrix (roadmap 3.6). The room id is internal (`!abc:example.org`), not an
+  // alias: an alias can be repointed at another room by anyone with the power
+  // to, which is not a property an alert channel should have.
+  {
+    id: "matrix",
+    config: {
+      homeserverUrlEnv: "MATRIX_HOMESERVER_URL",
+      roomIdEnv: "MATRIX_ROOM_ID",
+      accessTokenEnv: "MATRIX_ACCESS_TOKEN",
+    },
+  },
+  // On-call chains (roadmap 3.7). Both de-duplicate on a key IsItDown derives
+  // from the change, so a provider's own "resolved" update closes the alert its
+  // "investigating" update opened. `region` is optional (see
+  // OPTIONAL_CHANNEL_SETTINGS).
+  {
+    id: "pagerduty",
+    config: { routingKeyEnv: "PAGERDUTY_ROUTING_KEY", regionEnv: "PAGERDUTY_REGION" },
+  },
+  { id: "opsgenie", config: { apiKeyEnv: "OPSGENIE_API_KEY", regionEnv: "OPSGENIE_REGION" } },
+  // Apprise bridge (roadmap 3.9). Either the key of a configuration the server
+  // stores or the service URLs themselves; the notifier refuses both empty.
+  {
+    id: "apprise",
+    config: {
+      serverUrlEnv: "APPRISE_SERVER_URL",
+      configKeyEnv: "APPRISE_CONFIG_KEY",
+      urlsEnv: "APPRISE_URLS",
+    },
+  },
   // Microsoft Teams (roadmap 3.8). One incoming webhook, like Discord and Slack.
   { id: "teams", config: { webhookUrlEnv: "TEAMS_WEBHOOK_URL" } },
   // SMTP submission (roadmap 3.3). Every setting is a `*Env` name like every

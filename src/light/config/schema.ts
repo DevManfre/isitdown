@@ -95,6 +95,43 @@ const gotifySchema = z.object({
   token: z.string().default(""),
 });
 
+/** Homeserver, the internal room id, and an access token for the sending user. */
+const matrixSchema = z.object({
+  enabled: z.boolean().default(false),
+  homeserverUrl: z.string().default(""),
+  roomId: z.string().default(""),
+  accessToken: z.string().default(""),
+});
+
+/**
+ * PagerDuty Events API v2 (roadmap 3.7). One integration key; `region` is `eu`
+ * for an account in PagerDuty's EU service region and may be left unset.
+ */
+const pagerdutySchema = z.object({
+  enabled: z.boolean().default(false),
+  routingKey: z.string().default(""),
+  region: z.string().default(""),
+});
+
+/** Opsgenie Alerts API (roadmap 3.7). One API key, plus the same region choice. */
+const opsgenieSchema = z.object({
+  enabled: z.boolean().default(false),
+  apiKey: z.string().default(""),
+  region: z.string().default(""),
+});
+
+/**
+ * An Apprise API server (roadmap 3.9). Either the key of a configuration the
+ * server stores — the better arrangement, since the service URLs behind it are
+ * credentials — or the URLs themselves, comma-separated, for a stateless server.
+ */
+const appriseSchema = z.object({
+  enabled: z.boolean().default(false),
+  serverUrl: z.string().default(""),
+  configKey: z.string().default(""),
+  urls: z.string().default(""),
+});
+
 /** Required non-empty settings per channel, used to produce an actionable error. */
 export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   telegram: ["botToken", "chatId"],
@@ -103,6 +140,13 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   slack: ["webhookUrl"],
   ntfy: ["topicUrl"],
   gotify: ["serverUrl", "token"],
+  matrix: ["homeserverUrl", "roomId", "accessToken"],
+  pagerduty: ["routingKey"],
+  opsgenie: ["apiKey"],
+  // Not `configKey` or `urls`: the channel needs one of the two, which a list
+  // of individually required fields cannot say. The notifier's own schema
+  // refuses the pair when both are empty.
+  apprise: ["serverUrl"],
   pushover: ["token", "userKey"],
   teams: ["webhookUrl"],
   // Not the credentials: a relay on this machine, or one that trusts this
@@ -125,6 +169,10 @@ const notificationsObject = z
     slack: slackSchema.optional(),
     ntfy: ntfySchema.optional(),
     gotify: gotifySchema.optional(),
+    matrix: matrixSchema.optional(),
+    pagerduty: pagerdutySchema.optional(),
+    opsgenie: opsgenieSchema.optional(),
+    apprise: appriseSchema.optional(),
     pushover: pushoverSchema.optional(),
     teams: teamsSchema.optional(),
     email: emailSchema.optional(),
@@ -147,6 +195,13 @@ export const fileConfigSchema = z.object({
   adaptiveIntervalMinutes: positiveInt.max(1440).optional(),
   /** Consecutive agreeing polls before a transition notifies. 1 is off. */
   confirmSamples: positiveInt.max(10).optional(),
+  /**
+   * How many providers have to go bad inside `correlationWindowMinutes` before
+   * the cycle reports one shared failure instead of one alert each (roadmap
+   * 2.7). 0 and 1 are off, which is the default.
+   */
+  correlationThreshold: z.number().int().min(0).max(100).optional(),
+  correlationWindowMinutes: positiveInt.max(1440).optional(),
   locale: localeSchema.optional(),
   services: z.array(serviceDefinitionSchema).min(1, "at least one service is required"),
   notifications: notificationsObject.default({}),
