@@ -12,6 +12,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { useCountWidth } from "@/hooks/useCountWidth.ts";
 import { ProviderIcon } from "@/components/ProviderIcon.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { StatTiles } from "@/components/StatTiles.tsx";
@@ -99,6 +100,8 @@ export function DeliveryLog() {
       ? "—"
       : `${new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format((counts.sent / counts.all) * 100)}%`;
 
+  const countWidth = useCountWidth(counts.all);
+
   const pick = (next: DeliveryState): void => {
     setState(next);
     setPage(1);
@@ -164,7 +167,15 @@ export function DeliveryLog() {
               <span className={cn(entry.value === "failed" && counts.failed > 0 && "text-destructive")}>
                 {t(entry.labelKey)}
               </span>
-              <span className="ml-1.5 font-mono text-xs text-muted-foreground">{counts[entry.value]}</span>
+              {/* Held to the widest tally, for the reason the Incidents chips
+                  are: picking a channel re-counts all three, and a digit
+                  arriving moved the chips beside it. */}
+              <span
+                className="ml-1.5 inline-block text-right font-mono text-xs text-muted-foreground"
+                style={{ minWidth: countWidth }}
+              >
+                {counts[entry.value]}
+              </span>
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -206,7 +217,7 @@ export function DeliveryLog() {
               <div key={key} className={cn("flex flex-col border-t border-border first:border-t-0", !record.ok && "bg-destructive/5")}>
                 <button
                   type="button"
-                  className="anim-rise anim-rise-row flex items-center gap-3 px-4 py-2.5 text-left"
+                  className="delivery-row anim-rise anim-rise-row flex items-center gap-3 px-4 py-2.5 text-left"
                   style={{ animationDelay: stagger(index, { base: 150, step: 28, cap: 420 }) }}
                   aria-expanded={open}
                   onClick={() => setExpanded(open ? null : key)}
