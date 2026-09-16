@@ -270,6 +270,24 @@ const NON_TOKEN_PROPERTIES: Record<string, string> = {
   // that reads it: `style={{ "--gap": spacing }}`. A component-local variable
   // passing a prop into a utility class, not a palette entry.
   "--gap": "declared inline by toggle-group.tsx itself, from its `spacing` prop",
+  // The spotlight's pointer position, written onto the element by
+  // components/ui/spotlight-card.tsx on every pointermove and cleared on
+  // leave. Component-local state expressed as custom properties so the paint
+  // itself stays in CSS; not palette entries, and never declared in a
+  // stylesheet — the fallbacks in the `var()` calls are what an untouched card
+  // renders.
+  // The arc's drawn length in px, written inline by UptimeArc beside the
+  // `stroke-dasharray` it is computed from, so the entry keyframe can travel
+  // exactly that distance. A geometry value, not a palette entry.
+  "--arc-length": "declared inline by UptimeArc.tsx, from the arc's own length",
+  "--spot-x": "written by spotlight-card.tsx on pointermove",
+  "--spot-y": "written by spotlight-card.tsx on pointermove",
+  "--spot-opacity": "written by spotlight-card.tsx on pointer enter and leave",
+  // The view-transition clip circle and its duration, set on <html> by
+  // animated-theme-toggler.tsx for the length of one theme switch and removed
+  // when it ends. State of a running animation, not a palette entry.
+  "--magicui-theme-vt-clip-from": "written by animated-theme-toggler.tsx while the switch runs",
+  "--magicui-theme-toggle-vt-duration": "written by animated-theme-toggler.tsx while the switch runs",
 };
 
 test("every custom property the dashboard references is declared in tokens.css", async () => {

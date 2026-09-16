@@ -83,7 +83,7 @@ const fixtures = {
 };
 
 const openAdd = async () => {
-  renderWithProviders(<Settings />, fixtures);
+  renderWithProviders(<Settings />, fixtures, "/settings/services");
   const trigger = await screen.findByRole("button", { name: i18n.t("action.add-service") });
   await userEvent.click(trigger);
   return { trigger, dialog: await screen.findByRole("dialog") };
@@ -164,7 +164,7 @@ describe("the service dialog's keyboard contract", () => {
   });
 
   it("refuses to edit the id of an existing service", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
     await openEdit();
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByLabelText(i18n.t("field.id"))).toHaveAttribute("readonly");
@@ -225,6 +225,22 @@ describe("the service dialog's two steps", () => {
     expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue(
       "https://status.example.com/history.rss",
     );
+  });
+
+  // The rail is a React Bits stepper, whose circles are buttons. Only the one
+  // behind the operator does anything: a circle that walked the wizard forward
+  // would skip the source form the second step is built out of.
+  it("steps back from the rail's first indicator, and offers no way forward from the second", async () => {
+    const { dialog } = await openAdd();
+    await addByAdapter(dialog, "rss", "https://status.example.com/history.rss");
+
+    expect(within(dialog).queryByRole("button", { name: i18n.t("add.step-details") })).toBeNull();
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("add.step-source") }));
+
+    expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue(
+      "https://status.example.com/history.rss",
+    );
+    expect(within(dialog).queryByLabelText(i18n.t("field.name"))).toBeNull();
   });
 });
 
@@ -446,7 +462,7 @@ describe("the service dialog's write path", () => {
     // Review item 2: the only edit-mode test on record asserts the id field is
     // read-only but never actually submits — patch.mutateAsync and its body
     // have never been exercised until now.
-    renderWithProviders(<Settings />, fixtures);
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
     await openEdit();
     const dialog = await screen.findByRole("dialog");
     const calls = interceptWrites({ "PATCH /config/services/github": {} });
@@ -558,7 +574,7 @@ describe("the service dialog's bundled catalog", () => {
   });
 
   it("offers no catalog while editing: an existing service has every answer already", async () => {
-    renderWithProviders(<Settings />, fixtures);
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
     await openEdit();
     const dialog = await screen.findByRole("dialog");
 

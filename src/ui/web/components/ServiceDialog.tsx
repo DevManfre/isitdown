@@ -8,6 +8,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { StepPanel, Stepper } from "@/components/ui/stepper.tsx";
 import { ComponentPicker, type ComponentPickerEntry, type ComponentPickerSelection } from "@/components/ComponentPicker.tsx";
 import {
   AdapterOptions, DNS_ADAPTER, hasAdapterOptions, PROBE_ADAPTER, SCRAPE_ADAPTER, TCP_ADAPTER,
@@ -528,7 +529,7 @@ export function ServiceDialog({
               <>
                 <DialogTitle>{t("add.title")}</DialogTitle>
                 <DialogDescription>{t(onSource ? "add.subtitle-source" : "add.subtitle-details")}</DialogDescription>
-                <StepRail step={step} />
+                <StepRail step={step} onBack={goToSource} />
               </>
             ) : (
               <>
@@ -541,81 +542,89 @@ export function ServiceDialog({
           </DialogHeader>
 
           <DialogBody>
-            {adding ? (
-              <div key={step} className={stepBack ? "anim-step-back" : "anim-step"}>
-                <div className="flex flex-col gap-4">
-                  {onSource ? (
-                    <SourceStep
-                      source={source}
-                      onSourceChange={setSource}
-                      catalog={catalog?.providers}
-                      query={catalogQuery}
-                      onQueryChange={setCatalogQuery}
-                      onPick={pick}
-                      picked={picked}
-                      baseUrl={baseUrl}
-                      onBaseUrlChange={setBaseUrl}
-                      onDetect={() => void runDetect()}
-                      detecting={detecting}
-                      adapter={adapter}
-                      onAdapterChange={(next) => {
-                        setAdapter(next);
-                        // Choosing an adapter by hand is choosing something
-                        // other than the catalog entry, so the grid stops
-                        // claiming one is still picked.
-                        setPicked(undefined);
-                        setPreview(undefined);
-                      }}
-                      fieldProps={fieldProps}
-                    />
-                  ) : (
-                    <>
-                      <ServiceIdentity name={name} adapter={adapter} baseUrl={baseUrl} onChange={goToSource} />
-                      {details}
-                      {/* Everything only one adapter can use, folded away. For
-                          a Statuspage site it is empty and stays shut; for the
-                          http probe it is where ten extra fields live instead
-                          of in the middle of the form. */}
-                      {hasAdapterOptions(activeAdapter) && (
-                        <Collapsible
-                          className="panel-advanced rounded-md border border-border"
-                          open={advanced}
-                          onOpenChange={setAdvanced}
-                        >
-                          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md px-3.5 py-3 text-left">
-                            <span className="flex flex-col gap-1">
-                              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                {t("add.advanced")}
-                              </span>
-                              <span className="text-xs text-muted-foreground">{t("add.advanced-hint")}</span>
-                            </span>
-                            <ChevronDown
-                              className={advanced ? "size-4 rotate-180 text-muted-foreground transition-transform" : "size-4 text-muted-foreground transition-transform"}
-                            />
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <div className="border-t border-border p-3">{adapterFields}</div>
-                          </CollapsibleContent>
-                        </Collapsible>
+            {/* Every height change in here is animated rather than jumped:
+                the step swap, the advanced disclosure opening, a message
+                arriving. The panel is centred, so a jump moves the whole
+                dialog under the pointer. */}
+            <StepPanel>
+              <div className="flex flex-col gap-4">
+                {adding ? (
+                  <div key={step} className={stepBack ? "anim-step-back" : "anim-step"}>
+                    <div className="flex flex-col gap-4">
+                      {onSource ? (
+                        <SourceStep
+                          source={source}
+                          onSourceChange={setSource}
+                          catalog={catalog?.providers}
+                          query={catalogQuery}
+                          onQueryChange={setCatalogQuery}
+                          onPick={pick}
+                          picked={picked}
+                          baseUrl={baseUrl}
+                          onBaseUrlChange={setBaseUrl}
+                          onDetect={() => void runDetect()}
+                          detecting={detecting}
+                          adapter={adapter}
+                          onAdapterChange={(next) => {
+                            setAdapter(next);
+                            // Choosing an adapter by hand is choosing something
+                            // other than the catalog entry, so the grid stops
+                            // claiming one is still picked.
+                            setPicked(undefined);
+                            setPreview(undefined);
+                          }}
+                          fieldProps={fieldProps}
+                        />
+                      ) : (
+                        <>
+                          <ServiceIdentity name={name} adapter={adapter} baseUrl={baseUrl} onChange={goToSource} />
+                          {details}
+                          {/* Everything only one adapter can use, folded away. For
+                              a Statuspage site it is empty and stays shut; for the
+                              http probe it is where ten extra fields live instead
+                              of in the middle of the form. */}
+                          {hasAdapterOptions(activeAdapter) && (
+                            <Collapsible
+                              className="panel-advanced rounded-md border border-border"
+                              open={advanced}
+                              onOpenChange={setAdvanced}
+                            >
+                              <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md px-3.5 py-3 text-left">
+                                <span className="flex flex-col gap-1">
+                                  <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                    {t("add.advanced")}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">{t("add.advanced-hint")}</span>
+                                </span>
+                                <ChevronDown
+                                  className={advanced ? "size-4 rotate-180 text-muted-foreground transition-transform" : "size-4 text-muted-foreground transition-transform"}
+                                />
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="border-t border-border p-3">{adapterFields}</div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <>
-                {details}
-                {/* No disclosure while editing: tuning these is most of why an
-                    operator opens an existing service at all. */}
-                {hasAdapterOptions(activeAdapter) && <Section title={t("add.advanced")}>{adapterFields}</Section>}
-              </>
-            )}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {details}
+                    {/* No disclosure while editing: tuning these is most of why an
+                        operator opens an existing service at all. */}
+                    {hasAdapterOptions(activeAdapter) && <Section title={t("add.advanced")}>{adapterFields}</Section>}
+                  </>
+                )}
 
-            {message !== undefined && (
-              <p className={message.tone === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
-                {message.text}
-              </p>
-            )}
+                {message !== undefined && (
+                  <p className={message.tone === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
+                    {message.text}
+                  </p>
+                )}
+              </div>
+            </StepPanel>
           </DialogBody>
 
           <DialogFooter className="sm:justify-between">
@@ -681,38 +690,17 @@ function Section({
 }
 
 /** Two steps, and which one you are on — the whole of the wizard's chrome. */
-function StepRail({ step }: { step: 1 | 2 }) {
+function StepRail({ step, onBack }: { step: 1 | 2; onBack: () => void }) {
   const { t } = useTranslation();
-  const steps = [
-    { index: 1, label: "add.step-source" },
-    { index: 2, label: "add.step-details" },
-  ];
 
   return (
-    <ol className="flex items-center gap-2.5 pt-1">
-      {steps.map((entry, position) => (
-        <li key={entry.index} className="flex flex-1 items-center gap-2.5 last:flex-none">
-          <span className="flex items-center gap-2">
-            <span
-              aria-hidden
-              className={
-                entry.index === step
-                  ? "flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground transition-colors"
-                  : "flex size-5 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-muted-foreground transition-colors"
-              }
-            >
-              {entry.index}
-            </span>
-            <span
-              aria-current={entry.index === step ? "step" : undefined}
-              className={entry.index === step ? "text-xs font-medium" : "text-xs font-medium text-muted-foreground"}
-            >
-              {t(entry.label)}
-            </span>
-          </span>
-          {position === 0 && <span className="h-px flex-1 bg-border" />}
-        </li>
-      ))}
-    </ol>
+    <Stepper
+      className="pt-1"
+      currentStep={step}
+      // Backwards only: step two is reached by answering step one, never by
+      // clicking its circle, which would skip the form it is built out of.
+      onStepClick={step === 2 ? onBack : undefined}
+      steps={[{ label: t("add.step-source") }, { label: t("add.step-details") }]}
+    />
   );
 }

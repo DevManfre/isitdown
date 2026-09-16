@@ -17,7 +17,13 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // Roadmap 7.6: the primary action is lit, not flat — the accent
+        // gradient and the drop that goes with it, both tokens, so a
+        // button reads as the one thing on the surface that emits light.
+        // `bg-primary` stays underneath as the fallback fill any surface
+        // that overrides the image still lands on.
+        default:
+          "bg-primary bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40",
         outline:

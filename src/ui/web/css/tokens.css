@@ -135,6 +135,15 @@
   --gradient-page: none;
   --gradient-rail: none;
   --gradient-hero: radial-gradient(110% 70% at 8% 0%, #eeecfa 0%, transparent 62%);
+  /* Roadmap 7.6. The three values the cinematic chrome needs that cannot be
+     mixed from the ramp above: the fill of a primary action, the drop that
+     makes it read as lit rather than painted, and the second bloom a hero band
+     takes while something is wrong. Declared per theme like every other
+     gradient, and `none`-free: both themes light the same surfaces, the light
+     one just does it with less of everything. */
+  --gradient-primary: linear-gradient(135deg, #7466dc, #473c9e);
+  --shadow-glow: 0 8px 24px rgba(71, 60, 158, 0.26);
+  --gradient-hero-live: radial-gradient(60% 120% at 96% 100%, rgba(185, 28, 28, 0.10), transparent 70%);
 
   --font-heading: "Inter", system-ui, sans-serif;
   --font-heading-weight: 500;
@@ -307,6 +316,9 @@
   --gradient-page: none;
   --gradient-rail: none;
   --gradient-hero: radial-gradient(110% 70% at 8% 0%, var(--color-accent-900), transparent 60%);
+  --gradient-primary: linear-gradient(135deg, #968ae0, #5d5294);
+  --shadow-glow: 0 8px 26px rgba(93, 82, 148, 0.5);
+  --gradient-hero-live: radial-gradient(60% 120% at 96% 100%, rgba(210, 105, 79, 0.18), transparent 70%);
 
   --font-heading: "Inter", system-ui, sans-serif;
   --font-heading-weight: 500;
@@ -456,6 +468,9 @@
     --gradient-page: none;
     --gradient-rail: none;
     --gradient-hero: radial-gradient(110% 70% at 8% 0%, var(--color-accent-900), transparent 60%);
+    --gradient-primary: linear-gradient(135deg, #968ae0, #5d5294);
+    --shadow-glow: 0 8px 26px rgba(93, 82, 148, 0.5);
+    --gradient-hero-live: radial-gradient(60% 120% at 96% 100%, rgba(210, 105, 79, 0.18), transparent 70%);
 
     --font-heading: "Inter", system-ui, sans-serif;
     --font-heading-weight: 500;

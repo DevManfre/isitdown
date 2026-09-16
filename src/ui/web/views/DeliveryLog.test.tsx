@@ -153,7 +153,9 @@ describe("DeliveryLog", () => {
 
     // A row stored before retries existed carries no count, so the view must
     // not invent one for it.
-    expect(screen.queryByText(/attempt/i)).not.toBeInTheDocument();
+    // Scoped to the rows: the stat tiles above the log say what share of
+    // attempts landed, which is a figure about the log and not about this row.
+    expect(rows().queryByText(/attempt/i)).not.toBeInTheDocument();
   });
 
   it("says that nothing failed rather than showing a blank panel", async () => {

@@ -64,6 +64,7 @@ export function NumberSetting({
     >
       <button
         type="button"
+        data-slot="number-stepper"
         className={cn(stepper, "border-r border-input")}
         disabled={disabled || value <= min}
         aria-label={t("action.decrease", { field: label })}
@@ -97,6 +98,7 @@ export function NumberSetting({
       </div>
       <button
         type="button"
+        data-slot="number-stepper"
         className={cn(stepper, "border-l border-input")}
         disabled={disabled || (max !== undefined && value >= max)}
         aria-label={t("action.increase", { field: label })}
