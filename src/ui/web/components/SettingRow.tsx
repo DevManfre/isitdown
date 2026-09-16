@@ -71,9 +71,20 @@ export function SettingRow({
         {leading}
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="truncate text-sm">{label}</span>
-          {description !== undefined && density === "detailed" && (
-            <span data-slot="setting-row-description" className="text-xs leading-relaxed text-muted-foreground">
-              {description}
+          {description !== undefined && (
+            // Compact density folds this away rather than unmounting it: forty
+            // rows losing a line each in one frame moved the page out from
+            // under whatever was being read. The row is a collapsing grid
+            // track (motion.css), so the hint keeps a height nothing here has
+            // to know, and `aria-hidden` keeps a folded sentence out of the
+            // accessibility tree the way the old unmount did.
+            <span
+              data-slot="setting-row-description"
+              data-collapsed={density === "compact" ? "true" : undefined}
+              aria-hidden={density === "compact" ? "true" : undefined}
+              className="text-xs leading-relaxed text-muted-foreground"
+            >
+              <span>{description}</span>
             </span>
           )}
           {status !== undefined && (

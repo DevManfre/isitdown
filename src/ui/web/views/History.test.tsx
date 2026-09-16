@@ -116,6 +116,13 @@ const withDrawer = {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/**
+ * The provider list alone. The stat tiles above it name the best and the worst
+ * provider, so a provider's name is on the page twice by design — a bare
+ * `screen` query for one would match both.
+ */
+const inList = async () => within(await screen.findByRole("region", { name: i18n.t("history.list") }));
+
 describe("History", () => {
   it("shows aggregate uptime and month columns", async () => {
     renderWithProviders(<History />, fixtures);
@@ -151,7 +158,7 @@ describe("History", () => {
 
   it("shows each provider's name and downtime figure", async () => {
     renderWithProviders(<History />, fixtures);
-    expect(await screen.findByText("GitHub")).toBeInTheDocument();
+    expect(await (await inList()).findByText("GitHub")).toBeInTheDocument();
     // history.downtime's real catalog template is "{minutes} min down" (a
     // numeric placeholder) — not the "{duration}" string the brief guessed.
     expect(await screen.findByText("min down", { exact: false })).toHaveTextContent(
@@ -325,7 +332,7 @@ describe("a provider's component breakdown (ComponentRows)", () => {
     // just this provider's component breakdown.
     expect(await screen.findByText(/99[.,]42/)).toBeInTheDocument();
     expect(await screen.findByText(i18n.t("history.month-no-data"))).toBeInTheDocument();
-    expect(await screen.findByText("GitHub")).toBeInTheDocument();
+    expect(await (await inList()).findByText("GitHub")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: i18n.t("action.download") })).toBeInTheDocument();
 
     // Asserted before the drawer opens on purpose: a modal sheet marks the rest
@@ -394,15 +401,17 @@ describe("the provider list", () => {
   it("labels its columns instead of running five bare numbers together", async () => {
     renderWithProviders(<History />, twoProviders);
 
-    expect(await screen.findByText(i18n.t("history.col-uptime", { days: 90 }))).toBeInTheDocument();
-    expect(screen.getByText(i18n.t("history.col-incidents"))).toBeInTheDocument();
+    const list = await inList();
+    expect(await list.findByText(i18n.t("history.col-uptime", { days: 90 }))).toBeInTheDocument();
+    expect(list.getByText(i18n.t("history.col-incidents"))).toBeInTheDocument();
   });
 
   it("shows one uptime figure per provider, for the active range only", async () => {
     renderWithProviders(<History />, twoProviders);
 
-    expect(await screen.findByText(/75[.,]33/)).toBeInTheDocument();
-    expect(screen.queryByText(/78[.,]09/)).not.toBeInTheDocument();
+    const list = await inList();
+    expect(await list.findByText(/75[.,]33/)).toBeInTheDocument();
+    expect(list.queryByText(/78[.,]09/)).not.toBeInTheDocument();
   });
 
   it("keeps component rows out of the list", async () => {

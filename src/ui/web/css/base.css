@@ -89,3 +89,33 @@ body {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/* A lit band — the Overview hero, the Incidents card, the incident's own
+   header — paints texture under its content: a dot grid, and sometimes a beam
+   travelling the border. Both are absolutely positioned, and a positioned
+   element paints above its static siblings whatever the source order, so
+   without this the grid would sit on top of the headline it is meant to be
+   behind. Lifting the band's own children onto the same layer puts them back
+   in front; the `svg` exclusion is the dot grid itself, which must keep the
+   absolute position it is drawn with. The beam is not a child — it is a
+   `div` that positions itself — so it is excluded by z-index instead: it is
+   the border it travels, and it is meant to read above the fill. */
+.lit-band > *:not(svg) {
+  position: relative;
+  z-index: 1;
+}
+
+/* The theme reveal, drawn by `AnimatedThemeToggler`. The browser's default
+   cross-fade is off so the clip-path is the whole transition; while one runs,
+   the incoming snapshot is pinned at its collapsed clip until the JS animation
+   takes over, or Firefox paints the new theme unclipped for a frame first. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html[data-magicui-theme-vt="active"]::view-transition-new(root) {
+  clip-path: var(--magicui-theme-vt-clip-from);
+  animation-duration: var(--magicui-theme-toggle-vt-duration, 400ms);
+}

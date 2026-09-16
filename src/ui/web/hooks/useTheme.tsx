@@ -91,6 +91,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // render, which a theme button cannot do.
   const cycle = useCallback((): ThemeMode => {
     const next = MODES[(MODES.indexOf(mode) + 1) % MODES.length] as ThemeMode;
+    // Stamped here and not only in the effect above: the theme button runs
+    // this inside a view transition, which snapshots the document the moment
+    // the callback returns. A passive effect is too late for that snapshot —
+    // the reveal would wipe the old theme onto itself. The effect still runs
+    // and writes the same attribute, so the two never disagree.
+    stamp(next);
     setMode(next);
     return next;
   }, [mode]);

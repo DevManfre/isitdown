@@ -32,6 +32,16 @@ UI edition. Three states: **light / dark / system**, cycled from the header.
   same tonal ramps from the other end — no colour was invented, including the five
   severity colours, which have their own value per theme.
 
+- **Lit chrome** (roadmap 7.6). Every view opens on a band that is lit rather than
+  washed: the accent bloom the palette always carried, a dot grid under it, a beam
+  along the top edge, and — only while something is actually down — a second bloom
+  in the severity colour and a beam travelling the card's border. Provider tiles
+  light under the pointer instead of only lifting. All of it is tokens
+  (`--gradient-primary`, `--gradient-hero-live`, `--shadow-glow`) plus three CSS
+  rules in `motion.css`; the beam is a CSS `offset-path` animation, not a motion
+  component, which is what keeps it off the bundle budget. `prefers-reduced-motion`
+  stops the beam and the header's poll meter dead.
+
 ### 8.2 Localisation
 
 Two layers, `en` as the source and the fallback in both:
@@ -98,8 +108,9 @@ What is guaranteed, and checked:
   each have a test that shows it rather than assuming it. Hand-written
   clickables (a provider row, a ring tile) get a visible focus ring from
   `base.css` at zero specificity, under whatever ring a primitive already has.
-- **The command palette.** `⌘K` (or `Ctrl+K`) on any screen opens one search
-  box over the console (roadmap 5.4): every view the rail lists, every enabled
+- **The command palette.** `⌘K` (or `Ctrl+K`) on any screen — or the header's
+  search button, which carries the shortcut on it so the second use is the
+  keystroke — opens one search box over the console (roadmap 5.4): every view the rail lists, every enabled
   provider — searchable by the name on screen or the id it was configured with
   — plus **Poll now** and the theme. A provider opens the History view's
   drawer, which is where a provider's detail lives until 5.6 gives it a page of

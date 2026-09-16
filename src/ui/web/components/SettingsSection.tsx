@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card.tsx";
-import { SettingsSectionScope, useSectionCount } from "@/components/settings/SettingsChrome.tsx";
+import { BentoCard } from "@/components/ui/bento-grid.tsx";
+import { SettingsReel, type ReelPainter } from "@/components/settings/SettingsReel.tsx";
+import {
+  SettingsSectionScope,
+  useSectionCount,
+  useSettingsChrome,
+} from "@/components/settings/SettingsChrome.tsx";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -25,6 +31,7 @@ export function SettingsSection({
   status,
   delay,
   className,
+  reel,
   children,
 }: {
   id: string;
@@ -34,19 +41,28 @@ export function SettingsSection({
   status?: ReactNode;
   delay: string;
   className?: string;
+  /** The tile's motion band, when the page laying this section out has one. */
+  reel?: ReelPainter;
   children: ReactNode;
 }) {
   const footer = status ?? note;
   const count = useSectionCount(id);
+  const { query } = useSettingsChrome();
+  // Only the page's search field may empty a section off the page. The
+  // services section has a state filter of its own (all / polling / paused /
+  // muted), and picking a state nothing is in reported zero rows — which took
+  // the whole card away, chips included, leaving no way back to "all". A
+  // section that empties itself keeps its chrome and says so inside the card.
+  const emptied = query !== "" && count === 0;
 
   return (
     <SettingsSectionScope value={id}>
       <section
         id={`settings-${id}`}
         data-slot="settings-section"
-        // `count === 0` is "the filter emptied it"; `undefined` is "no row has
-        // reported yet", which is every section on the first render.
-        hidden={count === 0}
+        // `undefined` is "no row has reported yet", which is every section on
+        // the first render, and never a reason to hide.
+        hidden={emptied}
         className={cn("anim-rise scroll-mt-6 flex flex-col gap-2.5", className)}
         style={{ animationDelay: delay }}
       >
@@ -56,14 +72,40 @@ export function SettingsSection({
           <span className="text-xs uppercase tracking-widest text-primary">{title}</span>
           {action}
         </div>
-        <Card className="gap-0 divide-y divide-border py-0">
-          {children}
-          {footer !== undefined && footer !== null && (
-            <div data-slot="settings-section-footer" className="px-4 py-2.5 text-xs text-muted-foreground">
-              {footer}
+        {/* Same rows either way: a reel changes what is behind them, never
+            what they are. Without one the section keeps the plain card, so
+            this component still suits a page that is not laid out as a bento. */}
+        {reel === undefined ? (
+          <Card className="gap-0 divide-y divide-border py-0">
+            {children}
+            {footer !== undefined && footer !== null && (
+              <div data-slot="settings-section-footer" className="px-4 py-2.5 text-xs text-muted-foreground">
+                {footer}
+              </div>
+            )}
+          </Card>
+        ) : (
+          <BentoCard
+            className="h-full"
+            background={
+              // Tall enough that the sweep and the beam have room to read, and
+              // masked out well before the first row (see SettingsReel).
+              <SettingsReel painter={reel} className="pointer-events-none absolute inset-x-0 top-0 h-28" />
+            }
+          >
+            {/* `pt-28` reserves exactly the band's own height: no row is ever
+                laid over moving pixels, so every row keeps the card's contrast
+                whatever the reel is painting. */}
+            <div className="flex flex-1 flex-col divide-y divide-border pt-28">
+              {children}
+              {footer !== undefined && footer !== null && (
+                <div data-slot="settings-section-footer" className="mt-auto px-4 py-2.5 text-xs text-muted-foreground">
+                  {footer}
+                </div>
+              )}
             </div>
-          )}
-        </Card>
+          </BentoCard>
+        )}
       </section>
     </SettingsSectionScope>
   );
