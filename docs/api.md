@@ -13,6 +13,7 @@ back reports a parse failure instead of the real problem.
 | `GET` | `/status` | Current status of every provider, plus last and next poll, plus `maintenance: { active, upcoming }` — windows running now and windows whose `startsAt` is still in the future; a window that has already ended but is still in the stored payload appears in neither list. A pure database read — safe to poll every 30s, which the dashboard does. Never reaches upstream. Also carries `groups` — one entry per provider group with its derived status, members and affected members (roadmap 2.6, §3.10). |
 | `GET` | `/history/calendar?provider=` | A year of day cells for one provider — roadmap 5.20. `{ providerId, days, cells: [{ day, status, uptime }], uptime, measuredDays }`, oldest first, gap-filled: an unsampled day is `unknown` with `uptime: null`, never `0`. The window is fixed at 365 days and named in the answer, so it takes no `days`. `404` on an unknown provider. |
 | `GET` | `/history?provider=&days=` | Pre-aggregated daily buckets, 7/30/90-day uptime, month columns. `days` accepts `7`, `30` or `90`; anything else is a 400 naming them. Without `provider`, a summary across all of them. |
+| `GET` | `/history?provider=&from=&to=` | The same payload over an arbitrary range (roadmap 5.5), `YYYY-MM-DD` and both ends included — which is what the History view's **Custom** pill asks for. The two travel together: one alone is a 400, as is a reversed pair or a span wider than 366 days. A range that ended in the past reads the samples inside it, not the last N days. Incidents inside a range are the ones that were *running* in it; the fixed windows keep counting the ones that *started* in them. |
 | `GET` | `/incidents?provider=&state=&q=&days=&page=&pageSize=` | One page of the incident list: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` is `all` (default), `active` or `resolved`; `q` searches incident names, case-insensitively, and `days` keeps only incidents that started within that window (both narrow the page **and** the counts); `pageSize` defaults to 20 and is capped at 100. A nonsense `page`, `pageSize`, `state`, `q` or `days` falls back to the first page of everything rather than a 400. `counts` carries all three states whatever the filter, and `active` is the open list the dashboard's hero card shows on every page — outside the search, so a card cannot vanish while the operator types. |
 | `GET` | `/incidents/:providerId/:incidentId` | Detail: the incident, the observed timeline, the action log of what was sent, the provider's other open incidents, the last 24 polls, and the operator's own notes on it (roadmap 5.3). |
 | `POST` | `/incidents/:providerId/:incidentId/notes` | Writes one note, `{ body }`, 1 to 2000 characters. The incident has to exist, so a typo in a URL cannot quietly accumulate notes about nothing. Answers the stored note. |
@@ -50,14 +51,72 @@ back reports a parse failure instead of the real problem.
 | `GET` | `/debug/adapters` | Adapter diagnostics: per provider, its adapter, base URL and options, and the last twenty read outcomes (duration, attempts, whether it was a `304`, and the error in full). In memory — diagnostics for the run in front of you, not history, so a restart empties it. |
 | `POST` | `/debug/adapters/:id/probe` | One read of that provider's page, right now, reported in full: the whole parsed reading on success, the adapter's own error on failure (as `200` with `ok: false`, like the connection test). Records nothing and notifies nothing. `404` on an unknown id. |
 | `POST` | `/poll` | Run a cycle now, through the scheduler. Returns the cycle summary. |
-| `GET` | `/events` | Server-sent events, one long-lived response per open tab. `hello` on connect (`lastPollAt`, `nextPollAt`, `serverNow`), then `cycle` as each cycle finishes (`finishedAt`, `providers`, `failed`, `changedProviders` — no deadline: the scheduler re-arms after the event, so the fresh one comes with the re-read). The stream is a courier, not a source of truth: it says what changed, and the dashboard re-reads it. Not JSON — see [6.3](#63-live-updates). |
-| `GET` | `/metrics` | Prometheus exposition. The one non-JSON endpoint — see [6.2](#62-prometheus-metrics). |
-| `GET` | `/badge.svg` | An SVG badge for the whole fleet: the worst reading anything is showing. Not JSON — see [6.4](#64-badges-and-the-widget-summary). |
+| `GET` | `/events` | Server-sent events, one long-lived response per open tab. `hello` on connect (`lastPollAt`, `nextPollAt`, `serverNow`), then `cycle` as each cycle finishes (`finishedAt`, `providers`, `failed`, `changedProviders` — no deadline: the scheduler re-arms after the event, so the fresh one comes with the re-read). The stream is a courier, not a source of truth: it says what changed, and the dashboard re-reads it. Not JSON — see [6.5](#65-live-updates). |
+| `GET` | `/metrics` | Prometheus exposition. The one non-JSON endpoint — see [6.4](#64-prometheus-metrics). |
+| `GET` | `/badge.svg` | An SVG badge for the whole fleet: the worst reading anything is showing. Not JSON — see [6.6](#66-badges-and-the-widget-summary). |
 | `GET` | `/badge/:providerId.svg` | The same for one provider. `404` (still as a badge) when nothing knows that id. |
-| `GET` | `/widget` | One flat summary object for a homelab dashboard's custom-API widget — see [6.4](#64-badges-and-the-widget-summary). |
+| `GET` | `/widget` | One flat summary object for a homelab dashboard's custom-API widget — see [6.6](#66-badges-and-the-widget-summary). |
+| `GET` | `/homeassistant` | One flat object per provider for Home Assistant's `rest` integration (roadmap 4.12): `state` is `ON` for anything but operational, which is what `device_class: problem` expects, plus a `fleet` sensor that is on when anything is. Keyed by provider id, so a `value_template` reads `value_json.providers.github.state` rather than searching a list. |
+| `GET` | `/homeassistant/configuration.yaml` | That fleet's Home Assistant configuration, generated and ready to paste: one `rest` resource, one binary sensor per provider. |
+| `GET` | `/openapi.json` | The whole API, machine-readable (roadmap 4.10) — OpenAPI 3.1, for a generated client. |
+| `GET` | `/openapi.yaml` | The same document as YAML, for reading. |
 | `GET` | `/` | The dashboard. |
 
-### 6.1 History backfill
+### 6.1 The OpenAPI document
+
+`GET /openapi.json` (and `/openapi.yaml`, the same document) describes every
+route on this page in OpenAPI 3.1 — roadmap 4.10. It is served by the instance
+rather than only committed to the repository, so the spec a client is generated
+against is the one that instance implements.
+
+It is written by hand in `src/ui/openapi.ts`, deliberately: Express routes carry
+no type information about what they answer with, and a spec inferred from them
+would describe every payload as `object` and be worth nothing to a generated
+client. What keeps it honest is `test/ui/openapi.test.ts`, which walks the
+running app's own router and fails when a route is registered without being
+described, or described without existing.
+
+`info.version` is the *API contract's* version, not the product's: a client
+generated against this document has no reason to be regenerated because the
+dashboard's CSS changed.
+
+No security scheme is declared, and that is a statement rather than an
+omission: IsItDown is a single-operator dashboard bound to the machine it runs
+on (see the non-goals in `README.md`).
+
+### 6.2 Home Assistant
+
+`GET /homeassistant/configuration.yaml` writes the block to paste into Home
+Assistant's `configuration.yaml`, for the fleet this instance is watching right
+now — one `rest` resource and one binary sensor per provider, plus a fleet
+sensor that is on when anything at all is not operational:
+
+```yaml
+rest:
+  - resource: "http://isitdown:3000/homeassistant"
+    scan_interval: 60
+    binary_sensor:
+      - name: "IsItDown GitHub"
+        unique_id: isitdown_github
+        device_class: problem
+        value_template: "{{ value_json.providers.github.state }}"
+```
+
+It is generated rather than written out here because the interesting part is one
+block per provider, and transcribing eight of them from a table is how one
+entity ends up pointing at the wrong key. The resource URL is the address the
+request came in on: inside Home Assistant's own container, `localhost` means
+Home Assistant.
+
+REST rather than MQTT discovery, deliberately. MQTT is the richer integration
+and it would cost a broker at runtime and an MQTT client in `package.json` —
+this project advertises three runtime dependencies and no message broker, which
+is a promise rather than an accident. One request feeds every sensor: Home
+Assistant fetches the resource once per `scan_interval` and each template reads
+its own key out of it, and the whole thing is a SQLite read that never touches a
+provider.
+
+### 6.3 History backfill
 
 At startup — and whenever a provider is added from the dashboard — the UI
 edition reconstructs up to 90 days of history from the provider's public
@@ -72,7 +131,7 @@ feed's reach stay grey ("no data") and are excluded from the uptime
 percentages. Backfill never triggers notifications and never overwrites
 observed samples.
 
-### 6.2 Prometheus metrics
+### 6.4 Prometheus metrics
 
 `GET /metrics` answers in the Prometheus text exposition format
 (`text/plain; version=0.0.4`), so any Prometheus can scrape IsItDown with no
@@ -140,7 +199,7 @@ publish port 3000 to a network you do not trust.
 
 ---
 
-### 6.3 Live updates
+### 6.5 Live updates
 
 The dashboard is pushed to rather than polling: it opens `/events` once and
 re-reads what an event names.
@@ -174,7 +233,7 @@ which is written every 20 seconds.
 
 ---
 
-### 6.4 Badges and the widget summary
+### 6.6 Badges and the widget summary
 
 Two read-only endpoints aimed outward rather than at the dashboard.
 
