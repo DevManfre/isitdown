@@ -17,8 +17,18 @@ import { join } from "node:path";
 
 const ASSETS = "dist/ui/public/assets";
 
-/** Gzipped bytes per kind. Roughly 10% over what the dashboard weighs today. */
-export const BUDGET = { js: 410_000, css: 20_000 };
+/**
+ * Gzipped bytes per kind. Roughly 10% over what the dashboard weighs today.
+ *
+ * The JS ceiling moved 410k -> 470k when the rail's add wizard landed on a
+ * stepper built from `motion.div` / `motion.span` / `motion.path`: until then
+ * the dashboard only ever imported motion's hooks (`useMotionValue`,
+ * `useSpring` in NumberTicker), so its DOM renderer stayed out of the bundle.
+ * Rendering through it costs ~40 kB gzipped, and the whole animated wizard
+ * would have to be rewritten in CSS keyframes to give that back. Code
+ * splitting does not help here: this check sums every .js the build emits.
+ */
+export const BUDGET = { js: 470_000, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
