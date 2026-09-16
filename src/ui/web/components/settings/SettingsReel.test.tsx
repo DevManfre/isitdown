@@ -97,6 +97,26 @@ describe("SettingsReel", () => {
     expect(raf).not.toHaveBeenCalled();
   });
 
+  // A frame callback carries the timestamp of the frame being composited, which
+  // can predate the `performance.now()` the reel started from. A painter reading
+  // that as a phase produced a negative alpha, `addColorStop` threw, and the
+  // throw took the `requestAnimationFrame` that would have queued the next frame
+  // with it — the delivery band was blank for the life of the page.
+  it("never hands a painter a negative time, even on a frame stamped before it started", () => {
+    const painter = vi.fn<ReelPainter>();
+    const queue: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => queue.push(cb));
+    vi.spyOn(performance, "now").mockReturnValue(5_000);
+    render(<SettingsReel painter={painter} />);
+
+    act(() => queue.shift()?.(4_990));
+    act(() => queue.shift()?.(5_100));
+
+    expect(painter).toHaveBeenCalledTimes(2);
+    expect(painter.mock.calls[0]?.[3]).toBe(0);
+    expect(painter.mock.calls[1]?.[3]).toBeCloseTo(0.1);
+  });
+
   it("loops on seconds elapsed when motion is allowed", () => {
     const painter = vi.fn<ReelPainter>();
     const pump = driveFrames();
