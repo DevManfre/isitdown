@@ -283,6 +283,11 @@ const NON_TOKEN_PROPERTIES: Record<string, string> = {
   "--spot-x": "written by spotlight-card.tsx on pointermove",
   "--spot-y": "written by spotlight-card.tsx on pointermove",
   "--spot-opacity": "written by spotlight-card.tsx on pointer enter and leave",
+  // The view-transition clip circle and its duration, set on <html> by
+  // animated-theme-toggler.tsx for the length of one theme switch and removed
+  // when it ends. State of a running animation, not a palette entry.
+  "--magicui-theme-vt-clip-from": "written by animated-theme-toggler.tsx while the switch runs",
+  "--magicui-theme-toggle-vt-duration": "written by animated-theme-toggler.tsx while the switch runs",
 };
 
 test("every custom property the dashboard references is declared in tokens.css", async () => {
