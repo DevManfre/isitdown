@@ -40,7 +40,7 @@ export function Overview() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { data: status } = useStatus();
-  const { data: summary } = useHistory(WINDOW_DAYS);
+  const { data: summary } = useHistory({ days: WINDOW_DAYS });
 
   // A disabled provider is one the poller has been told to skip
   // (poller.ts:164), so nothing about it is being measured any more. It is left

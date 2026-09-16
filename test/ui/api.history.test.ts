@@ -576,3 +576,74 @@ test("the history summary leaves out a disabled provider", async () => {
     await app.close();
   }
 });
+
+test("an arbitrary range answers the same shape, spanning exactly the days asked for", async () => {
+  const app = await api();
+  try {
+    await save(app.runtime, "github", "operational", at(5));
+    await save(app.runtime, "github", "major_outage", at(4));
+    const from = at(5).slice(0, 10);
+    const to = at(3).slice(0, 10);
+
+    const { status, body } = await app.get(`/history?provider=github&from=${from}&to=${to}`);
+    assert.equal(status, 200);
+    const single = body as { providerId: string; buckets: { day: string }[] };
+    assert.equal(single.providerId, "github");
+    assert.equal(single.buckets.length, 3, "both ends are included");
+    assert.equal(single.buckets[0]?.day, from);
+    assert.equal(single.buckets.at(-1)?.day, to);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a range that ended in the past still reads the samples inside it", async () => {
+  const app = await api();
+  try {
+    // Two days of samples well behind today, and nothing since.
+    await save(app.runtime, "github", "operational", at(40));
+    await save(app.runtime, "github", "major_outage", at(39));
+
+    const { body } = await app.get(
+      `/history?provider=github&from=${at(41).slice(0, 10)}&to=${at(38).slice(0, 10)}`,
+    );
+    const single = body as { sampleCount: number; buckets: { day: string; status: string }[] };
+    assert.equal(single.sampleCount, 2, "a window ending in the past is not empty");
+  } finally {
+    await app.close();
+  }
+});
+
+test("the fleet summary takes a range too", async () => {
+  const app = await api();
+  try {
+    await save(app.runtime, "github", "operational", at(2));
+    const { status, body } = await app.get(
+      `/history?from=${at(2).slice(0, 10)}&to=${at(0).slice(0, 10)}`,
+    );
+    assert.equal(status, 200);
+    const summary = body as { providers: { buckets: unknown[] }[] };
+    assert.equal(summary.providers[0]?.buckets.length, 3);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a half-written or impossible range is refused in words", async () => {
+  const app = await api();
+  try {
+    for (const [query, expected] of [
+      ["from=2026-01-01", /together/],
+      ["to=2026-01-01", /together/],
+      ["from=january&to=2026-01-02", /YYYY-MM-DD/],
+      ["from=2026-01-05&to=2026-01-01", /before/],
+      ["from=2020-01-01&to=2026-01-01", /at most/],
+    ] as const) {
+      const { status, body } = await app.get(`/history?${query}`);
+      assert.equal(status, 400, query);
+      assert.match((body as { error: { message: string } }).error.message, expected, query);
+    }
+  } finally {
+    await app.close();
+  }
+});

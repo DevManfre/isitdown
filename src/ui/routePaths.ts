@@ -8,6 +8,12 @@
 export const ROUTE_PATHS = {
   overview: "/overview",
   providers: "/providers",
+  /**
+   * One provider, linkable — roadmap 5.6. `#/providers/github` is the page an
+   * operator can send to somebody or keep in a tab; the drawer beside the lists
+   * stays the one-click look, not the only way in.
+   */
+  providerDetail: "/providers/:providerId",
   incidents: "/incidents",
   incidentDetail: "/incidents/:providerId/:incidentId",
   history: "/history",
@@ -20,7 +26,7 @@ export const ROUTE_PATHS = {
 export type RouteName = keyof typeof ROUTE_PATHS;
 
 /** Every route that is a destination in its own right — the rail's own set. */
-export type NavRouteName = Exclude<RouteName, "settingsSection">;
+export type NavRouteName = Exclude<RouteName, "settingsSection" | "providerDetail">;
 
 /** The rail's order, which is also the nav-label lookup order. */
 export const NAV_ROUTES: { name: NavRouteName; labelKey: string }[] = [
