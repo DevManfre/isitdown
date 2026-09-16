@@ -1547,12 +1547,18 @@ describe("finding a setting", () => {
 
     await userEvent.click(screen.getByRole("radio", { name: i18n.t("settings.density.compact") }));
 
-    // The setting itself stays: it is the sentence under it that folds.
-    await waitFor(() => expect(screen.queryByText(i18n.t("field.interval.hint"))).toBeNull());
+    // The setting itself stays: it is the sentence under it that folds. The
+    // hint stays in the document while it folds — unmounting it dropped forty
+    // lines in one frame — so what is asserted is that it is folded away and
+    // out of the accessibility tree, not that it is gone.
+    const hint = () => screen.getByText(i18n.t("field.interval.hint")).closest("[data-slot='setting-row-description']");
+    await waitFor(() => expect(hint()).toHaveAttribute("data-collapsed", "true"));
+    expect(hint()).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByLabelText(i18n.t("field.interval"))).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("radio", { name: i18n.t("settings.density.detailed") }));
-    expect(await screen.findByText(i18n.t("field.interval.hint"))).toBeInTheDocument();
+    await waitFor(() => expect(hint()).not.toHaveAttribute("data-collapsed"));
+    expect(hint()).not.toHaveAttribute("aria-hidden");
   });
 
   it("lists only the providers in the state the chip names", async () => {

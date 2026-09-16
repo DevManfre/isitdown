@@ -421,12 +421,9 @@
 .panel-advanced [data-slot="collapsible-content"][data-state="closed"] {
   animation: channel-fold 0.2s ease;
 }
-.panel-advanced [data-slot="collapsible-trigger"] {
-  transition: background-color 0.18s ease;
-}
-.panel-advanced [data-slot="collapsible-trigger"]:hover {
-  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
-}
+/* The advanced disclosure and the channel row's own trigger are both covered
+   by the general rule further down; what is scoped here is only the panel's
+   fold, which measures itself. */
 
 /* — rail — */
 /* Hovering nudges the label 4px further in, pressing settles at 2px.
@@ -466,7 +463,22 @@
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 .theme-btn {
-  transition: background 0.24s ease;
+  transition:
+    background 0.24s ease,
+    color 0.2s ease;
+}
+
+/* It had the transition and nothing to transition to: the one control in the
+   header that answered neither hover nor press. The box takes the hover and
+   the glyph takes the press, so the two do not fight over one 30px square. */
+.theme-btn:hover {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.theme-btn svg {
+  transition: transform 0.16s var(--ease-out);
+}
+.theme-btn:active svg {
+  transform: scale(0.88);
 }
 /* Each mode mounts its own glyph, so there is no single element left to
    transition the way the prototype's dot spun between two modes. Header.tsx
@@ -482,7 +494,10 @@
    one is a solid fill whose label is --primary-foreground. Swapping the fill for
    a tint left that label floating on the page colour at 1.05:1, so the fill
    stays solid and moves to --primary-hover instead. */
-[data-slot="button"] {
+[data-slot="button"],
+[data-slot="dialog-trigger"][data-variant],
+[data-slot="dropdown-menu-trigger"][data-variant],
+[data-slot="sheet-trigger"][data-variant] {
   transition:
     background 0.22s ease,
     border-color 0.22s ease,
@@ -493,14 +508,21 @@
     transform 0.18s var(--ease-out),
     box-shadow 0.24s ease;
 }
-[data-slot="button"]:active {
+[data-slot="button"]:active,
+[data-slot="dialog-trigger"][data-variant]:active,
+[data-slot="dropdown-menu-trigger"][data-variant]:active,
+[data-slot="sheet-trigger"][data-variant]:active {
   transform: scale(0.96);
 }
-[data-slot="button"][data-variant="default"]:hover {
+[data-slot="button"][data-variant="default"]:hover,
+[data-slot="dialog-trigger"][data-variant="default"]:hover,
+[data-slot="dropdown-menu-trigger"][data-variant="default"]:hover,
+[data-slot="sheet-trigger"][data-variant="default"]:hover {
   background: var(--primary-hover);
   box-shadow: 0 0 18px color-mix(in srgb, var(--color-accent) 22%, transparent);
 }
-[data-slot="button"][data-variant="destructive"]:hover {
+[data-slot="button"][data-variant="destructive"]:hover,
+[data-slot="dialog-trigger"][data-variant="destructive"]:hover {
   box-shadow: 0 0 18px var(--status-outage-tint);
 }
 
@@ -575,12 +597,7 @@
 /* A channel row is a list row now, not a card: there is no border left to
    tint, so the hover lands on the disclosure itself — the part that is
    clickable — rather than on the whole row including its switch. */
-.panel-channel [data-slot="collapsible-trigger"] {
-  transition: background-color 0.18s ease;
-}
-.panel-channel [data-slot="collapsible-trigger"]:hover {
-  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
-}
+
 
 /* The row's panel unfolding open. Radix measures the panel and publishes the
    height as a custom property, which is what lets a keyframe travel to a height
@@ -734,6 +751,493 @@
   box-shadow: var(--shadow-lg);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   Every other call to action
+
+   The rules above cover the surfaces the prototype drew by hand — the primary
+   button, the rail, the badges, the rows. Everything else an operator can
+   click arrived with the shadcn primitives, and those ship their motion as
+   `animate-in` / `zoom-in-95` utilities from `tw-animate-css`, which this
+   project does not install: the class names sit in the components and resolve
+   to nothing, which is why the dialog got hand-written keyframes here in the
+   first place. A popover therefore appeared in one frame, a menu row lit with
+   no travel, a switch flipped with no press.
+
+   So the same vocabulary is spelled out for the rest of them, one gesture per
+   kind of control:
+
+     - a button-shaped thing lifts 1px under the pointer and settles on press
+       (the press scale already lives on [data-slot="button"] above),
+     - a surface that opens near its trigger pops from its own corner,
+     - a row inside such a surface nudges 2px along the reading direction,
+       the way .service-row and .history-row do on the page itself,
+     - a field transitions its border and ring instead of snapping.
+
+   Travel stays small on purpose: these are controls an operator uses in runs
+   of five or ten — a settings page is thirty of them — and a gesture that
+   reads well once is seasickness at that rate.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* — buttons, the variants the bloom above does not cover — */
+
+/* `default` gets the accent bloom and `destructive` its red one. The quieter
+   variants carry no fill worth glowing, so they lift instead: enough to say
+   the pointer landed, not enough to move the text under it. Ghost included —
+   a sort header and a row's chevron are ghost buttons, and they were the two
+   controls on the page with no hover state of their own at all. */
+/* `asChild` is why this is a list rather than [data-slot="button"]: a Button
+   handed to DialogTrigger, DropdownMenuTrigger or CollapsibleTrigger is merged
+   into the trigger and the trigger's own data-slot wins — so "Add service" and
+   "Edit rules" on Settings kept the Button's look and none of its motion.
+   `data-variant` is what still says a Button drew it, and it appears on the
+   Radix menu item and the badge too, hence the slot list around it. */
+:is(
+  [data-slot="button"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dropdown-menu-trigger"],
+    [data-slot="collapsible-trigger"],
+    [data-slot="sheet-trigger"]
+  )[data-variant="outline"]:hover,
+:is(
+  [data-slot="button"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dropdown-menu-trigger"],
+    [data-slot="collapsible-trigger"],
+    [data-slot="sheet-trigger"]
+  )[data-variant="secondary"]:hover,
+:is(
+  [data-slot="button"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dropdown-menu-trigger"],
+    [data-slot="collapsible-trigger"],
+    [data-slot="sheet-trigger"]
+  )[data-variant="ghost"]:hover {
+  transform: translateY(-1px);
+}
+
+:is(
+  [data-slot="button"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dropdown-menu-trigger"],
+    [data-slot="collapsible-trigger"],
+    [data-slot="sheet-trigger"]
+  )[data-variant="outline"]:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+/* A link-shaped button has no box to lift, so it travels the way .back-link
+   does — along the line, in the direction it sends you. */
+[data-slot="button"][data-variant="link"]:hover {
+  transform: translateX(2px);
+}
+
+/* The press scale is inherited from [data-slot="button"], but a button that
+   lifted first has to land back on the baseline, not 1px above it. */
+[data-slot="button"][data-variant="outline"]:active,
+[data-slot="button"][data-variant="secondary"]:active,
+[data-slot="button"][data-variant="ghost"]:active,
+[data-slot="button"][data-variant="link"]:active {
+  transform: scale(0.96);
+}
+
+/* — popovers: select, dropdown, tooltip, hover card — */
+
+/* Radix hands each of these the transform origin of the corner it grew from
+   (`--radix-*-content-transform-origin`), which the shadcn class list already
+   sets. With the utilities inert nothing read it; these keyframes do. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Leaving is the entry run backwards and faster, as the dialog's is: a menu
+   that fades as slowly as it opened feels stuck to the pointer. */
+@keyframes pop-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98) translateY(-2px);
+  }
+}
+
+[data-slot="select-content"][data-state="open"],
+[data-slot="dropdown-menu-content"][data-state="open"],
+[data-slot="dropdown-menu-sub-content"][data-state="open"],
+[data-slot="hover-card-content"][data-state="open"] {
+  animation: pop-in 0.18s var(--ease-entry) both;
+}
+
+[data-slot="select-content"][data-state="closed"],
+[data-slot="dropdown-menu-content"][data-state="closed"],
+[data-slot="dropdown-menu-sub-content"][data-state="closed"],
+[data-slot="hover-card-content"][data-state="closed"] {
+  animation: pop-out 0.12s ease both;
+}
+
+/* A tooltip is smaller and answers a hover, not a click, so it only rises the
+   last couple of pixels into place — a scale on two words of text wobbles. */
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-slot="tooltip-content"][data-state="delayed-open"],
+[data-slot="tooltip-content"][data-state="instant-open"] {
+  animation: tip-in 0.14s var(--ease-entry) both;
+}
+
+[data-slot="tooltip-content"][data-state="closed"] {
+  animation: fade-out 0.1s ease both;
+}
+
+/* — the rows inside them — */
+
+/* One nudge for every menu row, whichever primitive drew it: Radix marks the
+   row under the pointer (or the arrow keys) with `data-highlighted`, cmdk with
+   `aria-selected`, and both mean the same thing to the operator. */
+[data-slot="select-item"],
+[data-slot="dropdown-menu-item"],
+[data-slot="dropdown-menu-checkbox-item"],
+[data-slot="dropdown-menu-radio-item"],
+[data-slot="dropdown-menu-sub-trigger"],
+[data-slot="command-item"] {
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s var(--ease-out);
+}
+
+[data-slot="select-item"][data-highlighted],
+[data-slot="dropdown-menu-item"][data-highlighted],
+[data-slot="dropdown-menu-checkbox-item"][data-highlighted],
+[data-slot="dropdown-menu-radio-item"][data-highlighted],
+[data-slot="dropdown-menu-sub-trigger"][data-highlighted],
+[data-slot="command-item"][aria-selected="true"] {
+  transform: translateX(2px);
+}
+
+/* — the triggers that open them — */
+
+/* A select is a button that happens to show its value, so it answers the
+   pointer the way an outline button does, and its chevron turns over while
+   the list is open — the one control on the page whose state outlives the
+   click that set it. */
+[data-slot="select-trigger"] {
+  transition:
+    border-color 0.22s ease,
+    background-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.18s var(--ease-out);
+}
+
+[data-slot="select-trigger"]:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  transform: translateY(-1px);
+}
+
+[data-slot="select-trigger"]:active {
+  transform: scale(0.98);
+}
+
+[data-slot="select-trigger"] svg {
+  transition: rotate 0.22s var(--ease-out);
+}
+
+[data-slot="select-trigger"][data-state="open"] svg {
+  rotate: 180deg;
+}
+
+/* — segmented controls — */
+
+/* The transition was already declared above; nothing ever changed under the
+   pointer, so an unselected segment was dead to the touch until it was
+   clicked. The tint is the badge's, at half strength — a segment sits beside
+   its selected sibling, and matching it would read as two selections. */
+[data-slot="toggle-group-item"]:hover,
+[data-slot="toggle"]:hover {
+  background-color: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--color-text);
+}
+
+[data-slot="toggle-group-item"]:active,
+[data-slot="toggle"]:active {
+  transform: scale(0.96);
+}
+
+[data-slot="toggle"] {
+  transition:
+    background-color 0.22s ease,
+    color 0.2s ease,
+    transform 0.16s var(--ease-out);
+}
+
+/* — switches — */
+
+/* The thumb's travel is shadcn's own `transition-transform`. What was missing
+   is the press: a switch is the one control here that can be held, and it
+   gave no sign it had been. The track dips rather than the thumb, so the
+   travel stays the thing that reads. */
+[data-slot="switch"] {
+  transition:
+    background-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.14s var(--ease-out);
+}
+
+[data-slot="switch"]:active {
+  transform: scale(0.94);
+}
+
+/* — fields — */
+
+/* `transition-[color,box-shadow]` ships on the input, which leaves the border
+   colour — the half of the focus ring an operator actually watches — to snap.
+   Named properties rather than `all`: a field that animates its width fights
+   the settings filter, which shrinks the list under it as you type. */
+[data-slot="input"],
+[data-slot="textarea"],
+[data-slot="command-input"] {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.22s ease,
+    background-color 0.2s ease;
+}
+
+[data-slot="input"]:hover:not(:focus),
+[data-slot="textarea"]:hover:not(:focus) {
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+/* The browser's own button inside a file field — the one that says Choose
+   File next to the config and database restores. It is not ours to restyle
+   here beyond the hover it never had. */
+input[type="file"]::file-selector-button {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+input[type="file"]:hover::file-selector-button {
+  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+/* — pagination — */
+
+/* Built from `buttonVariants` but stamped `pagination-link`, so none of the
+   button rules above reach it. Same lift, same press. */
+[data-slot="pagination-link"] {
+  transition:
+    background-color 0.22s ease,
+    border-color 0.22s ease,
+    color 0.2s ease,
+    transform 0.18s var(--ease-out);
+}
+
+[data-slot="pagination-link"]:hover {
+  transform: translateY(-1px);
+}
+
+[data-slot="pagination-link"]:active {
+  transform: scale(0.96);
+}
+
+/* — the number steppers — */
+
+/* − and + are held down, not clicked once: an operator taking a poll interval
+   from 3 to 12 presses the same 28px box nine times. The glyph itself takes
+   the press, so the repeat reads as a count rather than one long dip. */
+[data-slot="number-stepper"] svg {
+  transition: transform 0.12s var(--ease-out);
+}
+
+[data-slot="number-stepper"]:active svg {
+  transform: scale(0.8);
+}
+
+/* — disclosures — */
+
+/* Every row that opens a panel under itself: a channel in the notification
+   list, a provider in the Settings service list, a group on the fleet map,
+   the advanced panel inside the service dialog. It used to be scoped to the
+   two panels the prototype drew, which left the Settings service rows — the
+   longest list of them on the page — with no hover at all. A trigger that is
+   a Button keeps the Button's own lift instead; this is for the bare ones. */
+[data-slot="collapsible-trigger"]:not([data-variant]) {
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+[data-slot="collapsible-trigger"]:not([data-variant]):hover {
+  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+/* — the delivery log's rows — */
+
+/* Each row opens the payload of that one notification underneath it, so it is
+   a disclosure like the rest, and it was the only list on the dashboard whose
+   rows answered nothing. On `translate` for the reason .history-row is: the
+   row carries `.anim-rise`, whose filled entry owns `transform` for good. */
+.delivery-row {
+  transition:
+    background-color 0.22s ease,
+    translate 0.22s var(--ease-out);
+}
+
+.delivery-row:hover {
+  background-color: color-mix(in srgb, var(--color-accent) 7%, transparent);
+  translate: 2px;
+}
+
+/* — the map's cells — */
+
+/* A marker on the fleet map is a button: it opens that cell's providers. The
+   tooltip answering was the only sign it had been found, which says the map
+   is alive but not which dot the pointer is actually on. `fill-box`, so the
+   dot grows around itself rather than around the whole 800px SVG. */
+[data-slot="tooltip-trigger"] circle[role="button"],
+circle[role="button"] {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.18s var(--ease-out);
+}
+
+circle[role="button"]:hover {
+  transform: scale(1.5);
+}
+
+/* — the settings hints — */
+
+/* Compact density used to unmount every hint: forty rows lost a line each in
+   one frame, and the page jumped out from under whatever was being read. The
+   hint stays mounted now and its row collapses instead — `0fr` resolves the
+   height no stylesheet could know, the way the accordion's `unfold` does.
+   `visibility` rides along so a folded hint is not a tab stop or a find-in-
+   page hit, and it is delayed by the collapse so it does not vanish before
+   the row has finished closing. */
+[data-slot="setting-row-description"] {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 0.26s var(--ease-out),
+    opacity 0.2s ease,
+    visibility 0s;
+}
+
+[data-slot="setting-row-description"] > * {
+  overflow: hidden;
+}
+
+[data-slot="setting-row-description"][data-collapsed="true"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.26s var(--ease-out),
+    opacity 0.16s ease,
+    visibility 0s linear 0.26s;
+}
+
+/* — the settings rail — */
+
+/* A second rail, anchors rather than buttons, so it earns the main rail's
+   gesture rather than a new one: the label steps in under the pointer. */
+/* The base padding is set here too, for the reason the main rail's is: the
+   nudge and the resting state have to be the same unit, or hovering moves the
+   label the wrong way by whatever the two scales differ by. */
+[data-slot="settings-nav-link"] {
+  padding-left: var(--space-4);
+  transition:
+    background-color 0.22s var(--ease-out),
+    color 0.22s ease,
+    padding-left 0.22s var(--ease-out);
+}
+
+[data-slot="settings-nav-link"]:hover {
+  padding-left: calc(var(--space-4) + 3px);
+}
+
+/* — the history rows — */
+
+/* Each row opens that provider's drawer, so it travels the way the service
+   row does — toward the panel it is about to pull open. On `translate` rather
+   than `transform` for the reason the table row is: the row carries
+   `.anim-rise`, whose `both` fill keeps that entry's last keyframe
+   (`transform: none`) applied for the life of the element, at a priority no
+   hover rule outranks. Written as `transform` the hover measured as identity
+   and the row never moved. */
+.history-row {
+  transition:
+    background-color 0.22s ease,
+    translate 0.22s var(--ease-out);
+}
+
+.history-row:hover {
+  translate: 3px;
+}
+
+/* — the provider drawer — */
+
+/* The sheet's own `transition ease-in-out` and `slide-in-from-right` are more
+   inert utilities: the drawer arrived fully open, a whole panel appearing in
+   one frame at the edge of the screen. It comes in from the side it lives on,
+   on the dialog's timing, since it is the same kind of arrival. */
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes drawer-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+[data-slot="sheet-overlay"][data-state="open"] {
+  animation: fade 0.28s ease both;
+}
+
+[data-slot="sheet-overlay"][data-state="closed"] {
+  animation: fade-out 0.22s ease both;
+  pointer-events: none;
+}
+
+[data-slot="sheet-content"][data-state="open"] {
+  animation: drawer-in 0.32s var(--ease-entry) both;
+}
+
+[data-slot="sheet-content"][data-state="closed"] {
+  animation: drawer-out 0.22s ease both;
+}
+
 /* Reduced motion keeps every state change, and none of the travel. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -759,5 +1263,43 @@
   [data-slot="sidebar-menu-button"]:hover,
   [data-slot="sidebar-menu-button"]:active {
     padding-left: var(--space-6);
+  }
+  /* The rest of the calls to action: the tint, the ring and the chevron's
+     turn all survive — they say what the control is doing — and only the
+     travel goes. */
+  [data-slot="button"][data-variant="outline"]:hover,
+  [data-slot="button"][data-variant="secondary"]:hover,
+  [data-slot="button"][data-variant="ghost"]:hover,
+  [data-slot="button"][data-variant="link"]:hover,
+  [data-slot="button"][data-variant="outline"]:active,
+  [data-slot="button"][data-variant="secondary"]:active,
+  [data-slot="button"][data-variant="ghost"]:active,
+  [data-slot="button"][data-variant="link"]:active,
+  [data-slot="select-trigger"]:hover,
+  [data-slot="select-trigger"]:active,
+  [data-slot="select-item"][data-highlighted],
+  [data-slot="dropdown-menu-item"][data-highlighted],
+  [data-slot="dropdown-menu-checkbox-item"][data-highlighted],
+  [data-slot="dropdown-menu-radio-item"][data-highlighted],
+  [data-slot="dropdown-menu-sub-trigger"][data-highlighted],
+  [data-slot="command-item"][aria-selected="true"],
+  [data-slot="toggle-group-item"]:active,
+  [data-slot="toggle"]:active,
+  [data-slot="switch"]:active,
+  [data-slot="pagination-link"]:hover,
+  [data-slot="pagination-link"]:active,
+  [data-slot="number-stepper"]:active svg {
+    transform: none;
+  }
+  .history-row:hover,
+  .delivery-row:hover {
+    translate: none;
+  }
+  circle[role="button"]:hover,
+  .theme-btn:active svg {
+    transform: none;
+  }
+  [data-slot="settings-nav-link"]:hover {
+    padding-left: var(--space-4);
   }
 }

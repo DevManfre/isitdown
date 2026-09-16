@@ -34,9 +34,10 @@ export function SettingsNav({ categories, active }: { categories: SettingsCatego
           <Link
             key={category.id}
             to={`/settings/${category.id}`}
+            data-slot="settings-nav-link"
             aria-current={category.id === active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors",
+              "flex items-center gap-2 rounded-md pr-2.5 py-1.5 text-sm text-muted-foreground",
               "hover:bg-accent hover:text-foreground",
               category.id === active && "bg-accent font-medium text-foreground shadow-[inset_2px_0_0_var(--primary)]",
             )}
