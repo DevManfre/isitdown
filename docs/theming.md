@@ -117,6 +117,20 @@ What is guaranteed, and checked:
   its own. It is mounted in the shell rather than in a view, so the keystroke
   answers everywhere, and it opens with its views and actions even when the
   status read has failed.
+- **Narrow screens.** Two thresholds, because the tablet range is not a small
+  desktop. **Below 768px** the rail is off the layout — the `Sidebar` primitive
+  hides it there — so the four views an operator moves between become a tab bar
+  fixed to the bottom of the screen; the page gutter drops from 32px to 16px;
+  every dialog anchors to the bottom edge as a sheet instead of the middle of
+  the screen; and menu items are 44px tall. **Below 1024px** — so on a tablet
+  too, where the rail is back but the page is not yet wide — the header keeps
+  only the title, the poll countdown and two icon buttons, with the search
+  field, the language pair, the theme toggle, Settings and the delivery log
+  behind **More**; the hero is one column rather than copy beside the uptime
+  arc; and the fleet rows, the history list and the delivery rows stay one card
+  or one stacked row each instead of the desktop's shared columns. Those columns
+  were what made a tablet drop text: five tracks in 464px left the headline
+  overlapping the arc and the header title truncated to nothing.
 - **Charts.** A run of coloured bars says nothing out loud, so the uptime bars,
   the component strip, the poll strip, the sparkline and the provider ring each
   carry a one-sentence summary ("Daily status over 90 days: 84 operational, 3

@@ -140,7 +140,9 @@ export function SettingsToasts({ toasts, onDismiss }: { toasts: SettingsToast[];
       data-slot="settings-toasts"
       aria-label={t("settings.toasts.aria")}
       aria-live="polite"
-      className="pointer-events-none fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col justify-end gap-0 p-4 sm:p-6"
+      // The bottom padding clears the mobile tab bar, which is fixed over the
+      // same corner: without it a toast reports a save from behind five tabs.
+      className="pointer-events-none fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col justify-end gap-0 p-4 pb-24 sm:p-6 md:pb-6"
     >
       {/* Newest last, so the stack grows towards the corner it is anchored to. */}
       <AnimatedList className="items-end">

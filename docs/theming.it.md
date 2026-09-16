@@ -130,6 +130,21 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   la 5.6 non gli darà una pagina sua. È montata nella shell e non in una vista,
   così la scorciatoia risponde ovunque, e si apre con le sue viste e le sue
   azioni anche quando la lettura dello stato è fallita.
+- **Schermi stretti.** Due soglie, perché la fascia tablet non è un desktop
+  piccolo. **Sotto i 768px** il rail esce dal layout — è la primitiva `Sidebar`
+  a nasconderlo lì — quindi le quattro viste tra cui un operatore si muove
+  diventano una barra di schede fissata in fondo allo schermo; il margine di
+  pagina scende da 32px a 16px; ogni dialog si ancora al bordo inferiore come
+  foglio invece che al centro dello schermo; le voci dei menu sono alte 44px.
+  **Sotto i 1024px** — quindi anche su tablet, dove il rail c'è di nuovo ma la
+  pagina non è ancora larga — l'header tiene solo titolo, countdown del poll e
+  due pulsanti a icona, mentre campo di ricerca, coppia delle lingue, tema,
+  Impostazioni e log invii stanno dietro **Altro**; l'hero è a una colonna
+  invece che testo accanto all'anello di uptime; le righe della flotta, la
+  lista della cronologia e le righe degli invii restano una carta o una riga
+  impilata invece delle colonne condivise del desktop. Erano quelle colonne a
+  far sparire il testo su tablet: cinque tracce in 464px lasciavano il titolo
+  dell'hero sovrapposto all'anello e il titolo dell'header troncato a zero.
 - **Grafici.** Una fila di barre colorate non dice nulla ad alta voce: le barre
   di uptime, la striscia dei componenti, quella dei poll, la sparkline e l'anello
   del provider portano ognuno un riassunto di una frase ("Stato giornaliero su 90

@@ -12,6 +12,10 @@
   "nav.channels": "Channels",
   "nav.sidebar-toggle": "Toggle the sidebar",
   "nav.sidebar-mobile": "Shows the sidebar on a narrow screen.",
+  "nav.more": "More",
+  "nav.more-description": "The views, the search and the appearance that do not fit the tab bar.",
+  "nav.language": "Language",
+  "nav.theme": "Theme",
 
   "palette.title": "Command palette",
   "palette.description": "Jump to a view or a provider, run a poll, or change the theme.",

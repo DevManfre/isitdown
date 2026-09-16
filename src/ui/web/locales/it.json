@@ -12,6 +12,10 @@
   "nav.channels": "Canali",
   "nav.sidebar-toggle": "Apri o chiudi la barra laterale",
   "nav.sidebar-mobile": "Mostra la barra laterale su schermo stretto.",
+  "nav.more": "Altro",
+  "nav.more-description": "Le viste, la ricerca e l'aspetto che non stanno nella barra delle schede.",
+  "nav.language": "Lingua",
+  "nav.theme": "Tema",
 
   "palette.title": "Palette dei comandi",
   "palette.description": "Vai a una vista o a un provider, lancia un poll, o cambia il tema.",

@@ -444,8 +444,12 @@ export function History() {
         <div
           role="region"
           aria-label={t("history.list")}
-          className="history-list grid grid-cols-[minmax(8rem,1fr)_minmax(6rem,2fr)_auto_auto_auto] items-center gap-x-4">
-          <div className="col-span-full grid grid-cols-subgrid items-center px-2 text-xs uppercase tracking-widest text-muted-foreground">
+          // Five shared tracks from `md` up; a plain column of cards below it,
+          // where five columns would each be 60px wide. The header labels the
+          // tracks, so it goes with them — each mobile card carries its own
+          // figures in a shape that reads without one.
+          className="history-list flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(8rem,1fr)_minmax(6rem,2fr)_auto_auto_auto] lg:items-center lg:gap-x-4">
+          <div className="col-span-full hidden grid-cols-subgrid items-center px-2 text-xs uppercase tracking-widest text-muted-foreground lg:grid">
             <span>{t("history.col-provider")}</span>
             <span>{t("history.col-trend")}</span>
             <span>{t("history.col-uptime", { days })}</span>
