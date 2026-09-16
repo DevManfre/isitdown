@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SECTION_REELS } from "./reels.ts";
+import { LOOP, SECTION_REELS } from "./reels.ts";
 import { fade, type ReelInk } from "./SettingsReel.tsx";
 
 /**
@@ -92,6 +92,16 @@ describe.each(names)("the %s reel", (name) => {
     expect(paint(name, 1.7).ops).not.toEqual(paint(name, 0).ops);
   });
 
+  // The band never stops, so a painter whose own period does not divide LOOP
+  // never actually repeats: it wanders, and the seam between one lap and the
+  // next lands somewhere new every time. `services` drifted three rows at
+  // 14/-10/8 px per second and no two of them ever came back together.
+  it("is back on the same frame one LOOP later", () => {
+    for (const t of [0, 0.4, 1.7, 5.3, 13.9]) {
+      expect(paint(name, t + LOOP).ops).toEqual(paint(name, t).ops);
+    }
+  });
+
   // Colours come from the tokens the component resolved, never from a literal:
   // a hardcoded violet would survive a theme switch and be wrong in the light
   // one. `test/ui/theme.test.ts` guards the CSS; this guards the canvas.
@@ -111,7 +121,48 @@ describe.each(names)("the %s reel", (name) => {
   });
 });
 
+describe("the services reel", () => {
+  /**
+   * Every mark that lands on the visible band, as `x:width`, in screen order.
+   *
+   * By position rather than by loop index, because the drift wraps by design:
+   * the index a mark is drawn under steps by one group at the wrap, and only
+   * what ends up on the band says whether anything moved.
+   */
+  const marksOnBand = (time: number): string[] =>
+    paint("services", time)
+      .ops.flatMap((op) => {
+        const match = /^roundRect\((-?[\d.]+),(-?[\d.]+),(-?[\d.]+),/.exec(op);
+        if (match === null) return [];
+        const [x, y, width] = [Number(match[1]), Number(match[2]), Number(match[3])];
+        // Whole pixels, and `+ 0` so the mark sitting on the origin reads the
+        // same whether it rounds to -0 or 0 either side of the wrap.
+        return x + width < 0 || x > 320 ? [] : [`${Math.round(y)}:${Math.round(x) + 0}:${Math.round(width)}`];
+      })
+      .sort();
+
+  // The drift wraps; the marks must not. Each row's pattern is three strides
+  // wide, so the old wrap on one stride slid every mark back 120px and swapped
+  // its width for its neighbour's — a visible jump once a lap, on a band whose
+  // whole job is to drift. Sampled either side of the wrap of the fastest row
+  // (three laps per LOOP, so at every multiple of LOOP / 3).
+  it("does not jump when a row's drift wraps", () => {
+    const before = marksOnBand(LOOP / 3 - 0.001);
+    const after = marksOnBand(LOOP / 3 + 0.001);
+    expect(before.length).toBeGreaterThan(6);
+    expect(after).toEqual(before);
+  });
+});
+
 describe("fade", () => {
+  // Canvas ignores an out-of-range percentage in `fillStyle` but throws on it in
+  // `addColorStop`, and that throw kills the frame loop that would have queued
+  // the next frame.
+  it("clamps an alpha outside 0-1 to a percentage a canvas will parse", () => {
+    expect(fade("red", -0.01)).toBe("color-mix(in srgb, red 0%, transparent)");
+    expect(fade("red", 1.4)).toBe("color-mix(in srgb, red 100%, transparent)");
+  });
+
   it("mixes a token towards transparent at the alpha asked for", () => {
     expect(fade("var(--primary)", 0.5)).toBe("color-mix(in srgb, var(--primary) 50%, transparent)");
   });
