@@ -489,7 +489,10 @@ function SettingsView() {
     <div className="flex w-full gap-10">
       {open !== undefined && <SettingsNav categories={categories} active={open} />}
 
-      <div className="flex min-w-0 max-w-5xl flex-1 flex-col gap-8">
+      {/* The rows read as prose, so they stay capped at a comfortable
+          measure; the launcher grid is tiles, not prose, and takes the
+          whole width it is given. */}
+      <div className={`flex min-w-0 flex-1 flex-col gap-8 ${open === undefined ? "" : "max-w-5xl"}`}>
       {/* The subtitle moved into the rail (SettingsNav), where it stays in view
           for the whole page rather than scrolling off above the first section.
           Below the `lg` breakpoint the rail is hidden, so it is said here
