@@ -221,6 +221,7 @@ npm run coverage         # le stesse due suite sotto una soglia minima di copert
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
 npm run test:visual      # baseline visive: ogni vista, entrambi i temi, entrambe le lingue
 npm run test:mutation    # mutation testing sul diff engine
+npm run test:load        # 200 provider sintetici, una settimana di storico, ogni lettura cronometrata
 npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
@@ -241,6 +242,46 @@ attuale, così il movimento ordinario passa e un sottosistema nuovo che arriva
 senza test propri trascina il totale sotto la soglia e fa fallire la CI. Alza una
 soglia quando la suite è davvero salita; non abbassarne mai una per far tornare
 verde una run rossa.
+
+Il **load test** (roadmap 7.4) risponde a una domanda che le altre suite non
+pongono: non "è veloce" ma "dove smette di esserlo". `tools/loadtest.mjs`
+sintetizza una flotta che nessuno ha — 200 provider e una settimana di campioni
+alla cadenza di default, circa 670 000 righe e ~100MB di SQLite — in una
+directory temporanea, poi cronometra ogni lettura che fa la dashboard e
+ricancella il database. Nulla parla con un provider, e i dati sono
+deterministici, così due esecuzioni sono confrontabili.
+
+```bash
+npm run test:load                                    # la flotta di default
+node tools/loadtest.mjs --providers=400 --days=30    # un soak, per trovare il ginocchio
+```
+
+Cosa ha trovato, su un portatile di sviluppo:
+
+| Flotta | `/status` | `/history?days=90` | `/incidents` | `/metrics` |
+|---|---|---|---|---|
+| 200 provider × 7 giorni (670k campioni) | 0,3s | 0,8s, 1,4MB | 23ms | 14ms |
+| 400 provider × 30 giorni (5,8M campioni) | **4,1s** | **7,8s**, 2,8MB | 61ms | 19ms |
+
+La forma è chiara. Tutto ciò che legge una riga e la restituisce resta nei
+millisecondi per quanto cresca la flotta — il pager degli incidenti, le
+metriche, il riepilogo del badge, Home Assistant — e i due endpoint che
+*aggregano sui campioni* sono quelli che cedono: `/status`, che deriva un uptime
+a 90 giorni per provider, e `/history`, il cui payload cresce anche con la
+flotta. Il ginocchio sta sotto i 400 provider con un mese di retention; a 200 e
+una settimana è tutto comodo.
+
+È la risposta a "dove servirebbe lavoro": non il poller, e non le scritture di
+SQLite, ma un rollup — bucket giornalieri salvati invece che aggregati a ogni
+richiesta — dietro a quelle due letture. Nulla in roadmap ne ha ancora bisogno,
+e questo script è il modo in cui il giorno in cui servirà si vedrà invece di
+arrivare come una segnalazione.
+
+Non è in CI, deliberatamente: scrive centinaia di migliaia di righe e richiede
+circa un minuto. I budget p95 nello script sono generosi per lo stesso motivo
+per cui la soglia di copertura è un pavimento — intercettano una regressione di
+un ordine di grandezza (un indice caduto, una query che ha iniziato a fare
+scansioni), non qualche punto percentuale di deriva.
 
 Il mutation testing (roadmap 7.3) pone la domanda che la copertura non può
 porre: una riga eseguita non è una riga a cui un test avrebbe obiettato.
@@ -372,6 +413,10 @@ push di tag non fa scattare la CI), si rifiuta di procedere se tag e
 `package.json` non concordano, costruisce entrambi i target per `linux/amd64` e
 `linux/arm64`, pubblica i quattro tag GHCR con SBOM e provenance, firma i due
 digest con `cosign` keyless e crea la release su GitHub.
+
+Lo stesso workflow costruisce l'edizione Light in un solo file (roadmap 6.7) con
+`npm run build:sea` e la allega alla release con accanto un `.sha256` — vedi
+[4.5](docker.md#45-nessuno-dei-due-ledizione-light-in-un-solo-file).
 
 Le note di rilascio si generano dal log con `tools/release-notes.mjs`, che sfrutta
 la convenzione dei commit: `<emoji> <TITOLO> - <descrizione>` è parsabile, quindi
