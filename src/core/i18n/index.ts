@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
+import { getAssetKeys, getRawAsset, isSea } from "node:sea";
 import { z } from "zod";
 
 /**
@@ -14,7 +15,32 @@ export const SOURCE_LOCALE = "en";
 
 const catalogDir = new URL(".", import.meta.url);
 
+/**
+ * The catalogs a single-binary build carries inside it (roadmap 6.7).
+ *
+ * A SEA has no `dist` beside it to read from, so the catalogs are embedded as
+ * assets named `i18n/<locale>.json` and enumerated the same way the directory
+ * is: whichever locales the build included are the locales it has, with no
+ * list of them written down twice.
+ */
+function loadSeaCatalogs(): Map<string, Record<string, string>> {
+  const catalogs = new Map<string, Record<string, string>>();
+  for (const key of getAssetKeys()) {
+    if (!key.startsWith("i18n/") || !key.endsWith(".json")) continue;
+    const raw: unknown = JSON.parse(new TextDecoder().decode(getRawAsset(key)));
+    catalogs.set(key.slice("i18n/".length, -".json".length), catalogSchema.parse(raw));
+  }
+  return catalogs;
+}
+
 function loadCatalogs(): Map<string, Record<string, string>> {
+  if (isSea()) {
+    const embedded = loadSeaCatalogs();
+    if (!embedded.has(SOURCE_LOCALE)) {
+      throw new Error(`missing embedded source catalog i18n/${SOURCE_LOCALE}.json`);
+    }
+    return embedded;
+  }
   const catalogs = new Map<string, Record<string, string>>();
   for (const file of readdirSync(catalogDir)) {
     if (!file.endsWith(".json")) continue;

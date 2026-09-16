@@ -34,6 +34,8 @@ npm run build:ui && node dist/ui/server.js          # UI edition, local
 docker compose --profile light up -d --build        # Light edition, container
 docker compose --profile ui up -d --build           # UI edition, container
 
+npm run build:sea && ./dist/sea/isitdown-light      # Light edition, one file, no Node install (roadmap 6.7)
+
 npm run dev:docker                                  # UI edition, container, rebuild-on-save
 npm run dev:ui                                      # UI edition, local, HMR on :5173
 ```

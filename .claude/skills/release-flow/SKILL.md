@@ -91,6 +91,17 @@ done
 
 Image tags are `light-v1.3.0` / `ui-v1.3.0` — with the `v`, unlike the bare version in `package.json`.
 
+The release also carries the single-file Light edition (roadmap 6.7), built by
+the same workflow and attached to the GitHub release:
+
+```bash
+gh release view vX.Y.Z --json assets --jq '.assets[].name'
+# expect isitdown-light-vX.Y.Z-linux-x64 and its .sha256
+```
+
+A release with images but no binary means `npm run build:sea` failed on the
+runner — read that step's log rather than re-tagging.
+
 ## Quick reference
 
 | Gate | Command | Green means |
@@ -103,6 +114,7 @@ Image tags are `light-v1.3.0` / `ui-v1.3.0` — with the `v`, unlike the bare ve
 
 ## Common mistakes
 
+- Reporting a release as published without checking the binary asset as well as the two image tags.
 - Tagging before `main`'s CI is green — the tag is public the moment it is pushed.
 - Running `npm version` — see step 2.
 - `git merge dev` on `main` — the guard hook aborts it; use `git mergeclean dev`.

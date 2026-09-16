@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json && vite build && node tools/copy-assets.mjs",
     "build:light": "tsc -p tsconfig.light.json && node tools/copy-assets.mjs",
     "build:ui": "tsc -p tsconfig.json && vite build && node tools/copy-assets.mjs",
+    "build:sea": "node tools/build-sea.mjs",
     "check:config": "node src/light/check.ts",
     "check:bundle": "node tools/bundle-budget.mjs",
     "check:readme": "node tools/readme-parity.mjs",
