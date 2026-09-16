@@ -46,6 +46,31 @@ const teams: ChannelConfig = {
   settings: { webhookUrl: "https://example.logic.azure.com/workflows/a/triggers/manual/paths/invoke" },
 };
 
+const matrix: ChannelConfig = {
+  id: "matrix",
+  enabled: true,
+  settings: {
+    homeserverUrl: "https://matrix.example.org",
+    roomId: "!room:example.org",
+    accessToken: "syt_token",
+  },
+};
+const pagerduty: ChannelConfig = {
+  id: "pagerduty",
+  enabled: true,
+  settings: { routingKey: "R0UT1NGKEY" },
+};
+const opsgenie: ChannelConfig = {
+  id: "opsgenie",
+  enabled: true,
+  settings: { apiKey: "genie-key" },
+};
+const apprise: ChannelConfig = {
+  id: "apprise",
+  enabled: true,
+  settings: { serverUrl: "http://apprise:8000", configKey: "isitdown" },
+};
+
 test("only enabled channels are built", () => {
   const built = buildNotifiers([telegram, { ...webhook, enabled: false }]);
   assert.deepEqual(
@@ -56,10 +81,34 @@ test("only enabled channels are built", () => {
 
 test("every built-in channel can be built together", () => {
   assert.deepEqual(
-    buildNotifiers([telegram, webhook, discord, slack, ntfy, gotify, pushover, teams]).map(
-      (notifier) => notifier.id,
-    ),
-    ["telegram", "webhook", "discord", "slack", "ntfy", "gotify", "pushover", "teams"],
+    buildNotifiers([
+      telegram,
+      webhook,
+      discord,
+      slack,
+      ntfy,
+      gotify,
+      pushover,
+      teams,
+      matrix,
+      pagerduty,
+      opsgenie,
+      apprise,
+    ]).map((notifier) => notifier.id),
+    [
+      "telegram",
+      "webhook",
+      "discord",
+      "slack",
+      "ntfy",
+      "gotify",
+      "pushover",
+      "teams",
+      "matrix",
+      "pagerduty",
+      "opsgenie",
+      "apprise",
+    ],
   );
 });
 

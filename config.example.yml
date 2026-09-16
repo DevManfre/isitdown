@@ -13,6 +13,12 @@ failureThreshold: 5         # consecutive failures before a "monitoring degraded
 adaptivePolling: true       # while a provider has an open incident, poll it on the cadence below
 adaptiveIntervalMinutes: 1  # that cadence; never slower than the provider's own interval
 confirmSamples: 1           # consecutive polls that must agree before a change notifies (1 = off)
+# Correlated-outage detection (roadmap 2.7): when this many providers go bad
+# inside the window below, one "this looks like a shared failure" alert replaces
+# the individual ones. 0 and 1 are off, which is the default — it is the only
+# setting here that replaces alerts rather than adding them.
+correlationThreshold: 0
+correlationWindowMinutes: 10
 locale: en                  # language for notification messages: en | it (falls back to en)
 
 services:
@@ -71,6 +77,21 @@ services:
   #     operational: "all systems operational"
   #     major_outage: "outage, down"
 
+  # A probe of the service itself rather than of a page about it. Here it is
+  # also the second opinion on GitHub's own status page: when this probe cannot
+  # reach the API and githubstatus.com still reports operational with no
+  # incident open, the disagreement is itself an alert — the silent-outage
+  # cross-check.
+  #
+  # - name: GitHub API
+  #   id: github-api
+  #   adapter: http
+  #   baseUrl: https://api.github.com
+  #   crossChecks: github
+  #   options:
+  #     path: /meta
+  #     expectStatus: "200-299"
+
 notifications:
   telegram:
     enabled: true
@@ -111,6 +132,37 @@ notifications:
     userKey: "${PUSHOVER_USER_KEY}"
     # Optional: one registered device; empty delivers to every device
     device: "${PUSHOVER_DEVICE}"
+  matrix:
+    enabled: false
+    # The homeserver's root, not a room path
+    homeserverUrl: "${MATRIX_HOMESERVER_URL}"
+    # The internal room id, not an alias: !abc:example.org
+    roomId: "${MATRIX_ROOM_ID}"
+    # An access token for the user that posts
+    accessToken: "${MATRIX_ACCESS_TOKEN}"
+  pagerduty:
+    enabled: false
+    # The integration key of an Events API v2 integration on a service. An
+    # incident that resolves closes the alert it opened, keyed on the change.
+    routingKey: "${PAGERDUTY_ROUTING_KEY}"
+    # Optional: "eu" for an account in PagerDuty's EU service region
+    region: "${PAGERDUTY_REGION}"
+  opsgenie:
+    enabled: false
+    # An API key from an Opsgenie API integration
+    apiKey: "${OPSGENIE_API_KEY}"
+    # Optional: "eu" for an account on Opsgenie's EU instance
+    region: "${OPSGENIE_REGION}"
+  apprise:
+    enabled: false
+    # An Apprise API server, which reaches the ~80 services Apprise knows
+    serverUrl: "${APPRISE_SERVER_URL}"
+    # Either the key of a configuration the server stores (preferred — the
+    # service URLs behind it are credentials) ...
+    configKey: "${APPRISE_CONFIG_KEY}"
+    # ... or the Apprise URLs themselves, comma-separated, for a stateless
+    # server. One of the two is required.
+    urls: "${APPRISE_URLS}"
   teams:
     enabled: false
     # A Teams channel webhook: Workflows → "Post to a channel when a webhook
