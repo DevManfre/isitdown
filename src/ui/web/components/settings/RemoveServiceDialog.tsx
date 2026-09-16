@@ -2,8 +2,15 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog.tsx";
+import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useServiceImpact, useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls } from "@/hooks/useBusy.tsx";
 import type { ServiceDefinition, ServiceImpact } from "@/lib/types.ts";
@@ -42,13 +49,12 @@ export function RemoveServiceDialog({ service, trigger }: { service: ServiceDefi
   const { setDialogOpen } = useBusyControls();
   const [open, setOpen] = useState(false);
   const remove = useServiceMutations().remove;
+  const toast = useSettingsToastReport();
   const impact = useServiceImpact(service.id, open);
   const rows =
     impact.data === undefined
       ? []
-      : IMPACT_ROWS.map((row) => ({ key: row.key, count: row.of(impact.data) })).filter(
-          (row) => row.count > 0,
-        );
+      : IMPACT_ROWS.map((row) => ({ key: row.key, count: row.of(impact.data) })).filter((row) => row.count > 0);
 
   // Same defect class as ServiceDialog's close paths: `onOpenChange` only
   // fires from Radix's own wrapped setter (Escape, outside-click), never
@@ -120,7 +126,17 @@ export function RemoveServiceDialog({ service, trigger }: { service: ServiceDefi
             variant="destructive"
             disabled={remove.isPending}
             onClick={() => {
-              remove.mutate(service.id, { onSuccess: close });
+              remove.mutate(service.id, {
+                onSuccess: () => {
+                  close();
+                  toast("services", { text: t("toast.service.removed", { name: service.name }), tone: "ok" });
+                },
+                onError: (error) =>
+                  toast("services", {
+                    text: t("toast.failed", { error: error instanceof Error ? error.message : String(error) }),
+                    tone: "error",
+                  }),
+              });
             }}
           >
             {t("action.remove")}

@@ -23,6 +23,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useChannelMutations, usePushDevices, usePushMutations } from "@/hooks/queries.ts";
 import { useFieldProps } from "@/hooks/useBusy.tsx";
 import { getPushKey } from "@/lib/api.ts";
@@ -44,16 +45,15 @@ const PUSH_FAILURE_KEYS: Record<string, string> = {
  * deliver anything until a browser has subscribed.
  */
 function PushDevices({
-  channelEnabled, testAction, testMessage,
+  channelEnabled, testAction,
 }: {
   channelEnabled: boolean;
   testAction: ReactNode;
-  testMessage: ReactNode;
 }) {
   const { t } = useTranslation();
   const devices = usePushDevices();
   const { add, remove } = usePushMutations();
-  const [message, setMessage] = useState<string | undefined>(undefined);
+  const toast = useSettingsToastReport();
   const supported = pushSupported();
 
   const enable = async (): Promise<void> => {
@@ -64,22 +64,23 @@ function PushDevices({
         // the channel is off is the likeliest first run (set the two env
         // vars, click this button, never touch the switch), and it must not
         // promise delivery that will not happen.
-        onSuccess: () => setMessage(channelEnabled ? t("push.enabled") : t("push.registered-channel-off")),
+        onSuccess: () =>
+          toast("notifications", {
+            text: channelEnabled ? t("push.enabled") : t("push.registered-channel-off"),
+            tone: "ok",
+          }),
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       const key = PUSH_FAILURE_KEYS[reason];
-      setMessage(key !== undefined ? t(key) : t("push.failed", { error: reason }));
+      toast("notifications", { text: key !== undefined ? t(key) : t("push.failed", { error: reason }), tone: "error" });
     }
   };
 
   if (!supported) {
     return (
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          {testAction}
-          {testMessage}
-        </div>
+        <div className="flex items-center gap-2">{testAction}</div>
         <p className="text-xs text-muted-foreground">{t("push.unsupported")}</p>
       </div>
     );
@@ -99,9 +100,7 @@ function PushDevices({
             {t("push.enable")}
           </Button>
           {testAction}
-          {testMessage}
         </div>
-        {message !== undefined && <p className="text-xs leading-relaxed text-muted-foreground">{message}</p>}
       </div>
 
       {/* The heading was a muted line of the same size as the device rows it
@@ -205,6 +204,7 @@ export function ChannelRow({
   const { t } = useTranslation();
   const fieldProps = useFieldProps();
   const { patch, saveSecrets, clearSecret, test } = useChannelMutations();
+  const toast = useSettingsToastReport();
   // Only what is being *changed* lives here: each field renders empty with the
   // stored variable name as its placeholder, so the hint can never be mistaken
   // for something the operator typed.
@@ -216,7 +216,6 @@ export function ChannelRow({
   // Which environment variable carries which credential is a detail an operator
   // rarely touches, so it is asked for rather than shown.
   const [showEnvVars, setShowEnvVars] = useState(false);
-  const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
   const fieldless = channel.fields.length === 0;
   const Icon = CHANNEL_ICONS[channel.id] ?? Bell;
   const nameKey = CHANNEL_NAME_KEYS[channel.id];
@@ -224,7 +223,7 @@ export function ChannelRow({
   const configured = isConfigured(channel);
 
   const failed = (error: unknown): void =>
-    setMessage({
+    toast("notifications", {
       text: t("channel.secret-failed", { error: error instanceof Error ? error.message : String(error) }),
       tone: "error",
     });
@@ -242,7 +241,6 @@ export function ChannelRow({
     );
     // An untouched row is not an instruction to blank every reference.
     if (Object.keys(fields).length === 0 && Object.keys(secrets).length === 0) return;
-    setMessage(undefined);
 
     // A credential is written to whichever variable the channel names *now*, so
     // a click that renames the reference and fills it in one go has to land the
@@ -254,7 +252,7 @@ export function ChannelRow({
         {
           onSuccess: () => {
             setSecretValues({});
-            setMessage({ text: t("channel.secret-saved"), tone: "info" });
+            toast("notifications", { text: t("channel.secret-saved"), tone: "ok" });
           },
           onError: failed,
         },
@@ -279,9 +277,10 @@ export function ChannelRow({
 
   const sendTest = async (): Promise<void> => {
     const result = await test.mutateAsync(channel.id);
-    setMessage(
+    toast(
+      "notifications",
       result.ok
-        ? { text: t("channel.test-ok"), tone: "info" }
+        ? { text: t("channel.test-ok"), tone: "ok" }
         : { text: t("channel.test-failed", { error: result.error }), tone: "error" },
     );
   };
@@ -294,12 +293,6 @@ export function ChannelRow({
       {t("action.send-test")}
     </Button>
   );
-  const testMessage =
-    message === undefined ? null : (
-      <span className={message.tone === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
-        {message.text}
-      </span>
-    );
 
   return (
     <Collapsible open={open} onOpenChange={onOpenChange} className="panel-channel">
@@ -339,7 +332,19 @@ export function ChannelRow({
         <Switch
           aria-label={`${name} — ${t(channel.enabled ? "channel.enabled" : "channel.disabled")}`}
           checked={channel.enabled}
-          onCheckedChange={(next) => patch.mutate({ id: channel.id, patch: { enabled: next } })}
+          onCheckedChange={(next) =>
+            patch.mutate(
+              { id: channel.id, patch: { enabled: next } },
+              {
+                onSuccess: () =>
+                  toast("notifications", {
+                    text: t(next ? "toast.channel.enabled" : "toast.channel.disabled", { name }),
+                    tone: "ok",
+                  }),
+                onError: failed,
+              },
+            )
+          }
         />
       </div>
 
@@ -395,7 +400,7 @@ export function ChannelRow({
                       clearSecret.mutate(
                         { id: channel.id, field: field.name },
                         {
-                          onSuccess: () => setMessage({ text: t("channel.secret-cleared"), tone: "info" }),
+                          onSuccess: () => toast("notifications", { text: t("channel.secret-cleared"), tone: "ok" }),
                           onError: failed,
                         },
                       )
@@ -443,12 +448,11 @@ export function ChannelRow({
             >
               {t("channel.env-var-toggle")}
             </Button>
-            {testMessage}
           </div>
         )}
 
         {channel.id === "webpush" && (
-          <PushDevices channelEnabled={channel.enabled} testAction={testButton} testMessage={testMessage} />
+          <PushDevices channelEnabled={channel.enabled} testAction={testButton} />
         )}
 
         </div>

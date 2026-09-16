@@ -15,6 +15,7 @@ import {
 } from "@/components/service-dialog/AdapterOptions.tsx";
 import { DEFAULT_ADAPTER, SourceStep, type ServiceSource } from "@/components/service-dialog/SourceStep.tsx";
 import { ServiceIdentity } from "@/components/service-dialog/ServiceIdentity.tsx";
+import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useCatalog, useConfig, useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { detectAdapter, previewComponents } from "@/lib/api.ts";
@@ -82,6 +83,7 @@ export function ServiceDialog({
   const { setDialogOpen, setEditing } = useBusyControls();
   const fieldProps = useFieldProps();
   const { add, patch, test } = useServiceMutations();
+  const toast = useSettingsToastReport();
 
   const [open, setOpen] = useState(false);
   // Which half of an add is on screen, and which way it last travelled — the
@@ -364,6 +366,7 @@ export function ServiceDialog({
           setSaving(false);
           return;
         }
+        toast("services", { text: t("toast.service.added", { name }), tone: "ok" });
       } else if (service !== undefined) {
         await patch.mutateAsync({
           id: service.id,
@@ -378,6 +381,7 @@ export function ServiceDialog({
             ...savedOptions(),
           },
         });
+        toast("services", { text: t("toast.service.saved", { name }), tone: "ok" });
       }
       close();
     } catch (error) {
