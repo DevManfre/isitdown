@@ -164,6 +164,13 @@ node tools/visual-regression.mjs --only=settings --update   # agree that view
 - **Look at every frame you agree**, with the Read tool on the PNG — not at
   the cell count. The count says something moved, never whether it should
   have.
+- **A chart view's frame can differ between an `--only` update and a check
+  run.** `--only=<view> --update` renders that view alone, in a fresh browser;
+  a check run reaches it after the others. For History that is worth ~30 cells
+  in the trend chart's axis labels, so agreeing it with `--only` leaves the
+  check failing forever. When that happens, agree the frame the check run
+  produced instead: `cp test/visual/current/<frame>.png test/visual/baseline/`
+  — after looking at it, like any other baseline.
 - **Never `--update` with no `--only`.** It rewrites all 24 frames, including
   views you never touched, and a single bad capture then *is* the baseline —
   which has happened: a half-rendered Overview, missing a provider tile and an
