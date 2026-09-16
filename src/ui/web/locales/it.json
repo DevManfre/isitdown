@@ -295,7 +295,6 @@
   "routing.note": "La prima regola che corrisponde a un cambiamento decide quali canali ne vengono informati — le regole sottostanti non vengono consultate. Metti quelle specifiche in alto.",
   "routing.empty": "Nessuna regola — ogni cambiamento viene inviato a ogni canale attivo, come prima che l'instradamento esistesse.",
   "routing.add": "Aggiungi regola",
-  "routing.column.order": "#",
   "routing.column.provider": "Provider",
   "routing.column.classes": "Eventi",
   "routing.column.severity": "Da gravità",

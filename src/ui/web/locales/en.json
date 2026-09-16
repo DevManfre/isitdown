@@ -295,7 +295,6 @@
   "routing.note": "The first rule that matches a change decides which channels hear about it — rules below it are not consulted. Put the specific ones on top.",
   "routing.empty": "No rules — every change goes to every enabled channel, as before routing existed.",
   "routing.add": "Add rule",
-  "routing.column.order": "#",
   "routing.column.provider": "Provider",
   "routing.column.classes": "Events",
   "routing.column.severity": "From severity",

@@ -38,18 +38,18 @@ describe("RoutingRules", () => {
       />,
     );
 
-    const rows = screen.getAllByRole("row").slice(1);
-    expect(within(rows[0]!).getByText("1")).toBeInTheDocument();
-    expect(within(rows[1]!).getByText("2")).toBeInTheDocument();
+    const cards = screen.getAllByTestId("routing-rule");
+    expect(within(cards[0]!).getByText("1")).toBeInTheDocument();
+    expect(within(cards[1]!).getByText("2")).toBeInTheDocument();
   });
 
-  // Pins the layout fix: on a narrow viewport the row (five columns, a
-  // four-item toggle-group, a channel multi-select, three action buttons) is
-  // wider than the tile can be, so the table must sit in its own horizontally
-  // scrolling container rather than relying on the tile's width. jsdom can't
-  // measure layout, so this only checks the container exists and actually
-  // contains the table — not pixel widths.
-  it("wraps the rule table in its own horizontally scrolling container", () => {
+  // Pins the layout fix: a rule needs five controls (provider, four event
+  // toggles, a severity floor, a channel multi-select and three actions),
+  // which as table columns were wider than the dialog and parked the channels
+  // column off-screen behind a horizontal scrollbar. One card per rule wraps
+  // instead, so nothing may reintroduce a table here. jsdom can't measure
+  // layout, so this checks the structure, not pixel widths.
+  it("lays every rule out as its own card rather than a row of a wide table", () => {
     mount(
       <RoutingRules
         routing={{
@@ -61,9 +61,8 @@ describe("RoutingRules", () => {
       />,
     );
 
-    const scrollContainer = screen.getByTestId("routing-table-scroll");
-    expect(scrollContainer.className).toMatch(/overflow-x-auto/);
-    expect(within(scrollContainer).getByRole("table")).toBeInTheDocument();
+    expect(screen.getAllByTestId("routing-rule")).toHaveLength(1);
+    expect(screen.queryByRole("table")).toBeNull();
   });
 
   it("marks a rule that can never be evaluated", () => {
@@ -86,11 +85,11 @@ describe("RoutingRules", () => {
       />,
     );
 
-    // Scoped to the table: the dry run below it can independently report its
-    // own trace rule as "never evaluated", which is a different question
-    // (shadowing is "can this rule EVER fire", the dry run is "did it fire
-    // for this one event") that happens to share wording by design.
-    expect(within(screen.getByRole("table")).getByText(/never evaluated/i)).toBeInTheDocument();
+    // Scoped to the shadowed card: the dry run below it can independently
+    // report its own trace rule as "never evaluated", which is a different
+    // question (shadowing is "can this rule EVER fire", the dry run is "did it
+    // fire for this one event") that happens to share wording by design.
+    expect(within(screen.getAllByTestId("routing-rule")[1]!).getByText(/never evaluated/i)).toBeInTheDocument();
   });
 
   it("warns that a rule with no event classes can never fire, even in first position", () => {
@@ -108,7 +107,7 @@ describe("RoutingRules", () => {
       />,
     );
 
-    expect(within(screen.getByRole("table")).getByText(/can never fire/i)).toBeInTheDocument();
+    expect(within(screen.getAllByTestId("routing-rule")[0]!).getByText(/can never fire/i)).toBeInTheDocument();
   });
 
   it("does not blame a rule above for shadowing a rule with no event classes", () => {
@@ -126,9 +125,9 @@ describe("RoutingRules", () => {
       />,
     );
 
-    const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
-    expect(within(rows[1]!).queryByText(/never evaluated/i)).not.toBeInTheDocument();
-    expect(within(rows[1]!).getByText(/can never fire/i)).toBeInTheDocument();
+    const cards = screen.getAllByTestId("routing-rule");
+    expect(within(cards[1]!).queryByText(/never evaluated/i)).not.toBeInTheDocument();
+    expect(within(cards[1]!).getByText(/can never fire/i)).toBeInTheDocument();
   });
 
   it("saves the whole list when a rule moves up", async () => {
@@ -210,9 +209,9 @@ describe("RoutingRules", () => {
         services={services}
       />,
     );
-    // Scoped to the table for the same reason as above: the dry run's own
+    // Scoped to the card for the same reason as above: the dry run's own
     // verdict can independently say "Muted by rule …" for the same rule set.
-    expect(within(screen.getByRole("table")).getByText(/muted/i)).toBeInTheDocument();
+    expect(within(screen.getAllByTestId("routing-rule")[0]!).getByText(/muted/i)).toBeInTheDocument();
   });
 
   describe("dry run", () => {
