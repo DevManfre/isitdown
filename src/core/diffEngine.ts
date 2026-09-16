@@ -1,5 +1,10 @@
 import { activeWindows } from "./maintenance.ts";
-import type { DampingState, NormalizedStatus, StatusChange } from "./types.ts";
+import type {
+  DampingState,
+  NormalizedStatus,
+  OverallStatus,
+  StatusChange,
+} from "./types.ts";
 
 export interface DiffInputs {
   /**
@@ -241,4 +246,174 @@ export function confirmedChanges(next: NormalizedStatus, inputs: ConfirmInputs):
   // Held: the baseline stays where it is, so the next poll asks the same
   // question again rather than treating this reading as the new normal.
   return { changes: [], baseline: inputs.baseline, pending: { signature, count } };
+}
+
+/** A provider going worse, remembered long enough to be compared with others. */
+export interface WorseningReading {
+  providerId: string;
+  /** ISO 8601, UTC. When the reading that went bad was taken. */
+  at: string;
+  status: OverallStatus;
+}
+
+export interface CorrelationInputs {
+  /** Every worsening seen recently, in any order; older ones are ignored here. */
+  recent: WorseningReading[];
+  /** How wide the window is. */
+  windowMinutes: number;
+  /** How many distinct providers have to be in it. 0 or 1 turns this off. */
+  threshold: number;
+  /** ISO 8601, UTC. The end of the window — the cycle that just finished. */
+  at: string;
+}
+
+/**
+ * Whether a cycle's worsenings are better explained by one shared upstream than
+ * by each provider having its own bad day (roadmap 2.7).
+ *
+ * Three providers going bad inside ten minutes is what a Cloudflare or an AWS
+ * day looks like from here, and three separate alerts is the least useful way
+ * to be told about it. This produces one change instead, and the poller drops
+ * the member alerts that fired in the same cycle.
+ *
+ * It lives in the diff engine, beside `diff` itself and just as pure, because
+ * it decides that something is news — and a notification produced anywhere else
+ * is how the two paths start disagreeing about what an operator was told.
+ *
+ * Deliberately narrow. A worsening is a *reading that got worse*, so a provider
+ * that was already down and stays down is not evidence of anything new; and
+ * `unknown` is excluded for the same reason the diff engine refuses to compare
+ * it — a page we could not read is not a page that reported trouble.
+ *
+ * The change names the worst-hit provider so routing, the delivery log and the
+ * dashboard have a real subject, and carries the whole set in `correlated`.
+ */
+export function correlatedOutage(inputs: CorrelationInputs): StatusChange | null {
+  if (!Number.isInteger(inputs.threshold) || inputs.threshold < 2) return null;
+  const end = Date.parse(inputs.at);
+  if (Number.isNaN(end)) return null;
+  const opens = end - inputs.windowMinutes * 60_000;
+
+  // One entry per provider, the worst reading it reached inside the window: a
+  // provider that degraded and then went down twice is one provider, not three.
+  const worst = new Map<string, WorseningReading>();
+  for (const reading of inputs.recent) {
+    const taken = Date.parse(reading.at);
+    if (Number.isNaN(taken) || taken < opens || taken > end) continue;
+    if (reading.status === "unknown" || reading.status === "operational") continue;
+    const seen = worst.get(reading.providerId);
+    if (seen === undefined || rank(reading.status) > rank(seen.status)) {
+      worst.set(reading.providerId, reading);
+    }
+  }
+  if (worst.size < inputs.threshold) return null;
+
+  const members = [...worst.values()].sort(
+    (a, b) => rank(b.status) - rank(a.status) || Date.parse(a.at) - Date.parse(b.at),
+  );
+  const [lead] = members;
+  if (lead === undefined) return null;
+
+  return {
+    kind: "correlated_outage",
+    providerId: lead.providerId,
+    currentStatus: lead.status,
+    correlated: {
+      providerIds: members.map((member) => member.providerId),
+      windowMinutes: inputs.windowMinutes,
+    },
+    at: inputs.at,
+  };
+}
+
+/** Severity order, for picking the worst member. `unknown` never gets here. */
+function rank(status: OverallStatus): number {
+  switch (status) {
+    case "major_outage":
+      return 3;
+    case "partial_outage":
+      return 2;
+    case "degraded":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * The worsenings in a cycle's changes, for the window `correlatedOutage` reads.
+ *
+ * A transition into something worse than it was, whatever kind carried it: a
+ * provider's overall status, one of its components, or an incident opening on a
+ * page that was calm. An incident *update* is not a worsening — the provider is
+ * restating a situation the operator has already been alerted about.
+ */
+export function worseningsIn(changes: StatusChange[]): WorseningReading[] {
+  const readings: WorseningReading[] = [];
+  for (const change of changes) {
+    if (change.kind === "correlated_outage" || change.kind === "monitoring_degraded") continue;
+    // A page that is lying is not a page that reported trouble: counting it
+    // here would let one probe's failure pull an unrelated provider into a
+    // shared-failure window.
+    if (change.kind === "silent_outage") continue;
+    if (change.kind === "incident_updated" || change.kind === "incident_resolved") continue;
+    if (change.kind === "maintenance_started" || change.kind === "maintenance_ended") continue;
+    const current = change.currentStatus;
+    if (current === "unknown" || current === "operational") continue;
+    const previous = change.previousStatus;
+    if (previous !== undefined && rank(current) <= rank(previous)) continue;
+    readings.push({ providerId: change.providerId, at: change.at, status: current });
+  }
+  return readings;
+}
+
+export interface CrossCheckInputs {
+  /** The probe's own reading, taken this cycle. */
+  probe: {
+    id: string;
+    status: OverallStatus;
+    /** What the probe said about why, when it said anything. */
+    note?: string | undefined;
+  };
+  /**
+   * What the provider's own page last reported. Null when we have never read
+   * it — which is not evidence of dishonesty, only of not knowing.
+   */
+  page: { id: string; status: OverallStatus; openIncidents: number } | null;
+  /** ISO 8601, UTC. */
+  at: string;
+}
+
+/**
+ * Whether a provider's status page is claiming everything is fine while our own
+ * probe of the same service cannot reach it — the silent-outage cross-check
+ * (roadmap 1.10).
+ *
+ * This is the one thing IsItDown reports that is not in anybody's status page:
+ * it monitors the page's *honesty*. A provider that is down and says so is
+ * already a `status_change`; a provider that is down and says nothing is the
+ * case an operator finds out about from their own users, and a probe pointed at
+ * the same service is the evidence that turns it into an alert.
+ *
+ * Deliberately narrow, because the failure mode is a false accusation. The
+ * probe has to have taken a reading (`unknown` is not one) and that reading has
+ * to be worse than operational; the page has to say operational *and* carry no
+ * open incident, so a provider that is halfway through admitting it is never
+ * called a liar. One vantage point is still one vantage point — the poller's
+ * own "this looks like our network" check runs first, on the same cycle.
+ */
+export function silentOutage(inputs: CrossCheckInputs): StatusChange | null {
+  const { probe, page } = inputs;
+  if (page === null) return null;
+  if (probe.status === "unknown" || probe.status === "operational") return null;
+  if (page.status !== "operational" || page.openIncidents > 0) return null;
+
+  return {
+    kind: "silent_outage",
+    providerId: page.id,
+    previousStatus: page.status,
+    currentStatus: probe.status,
+    crossCheck: { probeId: probe.id, ...(probe.note === undefined ? {} : { note: probe.note }) },
+    at: inputs.at,
+  };
 }

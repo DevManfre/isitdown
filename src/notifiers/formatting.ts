@@ -59,6 +59,8 @@ const TEMPLATE: Record<StatusChangeKind, string> = {
   maintenance_started: "notification.maintenance.started",
   maintenance_ended: "notification.maintenance.ended",
   monitoring_degraded: "notification.monitoring.degraded",
+  correlated_outage: "notification.correlated.outage",
+  silent_outage: "notification.silent.outage",
 };
 
 export function emojiFor(status: OverallStatus): string {
@@ -204,6 +206,16 @@ function summarise(payload: NotificationPayload): string {
       return t(locale, "notification.digest.maintenance-ended", { title: change.maintenance?.name ?? "" });
     case "monitoring_degraded":
       return t(locale, "notification.digest.monitoring", { count: change.failureCount ?? 0 });
+    case "silent_outage":
+      return t(locale, "notification.digest.silent", {
+        probe: change.crossCheck?.probeId ?? "",
+        current,
+      });
+    case "correlated_outage":
+      return t(locale, "notification.digest.correlated", {
+        count: change.correlated?.providerIds.length ?? 0,
+        providers: (change.correlated?.providerIds ?? []).join(", "),
+      });
   }
 }
 
@@ -242,7 +254,14 @@ function render(payload: NotificationPayload, options: { omitUrl: boolean }): st
     current: statusLabel(change.currentStatus, locale),
     title: change.incident?.name ?? change.maintenance?.name ?? "",
     status: incidentStatusLabel(change.incident?.status ?? "", locale),
-    count: change.failureCount ?? change.openIncidents ?? 0,
+    count: change.failureCount ?? change.openIncidents ?? change.correlated?.providerIds.length ?? 0,
+    // Provider ids rather than names: only the change's own provider has a
+    // name here, and a list that mixed one display name with N slugs would
+    // read as two different things.
+    providers: (change.correlated?.providerIds ?? []).join(", "),
+    minutes: change.correlated?.windowMinutes ?? 0,
+    probe: change.crossCheck?.probeId ?? "",
+    note: change.crossCheck?.note ?? "",
     endsAt:
       change.maintenance?.endsAt === null || change.maintenance?.endsAt === undefined
         ? t(locale, "maintenance.no-end")

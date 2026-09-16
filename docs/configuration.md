@@ -16,6 +16,8 @@ failureThreshold: 5         # consecutive failures before a "monitoring degraded
 adaptivePolling: true       # while a provider has an open incident, poll it on the cadence below
 adaptiveIntervalMinutes: 1  # that cadence; never slower than the provider's own interval
 confirmSamples: 1           # consecutive polls that must agree before a change notifies
+correlationThreshold: 0     # providers that must go bad together before one shared-failure alert replaces them; 0 is off
+correlationWindowMinutes: 10 # how wide "together" is
 locale: en                  # language for notification messages: en | it
 
 services:
@@ -60,11 +62,14 @@ notifications:
 | `adaptivePolling` | `true` | While a provider has an open incident — or any status worse than operational — poll it on `adaptiveIntervalMinutes` instead of its own cadence. `false` leaves every provider on the cadence it was configured with. |
 | `adaptiveIntervalMinutes` | `1` | 1–1440. Taken as a *minimum* against the provider's own interval, so it can only ever watch a provider more closely. A provider that has never answered stays on its configured cadence: `unknown` is not an incident. |
 | `confirmSamples` | `1` | 1–10. Flap damping: how many consecutive polls must agree on a reading before the change is announced. `1` notifies immediately; `2` ignores a page that disagrees with itself for one cycle, at the cost of one poll of delay. |
+| `correlationThreshold` | `0` | 0–100. Correlated-outage detection (roadmap 2.7): how many providers have to go bad inside `correlationWindowMinutes` before the cycle sends one "this looks like a shared failure" alert instead of one per provider. `0` and `1` are off, which is the default — this is the only setting here that *replaces* alerts. |
+| `correlationWindowMinutes` | `10` | 1–1440. How wide that window is. Wider catches a shared failure that rolls across status pages slowly, and risks folding two unrelated bad days into one. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
 | `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
+| `services[].crossChecks` | — | Only on a probe (`http`, `tcp`, `dns`): the id of the provider whose status page this probe is a second opinion on — silent-outage cross-check (roadmap 1.10). When the probe cannot reach the service and that provider's page still reports operational with no open incident, the disagreement is itself an alert. |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
 | `services[].options` | — | Adapter-specific extras. Four adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), and `http`, `tcp` and `dns` (see their own sections below). |
 
@@ -157,9 +162,10 @@ Four things worth knowing before relying on it:
   and adds "this looks like a failure on our side" to those reads in
   **Diagnose** — one status page answering normally is enough to rule it out. It
   changes no reading and silences no message, because from here those services
-  really are unreachable; collapsing the burst into a single fleet-wide alert
-  needs an event that is not about one provider (roadmap 2.7). `confirmSamples`
-  is still the setting for "a single blip is not worth a message".
+  really are unreachable. Collapsing a burst into one alert is what
+  `correlationThreshold` does (the settings table above, and §7.3 in the manual);
+  `confirmSamples` is still the
+  setting for "a single blip is not worth a message".
 - a probe that is not operational says why: **Settings → the provider's row,
   expanded → Diagnose** carries the sentence the reading has nowhere to hold — `answered
   HTTP 503, outside the accepted 200-299`, `no answer from …: connect
@@ -303,6 +309,16 @@ list is never overwritten afterwards.
 | `PUSHOVER_USER_KEY` | both | — | Pushover user or group key. Required with the above. |
 | `PUSHOVER_DEVICE` | both | — | Optional. One registered device; unset delivers to every device on the account. |
 | `TEAMS_WEBHOOK_URL` | both | — | Microsoft Teams channel webhook. Required if the Teams channel is enabled. |
+| `MATRIX_HOMESERVER_URL` | both | — | Matrix homeserver root (`https://matrix.example.org`). Required if the Matrix channel is enabled. |
+| `MATRIX_ROOM_ID` | both | — | Internal room id (`!ops:example.org`), not an alias. Required with the above. |
+| `MATRIX_ACCESS_TOKEN` | both | — | Access token for the user that posts. Required with the above. |
+| `PAGERDUTY_ROUTING_KEY` | both | — | Integration key of an Events API v2 integration. Required if the PagerDuty channel is enabled. |
+| `PAGERDUTY_REGION` | both | — | Optional. `eu` for an account in PagerDuty's EU service region. |
+| `OPSGENIE_API_KEY` | both | — | Opsgenie API integration key. Required if the Opsgenie channel is enabled. |
+| `OPSGENIE_REGION` | both | — | Optional. `eu` for an account on Opsgenie's EU instance. |
+| `APPRISE_SERVER_URL` | both | — | Apprise API server (`http://apprise:8000`). Required if the Apprise channel is enabled. |
+| `APPRISE_CONFIG_KEY` | both | — | Key of a configuration the Apprise server stores. Either this or `APPRISE_URLS` is required. |
+| `APPRISE_URLS` | both | — | Apprise service URLs, comma-separated, for a stateless server. Either this or `APPRISE_CONFIG_KEY` is required. |
 | `WEBHOOK_SECRET` | both | — | Optional shared secret for the generic webhook. Set it and every request is signed (see [3.6](#36-notification-channels)); leave it unset and requests go out unsigned, exactly as before. |
 | `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
 | `LOG_FILE` | both | — | Also append every log line to this file, rotated by size. Unset, logs go to stdout only. |
@@ -727,6 +743,10 @@ validators all drop the cache entry rather than pin a stale reading.
 | Gotify | `gotify` | `GOTIFY_URL`, `GOTIFY_TOKEN` |
 | Pushover | `pushover` | `PUSHOVER_TOKEN`, `PUSHOVER_USER_KEY` (`PUSHOVER_DEVICE` optional) |
 | Microsoft Teams | `teams` | `TEAMS_WEBHOOK_URL` |
+| Matrix | `matrix` | `MATRIX_HOMESERVER_URL`, `MATRIX_ROOM_ID`, `MATRIX_ACCESS_TOKEN` |
+| PagerDuty | `pagerduty` | `PAGERDUTY_ROUTING_KEY` (`PAGERDUTY_REGION` optional) |
+| Opsgenie | `opsgenie` | `OPSGENIE_API_KEY` (`OPSGENIE_REGION` optional) |
+| Apprise | `apprise` | `APPRISE_SERVER_URL`, and one of `APPRISE_CONFIG_KEY` / `APPRISE_URLS` |
 | Email (SMTP) | `email` | `SMTP_HOST`, `SMTP_FROM`, `SMTP_TO` (`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ALLOW_INSECURE_AUTH`, `SMTP_ALLOW_SELF_SIGNED` optional) |
 | Desktop (Web Push) | `webpush` | none |
 
@@ -823,6 +843,58 @@ webhook request is received"**. Severity is the heading's own colour, named
 legible in both of Teams' themes, and the same emoji every other channel shows
 says it again for a client rendering in monochrome. The status page is a button,
 not a line of text. The URL is the credential, so it never appears in an error.
+
+**Matrix** (roadmap 3.6) posts into one room through the client-server API.
+Two formats travel together, as Matrix expects: `body` is the plain text a
+terminal client shows and `formatted_body` the HTML a graphical one renders,
+both built from the same words, so neither can say something the other does
+not. A Matrix message has no separate link affordance, so the status page is a
+trailing line in the text and a link in the HTML — and a provider's own
+incident title is escaped before it lands in that HTML rather than trusted.
+`MATRIX_ROOM_ID` is the internal room id (`!ops:example.org`), not an alias: an
+alias can be repointed at another room by anyone with the power to, which is
+not a property an alert channel should have. Sends are `PUT`s carrying a fresh
+transaction id, Matrix's own idempotency key, so a retried request is
+de-duplicated by the homeserver instead of posting the alert twice. Editing is
+native — an incident update rewrites the message it updates rather than adding
+another one.
+
+**PagerDuty and Opsgenie** (roadmap 3.7) are the on-call pair, and they are the
+only channels that do more than deliver a message: an alert here enters an
+escalation chain, so it also has to close again. Both key on the change —
+PagerDuty's `dedup_key`, Opsgenie's `alias`, derived identically — so the
+resolve a provider's own "resolved" update produces names the very alert its
+"investigating" update opened. An incident keys on its own id, so a provider
+with three open incidents holds three alerts that each close on their own;
+a status, a component, a maintenance window and our own fetching each key on
+what they are about, so a status that worsens twice updates one alert instead
+of stacking. What counts as a close is the diff engine's lifecycle unchanged:
+an incident that resolved, a maintenance window that ended, a status back to
+operational. A digest never closes anything — its most severe member stands in
+for the batch, and closing on a recovery that happened to be the worst of five
+changes would silence the other four.
+
+Severity becomes each service's own scale: PagerDuty's `critical` / `error` /
+`warning` / `info`, Opsgenie's `P1`–`P3`. Set `PAGERDUTY_REGION` or
+`OPSGENIE_REGION` to `eu` for an account provisioned in Europe; unset means the
+default instance. Neither credential appears in a URL or an error — a rejected
+send reports the status and the service's own message.
+
+**Apprise** (roadmap 3.9) is a bridge rather than a channel of its own: one
+notifier talking to an [Apprise](https://github.com/caronc/apprise) API server,
+and through it to the ~80 services Apprise already knows how to reach. It is
+the pragmatic answer for a destination this project will never write a notifier
+for. The cost is an external service, so nothing about it is assumed: the
+server URL is a setting with no default, and a server that is down fails the
+delivery like any other channel rather than losing the alert quietly. Two
+shapes are supported because Apprise offers two — with `APPRISE_CONFIG_KEY` the
+server holds the service URLs and IsItDown never sees them, which is the better
+arrangement since those URLs are credentials; with `APPRISE_URLS` they travel
+on each request instead, for a stateless server. Set both and the stored
+configuration wins, since that is the one an operator edits. Severity survives
+the bridge as Apprise's own notification type (`failure` / `warning` /
+`success` / `info`), and the status page is a line in the body: Apprise
+flattens away whatever link affordance each downstream service has.
 
 **Email** is SMTP submission, and it is written here rather than taken from a
 library (roadmap 3.3): what a notification needs is one submission conversation

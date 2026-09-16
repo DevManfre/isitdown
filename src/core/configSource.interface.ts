@@ -23,6 +23,14 @@ export interface PollingConfig {
    * transition notifies. 1 is off. See `confirmedChanges` in the diff engine.
    */
   confirmSamples: number;
+  /**
+   * How many providers have to go bad inside `correlationWindowMinutes` before
+   * the poller reports one shared failure instead of one alert each (roadmap
+   * 2.7). 0 and 1 are off. See `correlatedOutage` in the diff engine.
+   */
+  correlationThreshold: number;
+  /** How wide that window is, in minutes. */
+  correlationWindowMinutes: number;
 }
 
 export interface ServiceDefinition {
@@ -34,6 +42,12 @@ export interface ServiceDefinition {
   enabled: boolean;
   /** The group this provider belongs to, or absent while the fleet is flat (roadmap 2.6). */
   group?: string | undefined;
+  /**
+   * On a probe: the provider whose status page it is a second opinion on
+   * (roadmap 1.10). Absent on everything else, which is every service that is
+   * a status page rather than a probe of one.
+   */
+  crossChecks?: string | undefined;
   /**
    * How often this provider is polled. Absent means the global cadence: a page
    * that publishes every few minutes and one that changes twice a year do not

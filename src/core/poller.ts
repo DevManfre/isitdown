@@ -1,6 +1,12 @@
 import type { Adapter, ReadingNote } from "./adapter.interface.ts";
 import type { RuntimeConfig, ServiceDefinition } from "./configSource.interface.ts";
-import { confirmedChanges } from "./diffEngine.ts";
+import {
+  confirmedChanges,
+  correlatedOutage,
+  silentOutage,
+  worseningsIn,
+  type WorseningReading,
+} from "./diffEngine.ts";
 import { RetryAfterError, type StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
 import type { ProviderRuntimeState, StateStore } from "./stateStore.interface.ts";
@@ -180,6 +186,31 @@ export function createPoller(deps: PollerDeps): Poller {
    * with nothing on the dashboard to explain it.
    */
   const holdUntil = new Map<string, number>();
+
+  /**
+   * The correlation window (roadmap 2.7): every worsening seen recently, so a
+   * shared failure can be recognised across cycles rather than only inside one.
+   * Providers are staggered and on their own cadences, so three pages going bad
+   * together are rarely read in the same cycle.
+   *
+   * In memory for the same reason the two maps above are: after a restart the
+   * window is empty, which costs at most one meta-event that would have folded
+   * alerts the operator gets individually instead — the safe direction.
+   */
+  let window: WorseningReading[] = [];
+  /**
+   * The provider set of the correlation last announced, so a window that keeps
+   * matching does not re-announce it on every cycle. A new provider joining is
+   * news and re-announces; the same three still being down is not.
+   */
+  let announced: string | null = null;
+
+  /**
+   * Cross-check pairs already reported (roadmap 1.10), so a page that keeps
+   * disagreeing with its probe is one alert rather than one per cycle. Dropped
+   * again the moment the two agree, so the next disagreement is news.
+   */
+  const accused = new Set<string>();
 
   async function attemptFetch(
     service: ServiceDefinition,
@@ -415,6 +446,132 @@ export function createPoller(deps: PollerDeps): Poller {
     return at - last >= interval * 60_000 * (1 - DUE_SLACK);
   }
 
+  /**
+   * Folds this cycle's worsenings into one shared-failure change when enough
+   * providers went bad inside the window (roadmap 2.7).
+   *
+   * The suppression rule is deliberately small: the member alerts *from this
+   * cycle* are dropped and replaced by the one change, and nothing else is.
+   * Alerts that already went out in an earlier cycle have been read; a provider
+   * that joins the window later still gets its own alert, because a fourth
+   * provider going down is news the meta-event did not already carry.
+   *
+   * Mutates `changes` rather than returning a new list: it is this cycle's
+   * outbound set, and having two lists in flight is how one of them ends up
+   * being the one that is sent.
+   */
+  function foldCorrelated(
+    changes: StatusChange[],
+    config: RuntimeConfig,
+    at: string,
+  ): StatusChange | null {
+    const { correlationThreshold, correlationWindowMinutes } = config.polling;
+    if (correlationThreshold < 2) return null;
+
+    const fresh = worseningsIn(changes);
+    const opens = Date.parse(at) - correlationWindowMinutes * 60_000;
+    window = [...window, ...fresh].filter((reading) => {
+      const taken = Date.parse(reading.at);
+      return !Number.isNaN(taken) && taken >= opens;
+    });
+
+    const correlated = correlatedOutage({
+      recent: window,
+      windowMinutes: correlationWindowMinutes,
+      threshold: correlationThreshold,
+      at,
+    });
+    if (correlated === null) {
+      announced = null;
+      return null;
+    }
+
+    const members = new Set(correlated.correlated?.providerIds ?? []);
+    const signature = [...members].sort().join(",");
+    // The same providers still being down is not news a second time; a new one
+    // joining them is, so the set is what decides rather than a cooldown.
+    if (signature === announced) return null;
+    announced = signature;
+
+    const folded = changes.filter(
+      (change) =>
+        !members.has(change.providerId) ||
+        worseningsIn([change]).length === 0,
+    );
+    changes.length = 0;
+    changes.push(...folded, correlated);
+    return correlated;
+  }
+
+  /**
+   * The silent-outage cross-check (roadmap 1.10): a probe that cannot reach a
+   * service whose provider's page still claims to be operational.
+   *
+   * Runs on this cycle's probe readings against the provider's *stored* state,
+   * because the two are separate services on separate cadences and are rarely
+   * read in the same cycle. It adds a change rather than replacing one: the
+   * probe's own alert still stands, and this says the thing the probe cannot —
+   * that the page has not caught up.
+   */
+  async function crossCheck(
+    results: ProviderResult[],
+    config: RuntimeConfig,
+    at: string,
+  ): Promise<StatusChange[]> {
+    const probes = config.services.filter(
+      (service) => service.enabled && service.crossChecks !== undefined,
+    );
+    if (probes.length === 0) return [];
+    const byId = new Map(results.map((result) => [result.providerId, result]));
+    const changes: StatusChange[] = [];
+
+    for (const probe of probes) {
+      const target = probe.crossChecks as string;
+      const pair = `${probe.id}->${target}`;
+      const reading = byId.get(probe.id);
+      // Not polled this cycle: its last reading has already been judged, and
+      // re-judging it here would re-accuse the page every cycle in between.
+      if (reading === undefined) continue;
+
+      const page = config.services.find((service) => service.id === target);
+      if (page === undefined || !page.enabled) {
+        logger.warn("a probe cross-checks a provider that is not being polled", {
+          providerId: probe.id,
+          crossChecks: target,
+        });
+        continue;
+      }
+
+      const state = await store.getState(target);
+      const change =
+        reading.ok && reading.status !== undefined
+          ? silentOutage({
+              probe: { id: probe.id, status: reading.status.overallStatus, note: reading.note },
+              page:
+                state.last === null
+                  ? null
+                  : {
+                      id: target,
+                      status: state.last.overallStatus,
+                      openIncidents: state.last.activeIncidents.length,
+                    },
+              at,
+            })
+          : null;
+
+      if (change === null) {
+        accused.delete(pair);
+        continue;
+      }
+      // Said once per disagreement: a page that stays wrong for an hour is one
+      // alert, the way a failing fetch is one `monitoring_degraded`.
+      if (accused.has(pair)) continue;
+      accused.add(pair);
+      changes.push(change);
+    }
+    return changes;
+  }
+
   return {
     async nextIntervalMinutes(config: RuntimeConfig): Promise<number> {
       let shortest = config.polling.intervalMinutes;
@@ -498,6 +655,27 @@ export function createPoller(deps: PollerDeps): Poller {
       }
 
       const finishedAt = new Date().toISOString();
+
+      // Before the fold: a page caught claiming to be fine is not a worsening
+      // the correlation window should count. Skipped entirely when the cycle
+      // already looks like our own network failing — a container that cannot
+      // reach anything must not spend that outage accusing status pages of
+      // lying.
+      if (!looksLikeOurOwnNetwork(results)) {
+        changes.push(...(await crossCheck(results, config, finishedAt)));
+      }
+
+      const correlated = foldCorrelated(changes, config, finishedAt);
+      if (correlated !== null) {
+        logger.warn(
+          "several providers went bad inside the correlation window — reporting one shared failure",
+          {
+            providers: correlated.correlated?.providerIds,
+            windowMinutes: correlated.correlated?.windowMinutes,
+          },
+        );
+      }
+
       logger.info("poll cycle finished", {
         providers: results.length,
         skipped: config.services.filter((service) => service.enabled).length - enabled.length,

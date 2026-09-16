@@ -21,6 +21,8 @@
   "notification.incident.updated": "{provider} — {severity}\n\nIncidente: {title}\nStato: {status}\nAggiornato: {updatedAt}\n\n{url}",
   "notification.incident.resolved": "{provider} — {severity}\n\nL'incidente \"{title}\" è stato risolto.\nAggiornato: {updatedAt}\n\n{url}",
   "notification.monitoring.degraded": "{provider} — monitoraggio degradato\n\n{count} richieste consecutive non riuscite. Ultimo stato noto: {lastStatus}.\nAggiornato: {updatedAt}",
+  "notification.correlated.outage": "{provider} — {severity}\n\n{count} provider sono peggiorati entro {minutes} minuto/i: {providers}.\nSembra un unico guasto condiviso piuttosto che {count} guasti separati.\n\n{url}",
+  "notification.silent.outage": "{provider} — {severity}\n\nLa status page riporta ancora {previous}, ma la nostra sonda {probe} non riesce a raggiungere il servizio: {note}\n\n{url}",
   "notification.maintenance.started": "{provider} — manutenzione\n\nÈ iniziata una manutenzione programmata: {title}\nFine prevista: {endsAt}\nGli avvisi per questo provider sono sospesi fino al termine.\n\n{url}",
   "notification.maintenance.ended": "{provider} — manutenzione conclusa\n\n{title} è terminata.\nStato attuale: {current} — {count} incidente/i aperto/i.\nAggiornato: {updatedAt}\n\n{url}",
 
@@ -34,6 +36,8 @@
   "notification.digest.maintenance-started": "manutenzione iniziata — {title}",
   "notification.digest.maintenance-ended": "manutenzione conclusa — {title}",
   "notification.digest.monitoring": "monitoraggio degradato — {count} letture consecutive fallite",
+  "notification.digest.silent": "la status page dice ancora operativo, ma la sonda {probe} legge {current}",
+  "notification.digest.correlated": "{count} provider peggiorati insieme — {providers}",
 
   "notification.suppressed": "{count} ulteriore/i avviso/i per questo provider sono stati soppressi dal limite orario."
 }
