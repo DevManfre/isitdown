@@ -9,6 +9,7 @@ import { BorderBeam } from "@/components/ui/border-beam.tsx";
 import { DotPattern } from "@/components/ui/dot-pattern.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
+import { useCountWidth } from "@/hooks/useCountWidth.ts";
 import {
   Pagination,
   PaginationContent,
@@ -284,6 +285,9 @@ export function Incidents() {
     />
   );
 
+  // The widest of the three, so all three chips hold the same column.
+  const countWidth = useCountWidth(counts.all);
+
   const filterControl = (
     <ToggleGroup
       type="single"
@@ -309,7 +313,16 @@ export function Incidents() {
               convenience. Incidents.test.tsx scopes its radio queries
               by a name-matcher function rather than depending on this
               attribute, so removing it later would not break the test. */}
-          <span aria-hidden="true" className="ml-1.5 text-[10px] text-muted-foreground">
+          {/* The width is held rather than left to the figure: the count is a
+              tally of whatever the window admits, and a digit arriving or
+              leaving used to move this chip, the chips after it, the search
+              field and the download button — on every frame of the ticker's
+              run, not just at the end. */}
+          <span
+            aria-hidden="true"
+            className="ml-1.5 inline-block text-right text-[10px] text-muted-foreground"
+            style={{ minWidth: countWidth }}
+          >
             <NumberTicker locale={i18n.language} value={counts[entry.value]} />
           </span>
         </ToggleGroupItem>
