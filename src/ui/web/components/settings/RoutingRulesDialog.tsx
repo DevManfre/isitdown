@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog.tsx";
 import { RoutingRules } from "@/components/RoutingRules.tsx";
 import { useRoutingMutations } from "@/hooks/queries.ts";
@@ -70,7 +71,7 @@ export function RoutingRulesDialog({
           {t("action.edit-rules")}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-[min(56rem,calc(100vw-2rem))]">
+      <DialogContent className="max-w-[min(48rem,calc(100vw-2rem))]">
         <DialogHeader>
           <DialogTitle>{t("settings.routing")}</DialogTitle>
           {/* `RoutingRules` opens with `routing.note`, which says this at
@@ -78,14 +79,24 @@ export function RoutingRulesDialog({
               twice. Kept for the accessible name Radix wants. */}
           <DialogDescription className="sr-only">{t("routing.note")}</DialogDescription>
         </DialogHeader>
-        <RoutingRules
-          routing={routing}
-          channels={channels}
-          services={services}
-          quietHours={quietHours}
-          onSave={(rules) => save.mutateAsync(rules)}
-          saving={save.isPending}
-        />
+        {/* `DialogBody`, not a bare child: the rules list plus the dry run is
+            taller than the capped panel as soon as there are two rules, and
+            `DialogContent` clips what it cannot fit. The body is the one part
+            allowed to scroll, so the title and the close row stay put. */}
+        <DialogBody>
+          <RoutingRules
+            routing={routing}
+            channels={channels}
+            services={services}
+            quietHours={quietHours}
+            onSave={(rules) => save.mutateAsync(rules)}
+            saving={save.isPending}
+          />
+        </DialogBody>
+        {/* Every edit saves itself, so there is nothing to confirm — the
+            footer exists to give the dialog a deliberate way out that is not
+            the 16px × in the corner. */}
+        <DialogFooter showCloseButton />
       </DialogContent>
     </Dialog>
   );
