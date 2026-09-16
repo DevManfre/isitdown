@@ -497,6 +497,30 @@ describe("Settings", () => {
     });
   });
 
+  // Every surface on this page answers in the same corner: the sections that
+  // save a number already did, and a provider, a channel and a preference had
+  // been answering with nothing at all.
+  it("leaves a receipt when a provider is paused", async () => {
+    renderSettings("services", fixtures);
+    const toggle = await screen.findByRole("switch", { name: "GitHub — enabled" });
+    interceptWrites({ "PATCH /config/services/github": {} });
+
+    await userEvent.click(toggle);
+
+    expect(await screen.findByText(i18n.t("toast.service.paused", { name: "GitHub" }))).toBeInTheDocument();
+  });
+
+  it("leaves a receipt when a channel is switched on or off", async () => {
+    renderSettings("notifications", fixtures);
+    const name = i18n.t("channel.name.telegram");
+    const toggle = await screen.findByRole("switch", { name: `${name} — ${i18n.t("channel.enabled")}` });
+    interceptWrites({ "PATCH /config/channels/telegram": {} });
+
+    await userEvent.click(toggle);
+
+    expect(await screen.findByText(i18n.t("toast.channel.disabled", { name }))).toBeInTheDocument();
+  });
+
   it("reads a disabled service as off, so the row states it rather than only tinting a dot", async () => {
     const services = [{ ...config.services[0], enabled: false }];
     renderSettings("services", { ...fixtures, config: { ...config, services } });
@@ -650,7 +674,8 @@ describe("Settings", () => {
       await userEvent.type(await screen.findByLabelText("botToken"), "123456:real-token");
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.save") }));
 
-      expect(await within(card).findByText(i18n.t("channel.secret-saved"))).toBeInTheDocument();
+      // The receipt leaves as a toast now, outside the card that saved.
+      expect(await screen.findByText(i18n.t("channel.secret-saved"))).toBeInTheDocument();
       // A successful save invalidates every query, so the GETs that follow are
       // the refetch, not the write under test.
       expect(writesIn(calls)).toEqual([
@@ -698,7 +723,7 @@ describe("Settings", () => {
       const card = await openChannel(i18n.t("channel.name.telegram"));
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.clear") }));
 
-      expect(await within(card).findByText(i18n.t("channel.secret-cleared"))).toBeInTheDocument();
+      expect(await screen.findByText(i18n.t("channel.secret-cleared"))).toBeInTheDocument();
       expect(writesIn(calls)).toEqual([
         { method: "DELETE", path: "/config/channels/telegram/secrets/botToken", body: undefined },
       ]);
@@ -711,7 +736,7 @@ describe("Settings", () => {
 
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.send-test") }));
 
-      expect(await within(card).findByText(i18n.t("channel.test-ok"))).toBeInTheDocument();
+      expect(await screen.findByText(i18n.t("channel.test-ok"))).toBeInTheDocument();
       expect(
         calls.some((call) => call.method === "POST" && call.path === "/config/channels/telegram/test"),
       ).toBe(true);
@@ -724,9 +749,7 @@ describe("Settings", () => {
 
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.send-test") }));
 
-      expect(
-        await within(card).findByText(i18n.t("channel.test-failed", { error: "timeout" })),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(i18n.t("channel.test-failed", { error: "timeout" }))).toBeInTheDocument();
     });
   });
 
@@ -1036,6 +1059,18 @@ describe("Settings", () => {
     });
   });
 
+  it("leaves a receipt when an appearance preference is saved", async () => {
+    renderSettings("appearance", fixtures);
+    await screen.findByLabelText(/geographic view/i);
+    interceptWrites({ "PATCH /api/preferences": { mapView: "map" } });
+
+    await userEvent.click(screen.getByLabelText(/geographic view/i));
+    await userEvent.click(await screen.findByRole("option", { name: /dotted map/i }));
+
+    const receipt = await screen.findByText(i18n.t("settings.saved"));
+    expect(receipt.closest("[data-slot='settings-toast']")).toBeInTheDocument();
+  });
+
   // Review gap 3: the harness had no `/api/preferences` fixture bucket, so a
   // GET there fell through to the `status` fixture — the initial-`off`
   // assertion above passed only by coincidence (the status fixture happens
@@ -1159,9 +1194,9 @@ describe("Settings retention", () => {
         { path: "/config/storage/maintenance", method: "POST", body: undefined },
       ]),
     );
-    const result = await screen.findByTestId("maintenance-result");
-    expect(result.textContent).toMatch(/1\.5 MB/);
+    const result = await screen.findByText(/1\.5 MB/);
     expect(result.textContent).toMatch(/4\.5 MB/);
+    expect(result.closest("[data-slot='settings-toast']")).toHaveAttribute("data-tone", "ok");
   });
 
   it("reports a failed integrity check as an error, and says nothing was rewritten", async () => {
@@ -1179,9 +1214,8 @@ describe("Settings retention", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: i18n.t("settings.maintenance.run") }));
 
-    const result = await screen.findByTestId("maintenance-result");
-    expect(result.textContent).toMatch(/row 3 missing from index/);
-    expect(result).toHaveClass("text-destructive");
+    const result = await screen.findByText(/row 3 missing from index/);
+    expect(result.closest("[data-slot='settings-toast']")).toHaveAttribute("data-tone", "error");
   });
 
   /**

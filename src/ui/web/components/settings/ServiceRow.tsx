@@ -8,6 +8,7 @@ import { AdapterDebugDialog } from "@/components/settings/AdapterDebugDialog.tsx
 import { MuteMenu } from "@/components/settings/MuteMenu.tsx";
 import { RemoveServiceDialog } from "@/components/settings/RemoveServiceDialog.tsx";
 import { useSettingVisible } from "@/components/settings/SettingsChrome.tsx";
+import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useServiceMutations } from "@/hooks/queries.ts";
 import { formatRelative, hostOf } from "@/lib/format.ts";
 import { isMuted } from "@/lib/mute.ts";
@@ -44,6 +45,7 @@ export function ServiceRow({
 }) {
   const { t, i18n } = useTranslation();
   const { patch } = useServiceMutations();
+  const toast = useSettingsToastReport();
   const host = hostOf(service.baseUrl);
   const muted = isMuted(service.mutedUntil);
   const visible = useSettingVisible(`${service.name} ${service.adapter} ${host} ${service.group ?? ""}`);
@@ -53,7 +55,10 @@ export function ServiceRow({
   // A live mute outranks "enabled": both describe whether the provider will say
   // anything, and the mute is the one with an end the operator wants to read.
   const state = muted
-    ? { text: t("service.muted-until", { when: formatRelative(i18n.language, service.mutedUntil ?? "") }), color: "var(--status-degraded)" }
+    ? {
+        text: t("service.muted-until", { when: formatRelative(i18n.language, service.mutedUntil ?? "") }),
+        color: "var(--status-degraded)",
+      }
     : service.enabled
       ? { text: t("service.enabled"), color: "var(--status-operational)" }
       : { text: t("service.disabled"), color: "var(--color-neutral-500)" };
@@ -89,7 +94,23 @@ export function ServiceRow({
         <Switch
           aria-label={`${service.name} — ${t(service.enabled ? "service.enabled" : "service.disabled")}`}
           checked={service.enabled}
-          onCheckedChange={(next) => patch.mutate({ id: service.id, patch: { enabled: next } })}
+          onCheckedChange={(next) =>
+            patch.mutate(
+              { id: service.id, patch: { enabled: next } },
+              {
+                onSuccess: () =>
+                  toast("services", {
+                    text: t(next ? "toast.service.polling" : "toast.service.paused", { name: service.name }),
+                    tone: "ok",
+                  }),
+                onError: (error) =>
+                  toast("services", {
+                    text: t("toast.failed", { error: error instanceof Error ? error.message : String(error) }),
+                    tone: "error",
+                  }),
+              },
+            )
+          }
         />
       </div>
 

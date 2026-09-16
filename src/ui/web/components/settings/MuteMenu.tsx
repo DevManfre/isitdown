@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
+import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useServiceMutations } from "@/hooks/queries.ts";
 import { isMuted } from "@/lib/mute.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
@@ -35,15 +36,30 @@ const DURATIONS: { minutes: number; labelKey: string }[] = [
 export function MuteMenu({ service }: { service: ServiceDefinition }) {
   const { t } = useTranslation();
   const { patch } = useServiceMutations();
+  const toast = useSettingsToastReport();
   const muted = isMuted(service.mutedUntil);
 
   const setMute = (minutes: number | null): void => {
-    patch.mutate({
-      id: service.id,
-      patch: {
-        mutedUntil: minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString(),
+    patch.mutate(
+      {
+        id: service.id,
+        patch: {
+          mutedUntil: minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString(),
+        },
       },
-    });
+      {
+        onSuccess: () =>
+          toast("services", {
+            text: t(minutes === null ? "toast.service.unmuted" : "toast.service.muted", { name: service.name }),
+            tone: "ok",
+          }),
+        onError: (error) =>
+          toast("services", {
+            text: t("toast.failed", { error: error instanceof Error ? error.message : String(error) }),
+            tone: "error",
+          }),
+      },
+    );
   };
 
   if (muted) {
