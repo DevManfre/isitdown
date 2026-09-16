@@ -27,24 +27,13 @@ const fold = (text: string): string =>
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "");
 
-/** How wide each tile sits in the six-column grid. */
-const SPAN: Record<string, string> = {
-  engine: "lg:col-span-4",
-  services: "lg:col-span-2",
-  removed: "lg:col-span-2",
-  notifications: "lg:col-span-4",
-  delivery: "lg:col-span-3",
-  data: "lg:col-span-3",
-  appearance: "lg:col-span-2",
-};
-
 function CategoryTile({ category, index, count }: { category: SettingsCategory; index: number; count?: number }) {
   const { t } = useTranslation();
   const painter = SECTION_REELS[category.id as keyof typeof SECTION_REELS];
 
   return (
     <BentoCard
-      className={`anim-rise ${SPAN[category.id] ?? "lg:col-span-2"} focus-within:ring-2 focus-within:ring-ring`}
+      className="anim-rise focus-within:ring-2 focus-within:ring-ring"
       style={{ animationDelay: stagger(index) }}
       background={
         painter === undefined ? undefined : (
@@ -115,7 +104,11 @@ export function SettingsLauncher({
   }
 
   return (
-    <BentoGrid className="items-stretch gap-5">
+    /* Equal tiles that pack the row, rather than spans of four and three that
+       left a two-column hole after "Notifications" and a lone tile at the
+       foot. Three across on a wide screen is also the width at which the
+       blurbs stop breaking every few words. */
+    <BentoGrid className="items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
       {categories.map((category, index) => (
         <CategoryTile
           key={category.id}
