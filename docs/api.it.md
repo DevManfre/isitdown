@@ -13,6 +13,7 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `GET` | `/status` | Stato corrente di ogni provider, più ultimo e prossimo poll, più `maintenance: { active, upcoming }` — le finestre in corso adesso e quelle il cui `startsAt` è ancora nel futuro; una finestra già terminata ma ancora presente nel payload salvato non compare in nessuna delle due liste. Pura lettura dal database — si può interrogare ogni 30s, come fa la dashboard. Non raggiunge mai l'upstream. Porta anche `groups` — una voce per gruppo di provider con lo stato derivato, i membri e i membri colpiti (roadmap 2.6, §3.10). |
 | `GET` | `/history/calendar?provider=` | Un anno di celle giornaliere per un provider — roadmap 5.20. `{ providerId, days, cells: [{ day, status, uptime }], uptime, measuredDays }`, dalla più vecchia, con i buchi riempiti: un giorno non campionato è `unknown` con `uptime: null`, mai `0`. La finestra è fissa a 365 giorni ed è dichiarata nella risposta, quindi non accetta `days`. `404` su un provider sconosciuto. |
 | `GET` | `/history?provider=&days=` | Bucket giornalieri pre-aggregati, uptime a 7/30/90 giorni, colonne dei mesi. `days` accetta `7`, `30` o `90`; altro è un 400 che li elenca. Senza `provider`, un riepilogo su tutti. |
+| `GET` | `/history?provider=&from=&to=` | Lo stesso payload su un intervallo arbitrario (roadmap 5.5), `YYYY-MM-DD` ed estremi inclusi — è ciò che chiede la pillola **Personalizzato** della vista Storico. I due viaggiano insieme: uno solo è un 400, come una coppia invertita o un intervallo più largo di 366 giorni. Un intervallo finito nel passato legge i campioni che contiene, non gli ultimi N giorni. Gli incidenti dentro un intervallo sono quelli che erano *in corso*, mentre le finestre fisse continuano a contare quelli *iniziati* al loro interno. |
 | `GET` | `/incidents?provider=&state=&q=&days=&page=&pageSize=` | Una pagina della lista incidenti: `{ active, page: { items, page, pageSize, total }, counts: { all, active, resolved } }`. `state` è `all` (default), `active` o `resolved`; `q` cerca nei nomi degli incidenti, senza distinguere maiuscole, e `days` tiene solo gli incidenti iniziati entro quella finestra (entrambi restringono la pagina **e** i conteggi); `pageSize` vale 20 di default, massimo 100. Un `page`, `pageSize`, `state`, `q` o `days` senza senso ricade sulla prima pagina di tutto invece di dare 400. `counts` porta tutti e tre gli stati qualunque sia il filtro, e `active` è la lista degli aperti che la card in evidenza della dashboard mostra su ogni pagina — fuori dalla ricerca, così la card non può sparire mentre l'operatore digita. |
 | `GET` | `/incidents/:providerId/:incidentId` | Dettaglio: l'incidente, la cronologia osservata, il log di ciò che è stato inviato, gli altri incidenti aperti del provider, gli ultimi 24 poll e le note dell'operatore su di esso (roadmap 5.3). |
 | `POST` | `/incidents/:providerId/:incidentId/notes` | Scrive una nota, `{ body }`, da 1 a 2000 caratteri. L'incidente deve esistere, così un refuso in un URL non accumula in silenzio note che non riguardano nulla. Risponde con la nota salvata. |
@@ -50,14 +51,71 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 | `GET` | `/debug/adapters` | Diagnostica degli adapter: per ogni provider il suo adapter, la base URL e le opzioni, più gli ultimi venti esiti di lettura (durata, tentativi, se era un `304`, e l'errore per intero). In memoria — diagnostica per l'esecuzione che hai davanti, non storico, quindi un restart la svuota. |
 | `POST` | `/debug/adapters/:id/probe` | Una lettura della pagina di quel provider, adesso, riportata per intero: l'intera lettura interpretata in caso di successo, l'errore dell'adapter in caso di fallimento (come `200` con `ok: false`, come il test di connessione). Non registra e non notifica nulla. `404` su un id sconosciuto. |
 | `POST` | `/poll` | Esegue subito un ciclo, tramite lo scheduler. Restituisce il riepilogo del ciclo. |
-| `GET` | `/events` | Server-sent events, una risposta long-lived per tab aperta. `hello` alla connessione (`lastPollAt`, `nextPollAt`, `serverNow`), poi `cycle` alla fine di ogni ciclo (`finishedAt`, `providers`, `failed`, `changedProviders` — nessuna scadenza: lo scheduler ri-arma dopo l'evento, quindi quella nuova arriva con la rilettura). Lo stream è un corriere, non una fonte di verità: dice cosa è cambiato, la dashboard lo rilegge. Non JSON — vedi [6.3](#63-aggiornamenti-live). |
-| `GET` | `/metrics` | Esposizione Prometheus. L'unico endpoint non JSON — vedi [6.2](#62-metriche-prometheus). |
-| `GET` | `/badge.svg` | Un badge SVG per l'intera flotta: la lettura peggiore in circolazione. Non JSON — vedi [6.4](#64-badge-e-riepilogo-widget). |
+| `GET` | `/events` | Server-sent events, una risposta long-lived per tab aperta. `hello` alla connessione (`lastPollAt`, `nextPollAt`, `serverNow`), poi `cycle` alla fine di ogni ciclo (`finishedAt`, `providers`, `failed`, `changedProviders` — nessuna scadenza: lo scheduler ri-arma dopo l'evento, quindi quella nuova arriva con la rilettura). Lo stream è un corriere, non una fonte di verità: dice cosa è cambiato, la dashboard lo rilegge. Non JSON — vedi [6.5](#65-aggiornamenti-live). |
+| `GET` | `/metrics` | Esposizione Prometheus. L'unico endpoint non JSON — vedi [6.4](#64-metriche-prometheus). |
+| `GET` | `/badge.svg` | Un badge SVG per l'intera flotta: la lettura peggiore in circolazione. Non JSON — vedi [6.6](#66-badge-e-riepilogo-widget). |
 | `GET` | `/badge/:providerId.svg` | Lo stesso per un singolo provider. `404` (comunque come badge) se quell'id non esiste. |
-| `GET` | `/widget` | Un oggetto di riepilogo piatto per il widget "custom API" di una dashboard homelab — vedi [6.4](#64-badge-e-riepilogo-widget). |
+| `GET` | `/widget` | Un oggetto di riepilogo piatto per il widget "custom API" di una dashboard homelab — vedi [6.6](#66-badge-e-riepilogo-widget). |
+| `GET` | `/homeassistant` | Un oggetto piatto per provider per l'integrazione `rest` di Home Assistant (roadmap 4.12): `state` è `ON` per qualsiasi cosa diversa da operativo, che è ciò che `device_class: problem` si aspetta, più un sensore `fleet` acceso quando lo è qualcosa. Indicizzato per id del provider, così un `value_template` legge `value_json.providers.github.state` invece di cercare in una lista. |
+| `GET` | `/homeassistant/configuration.yaml` | La configurazione Home Assistant di quella flotta, generata e pronta da incollare: una risorsa `rest`, un binary sensor per provider. |
+| `GET` | `/openapi.json` | L'intera API, leggibile da una macchina (roadmap 4.10) — OpenAPI 3.1, per generare un client. |
+| `GET` | `/openapi.yaml` | Lo stesso documento in YAML, da leggere. |
 | `GET` | `/` | La dashboard. |
 
-### 6.1 Backfill dello storico
+### 6.1 Il documento OpenAPI
+
+`GET /openapi.json` (e `/openapi.yaml`, lo stesso documento) descrive ogni rotta
+di questa pagina in OpenAPI 3.1 — roadmap 4.10. È servito dall'istanza e non
+solo committato nel repository, così la specifica su cui viene generato un
+client è quella che quell'istanza implementa davvero.
+
+È scritto a mano in `src/ui/openapi.ts`, deliberatamente: le rotte Express non
+portano informazioni di tipo su cosa rispondono, e una specifica dedotta da
+loro descriverebbe ogni payload come `object`, cioè nulla di utile per un client
+generato. A tenerlo onesto è `test/ui/openapi.test.ts`, che percorre il router
+dell'app in esecuzione e fallisce quando una rotta è registrata senza essere
+descritta, o descritta senza esistere.
+
+`info.version` è la versione del *contratto* dell'API, non del prodotto: un
+client generato su questo documento non ha motivo di essere rigenerato perché è
+cambiato il CSS della dashboard.
+
+Non è dichiarato nessuno schema di sicurezza, ed è un'affermazione più che
+un'omissione: IsItDown è una dashboard per un solo operatore, legata alla
+macchina su cui gira (vedi i non-obiettivi in `README.md`).
+
+### 6.2 Home Assistant
+
+`GET /homeassistant/configuration.yaml` scrive il blocco da incollare nel
+`configuration.yaml` di Home Assistant, per la flotta che questa istanza sta
+osservando adesso — una risorsa `rest` e un binary sensor per provider, più un
+sensore di flotta acceso quando qualsiasi cosa non è operativa:
+
+```yaml
+rest:
+  - resource: "http://isitdown:3000/homeassistant"
+    scan_interval: 60
+    binary_sensor:
+      - name: "IsItDown GitHub"
+        unique_id: isitdown_github
+        device_class: problem
+        value_template: "{{ value_json.providers.github.state }}"
+```
+
+È generato invece che scritto qui perché la parte interessante è un blocco per
+provider, e trascriverne otto da una tabella è il modo in cui un'entità finisce
+per puntare alla chiave sbagliata. La URL della risorsa è l'indirizzo da cui è
+arrivata la richiesta: dentro il container di Home Assistant, `localhost`
+significa Home Assistant.
+
+REST e non MQTT discovery, deliberatamente. MQTT è l'integrazione più ricca e
+costerebbe un broker a runtime e un client MQTT in `package.json` — questo
+progetto dichiara tre dipendenze a runtime e nessun message broker, ed è una
+promessa più che un caso. Una sola richiesta alimenta tutti i sensori: Home
+Assistant preleva la risorsa una volta per `scan_interval` e ogni template legge
+la propria chiave, e il tutto è una lettura SQLite che non tocca mai un provider.
+
+### 6.3 Backfill dello storico
 
 All'avvio — e ogni volta che un provider viene aggiunto dalla dashboard —
 l'edizione UI ricostruisce fino a 90 giorni di storico dal feed pubblico
@@ -73,7 +131,7 @@ per provider; i giorni oltre la portata del feed restano grigi ("nessun
 dato") ed esclusi dalle percentuali di uptime. Il backfill non genera mai
 notifiche e non sovrascrive mai campioni osservati.
 
-### 6.2 Metriche Prometheus
+### 6.4 Metriche Prometheus
 
 `GET /metrics` risponde nel formato di esposizione testuale di Prometheus
 (`text/plain; version=0.0.4`), così qualsiasi Prometheus può fare scrape di
@@ -142,7 +200,7 @@ pubblicare la porta 3000 su una rete di cui non ti fidi.
 
 ---
 
-### 6.3 Aggiornamenti live
+### 6.5 Aggiornamenti live
 
 La dashboard viene notificata invece di interrogare: apre `/events` una volta e
 rilegge ciò che l'evento nomina.
@@ -177,7 +235,7 @@ che viene scritto ogni 20 secondi.
 
 ---
 
-### 6.4 Badge e riepilogo widget
+### 6.6 Badge e riepilogo widget
 
 Due endpoint in sola lettura rivolti verso l'esterno, non alla dashboard.
 
