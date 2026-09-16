@@ -80,15 +80,35 @@ export const pollNow = () =>
   );
 
 /**
+ * The window a history request asks for: one of the fixed spans, or an
+ * arbitrary range (roadmap 5.5). `days` is the span either way, so everything
+ * that labels a window — "last 30 days", the download names — reads one field.
+ */
+export interface HistoryWindow {
+  days: number;
+  range?: { from: string; to: string } | undefined;
+}
+
+/**
  * Returns `HistorySummary` when `provider` is omitted, `ProviderHistory`
  * otherwise. There is no literal tag to switch on; a caller discriminates by
  * shape instead — `providerId` is unique to `ProviderHistory`, `months` and
  * `providers` unique to `HistorySummary`.
  */
-export const getHistory = (days: number, provider?: string): Promise<HistorySummary | ProviderHistory> =>
-  provider === undefined
-    ? request<HistorySummary>("GET", `/history?days=${days}`)
-    : request<ProviderHistory>("GET", `/history?days=${days}&provider=${encodeURIComponent(provider)}`);
+export const getHistory = (
+  window: HistoryWindow,
+  provider?: string,
+): Promise<HistorySummary | ProviderHistory> => {
+  // A range and a fixed window are the same question asked two ways, so they
+  // are one call: `from`/`to` when the operator picked dates, `days` otherwise.
+  const span =
+    window.range === undefined
+      ? `days=${window.days}`
+      : `from=${window.range.from}&to=${window.range.to}`;
+  return provider === undefined
+    ? request<HistorySummary>("GET", `/history?${span}`)
+    : request<ProviderHistory>("GET", `/history?${span}&provider=${encodeURIComponent(provider)}`);
+};
 
 /** A year of day cells for one provider — roadmap 5.20. The window is the server's. */
 export const getProviderCalendar = (provider: string) =>

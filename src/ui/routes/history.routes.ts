@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { UiRuntimeCore } from "../runtime.ts";
-import { ALLOWED_DAYS, CALENDAR_DAYS, parseDays } from "./historyWindow.ts";
+import { ALLOWED_DAYS, CALENDAR_DAYS, parseDays, parseWindow } from "./historyWindow.ts";
 
 /**
  * Pre-aggregated history. The frontend never re-derives a percentage or a daily
@@ -52,14 +52,22 @@ export function historyRoutes(runtime: UiRuntimeCore): Router {
     });
   });
 
+  /**
+   * The three fixed windows, or an arbitrary `from`/`to` range (roadmap 5.5).
+   * Both answer the same shape: the range picker is another way of asking for a
+   * window, not another endpoint with its own payload for the charts to learn.
+   */
   router.get("/history", async (req, res) => {
-    const days = parseDays(req.query["days"] ?? undefined);
-    if (days === null) {
-      res
-        .status(400)
-        .json({ error: { message: `days must be one of ${ALLOWED_DAYS.join(", ")}` } });
+    const window = parseWindow({
+      days: req.query["days"] ?? undefined,
+      from: req.query["from"] ?? undefined,
+      to: req.query["to"] ?? undefined,
+    });
+    if ("error" in window) {
+      res.status(400).json({ error: { message: window.error } });
       return;
     }
+    const { days, endDay } = window;
 
     const { intervalMinutes } = (await runtime.configSource.load()).polling;
     const provider = req.query["provider"];
@@ -70,14 +78,16 @@ export function historyRoutes(runtime: UiRuntimeCore): Router {
         res.status(404).json({ error: { message: `unknown provider: ${provider}` } });
         return;
       }
-      res.json(await runtime.history.getProviderHistory(provider, days, intervalMinutes));
+      res.json(await runtime.history.getProviderHistory(provider, days, intervalMinutes, endDay));
       return;
     }
 
     // The fleet-wide view of what is being watched: a disabled provider leaves
     // the table and stops moving the aggregate, but keeps its stored history for
     // the day it is switched back on.
-    res.json(await runtime.history.getSummary(days, intervalMinutes, runtime.enabledProviderIds()));
+    res.json(
+      await runtime.history.getSummary(days, intervalMinutes, runtime.enabledProviderIds(), endDay),
+    );
   });
 
   return router;
