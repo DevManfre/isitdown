@@ -152,7 +152,36 @@ and mounted read-only; `${VAR}` references in it resolve against that same Secre
 An edit to it rolls the pod, because a mounted ConfigMap changing on disk
 restarts nothing on its own.
 
-### 4.5 Unraid and Home Assistant
+### 4.5 Neither: the single-file Light edition
+
+An operator who wants neither Docker nor a Node install can run the Light
+edition as one executable — roadmap 6.7. Every release attaches it beside the
+images, with a checksum:
+
+```bash
+gh release download vX.Y.Z --pattern 'isitdown-light-*-linux-x64*'
+sha256sum -c isitdown-light-vX.Y.Z-linux-x64.sha256
+chmod +x isitdown-light-vX.Y.Z-linux-x64
+CONFIG_PATH=./config.yml DATA_PATH=./state.json ./isitdown-light-vX.Y.Z-linux-x64
+```
+
+It is the same edition, with the same `config.yml` and the same environment
+variables — the two paths have no `/app` default to fall back on here, so both
+are worth setting. Build one locally with `npm run build:sea`, which writes
+`dist/sea/isitdown-light`.
+
+Light only, deliberately: the UI edition serves a built dashboard out of
+`dist/ui/public`, which is thousands of files a binary would have to carry and
+an operator would have to be told about. The file is around 120MB, nearly all of
+it Node itself — that is the shape of a Node single executable, not a sign
+something went wrong — and the binary is built with the Node version in
+`.nvmrc`. Linux x64 for now; macOS and Windows need a runner each, which is
+worth adding when somebody asks rather than before.
+
+The notification catalogs travel inside the binary as SEA assets, so it needs
+nothing beside it but the config file and somewhere to keep its state.
+
+### 4.6 Unraid and Home Assistant
 
 Distribution rather than features (roadmap 6.6): both reach an audience that
 runs exactly this kind of container, and neither changes a line of the

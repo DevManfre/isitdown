@@ -83,6 +83,36 @@ Sanity checklist before declaring a build "done":
 - [ ] Both images pass their `HEALTHCHECK` (`docker ps` should show `healthy`, not `starting` forever or `unhealthy`).
 - [ ] Neither image bakes in any secret — `docker history <image>` should show no `ENV` layer with a real token value; secrets only ever come from the runtime `.env` / `env_file`.
 
+## The third artefact: a single binary (roadmap 6.7)
+
+Light also ships as one executable, for an operator who wants neither Docker
+nor a Node install. It is **not** a Docker target — it is `npm run build:sea`,
+which writes `dist/sea/isitdown-light`:
+
+```bash
+npm run build:sea
+CONFIG_PATH=./config.yml DATA_PATH=./state.json ./dist/sea/isitdown-light
+```
+
+Three steps inside `tools/build-sea.mjs`, all of them Node's own: Vite bundles
+`src/light/index.ts` to one CommonJS file (Node's SEA has no ESM loader and no
+top-level `await` — which is why that entry keeps its `main()` wrapper: do not
+"simplify" it back to top-level awaits), `--experimental-sea-config` builds the
+blob, and `postject` injects it into a copy of the Node binary that ran the
+script. So the binary is whatever `.nvmrc` pins, with no second place saying so.
+
+- **Light only.** The UI edition serves a built dashboard out of
+  `dist/ui/public` — thousands of files a binary would have to carry.
+- **The notification catalogs travel as SEA assets** (`i18n/<locale>.json`),
+  because there is no `dist` beside a binary to read them from.
+  `src/core/i18n/index.ts` enumerates asset keys when `isSea()`, exactly as it
+  enumerates the directory otherwise, so a new locale needs no edit in the
+  build script.
+- **~120MB**, nearly all of it Node. That is the shape of a SEA, not a bug.
+- The release workflow builds it on the Linux x64 runner and attaches it to the
+  GitHub release with a `.sha256` beside it. macOS and Windows would be a
+  runner matrix; add one when somebody asks.
+
 ## Common build failures
 
 - **"Cannot find module" at runtime but build succeeded**: usually means `COPY --from=builder /app/dist/<edition> ./dist` is copying the wrong sub-path, or `npm run build:light`/`build:ui` isn't actually splitting output by edition. Check the build script in `package.json` first.
