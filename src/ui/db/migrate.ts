@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -415,6 +415,20 @@ export function migrate(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_incident_notes_incident
         ON incident_notes (provider_id, incident_id, created_at);
     `);
+  }
+
+  if (from < 18) {
+    // Silent-outage cross-check — roadmap 1.10. A column beside `group_name`
+    // for the same reason: it is a name a probe carries, written identically in
+    // the Light edition's `config.yml`, and a table would let the two editions
+    // describe one relationship two ways. Nullable, because a probe checks
+    // nothing but itself until an operator says otherwise.
+    const columns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!columns.includes("cross_checks")) {
+      db.exec("ALTER TABLE services ADD COLUMN cross_checks TEXT");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

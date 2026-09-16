@@ -62,6 +62,8 @@ test("a full file maps onto a runtime config with the polling keys flattened", a
     adaptivePolling: true,
     confirmSamples: 1,
     adaptiveIntervalMinutes: 1,
+    correlationThreshold: 0,
+    correlationWindowMinutes: 10,
   });
   assert.equal(config.locale, "it");
   assert.equal(config.services.length, 2);
@@ -107,6 +109,8 @@ test("omitted optional keys fall back to the documented defaults", async () => {
     adaptivePolling: true,
     confirmSamples: 1,
     adaptiveIntervalMinutes: 1,
+    correlationThreshold: 0,
+    correlationWindowMinutes: 10,
   });
   assert.equal(config.locale, "en");
   assert.deepEqual(config.channels, []);

@@ -73,6 +73,14 @@ const settingsSchema = z.object({
    */
   confirmSamples: z.coerce.number().int().positive().max(10).catch(1),
   /**
+   * Correlated-outage detection (roadmap 2.7): how many providers have to go
+   * bad inside the window before one shared failure is reported instead of one
+   * alert each. Off by default — it is the only setting here that *replaces*
+   * alerts, and an installation must not discover that mid-incident.
+   */
+  correlationThreshold: z.coerce.number().int().min(0).max(100).catch(0),
+  correlationWindowMinutes: z.coerce.number().int().positive().max(1440).catch(10),
+  /**
    * How long history is kept. Four months by default — a month beyond the
    * 90-day view, so a full window is always available — and up to ten years for
    * anyone who wants year-on-year comparisons more than they want the disk.
@@ -148,6 +156,7 @@ const serviceRowSchema = z.object({
   interval_minutes: z.number().nullable(),
   muted_until: z.string().nullable(),
   group_name: z.string().nullable(),
+  cross_checks: z.string().nullable(),
 });
 
 const removedRowSchema = z.object({
@@ -261,7 +270,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -289,13 +298,14 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // Absent rather than null, like the interval above: "in no group" is the
       // normal state and the engine reads it from the field not being there.
       ...(row.group_name === null ? {} : { group: row.group_name }),
+      ...(row.cross_checks === null ? {} : { crossChecks: row.cross_checks }),
     }));
 }
 
 export function insertService(db: DatabaseSync, definition: ServiceDefinition): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -308,6 +318,7 @@ export function insertService(db: DatabaseSync, definition: ServiceDefinition): 
     parsed.intervalMinutes ?? null,
     parsed.mutedUntil ?? null,
     parsed.group ?? null,
+    parsed.crossChecks ?? null,
     new Date().toISOString(),
   );
 }
@@ -327,6 +338,8 @@ export const servicePatchSchema = serviceDefinitionSchema
     mutedUntil: z.string().datetime().nullable().optional(),
     /** Null takes the provider out of its group (roadmap 2.6). */
     group: serviceDefinitionSchema.shape.group.unwrap().nullable().optional(),
+    /** Null stops a probe cross-checking anything (roadmap 1.10). */
+    crossChecks: serviceDefinitionSchema.shape.crossChecks.unwrap().nullable().optional(),
   });
 
 /** Returns false when there was no such service, so a route can answer 404. */
@@ -345,6 +358,7 @@ export function updateService(
   // Null is how the dashboard takes a provider out of its group, the way it
   // clears an interval: on a patch `undefined` already means "leave it alone".
   if (parsed.group !== undefined) columns["group_name"] = parsed.group;
+  if (parsed.crossChecks !== undefined) columns["cross_checks"] = parsed.crossChecks;
   if (parsed.components !== undefined) {
     columns["components"] = parsed.components.length === 0 ? null : JSON.stringify(parsed.components);
   }
@@ -774,6 +788,8 @@ export function createDbConfigSource(
           adaptivePolling: settings.adaptivePolling,
           adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
           confirmSamples: settings.confirmSamples,
+          correlationThreshold: settings.correlationThreshold,
+          correlationWindowMinutes: settings.correlationWindowMinutes,
         }),
         locale: settings.notificationLocale,
         services,

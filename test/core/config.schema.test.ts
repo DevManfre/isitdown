@@ -153,6 +153,10 @@ test("polling schema fills every default", () => {
     adaptivePolling: true,
     confirmSamples: 1,
     adaptiveIntervalMinutes: 1,
+    // Correlated-outage detection is off until asked for (roadmap 2.7): it is
+    // the one polling setting that replaces alerts rather than adding them.
+    correlationThreshold: 0,
+    correlationWindowMinutes: 10,
   });
 });
 

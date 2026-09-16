@@ -107,6 +107,12 @@ export async function inspectConfig(path: string, env: NodeJS.ProcessEnv): Promi
         ? {}
         : { adaptiveIntervalMinutes: file.adaptiveIntervalMinutes }),
       ...(file.confirmSamples === undefined ? {} : { confirmSamples: file.confirmSamples }),
+      ...(file.correlationThreshold === undefined
+        ? {}
+        : { correlationThreshold: file.correlationThreshold }),
+      ...(file.correlationWindowMinutes === undefined
+        ? {}
+        : { correlationWindowMinutes: file.correlationWindowMinutes }),
     }),
     locale: file.locale ?? "en",
     services: file.services,

@@ -8,7 +8,7 @@ import type { OverallStatus, StatusChange, StatusChangeKind } from "./types.ts";
  */
 
 /**
- * The eight change kinds grouped into four classes. Classes rather than raw
+ * The ten change kinds grouped into four classes. Classes rather than raw
  * kinds for two reasons: a rule stays readable at four checkboxes instead of
  * eight, and a kind added later joins an existing class rather than being
  * invisible to every rule already saved.
@@ -31,6 +31,14 @@ const CLASS_OF: Record<StatusChangeKind, EventClass> = {
   maintenance_started: "maintenance",
   maintenance_ended: "maintenance",
   monitoring_degraded: "monitoring",
+  // A shared failure is still a fleet of statuses going bad (roadmap 2.7): it
+  // replaces the status alerts it folds, so it has to reach the same rules
+  // they would have.
+  correlated_outage: "status",
+  // The claim is about a provider's own status — that it is worse than its
+  // page admits (roadmap 1.10) — not about our monitoring, so it reaches the
+  // rules a status change would.
+  silent_outage: "status",
 };
 
 export function classOf(kind: StatusChangeKind): EventClass {

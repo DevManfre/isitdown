@@ -147,6 +147,8 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         adaptivePolling: settings.adaptivePolling,
         adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
         confirmSamples: settings.confirmSamples,
+        correlationThreshold: settings.correlationThreshold,
+        correlationWindowMinutes: settings.correlationWindowMinutes,
       },
       retention: { days: settings.retentionDays },
       // Quiet hours, the digest window, the per-provider cap and whether an
@@ -396,6 +398,12 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         ? {}
         : { adaptiveIntervalMinutes: parsed.data.adaptiveIntervalMinutes }),
       ...(parsed.data.confirmSamples === undefined ? {} : { confirmSamples: parsed.data.confirmSamples }),
+      ...(parsed.data.correlationThreshold === undefined
+        ? {}
+        : { correlationThreshold: parsed.data.correlationThreshold }),
+      ...(parsed.data.correlationWindowMinutes === undefined
+        ? {}
+        : { correlationWindowMinutes: parsed.data.correlationWindowMinutes }),
       ...(parsed.data.retentionDays === undefined ? {} : { retentionDays: parsed.data.retentionDays }),
       ...deliveryPatch(parsed.data.delivery),
     });
@@ -410,6 +418,8 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         adaptivePolling: settings.adaptivePolling,
         adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
         confirmSamples: settings.confirmSamples,
+        correlationThreshold: settings.correlationThreshold,
+        correlationWindowMinutes: settings.correlationWindowMinutes,
       },
       retention: { days: settings.retentionDays },
     });

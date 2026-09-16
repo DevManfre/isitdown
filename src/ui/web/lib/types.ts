@@ -222,7 +222,12 @@ export type StatusChangeKind =
   | "incident_resolved"
   | "maintenance_started"
   | "maintenance_ended"
-  | "monitoring_degraded";
+  | "monitoring_degraded"
+  // Several providers going bad inside one window, reported once (roadmap 2.7).
+  | "correlated_outage"
+  // A provider's page claiming to be fine while our own probe cannot reach the
+  // service it describes (roadmap 1.10).
+  | "silent_outage";
 
 /**
  * One dispatch attempt, delivered or failed. Field list follows

@@ -90,6 +90,8 @@ export const STATUS_CHANGE_KINDS = [
   "maintenance_started",
   "maintenance_ended",
   "monitoring_degraded",
+  "correlated_outage",
+  "silent_outage",
 ] as const;
 
 export type StatusChangeKind = (typeof STATUS_CHANGE_KINDS)[number];
@@ -114,6 +116,22 @@ export interface StatusChange {
   maintenance?: MaintenanceWindow | undefined;
   /** Present on maintenance_ended only: incidents still open as it closed. */
   openIncidents?: number | undefined;
+  /**
+   * Present for correlated_outage only (roadmap 2.7): every provider that
+   * went bad inside the window, the change's own provider included, and how
+   * wide that window was. The change still names one provider in
+   * `providerId` — the worst-hit one — so routing, the delivery log and the
+   * dashboard all have a real subject to hang it on, and this is what says
+   * the alert is about more than that one.
+   */
+  correlated?: { providerIds: string[]; windowMinutes: number } | undefined;
+  /**
+   * Present for silent_outage only (roadmap 1.10): the probe whose failing
+   * reading disagrees with the provider's own page, and whatever it had to say
+   * about why. The change names the *provider* in `providerId`, because the
+   * claim is about that page's honesty rather than about the probe.
+   */
+  crossCheck?: { probeId: string; note?: string | undefined } | undefined;
   /** ISO 8601, UTC. */
   at: string;
 }
