@@ -8,6 +8,7 @@ import { getAdapter } from "../../adapters/index.ts";
 import {
   alertCapSchema,
   digestSchema,
+  localeSchema,
   pollingSchema,
   quietHoursSchema,
   routingRulesSchema,
@@ -33,6 +34,7 @@ import {
   updateService,
   writeSettings,
 } from "../dbConfigSource.ts";
+import { TEMPLATE_MAX_LENGTH } from "../../notifiers/template.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { exportConfigYaml, importConfigYaml } from "../configFile.ts";
 import { createBackup, restoreBackup } from "../dbBackup.ts";
@@ -69,6 +71,19 @@ const settingsPatchSchema = pollingSchema
 const channelPatchSchema = z.object({
   enabled: z.boolean().optional(),
   fields: z.record(z.string()).optional(),
+  /**
+   * The language this channel's messages are written in (roadmap 3.20), or an
+   * empty string to go back to the installation's own. Empty rather than `null`
+   * because this is what a cleared `<select>` sends, and a second spelling of
+   * "unset" is a second thing to get wrong.
+   */
+  locale: z.union([localeSchema, z.literal("")]).optional(),
+  /**
+   * This channel's message template (roadmap 3.15); empty clears it. Length is
+   * checked here and the token set in `updateChannel`, which is where the Light
+   * edition's loader checks it too.
+   */
+  template: z.string().max(TEMPLATE_MAX_LENGTH).optional(),
 });
 // Credential *values*, unlike the patch above's variable names. At least one,
 // because an empty save is a request that would report success having done
@@ -735,7 +750,13 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       components: [],
       scopeToComponents: false,
     };
-    const record = await runtime.dispatcher.sendTest(notifier, service, config.locale);
+    // The channel's own wording, so the test shows what the channel will
+    // actually send rather than a message in the fleet's default language
+    // (roadmap 3.20) and the default layout (roadmap 3.15).
+    const record = await runtime.dispatcher.sendTest(notifier, service, config.locale, {
+      ...(resolved.locale === undefined ? {} : { locale: resolved.locale }),
+      ...(resolved.template === undefined ? {} : { template: resolved.template }),
+    });
     res.json(record.ok ? { ok: true } : { ok: false, error: record.error });
   });
 

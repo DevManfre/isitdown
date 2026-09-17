@@ -6,7 +6,7 @@ import { useBusy } from "@/hooks/useBusy.tsx";
 import { renderWithProviders } from "@/test/harness.tsx";
 import { RoutingRulesDialog } from "./RoutingRulesDialog.tsx";
 
-const channels = [{ id: "telegram", enabled: true, fields: [] }];
+const channels = [{ id: "telegram", enabled: true, fields: [], locale: "", template: "" }];
 const services = [
   {
     id: "github",

@@ -9,16 +9,18 @@ import {
   routingRulesSchema,
   serviceDefinitionSchema,
 } from "../core/config.schema.ts";
-import type {
-  ChannelConfig,
-  ConfigSource,
-  RuntimeConfig,
-  ServiceDefinition,
+import {
+  CHANNEL_MESSAGE_KEYS,
+  type ChannelConfig,
+  type ConfigSource,
+  type RuntimeConfig,
+  type ServiceDefinition,
 } from "../core/configSource.interface.ts";
 import type { Logger } from "../core/logger.ts";
 import { forgetProvider } from "../core/http.ts";
 import { CATCH_ALL_RULE, SEVERITY_FLOORS } from "../core/routing.ts";
 import { isOptionalSetting } from "../notifiers/settings.ts";
+import { templateProblems } from "../notifiers/template.ts";
 import type { RoutingRule } from "../core/routing.ts";
 
 /**
@@ -157,6 +159,7 @@ const serviceRowSchema = z.object({
   muted_until: z.string().nullable(),
   group_name: z.string().nullable(),
   cross_checks: z.string().nullable(),
+  sla_target: z.number().nullable(),
 });
 
 const removedRowSchema = z.object({
@@ -196,6 +199,15 @@ export interface DescribedChannel {
   id: string;
   enabled: boolean;
   fields: DescribedField[];
+  /**
+   * The language this channel writes in (roadmap 3.20), empty for the
+   * installation's own. Unlike a credential this *is* handed back: it is a
+   * preference, not a secret, and a field the dashboard could set but never
+   * read would show an empty box over a configured channel.
+   */
+  locale: string;
+  /** This channel's message template (roadmap 3.15), empty for the default rendering. */
+  template: string;
 }
 
 export function readSettings(db: DatabaseSync, logger: Logger): Settings {
@@ -270,7 +282,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks, sla_target
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -299,13 +311,17 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // normal state and the engine reads it from the field not being there.
       ...(row.group_name === null ? {} : { group: row.group_name }),
       ...(row.cross_checks === null ? {} : { crossChecks: row.cross_checks }),
+      // Absent rather than null, like every optional above: "nobody promised
+      // anything about this provider" has to stay distinguishable from a
+      // target that happens to be 100 (roadmap 4.13).
+      ...(row.sla_target === null ? {} : { slaTarget: row.sla_target }),
     }));
 }
 
 export function insertService(db: DatabaseSync, definition: ServiceDefinition): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks, sla_target, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -319,6 +335,7 @@ export function insertService(db: DatabaseSync, definition: ServiceDefinition): 
     parsed.mutedUntil ?? null,
     parsed.group ?? null,
     parsed.crossChecks ?? null,
+    parsed.slaTarget ?? null,
     new Date().toISOString(),
   );
 }
@@ -340,6 +357,8 @@ export const servicePatchSchema = serviceDefinitionSchema
     group: serviceDefinitionSchema.shape.group.unwrap().nullable().optional(),
     /** Null stops a probe cross-checking anything (roadmap 1.10). */
     crossChecks: serviceDefinitionSchema.shape.crossChecks.unwrap().nullable().optional(),
+    /** Null means nobody is promising anything about this provider any more (roadmap 4.13). */
+    slaTarget: serviceDefinitionSchema.shape.slaTarget.unwrap().nullable().optional(),
   });
 
 /** Returns false when there was no such service, so a route can answer 404. */
@@ -367,6 +386,7 @@ export function updateService(
   }
   if (parsed.intervalMinutes !== undefined) columns["interval_minutes"] = parsed.intervalMinutes;
   if (parsed.mutedUntil !== undefined) columns["muted_until"] = parsed.mutedUntil;
+  if (parsed.slaTarget !== undefined) columns["sla_target"] = parsed.slaTarget;
   if (Object.keys(columns).length === 0) return exists(db, id);
 
   const assignments = Object.keys(columns)
@@ -641,6 +661,15 @@ export interface ChannelPatch {
   enabled?: boolean | undefined;
   /** Only `*Env` keys are accepted: the database stores references, not secrets. */
   fields?: Record<string, string> | undefined;
+  /**
+   * The channel's own locale (roadmap 3.20); `""` clears it back to the
+   * installation's. Its own field rather than one of `fields` above, which is
+   * deliberately closed to anything but an environment-variable reference — a
+   * locale is neither a credential nor a reference to one.
+   */
+  locale?: string | undefined;
+  /** The channel's own message template (roadmap 3.15); `""` clears it. */
+  template?: string | undefined;
 }
 
 export function updateChannel(db: DatabaseSync, id: string, patch: ChannelPatch): boolean {
@@ -702,6 +731,21 @@ export function updateChannel(db: DatabaseSync, id: string, patch: ChannelPatch)
     }
   }
 
+  // The two fields that say how a message reads rather than where it goes. An
+  // empty string removes the key outright instead of storing a blank one: a
+  // stored `""` and an absent key would both have to mean "the default", and
+  // one of the two spellings would eventually be read as a real value.
+  for (const key of CHANNEL_MESSAGE_KEYS) {
+    const value = patch[key];
+    if (value === undefined) continue;
+    if (key === "template" && value !== "") {
+      const problems = templateProblems(value);
+      if (problems.length > 0) throw new Error(`channel ${id}: template — ${problems.join("; ")}`);
+    }
+    const { [key]: _dropped, ...rest } = config;
+    config = value === "" ? rest : { ...rest, [key]: value };
+  }
+
   db.prepare("UPDATE channels SET enabled = ?, config = ? WHERE id = ?").run(
     (patch.enabled ?? current.enabled) ? 1 : 0,
     JSON.stringify(config),
@@ -715,6 +759,8 @@ export function describeChannels(db: DatabaseSync, env: NodeJS.ProcessEnv): Desc
   return listChannels(db).map((channel) => ({
     id: channel.id,
     enabled: channel.enabled,
+    locale: channel.config["locale"] ?? "",
+    template: channel.config["template"] ?? "",
     fields: Object.entries(channel.config)
       .filter(([key]) => key.endsWith(ENV_SUFFIX))
       .map(([key, envVar]) => ({
@@ -753,6 +799,10 @@ export function createDbConfigSource(
         const resolved: Record<string, string> = {};
         const missing: string[] = [];
         for (const [key, value] of Object.entries(channel.config)) {
+          // Not transport: how the message reads, not where it goes. Read off
+          // below rather than resolved into `settings`, so a notifier factory
+          // is never handed a setting it has no schema for.
+          if ((CHANNEL_MESSAGE_KEYS as readonly string[]).includes(key)) continue;
           if (!key.endsWith(ENV_SUFFIX)) {
             resolved[key] = value;
             continue;
@@ -767,14 +817,19 @@ export function createDbConfigSource(
           } else resolved[name] = fromEnv;
         }
 
+        const message = {
+          ...(channel.config["locale"] === undefined ? {} : { locale: channel.config["locale"] }),
+          ...(channel.config["template"] === undefined ? {} : { template: channel.config["template"] }),
+        };
+
         if (channel.enabled && missing.length > 0) {
           logger.warn("channel disabled for this cycle: its environment variables are not set", {
             channel: channel.id,
             missing,
           });
-          return { id: channel.id, enabled: false, settings: resolved };
+          return { id: channel.id, enabled: false, ...message, settings: resolved };
         }
-        return { id: channel.id, enabled: channel.enabled, settings: resolved };
+        return { id: channel.id, enabled: channel.enabled, ...message, settings: resolved };
       });
 
       const routing = listRoutingRules(db, logger);

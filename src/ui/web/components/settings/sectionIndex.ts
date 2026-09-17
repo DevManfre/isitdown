@@ -52,7 +52,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     id: "notifications",
     labelKey: "settings.section.notifications",
     blurbKey: "settings.section.notifications.blurb",
-    rowKeys: ["settings.routing", "channel.env-var-toggle"],
+    rowKeys: ["settings.routing", "channel.env-var-toggle", "channel.locale", "channel.template"],
   },
   {
     id: "delivery",

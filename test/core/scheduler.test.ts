@@ -685,3 +685,53 @@ test("a poller asking for a longer cadence than the configuration cannot have it
 
   assert.ok(armedIn > 170_000 && armedIn < 190_000, `armed in ${armedIn}ms`);
 });
+
+/**
+ * A push-driven read — roadmap 2.10. The claim is that it is a real cycle,
+ * narrowed: same poller, same dispatch, and the standing timer untouched.
+ */
+test("triggerFor reads one provider and dispatches whatever came of it", async () => {
+  const polled: (readonly string[] | undefined)[] = [];
+  const dispatched: StatusChange[][] = [];
+  const change: StatusChange = {
+    kind: "status_change",
+    providerId: "github",
+    previousStatus: "operational",
+    currentStatus: "degraded",
+    at: "2026-08-19T14:00:00.000Z",
+  };
+
+  const scheduler = createScheduler({
+    configSource: fakeConfigSource(),
+    poller: {
+      async runCycle(_config, options) {
+        polled.push(options?.only);
+        return cycleResult([change]);
+      },
+      async nextIntervalMinutes(config: RuntimeConfig): Promise<number> {
+        return config.polling.intervalMinutes;
+      },
+    },
+    dispatcher: {
+      async dispatch(changes): Promise<SentRecord[]> {
+        dispatched.push(changes);
+        return [];
+      },
+      async sendTest(): Promise<SentRecord> {
+        throw new Error("not used here");
+      },
+    },
+    buildNotifiers: (_channels: ChannelConfig[]) => [],
+    logger: silent,
+  });
+
+  const result = await scheduler.triggerFor("github");
+
+  assert.deepEqual(polled, [["github"]]);
+  assert.equal(dispatched.length, 1, "a pushed reading goes through the dispatcher like any other");
+  assert.equal(dispatched[0]?.[0]?.providerId, "github");
+  assert.equal(result.changes.length, 1);
+  // Polling stays the fallback: a push must not be able to shove the fleet's
+  // own cycle indefinitely into the future.
+  assert.equal(scheduler.nextRunAt(), null, "triggerFor never arms or re-arms the timer");
+});

@@ -126,6 +126,15 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "400": badRequest, "404": notFound },
     },
   },
+  "/sla": {
+    get: {
+      tags: ["History"],
+      summary: "Monthly uptime targets and what the month has spent of them.",
+      description:
+        "Roadmap 4.13. One entry per provider that has a target: the budget the target implies, minutes spent, the burn rate against elapsed time, and where the month lands at this rate. Providers with no target are absent rather than reported at 100%.",
+      responses: { "200": ok({ type: "object" }) },
+    },
+  },
   "/history/calendar": {
     get: {
       tags: ["History"],
@@ -448,8 +457,9 @@ const paths: Json = {
   "/config/channels/{id}": {
     patch: {
       tags: ["Configuration"],
-      summary: "Enable or disable a channel, and set its variable names.",
-      description: "Refuses a literal secret.",
+      summary: "Enable or disable a channel, set its variable names, its locale and its template.",
+      description:
+        "Refuses a literal secret. `locale` (roadmap 3.20) and `template` (roadmap 3.15) are the two fields that are not credentials: an empty string clears either back to the default, and a template naming an unknown token is a 400.",
       parameters: [path("id", "Channel id.")],
       requestBody: { required: true, ...json({ type: "object" }) },
       responses: { "200": ok({ type: "object" }), "400": badRequest, "404": notFound },
@@ -549,6 +559,26 @@ const paths: Json = {
       summary: "One read of that provider's page, right now, reported in full.",
       parameters: [path("id", "Service id.")],
       responses: { "200": ok({ type: "object" }, "A failed read is 200 with ok: false."), "404": notFound },
+    },
+  },
+  "/push/{providerId}": {
+    post: {
+      tags: ["Diagnostics"],
+      summary: "A provider's own webhook: read this provider now.",
+      description:
+        "Roadmap 2.10. Registered as the subscriber URL on a provider's status page, so a change is read in seconds instead of on the next cadence. The body is a trigger, not a reading — the provider is then read through its adapter, so a pushed change and a polled one go through the same diff engine. Requires `?token=` matching `PUSH_TOKEN`; without that variable set the route answers 404. Several posts within ten seconds are coalesced into one read (202).",
+      parameters: [
+        path("providerId", "Provider id."),
+        query("token", "Must equal PUSH_TOKEN.", { type: "string" }),
+      ],
+      requestBody: { required: false, ...json({ type: "object" }) },
+      responses: {
+        "200": ok({ type: "object" }, "The provider was read."),
+        "202": ok({ type: "object" }, "Coalesced into a read already made."),
+        "400": badRequest,
+        "401": { description: "Wrong or missing token.", ...json(ref("Error")) },
+        "404": notFound,
+      },
     },
   },
   "/poll": {
@@ -723,7 +753,7 @@ export function openapiDocument(): Json {
       title: "IsItDown",
       version: API_VERSION,
       description:
-        "The UI edition's HTTP API. Everything here is local and unauthenticated: IsItDown is a single-operator dashboard bound to the machine it runs on, which is why no security scheme is declared.",
+        "The UI edition's HTTP API. It is a single-operator dashboard bound to the machine it runs on, so by default nothing here is authenticated. Setting API_TOKEN (roadmap 4.15) turns on the one scheme below: a bearer token granting read access from any host, while writes stay local-only. /health and /ready are never gated.",
       license: { name: "MIT" },
     },
     servers: [{ url: "/", description: "This instance." }],
@@ -741,6 +771,22 @@ export function openapiDocument(): Json {
       { name: "Meta", description: "This document." },
     ],
     paths,
-    components: { schemas },
+    components: {
+      schemas,
+      /**
+       * Declared rather than applied: with no `API_TOKEN` set — the default —
+       * every route is open, and a `security` requirement on each path would
+       * tell a generated client to demand a credential most installations do
+       * not have.
+       */
+      securitySchemes: {
+        apiToken: {
+          type: "http",
+          scheme: "bearer",
+          description:
+            "The value of API_TOKEN, when the instance sets one. Grants GET and HEAD from any host; anything else answers 403. X-API-Token carries the same value for a client that cannot send an Authorization header.",
+        },
+      },
+    },
   };
 }

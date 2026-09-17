@@ -10,6 +10,7 @@ import {
 import { RetryAfterError, type StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
 import type { ProviderRuntimeState, StateStore } from "./stateStore.interface.ts";
+import { tracer } from "./tracing.ts";
 import type { NormalizedStatus, StatusChange } from "./types.ts";
 
 /**
@@ -125,6 +126,19 @@ export interface CycleOptions {
    * cadence must not sit the request out.
    */
   ignoreSchedule?: boolean | undefined;
+  /**
+   * Poll only these providers, and leave everything else untouched — what a
+   * provider's own push arriving means (roadmap 2.10): GitHub said something
+   * changed, so read GitHub, not the fleet.
+   *
+   * Absent — the normal case — is every enabled provider. A cycle narrowed to
+   * one provider is deliberately still a cycle: it goes through the same
+   * `pollOne`, the same diff engine and the same dispatcher, so a pushed
+   * reading and a polled one cannot end up being two different code paths that
+   * agree only by accident. What it does not do is fold correlations, which
+   * would be nonsense across a set of one.
+   */
+  only?: readonly string[] | undefined;
 }
 
 export interface Poller {
@@ -591,8 +605,12 @@ export function createPoller(deps: PollerDeps): Poller {
       // A loop rather than `filter`: whether a provider is due now depends on
       // its stored state, and reading that is asynchronous.
       const enabled: ServiceDefinition[] = [];
+      const narrowed = options.only === undefined ? null : new Set(options.only);
       for (const service of config.services) {
         if (!service.enabled) continue;
+        // Narrowed before the schedule is consulted: a push is a reason to read
+        // this provider, and the other providers are not being asked at all.
+        if (narrowed !== null && !narrowed.has(service.id)) continue;
         // A manual poll overrides the schedule, a `Retry-After` hold included:
         // the operator asked for one request now, which is not the hammering
         // the hold exists to prevent.
@@ -610,7 +628,17 @@ export function createPoller(deps: PollerDeps): Poller {
       }
 
       const settled = await Promise.allSettled(
-        enabled.map((service) => pollOne(service, config, options)),
+        enabled.map((service) =>
+          // One span per provider read — roadmap 6.10. Here rather than inside
+          // `pollOne` so the span covers the stagger wait too: "this provider
+          // took 14 seconds" has to include the seconds it spent deliberately
+          // waiting, or the trace explains a slow cycle with nothing in it.
+          tracer().span(
+            "provider.read",
+            { "isitdown.provider": service.id, "isitdown.adapter": service.adapter },
+            () => pollOne(service, config, options),
+          ),
+        ),
       );
 
       const results: ProviderResult[] = [];

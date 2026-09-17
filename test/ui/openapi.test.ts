@@ -128,8 +128,22 @@ test("the document is served as JSON and as the same document in YAML", async ()
   }
 });
 
-test("no path declares a security scheme — this API is local and unauthenticated", () => {
-  const document = openapiDocument() as { components: { securitySchemes?: unknown }; security?: unknown };
-  assert.equal(document.components.securitySchemes, undefined);
+test("the token scheme is declared but nothing requires it — most installations have no token", () => {
+  // Roadmap 4.15 gave the API a credential, and it is optional by construction:
+  // with no `API_TOKEN` set every route is open, so a `security` requirement on
+  // a path — or a document-wide one — would tell a generated client to demand a
+  // credential the instance it is talking to does not want.
+  const document = openapiDocument() as {
+    components: { securitySchemes?: Record<string, { type: string; scheme: string }> };
+    security?: unknown;
+    paths: Record<string, Record<string, { security?: unknown }>>;
+  };
+  assert.deepEqual(Object.keys(document.components.securitySchemes ?? {}), ["apiToken"]);
+  assert.equal(document.components.securitySchemes?.["apiToken"]?.scheme, "bearer");
   assert.equal(document.security, undefined);
+  for (const [path, operations] of Object.entries(document.paths)) {
+    for (const [method, operation] of Object.entries(operations)) {
+      assert.equal(operation.security, undefined, `${method.toUpperCase()} ${path}`);
+    }
+  }
 });

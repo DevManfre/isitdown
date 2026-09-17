@@ -21,12 +21,18 @@ export const ROUTE_PATHS = {
   settings: "/settings",
   /** One Settings category, on its own page: `#/settings/engine`. */
   settingsSection: "/settings/:sectionId",
+  /**
+   * The office screen — roadmap 5.8. Outside the app shell rather than a view
+   * inside it: it has no rail and no header, and a view cannot remove the
+   * chrome around it.
+   */
+  wallboard: "/wallboard",
 } as const;
 
 export type RouteName = keyof typeof ROUTE_PATHS;
 
 /** Every route that is a destination in its own right — the rail's own set. */
-export type NavRouteName = Exclude<RouteName, "settingsSection" | "providerDetail">;
+export type NavRouteName = Exclude<RouteName, "settingsSection" | "providerDetail" | "wallboard">;
 
 /** The rail's order, which is also the nav-label lookup order. */
 export const NAV_ROUTES: { name: NavRouteName; labelKey: string }[] = [

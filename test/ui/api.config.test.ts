@@ -372,6 +372,74 @@ test("the API refuses to accept a literal secret value", async () => {
   }
 });
 
+/**
+ * Per-channel locale (roadmap 3.20) and template (roadmap 3.15): the two fields
+ * on a channel that are not credentials, and the only two the API hands back.
+ */
+test("a channel's locale and template are stored, read back and clearable", async () => {
+  const app = await api();
+  try {
+    const patched = await app.request("PATCH", "/config/channels/telegram", {
+      locale: "it",
+      template: "{{provider}} {{severity}}",
+    });
+    assert.equal(patched.status, 200);
+    assert.equal((patched.body as { locale: string }).locale, "it");
+    assert.equal((patched.body as { template: string }).template, "{{provider}} {{severity}}");
+
+    // Unlike a credential, these come back: they are preferences, and a field
+    // the dashboard can set but never read shows an empty box over a
+    // configured channel.
+    const read = (await app.request("GET", "/config")).body as {
+      channels: { id: string; locale: string; template: string }[];
+    };
+    const telegram = read.channels.find((channel) => channel.id === "telegram");
+    assert.equal(telegram?.locale, "it");
+    assert.equal(telegram?.template, "{{provider}} {{severity}}");
+
+    // An empty string is how the dashboard says "back to the default", and it
+    // has to leave nothing behind that could later be read as a real value.
+    const cleared = await app.request("PATCH", "/config/channels/telegram", { locale: "", template: "" });
+    assert.equal((cleared.body as { locale: string }).locale, "");
+    assert.equal((cleared.body as { template: string }).template, "");
+  } finally {
+    await app.close();
+  }
+});
+
+test("a template naming an unknown token is refused with the token in the message", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.request("PATCH", "/config/channels/telegram", {
+      template: "{{provder}} is down",
+    });
+    assert.equal(status, 400);
+    assert.match((body as { error: { message: string } }).error.message, /\{\{provder\}\}/);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a channel's locale never reaches the notifier as a transport setting", async () => {
+  const app = await api({ MY_HOOK: "https://hooks.example/x" });
+  try {
+    await app.request("PATCH", "/config/channels/webhook", {
+      enabled: true,
+      fields: { urlEnv: "MY_HOOK" },
+      locale: "it",
+      template: "{{message}}",
+    });
+    const channel = (await app.runtime.configSource.load()).channels.find(
+      (entry) => entry.id === "webhook",
+    );
+    assert.equal(channel?.locale, "it");
+    assert.equal(channel?.template, "{{message}}");
+    assert.deepEqual(Object.keys(channel?.settings ?? {}), ["url"]);
+  } finally {
+    await app.close();
+  }
+});
+
 test("an unknown channel is a 404", async () => {
   const app = await api();
   try {

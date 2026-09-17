@@ -22,14 +22,21 @@ import { Button } from "@/components/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useChannelMutations, usePushDevices, usePushMutations } from "@/hooks/queries.ts";
 import { useFieldProps } from "@/hooks/useBusy.tsx";
 import { getPushKey } from "@/lib/api.ts";
 import { pushSupported, subscribeThisBrowser } from "@/lib/push.ts";
 import { cn } from "@/lib/utils.ts";
+import { supportedLocales } from "@/lib/i18n.ts";
 import type { DescribedChannel } from "@/lib/types.ts";
+// The token names come from the notifier layer rather than being restated here:
+// a token added there has to show up in this list, and a literal array would
+// silently not.
+import { TEMPLATE_TOKENS } from "../../../../notifiers/template.ts";
 
 // Reason codes `subscribeThisBrowser` throws, mapped to copy that says what to
 // do about them; anything else falls back to push.failed with the raw text.
@@ -122,6 +129,103 @@ function PushDevices({
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What this channel says, as opposed to where it says it: the language it
+ * writes in (roadmap 3.20) and the template it renders with (roadmap 3.15).
+ *
+ * Both save instantly, like every other preference on this page — the language
+ * on pick, the template on blur, because a template is typed rather than chosen
+ * and saving per keystroke would validate half-written tokens at the operator.
+ * Shown for every channel including the fieldless ones: browser push has no
+ * credential to configure and every reason to be readable in Italian.
+ */
+function ChannelMessage({ channel }: { channel: DescribedChannel }) {
+  const { t } = useTranslation();
+  const fieldProps = useFieldProps();
+  const { patch } = useChannelMutations();
+  const [template, setTemplate] = useState(channel.template);
+  const [problem, setProblem] = useState<string | undefined>(undefined);
+  const [saved, setSaved] = useState(false);
+
+  const localeId = `channel-${channel.id}-locale`;
+  const templateId = `channel-${channel.id}-template`;
+
+  const saveTemplate = (): void => {
+    if (template === channel.template) return;
+    setSaved(false);
+    patch.mutate(
+      { id: channel.id, patch: { template } },
+      {
+        onSuccess: () => {
+          setProblem(undefined);
+          setSaved(true);
+        },
+        // The server is the one that knows the token set, so its sentence is
+        // the one shown — a second copy of the rules here is a second copy to
+        // keep in step with `template.ts`.
+        onError: (error: unknown) =>
+          setProblem(t("channel.message.failed", { error: error instanceof Error ? error.message : String(error) })),
+      },
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border pt-3">
+      <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("channel.message")}</span>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={localeId}>{t("channel.locale")}</Label>
+        {/* An empty value is the fleet's own locale, which is why it is an
+            option rather than an absent one: "inherit" has to be reachable
+            again once a channel has been given a language of its own. */}
+        <Select
+          value={channel.locale === "" ? "default" : channel.locale}
+          onValueChange={(next) =>
+            patch.mutate({ id: channel.id, patch: { locale: next === "default" ? "" : next } })
+          }
+        >
+          <SelectTrigger id={localeId} className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="default">{t("channel.locale.default")}</SelectItem>
+            {supportedLocales.map((locale) => (
+              <SelectItem key={locale} value={locale}>
+                {locale}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={templateId}>{t("channel.template")}</Label>
+        <Textarea
+          id={templateId}
+          rows={3}
+          className="font-mono text-xs"
+          value={template}
+          onChange={(event) => setTemplate(event.target.value)}
+          {...fieldProps}
+          // After the spread, deliberately: `fieldProps` carries its own
+          // `onBlur` (it releases the poll hold), and letting the spread land
+          // last would silently drop the save.
+          onBlur={() => {
+            fieldProps.onBlur();
+            saveTemplate();
+          }}
+        />
+        <p className="text-xs text-muted-foreground">{t("channel.template.hint")}</p>
+        <p className="font-mono text-xs text-muted-foreground">
+          {t("channel.template.tokens", { tokens: Object.keys(TEMPLATE_TOKENS).join(", ") })}
+        </p>
+        {problem !== undefined && <p className="text-xs text-destructive">{problem}</p>}
+        {problem === undefined && saved && <p className="text-xs text-muted-foreground">{t("channel.template.saved")}</p>}
       </div>
     </div>
   );
@@ -454,6 +558,10 @@ export function ChannelRow({
         {channel.id === "webpush" && (
           <PushDevices channelEnabled={channel.enabled} testAction={testButton} />
         )}
+
+        {/* Last in the body, under the credentials and the actions: a channel is
+            configured before it is worth deciding how it reads. */}
+        <ChannelMessage channel={channel} />
 
         </div>
       </CollapsibleContent>

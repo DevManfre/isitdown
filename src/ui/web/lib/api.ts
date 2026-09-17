@@ -20,6 +20,7 @@ import type {
   OverallStatus,
   Preferences,
   ProviderCalendar,
+  SlaResponse,
   ProviderHistory,
   HistorySummary,
   RoutingResponse,
@@ -113,6 +114,9 @@ export const getHistory = (
 /** A year of day cells for one provider — roadmap 5.20. The window is the server's. */
 export const getProviderCalendar = (provider: string) =>
   request<ProviderCalendar>("GET", `/history/calendar?provider=${encodeURIComponent(provider)}`);
+
+/** Monthly targets and what the month has spent of them — roadmap 4.13. */
+export const getSla = () => request<SlaResponse>("GET", "/sla");
 
 export const getComponentHistory = (provider: string, days: number) =>
   request<ComponentHistoryResponse>(

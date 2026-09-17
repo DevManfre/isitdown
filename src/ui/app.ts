@@ -1,4 +1,5 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
+import { apiToken } from "./apiToken.ts";
 import { badgeRoutes } from "./routes/badge.routes.ts";
 import { configRoutes } from "./routes/config.routes.ts";
 import { debugRoutes } from "./routes/debug.routes.ts";
@@ -14,6 +15,8 @@ import { maintenancesRoutes } from "./routes/maintenances.routes.ts";
 import { metricsRoutes } from "./routes/metrics.routes.ts";
 import { notificationsRoutes } from "./routes/notifications.routes.ts";
 import { preferencesRoutes } from "./routes/preferences.routes.ts";
+import { pushRoutes } from "./routes/push.routes.ts";
+import { slaRoutes } from "./routes/sla.routes.ts";
 import { statusRoutes } from "./routes/status.routes.ts";
 import type { UiRuntimeCore } from "./runtime.ts";
 
@@ -27,6 +30,10 @@ const PUBLIC_DIR = process.env["WEB_DIR"] ?? new URL("./public/", import.meta.ur
 export function createApp(runtime: UiRuntimeCore): Express {
   const app = express();
   app.disable("x-powered-by");
+  // First, before the body parsers: a request this instance will not answer
+  // should be refused before 512 MB of it has been read (roadmap 4.15). Does
+  // nothing at all unless `API_TOKEN` is set.
+  app.use(apiToken(runtime.env));
   app.use(express.json({ limit: "64kb" }));
   // The config import (roadmap 4.3) takes a `config.yml` as it stands, so the
   // YAML content types arrive as text rather than as a JSON string.
@@ -40,6 +47,8 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(statusRoutes(runtime));
   app.use(eventsRoutes(runtime));
   app.use(historyRoutes(runtime));
+  app.use(slaRoutes(runtime));
+  app.use(pushRoutes(runtime));
   app.use(incidentsRoutes(runtime));
   app.use(notificationsRoutes(runtime));
   app.use(configRoutes(runtime));

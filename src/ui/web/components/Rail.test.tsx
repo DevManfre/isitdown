@@ -16,7 +16,7 @@ const status = {
   ],
   pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null,
 };
-const config = { polling: {}, services: [], channels: [{ id: "telegram", enabled: true, fields: [] }] };
+const config = { polling: {}, services: [], channels: [{ id: "telegram", enabled: true, fields: [], locale: "", template: "" }] };
 
 // The rail is a `Sidebar`, so it needs the primitive's context — mounted the
 // way App mounts it, with `open` pinned true, since that pin is what leaves the

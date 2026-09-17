@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { IncidentMap } from "@/components/IncidentMap.tsx";
 import { ProviderDetailPanel } from "@/components/ProviderDetailPanel.tsx";
+import { SlaBudgetCard } from "@/components/SlaBudgetCard.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { useIncidents, useStatus } from "@/hooks/queries.ts";
 import { statusLabelKey } from "@/lib/chartConfig.ts";
@@ -100,6 +101,11 @@ export function ProviderDetail() {
           upcoming={provider.maintenance?.upcoming ?? []}
         />
       </section>
+
+      {/* Roadmap 4.13. Under the uptime it is measured from and above the
+          incidents that spent it, which is the order the question is asked in.
+          Renders nothing at all for a provider with no target. */}
+      <SlaBudgetCard providerId={providerId} />
 
       <section aria-label={t("incidents.list")} className="flex flex-col gap-2">
         <span className="text-xs uppercase tracking-widest text-primary">{t("incidents.list")}</span>

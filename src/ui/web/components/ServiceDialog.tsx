@@ -105,6 +105,9 @@ export function ServiceDialog({
   // "My stack" (roadmap 2.6). A free-text slug rather than a picker: the first
   // group has to be creatable, and a select with nothing in it cannot do that.
   const [group, setGroup] = useState(service?.group ?? "");
+  // Roadmap 4.13. A string rather than a number, like the interval above: a
+  // half-typed "99." is a state the input has to be allowed to be in.
+  const [slaTarget, setSlaTarget] = useState(service?.slaTarget == null ? "" : String(service.slaTarget));
   // Adapter-specific extras, of which the scrape adapter is so far the only
   // user. Kept as the raw record the service definition carries, rather than as
   // named fields, so an adapter that grows an option later needs no new state.
@@ -205,6 +208,7 @@ export function ServiceDialog({
     setScopeToComponents(service?.scopeToComponents ?? false);
     setIntervalMinutes(intervalValue(service));
     setGroup(service?.group ?? "");
+    setSlaTarget(service?.slaTarget == null ? "" : String(service.slaTarget));
     setOptions(service?.options ?? {});
     setHeader(storedHeader(service?.options));
     setPreview(undefined);
@@ -355,6 +359,9 @@ export function ServiceDialog({
           // Omitted rather than null on an add: the schema behind the POST takes
           // the field as optional, and absent already means the global cadence.
           ...(intervalMinutes.trim() === "" ? {} : { intervalMinutes: Number(intervalMinutes) }),
+          // Omitted rather than null, like the interval: absent means nobody
+          // promised anything about this provider (roadmap 4.13).
+          ...(slaTarget.trim() === "" ? {} : { slaTarget: Number(slaTarget) }),
         });
         const result = await test.mutateAsync(id);
         if (!result.ok) {
@@ -378,6 +385,9 @@ export function ServiceDialog({
             // Same rule for the group: cleared means "out of the group", which
             // only null can say (roadmap 2.6).
             group: slugify(group) === "" ? null : slugify(group),
+            // And null again for the target: cleared means the promise is off,
+            // which only null can say.
+            slaTarget: slaTarget.trim() === "" ? null : Number(slaTarget),
             ...savedOptions(),
           },
         });
@@ -472,6 +482,25 @@ export function ServiceDialog({
             {...fieldProps}
           />
           <span className="text-xs text-muted-foreground">{t("field.provider-interval-hint")}</span>
+        </div>
+
+        {/* Roadmap 4.13. Empty is the normal state: most providers are watched
+            without anybody having promised anything, and a default would invent
+            a promise and then report against it. */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-sla">{t("field.sla-target")}</Label>
+          <Input
+            id="service-sla"
+            type="number"
+            min={50}
+            max={100}
+            step={0.01}
+            placeholder={t("field.sla-target-placeholder")}
+            value={slaTarget}
+            onChange={(event) => setSlaTarget(event.target.value)}
+            {...fieldProps}
+          />
+          <span className="text-xs text-muted-foreground">{t("field.sla-target-hint")}</span>
         </div>
       </Section>
 

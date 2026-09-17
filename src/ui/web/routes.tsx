@@ -10,8 +10,17 @@ import { Overview } from "./views/Overview.tsx";
 import { ProviderDetail } from "./views/ProviderDetail.tsx";
 import { Providers } from "./views/Providers.tsx";
 import { Settings } from "./views/Settings.tsx";
+import { Wallboard } from "./views/Wallboard.tsx";
 
 export const router = createHashRouter([
+  {
+    // Roadmap 5.8. A sibling of the shell, not a child of it: the wallboard's
+    // whole premise is that there is no rail and no header, and a view nested
+    // under `App` renders inside both.
+    path: ROUTE_PATHS.wallboard,
+    element: <Wallboard />,
+    errorElement: <ViewError />,
+  },
   {
     path: "/",
     element: <App />,

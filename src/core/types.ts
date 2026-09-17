@@ -92,6 +92,7 @@ export const STATUS_CHANGE_KINDS = [
   "monitoring_degraded",
   "correlated_outage",
   "silent_outage",
+  "sla_burn",
 ] as const;
 
 export type StatusChangeKind = (typeof STATUS_CHANGE_KINDS)[number];
@@ -132,6 +133,33 @@ export interface StatusChange {
    * claim is about that page's honesty rather than about the probe.
    */
   crossCheck?: { probeId: string; note?: string | undefined } | undefined;
+  /**
+   * Present for sla_burn only (roadmap 4.13): the provider's monthly target,
+   * how much of the error budget the month has spent, and where the month ends
+   * up if it carries on at this rate.
+   *
+   * The only change here that is not about a moment. Every other kind reports
+   * something that just happened; this one reports an arithmetic fact about a
+   * month in progress — which is why it carries the whole calculation rather
+   * than a severity, and why the message says the projection instead of saying
+   * the provider is down.
+   */
+  sla?:
+    | {
+        /** `YYYY-MM`, UTC. */
+        month: string;
+        /** The configured target, as a percentage: 99.9. */
+        target: number;
+        /** Measured uptime so far this month, as a percentage. */
+        uptime: number;
+        /** Minutes of downtime the target allows across the whole month. */
+        budgetMinutes: number;
+        /** Minutes of it spent so far. May exceed the budget — that is the point. */
+        spentMinutes: number;
+        /** Where the month lands if the rate so far holds, as a percentage. */
+        projectedUptime: number;
+      }
+    | undefined;
   /** ISO 8601, UTC. */
   at: string;
 }
@@ -154,7 +182,23 @@ export interface NotificationPayload {
     /** The provider's public status page, linked from the message. */
     statusUrl: string;
   };
+  /**
+   * The language this message is written in. The configured notification
+   * locale, unless the channel it is going to names one of its own (roadmap
+   * 3.20) — which is why it sits on the payload rather than being read from the
+   * configuration inside each notifier: two channels can be handed the same
+   * change in two languages within one cycle.
+   */
   locale: string;
+  /**
+   * The channel's own message template, when it has one (roadmap 3.15). Absent
+   * is the normal case and means the default rendering, byte for byte.
+   *
+   * On the payload rather than passed beside it because every notifier renders
+   * from the payload it is handed — a channel that took the template as a
+   * second argument would be a channel that could forget it.
+   */
+  template?: string | undefined;
   /**
    * How many alerts for this provider the hourly cap swallowed before this one
    * (roadmap 3.13). Rendered as a line under the message: a cap that hid

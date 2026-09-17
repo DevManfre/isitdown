@@ -39,6 +39,12 @@ const CLASS_OF: Record<StatusChangeKind, EventClass> = {
   // page admits (roadmap 1.10) — not about our monitoring, so it reaches the
   // rules a status change would.
   silent_outage: "status",
+  // Monitoring rather than status (roadmap 4.13): nothing about the provider
+  // changed when this fires. It is a statement about a month of measurements —
+  // "at this rate, August misses what we were promised" — and routing it as a
+  // status change would send it to every rule that exists to be woken by an
+  // outage.
+  sla_burn: "monitoring",
 };
 
 export function classOf(kind: StatusChangeKind): EventClass {
