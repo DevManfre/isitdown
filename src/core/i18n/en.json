@@ -41,5 +41,28 @@
   "notification.digest.correlated": "{count} providers went bad together — {providers}",
   "notification.digest.sla": "error budget — at this rate the month lands at {projected}% against {target}%",
 
-  "notification.suppressed": "{count} further alert(s) for this provider were suppressed by the hourly cap."
+  "notification.suppressed": "{count} further alert(s) for this provider were suppressed by the hourly cap.",
+
+  "chatops.help": "IsItDown commands\n\n/status — every provider, worst first\n/status <provider> — one provider\n/history <provider> [7|30|90] — uptime over a window\n/mute <provider> <30m|2h|1d> — stop alerts for a while\n/unmute <provider> — start them again\n/help — this message",
+  "chatops.status.heading": "{count} of {total} provider(s) are not operational.",
+  "chatops.status.all-operational": "All {count} provider(s) are operational.",
+  "chatops.status.empty": "No providers are being watched yet.",
+  "chatops.status.incidents": "{count} open incident(s)",
+  "chatops.status.maintenance": "under maintenance",
+  "chatops.status.muted": "muted until {until}",
+  "chatops.status.uptime90": "90-day uptime: {uptime}",
+  "chatops.history.heading": "{provider} — last {days} day(s)",
+  "chatops.history.uptime": "Uptime: {uptime} over {days} measured day(s)",
+  "chatops.history.incidents": "Incidents: {count}",
+  "chatops.history.worst": "Worst day: {day} at {uptime}",
+  "chatops.history.unmeasured": "Nothing has been measured for {provider} in the last {days} day(s).",
+  "chatops.mute.done": "{provider} is muted until {until}. Alerts resume by themselves after that.",
+  "chatops.unmute.done": "{provider} is no longer muted.",
+  "chatops.error.provider-required": "Name a provider, e.g. /status github",
+  "chatops.error.duration-required": "Say how long, e.g. /mute github 2h",
+  "chatops.error.bad-duration": "{duration} is not a duration I understand. Try 30m, 2h or 1d, up to 30d.",
+  "chatops.error.bad-window": "{window} is not a window I keep. Ask for 7, 30 or 90 days.",
+  "chatops.error.unknown-provider": "I am not watching anything called {provider}.",
+  "chatops.error.unknown-command": "/{command} is not a command. Send /help for the list.",
+  "chatops.error.failed": "That did not work: {reason}"
 }
