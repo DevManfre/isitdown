@@ -1065,6 +1065,17 @@ describe("Settings", () => {
   // the one preference that changes the words every other row is read in, so
   // the assertions are about what a person sees and what is remembered for the
   // next browser — not about i18next's internals.
+  it("offers each language under its own name, so a reader can find their own", async () => {
+    // "Deutsch", not "German": somebody reading an English dashboard and
+    // looking for German is looking for the word German speakers use.
+    renderSettings("appearance", fixtures);
+    await userEvent.click(await screen.findByLabelText(i18n.t("settings.language.label")));
+
+    for (const name of ["English", "Deutsch", "Español", "Français", "Italiano", "Português"]) {
+      expect(await screen.findByRole("option", { name })).toBeInTheDocument();
+    }
+  });
+
   it("applies the language and remembers it for the next browser", async () => {
     renderSettings("appearance", fixtures);
     await screen.findByLabelText(i18n.t("settings.language.label"));
