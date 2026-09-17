@@ -38,6 +38,7 @@ test("migrate creates every table the dashboard reads", async () => {
     "routing_rules",
     "services",
     "settings",
+    "sla_notices",
     "status_samples",
   ]);
   db.close();

@@ -417,3 +417,85 @@ export function silentOutage(inputs: CrossCheckInputs): StatusChange | null {
     at: inputs.at,
   };
 }
+
+export interface SlaBurnInputs {
+  providerId: string;
+  /** `YYYY-MM`, UTC — the month being measured. */
+  month: string;
+  /** The provider's target, as a percentage: 99.9. */
+  target: number;
+  /** Measured uptime so far this month, as a percentage. */
+  uptime: number;
+  /** How long the whole month is, and how much of it has been measured. */
+  monthMinutes: number;
+  measuredMinutes: number;
+  /** ISO 8601, UTC. */
+  at: string;
+}
+
+/**
+ * Whether a provider is spending its monthly error budget faster than the month
+ * can afford — roadmap 4.13.
+ *
+ * The row asked for the alert that turns history from "what happened" into
+ * "does this vendor meet what we were promised". The arithmetic is the whole
+ * feature: a 99.9% target over a 30-day month allows 43 minutes of downtime,
+ * and the useful moment to say something is not when the 43rd minute is spent
+ * but when the *rate* says it will be. Four days in with nine minutes gone is
+ * already a month that misses, and that is a sentence worth reading on the 4th
+ * rather than on the 30th.
+ *
+ * So the projection is simply the measured rate carried to the end of the
+ * month: uptime so far *is* the projected uptime, and the alert fires when that
+ * is below the target. Nothing cleverer, deliberately — a weighted or
+ * decaying estimate would be a forecast, and a forecast that is wrong about a
+ * vendor's month is worse than no forecast at all.
+ *
+ * It lives in the diff engine, pure like `silentOutage` and `correlatedOutage`
+ * beside it, because it decides that something is news. What it is *not* is
+ * per-cycle state: the caller is responsible for saying this once a month per
+ * provider, exactly as the poller is responsible for not re-reporting a
+ * correlation every cycle.
+ *
+ * Two guards, both about not making a claim the data does not support:
+ *
+ * - A month nothing has measured yet produces nothing. Zero samples is not 0%
+ *   uptime, a distinction the whole history service already turns on.
+ * - A month measured for less than `MIN_MEASURED_FRACTION` of what has elapsed
+ *   produces nothing either. One bad hour on the 1st is a 100%-of-a-tiny-sample
+ *   projection that says the month is lost, and by the 3rd it is not.
+ */
+const MIN_MEASURED_MINUTES = 6 * 60;
+
+export function slaBurn(inputs: SlaBurnInputs): StatusChange | null {
+  const { target, uptime, monthMinutes, measuredMinutes } = inputs;
+  if (!(target > 0) || target > 100) return null;
+  if (measuredMinutes < MIN_MEASURED_MINUTES) return null;
+  if (monthMinutes <= 0) return null;
+  // The rate so far, carried to the end of the month. Rounded like every other
+  // percentage that leaves this codebase, so the number in the message is the
+  // number on the dashboard.
+  const projectedUptime = Math.round(uptime * 100) / 100;
+  if (projectedUptime >= target) return null;
+
+  const budgetMinutes = (monthMinutes * (100 - target)) / 100;
+  const spentMinutes = (measuredMinutes * (100 - uptime)) / 100;
+
+  return {
+    kind: "sla_burn",
+    providerId: inputs.providerId,
+    // Not a severity the provider is in — it may well be operational as this
+    // fires. `degraded` is what the *month* is, and it is the floor a rule
+    // written as "tell me about anything real" already clears.
+    currentStatus: "degraded",
+    sla: {
+      month: inputs.month,
+      target,
+      uptime: projectedUptime,
+      budgetMinutes,
+      spentMinutes,
+      projectedUptime,
+    },
+    at: inputs.at,
+  };
+}

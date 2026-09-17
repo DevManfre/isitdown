@@ -192,6 +192,17 @@ export const useProviderCalendar = (provider: string | null) =>
   });
 
 /**
+ * Monthly targets and error budgets — roadmap 4.13.
+ *
+ * Never throws: a provider page whose budget card cannot load should lose the
+ * card, not the page. No `refetchInterval` either — a budget moves by a minute
+ * per poll at worst, and the cycle's own `["history"]` invalidation already
+ * brings it back.
+ */
+export const useSla = () =>
+  useQuery({ queryKey: ["sla"], queryFn: api.getSla, throwOnError: false });
+
+/**
  * Never throws. Vanilla's own reasoning (`history.js:70-82`): "the provider's
  * own uptime figures already rendered; a missing component breakdown is not
  * worth surfacing as a page-level error." `History`'s per-provider row (and

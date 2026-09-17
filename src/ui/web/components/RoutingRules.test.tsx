@@ -10,12 +10,12 @@ import { explain } from "../../../core/routing.ts";
 import type { StatusChange } from "../../../core/types.ts";
 
 const channels = [
-  { id: "telegram", enabled: true, fields: [] },
-  { id: "slack", enabled: true, fields: [] },
+  { id: "telegram", enabled: true, fields: [], locale: "", template: "" },
+  { id: "slack", enabled: true, fields: [], locale: "", template: "" },
   // Disabled on purpose: several dry-run assertions below need a channel that
   // exists but will never actually receive anything, matching what
   // buildNotifiers filters out before the dispatcher ever sees it.
-  { id: "webhook", enabled: false, fields: [] },
+  { id: "webhook", enabled: false, fields: [], locale: "", template: "" },
 ];
 const services = [{ id: "github", name: "GitHub" }];
 
@@ -456,8 +456,8 @@ describe("RoutingRules", () => {
       // `won.channels.length === 0` muted-check never fired and the panel
       // rendered an empty verdict instead of saying so.
       const allDisabled = [
-        { id: "telegram", enabled: false, fields: [] },
-        { id: "slack", enabled: false, fields: [] },
+        { id: "telegram", enabled: false, fields: [], locale: "", template: "" },
+        { id: "slack", enabled: false, fields: [], locale: "", template: "" },
       ];
       const wildcardRule: RoutingRule[] = [
         { provider: "github", classes: ["status"], minSeverity: "any", channels: ["*"] },

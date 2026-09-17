@@ -82,6 +82,7 @@ export function exportConfigYaml(db: DatabaseSync, logger: Logger): string {
       ...(service.scopeToComponents ? { scopeToComponents: true } : {}),
       ...(service.group === undefined ? {} : { group: service.group }),
       ...(service.crossChecks === undefined ? {} : { crossChecks: service.crossChecks }),
+      ...(service.slaTarget === undefined ? {} : { slaTarget: service.slaTarget }),
     })),
     notifications,
     routing: listRoutingRules(db, logger).rules,
@@ -221,6 +222,7 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
         // the one the database is still holding.
         group: service.group ?? null,
         crossChecks: service.crossChecks ?? null,
+        slaTarget: service.slaTarget ?? null,
         ...(service.options === undefined ? {} : { options: service.options }),
       });
       report.updated.push(service.id);

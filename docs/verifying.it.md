@@ -61,7 +61,7 @@ History · Log invii · Settings. Poi prova i due controlli a runtime nell'heade
 La linguetta del browser risponde alla stessa domanda senza essere guardata:
 mentre qualcosa non va, il titolo conta i provider in difficoltà (`2 provider in
 difficoltà · IsItDown`) e la favicon prende un punto nel colore di quella
-gravità. Con la flotta tranquilla tornano l'icona e il titolo originali della
+gravità. Con tutti i provider tranquilli tornano l'icona e il titolo originali della
 pagina, così un punto nella linguetta significa sempre che c'è qualcosa da
 aprire. Un provider mai letto con successo non è "difficoltà" — un primo ciclo
 non ancora arrivato non deve mostrare una linguetta rossa — e un provider

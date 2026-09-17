@@ -86,7 +86,7 @@ const config = {
  * mount would land in those recordings and fail them for a reason that has
  * nothing to do with what they're testing.
  */
-const webpushChannel = { id: "webpush", enabled: false, fields: [] };
+const webpushChannel = { id: "webpush", enabled: false, fields: [], locale: "", template: "" };
 
 /** Just the writes: a successful mutation invalidates the queries, so refetching GETs follow it. */
 const writesIn = (calls: RecordedCall[]): RecordedCall[] => calls.filter((call) => call.method !== "GET");
@@ -559,7 +559,7 @@ describe("Settings", () => {
     const manyChannels = [
       { id: "discord", enabled: false, fields: [{ name: "webhookUrl", envVar: "DISCORD_WEBHOOK_URL", isSet: false }] },
       { id: "telegram", enabled: false, fields: [{ name: "botToken", envVar: "TELEGRAM_BOT_TOKEN", isSet: true }] },
-      { id: "webpush", enabled: true, fields: [] },
+      { id: "webpush", enabled: true, fields: [], locale: "", template: "" },
     ];
     const listFixtures = { ...fixtures, config: { ...config, channels: manyChannels } };
 
@@ -784,8 +784,10 @@ describe("Settings", () => {
 
       const card = await openChannel(i18n.t("channel.name.webpush"));
       // The VAPID pair is the server's own, so neither variable name is asked
-      // for and there is nothing on this card a Save button could write.
-      expect(within(card).queryByRole("textbox")).toBeNull();
+      // for and there is nothing on this card a Save button could write. The
+      // template box below is not a credential field — it saves itself on blur
+      // — so the card still has no Save button and no box asking for a secret.
+      expect(within(card).queryByLabelText("publicKey")).toBeNull();
       expect(within(card).queryByRole("button", { name: i18n.t("action.save") })).toBeNull();
       expect(within(card).getByRole("button", { name: i18n.t("push.enable") })).toBeInTheDocument();
 

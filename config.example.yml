@@ -36,6 +36,11 @@ services:
     # rule below can cover all of them with `provider: group:deploy-path`. A
     # lowercase slug; omit it to leave the provider ungrouped.
     group: deploy-path
+    # Optional: the monthly uptime this provider is supposed to deliver, as a
+    # percentage. The UI edition turns it into an error budget, reports what the
+    # month has spent of it, and sends one alert when the rate says the month
+    # will miss. Omit it when nobody promised anything — most providers.
+    slaTarget: 99.9
 
   - name: Cloudflare
     id: cloudflare
@@ -97,6 +102,14 @@ notifications:
     enabled: true
     botToken: "${TELEGRAM_BOT_TOKEN}"
     chatId: "${TELEGRAM_CHAT_ID}"
+    # Optional, per channel (roadmap 3.20 and 3.15). `locale` overrides the
+    # notification language above for this channel alone — so this chat can read
+    # Italian while the webhook payload below stays English. `template` replaces
+    # the default message: substitution only, no conditions and no loops, and an
+    # unknown token stops the container with the token named. See
+    # docs/configuration.md#311-per-channel-locale-and-template for the tokens.
+    # locale: it
+    # template: "[{{severity}}] {{provider}} — {{title}}\n{{url}}"
   webhook:
     enabled: false
     url: "${WEBHOOK_URL}"

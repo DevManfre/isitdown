@@ -311,6 +311,37 @@ export interface ServiceDefinition {
    * ever sent, on a patch, to lift a mute early.
    */
   mutedUntil?: string | null;
+  /**
+   * The monthly uptime this provider is supposed to deliver, as a percentage
+   * (roadmap 4.13). Absent when nobody promised anything; `null` is only ever
+   * sent, on a patch, to drop the promise.
+   */
+  slaTarget?: number | null;
+}
+
+/** One provider's month against its target — `GET /sla` (roadmap 4.13). */
+export interface SlaBudget {
+  providerId: string;
+  /** `YYYY-MM`, UTC. */
+  month: string;
+  target: number;
+  /** `null` when the month holds no samples: that is not 0% uptime. */
+  uptime: number | null;
+  budgetMinutes: number;
+  spentMinutes: number;
+  remainingMinutes: number;
+  /** Spend against elapsed time: 1 is exactly on budget. `null` when unmeasured. */
+  burnRate: number | null;
+  projectedUptime: number | null;
+  willMiss: boolean;
+  elapsedMinutes: number;
+  monthMinutes: number;
+  measuredMinutes: number;
+}
+
+export interface SlaResponse {
+  month: string;
+  providers: SlaBudget[];
 }
 
 /** What removing a service would delete along with it — `GET /config/services/:id/impact`. */
@@ -337,6 +368,10 @@ export interface DescribedChannel {
   id: string;
   enabled: boolean;
   fields: DescribedField[];
+  /** The language this channel writes in (roadmap 3.20); empty means the fleet's own. */
+  locale: string;
+  /** This channel's message template (roadmap 3.15); empty means the default rendering. */
+  template: string;
 }
 
 /**

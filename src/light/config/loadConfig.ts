@@ -1,8 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { parse } from "yaml";
 import { deliverySchema, pollingSchema } from "../../core/config.schema.ts";
-import type { ChannelConfig, ConfigSource, RuntimeConfig } from "../../core/configSource.interface.ts";
+import {
+  CHANNEL_MESSAGE_KEYS,
+  type ChannelConfig,
+  type ConfigSource,
+  type RuntimeConfig,
+} from "../../core/configSource.interface.ts";
 import { CATCH_ALL_RULE, type RoutingRule } from "../../core/routing.ts";
+import { templateProblems } from "../../notifiers/template.ts";
 import { fileConfigSchema, REQUIRED_CHANNEL_SETTINGS, type FileConfig } from "./schema.ts";
 
 const ENV_REFERENCE = /\$\{([A-Z0-9_]+)\}/g;
@@ -190,7 +196,25 @@ function buildChannels(
     if (raw === undefined) continue;
     const settings: Record<string, string> = {};
     for (const [key, value] of Object.entries(raw)) {
-      if (key !== "enabled" && typeof value === "string") settings[key] = value;
+      // `locale` and `template` are channel fields, but they are not transport:
+      // they say how the message reads, not where it goes. Kept out of
+      // `settings` so a notifier factory is never handed a setting it has no
+      // schema for (see `CHANNEL_MESSAGE_KEYS`).
+      if (key === "enabled" || (CHANNEL_MESSAGE_KEYS as readonly string[]).includes(key)) continue;
+      if (typeof value === "string") settings[key] = value;
+    }
+
+    const locale = typeof raw["locale"] === "string" ? raw["locale"] : undefined;
+    const template = typeof raw["template"] === "string" ? raw["template"] : undefined;
+    // Which tokens a template may name is `notifiers/template.ts`'s business,
+    // and it is checked here rather than in the schema so the operator meets
+    // it in the same list as every other problem with the file — a typo'd token
+    // is a message that reads `{{provder}}` to whoever is being paged, and the
+    // moment to catch it is before the container starts.
+    if (template !== undefined) {
+      for (const problem of templateProblems(template)) {
+        problems.push(`config file ${path}: notifications.${id}.template — ${problem}`);
+      }
     }
 
     if (raw.enabled) {
@@ -205,7 +229,13 @@ function buildChannels(
       }
     }
 
-    channels.push({ id, enabled: raw.enabled, settings });
+    channels.push({
+      id,
+      enabled: raw.enabled,
+      ...(locale === undefined ? {} : { locale }),
+      ...(template === undefined ? {} : { template }),
+      settings,
+    });
   }
 
   return channels;

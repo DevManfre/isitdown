@@ -416,3 +416,75 @@ ${MINIMAL}
 
   await assert.rejects(loadConfig(path, {}), /start/);
 });
+
+/**
+ * A channel's own locale (roadmap 3.20) and template (roadmap 3.15), written in
+ * the file where the rest of that channel is configured.
+ */
+
+test("a channel's locale and template are read off it, and kept out of its settings", async () => {
+  const path = await configFile(`
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+
+notifications:
+  telegram:
+    enabled: true
+    botToken: t
+    chatId: c
+    locale: it
+    template: "{{provider}} {{severity}}"
+`);
+
+  const config = await loadConfig(path, {});
+  const [telegram] = config.channels;
+  assert.equal(telegram?.locale, "it");
+  assert.equal(telegram?.template, "{{provider}} {{severity}}");
+  // The notifier factory validates what it is handed, and neither of these is a
+  // transport setting it has a schema for.
+  assert.deepEqual(Object.keys(telegram?.settings ?? {}).sort(), ["botToken", "chatId"]);
+});
+
+test("a channel with neither reads exactly as it did before they existed", async () => {
+  const path = await configFile(`
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+
+notifications:
+  telegram:
+    enabled: true
+    botToken: t
+    chatId: c
+`);
+
+  const [telegram] = (await loadConfig(path, {})).channels;
+  assert.equal(telegram?.locale, undefined);
+  assert.equal(telegram?.template, undefined);
+});
+
+test("a template naming a token nothing resolves is refused at load, by name", async () => {
+  const path = await configFile(`
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+
+notifications:
+  telegram:
+    enabled: true
+    botToken: t
+    chatId: c
+    template: "{{provder}} is down"
+`);
+
+  // A typo that survives to an outage reads as `{{provder}}` to whoever is
+  // being paged, so the container refuses to start on it.
+  await assert.rejects(loadConfig(path, {}), /notifications\.telegram\.template.*\{\{provder\}\}/s);
+});

@@ -79,6 +79,18 @@ export const serviceDefinitionSchema = z.object({
   mutedUntil: z.string().datetime().optional(),
   components: componentSelectionSchema.default([]),
   scopeToComponents: z.boolean().default(false),
+  /**
+   * The monthly uptime this provider is supposed to deliver, as a percentage —
+   * `99.9` (roadmap 4.13). Optional rather than defaulted: most providers are
+   * watched without anybody having promised anything, and a default would
+   * invent a promise and then report against it.
+   *
+   * Floored at 50 and capped at 100. Below half the month, a "target" is not
+   * one; and the samples this is measured from are polls, so a figure with more
+   * than three decimals is claiming a precision a three-minute cadence does not
+   * have.
+   */
+  slaTarget: z.number().min(50).max(100).optional(),
 });
 
 export const pollingSchema = z.object({

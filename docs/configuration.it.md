@@ -222,7 +222,7 @@ lo schema, `dns` ne risolve l'host e da lì non scarica nulla.
 | `slowMs` | entrambi | — | Un handshake o una risposta a questi millisecondi o oltre legge `degraded` invece di `operational`. |
 | `recordType` | `dns` | `A` | `A`, `AAAA`, `CNAME`, `MX`, `NS` o `TXT`. Una risposta `MX` viene confrontata come `"<preferenza> <exchange>"` e una `TXT` con i suoi pezzi uniti — il modo in cui entrambe si scrivono quando qualcuno dice come dovrebbero essere. |
 | `expectValue` | `dns` | — | Testo che uno dei record deve contenere. Un record puntato a un indirizzo dismesso si risolve comunque, ed è una brutta giornata diversa dal non risolversi affatto. |
-| `resolver` | `dns` | quello di sistema | `1.1.1.1`, oppure `127.0.0.1:5353`. Interroga un server direttamente — per esempio uno autoritativo — invece di ciò che il resolver di questo container ha in cache. Non impostato legge ciò che sperimenta il resto della flotta. |
+| `resolver` | `dns` | quello di sistema | `1.1.1.1`, oppure `127.0.0.1:5353`. Interroga un server direttamente — per esempio uno autoritativo — invece di ciò che il resolver di questo container ha in cache. Non impostato legge ciò che sperimenta il resto dei provider monitorati. |
 
 Le letture che producono:
 
@@ -269,10 +269,10 @@ ignorato. Tutto vive in SQLite in `/app/data/isitdown.db` e si modifica da
   credenziale e — in sola scrittura — la credenziale stessa
 - tema, lingua della dashboard, lingua delle notifiche, fuso orario
 
-La pagina si apre come un bento di riquadri per categoria — Motore, Servizi
+La pagina si apre come un bento di riquadri per categoria — Polling, Servizi
 monitorati, Notifiche, Consegna, Dati, Aspetto, e Rimossi di recente finché c'è
 qualcosa da ripristinare. Ogni riquadro porta una breve banda in movimento che
-mostra cosa fa quella categoria (il motore che spazza i provider, il fascio che
+mostra cosa fa quella categoria (il poller che spazza i provider, il fascio che
 parte verso ogni canale di consegna, la retention che pota il giorno più
 vecchio), disegnata con i colori del tema e tenuta ferma per chi chiede meno
 animazioni al sistema. Cliccando un riquadro quella categoria si apre su una
@@ -332,12 +332,20 @@ tua lista non viene più sovrascritta in seguito.
 | `APPRISE_URLS` | entrambe | — | URL dei servizi Apprise, separati da virgola, per un server stateless. Serve questa oppure `APPRISE_CONFIG_KEY`. |
 | `WEBHOOK_SECRET` | entrambe | — | Segreto condiviso opzionale per il webhook generico. Impostandolo ogni richiesta viene firmata (vedi [3.6](#36-canali-di-notifica)); lasciandolo vuoto le richieste partono non firmate, esattamente come prima. |
 | `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
+| `PLUGINS_DIR` | entrambe | — | Una cartella di plugin adapter da caricare all'avvio ([3.14](#314-plugin-adapter)). Non impostata — il valore predefinito, anche nelle immagini — non carica nulla. **Un plugin gira con i privilegi di questo processo.** |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | entrambe | — | L'URL base di un collector OTLP/HTTP; `/v1/traces` viene aggiunto. Impostarla attiva il tracing ([3.16](#316-tracce)). Se non è impostata non viene tracciato nulla e non viene allocato nulla. |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | entrambe | — | L'endpoint delle tracce esatto, quando non è `<base>/v1/traces`. Ha la precedenza sulla variabile qui sopra. |
+| `OTEL_EXPORTER_OTLP_HEADERS` | entrambe | — | `chiave=valore,altra=valore` — una API key che un collector gestito richiede. |
+| `OTEL_SERVICE_NAME` | entrambe | `isitdown` | Come il collector etichetta questo processo. |
 | `LOG_FILE` | entrambe | — | Accoda ogni riga di log anche a questo file, ruotato per dimensione. Se non è impostata, i log vanno solo su stdout. |
 | `LOG_MAX_BYTES` | entrambe | `5242880` | Dimensione alla quale `LOG_FILE` ruota. |
 | `LOG_MAX_FILES` | entrambe | `5` | Quante generazioni ruotate (`.1` … `.5`) sopravvivono accanto al file vivo. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Dove leggere `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Dove tenere il file di stato. |
 | `DB_PATH` | UI | `/app/data/isitdown.db` | Database SQLite. |
+| `API_TOKEN` | UI | — | Un token bearer di sola lettura ([3.12](#312-raggiungere-lapi-da-un-altro-host)). Non impostato — il valore predefinito — lascia ogni rotta aperta, che è giusto per un'istanza legata a `127.0.0.1`. Impostandolo, una richiesta che lo porta può fare `GET` da qualunque host; le scritture restano solo locali. |
+| `API_LOCAL_BYPASS` | UI | `true` | Se una richiesta da questa macchina possa saltare `API_TOKEN`. Impostalo a `false` dietro un reverse proxy, dove ogni richiesta inoltrata sembra locale. |
+| `PUSH_TOKEN` | UI | — | Attiva l'endpoint per i webhook dei provider ([3.15](#315-push-del-provider-invece-del-polling)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
 | `PORT` | UI | `3000` | Porta HTTP. |
 
 I segreti arrivano tramite `env_file` a runtime; nulla viene incorporato in
@@ -652,7 +660,7 @@ tutto suo.
 #### Cachet, Uptime Kuma e Uptime.com
 
 Altre tre forme JSON piccole, e le prime due sono quelle che il pubblico di
-questo progetto si ospita da sé — una flotta può includere la status page del
+questo progetto si ospita da sé — il parco provider può includere la status page del
 vicino:
 
 ```yaml
@@ -1120,7 +1128,7 @@ non solo per noi:
 
 ### 3.10 Gruppi di provider — "il mio stack"
 
-Una flotta piatta risponde a "GitHub sta bene" e mai a "il mio percorso di deploy
+Un parco provider piatto risponde a "GitHub sta bene" e mai a "il mio percorso di deploy
 sta bene", che è la domanda che un operatore ha davvero: quattro provider che
 singolarmente non gli interessano, e una risposta che gli interessa. Un gruppo è
 uno slug che il provider porta (roadmap 2.6) — in `config.yml`:
@@ -1160,3 +1168,368 @@ Ne derivano due cose:
   scritti a mano non farebbero. La tabella di instradamento della dashboard
   propone i gruppi sopra i singoli provider, e la prova a vuoto li valuta con il
   gruppo del provider scelto.
+
+### 3.11 Lingua e modello per canale
+
+Due cose di un canale non riguardano il trasporto: in che lingua scrive
+(roadmap 3.20) e come è impaginato il messaggio (roadmap 3.15). Entrambe sono
+campi del canale stesso — `notifications.<canale>.locale` e
+`notifications.<canale>.template` in `config.yml`, e il blocco **Messaggio** in
+fondo alla riga del canale in **Impostazioni → Notifiche**.
+
+```yaml
+notifications:
+  telegram:
+    enabled: true
+    botToken: "${TELEGRAM_BOT_TOKEN}"
+    chatId: "${TELEGRAM_CHAT_ID}"
+    # La chat legge in italiano; il webhook qui sotto resta in inglese.
+    locale: it
+  webhook:
+    enabled: true
+    url: "${WEBHOOK_URL}"
+    template: |
+      [{{severity}}] {{provider}} — {{title}}
+      {{url}}
+```
+
+**La lingua** ricade sulla lingua di notifica dell'installazione (`locale:` in
+cima al file, oppure **Impostazioni → Aspetto** nell'edizione UI), che è ciò che
+ogni canale faceva prima che questo esistesse. È lo stesso catalogo che usa la
+dashboard, quindi un canale può nominare solo una lingua che IsItDown ha davvero.
+
+**Il modello** sostituisce la resa predefinita per quel canale. Non è
+volutamente un linguaggio di template:
+
+- **Solo sostituzione.** `{{provider}}` diventa una stringa. Niente `if`, niente
+  cicli, niente filtri, nessuna espressione di alcun tipo.
+- **Un segnaposto senza nulla dietro rende una stringa vuota**, e una riga fatta
+  solo di segnaposti del genere viene eliminata invece di restare un'etichetta
+  penzolante — così un modello scritto per gli incidenti resta leggibile su un
+  cambio di stato che non ha nessun incidente dentro. Una riga con del testo
+  letterale lo conserva: `Incidente: {{title}}` rende `Incidente:`.
+- **Un segnaposto sconosciuto è rifiutato dove viene salvato**: l'edizione Light
+  non parte e lo nomina, la dashboard risponde `400` con il segnaposto nel
+  messaggio. Un refuso sopravvissuto si leggerebbe come `{{provder}}` a chi viene
+  svegliato.
+- **Un riepilogo non usa mai un modello.** Un modello descrive un cambiamento; un
+  riepilogo è un gruppo di cambiamenti, e mantiene la propria resa.
+- **La riga degli avvisi soppressi segue comunque il messaggio**, con o senza
+  modello: riguarda ciò che l'operatore *non* si è sentito dire, non il
+  cambiamento.
+
+I segnaposti, che la dashboard elenca anche sotto il campo:
+
+| Segnaposto | Che cos'è |
+| --- | --- |
+| `{{message}}` | L'intero messaggio predefinito, esattamente come il canale l'avrebbe inviato — il segnaposto che rende "il solito testo, con il nostro prefisso" un modello di una riga. |
+| `{{emoji}}` | L'emoji della severità, quella con cui si apre il messaggio predefinito. |
+| `{{provider}}` | Il nome visualizzato del provider. |
+| `{{providerId}}` | L'id del provider, come configurato. |
+| `{{kind}}` | Che cosa è successo, nella parola del diff engine: `incident_opened`, `status_change`, … |
+| `{{severity}}` | La severità attuale, in maiuscolo — la parola del titolo. |
+| `{{status}}` | La severità attuale, in forma normale. |
+| `{{previous}}` | La severità prima di questo cambiamento; vuota se non c'era una lettura precedente. |
+| `{{component}}` | Il componente che è cambiato; vuoto se non è un cambio di componente. |
+| `{{title}}` | Il titolo dell'incidente o della finestra di manutenzione; vuoto se non c'è nessuno dei due. |
+| `{{incidentStatus}}` | La parola di ciclo di vita del provider per l'incidente, tradotta dove è nota. |
+| `{{url}}` | La pagina di stato pubblica del provider. Vuota su un canale che rende il link da sé (un embed Discord), così non viene mai stampato due volte. |
+| `{{at}}` | Quando è successo, UTC. |
+
+Tutto ciò che un segnaposto risolve viene dallo stesso catalogo con cui è
+assemblato il messaggio predefinito, quindi un messaggio con modello e uno
+predefinito dicono le stesse parole nella stessa lingua. Un modello le
+riorganizza; non può inventarne di nuove.
+
+### 3.12 Raggiungere l'API da un altro host
+
+Ogni rotta dell'edizione UI è aperta, ed è la risposta giusta per il deployment
+che questo progetto documenta: un container, legato a `127.0.0.1`, guardato da
+chi lo gestisce. Smette di essere la risposta giusta nel momento in cui qualcosa
+fuori da questa macchina deve leggerlo — un widget per una home page
+([4.11](api.it.md)), un badge in un README, un job di scraping sulla macchina
+accanto.
+
+`API_TOKEN` è la cosa più piccola che sblocca questi casi (roadmap 4.15):
+
+```yaml
+services:
+  isitdown-ui:
+    environment:
+      API_TOKEN: "una-stringa-lunga-e-casuale"
+```
+
+Quando è impostato:
+
+- **Una richiesta che porta il token può leggere, da qualunque host.** `GET` e
+  `HEAD` passano. Mandalo come `Authorization: Bearer <token>`, oppure come
+  `X-API-Token: <token>` per un client il cui file di configurazione non ha
+  spazio per uno schema.
+- **Il token non concede nient'altro.** Qualunque altro metodo risponde `403`,
+  a chi ha un token valido tanto quanto a chiunque altro — anche da questa
+  macchina. Un token finisce incollato nella configurazione di una dashboard, in
+  un cron, in un messaggio di chat; non deve mai valere più della lettura.
+- **Tutto il resto deve comunque essere locale.** Una richiesta senza token
+  viene servita solo se arriva da questa macchina, ed è ciò che tiene in
+  funzione la dashboard stessa senza token nel browser.
+- **`/health` e `/ready` non sono mai protette.** Una probe di Kubernetes arriva
+  dall'indirizzo del nodo, non da loopback, e un controllo di liveness che
+  comincia a fallire perché è stato impostato un token è un ciclo di riavvii.
+
+Due cose da mettere in chiaro:
+
+- **`X-Forwarded-For` viene ignorato.** Un header scritto dal client non può
+  decidere se il client è locale. La conseguenza è che un reverse proxy che gira
+  su questa stessa macchina fa sembrare locale ogni richiesta che inoltra —
+  quindi dietro a uno imposta `API_LOCAL_BYPASS=false` e richiedi il token a
+  tutti, questa macchina compresa.
+- **Questa non è autenticazione.** Un token, nessuna identità, nessuna scadenza,
+  e niente da revocare se non la variabile. È una porta con una chiave. L'auth
+  multi-utente resta un non-obiettivo dichiarato.
+
+```bash
+curl -H "Authorization: Bearer $API_TOKEN" http://isitdown.lan:3000/widget
+```
+
+### 3.13 Obiettivi SLA e budget di errore
+
+Una percentuale di uptime a 90 giorni risponde a "come è andato questo
+fornitore". La domanda a cui bisogna rispondere in una revisione è "questo
+fornitore rispetta ciò che ci era stato promesso, questo mese" — e serve un
+numero che nessuno aveva scritto. `slaTarget` è quel numero (roadmap 4.13): una
+percentuale di uptime mensile sul provider, in `config.yml` o nel campo
+**Obiettivo di uptime mensile** della finestra di aggiunta/modifica.
+
+```yaml
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    slaTarget: 99.9
+```
+
+Opzionale, e assente per impostazione predefinita: la maggior parte dei provider
+è sorvegliata senza che nessuno abbia promesso nulla, e un valore predefinito
+inventerebbe una promessa per poi misurarla. Tra 50 e 100.
+
+Con un obiettivo impostato, l'edizione UI calcola quattro cose per il mese
+solare in corso — un mese, perché è l'unità in cui uno SLA è scritto — dagli
+stessi campioni salvati da cui è disegnata la vista Cronologia:
+
+- **Il budget.** Lo 0,1% di un mese da 31 giorni sono 44,6 minuti di disservizio.
+- **Quanto è speso.** Il disservizio misurato finora, con la stessa aritmetica
+  sul numero di campioni che usa già la cifra di downtime della Cronologia.
+- **Il ritmo di consumo.** La spesa rapportata al tempo *trascorso*: `1` è
+  esattamente in budget, `2` è spenderlo al doppio della velocità che il mese si
+  può permettere. È il numero che vale la pena leggere su una dashboard, perché
+  "13 minuti su 44" richiede che il lettore sappia che giorno è, e questo no.
+- **La proiezione.** Il ritmo misurato portato fino a fine mese. Volutamente
+  nulla di più sofisticato: una stima pesata sarebbe una previsione, e una
+  previsione sbagliata sul mese di un fornitore è peggio di nessuna previsione.
+
+Compare come scheda **Budget di errore** nella pagina del provider, e per tutta
+la flotta è `GET /sla`.
+
+**L'avviso.** Quando la proiezione scende sotto l'obiettivo per la prima volta,
+il provider riceve una notifica `sla_burn` — attraverso il motore di diff e il
+dispatcher come ogni altro avviso, quindi valgono le regole di instradamento, le
+ore di silenzio, la finestra di riepilogo e il limite orario. Tre cose:
+
+- È instradato come evento di **monitoraggio**, non di stato. Quando scatta,
+  nulla del provider è cambiato; è un'affermazione su un mese di misurazioni, e
+  una regola che esiste per svegliare qualcuno durante un disservizio non deve
+  essere svegliata da un'aritmetica.
+- È detto **una volta per provider per mese**, e il segnaposto sta nel database
+  invece che in memoria: un riavvio il 12 non deve ripeterlo.
+- Non dice nulla finché non sono state misurate almeno sei ore di quel mese.
+  Un'ora storta il giorno 1 proietta un mese perduto, e il giorno 3 non lo è più.
+
+Un mese che non contiene campioni riporta `null` invece di 0%: non aver misurato
+nulla non è un fornitore che era giù, e l'intero servizio di cronologia si regge
+già su questa distinzione.
+
+### 3.14 Plugin adapter
+
+Un provider con una pagina di stato inusuale richiede un adapter, un adapter
+richiede una pull request, e chi vuole sorvegliare un solo servizio interno non
+dovrebbe dover forkare uno strumento di monitoraggio per farlo. `PLUGINS_DIR` è
+la risposta (roadmap 1.13): puntalo a una cartella e ogni file `.js`, `.mjs` e
+`.cjs` al suo interno viene caricato all'avvio e registrato come adapter.
+
+```yaml
+services:
+  isitdown-ui:
+    environment:
+      PLUGINS_DIR: /plugins
+    volumes:
+      - ./plugins:/plugins:ro
+```
+
+Un plugin è un modulo il cui export di default è un adapter — la stessa forma
+che implementano quelli integrati:
+
+```js
+// plugins/acme.js
+export default {
+  // Uno slug minuscolo, e non uno già usato da un adapter integrato. È ciò che
+  // `adapter:` nomina in config.yml, o ciò che accetta il campo adapter della
+  // dashboard.
+  id: "acme",
+
+  // Lancia su errore di rete, risposta non 2xx o corpo non interpretabile;
+  // degrada in silenzio su un singolo campo mancante. `ctx.timeoutMs` è il
+  // timeout di richiesta configurato.
+  async fetchStatus(service, ctx) {
+    const response = await fetch(`${service.baseUrl}/health.json`, {
+      signal: AbortSignal.timeout(ctx.timeoutMs),
+    });
+    if (!response.ok) throw new Error(`acme: HTTP ${response.status}`);
+    const body = await response.json();
+    return {
+      provider: service.id,
+      // Uno tra: operational, degraded, partial_outage, major_outage, unknown.
+      overallStatus: body.ok ? "operational" : "major_outage",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    };
+  },
+};
+```
+
+`fetchIncidentHistory` e `listComponents` sono opzionali; un adapter che non li
+ha semplicemente non ha una cronologia recuperabile e non offre il selettore dei
+componenti. Funziona anche un export chiamato `adapter` al posto di quello di
+default, per un file che esporta anche funzioni sue.
+
+> **Un plugin è codice arbitrario che gira dentro il poller**, con i suoi
+> privilegi e il suo accesso a ogni credenziale di canale che la configurazione
+> ha risolto. Non c'è nessuna sandbox, e non ci sarà: Node non ha un confine
+> in-process degno di questo nome, e uno finto sarebbe peggio di un'assenza
+> onesta. Per questo nulla imposta `PLUGINS_DIR` al posto tuo — né le immagini né
+> il file compose — e per questo ogni plugin caricato viene annunciato nel log
+> con il file da cui proviene. Tratta un plugin esattamente come tratteresti una
+> patch a questo codice, perché è quello che è.
+
+Tre regole che il loader applica, tutte perché un file sbagliato non costi alla
+flotta il suo monitoraggio:
+
+- **Un plugin non può prendere un id che esiste già** — né quello di un adapter
+  integrato né quello di un altro plugin. Sovrascrivere `statuspage` cambierebbe
+  ciò che legge ogni provider esistente, e due plugin in corsa per lo stesso id
+  renderebbero il comportamento dipendente dai nomi dei file. Il file viene
+  rifiutato e nominato.
+- **Un file che non si importa, o che esporta qualcosa che non è un adapter,
+  viene saltato e nominato** — il resto della cartella si carica lo stesso.
+- **Una cartella mancante è un avviso, non un errore.** Impostare la variabile
+  prima di montare il volume ti dà una riga nel log e un poller che gira.
+
+`node dist/light/check.js` carica i plugin prima di validare il file, così un
+`config.yml` che nomina l'adapter di un plugin risulta valido, e un plugin che
+non si è potuto caricare è uno degli errori che riporta.
+
+### 3.15 Push del provider invece del polling
+
+Atlassian Statuspage permette a chi si iscrive di registrare un URL e ci invia
+una POST a ogni cambiamento. Dove quell'URL è raggiungibile, la latenza di un
+cambio di stato passa da una cadenza a pochi secondi, e un provider tranquillo
+smette del tutto di essere letto a timer (roadmap 2.10).
+
+Imposta `PUSH_TOKEN` sull'edizione UI e registra l'URL sulla pagina del provider
+(**Subscribe → Webhook**, sulla maggior parte delle istanze Statuspage):
+
+```
+https://isitdown.example.com/push/github?token=<PUSH_TOKEN>
+```
+
+**Ciò che arriva è un innesco, non una lettura.** È la decisione di progetto che
+vale la pena conoscere. IsItDown non interpreta il corpo del webhook per
+ricavarne uno stato: legge il provider, in quel momento, attraverso l'adapter che
+già sa come farlo. Tutto ciò che viene dopo — il motore di diff, lo smorzamento
+dei rimbalzi, l'instradamento, le ore di silenzio, il registro di consegna — è lo
+stesso codice che esegue un ciclo programmato. L'alternativa, interpretare
+direttamente il payload, significherebbe due modi di conoscere lo stato di un
+provider, due parser da tenere al passo con Statuspage e due occasioni perché un
+incidente arrivato via push abbia una forma diversa da uno letto col polling. Il
+costo di farlo così è una richiesta HTTP per evento invece di zero, che sono
+comunque molte meno di una per cadenza per sempre.
+
+**Il polling resta la rete di sicurezza.** Un push è un'aggiunta, mai una
+sostituzione. La pianificazione continua a girare e questa rotta non la ritarda,
+quindi un'installazione casalinga senza URL raggiungibile dall'esterno — il
+motivo per cui questa non può essere l'unica strada — si comporta esattamente
+come oggi. Un'istanza *raggiungibile* può allungare l'`intervalMinutes` di quel
+provider per rendere la pianificazione una rete di sicurezza invece della strada
+principale.
+
+Tre cose sull'endpoint:
+
+- **L'URL è la credenziale.** Statuspage non manda firme né header
+  personalizzati, quindi non c'è altro a disposizione. Tratta l'URL come un
+  segreto, ruotalo cambiando `PUSH_TOKEN` e servilo su HTTPS. Il token è
+  confrontato a tempo costante, e uno sbagliato è un `401` con una riga nel log.
+- **È l'unica rotta che il token API di sola lettura non protegge**
+  ([3.12](#312-raggiungere-lapi-da-un-altro-host)). Chi la chiama è un provider,
+  non un operatore: non gli si può dare un bearer token, ed è una `POST`, che
+  quel token rifiuta per principio. Porta invece la propria credenziale.
+- **Più POST per un solo cambiamento costano una sola lettura.** Statuspage
+  invia l'incidente e poi ogni componente coinvolto nel giro di pochi secondi;
+  qualunque cosa arrivi entro dieci secondi da un push accolto riceve
+  `202 coalesced`.
+
+Un id di provider che nessuno sta sorvegliando, o disabilitato, è un `404` — che
+è anche la risposta quando `PUSH_TOKEN` non è impostata, così un'istanza che non
+ha aderito non fa sapere che la funzione esiste.
+
+### 3.16 Tracce
+
+Punta `OTEL_EXPORTER_OTLP_ENDPOINT` a un collector e IsItDown esporta tracce
+OpenTelemetry (roadmap 6.10):
+
+```yaml
+services:
+  isitdown-ui:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      OTEL_SERVICE_NAME: isitdown
+```
+
+Tre span, ed è tutta la strumentazione:
+
+| Span | Che cosa copre |
+| --- | --- |
+| `poll.cycle` | Un ciclo da capo a fondo — il caricamento della configurazione, la lettura di ogni provider e l'invio che ne segue. `isitdown.manual` dice se è partito dal pulsante **Interroga ora**, `isitdown.narrowed` se era un solo provider che rispondeva a un push ([3.15](#315-push-del-provider-invece-del-polling)). |
+| `provider.read` | Un provider, compresa l'attesa di sfasamento prima della sua richiesta — perché una lettura durata quattordici secondi deve rendere conto anche dei secondi passati ad aspettare di proposito. Porta `isitdown.provider` e `isitdown.adapter`. |
+| `notification.send` | Un messaggio verso un canale, ritentativi compresi: "quanto è servito per avvisare qualcuno" è una risposta sola, non tre. Porta `isitdown.channel`, `isitdown.provider` e `isitdown.kind`. |
+
+Uno span il cui lavoro solleva un'eccezione viene esportato con l'errore sopra e
+l'errore viene rilanciato — così la traccia mostra la lettura fallita e il poller
+gestisce il fallimento esattamente come ha sempre fatto.
+
+**La riga di roadmap che chiedeva questa funzione diceva "probabilmente no", e il
+motivo erano le dipendenze**: il modo consueto di ottenere le tracce è un SDK con
+le sue trenta dipendenze transitive, in un progetto il cui punto di forza è
+averne tre e poterle leggere tutte. Perciò questa funzione arriva **senza
+nessuna nuova dipendenza**. OTLP su HTTP è un documento JSON inviato in POST a
+`/v1/traces`, ed è esattamente ciò che costruisce `src/core/tracing.ts` — niente
+auto-strumentazione, niente `fetch` modificata, nessun vendor. Qualunque
+collector che parli OTLP/HTTP (Tempo, Jaeger, l'OTel Collector, uno gestito) lo
+legge.
+
+La metà onesta del compromesso:
+
+- **Esistono solo i tre span qui sopra.** Non ci sono span HTTP o SQLite
+  automatici sotto di essi. Sono esattamente la domanda posta dalla riga di
+  roadmap — dove sia finito un ciclo lento — e nulla di più.
+- **Nessun segnale di metriche né di log.** `/metrics` è già migliore per il
+  primo e il logger è già strutturato per il secondo.
+- **Nessun campionamento e nessun ritentativo.** Gli span si accodano fino a un
+  massimo di 2048 e oltre quello vengono scartati a partire dai più vecchi; un
+  export fallito è un avviso, detto una volta per guasto, e quegli span sono
+  persi. La telemetria non deve mai poter far cadere il monitoraggio.
+
+Il tracing è spento se non è impostata una delle due variabili di endpoint, e da
+spento non costa nulla: ogni punto di chiamata tiene un oggetto i cui metodi
+ritornano immediatamente.

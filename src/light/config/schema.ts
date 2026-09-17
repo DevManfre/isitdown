@@ -5,6 +5,7 @@ import {
   routingRuleSchema,
   serviceDefinitionSchema,
 } from "../../core/config.schema.ts";
+import { TEMPLATE_MAX_LENGTH } from "../../notifiers/template.ts";
 
 /**
  * The shape of `config.yml`. Service definitions and the locale reuse the shared
@@ -156,6 +157,28 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
 };
 
 /**
+ * The two fields every channel has that are not transport: the locale its
+ * messages are written in (roadmap 3.20) and the template they are rendered
+ * with (roadmap 3.15).
+ *
+ * Added to each channel's own schema rather than listed once as a sibling
+ * block, because they are settings *of the channel* — `notifications.telegram.
+ * locale` is where an operator looks for them, and a parallel
+ * `messageOptions.telegram.locale` would be a second place a channel is
+ * configured. Applied through one helper so thirteen channels cannot end up
+ * accepting thirteen slightly different spellings of the same two fields.
+ *
+ * The template is only checked for length here; which tokens exist is
+ * `notifiers/template.ts`'s business, and the loader reports its verdict with
+ * the rest of the file's problems so an operator sees them all at once.
+ */
+const withMessageOptions = <T extends z.ZodRawShape>(schema: z.ZodObject<T>) =>
+  schema.extend({
+    locale: localeSchema.optional(),
+    template: z.string().max(TEMPLATE_MAX_LENGTH).optional(),
+  });
+
+/**
  * The channels this file format has a place for. Webpush is deliberately absent:
  * a browser subscription belongs to a browser that visited the dashboard, and
  * the Light edition has no dashboard to have visited. `FILE_CHANNEL_IDS` is what
@@ -163,19 +186,19 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
  */
 const notificationsObject = z
   .object({
-    telegram: telegramSchema.optional(),
-    webhook: webhookSchema.optional(),
-    discord: discordSchema.optional(),
-    slack: slackSchema.optional(),
-    ntfy: ntfySchema.optional(),
-    gotify: gotifySchema.optional(),
-    matrix: matrixSchema.optional(),
-    pagerduty: pagerdutySchema.optional(),
-    opsgenie: opsgenieSchema.optional(),
-    apprise: appriseSchema.optional(),
-    pushover: pushoverSchema.optional(),
-    teams: teamsSchema.optional(),
-    email: emailSchema.optional(),
+    telegram: withMessageOptions(telegramSchema).optional(),
+    webhook: withMessageOptions(webhookSchema).optional(),
+    discord: withMessageOptions(discordSchema).optional(),
+    slack: withMessageOptions(slackSchema).optional(),
+    ntfy: withMessageOptions(ntfySchema).optional(),
+    gotify: withMessageOptions(gotifySchema).optional(),
+    matrix: withMessageOptions(matrixSchema).optional(),
+    pagerduty: withMessageOptions(pagerdutySchema).optional(),
+    opsgenie: withMessageOptions(opsgenieSchema).optional(),
+    apprise: withMessageOptions(appriseSchema).optional(),
+    pushover: withMessageOptions(pushoverSchema).optional(),
+    teams: withMessageOptions(teamsSchema).optional(),
+    email: withMessageOptions(emailSchema).optional(),
   })
   .strict();
 

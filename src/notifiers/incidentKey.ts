@@ -35,6 +35,11 @@ export function incidentKey(change: StatusChange): string {
       return `isitdown/${change.providerId}/silent/${change.crossCheck?.probeId ?? "unknown"}`;
     case "correlated_outage":
       return `isitdown/correlated/${[...(change.correlated?.providerIds ?? [])].sort().join("+")}`;
+    // Keyed on the month as well as the provider (roadmap 4.13): the budget is
+    // a monthly quantity, so September's burn is a new alert rather than an
+    // update to August's — which would otherwise resolve and reopen forever.
+    case "sla_burn":
+      return `isitdown/${change.providerId}/sla/${change.sla?.month ?? "unknown"}`;
   }
 }
 

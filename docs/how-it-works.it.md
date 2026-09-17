@@ -35,7 +35,7 @@
    dallo stesso StateStore, e può chiedere allo scheduler un ciclo immediato.
 ```
 
-Il motore è indipendente dall'edizione. `src/core`, `src/adapters` e `src/notifiers`
+Il core è indipendente dall'edizione. `src/core`, `src/adapters` e `src/notifiers`
 non importano mai da `src/light` o `src/ui` — un test lo impone. Le edizioni
 differiscono solo per il `ConfigSource` e lo `StateStore` che iniettano.
 
@@ -43,7 +43,7 @@ differiscono solo per il `ConfigSource` e lo `StateStore` che iniettano.
 
 1. **Scheduler** — esegue subito un ciclo, poi riarma un `setTimeout` all'intervallo
    ±10% di jitter, così un ciclo lento ritarda il successivo invece di sovrapporsi e
-   una flotta di istanze non colpisce mai un provider all'unisono. Rilegge la
+   più istanze non colpiscono mai un provider all'unisono. Rilegge la
    configurazione a ogni ciclo: è questo che fa avere effetto alle modifiche dalla UI
    senza restart. Un ciclo che solleva un errore viene loggato e il loop continua.
    Il tick segue la cadenza più corta che qualcuno abbia chiesto: prende
@@ -59,7 +59,7 @@ differiscono solo per il `ConfigSource` e lo `StateStore` che iniettano.
    interrogato quando la sua cadenza è trascorsa — il suo `intervalMinutes`, quella
    globale se non ne nomina una, oppure `adaptiveIntervalMinutes` mentre ha un
    incidente aperto — così un tick portato a un minuto da un provider in difficoltà
-   non si trascina dietro tutta la flotta.
+   non si trascina dietro tutto il parco provider.
 
 3. **Adapter** — trasformano la risposta grezza di un provider nella forma
    normalizzata:
@@ -195,7 +195,7 @@ Tutto ciò che sta nella tabella sopra è il diff engine che decide cosa è
 di consegna — ore di silenzio, finestra di riepilogo, limite orario, un
 messaggio per incidente — ed è
 [3.8](configuration.it.md#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti). L'ordine è
-voluto e mai il contrario: il motore risponde a "è cambiato qualcosa", le regole
+voluto e mai il contrario: il diff engine risponde a "è cambiato qualcosa", le regole
 a "chi se ne occupa", la politica a "gli arriva adesso".
 
 **Regola di soppressione**: finché una finestra di manutenzione dichiarata da
@@ -267,7 +267,7 @@ timestamp restano UTC con suffisso esplicito in ogni lingua.
   "è cambiato tutto". Testato in entrambe le edizioni, anche nel container.
 - **Rate limiting** — la richiesta di ogni provider è sfasata di un valore derivato
   dall'hash del suo id, limitato a un decimo della sua cadenza, e l'intervallo stesso
-  porta jitter, così né una singola istanza né una flotta martellano un provider nello
+  porta jitter, così né una singola istanza né un insieme di istanze martellano un provider nello
   stesso secondo; poiché lo sfasamento è ancorato all'id, aggiungere un provider non
   sposta la richiesta di tutti gli altri. Il validatore memorizzato per provider
   trasforma la maggior parte dei cicli in un `304` senza corpo, e a un provider che

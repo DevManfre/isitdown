@@ -23,7 +23,7 @@ poi Vite, poi la copia degli asset — un unico layer `RUN` condiviso da entramb
 stage di runtime sotto di esso. `light` e `ui` sono per il resto invariati: lo
 stage `ui` continua a partire `FROM light`, quindi l'immagine UI è l'immagine
 Light più un unico layer sottile — immagine base, dipendenze di produzione e tutto
-il motore sono condivisi su disco e in un registry.
+il core sono condivisi su disco e in un registry.
 
 `dev`, il terzo stage, è `FROM builder` invece che `FROM light`: lo sviluppo live
 ha bisogno delle devDependencies (Vite, React, gli strumenti di test) che

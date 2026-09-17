@@ -63,11 +63,44 @@ export interface ServiceDefinition {
    * provider notifies. Absent means the provider is not muted.
    */
   mutedUntil?: string | undefined;
+  /**
+   * The monthly uptime target this provider is held to, as a percentage
+   * (roadmap 4.13). Absent means nobody promised anything, which is the normal
+   * case — and it is what keeps "no target" distinguishable from a target of
+   * 100%.
+   */
+  slaTarget?: number | undefined;
 }
+
+/**
+ * Channel fields that decide how a message *reads* rather than where it goes —
+ * the locale it is written in (roadmap 3.20) and the template it is rendered
+ * with (roadmap 3.15).
+ *
+ * Named once, here, because both editions store them beside the channel's
+ * transport settings and both have to keep them out of `settings`: a notifier
+ * factory validates what it is handed, and a stray `locale` key in there would
+ * be a transport setting nothing knows what to do with.
+ */
+export const CHANNEL_MESSAGE_KEYS = ["locale", "template"] as const;
 
 export interface ChannelConfig {
   id: string;
   enabled: boolean;
+  /**
+   * The language this channel's messages are written in, when it asks for one
+   * of its own (roadmap 3.20). Absent means the installation's notification
+   * locale — which is what every channel did before this existed, and still the
+   * normal case. What it buys is a Telegram chat reading Italian while the
+   * webhook payload beside it stays English.
+   */
+  locale?: string | undefined;
+  /**
+   * This channel's own message template (roadmap 3.15). Absent means the
+   * default rendering, byte for byte. See `src/notifiers/template.ts` for what
+   * a template may contain and, just as much, what it may not.
+   */
+  template?: string | undefined;
   /**
    * Channel settings with any secret already resolved from the environment.
    * Never persisted, never logged.
