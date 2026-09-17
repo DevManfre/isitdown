@@ -278,3 +278,52 @@ widget — counts and one word, no nested history:
 
 Neither endpoint contacts a provider and neither records anything: both are
 reads of stored state, which is what makes them safe to poll often.
+
+### 6.7 The public status page
+
+Two routes, off unless `PUBLIC_PAGE` is `true`, both answering `404` when it is
+not set (see [3.18](configuration.md#318-the-public-status-page)):
+
+```bash
+curl -s localhost:3000/public | head -5
+#   <!doctype html>
+#   <html lang="en">
+
+curl -s localhost:3000/public/summary.json | jq '{overall, providers: (.providers | length)}'
+#   {
+#     "overall": "degraded",
+#     "providers": 4
+#   }
+```
+
+One entry per published provider:
+
+```json
+{
+  "title": "Acme status",
+  "overall": "degraded",
+  "generatedAt": "2026-09-17T10:00:00.000Z",
+  "providers": [
+    {
+      "id": "github",
+      "name": "GitHub",
+      "status": "degraded",
+      "statusUrl": "https://www.githubstatus.com",
+      "uptime90": 99.94,
+      "days": [{ "day": "2026-06-19", "status": "operational", "uptime": 100 }],
+      "openIncidents": [
+        { "title": "Elevated API errors", "status": "investigating", "updatedAt": "2026-09-17T09:12:00.000Z" }
+      ],
+      "maintenance": null
+    }
+  ]
+}
+```
+
+`statusUrl` is `null` for the `http`, `tcp`, `dns` and `uptimekuma` adapters,
+whose base URL is your own host rather than a vendor's public page.
+
+Both responses are cached for a minute. `summary.json` sends
+`access-control-allow-origin: *`, because a published projection with nothing
+private in it is exactly the thing someone wants to fetch from their own page.
+Neither route is gated by `API_TOKEN`.

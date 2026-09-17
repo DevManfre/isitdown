@@ -282,3 +282,53 @@ widget "custom API" — conteggi e una parola, nessuno storico annidato:
 
 Nessuno dei due contatta un provider e nessuno dei due registra qualcosa: sono
 letture dello stato salvato, ed è questo che li rende interrogabili spesso.
+
+
+### 6.7 La pagina di stato pubblica
+
+Due rotte, spente se `PUBLIC_PAGE` non è `true`, che rispondono `404` quando non
+lo è (vedi [3.18](configuration.it.md#318-la-pagina-di-stato-pubblica)):
+
+```bash
+curl -s localhost:3000/public | head -5
+#   <!doctype html>
+#   <html lang="it">
+
+curl -s localhost:3000/public/summary.json | jq '{overall, providers: (.providers | length)}'
+#   {
+#     "overall": "degraded",
+#     "providers": 4
+#   }
+```
+
+Una voce per ogni provider pubblicato:
+
+```json
+{
+  "title": "Stato Acme",
+  "overall": "degraded",
+  "generatedAt": "2026-09-17T10:00:00.000Z",
+  "providers": [
+    {
+      "id": "github",
+      "name": "GitHub",
+      "status": "degraded",
+      "statusUrl": "https://www.githubstatus.com",
+      "uptime90": 99.94,
+      "days": [{ "day": "2026-06-19", "status": "operational", "uptime": 100 }],
+      "openIncidents": [
+        { "title": "Elevated API errors", "status": "investigating", "updatedAt": "2026-09-17T09:12:00.000Z" }
+      ],
+      "maintenance": null
+    }
+  ]
+}
+```
+
+`statusUrl` è `null` per gli adattatori `http`, `tcp`, `dns` e `uptimekuma`, il
+cui URL base è un host tuo e non la pagina pubblica di un fornitore.
+
+Entrambe le risposte sono in cache per un minuto. `summary.json` invia
+`access-control-allow-origin: *`, perché una proiezione pubblicata che non
+contiene nulla di privato è esattamente ciò che si vuole poter chiamare dalla
+propria pagina. Nessuna delle due rotte è protetta da `API_TOKEN`.
