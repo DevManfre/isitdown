@@ -5,7 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createHashRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import i18n from "@/lib/i18n.ts";
+import i18n, { switchLocale } from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders, stubApi, type Fixtures } from "@/test/harness.tsx";
 import { createQueryClient } from "@/lib/queryClient.ts";
 import { BusyProvider, useBusy } from "@/hooks/useBusy.tsx";
@@ -1059,6 +1059,31 @@ describe("Settings", () => {
       );
       expect(patchCall?.body).toEqual({ mapView: "map" });
     });
+  });
+
+  // The language control moved out of the header and into this section. It is
+  // the one preference that changes the words every other row is read in, so
+  // the assertions are about what a person sees and what is remembered for the
+  // next browser — not about i18next's internals.
+  it("applies the language and remembers it for the next browser", async () => {
+    renderSettings("appearance", fixtures);
+    await screen.findByLabelText(i18n.t("settings.language.label"));
+    const calls = interceptWrites({ "PATCH /api/preferences": { uiLocale: "it" } });
+
+    await userEvent.click(screen.getByLabelText(i18n.t("settings.language.label")));
+    await userEvent.click(await screen.findByRole("option", { name: "Italiano" }));
+
+    await waitFor(() => {
+      const patched = calls.find(
+        (call) => call.method === "PATCH" && call.path === "/api/preferences",
+      );
+      expect(patched?.body).toEqual({ uiLocale: "it" });
+    });
+    expect(i18n.language).toBe("it");
+
+    // Put it back: i18next is module state, and a suite that leaves the
+    // dashboard in Italian fails whichever test runs next.
+    await switchLocale("en");
   });
 
   it("leaves a receipt when an appearance preference is saved", async () => {
