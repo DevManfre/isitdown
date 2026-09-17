@@ -334,6 +334,12 @@ list is never overwritten afterwards.
 | `DB_PATH` | UI | `/app/data/isitdown.db` | SQLite database. |
 | `API_TOKEN` | UI | — | A read-only bearer token ([3.12](#312-reaching-the-api-from-another-host)). Unset — the default — leaves every route open, which is right for an instance bound to `127.0.0.1`. Set it and a request carrying it may `GET` from any host; writes stay local-only. |
 | `API_LOCAL_BYPASS` | UI | `true` | Whether a request from this machine may skip `API_TOKEN`. Set it to `false` behind a reverse proxy, where every forwarded request looks local. |
+| `TELEGRAM_CHATOPS` | UI | `false` | Set it to `true` to let the Telegram bot take commands as well as send alerts ([3.17](#317-chatops--commanding-the-bot-from-telegram)). Off by default: an inbound command channel is something you opt into. |
+| `TELEGRAM_COMMAND_CHAT_IDS` | UI | — | Extra chat ids allowed to command the bot, comma-separated. The chat the Telegram channel already sends to is always allowed; this is for an installation alerted in one chat and commanded from another. |
+| `PUBLIC_PAGE` | UI | `false` | Set it to `true` to publish a read-only status page at `/public` ([3.18](#318-the-public-status-page)). Off by default — it is the one surface strangers can read. |
+| `PUBLIC_PAGE_TITLE` | UI | `Service status` | The heading and the browser title of that page. |
+| `PUBLIC_PAGE_PROVIDERS` | UI | — | Which providers to publish, comma-separated by id. Unset publishes every enabled provider. A visitor cannot widen this: the page takes no request input at all. |
+| `PUBLIC_PAGE_LOCALE` | UI | — | The language that page is written in. Unset follows the installation's own notification locale. |
 | `PUSH_TOKEN` | UI | — | Turns on the provider-webhook endpoint ([3.15](#315-provider-push-instead-of-poll)) and is the credential in its URL. Unset, that route answers `404`. |
 | `PORT` | UI | `3000` | HTTP port. |
 
@@ -1482,3 +1488,83 @@ The honest half of that trade:
 
 Tracing is off unless one of the two endpoint variables is set, and off it costs
 nothing: every call site holds an object whose methods return immediately.
+
+### 3.17 Chatops — commanding the bot from Telegram
+
+The Telegram channel can take commands as well as send alerts. UI edition only,
+and off unless you ask for it:
+
+```bash
+TELEGRAM_CHATOPS=true
+```
+
+The bot then answers, in the chat it already alerts:
+
+| Command | What it does |
+|---|---|
+| `/status` | Every enabled provider, worst first, with open incidents and any running mute. |
+| `/status <provider>` | One provider, plus its 90-day uptime. |
+| `/history <provider> [7\|30\|90]` | Uptime over a window, the days actually measured, incidents, and the worst day. Defaults to 30. |
+| `/mute <provider> <30m\|2h\|1d>` | Stops alerts for a while, up to `30d`. |
+| `/unmute <provider>` | Starts them again. |
+| `/help` | The list above. |
+
+A provider can be named by its configured id or by the name on the dashboard,
+whichever comes to mind. A mute set here is the *same* mute the dashboard sets —
+it is written where the diff engine reads it, so it shows up on screen and lifts
+itself when it expires.
+
+**Who may command it.** The chats you configured, and nobody else. The allowlist
+is the chat the Telegram channel already sends to, plus anything in
+`TELEGRAM_COMMAND_CHAT_IDS`. A message from any other chat is ignored in
+silence — not refused, because a refusal confirms the bot is there to whoever is
+probing it. There is no enrolment step and no password, deliberately: a secret
+typed into a chat to gain access to that chat protects nothing.
+
+It long-polls rather than taking a webhook, so it works from behind a router
+with no ports forwarded — the same assumption the rest of IsItDown makes.
+
+Light edition has no chatops, because `/mute` would mean this process rewriting
+your `config.yml` behind your back. Reading it from the UI edition's database is
+a door onto a room that already exists.
+
+### 3.18 The public status page
+
+A read-only page, built from the fleet you already watch, for people who are not
+the operator — "here is the health of everything we depend on". Off unless you
+turn it on:
+
+```bash
+PUBLIC_PAGE=true
+PUBLIC_PAGE_TITLE="Acme status"
+PUBLIC_PAGE_PROVIDERS=github,cloudflare,stripe   # optional; unset publishes all
+```
+
+It serves two things and nothing else:
+
+- **`GET /public`** — one self-contained HTML page: a banner, then a card per
+  provider with the familiar 90-day daily strip, its open incidents and any
+  running maintenance.
+- **`GET /public/summary.json`** — the very same projection as JSON, CORS-open,
+  for anyone who wants to build their own view on it.
+
+Both are cached for a minute, and neither reads a query parameter, a header or a
+body. There is no request input at all, so a visitor cannot ask to see a provider
+you chose not to publish.
+
+**What it deliberately cannot leak.** The published object is written out field
+by field in `src/ui/publicPage.ts` rather than filtered down from the dashboard's
+own payload — a filtered payload leaks the next field somebody adds to it. So
+nothing about adapters, channels, routing rules, mutes, failure counts or
+credentials has a line there, and the page carries **no JavaScript at all**: it
+cannot call the dashboard's API because there is nothing on it that could call
+anything. That also means it still renders during the outage it exists to report.
+
+One case is worth knowing about. A provider's link points at the vendor's own
+status page, which is public by definition — but for the `http`, `tcp`, `dns` and
+`uptimekuma` adapters the base URL is *yours*, an internal hostname. Those
+providers still appear, under the name you gave them, with no link.
+
+It is not authentication: anyone who can reach the port can read the page, which
+is the point of it. Set `API_TOKEN` and the page stays open while the dashboard
+does not — its readers are exactly the people who hold no token.

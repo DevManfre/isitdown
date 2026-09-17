@@ -93,8 +93,16 @@ Regole imposte dai test, non solo documentate:
   `src/ui/web/lib/i18n.ts`, perché i cataloghi sono incorporati nel bundle invece
   che scoperti da disco a runtime.
 
-In distribuzione: `en` e `it`. La risoluzione della lingua è la preferenza salvata,
-poi `en`.
+In distribuzione: `en`, `de`, `es`, `fr`, `it` e `pt` (roadmap 5.14). La
+risoluzione della lingua è la preferenza salvata, poi `en`. Il selettore sta in
+**Impostazioni → Aspetto**, non nell'header: con sei lingue una fila di sigle
+nella chrome smette di essere un colpo d'occhio e diventa ingombro. Ognuna è
+elencata col proprio nome — «Deutsch», non «Tedesco» — perché chi non legge la
+lingua attuale cerca la parola della propria.
+
+> Il catalogo italiano ha avuto una revisione madrelingua nella roadmap 5.15; le
+> quattro lingue aggiunte in 5.14 sono state scritte sulla sorgente inglese e non
+> l'hanno avuta.
 
 > Le stringhe italiane sono state scritte insieme all'implementazione e non hanno
 > avuto una revisione da madrelingua. Vale anche per questo documento.

@@ -345,6 +345,12 @@ tua lista non viene più sovrascritta in seguito.
 | `DB_PATH` | UI | `/app/data/isitdown.db` | Database SQLite. |
 | `API_TOKEN` | UI | — | Un token bearer di sola lettura ([3.12](#312-raggiungere-lapi-da-un-altro-host)). Non impostato — il valore predefinito — lascia ogni rotta aperta, che è giusto per un'istanza legata a `127.0.0.1`. Impostandolo, una richiesta che lo porta può fare `GET` da qualunque host; le scritture restano solo locali. |
 | `API_LOCAL_BYPASS` | UI | `true` | Se una richiesta da questa macchina possa saltare `API_TOKEN`. Impostalo a `false` dietro un reverse proxy, dove ogni richiesta inoltrata sembra locale. |
+| `TELEGRAM_CHATOPS` | UI | `false` | Impostala a `true` perché il bot Telegram accetti comandi oltre a inviare avvisi ([3.17](#317-chatops--comandare-il-bot-da-telegram)). Spento per default: un canale di comando in entrata è una cosa che si sceglie. |
+| `TELEGRAM_COMMAND_CHAT_IDS` | UI | — | Altre chat autorizzate a comandare il bot, separate da virgola. La chat a cui il canale Telegram già invia è sempre autorizzata; questa serve a un'installazione avvisata in una chat e comandata da un'altra. |
+| `PUBLIC_PAGE` | UI | `false` | Impostala a `true` per pubblicare una pagina di stato in sola lettura su `/public` ([3.18](#318-la-pagina-di-stato-pubblica)). Spenta per default: è l'unica superficie che possono leggere degli estranei. |
+| `PUBLIC_PAGE_TITLE` | UI | `Service status` | Il titolo della pagina e quello del browser. |
+| `PUBLIC_PAGE_PROVIDERS` | UI | — | Quali provider pubblicare, per id e separati da virgola. Se non è impostata pubblica tutti i provider attivi. Un visitatore non può allargare l'elenco: la pagina non legge nulla dalla richiesta. |
+| `PUBLIC_PAGE_LOCALE` | UI | — | La lingua in cui è scritta quella pagina. Se non è impostata segue il locale delle notifiche dell'installazione. |
 | `PUSH_TOKEN` | UI | — | Attiva l'endpoint per i webhook dei provider ([3.15](#315-push-del-provider-invece-del-polling)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
 | `PORT` | UI | `3000` | Porta HTTP. |
 
@@ -1533,3 +1539,87 @@ La metà onesta del compromesso:
 Il tracing è spento se non è impostata una delle due variabili di endpoint, e da
 spento non costa nulla: ogni punto di chiamata tiene un oggetto i cui metodi
 ritornano immediatamente.
+
+
+### 3.17 Chatops — comandare il bot da Telegram
+
+Il canale Telegram può accettare comandi oltre a inviare avvisi. Solo edizione
+UI, e spento se non lo chiedi:
+
+```bash
+TELEGRAM_CHATOPS=true
+```
+
+Il bot risponde allora nella chat in cui già avvisa:
+
+| Comando | Cosa fa |
+|---|---|
+| `/status` | Tutti i provider attivi, i peggiori per primi, con incidenti aperti ed eventuale silenziamento in corso. |
+| `/status <provider>` | Un solo provider, più il suo uptime a 90 giorni. |
+| `/history <provider> [7\|30\|90]` | Uptime su un periodo, i giorni davvero misurati, gli incidenti e la giornata peggiore. Default 30. |
+| `/mute <provider> <30m\|2h\|1d>` | Sospende gli avvisi per un po', fino a `30d`. |
+| `/unmute <provider>` | Li riattiva. |
+| `/help` | L'elenco qui sopra. |
+
+Un provider si può indicare con l'id configurato o con il nome che compare sulla
+dashboard, quello che viene in mente per primo. Un mute impostato qui è lo
+*stesso* mute della dashboard: è scritto dove lo legge il diff engine, quindi si
+vede a schermo e scade da solo.
+
+**Chi può comandarlo.** Le chat che hai configurato, e nessun altro. L'elenco è
+la chat a cui il canale Telegram già invia, più quanto c'è in
+`TELEGRAM_COMMAND_CHAT_IDS`. Un messaggio da qualsiasi altra chat viene ignorato
+in silenzio — non rifiutato, perché un rifiuto conferma che il bot esiste a
+chiunque stia sondando. Non c'è nessuna procedura di iscrizione e nessuna
+password, di proposito: un segreto scritto in una chat per ottenere l'accesso a
+quella chat non protegge nulla.
+
+Usa il long polling invece di un webhook, così funziona da dietro un router senza
+porte aperte — la stessa ipotesi su cui è costruito tutto il resto di IsItDown.
+
+L'edizione Light non ha chatops, perché `/mute` significherebbe che questo
+processo riscrive il tuo `config.yml` alle tue spalle. Leggerlo dal database
+dell'edizione UI è invece una porta su una stanza che esiste già.
+
+### 3.18 La pagina di stato pubblica
+
+Una pagina in sola lettura, costruita sulla flotta che già controlli, per
+persone che non sono l'operatore: «ecco lo stato di salute di tutto ciò da cui
+dipendiamo». Spenta finché non la accendi:
+
+```bash
+PUBLIC_PAGE=true
+PUBLIC_PAGE_TITLE="Stato Acme"
+PUBLIC_PAGE_PROVIDERS=github,cloudflare,stripe   # facoltativa; vuota li pubblica tutti
+```
+
+Serve due cose e nient'altro:
+
+- **`GET /public`** — una pagina HTML autosufficiente: una fascia di riepilogo e
+  poi una scheda per provider con la solita striscia giornaliera a 90 giorni, i
+  suoi incidenti aperti ed eventuali manutenzioni in corso.
+- **`GET /public/summary.json`** — esattamente la stessa proiezione in JSON,
+  aperta via CORS, per chi vuole costruirci sopra una vista propria.
+
+Entrambe sono in cache per un minuto, e nessuna delle due legge un parametro di
+query, un header o un corpo. Non c'è alcun input nella richiesta, quindi un
+visitatore non può chiedere di vedere un provider che hai scelto di non
+pubblicare.
+
+**Cosa non può far uscire, di proposito.** L'oggetto pubblicato è scritto campo
+per campo in `src/ui/publicPage.ts` invece di essere filtrato dal payload della
+dashboard: un payload filtrato lascerebbe passare il prossimo campo che qualcuno
+gli aggiunge. Così niente su adattatori, canali, regole di instradamento, mute,
+conteggi di errore o credenziali ha una riga lì, e la pagina non porta **nessun
+JavaScript**: non può chiamare l'API della dashboard perché non c'è nulla, sopra,
+che possa chiamare qualcosa. Il che significa anche che si disegna comunque
+durante il guasto che esiste per raccontare.
+
+Un caso vale la pena conoscerlo. Il link di un provider punta alla pagina di
+stato del fornitore, che è pubblica per definizione — ma per gli adattatori
+`http`, `tcp`, `dns` e `uptimekuma` l'URL base è *tuo*, un hostname interno.
+Quei provider compaiono lo stesso, con il nome che hai dato loro, ma senza link.
+
+Non è autenticazione: chiunque raggiunga la porta può leggere la pagina, ed è
+proprio il punto. Imposta `API_TOKEN` e la pagina resta aperta mentre la
+dashboard no — chi la legge è esattamente chi non ha nessun token.

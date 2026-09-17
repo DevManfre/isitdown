@@ -83,10 +83,15 @@ Rules that are enforced by tests, not just documented:
   `src/ui/web/locales/` plus one import line in `src/ui/web/lib/i18n.ts`, since the
   catalogs are bundled rather than discovered from disk at runtime.
 
-Shipping: `en` and `it`. Locale resolution is the stored preference, then `en`.
+Shipping: `en`, `de`, `es`, `fr`, `it` and `pt` (roadmap 5.14). Locale resolution
+is the stored preference, then `en`. The picker is **Settings → Appearance**, not
+the header: six languages is past the point where a row of codes in the chrome is
+a glance rather than clutter. Each one is listed under its own name — "Deutsch",
+not "German" — since a reader who does not read the current language is looking
+for the word their own language uses.
 
-> The Italian strings were written alongside the implementation and have not had a
-> native review.
+> The Italian catalog had a native review in roadmap 5.15; the four added in 5.14
+> were written against the English source and have not.
 
 ### 8.3 Accessibility
 
