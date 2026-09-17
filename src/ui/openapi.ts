@@ -581,6 +581,30 @@ const paths: Json = {
       },
     },
   },
+  "/public": {
+    get: {
+      tags: ["Public"],
+      summary: "The public read-only status page, as HTML.",
+      description:
+        "Roadmap 5.1. One self-contained document with no script in it, built from a projection that carries no adapter, channel, routing, mute or credential field. Answers 404 unless `PUBLIC_PAGE=true`. `PUBLIC_PAGE_PROVIDERS` chooses what appears; the request itself carries no input, so a visitor cannot widen it. Never gated by `API_TOKEN` — its readers are exactly the people who hold none.",
+      responses: {
+        "200": media("text/html", "The page."),
+        "404": notFound,
+      },
+    },
+  },
+  "/public/summary.json": {
+    get: {
+      tags: ["Public"],
+      summary: "The same published projection as JSON.",
+      description:
+        "The very object `/public` is rendered from, CORS-open for anyone building their own view. Two projections would eventually disagree, so there is only one. Answers 404 unless `PUBLIC_PAGE=true`.",
+      responses: {
+        "200": ok({ type: "object" }, "The published fleet."),
+        "404": notFound,
+      },
+    },
+  },
   "/poll": {
     post: {
       tags: ["Diagnostics"],
@@ -768,6 +792,7 @@ export function openapiDocument(): Json {
       { name: "Preferences", description: "Per-dashboard display preferences." },
       { name: "Diagnostics", description: "Adapter probes and manual polls." },
       { name: "Live", description: "Streams and scrape targets." },
+      { name: "Public", description: "The read-only status page, for readers who are not the operator." },
       { name: "Meta", description: "This document." },
     ],
     paths,
