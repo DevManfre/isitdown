@@ -1,5 +1,6 @@
 import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
+import { createChatops } from "./chatops.ts";
 import { buildUiRuntime } from "./runtime.ts";
 
 const DB_PATH = process.env["DB_PATH"] ?? "/app/data/isitdown.db";
@@ -29,6 +30,7 @@ const server = started.app.listen(PORT, () => {
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
     logger.info("shutting down", { signal });
+    chatops?.stop();
     server.close(() => {
       void started
         .close()
@@ -49,6 +51,17 @@ await started.backfill.backfillAll();
 await started.scheduler.start();
 
 started.mapLane.start();
+
+// Roadmap 3.18. Started here rather than in the runtime builder, like the
+// scheduler and the map lane, so tests never open a long poll to Telegram.
+// Does nothing at all unless `TELEGRAM_CHATOPS=true`.
+const chatops = await createChatops(started).catch((error: unknown) => {
+  logger.error("telegram chatops failed to start", {
+    error: error instanceof Error ? error.message : String(error),
+  });
+  return null;
+});
+chatops?.start();
 // One immediate pass so a fresh container has markers on the map before the
 // first quarter-hour interval elapses, rather than an empty card until then.
 void started.mapLane.refresh().catch((error: unknown) => {

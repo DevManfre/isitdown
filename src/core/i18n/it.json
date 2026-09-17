@@ -41,5 +41,28 @@
   "notification.digest.correlated": "{count} provider peggiorati insieme — {providers}",
   "notification.digest.sla": "budget di errore — a questo ritmo il mese chiude al {projected}% contro {target}%",
 
-  "notification.suppressed": "{count} ulteriore/i avviso/i per questo provider sono stati soppressi dal limite orario."
+  "notification.suppressed": "{count} ulteriore/i avviso/i per questo provider sono stati soppressi dal limite orario.",
+
+  "chatops.help": "Comandi di IsItDown\n\n/status — tutti i provider, i peggiori per primi\n/status <provider> — un solo provider\n/history <provider> [7|30|90] — uptime su un periodo\n/mute <provider> <30m|2h|1d> — sospendi gli avvisi per un po'\n/unmute <provider> — riattivali\n/help — questo messaggio",
+  "chatops.status.heading": "{count} provider su {total} non sono operativi.",
+  "chatops.status.all-operational": "Tutti i {count} provider sono operativi.",
+  "chatops.status.empty": "Non è ancora sotto controllo nessun provider.",
+  "chatops.status.incidents": "incidenti aperti: {count}",
+  "chatops.status.maintenance": "in manutenzione",
+  "chatops.status.muted": "silenziato fino al {until}",
+  "chatops.status.uptime90": "Uptime a 90 giorni: {uptime}",
+  "chatops.history.heading": "{provider} — ultimi {days} giorni",
+  "chatops.history.uptime": "Uptime: {uptime} su {days} giorni misurati",
+  "chatops.history.incidents": "Incidenti: {count}",
+  "chatops.history.worst": "Giornata peggiore: {day} al {uptime}",
+  "chatops.history.unmeasured": "Per {provider} non è stata misurata alcuna lettura negli ultimi {days} giorni.",
+  "chatops.mute.done": "{provider} è silenziato fino al {until}. Gli avvisi riprendono da soli dopo quell'ora.",
+  "chatops.unmute.done": "{provider} non è più silenziato.",
+  "chatops.error.provider-required": "Indica un provider, ad esempio /status github",
+  "chatops.error.duration-required": "Indica per quanto tempo, ad esempio /mute github 2h",
+  "chatops.error.bad-duration": "{duration} non è una durata che so leggere. Prova 30m, 2h o 1d, fino a 30d.",
+  "chatops.error.bad-window": "{window} non è un periodo che conservo. Chiedi 7, 30 o 90 giorni.",
+  "chatops.error.unknown-provider": "Non sto controllando nulla che si chiami {provider}.",
+  "chatops.error.unknown-command": "/{command} non è un comando. Scrivi /help per l'elenco.",
+  "chatops.error.failed": "Non ha funzionato: {reason}"
 }
