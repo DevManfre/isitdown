@@ -308,6 +308,13 @@
   "settings.map-view.off": "Off",
   "settings.map-view.map": "Dotted map",
   "settings.map-view.globe": "Rotating globe",
+
+  "settings.install.label": "Install as an app",
+  "settings.install.hint": "Adds IsItDown to your home screen or dock, in its own window.",
+  "settings.install.manual": "Your browser installs from its own menu \u2014 on iOS, Share then Add to Home Screen.",
+  "settings.install.installed": "You are already reading the installed app.",
+  "settings.install.action": "Install",
+  "settings.install.done": "Installed",
   "settings.map-view.hint": "Shows monitored locations on the overview. Only providers that name their own regions or edge locations can be placed.",
 
   "settings.routing": "Notification routing",

@@ -14,6 +14,7 @@ import { SettingsLauncher } from "@/components/settings/SettingsLauncher.tsx";
 import { openCategory, SETTINGS_CATEGORIES } from "@/components/settings/sectionIndex.ts";
 import { Reveal } from "@/components/settings/Reveal.tsx";
 import { ChannelRow, ChannelSummary, channelRank } from "@/components/settings/ChannelRow.tsx";
+import { InstallAppRow } from "@/components/settings/InstallAppRow.tsx";
 import { NumberSetting } from "@/components/settings/NumberSetting.tsx";
 import { RoutingRulesDialog } from "@/components/settings/RoutingRulesDialog.tsx";
 import { ServiceRow } from "@/components/settings/ServiceRow.tsx";
@@ -1153,6 +1154,9 @@ function SettingsView() {
             </SelectContent>
           </Select>
         </SettingRow>
+        {/* Roadmap 5.21. Last in Appearance: it is about the window the
+            dashboard lives in rather than about what is drawn inside it. */}
+        <InstallAppRow />
       </SettingsSection>
       )}
 
