@@ -30,6 +30,14 @@ export default defineConfig({
     environment: "happy-dom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
+    // Vitest's default is 5s, which the userEvent-heavy suites (ServiceDialog,
+    // Incidents pagination) sit close enough to that they fail intermittently
+    // under `npm run coverage` — v8 instrumentation costs this suite ~45% wall
+    // clock, and the failures rotate between tests and vanish on a re-run,
+    // which is the signature of a deadline rather than a defect. Raising it
+    // weakens no assertion: a test that is genuinely wrong still fails, it
+    // simply gets long enough to say so on a loaded machine.
+    testTimeout: 20_000,
     include: ["**/*.test.tsx", "**/*.test.ts"],
     // Roadmap 7.2. A floor, not a target: these sit a few points under what
     // the dashboard covers today, so ordinary movement passes and a new view
