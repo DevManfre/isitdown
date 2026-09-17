@@ -454,14 +454,6 @@
 }
 
 /* — header controls — */
-.lang-opt {
-  transition:
-    color 0.2s ease,
-    background 0.24s var(--ease-out);
-}
-.lang-opt:hover {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-}
 .theme-btn {
   transition:
     background 0.24s ease,
