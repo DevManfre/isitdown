@@ -64,5 +64,15 @@
   "chatops.error.bad-window": "{window} non è un periodo che conservo. Chiedi 7, 30 o 90 giorni.",
   "chatops.error.unknown-provider": "Non sto controllando nulla che si chiami {provider}.",
   "chatops.error.unknown-command": "/{command} non è un comando. Scrivi /help per l'elenco.",
-  "chatops.error.failed": "Non ha funzionato: {reason}"
+  "chatops.error.failed": "Non ha funzionato: {reason}",
+
+  "public.banner.operational": "Tutti i {count} servizi sono operativi.",
+  "public.banner.degraded": "Alcuni servizi stanno avendo problemi.",
+  "public.uptime90": "{uptime} di uptime su 90 giorni",
+  "public.ninety-days-ago": "90 giorni fa",
+  "public.today": "Oggi",
+  "public.strip-label": "Stato giorno per giorno negli ultimi 90 giorni — {uptime} di uptime",
+  "public.maintenance": "Manutenzione programmata in corso: {title} (fine {endsAt})",
+  "public.empty": "Non è ancora pubblicato nessun servizio.",
+  "public.generated": "Ultimo controllo {at}. Questa pagina è generata da IsItDown a partire dalla pagina di stato pubblica di ogni provider."
 }
