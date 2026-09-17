@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 19;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -414,6 +414,49 @@ export function migrate(db: DatabaseSync): void {
       );
       CREATE INDEX IF NOT EXISTS idx_incident_notes_incident
         ON incident_notes (provider_id, incident_id, created_at);
+    `);
+  }
+
+  if (from < 18) {
+    // Silent-outage cross-check — roadmap 1.10. A column beside `group_name`
+    // for the same reason: it is a name a probe carries, written identically in
+    // the Light edition's `config.yml`, and a table would let the two editions
+    // describe one relationship two ways. Nullable, because a probe checks
+    // nothing but itself until an operator says otherwise.
+    const columns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!columns.includes("cross_checks")) {
+      db.exec("ALTER TABLE services ADD COLUMN cross_checks TEXT");
+    }
+  }
+
+  if (from < 19) {
+    // Per-provider SLA target and error budget — roadmap 4.13. A column beside
+    // `group_name` and `cross_checks` for the same reason both of those are
+    // one: it is a number the provider carries, written identically in the
+    // Light edition's `config.yml`, and a table would let the two editions
+    // describe one fact two ways. Nullable, because most providers are watched
+    // without anybody having promised anything about them.
+    const columns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!columns.includes("sla_target")) {
+      db.exec("ALTER TABLE services ADD COLUMN sla_target REAL");
+    }
+
+    // One row per provider per month it has already been warned about (roadmap
+    // 4.13). The burn alert is a statement about a month, so it is said once a
+    // month — and unlike the dispatcher's hourly cap, that state cannot live in
+    // memory: a restart on the 12th would say it again, and an operator who
+    // reads the same sentence twice stops reading it.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS sla_notices (
+        provider_id TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        month       TEXT NOT NULL,
+        notified_at TEXT NOT NULL,
+        PRIMARY KEY (provider_id, month)
+      );
     `);
   }
 

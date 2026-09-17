@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type Query } from "@tanstack/react-query";
 import * as api from "@/lib/api.ts";
+import type { HistoryWindow } from "@/lib/api.ts";
 import { LIVE_REFRESH_MS, msUntilNextPoll, REFRESH_MS, statusRefetchDelay } from "@/lib/statusRefetch.ts";
 import type { StatusResponse } from "@/lib/types.ts";
 import { useBusy } from "./useBusy.tsx";
@@ -123,12 +124,14 @@ export function useConfigChrome() {
  * stays at its default `false`, so this costs nothing for a view nobody is
  * looking at or a tab nobody has in front of them.
  */
-export const useHistory = (days: number) => {
+export const useHistory = (window: HistoryWindow) => {
   const busy = useBusy();
   const live = useLive();
   return useQuery({
-    queryKey: ["history", days, null],
-    queryFn: () => api.getHistory(days),
+    // The range is part of the key, not just the span: two different ranges can
+    // be the same number of days and are not the same answer.
+    queryKey: ["history", window.days, window.range ?? null, null],
+    queryFn: () => api.getHistory(window),
     refetchInterval: idleInterval(busy, live),
   });
 };
@@ -158,12 +161,12 @@ export const useHistory = (days: number) => {
  * the drawer mounts closed, with `provider === null`, and must not fetch for a
  * provider nobody opened.
  */
-export const useProviderHistory = (provider: string | null, days: number) => {
+export const useProviderHistory = (provider: string | null, window: HistoryWindow) => {
   const busy = useBusy();
   const live = useLive();
   return useQuery({
-    queryKey: ["history", days, provider],
-    queryFn: () => api.getHistory(days, provider ?? undefined),
+    queryKey: ["history", window.days, window.range ?? null, provider],
+    queryFn: () => api.getHistory(window, provider ?? undefined),
     throwOnError: false,
     enabled: provider !== null,
     refetchInterval: idleInterval(busy, live),
@@ -187,6 +190,17 @@ export const useProviderCalendar = (provider: string | null) =>
     throwOnError: false,
     enabled: provider !== null,
   });
+
+/**
+ * Monthly targets and error budgets — roadmap 4.13.
+ *
+ * Never throws: a provider page whose budget card cannot load should lose the
+ * card, not the page. No `refetchInterval` either — a budget moves by a minute
+ * per poll at worst, and the cycle's own `["history"]` invalidation already
+ * brings it back.
+ */
+export const useSla = () =>
+  useQuery({ queryKey: ["sla"], queryFn: api.getSla, throwOnError: false });
 
 /**
  * Never throws. Vanilla's own reasoning (`history.js:70-82`): "the provider's

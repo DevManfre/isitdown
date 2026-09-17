@@ -486,6 +486,9 @@ describe("the service dialog's write path", () => {
       // Same for the group (roadmap 2.6): an empty field means "out of the
       // group", which only a null can say.
       group: null,
+      // And for the SLA target (roadmap 4.13): an empty field means nobody is
+      // promising anything about this provider any more.
+      slaTarget: null,
     });
   });
 

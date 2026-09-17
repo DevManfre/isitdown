@@ -1,6 +1,6 @@
 {
   "name": "isitdown",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "description": "Polls the public status pages of third-party providers and notifies on state transitions",
   "license": "MIT",
@@ -12,10 +12,11 @@
     "build": "tsc -p tsconfig.json && vite build && node tools/copy-assets.mjs",
     "build:light": "tsc -p tsconfig.light.json && node tools/copy-assets.mjs",
     "build:ui": "tsc -p tsconfig.json && vite build && node tools/copy-assets.mjs",
+    "build:sea": "node tools/build-sea.mjs",
     "check:config": "node src/light/check.ts",
     "check:bundle": "node tools/bundle-budget.mjs",
     "check:readme": "node tools/readme-parity.mjs",
-    "coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"tools/**\" --test-coverage-exclude=\"src/ui/web/**\" --test-coverage-lines=95 --test-coverage-branches=88 --test-coverage-functions=93 \"test/**/*.test.ts\" && vitest run --coverage",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"tools/**\" --test-coverage-exclude=\"src/ui/web/**\" --test-coverage-exclude=\"**/isitdown-plugins-*/**\" --test-coverage-lines=95 --test-coverage-branches=88 --test-coverage-functions=93 \"test/**/*.test.ts\" && vitest run --coverage",
     "dev:ui": "concurrently -n server,vite -c blue,magenta \"DB_PATH=./data/isitdown.db WEB_DIR=./dist/ui/public node --watch --env-file-if-exists=.env src/ui/server.ts\" \"vite\"",
     "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
     "preversion": "npm run typecheck && npm test && npm run test:integration",
@@ -23,6 +24,7 @@
     "release-notes": "node tools/release-notes.mjs",
     "test": "node --test \"test/**/*.test.ts\" && vitest run",
     "test:integration": "node --test \"test/**/*.itest.ts\"",
+    "test:load": "node tools/loadtest.mjs",
     "test:mutation": "node tools/mutation.mjs",
     "test:visual": "node tools/visual-regression.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"

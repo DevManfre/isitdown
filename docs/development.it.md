@@ -221,6 +221,7 @@ npm run coverage         # le stesse due suite sotto una soglia minima di copert
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
 npm run test:visual      # baseline visive: ogni vista, entrambi i temi, entrambe le lingue
 npm run test:mutation    # mutation testing sul diff engine
+npm run test:load        # 200 provider sintetici, una settimana di storico, ogni lettura cronometrata
 npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
@@ -233,22 +234,62 @@ gzip, perché è quello che il browser scarica: `410 kB` di JavaScript e `20 kB`
 CSS, entrambi poco sopra la build di oggi. È un tetto, non un obiettivo — quando
 fallisce la risposta è trovare cosa è cresciuto, non alzare il numero.
 
-La soglia di copertura (roadmap 7.2) è un pavimento, non un obiettivo da
+La soglia di copertura (roadmap 7.2) è un minimo garantito, non un obiettivo da
 rincorrere. Sono due, perché le due suite coprono metà diverse: il server e il
-motore devono restare al 95% delle righe, all'88% dei rami e al 93% delle
+core devono restare al 95% delle righe, all'88% dei rami e al 93% delle
 funzioni, e la dashboard a 85/75/80 — ciascuna qualche punto sotto il valore
 attuale, così il movimento ordinario passa e un sottosistema nuovo che arriva
 senza test propri trascina il totale sotto la soglia e fa fallire la CI. Alza una
 soglia quando la suite è davvero salita; non abbassarne mai una per far tornare
 verde una run rossa.
 
+Il **load test** (roadmap 7.4) risponde a una domanda che le altre suite non
+pongono: non "è veloce" ma "dove smette di esserlo". `tools/loadtest.mjs`
+sintetizza un parco provider che nessuno ha — 200 provider e una settimana di campioni
+alla cadenza di default, circa 670 000 righe e ~100MB di SQLite — in una
+directory temporanea, poi cronometra ogni lettura che fa la dashboard e
+ricancella il database. Nulla parla con un provider, e i dati sono
+deterministici, così due esecuzioni sono confrontabili.
+
+```bash
+npm run test:load                                    # il parco provider di default
+node tools/loadtest.mjs --providers=400 --days=30    # un soak, per trovare il ginocchio della curva
+```
+
+Cosa ha trovato, su un portatile di sviluppo:
+
+| Parco provider | `/status` | `/history?days=90` | `/incidents` | `/metrics` |
+|---|---|---|---|---|
+| 200 provider × 7 giorni (670k campioni) | 0,3s | 0,8s, 1,4MB | 23ms | 14ms |
+| 400 provider × 30 giorni (5,8M campioni) | **4,1s** | **7,8s**, 2,8MB | 61ms | 19ms |
+
+La forma è chiara. Tutto ciò che legge una riga e la restituisce resta nei
+millisecondi per quanto cresca il parco provider — il pager degli incidenti, le
+metriche, il riepilogo del badge, Home Assistant — e i due endpoint che
+*aggregano sui campioni* sono quelli che cedono: `/status`, che deriva un uptime
+a 90 giorni per provider, e `/history`, il cui payload cresce anche con il
+parco provider. Il ginocchio della curva sta sotto i 400 provider con un mese di retention; a 200 e
+una settimana è tutto comodo.
+
+È la risposta a "dove servirebbe lavoro": non il poller, e non le scritture di
+SQLite, ma un rollup — bucket giornalieri salvati invece che aggregati a ogni
+richiesta — dietro a quelle due letture. Nulla in roadmap ne ha ancora bisogno,
+e questo script è il modo in cui il giorno in cui servirà si vedrà invece di
+arrivare come una segnalazione.
+
+Non è in CI, deliberatamente: scrive centinaia di migliaia di righe e richiede
+circa un minuto. I budget p95 nello script sono generosi per lo stesso motivo
+per cui la soglia di copertura è un minimo garantito — intercettano una regressione di
+un ordine di grandezza (un indice caduto, una query che ha iniziato a fare
+scansioni), non qualche punto percentuale di deriva.
+
 Il mutation testing (roadmap 7.3) pone la domanda che la copertura non può
 porre: una riga eseguita non è una riga a cui un test avrebbe obiettato.
 `tools/mutation.mjs` cambia un operatore in `src/core/diffEngine.ts` — un
 confronto invertito, un confine spostato di uno, `&&` al posto di `||` — esegue
-la suite propria del motore e riporta ogni mutante che la suite continua a far
-passare. Quello è un comportamento del motore che nulla sta tenendo fermo, e il
-motore è l'unica autorità su se qualcuno viene avvisato di qualcosa: è per
+la suite propria del diff engine e riporta ogni mutante che la suite continua a far
+passare. Quello è un comportamento del diff engine che nulla sta tenendo fermo, e il
+diff engine è l'unica autorità su se qualcuno viene avvisato di qualcosa: è per
 questo che qui vale la pena farlo e altrove no. Non prende dipendenze e costa
 circa un minuto.
 
@@ -300,7 +341,7 @@ Suite notevoli:
   esatta sui nodi di testo che ha sostituito, perché il JSX non offre un modo
   privo di parsing per distinguere un'espressione tradotta da un letterale.
 - **Regressione visiva** — ogni vista fotografata in entrambi i temi ed entrambe
-  le lingue su una flotta fissa e con l'orologio congelato, poi confrontata con
+  le lingue su un parco provider fisso e con l'orologio congelato, poi confrontata con
   le baseline concordate sotto `test/visual/baseline/`. Il confronto avviene su
   una riduzione 8× di entrambi i frame, ed è questo che permette a un solo set di
   baseline di valere su più macchine: la rasterizzazione dei font non è
@@ -372,6 +413,10 @@ push di tag non fa scattare la CI), si rifiuta di procedere se tag e
 `package.json` non concordano, costruisce entrambi i target per `linux/amd64` e
 `linux/arm64`, pubblica i quattro tag GHCR con SBOM e provenance, firma i due
 digest con `cosign` keyless e crea la release su GitHub.
+
+Lo stesso workflow costruisce l'edizione Light in un solo file (roadmap 6.7) con
+`npm run build:sea` e la allega alla release con accanto un `.sha256` — vedi
+[4.5](docker.md#45-nessuno-dei-due-ledizione-light-in-un-solo-file).
 
 Le note di rilascio si generano dal log con `tools/release-notes.mjs`, che sfrutta
 la convenzione dei commit: `<emoji> <TITOLO> - <descrizione>` è parsabile, quindi

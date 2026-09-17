@@ -1,9 +1,13 @@
 import type { ChannelConfig } from "../core/configSource.interface.ts";
 import type { Notifier } from "../core/notifier.interface.ts";
+import { createAppriseNotifier } from "./apprise.notifier.ts";
 import { createDiscordNotifier } from "./discord.notifier.ts";
 import { createEmailNotifier } from "./email.notifier.ts";
 import { createGotifyNotifier } from "./gotify.notifier.ts";
+import { createMatrixNotifier } from "./matrix.notifier.ts";
 import { createNtfyNotifier } from "./ntfy.notifier.ts";
+import { createOpsgenieNotifier } from "./opsgenie.notifier.ts";
+import { createPagerdutyNotifier } from "./pagerduty.notifier.ts";
 import { createPushoverNotifier } from "./pushover.notifier.ts";
 import { createSlackNotifier } from "./slack.notifier.ts";
 import { createTeamsNotifier } from "./teams.notifier.ts";
@@ -13,10 +17,14 @@ import { createWebhookNotifier } from "./webhook.notifier.ts";
 export type NotifierFactory = (settings: Record<string, string>) => Notifier;
 
 const factories: Record<string, NotifierFactory> = {
+  apprise: createAppriseNotifier,
   discord: createDiscordNotifier,
   email: createEmailNotifier,
   gotify: createGotifyNotifier,
+  matrix: createMatrixNotifier,
   ntfy: createNtfyNotifier,
+  opsgenie: createOpsgenieNotifier,
+  pagerduty: createPagerdutyNotifier,
   pushover: createPushoverNotifier,
   slack: createSlackNotifier,
   teams: createTeamsNotifier,

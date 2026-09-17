@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { Activity, MonitorCog, RefreshCw, Server } from "lucide-react";
+import { Activity, MonitorCog, RefreshCw, Server, Tv } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -141,6 +141,16 @@ export function CommandPalette() {
           <CommandItem value={t("palette.cycle-theme")} onSelect={run(() => cycle())}>
             <MonitorCog aria-hidden="true" />
             {t("palette.cycle-theme")}
+          </CommandItem>
+          {/* Roadmap 5.8. An action rather than a rail entry: the wallboard is
+              somewhere you send a screen, not somewhere you navigate between
+              tasks, and a sixth rail item would say otherwise every day. */}
+          <CommandItem
+            value={t("palette.wallboard")}
+            onSelect={run(() => void navigate(ROUTE_PATHS.wallboard))}
+          >
+            <Tv aria-hidden="true" />
+            {t("palette.wallboard")}
           </CommandItem>
         </CommandGroup>
       </CommandList>

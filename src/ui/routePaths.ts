@@ -8,6 +8,12 @@
 export const ROUTE_PATHS = {
   overview: "/overview",
   providers: "/providers",
+  /**
+   * One provider, linkable — roadmap 5.6. `#/providers/github` is the page an
+   * operator can send to somebody or keep in a tab; the drawer beside the lists
+   * stays the one-click look, not the only way in.
+   */
+  providerDetail: "/providers/:providerId",
   incidents: "/incidents",
   incidentDetail: "/incidents/:providerId/:incidentId",
   history: "/history",
@@ -15,12 +21,18 @@ export const ROUTE_PATHS = {
   settings: "/settings",
   /** One Settings category, on its own page: `#/settings/engine`. */
   settingsSection: "/settings/:sectionId",
+  /**
+   * The office screen — roadmap 5.8. Outside the app shell rather than a view
+   * inside it: it has no rail and no header, and a view cannot remove the
+   * chrome around it.
+   */
+  wallboard: "/wallboard",
 } as const;
 
 export type RouteName = keyof typeof ROUTE_PATHS;
 
 /** Every route that is a destination in its own right — the rail's own set. */
-export type NavRouteName = Exclude<RouteName, "settingsSection">;
+export type NavRouteName = Exclude<RouteName, "settingsSection" | "providerDetail" | "wallboard">;
 
 /** The rail's order, which is also the nav-label lookup order. */
 export const NAV_ROUTES: { name: NavRouteName; labelKey: string }[] = [

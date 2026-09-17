@@ -64,6 +64,8 @@ export function exportConfigYaml(db: DatabaseSync, logger: Logger): string {
     adaptivePolling: settings.adaptivePolling,
     adaptiveIntervalMinutes: settings.adaptiveIntervalMinutes,
     confirmSamples: settings.confirmSamples,
+    correlationThreshold: settings.correlationThreshold,
+    correlationWindowMinutes: settings.correlationWindowMinutes,
     locale: settings.uiLocale,
     // Exactly what the file schema takes, field for field: a service that
     // round-trips through this must come back the same service.
@@ -78,6 +80,9 @@ export function exportConfigYaml(db: DatabaseSync, logger: Logger): string {
       ...(service.mutedUntil === undefined ? {} : { mutedUntil: service.mutedUntil }),
       ...(service.components.length === 0 ? {} : { components: service.components }),
       ...(service.scopeToComponents ? { scopeToComponents: true } : {}),
+      ...(service.group === undefined ? {} : { group: service.group }),
+      ...(service.crossChecks === undefined ? {} : { crossChecks: service.crossChecks }),
+      ...(service.slaTarget === undefined ? {} : { slaTarget: service.slaTarget }),
     })),
     notifications,
     routing: listRoutingRules(db, logger).rules,
@@ -171,6 +176,8 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
     adaptivePolling: file.adaptivePolling,
     adaptiveIntervalMinutes: file.adaptiveIntervalMinutes,
     confirmSamples: file.confirmSamples,
+    correlationThreshold: file.correlationThreshold,
+    correlationWindowMinutes: file.correlationWindowMinutes,
     uiLocale: file.locale,
     ...(file.delivery === undefined
       ? {}
@@ -210,6 +217,12 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
         intervalMinutes: service.intervalMinutes ?? null,
         components: service.components,
         scopeToComponents: service.scopeToComponents,
+        // Null rather than omitted: an import is the file's whole fleet, so a
+        // service that no longer carries a group or a cross-check has to lose
+        // the one the database is still holding.
+        group: service.group ?? null,
+        crossChecks: service.crossChecks ?? null,
+        slaTarget: service.slaTarget ?? null,
         ...(service.options === undefined ? {} : { options: service.options }),
       });
       report.updated.push(service.id);

@@ -83,6 +83,11 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "fixed top-[50%] left-[50%] z-50 flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col gap-4 overflow-hidden rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          // Below 768px the same panel is a bottom sheet: anchored to the edge
+          // the thumb reaches, full width, and entering from below rather than
+          // zooming out of the middle of the screen. The zoom is neutralised
+          // rather than dropped — one class list, two placements.
+          "max-md:top-auto max-md:bottom-0 max-md:left-0 max-md:max-h-[85dvh] max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-2xl max-md:p-4 max-md:data-[state=closed]:zoom-out-100 max-md:data-[state=closed]:slide-out-to-bottom max-md:data-[state=open]:zoom-in-100 max-md:data-[state=open]:slide-in-from-bottom",
           className
         )}
         {...props}
@@ -147,7 +152,10 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        // Stacked and full width on a phone — the sheet's buttons are the last
+        // thing the thumb reaches, so they get the whole width rather than
+        // sharing a line — and back to a right-aligned row from `sm` up.
+        "flex shrink-0 flex-col-reverse gap-2 max-sm:[&>*]:w-full sm:flex-row sm:justify-end",
         className
       )}
       {...props}

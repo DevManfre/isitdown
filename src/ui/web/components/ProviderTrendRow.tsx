@@ -39,15 +39,21 @@ export function ProviderTrendRow({
       aria-label={t("history.open-detail", { name })}
       // `subgrid`, not a grid template of its own: the tracks belong to the
       // list, so every row's figure sits under the header that names it.
-      className="history-row anim-rise col-span-full grid grid-cols-subgrid items-center rounded-md px-2 py-2 text-left hover:bg-muted/40"
+      // `subgrid`, not a grid template of its own: the tracks belong to the
+      // list, so every row's figure sits under the header that names it. Below
+      // `md` the list is a column of cards and there are no shared tracks to
+      // sit under, so the row draws its own two-column card instead.
+      className="history-row anim-rise grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-md border border-border p-3 text-left hover:bg-muted/40 lg:col-span-full lg:grid-cols-subgrid lg:gap-y-0 lg:border-0 lg:px-2 lg:py-2"
       style={{ animationDelay: delay }}
     >
-      <span className="flex items-center gap-2 text-sm">
+      <span className="col-start-1 row-start-1 flex items-center gap-2 text-sm">
         <StatusDot status={status} label={t(statusLabelKey(status))} />
         <span className="provider-name break-words">{name}</span>
       </span>
-      <TrendSparkline series={provider.dailySeries} />
-      <span className="font-mono text-sm">
+      <span className="col-span-2 col-start-1 row-start-3 lg:col-span-1 lg:col-start-2 lg:row-start-1">
+        <TrendSparkline series={provider.dailySeries} />
+      </span>
+      <span className="col-start-2 row-start-1 text-right font-mono text-sm lg:col-start-3 lg:text-left">
         <NumberTicker locale={i18n.language} value={uptime} decimalPlaces={2} suffix="%" />
       </span>
       {/* The chip is wrapped rather than dropped in bare: `DeltaChip` renders
@@ -55,7 +61,7 @@ export function ProviderTrendRow({
           emits no element for a track loses the track — its incidents cell
           slides left into the delta column and the header stops matching. An
           empty span holds the column open. */}
-      <span>
+      <span className="col-start-1 row-start-2 lg:col-start-4 lg:row-start-1">
         <DeltaChip
           delta={
             provider.previousUptime === null
@@ -66,7 +72,7 @@ export function ProviderTrendRow({
           compact
         />
       </span>
-      <span className="font-mono text-xs text-muted-foreground">
+      <span className="col-start-2 row-start-2 text-right font-mono text-xs text-muted-foreground lg:col-start-5 lg:row-start-1 lg:text-left">
         <Trans
           i18nKey="history.incidents"
           count={provider.incidentCount}

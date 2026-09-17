@@ -40,7 +40,7 @@ export function Overview() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { data: status } = useStatus();
-  const { data: summary } = useHistory(WINDOW_DAYS);
+  const { data: summary } = useHistory({ days: WINDOW_DAYS });
 
   // A disabled provider is one the poller has been told to skip
   // (poller.ts:164), so nothing about it is being measured any more. It is left
@@ -80,7 +80,9 @@ export function Overview() {
           separate claims. */}
       <div className="anim-rise anim-rise-hero flex items-center gap-3" style={{ animationDelay: "50ms" }}>
         <StatusBeacon tier={worstTier(providers.map((p) => p.overallStatus))} />
-        <h2 className="text-4xl font-semibold tracking-tight text-balance">
+        {/* 28px on a phone: at `text-4xl` the four-word headline took six
+            lines of a 390px screen and pushed the fleet under the fold. */}
+        <h2 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance md:text-3xl lg:text-4xl lg:leading-[1.1]">
           {allDisabled
             ? t("overview.title.all-disabled")
             : down.length === 0
@@ -171,7 +173,7 @@ export function Overview() {
           replaces them — the rings moved below the rule, where a row of tiles
           can wrap without pushing the headline around. */}
       <div
-        className="view-hero lit-band relative -mx-8 -mt-6 overflow-hidden border-b border-border px-8 pt-6 pb-7"
+        className="view-hero lit-band relative -mx-4 -mt-6 overflow-hidden border-b border-border px-4 pt-6 pb-7 md:-mx-8 md:px-8"
         style={{
           backgroundImage:
             down.length === 0
@@ -197,7 +199,7 @@ export function Overview() {
             "relative grid gap-8",
             shape === "band"
               ? "grid-cols-1"
-              : "grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto]",
+              : "grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]",
           )}
         >
           {heroCopy}

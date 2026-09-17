@@ -546,7 +546,7 @@ export function Incidents() {
           // all — `pages > 1`). Translucent with a blur because it does overlay
           // the rows it is pinned over; opaque would need the page's own
           // gradient, which only the body carries.
-          <div className="sticky bottom-2 z-10 mt-1 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-background/95 px-3 py-2 backdrop-blur-md">
+          <div className="sticky bottom-20 z-10 mt-1 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-background/95 px-3 py-2 backdrop-blur-md md:bottom-2">
             <span className="font-mono text-xs text-muted-foreground">{t("incidents.total", { count: total })}</span>
             <Pagination className="mx-0 w-auto justify-end">
               <PaginationContent>

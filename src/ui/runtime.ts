@@ -2,12 +2,14 @@ import { dirname, join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import type { Express } from "express";
 import { getAdapter } from "../adapters/index.ts";
+import { registerPluginAdapters } from "../adapters/plugins.ts";
 import type { ChannelConfig, ConfigSource, ServiceDefinition } from "../core/configSource.interface.ts";
 import { createLogger, parseLogLevel, type Logger } from "../core/logger.ts";
 import { createDispatcher, type Dispatcher } from "../core/notificationDispatcher.ts";
 import type { Notifier } from "../core/notifier.interface.ts";
 import { createPoller, type CycleResult } from "../core/poller.ts";
-import { createScheduler, type Scheduler } from "../core/scheduler.ts";
+import { createScheduler, dispatchContextOf, type Scheduler } from "../core/scheduler.ts";
+import { initTracing, tracer } from "../core/tracing.ts";
 import { createWebPushNotifier } from "../notifiers/webpush.notifier.ts";
 import { buildNotifiers } from "../notifiers/index.ts";
 import { createApp } from "./app.ts";
@@ -29,6 +31,7 @@ import type { HistoryStore } from "./historyStore.interface.ts";
 import { createMapLane, type MapLane } from "./mapLane.ts";
 import { createMapStore, type MapStore } from "./mapStore.ts";
 import { createMetricsRegistry, type MetricsRegistry } from "./metrics.ts";
+import { createSlaService, rememberSlaNotice, slaAlreadyTold } from "./sla.ts";
 import { createSqlitePushSubscriptionStore, type SqlitePushSubscriptionStore } from "./sqlitePushSubscriptionStore.ts";
 import { loadSecretsFile, type SecretsFile } from "./secretsFile.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
@@ -66,6 +69,8 @@ export interface UiRuntimeCore {
   dispatcher: Dispatcher;
   store: HistoryStore;
   history: ReturnType<typeof createHistoryService>;
+  /** Monthly targets and what the month has spent of them — roadmap 4.13. */
+  sla: ReturnType<typeof createSlaService>;
   configSource: ConfigSource;
   scheduler: Scheduler;
   /** Built here, run by the server at boot — never by the runtime builder, so tests stay offline. */
@@ -127,6 +132,15 @@ export interface UiRuntime extends UiRuntimeCore {
 export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRuntime> {
   const logger = options.logger ?? createLogger(parseLogLevel(options.env["LOG_LEVEL"]));
 
+  // Before anything is polled, so the first cycle is traced too (roadmap 6.10).
+  // Does nothing unless an OTLP endpoint is configured.
+  initTracing(options.env, logger);
+
+  // Before anything reads a service row, so a provider whose adapter comes from
+  // a plugin resolves on the first cycle rather than on the second boot
+  // (roadmap 1.13). Does nothing unless `PLUGINS_DIR` is set.
+  await registerPluginAdapters(options.env, logger);
+
   const db = openDatabase(options.dbPath);
   migrate(db);
   seedDefaults(db);
@@ -139,6 +153,9 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
 
   const store = createSqliteStateStore(db);
   const history = createHistoryService(store);
+  // Roadmap 4.13. Reads the same monthly report the export and the History view
+  // are drawn from, so a budget can never disagree with the uptime beside it.
+  const sla = createSlaService({ history });
   const configSource = createDbConfigSource(db, options.env, logger);
 
   const pushSubscriptions = createSqlitePushSubscriptionStore(db);
@@ -194,7 +211,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     dispatcher,
     buildNotifiers: buildAllNotifiers,
     logger,
-    onCycle: (result) => {
+    onCycle: async (result) => {
       lastCycle = result;
       metrics.recordCycle(result);
       // Recorded next to the metrics and for the same reason: both are read
@@ -224,8 +241,54 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
           changedProviders: [...new Set(result.changes.map((change) => change.providerId))],
         },
       });
+
+      await reportSlaBurn();
     },
   });
+
+  /**
+   * The error-budget alert — roadmap 4.13.
+   *
+   * After the cycle rather than inside it, because it is not about the cycle:
+   * it reads a month of stored samples, which only this edition has, and the
+   * poller is edition-agnostic. The *decision* is still the diff engine's
+   * (`slaBurn`), and the *sending* is still the dispatcher's, through the same
+   * context the scheduler just used — so routing rules, quiet hours and the
+   * digest window apply to it exactly as they do to an outage.
+   *
+   * Said once per provider per month, and the marker is written only after the
+   * dispatcher has taken the message: a marker written first, by a cycle whose
+   * dispatch then threw, is a month of silence about a budget already gone.
+   */
+  async function reportSlaBurn(): Promise<void> {
+    try {
+      const config = await configSource.load();
+      const changes = await sla.burnChanges(
+        config.services,
+        config.polling.intervalMinutes,
+        (providerId, month) => slaAlreadyTold(db, providerId, month),
+      );
+      if (changes.length === 0) return;
+      await dispatcher.dispatch(changes, dispatchContextOf(config, buildAllNotifiers(config.channels)));
+      for (const change of changes) {
+        if (change.sla === undefined) continue;
+        rememberSlaNotice(db, change.providerId, change.sla.month);
+        logger.warn("a provider is on course to miss its monthly target", {
+          providerId: change.providerId,
+          month: change.sla.month,
+          target: change.sla.target,
+          projected: change.sla.projectedUptime,
+        });
+      }
+    } catch (error) {
+      // A failure here must not take the cycle down with it: the poll worked,
+      // and an arithmetic lane that cannot read its own table is not a reason
+      // to stop monitoring.
+      logger.error("checking error budgets failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   const backfill = createBackfillService({ getAdapter, store, configSource, logger });
 
@@ -263,6 +326,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     dispatcher,
     store,
     history,
+    sla,
     configSource,
     scheduler,
     backfill,
@@ -295,6 +359,9 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
       mapLane.stop();
       scheduler.stop();
       await scheduler.settled();
+      // The last cycle's spans are the interesting ones when a container is
+      // being stopped, so they are sent rather than dropped on the way out.
+      await tracer().flush();
       await store.close();
     },
   };

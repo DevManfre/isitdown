@@ -7,9 +7,13 @@ import {
   Hash,
   Mail,
   Megaphone,
+  MessageSquareCode,
   MessagesSquare,
   MonitorSmartphone,
+  Radio,
   Send,
+  Share2,
+  Siren,
   Smartphone,
   Users,
   Webhook,
@@ -18,13 +22,21 @@ import { Button } from "@/components/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useChannelMutations, usePushDevices, usePushMutations } from "@/hooks/queries.ts";
 import { useFieldProps } from "@/hooks/useBusy.tsx";
 import { getPushKey } from "@/lib/api.ts";
 import { pushSupported, subscribeThisBrowser } from "@/lib/push.ts";
 import { cn } from "@/lib/utils.ts";
+import { supportedLocales } from "@/lib/i18n.ts";
 import type { DescribedChannel } from "@/lib/types.ts";
+// The token names come from the notifier layer rather than being restated here:
+// a token added there has to show up in this list, and a literal array would
+// silently not.
+import { TEMPLATE_TOKENS } from "../../../../notifiers/template.ts";
 
 // Reason codes `subscribeThisBrowser` throws, mapped to copy that says what to
 // do about them; anything else falls back to push.failed with the raw text.
@@ -40,16 +52,15 @@ const PUSH_FAILURE_KEYS: Record<string, string> = {
  * deliver anything until a browser has subscribed.
  */
 function PushDevices({
-  channelEnabled, testAction, testMessage,
+  channelEnabled, testAction,
 }: {
   channelEnabled: boolean;
   testAction: ReactNode;
-  testMessage: ReactNode;
 }) {
   const { t } = useTranslation();
   const devices = usePushDevices();
   const { add, remove } = usePushMutations();
-  const [message, setMessage] = useState<string | undefined>(undefined);
+  const toast = useSettingsToastReport();
   const supported = pushSupported();
 
   const enable = async (): Promise<void> => {
@@ -60,22 +71,23 @@ function PushDevices({
         // the channel is off is the likeliest first run (set the two env
         // vars, click this button, never touch the switch), and it must not
         // promise delivery that will not happen.
-        onSuccess: () => setMessage(channelEnabled ? t("push.enabled") : t("push.registered-channel-off")),
+        onSuccess: () =>
+          toast("notifications", {
+            text: channelEnabled ? t("push.enabled") : t("push.registered-channel-off"),
+            tone: "ok",
+          }),
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       const key = PUSH_FAILURE_KEYS[reason];
-      setMessage(key !== undefined ? t(key) : t("push.failed", { error: reason }));
+      toast("notifications", { text: key !== undefined ? t(key) : t("push.failed", { error: reason }), tone: "error" });
     }
   };
 
   if (!supported) {
     return (
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          {testAction}
-          {testMessage}
-        </div>
+        <div className="flex items-center gap-2">{testAction}</div>
         <p className="text-xs text-muted-foreground">{t("push.unsupported")}</p>
       </div>
     );
@@ -95,9 +107,7 @@ function PushDevices({
             {t("push.enable")}
           </Button>
           {testAction}
-          {testMessage}
         </div>
-        {message !== undefined && <p className="text-xs leading-relaxed text-muted-foreground">{message}</p>}
       </div>
 
       {/* The heading was a muted line of the same size as the device rows it
@@ -125,16 +135,117 @@ function PushDevices({
 }
 
 /**
+ * What this channel says, as opposed to where it says it: the language it
+ * writes in (roadmap 3.20) and the template it renders with (roadmap 3.15).
+ *
+ * Both save instantly, like every other preference on this page — the language
+ * on pick, the template on blur, because a template is typed rather than chosen
+ * and saving per keystroke would validate half-written tokens at the operator.
+ * Shown for every channel including the fieldless ones: browser push has no
+ * credential to configure and every reason to be readable in Italian.
+ */
+function ChannelMessage({ channel }: { channel: DescribedChannel }) {
+  const { t } = useTranslation();
+  const fieldProps = useFieldProps();
+  const { patch } = useChannelMutations();
+  const [template, setTemplate] = useState(channel.template);
+  const [problem, setProblem] = useState<string | undefined>(undefined);
+  const [saved, setSaved] = useState(false);
+
+  const localeId = `channel-${channel.id}-locale`;
+  const templateId = `channel-${channel.id}-template`;
+
+  const saveTemplate = (): void => {
+    if (template === channel.template) return;
+    setSaved(false);
+    patch.mutate(
+      { id: channel.id, patch: { template } },
+      {
+        onSuccess: () => {
+          setProblem(undefined);
+          setSaved(true);
+        },
+        // The server is the one that knows the token set, so its sentence is
+        // the one shown — a second copy of the rules here is a second copy to
+        // keep in step with `template.ts`.
+        onError: (error: unknown) =>
+          setProblem(t("channel.message.failed", { error: error instanceof Error ? error.message : String(error) })),
+      },
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border pt-3">
+      <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("channel.message")}</span>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={localeId}>{t("channel.locale")}</Label>
+        {/* An empty value is the fleet's own locale, which is why it is an
+            option rather than an absent one: "inherit" has to be reachable
+            again once a channel has been given a language of its own. */}
+        <Select
+          value={channel.locale === "" ? "default" : channel.locale}
+          onValueChange={(next) =>
+            patch.mutate({ id: channel.id, patch: { locale: next === "default" ? "" : next } })
+          }
+        >
+          <SelectTrigger id={localeId} className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="default">{t("channel.locale.default")}</SelectItem>
+            {supportedLocales.map((locale) => (
+              <SelectItem key={locale} value={locale}>
+                {locale}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={templateId}>{t("channel.template")}</Label>
+        <Textarea
+          id={templateId}
+          rows={3}
+          className="font-mono text-xs"
+          value={template}
+          onChange={(event) => setTemplate(event.target.value)}
+          {...fieldProps}
+          // After the spread, deliberately: `fieldProps` carries its own
+          // `onBlur` (it releases the poll hold), and letting the spread land
+          // last would silently drop the save.
+          onBlur={() => {
+            fieldProps.onBlur();
+            saveTemplate();
+          }}
+        />
+        <p className="text-xs text-muted-foreground">{t("channel.template.hint")}</p>
+        <p className="font-mono text-xs text-muted-foreground">
+          {t("channel.template.tokens", { tokens: Object.keys(TEMPLATE_TOKENS).join(", ") })}
+        </p>
+        {problem !== undefined && <p className="text-xs text-destructive">{problem}</p>}
+        {problem === undefined && saved && <p className="text-xs text-muted-foreground">{t("channel.template.saved")}</p>}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Which icon and which name a channel shows. Keyed by channel id, exhaustively
  * — a key built at runtime would be invisible to the catalog parity test — and
  * both lookups fall back to the id, so a channel this dashboard has never heard
  * of still renders a readable row instead of a blank one.
  */
 const CHANNEL_ICONS: Record<string, typeof Bell> = {
+  apprise: Share2,
   discord: MessagesSquare,
   email: Mail,
   gotify: BellRing,
+  matrix: MessageSquareCode,
   ntfy: Megaphone,
+  opsgenie: Radio,
+  pagerduty: Siren,
   pushover: Smartphone,
   slack: Hash,
   teams: Users,
@@ -144,10 +255,14 @@ const CHANNEL_ICONS: Record<string, typeof Bell> = {
 };
 
 const CHANNEL_NAME_KEYS: Record<string, string> = {
+  apprise: "channel.name.apprise",
   discord: "channel.name.discord",
   email: "channel.name.email",
   gotify: "channel.name.gotify",
+  matrix: "channel.name.matrix",
   ntfy: "channel.name.ntfy",
+  opsgenie: "channel.name.opsgenie",
+  pagerduty: "channel.name.pagerduty",
   pushover: "channel.name.pushover",
   slack: "channel.name.slack",
   teams: "channel.name.teams",
@@ -193,6 +308,7 @@ export function ChannelRow({
   const { t } = useTranslation();
   const fieldProps = useFieldProps();
   const { patch, saveSecrets, clearSecret, test } = useChannelMutations();
+  const toast = useSettingsToastReport();
   // Only what is being *changed* lives here: each field renders empty with the
   // stored variable name as its placeholder, so the hint can never be mistaken
   // for something the operator typed.
@@ -204,7 +320,6 @@ export function ChannelRow({
   // Which environment variable carries which credential is a detail an operator
   // rarely touches, so it is asked for rather than shown.
   const [showEnvVars, setShowEnvVars] = useState(false);
-  const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
   const fieldless = channel.fields.length === 0;
   const Icon = CHANNEL_ICONS[channel.id] ?? Bell;
   const nameKey = CHANNEL_NAME_KEYS[channel.id];
@@ -212,7 +327,7 @@ export function ChannelRow({
   const configured = isConfigured(channel);
 
   const failed = (error: unknown): void =>
-    setMessage({
+    toast("notifications", {
       text: t("channel.secret-failed", { error: error instanceof Error ? error.message : String(error) }),
       tone: "error",
     });
@@ -230,7 +345,6 @@ export function ChannelRow({
     );
     // An untouched row is not an instruction to blank every reference.
     if (Object.keys(fields).length === 0 && Object.keys(secrets).length === 0) return;
-    setMessage(undefined);
 
     // A credential is written to whichever variable the channel names *now*, so
     // a click that renames the reference and fills it in one go has to land the
@@ -242,7 +356,7 @@ export function ChannelRow({
         {
           onSuccess: () => {
             setSecretValues({});
-            setMessage({ text: t("channel.secret-saved"), tone: "info" });
+            toast("notifications", { text: t("channel.secret-saved"), tone: "ok" });
           },
           onError: failed,
         },
@@ -267,9 +381,10 @@ export function ChannelRow({
 
   const sendTest = async (): Promise<void> => {
     const result = await test.mutateAsync(channel.id);
-    setMessage(
+    toast(
+      "notifications",
       result.ok
-        ? { text: t("channel.test-ok"), tone: "info" }
+        ? { text: t("channel.test-ok"), tone: "ok" }
         : { text: t("channel.test-failed", { error: result.error }), tone: "error" },
     );
   };
@@ -282,12 +397,6 @@ export function ChannelRow({
       {t("action.send-test")}
     </Button>
   );
-  const testMessage =
-    message === undefined ? null : (
-      <span className={message.tone === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
-        {message.text}
-      </span>
-    );
 
   return (
     <Collapsible open={open} onOpenChange={onOpenChange} className="panel-channel">
@@ -327,7 +436,19 @@ export function ChannelRow({
         <Switch
           aria-label={`${name} — ${t(channel.enabled ? "channel.enabled" : "channel.disabled")}`}
           checked={channel.enabled}
-          onCheckedChange={(next) => patch.mutate({ id: channel.id, patch: { enabled: next } })}
+          onCheckedChange={(next) =>
+            patch.mutate(
+              { id: channel.id, patch: { enabled: next } },
+              {
+                onSuccess: () =>
+                  toast("notifications", {
+                    text: t(next ? "toast.channel.enabled" : "toast.channel.disabled", { name }),
+                    tone: "ok",
+                  }),
+                onError: failed,
+              },
+            )
+          }
         />
       </div>
 
@@ -383,7 +504,7 @@ export function ChannelRow({
                       clearSecret.mutate(
                         { id: channel.id, field: field.name },
                         {
-                          onSuccess: () => setMessage({ text: t("channel.secret-cleared"), tone: "info" }),
+                          onSuccess: () => toast("notifications", { text: t("channel.secret-cleared"), tone: "ok" }),
                           onError: failed,
                         },
                       )
@@ -431,13 +552,16 @@ export function ChannelRow({
             >
               {t("channel.env-var-toggle")}
             </Button>
-            {testMessage}
           </div>
         )}
 
         {channel.id === "webpush" && (
-          <PushDevices channelEnabled={channel.enabled} testAction={testButton} testMessage={testMessage} />
+          <PushDevices channelEnabled={channel.enabled} testAction={testButton} />
         )}
+
+        {/* Last in the body, under the credentials and the actions: a channel is
+            configured before it is worth deciding how it reads. */}
+        <ChannelMessage channel={channel} />
 
         </div>
       </CollapsibleContent>

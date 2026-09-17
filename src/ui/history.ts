@@ -191,6 +191,25 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
 
   const dayKey = (date: Date): string => date.toISOString().slice(0, 10);
 
+  /**
+   * The day a window ends on, as a Date the rest of this file can subtract
+   * from: today, or the end of an arbitrary range (roadmap 5.5). Anchored at
+   * the end of that UTC day so `dayKey` reads it back as the day asked for
+   * whatever the process's own zone.
+   */
+  const anchorOf = (endDay: string | undefined): Date =>
+    endDay === undefined ? now() : new Date(`${endDay}T23:59:59.999Z`);
+
+  /**
+   * How many days of buckets have to be read to cover a window that ends in the
+   * past. The store answers "the last N days from now", so a range ending three
+   * months ago needs those three months on top of its own span.
+   */
+  const lookbackFor = (days: number, anchor: Date): number => {
+    const behind = Math.max(0, Math.ceil((now().getTime() - anchor.getTime()) / DAY_MS));
+    return Math.max(WINDOW_DAYS, days + behind);
+  };
+
   function uptimeOver(buckets: DailyBucket[], days: number, today: Date): number {
     const from = dayKey(new Date(today.getTime() - (days - 1) * DAY_MS));
     let ok = 0;
@@ -291,10 +310,25 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     providerId: string,
     days: number,
     intervalMinutes: number,
+    endDay?: string | undefined,
   ): Promise<ProviderHistory> {
-    const today = now();
-    const buckets = await store.getDailyBuckets(providerId, WINDOW_DAYS);
-    const incidents = await store.listIncidents({ providerId, days });
+    const today = anchorOf(endDay);
+    const buckets = await store.getDailyBuckets(providerId, lookbackFor(days, today));
+    // `days` is anchored on now inside the store, so a window that ends in the
+    // past has to name its two ends instead. The fixed windows keep asking the
+    // way they always have: `days` counts incidents that *started* in the
+    // window, `openFrom`/`openTo` counts the ones that were *running* in it,
+    // and quietly swapping one for the other would move every existing
+    // provider's incident count.
+    const incidents = await store.listIncidents(
+      endDay === undefined
+        ? { providerId, days }
+        : {
+            providerId,
+            openFrom: dayKey(new Date(today.getTime() - (days - 1) * DAY_MS)),
+            openTo: dayKey(today),
+          },
+    );
 
     let notOk = 0;
     let sampleCount = 0;
@@ -485,12 +519,13 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     days: number,
     intervalMinutes: number,
     only?: string[] | undefined,
+    endDay?: string | undefined,
   ): Promise<HistorySummary> {
-    const today = now();
+    const today = anchorOf(endDay);
     const stored = await store.listProviderIds();
     const providerIds = only === undefined ? stored : stored.filter((id) => only.includes(id));
     const providers = await Promise.all(
-      providerIds.map((providerId) => getProviderHistory(providerId, days, intervalMinutes)),
+      providerIds.map((providerId) => getProviderHistory(providerId, days, intervalMinutes, endDay)),
     );
 
     const monthTotals = new Map<string, { ok: number; total: number }>();
@@ -499,7 +534,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
       monthTotals.set(month.toISOString().slice(0, 7), { ok: 0, total: 0 });
     }
     for (const providerId of providerIds) {
-      for (const bucket of await store.getDailyBuckets(providerId, WINDOW_DAYS)) {
+      for (const bucket of await store.getDailyBuckets(providerId, lookbackFor(days, today))) {
         const totals = monthTotals.get(bucket.day.slice(0, 7));
         if (totals === undefined) continue;
         totals.ok += bucket.okSamples;

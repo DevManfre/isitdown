@@ -50,6 +50,15 @@ export const OPTIONAL_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   // wants no credentials at all — and a submission server that does will refuse
   // the envelope in words the delivery log can show.
   email: ["port", "secure", "allowInsecureAuth", "allowSelfSigned", "username", "password"],
+  // The service region, unset meaning the default US instance — which is the
+  // account most operators have, and requiring it would disable the channel
+  // for all of them.
+  pagerduty: ["region"],
+  opsgenie: ["region"],
+  // Either of the two is enough, and neither on its own is required: the
+  // notifier's schema refuses the pair when both are empty, which is a claim
+  // about the pair that a per-field list cannot make.
+  apprise: ["configKey", "urls"],
 };
 
 /** Whether a channel still works with this credential unset. */

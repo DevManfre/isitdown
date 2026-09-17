@@ -917,3 +917,81 @@ test("with nowhere to keep a reference, editing cannot silently drop updates", a
   assert.equal(channel.sent.length, 2);
   assert.deepEqual(channel.edited, []);
 });
+
+/**
+ * Per-channel locale (roadmap 3.20) and per-channel template (roadmap 3.15).
+ *
+ * Both are the same claim from the dispatcher's side: one change, routed to two
+ * channels, is allowed to be two different messages — so the wording cannot be
+ * decided when the payload is built, only when a channel is picked.
+ */
+
+test("each channel is handed the change in the language it asked for", async () => {
+  const italian = recorder("telegram");
+  const english = recorder("webhook");
+  const dispatcher = createDispatcher({ logger: silent });
+
+  await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [italian.notifier, english.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    channelMessages: { telegram: { locale: "it" } },
+  });
+
+  assert.equal(italian.seen[0]?.locale, "it");
+  // The channel that asked for nothing keeps the fleet's own locale.
+  assert.equal(english.seen[0]?.locale, "en");
+});
+
+test("a channel's template reaches it, and only it", async () => {
+  const templated = recorder("telegram");
+  const plain = recorder("webhook");
+  const dispatcher = createDispatcher({ logger: silent });
+
+  await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [templated.notifier, plain.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    channelMessages: { telegram: { template: "{{provider}} {{status}}" } },
+  });
+
+  assert.equal(templated.seen[0]?.template, "{{provider}} {{status}}");
+  assert.equal(plain.seen[0]?.template, undefined);
+});
+
+test("a digest reads in the batching channel's language, line by line", async () => {
+  const channel = recorder("telegram");
+  let now = 0;
+  const dispatcher = createDispatcher({ logger: silent, now: () => now });
+  const delivery: DeliveryConfig = {
+    ...DELIVERY_DEFAULTS,
+    digest: { enabled: true, windowMinutes: 1, immediateFloor: "major_outage" },
+  };
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery,
+    channelMessages: { telegram: { locale: "it", template: "{{provider}}" } },
+  };
+
+  await dispatcher.dispatch([change()], ctx);
+  assert.equal(channel.seen.length, 0);
+
+  now += 61_000;
+  await dispatcher.dispatch([], ctx);
+
+  const [payload] = channel.seen;
+  assert.equal(payload?.locale, "it");
+  // Every member too: the digest renders one line per item out of the item's
+  // own locale, and the items were collected before the channel was known.
+  assert.deepEqual(payload?.digest?.items.map((item) => item.locale), ["it"]);
+  // A template describes one change; a batch of them is not templated.
+  assert.equal(payload?.template, undefined);
+});

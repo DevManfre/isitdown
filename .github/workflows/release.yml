@@ -114,7 +114,25 @@ jobs:
       - name: Generate the release notes
         run: node tools/release-notes.mjs "$GITHUB_REF_NAME" > release-notes.md
 
+      # The single-file Light edition (roadmap 6.7), for an operator who wants
+      # neither Docker nor a Node install. Built on the runner whose Node is
+      # the one in .nvmrc, so the binary is that version; Linux x64 only, which
+      # is what this runner is — a matrix across macOS and Windows runners is
+      # the shape to add when somebody asks for one.
+      - name: Build the single-file Light edition
+        run: npm run build:sea
+
+      - name: Name the binary after the release
+        run: |
+          mv dist/sea/isitdown-light "isitdown-light-${GITHUB_REF_NAME}-linux-x64"
+          sha256sum "isitdown-light-${GITHUB_REF_NAME}-linux-x64" > "isitdown-light-${GITHUB_REF_NAME}-linux-x64.sha256"
+
       - uses: softprops/action-gh-release@v2
         with:
           body_path: release-notes.md
           make_latest: true
+          # Attached rather than pushed anywhere: a 120MB binary is a download
+          # an operator asks for once, not something a registry should carry.
+          files: |
+            isitdown-light-${{ github.ref_name }}-linux-x64
+            isitdown-light-${{ github.ref_name }}-linux-x64.sha256

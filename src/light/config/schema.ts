@@ -5,6 +5,7 @@ import {
   routingRuleSchema,
   serviceDefinitionSchema,
 } from "../../core/config.schema.ts";
+import { TEMPLATE_MAX_LENGTH } from "../../notifiers/template.ts";
 
 /**
  * The shape of `config.yml`. Service definitions and the locale reuse the shared
@@ -95,6 +96,43 @@ const gotifySchema = z.object({
   token: z.string().default(""),
 });
 
+/** Homeserver, the internal room id, and an access token for the sending user. */
+const matrixSchema = z.object({
+  enabled: z.boolean().default(false),
+  homeserverUrl: z.string().default(""),
+  roomId: z.string().default(""),
+  accessToken: z.string().default(""),
+});
+
+/**
+ * PagerDuty Events API v2 (roadmap 3.7). One integration key; `region` is `eu`
+ * for an account in PagerDuty's EU service region and may be left unset.
+ */
+const pagerdutySchema = z.object({
+  enabled: z.boolean().default(false),
+  routingKey: z.string().default(""),
+  region: z.string().default(""),
+});
+
+/** Opsgenie Alerts API (roadmap 3.7). One API key, plus the same region choice. */
+const opsgenieSchema = z.object({
+  enabled: z.boolean().default(false),
+  apiKey: z.string().default(""),
+  region: z.string().default(""),
+});
+
+/**
+ * An Apprise API server (roadmap 3.9). Either the key of a configuration the
+ * server stores — the better arrangement, since the service URLs behind it are
+ * credentials — or the URLs themselves, comma-separated, for a stateless server.
+ */
+const appriseSchema = z.object({
+  enabled: z.boolean().default(false),
+  serverUrl: z.string().default(""),
+  configKey: z.string().default(""),
+  urls: z.string().default(""),
+});
+
 /** Required non-empty settings per channel, used to produce an actionable error. */
 export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   telegram: ["botToken", "chatId"],
@@ -103,6 +141,13 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   slack: ["webhookUrl"],
   ntfy: ["topicUrl"],
   gotify: ["serverUrl", "token"],
+  matrix: ["homeserverUrl", "roomId", "accessToken"],
+  pagerduty: ["routingKey"],
+  opsgenie: ["apiKey"],
+  // Not `configKey` or `urls`: the channel needs one of the two, which a list
+  // of individually required fields cannot say. The notifier's own schema
+  // refuses the pair when both are empty.
+  apprise: ["serverUrl"],
   pushover: ["token", "userKey"],
   teams: ["webhookUrl"],
   // Not the credentials: a relay on this machine, or one that trusts this
@@ -112,6 +157,28 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
 };
 
 /**
+ * The two fields every channel has that are not transport: the locale its
+ * messages are written in (roadmap 3.20) and the template they are rendered
+ * with (roadmap 3.15).
+ *
+ * Added to each channel's own schema rather than listed once as a sibling
+ * block, because they are settings *of the channel* — `notifications.telegram.
+ * locale` is where an operator looks for them, and a parallel
+ * `messageOptions.telegram.locale` would be a second place a channel is
+ * configured. Applied through one helper so thirteen channels cannot end up
+ * accepting thirteen slightly different spellings of the same two fields.
+ *
+ * The template is only checked for length here; which tokens exist is
+ * `notifiers/template.ts`'s business, and the loader reports its verdict with
+ * the rest of the file's problems so an operator sees them all at once.
+ */
+const withMessageOptions = <T extends z.ZodRawShape>(schema: z.ZodObject<T>) =>
+  schema.extend({
+    locale: localeSchema.optional(),
+    template: z.string().max(TEMPLATE_MAX_LENGTH).optional(),
+  });
+
+/**
  * The channels this file format has a place for. Webpush is deliberately absent:
  * a browser subscription belongs to a browser that visited the dashboard, and
  * the Light edition has no dashboard to have visited. `FILE_CHANNEL_IDS` is what
@@ -119,15 +186,19 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
  */
 const notificationsObject = z
   .object({
-    telegram: telegramSchema.optional(),
-    webhook: webhookSchema.optional(),
-    discord: discordSchema.optional(),
-    slack: slackSchema.optional(),
-    ntfy: ntfySchema.optional(),
-    gotify: gotifySchema.optional(),
-    pushover: pushoverSchema.optional(),
-    teams: teamsSchema.optional(),
-    email: emailSchema.optional(),
+    telegram: withMessageOptions(telegramSchema).optional(),
+    webhook: withMessageOptions(webhookSchema).optional(),
+    discord: withMessageOptions(discordSchema).optional(),
+    slack: withMessageOptions(slackSchema).optional(),
+    ntfy: withMessageOptions(ntfySchema).optional(),
+    gotify: withMessageOptions(gotifySchema).optional(),
+    matrix: withMessageOptions(matrixSchema).optional(),
+    pagerduty: withMessageOptions(pagerdutySchema).optional(),
+    opsgenie: withMessageOptions(opsgenieSchema).optional(),
+    apprise: withMessageOptions(appriseSchema).optional(),
+    pushover: withMessageOptions(pushoverSchema).optional(),
+    teams: withMessageOptions(teamsSchema).optional(),
+    email: withMessageOptions(emailSchema).optional(),
   })
   .strict();
 
@@ -147,6 +218,13 @@ export const fileConfigSchema = z.object({
   adaptiveIntervalMinutes: positiveInt.max(1440).optional(),
   /** Consecutive agreeing polls before a transition notifies. 1 is off. */
   confirmSamples: positiveInt.max(10).optional(),
+  /**
+   * How many providers have to go bad inside `correlationWindowMinutes` before
+   * the cycle reports one shared failure instead of one alert each (roadmap
+   * 2.7). 0 and 1 are off, which is the default.
+   */
+  correlationThreshold: z.number().int().min(0).max(100).optional(),
+  correlationWindowMinutes: positiveInt.max(1440).optional(),
   locale: localeSchema.optional(),
   services: z.array(serviceDefinitionSchema).min(1, "at least one service is required"),
   notifications: notificationsObject.default({}),

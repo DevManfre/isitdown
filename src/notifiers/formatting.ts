@@ -5,6 +5,7 @@ import type {
   StatusChange,
   StatusChangeKind,
 } from "../core/types.ts";
+import { fillTemplate, type TemplateValues } from "./template.ts";
 
 /**
  * Message assembly shared by every channel. Emoji and layout are formatting and
@@ -59,6 +60,9 @@ const TEMPLATE: Record<StatusChangeKind, string> = {
   maintenance_started: "notification.maintenance.started",
   maintenance_ended: "notification.maintenance.ended",
   monitoring_degraded: "notification.monitoring.degraded",
+  correlated_outage: "notification.correlated.outage",
+  silent_outage: "notification.silent.outage",
+  sla_burn: "notification.sla.burn",
 };
 
 export function emojiFor(status: OverallStatus): string {
@@ -204,6 +208,30 @@ function summarise(payload: NotificationPayload): string {
       return t(locale, "notification.digest.maintenance-ended", { title: change.maintenance?.name ?? "" });
     case "monitoring_degraded":
       return t(locale, "notification.digest.monitoring", { count: change.failureCount ?? 0 });
+    case "silent_outage":
+      return t(locale, "notification.digest.silent", {
+        probe: change.crossCheck?.probeId ?? "",
+    // The SLA burn's own numbers (roadmap 4.13). Formatted to two decimals
+    // here rather than in the catalog: a percentage printed as 99.87333333 is
+    // the kind of detail that makes a message read like a debug dump.
+    month: change.sla?.month ?? "",
+    target: (change.sla?.target ?? 0).toFixed(2),
+    uptime: (change.sla?.uptime ?? 0).toFixed(2),
+    projected: (change.sla?.projectedUptime ?? 0).toFixed(2),
+    budgetMinutes: Math.round(change.sla?.budgetMinutes ?? 0),
+    spentMinutes: Math.round(change.sla?.spentMinutes ?? 0),
+        current,
+      });
+    case "correlated_outage":
+      return t(locale, "notification.digest.correlated", {
+        count: change.correlated?.providerIds.length ?? 0,
+        providers: (change.correlated?.providerIds ?? []).join(", "),
+      });
+    case "sla_burn":
+      return t(locale, "notification.digest.sla", {
+        target: (change.sla?.target ?? 0).toFixed(2),
+        projected: (change.sla?.projectedUptime ?? 0).toFixed(2),
+      });
   }
 }
 
@@ -217,12 +245,60 @@ export function suppressedLine(count: number, locale: string): string {
   return t(locale, "notification.suppressed", { count });
 }
 
+/**
+ * What each template token stands for, for this one change — roadmap 3.15.
+ *
+ * Resolved here rather than in `template.ts` because every value below comes
+ * from a catalog lookup or a helper this file already owns: a token map built
+ * anywhere else would be a second vocabulary, free to drift from the default
+ * message by a locale or a label. `template.ts` holds the token *names* and the
+ * substitution; this holds their meaning.
+ */
+export function templateValues(
+  payload: NotificationPayload,
+  options: { omitUrl: boolean } = { omitUrl: false },
+): TemplateValues {
+  const { change, service, locale } = payload;
+  return {
+    // Rendered with the template dropped, deliberately: this token stands for
+    // the default message, and resolving it through the template would recurse.
+    message: render({ ...payload, template: undefined }, options),
+    emoji: accentFor(change).emoji,
+    provider: service.name,
+    providerId: service.id,
+    kind: change.kind,
+    severity: severityLabel(change.currentStatus, locale),
+    status: statusLabel(change.currentStatus, locale),
+    previous: change.previousStatus === undefined ? "" : statusLabel(change.previousStatus, locale),
+    component: change.component?.name ?? "",
+    title: change.incident?.name ?? change.maintenance?.name ?? "",
+    incidentStatus: incidentStatusLabel(change.incident?.status ?? "", locale),
+    // Dropped for a channel that links the status page itself, on the same rule
+    // the default rendering follows: a Discord embed already carries the link
+    // as a button, and a template that printed it again would print it twice.
+    url: options.omitUrl ? "" : service.statusUrl,
+    at: formatUtc(change.incident?.updatedAt ?? change.at),
+  };
+}
+
 function render(payload: NotificationPayload, options: { omitUrl: boolean }): string {
   // A digest is its own message shape, so it short-circuits the per-kind
   // template below — but it still goes through here, which is what keeps the
   // suppressed line and every channel's own rendering path shared.
   if (payload.digest !== undefined) {
     return withSuppressed(renderDigest(payload.digest.items, payload.digest.windowMinutes), payload);
+  }
+
+  // The channel's own template, when it has one (roadmap 3.15). Checked after
+  // the digest above and before the per-kind catalog below: a digest describes
+  // a batch and a template describes one change, so the two never meet, and
+  // everything past this point is the default rendering a template replaces.
+  //
+  // The suppressed line still goes on afterwards, like it does for every other
+  // shape here: it is not about the change, so a template has no token for it
+  // and no way to lose it.
+  if (payload.template !== undefined && payload.template.trim() !== "") {
+    return withSuppressed(fillTemplate(payload.template, templateValues(payload, options)), payload);
   }
 
   const { change, service, locale } = payload;
@@ -242,7 +318,14 @@ function render(payload: NotificationPayload, options: { omitUrl: boolean }): st
     current: statusLabel(change.currentStatus, locale),
     title: change.incident?.name ?? change.maintenance?.name ?? "",
     status: incidentStatusLabel(change.incident?.status ?? "", locale),
-    count: change.failureCount ?? change.openIncidents ?? 0,
+    count: change.failureCount ?? change.openIncidents ?? change.correlated?.providerIds.length ?? 0,
+    // Provider ids rather than names: only the change's own provider has a
+    // name here, and a list that mixed one display name with N slugs would
+    // read as two different things.
+    providers: (change.correlated?.providerIds ?? []).join(", "),
+    minutes: change.correlated?.windowMinutes ?? 0,
+    probe: change.crossCheck?.probeId ?? "",
+    note: change.crossCheck?.note ?? "",
     endsAt:
       change.maintenance?.endsAt === null || change.maintenance?.endsAt === undefined
         ? t(locale, "maintenance.no-end")

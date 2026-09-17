@@ -16,6 +16,8 @@ failureThreshold: 5         # consecutive failures before a "monitoring degraded
 adaptivePolling: true       # while a provider has an open incident, poll it on the cadence below
 adaptiveIntervalMinutes: 1  # that cadence; never slower than the provider's own interval
 confirmSamples: 1           # consecutive polls that must agree before a change notifies
+correlationThreshold: 0     # providers that must go bad together before one shared-failure alert replaces them; 0 is off
+correlationWindowMinutes: 10 # how wide "together" is
 locale: en                  # language for notification messages: en | it
 
 services:
@@ -60,11 +62,14 @@ notifications:
 | `adaptivePolling` | `true` | While a provider has an open incident — or any status worse than operational — poll it on `adaptiveIntervalMinutes` instead of its own cadence. `false` leaves every provider on the cadence it was configured with. |
 | `adaptiveIntervalMinutes` | `1` | 1–1440. Taken as a *minimum* against the provider's own interval, so it can only ever watch a provider more closely. A provider that has never answered stays on its configured cadence: `unknown` is not an incident. |
 | `confirmSamples` | `1` | 1–10. Flap damping: how many consecutive polls must agree on a reading before the change is announced. `1` notifies immediately; `2` ignores a page that disagrees with itself for one cycle, at the cost of one poll of delay. |
+| `correlationThreshold` | `0` | 0–100. Correlated-outage detection (roadmap 2.7): how many providers have to go bad inside `correlationWindowMinutes` before the cycle sends one "this looks like a shared failure" alert instead of one per provider. `0` and `1` are off, which is the default — this is the only setting here that *replaces* alerts. |
+| `correlationWindowMinutes` | `10` | 1–1440. How wide that window is. Wider catches a shared failure that rolls across status pages slowly, and risks folding two unrelated bad days into one. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
 | `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
+| `services[].crossChecks` | — | Only on a probe (`http`, `tcp`, `dns`): the id of the provider whose status page this probe is a second opinion on — silent-outage cross-check (roadmap 1.10). When the probe cannot reach the service and that provider's page still reports operational with no open incident, the disagreement is itself an alert. |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
 | `services[].options` | — | Adapter-specific extras. Four adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), and `http`, `tcp` and `dns` (see their own sections below). |
 
@@ -157,9 +162,10 @@ Four things worth knowing before relying on it:
   and adds "this looks like a failure on our side" to those reads in
   **Diagnose** — one status page answering normally is enough to rule it out. It
   changes no reading and silences no message, because from here those services
-  really are unreachable; collapsing the burst into a single fleet-wide alert
-  needs an event that is not about one provider (roadmap 2.7). `confirmSamples`
-  is still the setting for "a single blip is not worth a message".
+  really are unreachable. Collapsing a burst into one alert is what
+  `correlationThreshold` does (the settings table above, and §7.3 in the manual);
+  `confirmSamples` is still the
+  setting for "a single blip is not worth a message".
 - a probe that is not operational says why: **Settings → the provider's row,
   expanded → Diagnose** carries the sentence the reading has nowhere to hold — `answered
   HTTP 503, outside the accepted 200-299`, `no answer from …: connect
@@ -303,14 +309,32 @@ list is never overwritten afterwards.
 | `PUSHOVER_USER_KEY` | both | — | Pushover user or group key. Required with the above. |
 | `PUSHOVER_DEVICE` | both | — | Optional. One registered device; unset delivers to every device on the account. |
 | `TEAMS_WEBHOOK_URL` | both | — | Microsoft Teams channel webhook. Required if the Teams channel is enabled. |
+| `MATRIX_HOMESERVER_URL` | both | — | Matrix homeserver root (`https://matrix.example.org`). Required if the Matrix channel is enabled. |
+| `MATRIX_ROOM_ID` | both | — | Internal room id (`!ops:example.org`), not an alias. Required with the above. |
+| `MATRIX_ACCESS_TOKEN` | both | — | Access token for the user that posts. Required with the above. |
+| `PAGERDUTY_ROUTING_KEY` | both | — | Integration key of an Events API v2 integration. Required if the PagerDuty channel is enabled. |
+| `PAGERDUTY_REGION` | both | — | Optional. `eu` for an account in PagerDuty's EU service region. |
+| `OPSGENIE_API_KEY` | both | — | Opsgenie API integration key. Required if the Opsgenie channel is enabled. |
+| `OPSGENIE_REGION` | both | — | Optional. `eu` for an account on Opsgenie's EU instance. |
+| `APPRISE_SERVER_URL` | both | — | Apprise API server (`http://apprise:8000`). Required if the Apprise channel is enabled. |
+| `APPRISE_CONFIG_KEY` | both | — | Key of a configuration the Apprise server stores. Either this or `APPRISE_URLS` is required. |
+| `APPRISE_URLS` | both | — | Apprise service URLs, comma-separated, for a stateless server. Either this or `APPRISE_CONFIG_KEY` is required. |
 | `WEBHOOK_SECRET` | both | — | Optional shared secret for the generic webhook. Set it and every request is signed (see [3.6](#36-notification-channels)); leave it unset and requests go out unsigned, exactly as before. |
 | `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
+| `PLUGINS_DIR` | both | — | A directory of adapter plugins to load at boot ([3.14](#314-adapter-plugins)). Unset — the default, in the images too — loads nothing. **A plugin runs with this process's own privileges.** |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | both | — | An OTLP/HTTP collector base URL; `/v1/traces` is appended. Setting it turns tracing on ([3.16](#316-traces)). Unset, nothing is traced and nothing is allocated. |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | both | — | The traces endpoint exactly, when it is not `<base>/v1/traces`. Wins over the variable above. |
+| `OTEL_EXPORTER_OTLP_HEADERS` | both | — | `key=value,other=value` — an API key a hosted collector wants. |
+| `OTEL_SERVICE_NAME` | both | `isitdown` | What the collector labels this process. |
 | `LOG_FILE` | both | — | Also append every log line to this file, rotated by size. Unset, logs go to stdout only. |
 | `LOG_MAX_BYTES` | both | `5242880` | Size at which `LOG_FILE` rotates. |
 | `LOG_MAX_FILES` | both | `5` | How many rotated generations (`.1` … `.5`) survive beside the live file. |
 | `CONFIG_PATH` | Light | `/app/config/config.yml` | Where to read `config.yml`. |
 | `DATA_PATH` | Light | `/app/data/state.json` | Where to keep the state file. |
 | `DB_PATH` | UI | `/app/data/isitdown.db` | SQLite database. |
+| `API_TOKEN` | UI | — | A read-only bearer token ([3.12](#312-reaching-the-api-from-another-host)). Unset — the default — leaves every route open, which is right for an instance bound to `127.0.0.1`. Set it and a request carrying it may `GET` from any host; writes stay local-only. |
+| `API_LOCAL_BYPASS` | UI | `true` | Whether a request from this machine may skip `API_TOKEN`. Set it to `false` behind a reverse proxy, where every forwarded request looks local. |
+| `PUSH_TOKEN` | UI | — | Turns on the provider-webhook endpoint ([3.15](#315-provider-push-instead-of-poll)) and is the credential in its URL. Unset, that route answers `404`. |
 | `PORT` | UI | `3000` | HTTP port. |
 
 Secrets arrive through `env_file` at runtime; nothing is baked into an image.
@@ -727,6 +751,10 @@ validators all drop the cache entry rather than pin a stale reading.
 | Gotify | `gotify` | `GOTIFY_URL`, `GOTIFY_TOKEN` |
 | Pushover | `pushover` | `PUSHOVER_TOKEN`, `PUSHOVER_USER_KEY` (`PUSHOVER_DEVICE` optional) |
 | Microsoft Teams | `teams` | `TEAMS_WEBHOOK_URL` |
+| Matrix | `matrix` | `MATRIX_HOMESERVER_URL`, `MATRIX_ROOM_ID`, `MATRIX_ACCESS_TOKEN` |
+| PagerDuty | `pagerduty` | `PAGERDUTY_ROUTING_KEY` (`PAGERDUTY_REGION` optional) |
+| Opsgenie | `opsgenie` | `OPSGENIE_API_KEY` (`OPSGENIE_REGION` optional) |
+| Apprise | `apprise` | `APPRISE_SERVER_URL`, and one of `APPRISE_CONFIG_KEY` / `APPRISE_URLS` |
 | Email (SMTP) | `email` | `SMTP_HOST`, `SMTP_FROM`, `SMTP_TO` (`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ALLOW_INSECURE_AUTH`, `SMTP_ALLOW_SELF_SIGNED` optional) |
 | Desktop (Web Push) | `webpush` | none |
 
@@ -823,6 +851,58 @@ webhook request is received"**. Severity is the heading's own colour, named
 legible in both of Teams' themes, and the same emoji every other channel shows
 says it again for a client rendering in monochrome. The status page is a button,
 not a line of text. The URL is the credential, so it never appears in an error.
+
+**Matrix** (roadmap 3.6) posts into one room through the client-server API.
+Two formats travel together, as Matrix expects: `body` is the plain text a
+terminal client shows and `formatted_body` the HTML a graphical one renders,
+both built from the same words, so neither can say something the other does
+not. A Matrix message has no separate link affordance, so the status page is a
+trailing line in the text and a link in the HTML — and a provider's own
+incident title is escaped before it lands in that HTML rather than trusted.
+`MATRIX_ROOM_ID` is the internal room id (`!ops:example.org`), not an alias: an
+alias can be repointed at another room by anyone with the power to, which is
+not a property an alert channel should have. Sends are `PUT`s carrying a fresh
+transaction id, Matrix's own idempotency key, so a retried request is
+de-duplicated by the homeserver instead of posting the alert twice. Editing is
+native — an incident update rewrites the message it updates rather than adding
+another one.
+
+**PagerDuty and Opsgenie** (roadmap 3.7) are the on-call pair, and they are the
+only channels that do more than deliver a message: an alert here enters an
+escalation chain, so it also has to close again. Both key on the change —
+PagerDuty's `dedup_key`, Opsgenie's `alias`, derived identically — so the
+resolve a provider's own "resolved" update produces names the very alert its
+"investigating" update opened. An incident keys on its own id, so a provider
+with three open incidents holds three alerts that each close on their own;
+a status, a component, a maintenance window and our own fetching each key on
+what they are about, so a status that worsens twice updates one alert instead
+of stacking. What counts as a close is the diff engine's lifecycle unchanged:
+an incident that resolved, a maintenance window that ended, a status back to
+operational. A digest never closes anything — its most severe member stands in
+for the batch, and closing on a recovery that happened to be the worst of five
+changes would silence the other four.
+
+Severity becomes each service's own scale: PagerDuty's `critical` / `error` /
+`warning` / `info`, Opsgenie's `P1`–`P3`. Set `PAGERDUTY_REGION` or
+`OPSGENIE_REGION` to `eu` for an account provisioned in Europe; unset means the
+default instance. Neither credential appears in a URL or an error — a rejected
+send reports the status and the service's own message.
+
+**Apprise** (roadmap 3.9) is a bridge rather than a channel of its own: one
+notifier talking to an [Apprise](https://github.com/caronc/apprise) API server,
+and through it to the ~80 services Apprise already knows how to reach. It is
+the pragmatic answer for a destination this project will never write a notifier
+for. The cost is an external service, so nothing about it is assumed: the
+server URL is a setting with no default, and a server that is down fails the
+delivery like any other channel rather than losing the alert quietly. Two
+shapes are supported because Apprise offers two — with `APPRISE_CONFIG_KEY` the
+server holds the service URLs and IsItDown never sees them, which is the better
+arrangement since those URLs are credentials; with `APPRISE_URLS` they travel
+on each request instead, for a stateless server. Set both and the stored
+configuration wins, since that is the one an operator edits. Severity survives
+the bridge as Apprise's own notification type (`failure` / `warning` /
+`success` / `info`), and the status page is a line in the body: Apprise
+flattens away whatever link affordance each downstream service has.
 
 **Email** is SMTP submission, and it is written here rather than taken from a
 library (roadmap 3.3): what a notification needs is one submission conversation
@@ -1047,3 +1127,358 @@ Two things follow from it:
   the stack gains a fifth provider, which four hard-coded ids never would. The
   dashboard's routing table offers the groups above the individual providers, and
   the dry run evaluates them with the picked provider's own group.
+
+### 3.11 Per-channel locale and template
+
+Two things about a channel are not transport: what language it writes in
+(roadmap 3.20) and how the message is laid out (roadmap 3.15). Both are fields
+on the channel itself — `notifications.<channel>.locale` and
+`notifications.<channel>.template` in `config.yml`, and the **Message** block at
+the bottom of the channel's row in **Settings → Notifications**.
+
+```yaml
+notifications:
+  telegram:
+    enabled: true
+    botToken: "${TELEGRAM_BOT_TOKEN}"
+    chatId: "${TELEGRAM_CHAT_ID}"
+    # The chat reads Italian; the webhook below still speaks English.
+    locale: it
+  webhook:
+    enabled: true
+    url: "${WEBHOOK_URL}"
+    template: |
+      [{{severity}}] {{provider}} — {{title}}
+      {{url}}
+```
+
+**The locale** falls back to the installation's own notification locale
+(`locale:` at the top of the file, or **Settings → Appearance** in the UI
+edition), which is what every channel did before this existed. It is the same
+catalog the dashboard uses, so a channel can only name a language IsItDown
+actually ships.
+
+**The template** replaces the default rendering for that channel. It is
+deliberately not a templating language:
+
+- **Substitution only.** `{{provider}}` becomes a string. There is no `if`, no
+  loop, no filter, and no expression of any kind.
+- **A token with nothing behind it renders empty**, and a line made only of such
+  tokens is dropped rather than left as a dangling label — so a template written
+  for incidents stays readable on a status change that has no incident in it. A
+  line carrying literal text keeps it: `Incident: {{title}}` renders as
+  `Incident:`.
+- **An unknown token is refused where it is saved**: the Light edition will not
+  start on one and names it, and the dashboard answers `400` with the token in
+  the message. A typo that survived would read as `{{provder}}` to whoever is
+  being paged.
+- **A digest is never templated.** A template describes one change; a digest is a
+  batch of them, and it keeps its own rendering.
+- **The suppressed-alerts line still follows the message**, templated or not: it
+  is about what the operator did not get told, not about the change.
+
+The tokens, which the dashboard also lists under the field:
+
+| Token | What it is |
+| --- | --- |
+| `{{message}}` | The whole default message, exactly as the channel would otherwise have sent it — the token that makes "the usual text, with our prefix" a one-line template. |
+| `{{emoji}}` | The severity's own emoji, the one the default message opens with. |
+| `{{provider}}` | The provider's display name. |
+| `{{providerId}}` | The provider's id, as configured. |
+| `{{kind}}` | What happened, in the diff engine's own word: `incident_opened`, `status_change`, … |
+| `{{severity}}` | The current severity, upper-cased — the heading word. |
+| `{{status}}` | The current severity, in sentence case. |
+| `{{previous}}` | The severity before this change; empty when there was no prior reading. |
+| `{{component}}` | The component that changed; empty unless this is a component change. |
+| `{{title}}` | The incident's or maintenance window's own title; empty when there is neither. |
+| `{{incidentStatus}}` | The provider's own lifecycle word for the incident, translated where known. |
+| `{{url}}` | The provider's public status page. Empty on a channel that renders the link itself (a Discord embed), so it is never printed twice. |
+| `{{at}}` | When it happened, UTC. |
+
+Everything a token resolves to comes from the same catalog the default message
+is assembled from, so a templated message and a default one say the same words
+in the same language. A template rearranges them; it cannot invent new ones.
+
+### 3.12 Reaching the API from another host
+
+Every route in the UI edition is open, and that is the right answer for the
+deployment this project documents: one container, bound to `127.0.0.1`, watched
+by the person who runs it. It stops being the right answer the moment something
+off this machine has to read it — a home page widget ([4.11](api.md)), a badge
+in a README, a scrape job on the next box.
+
+`API_TOKEN` is the smallest thing that unblocks those (roadmap 4.15):
+
+```yaml
+services:
+  isitdown-ui:
+    environment:
+      API_TOKEN: "a-long-random-string"
+```
+
+With it set:
+
+- **A request carrying the token may read, from anywhere.** `GET` and `HEAD`
+  pass. Send it as `Authorization: Bearer <token>`, or as `X-API-Token: <token>`
+  for a client whose configuration file has no room for a scheme.
+- **The token grants nothing else.** Any other method answers `403`, from the
+  holder of a valid token as much as from anyone — including from this machine.
+  A token ends up pasted into a dashboard config, a cron job, a chat message;
+  it must never be worth more than reading.
+- **Everything else still has to be local.** A request with no token is answered
+  only if it came from this machine, which is what keeps the dashboard itself
+  working with no token in the browser.
+- **`/health` and `/ready` are never gated.** A Kubernetes probe arrives from
+  the node's address, not from loopback, and a liveness check that starts
+  failing because a token was set is a restart loop.
+
+Two things to be clear about:
+
+- **`X-Forwarded-For` is ignored.** A header the client writes cannot decide
+  whether the client is local. The consequence is that a reverse proxy running
+  on this same host makes every request it forwards look local — so behind one,
+  set `API_LOCAL_BYPASS=false` and require the token from everybody, this
+  machine included.
+- **This is not authentication.** One token, no identities, no expiry, and
+  nothing to revoke but the variable. It is a door with one key. Multi-user auth
+  remains a declared non-goal.
+
+```bash
+curl -H "Authorization: Bearer $API_TOKEN" http://isitdown.lan:3000/widget
+```
+
+### 3.13 SLA targets and error budgets
+
+A 90-day uptime figure answers "how has this vendor been". The question somebody
+has to answer in a review is "does this vendor meet what we were promised, this
+month" — and that needs a number nobody had written down. `slaTarget` is that
+number (roadmap 4.13): a monthly uptime percentage on the provider, in
+`config.yml` or in the **Monthly uptime target** field of the add/edit dialog.
+
+```yaml
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    slaTarget: 99.9
+```
+
+Optional, and absent by default: most providers are watched without anybody
+having promised anything, and a default would invent a promise and then report
+against it. Between 50 and 100.
+
+With a target set, the UI edition works out four things for the current calendar
+month — a month, because that is the unit an SLA is written in — from the same
+stored samples the History view is drawn from:
+
+- **The budget.** 0.1% of a 31-day month is 44.6 minutes of downtime.
+- **What is spent.** Measured downtime so far, on the same sample-count
+  arithmetic the History view's own downtime figure uses.
+- **The burn rate.** Spend against *elapsed* time: `1` is exactly on budget, `2`
+  is spending it twice as fast as the month can afford. The number worth reading
+  on a dashboard, because "13 of 44 minutes" needs the reader to know what day
+  it is and this does not.
+- **The projection.** The measured rate carried to the end of the month.
+  Deliberately nothing cleverer: a weighted estimate would be a forecast, and a
+  forecast that is wrong about a vendor's month is worse than none.
+
+It shows as an **Error budget** card on the provider's own page, and the whole
+fleet's is `GET /sla`.
+
+**The alert.** When the projection first drops below the target, the provider
+gets one `sla_burn` notification — through the diff engine and the dispatcher
+like every other alert, so routing rules, quiet hours, the digest window and the
+hourly cap all apply. Three things about it:
+
+- It is routed as a **monitoring** event, not a status one. Nothing about the
+  provider changed when it fires; it is a statement about a month of
+  measurements, and a rule that exists to be woken by an outage should not be
+  woken by arithmetic.
+- It is said **once per provider per month**, and the marker is kept in the
+  database rather than in memory — a restart on the 12th must not repeat it.
+- It says nothing until at least six hours of that month have been measured. One
+  bad hour on the 1st projects a month that is lost, and by the 3rd it is not.
+
+A month that holds no samples reports `null` rather than 0%: nothing measured is
+not a vendor that was down, and the whole history service already turns on that
+distinction.
+
+### 3.14 Adapter plugins
+
+A provider with an unusual status page needs an adapter, an adapter needs a pull
+request, and somebody who wants to watch one internal service should not have to
+fork a monitoring tool to do it. `PLUGINS_DIR` is the answer (roadmap 1.13):
+point it at a directory and every `.js`, `.mjs` and `.cjs` file in it is loaded
+at boot and registered as an adapter.
+
+```yaml
+services:
+  isitdown-ui:
+    environment:
+      PLUGINS_DIR: /plugins
+    volumes:
+      - ./plugins:/plugins:ro
+```
+
+A plugin is one module whose default export is an adapter — the same shape the
+built-in ones implement:
+
+```js
+// plugins/acme.js
+export default {
+  // A lowercase slug, and not one a built-in already uses. This is what
+  // `adapter:` names in config.yml, or what the dashboard's adapter field takes.
+  id: "acme",
+
+  // Throws on a network error, a non-2xx or an unparseable body; degrades
+  // quietly on a missing individual field. `ctx.timeoutMs` is the configured
+  // request timeout.
+  async fetchStatus(service, ctx) {
+    const response = await fetch(`${service.baseUrl}/health.json`, {
+      signal: AbortSignal.timeout(ctx.timeoutMs),
+    });
+    if (!response.ok) throw new Error(`acme: HTTP ${response.status}`);
+    const body = await response.json();
+    return {
+      provider: service.id,
+      // One of: operational, degraded, partial_outage, major_outage, unknown.
+      overallStatus: body.ok ? "operational" : "major_outage",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    };
+  },
+};
+```
+
+`fetchIncidentHistory` and `listComponents` are optional; an adapter without
+them simply has no backfillable history and offers no component picker. A named
+`adapter` export works as well as a default one, for a file that also exports
+helpers of its own.
+
+> **A plugin is arbitrary code running inside the poller**, with its privileges
+> and its access to every channel credential the configuration resolved. There
+> is no sandbox, and there is not going to be one: Node has no in-process
+> boundary worth the name, and a fake one would be worse than an honest absence.
+> That is why nothing sets `PLUGINS_DIR` for you — not the images, not the
+> compose file — and why every plugin loaded is announced in the log with the
+> file it came from. Treat a plugin exactly as you would treat a patch to this
+> codebase, because that is what it is.
+
+Three rules the loader enforces, all so that one bad file cannot cost a fleet
+its monitoring:
+
+- **A plugin may not take an id that already exists** — not a built-in's, and
+  not another plugin's. Overriding `statuspage` would change what every existing
+  provider reads, and two plugins racing for one id would make behaviour depend
+  on filenames. The file is refused and named.
+- **A file that will not import, or that exports something that is not an
+  adapter, is skipped and named** — the rest of the directory still loads.
+- **A missing directory is a warning, not a failure.** Setting the variable
+  before mounting the volume gets you a line in the log and a running poller.
+
+`node dist/light/check.js` loads plugins before validating the file, so a
+`config.yml` naming a plugin's adapter checks out, and a plugin that could not be
+loaded is one of the errors it reports.
+
+### 3.15 Provider push instead of poll
+
+Atlassian Statuspage lets a subscriber register a URL and posts to it on every
+change. Where that is reachable, the latency of a status change drops from a
+cadence to seconds, and a quiet provider stops being read on a timer at all
+(roadmap 2.10).
+
+Set `PUSH_TOKEN` on the UI edition and register the URL on the provider's page
+(**Subscribe → Webhook**, on most Statuspage instances):
+
+```
+https://isitdown.example.com/push/github?token=<PUSH_TOKEN>
+```
+
+**What arrives is a trigger, not a reading.** This is the design decision worth
+knowing about. IsItDown does not parse the webhook body into a status: it reads
+the provider, right then, through the adapter that already knows how. Everything
+after that — the diff engine, flap damping, routing, quiet hours, the delivery
+log — is the same code a scheduled cycle runs. The alternative, parsing the
+payload directly, would mean two ways a provider's state can be learned, two
+parsers to keep in step with Statuspage, and two chances for a pushed incident to
+be shaped differently from a polled one. The cost of doing it this way is one
+HTTP request per event rather than zero, which is still far fewer than one per
+cadence forever.
+
+**Polling stays the fallback.** A push is an addition, never a replacement. The
+standing schedule keeps running and this route does not delay it, so a homelab
+install with no inbound URL — the reason this cannot be the only path — behaves
+exactly as it does today. An instance that *is* reachable can lengthen that
+provider's `intervalMinutes` to make the schedule a safety net rather than the
+main path.
+
+Three things about the endpoint:
+
+- **The URL is the credential.** Statuspage sends no signature and no custom
+  headers, so there is nothing else available. Treat the URL as a secret,
+  rotate it by changing `PUSH_TOKEN`, and serve it over HTTPS. The token is
+  compared in constant time, and a wrong one is a `401` with a line in the log.
+- **It is the one route the read-only API token does not gate**
+  ([3.12](#312-reaching-the-api-from-another-host)). Its caller is a provider
+  rather than an operator: it cannot be handed a bearer token, and it is a
+  `POST`, which that token refuses on principle. It carries its own credential
+  instead.
+- **Several posts about one change cost one read.** Statuspage posts the
+  incident and then each affected component within seconds; anything arriving
+  within ten seconds of a honoured push is answered `202 coalesced`.
+
+A provider id nothing is watching, or one that is disabled, is a `404` — which
+is also the answer when `PUSH_TOKEN` is unset, so an instance that has not opted
+in does not advertise that the feature exists.
+
+### 3.16 Traces
+
+Point `OTEL_EXPORTER_OTLP_ENDPOINT` at a collector and IsItDown exports
+OpenTelemetry traces (roadmap 6.10):
+
+```yaml
+services:
+  isitdown-ui:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      OTEL_SERVICE_NAME: isitdown
+```
+
+Three spans, which is the whole instrumentation:
+
+| Span | What it covers |
+| --- | --- |
+| `poll.cycle` | One cycle end to end — the configuration load, every provider read, and the dispatch that follows. `isitdown.manual` says whether it came from the **Poll now** button, `isitdown.narrowed` whether it was one provider answering a push ([3.15](#315-provider-push-instead-of-poll)). |
+| `provider.read` | One provider, including the stagger wait it spent before its request — because a read that took fourteen seconds has to account for the seconds it spent deliberately waiting. Carries `isitdown.provider` and `isitdown.adapter`. |
+| `notification.send` | One message to one channel, retries included: "how long did telling somebody take" is one answer, not three. Carries `isitdown.channel`, `isitdown.provider` and `isitdown.kind`. |
+
+A span whose work throws is exported with the error on it and the error is
+rethrown — so a trace shows the failed provider read, and the poller still
+handles the failure exactly as it always did.
+
+**The roadmap row that asked for this said "probably no", and the reason was
+dependencies**: the usual way to get traces is an SDK and its thirty transitive
+packages, in a project whose pitch is that it has three and you can read all of
+them. So this ships with **no new dependency at all**. OTLP over HTTP is a JSON
+document posted to `/v1/traces`, and that is precisely what
+`src/core/tracing.ts` builds — no auto-instrumentation, no patched `fetch`, no
+vendor. Any collector that speaks OTLP/HTTP (Tempo, Jaeger, the OTel Collector,
+a hosted one) reads it.
+
+The honest half of that trade:
+
+- **Only the three spans above exist.** There are no automatic HTTP or SQLite
+  spans underneath them. They happen to be the question the row asked — where a
+  slow cycle went — and nothing more.
+- **No metrics and no logs signal.** `/metrics` is already better at the first
+  and the logger is already structured for the second.
+- **No sampling and no retry.** Spans queue to a bounded 2048 and are dropped
+  oldest-first past that; an export that fails is a warning, said once per
+  outage, and those spans are gone. Telemetry must never be able to take
+  monitoring down.
+
+Tracing is off unless one of the two endpoint variables is set, and off it costs
+nothing: every call site holds an object whose methods return immediately.

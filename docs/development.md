@@ -224,6 +224,7 @@ npm run coverage         # the same two suites under a coverage floor
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
 npm run test:visual      # visual baselines: every view, both themes, both locales
 npm run test:mutation    # mutation testing on the diff engine
+npm run test:load        # 200 synthetic providers, a week of history, every read timed
 npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
@@ -243,6 +244,45 @@ stay at 95% of lines, 88% of branches and 93% of functions, and the dashboard at
 passes and a new subsystem landing with no test of its own drags the total under
 and fails CI. Raise a floor when the suite has genuinely climbed; never lower one
 to make a red run green.
+
+The **load test** (roadmap 7.4) answers a question the other suites do not ask:
+not "is this fast" but "where does it stop being fast". `tools/loadtest.mjs`
+synthesises a fleet nobody has — 200 providers and a week of samples at the
+default cadence, about 670 000 rows and ~100MB of SQLite — in a temp directory,
+then times every read the dashboard makes against it and deletes the database
+again. Nothing talks to a provider, and the data is deterministic so two runs
+are comparable.
+
+```bash
+npm run test:load                                    # the default fleet
+node tools/loadtest.mjs --providers=400 --days=30    # a soak, to find the knee
+```
+
+What it found, on a developer laptop:
+
+| Fleet | `/status` | `/history?days=90` | `/incidents` | `/metrics` |
+|---|---|---|---|---|
+| 200 providers × 7 days (670k samples) | 0.3s | 0.8s, 1.4MB | 23ms | 14ms |
+| 400 providers × 30 days (5.8M samples) | **4.1s** | **7.8s**, 2.8MB | 61ms | 19ms |
+
+So the shape is clear. Everything that reads a row and hands it back stays in
+milliseconds however large the fleet grows — the incident pager, the metrics,
+the badge summary, Home Assistant — and the two endpoints that *aggregate over
+samples* are what fall over: `/status`, which derives a 90-day uptime per
+provider, and `/history`, whose payload also grows with the fleet. The knee is
+somewhere under 400 providers with a month of retention; at 200 and a week
+everything is comfortable.
+
+That is the answer to "where would it need work": not the poller, and not
+SQLite's writes, but a rollup — daily buckets stored rather than aggregated per
+request — behind those two reads. Nothing on the roadmap needs it yet, and this
+script is how the day it does becomes visible instead of arriving as a support
+question.
+
+It is not in CI, deliberately: it writes hundreds of thousands of rows and takes
+about a minute. The p95 budgets in the script are generous for the same reason
+the coverage floor is a floor — they catch an order-of-magnitude regression (an
+index dropped, a query that started scanning), not a few percent of drift.
 
 Mutation testing (roadmap 7.3) asks the question coverage cannot: a line that
 ran is not a line a test would have objected to. `tools/mutation.mjs` swaps one
@@ -365,6 +405,10 @@ Pushing the tag runs `.github/workflows/release.yml`, which re-runs the checks
 `package.json` disagree, builds both targets for `linux/amd64` and
 `linux/arm64`, pushes the four GHCR tags with an SBOM and provenance, signs both
 digests with keyless `cosign`, and creates the GitHub release.
+
+The same workflow builds the single-file Light edition (roadmap 6.7) with
+`npm run build:sea` and attaches it to the release with a `.sha256` beside it —
+see [4.5](docker.md#45-neither-the-single-file-light-edition).
 
 The release notes are generated from the log by `tools/release-notes.mjs`, which
 leans on the commit convention: `<emoji> <TITLE> - <description>` parses, so the

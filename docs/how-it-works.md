@@ -129,6 +129,10 @@ cases get added as rows rather than as one-off tests.
 | a mute is running (`mutedUntil` in the future) | anything | **no** — the operator said they already know; polling and recording carry on |
 | `confirmSamples: N` | a change seen fewer than N polls in a row | **no**, *yet* — the baseline is held, so the same change is announced once N polls agree |
 | `confirmSamples: N` | a change that reverts before N polls agree | **no**, ever — a page disagreeing with itself was never news |
+| `correlationThreshold: N` | N providers go bad inside `correlationWindowMinutes` | yes, **once** — `correlated_outage` replaces this cycle's individual alerts |
+| `correlationThreshold: N` | the same providers are still down next cycle | **no** — the shared failure was already announced |
+| a probe with `crossChecks` fails | the provider's page still says operational, no incident open | yes, **once** — `silent_outage`, and not again until the two agree |
+| a probe with `crossChecks` fails | the provider's page already says degraded, or has an incident open | **no** — the page is not hiding anything |
 
 **Mute** is the same rule with the operator standing in for the provider: it is
 an input to the diff engine rather than a filter on the way out, which is why a
@@ -142,6 +146,43 @@ dashboard always says what the page says right now, while the baseline stays put
 until a change has been seen the configured number of polls in a row. A real
 outage therefore costs at most `confirmSamples - 1` polls of delay, and a
 one-cycle disagreement costs nothing at all.
+
+**The silent-outage cross-check** (`crossChecks`, roadmap 1.10) is the one
+thing here that is not in anybody's status page: it watches the page's
+*honesty*. A provider that is down and says so is already a `status_change`; a
+provider that is down and says nothing is the outage an operator hears about
+from their own users first, and a probe pointed at the same service
+(`adapter: http`, `tcp` or `dns`) is the evidence that turns it into an alert.
+
+It is narrow on purpose, because the failure mode is a false accusation. The
+probe must have taken a reading — `unknown` is not one — and it must be worse
+than operational; the page must say operational *and* carry no open incident,
+so a provider halfway through admitting an outage is never called a liar. The
+check is skipped entirely on a cycle that already looks like our own network
+failing, since a container that cannot reach anything must not spend that
+outage accusing status pages. The probe's own alert still stands beside it:
+this change adds the sentence the probe cannot say, which is that the page has
+not caught up.
+
+**Correlated-outage detection** (`correlationThreshold`, roadmap 2.7) is the
+one rule that *replaces* alerts rather than delaying them, which is why it is
+off until an operator asks for it. Three providers going bad inside ten minutes
+is what a shared upstream failure looks like from here, and three separate
+messages is the least useful way to be told about it — so the cycle sends one
+change that names them all, attributed to the worst-hit provider so routing,
+the delivery log and the dashboard still have a real subject.
+
+The window spans cycles rather than sitting inside one: providers are staggered
+and on their own cadences, so three pages rarely go bad in the same cycle. Only
+worsenings count — a transition into something worse than it was — so a
+provider that was already down and stays down is not evidence of anything new,
+and a page we could not read is not a page that reported trouble. The
+suppression is deliberately small: the member alerts *from the cycle that
+crossed the threshold* are folded into the one change, alerts that already went
+out stand, and a fourth provider joining later gets its own alert, because that
+is news the shared-failure message did not carry. The window lives in memory,
+so a restart costs at most one folded alert — in the direction of saying too
+much rather than too little.
 
 Everything in the table above is the diff engine deciding what is *news*. What
 happens to a change after that is the delivery policy's business — quiet hours,
