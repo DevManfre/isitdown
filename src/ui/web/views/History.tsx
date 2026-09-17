@@ -22,11 +22,36 @@ import {
 import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { COMPARE_CHART } from "@/lib/chartConfig.ts";
 import { formatDuration } from "@/lib/format.ts";
+import { Input } from "@/components/ui/input.tsx";
 import { alignSeries, uptimeForRange } from "@/lib/history.ts";
+import type { HistoryWindow } from "@/lib/api.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { HistorySummary, ProviderHistory } from "@/lib/types.ts";
 
 const RANGES = [7, 30, 90] as const;
+
+/** The fourth pill: not a span, a way of asking for two dates (roadmap 5.5). */
+const CUSTOM = "custom";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const dayKey = (at: number): string => new Date(at).toISOString().slice(0, 10);
+
+/** How many days a range covers, both ends included. */
+const spanOf = (range: { from: string; to: string }): number =>
+  Math.max(
+    1,
+    Math.round((Date.parse(`${range.to}T00:00:00Z`) - Date.parse(`${range.from}T00:00:00Z`)) / MS_PER_DAY) + 1,
+  );
+
+/** The fixed window an operator was on, written as the two dates it means. */
+const rangeEndingToday = (days: number): { from: string; to: string } => {
+  const today = Date.now();
+  return { from: dayKey(today - (days - 1) * MS_PER_DAY), to: dayKey(today) };
+};
+
+/** The widest fixed window a picked range fits inside, for the CSV link. */
+const nearestFixed = (days: number): number => RANGES.find((range) => days <= range) ?? 90;
 
 const monthLabel = (locale: string, month: string) =>
   new Intl.DateTimeFormat(locale, { month: "short" }).format(new Date(`${month}-01T00:00:00Z`));
@@ -65,6 +90,15 @@ function downloadHistoryJson(summary: HistorySummary, days: number): void {
 export function History() {
   const { t, i18n } = useTranslation();
   const [days, setDays] = useState<number>(90);
+  /**
+   * The picked range, or null while one of the fixed windows is selected
+   * (roadmap 5.5). Kept beside `days` rather than replacing it: everything on
+   * this page labels the window by its span, and a range is a span with two
+   * ends rather than a different kind of thing.
+   */
+  const [range, setRange] = useState<{ from: string; to: string } | null>(null);
+  const window_: HistoryWindow =
+    range === null ? { days } : { days: spanOf(range), range };
   // The provider the command palette (roadmap 5.4) asked for, if any. Route
   // state rather than a url because there is no per-provider route yet (5.6);
   // read in an effect as well as initially, since navigating here from here
@@ -82,7 +116,7 @@ export function History() {
     left: null,
     right: null,
   });
-  const { data } = useHistory(days);
+  const { data } = useHistory(window_);
   const { data: status } = useStatus();
 
   // useHistory throws on an initial-load failure (routes.tsx's errorElement
@@ -189,12 +223,23 @@ export function History() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs text-muted-foreground">{t("history.range-active", { days })}</span>
+            <span className="text-xs text-muted-foreground">
+              {range === null
+                ? t("history.range-active", { days })
+                : t("history.range-custom-active", { from: range.from, to: range.to })}
+            </span>
             <ToggleGroup
               type="single"
-              value={String(days)}
+              value={range === null ? String(days) : CUSTOM}
               onValueChange={(next) => {
                 if (next === "") return;
+                if (next === CUSTOM) {
+                  // Opens on the window already on screen, so the first thing
+                  // the picker shows is what the operator was just looking at.
+                  setRange(rangeEndingToday(days));
+                  return;
+                }
+                setRange(null);
                 setDays(Number(next));
               }}
             >
@@ -208,7 +253,41 @@ export function History() {
                   {`${range}d`}
                 </ToggleGroupItem>
               ))}
+              <ToggleGroupItem value={CUSTOM} aria-label={t("history.range-custom")}>
+                {t("history.range-custom")}
+              </ToggleGroupItem>
             </ToggleGroup>
+            {range !== null && (
+              // Native date inputs: the browser already localises them, and a
+              // calendar popover would be a new surface for what is two dates.
+              <span className="flex items-center gap-2">
+                <label className="sr-only" htmlFor="history-from">
+                  {t("history.range-from")}
+                </label>
+                <Input
+                  id="history-from"
+                  type="date"
+                  className="h-8 w-[10.5rem]"
+                  value={range.from}
+                  max={range.to}
+                  onChange={(event) => setRange({ ...range, from: event.target.value })}
+                />
+                <span aria-hidden="true" className="text-muted-foreground">
+                  —
+                </span>
+                <label className="sr-only" htmlFor="history-to">
+                  {t("history.range-to")}
+                </label>
+                <Input
+                  id="history-to"
+                  type="date"
+                  className="h-8 w-[10.5rem]"
+                  value={range.to}
+                  min={range.from}
+                  onChange={(event) => setRange({ ...range, to: event.target.value })}
+                />
+              </span>
+            )}
             {/* The CSV is the server's own aggregation rather than this summary
                 flattened here (roadmap 4.6): one row per provider per day is a
                 shape the JSON payload does not have, and deriving it in the
@@ -228,7 +307,11 @@ export function History() {
                     {
                       format: "CSV",
                       description: t("history.download-csv", { days }),
-                      href: `/export/history.csv?days=${days}`,
+                      // The export still takes one of the three fixed windows
+                      // (roadmap 4.6), so a picked range downloads the span it
+                      // rounds to rather than offering a file the server has no
+                      // way to produce.
+                      href: `/export/history.csv?days=${nearestFixed(days)}`,
                     },
                   ],
                 },
@@ -361,8 +444,12 @@ export function History() {
         <div
           role="region"
           aria-label={t("history.list")}
-          className="history-list grid grid-cols-[minmax(8rem,1fr)_minmax(6rem,2fr)_auto_auto_auto] items-center gap-x-4">
-          <div className="col-span-full grid grid-cols-subgrid items-center px-2 text-xs uppercase tracking-widest text-muted-foreground">
+          // Five shared tracks from `md` up; a plain column of cards below it,
+          // where five columns would each be 60px wide. The header labels the
+          // tracks, so it goes with them — each mobile card carries its own
+          // figures in a shape that reads without one.
+          className="history-list flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(8rem,1fr)_minmax(6rem,2fr)_auto_auto_auto] lg:items-center lg:gap-x-4">
+          <div className="col-span-full hidden grid-cols-subgrid items-center px-2 text-xs uppercase tracking-widest text-muted-foreground lg:grid">
             <span>{t("history.col-provider")}</span>
             <span>{t("history.col-trend")}</span>
             <span>{t("history.col-uptime", { days })}</span>
@@ -393,7 +480,7 @@ export function History() {
         components={open === null ? [] : (statusById.get(open)?.components ?? [])}
         selection={open === null ? [] : (statusById.get(open)?.componentSelection ?? [])}
         upcoming={open === null ? [] : (statusById.get(open)?.maintenance.upcoming ?? [])}
-        days={days}
+        historyWindow={window_}
         onClose={() => setOpen(null)}
       />
     </div>

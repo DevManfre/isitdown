@@ -25,7 +25,7 @@ problemi upstream senza tenere aperte cinque dashboard di stato. Notifica sulle
 *transizioni*, mai a ogni poll: una settimana tranquilla è una settimana silenziosa.
 
 Due edizioni dallo stesso codice: **Light** (solo polling e notifiche, nessun
-server) e **UI** (lo stesso motore più una dashboard locale, configurabile a runtime).
+server) e **UI** (lo stesso core più una dashboard locale, configurabile a runtime).
 
 ## Indice
 
@@ -86,7 +86,7 @@ Anthropic       operational    ████████████████�
 | Localizzazione | testo delle notifiche | testo delle notifiche **e** tutta la dashboard |
 | Impronta | immagine 264MB, nessuna porta in ascolto | 267MB: l'immagine Light più un layer |
 
-Entrambe le edizioni eseguono lo stesso motore. Differiscono solo per ciò che viene
+Entrambe le edizioni eseguono lo stesso core. Differiscono solo per ciò che viene
 iniettato: da dove arriva la configurazione e dove viene tenuto lo stato.
 
 ---

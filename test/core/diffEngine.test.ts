@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { confirmedChanges, diff, signatureOf } from "../../src/core/diffEngine.ts";
+import {
+  confirmedChanges,
+  correlatedOutage,
+  diff,
+  silentOutage,
+  signatureOf,
+  worseningsIn,
+  type WorseningReading,
+} from "../../src/core/diffEngine.ts";
 import type {
   ComponentStatus,
   Incident,
@@ -473,4 +481,189 @@ test("a signature ignores timestamps and reads incident lifecycle, components an
   assert.notEqual(signatureOf(one), signatureOf(snap("degraded", [inc({ id: "i1", status: "monitoring" })], [comp()])));
   assert.notEqual(signatureOf(one), signatureOf(snap("degraded", [inc()], [comp({ status: "major_outage" })])));
   assert.notEqual(signatureOf(one), signatureOf(snap("degraded", [inc()], [comp()], [running])));
+});
+
+const worsening = (providerId: string, at: string, status: OverallStatus): WorseningReading => ({
+  providerId,
+  at,
+  status,
+});
+
+test("three providers inside the window are one shared failure, named after the worst", () => {
+  const correlated = correlatedOutage({
+    recent: [
+      worsening("github", "2026-09-01T10:00:00.000Z", "degraded"),
+      worsening("cloudflare", "2026-09-01T10:04:00.000Z", "major_outage"),
+      worsening("anthropic", "2026-09-01T10:06:00.000Z", "partial_outage"),
+    ],
+    windowMinutes: 10,
+    threshold: 3,
+    at: "2026-09-01T10:07:00.000Z",
+  });
+
+  assert.equal(correlated?.kind, "correlated_outage");
+  assert.equal(correlated?.providerId, "cloudflare", "the worst-hit provider is the subject");
+  assert.equal(correlated?.currentStatus, "major_outage");
+  assert.deepEqual(correlated?.correlated?.providerIds, ["cloudflare", "anthropic", "github"]);
+});
+
+test("a worsening older than the window is not evidence of anything", () => {
+  const correlated = correlatedOutage({
+    recent: [
+      worsening("github", "2026-09-01T09:40:00.000Z", "major_outage"),
+      worsening("cloudflare", "2026-09-01T10:04:00.000Z", "major_outage"),
+      worsening("anthropic", "2026-09-01T10:06:00.000Z", "degraded"),
+    ],
+    windowMinutes: 10,
+    threshold: 3,
+    at: "2026-09-01T10:07:00.000Z",
+  });
+  assert.equal(correlated, null);
+});
+
+test("one provider getting worse three times is one provider, not a correlation", () => {
+  const correlated = correlatedOutage({
+    recent: [
+      worsening("github", "2026-09-01T10:00:00.000Z", "degraded"),
+      worsening("github", "2026-09-01T10:02:00.000Z", "partial_outage"),
+      worsening("github", "2026-09-01T10:04:00.000Z", "major_outage"),
+    ],
+    windowMinutes: 10,
+    threshold: 3,
+    at: "2026-09-01T10:05:00.000Z",
+  });
+  assert.equal(correlated, null);
+});
+
+test("a threshold below two is off, whatever the window holds", () => {
+  const recent = [
+    worsening("github", "2026-09-01T10:00:00.000Z", "major_outage"),
+    worsening("cloudflare", "2026-09-01T10:01:00.000Z", "major_outage"),
+  ];
+  for (const threshold of [0, 1, 1.5, Number.NaN]) {
+    assert.equal(
+      correlatedOutage({ recent, windowMinutes: 10, threshold, at: "2026-09-01T10:02:00.000Z" }),
+      null,
+      `threshold ${threshold}`,
+    );
+  }
+});
+
+test("a reading we could not take is never counted as a provider going bad", () => {
+  const correlated = correlatedOutage({
+    recent: [
+      worsening("github", "2026-09-01T10:00:00.000Z", "unknown"),
+      worsening("cloudflare", "2026-09-01T10:01:00.000Z", "unknown"),
+      worsening("anthropic", "2026-09-01T10:02:00.000Z", "major_outage"),
+    ],
+    windowMinutes: 10,
+    threshold: 2,
+    at: "2026-09-01T10:03:00.000Z",
+  });
+  assert.equal(correlated, null);
+});
+
+test("worsenings are the transitions into something worse, nothing else", () => {
+  const at = "2026-09-01T10:00:00.000Z";
+  const readings = worseningsIn([
+    { kind: "status_change", providerId: "a", previousStatus: "operational", currentStatus: "degraded", at },
+    // A recovery, and a provider that improved without recovering: neither is
+    // evidence of a shared failure.
+    { kind: "status_change", providerId: "b", previousStatus: "major_outage", currentStatus: "operational", at },
+    { kind: "status_change", providerId: "c", previousStatus: "major_outage", currentStatus: "degraded", at },
+    // A provider restating an incident it already raised.
+    {
+      kind: "incident_updated",
+      providerId: "d",
+      currentStatus: "major_outage",
+      incident: { id: "i", name: "", impact: "major", status: "identified", updatedAt: at },
+      at,
+    },
+    // An incident opening on a page that was calm is a worsening.
+    {
+      kind: "incident_opened",
+      providerId: "e",
+      currentStatus: "partial_outage",
+      incident: { id: "i", name: "", impact: "minor", status: "investigating", updatedAt: at },
+      at,
+    },
+    // Our own fetching failing says nothing about the provider.
+    { kind: "monitoring_degraded", providerId: "f", currentStatus: "unknown", failureCount: 5, at },
+  ]);
+
+  assert.deepEqual(
+    readings.map((reading) => reading.providerId),
+    ["a", "e"],
+  );
+});
+
+const crossAt = "2026-09-01T10:00:00.000Z";
+
+test("a probe that cannot reach a service whose page says operational is news", () => {
+  const change = silentOutage({
+    probe: { id: "github-api", status: "major_outage", note: "answered HTTP 503" },
+    page: { id: "github", status: "operational", openIncidents: 0 },
+    at: crossAt,
+  });
+
+  assert.equal(change?.kind, "silent_outage");
+  assert.equal(change?.providerId, "github", "the page is the subject, not the probe");
+  assert.equal(change?.previousStatus, "operational");
+  assert.equal(change?.currentStatus, "major_outage");
+  assert.deepEqual(change?.crossCheck, { probeId: "github-api", note: "answered HTTP 503" });
+});
+
+test("a page already admitting trouble is never accused", () => {
+  for (const page of [
+    { id: "github", status: "degraded" as const, openIncidents: 0 },
+    // Halfway through admitting it: an incident is open while the indicator
+    // has not moved yet.
+    { id: "github", status: "operational" as const, openIncidents: 1 },
+  ]) {
+    assert.equal(
+      silentOutage({ probe: { id: "p", status: "major_outage" }, page, at: crossAt }),
+      null,
+      JSON.stringify(page),
+    );
+  }
+});
+
+test("a probe with no reading, and a page we have never read, accuse nobody", () => {
+  assert.equal(
+    silentOutage({
+      probe: { id: "p", status: "unknown" },
+      page: { id: "github", status: "operational", openIncidents: 0 },
+      at: crossAt,
+    }),
+    null,
+  );
+  assert.equal(
+    silentOutage({ probe: { id: "p", status: "major_outage" }, page: null, at: crossAt }),
+    null,
+  );
+});
+
+test("a healthy probe is simply a healthy probe", () => {
+  assert.equal(
+    silentOutage({
+      probe: { id: "p", status: "operational" },
+      page: { id: "github", status: "operational", openIncidents: 0 },
+      at: crossAt,
+    }),
+    null,
+  );
+});
+
+test("a page caught out is not counted as a worsening for the correlation window", () => {
+  const readings = worseningsIn([
+    {
+      kind: "silent_outage",
+      providerId: "github",
+      previousStatus: "operational",
+      currentStatus: "major_outage",
+      crossCheck: { probeId: "github-api" },
+      at: crossAt,
+    },
+  ]);
+  assert.deepEqual(readings, []);
 });

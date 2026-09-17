@@ -1,3 +1,5 @@
+import { registerPluginAdapters } from "../adapters/plugins.ts";
+import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { checkConfig } from "./config/checkConfig.ts";
 
 /**
@@ -38,13 +40,27 @@ if (unknown.length > 0 || positional.length > 1) {
 
 const path = positional[0] ?? process.env["CONFIG_PATH"] ?? "/app/config/config.yml";
 
+// Plugin adapters first, for the same reason the runtime loads them before
+// reading the configuration (roadmap 1.13): a config naming a plugin's adapter
+// is valid, and a check that had not loaded the plugins would report it as an
+// unknown adapter and exit non-zero on a file that runs perfectly well. Any
+// plugin that could not be loaded is a finding of its own, below.
+const plugins = await registerPluginAdapters(process.env, createLogger(parseLogLevel(process.env["LOG_LEVEL"])));
+
 const report = await checkConfig({ path, env: process.env, probe });
+
+for (const problem of plugins.problems) {
+  process.stderr.write(`error: plugin adapter — ${problem}\n`);
+}
 
 for (const finding of report.findings) {
   process.stderr.write(`${finding.level}: ${finding.message}\n`);
 }
 
-const errors = report.findings.filter((finding) => finding.level === "error").length;
+// Plugin problems count as errors here too, so the summary line and the exit
+// code agree about how many things are wrong.
+const errors =
+  report.findings.filter((finding) => finding.level === "error").length + plugins.problems.length;
 const warnings = report.findings.length - errors;
 const summary = [
   `${report.services} service${report.services === 1 ? "" : "s"} (${report.enabledServices} enabled)`,
@@ -54,7 +70,10 @@ const summary = [
   report.probed ? "providers probed" : "file only, no provider read",
 ].join(", ");
 
-if (report.ok) {
+// A plugin that could not be loaded is an error even when the file itself is
+// fine: the operator put it there on purpose, and a check that passed while a
+// provider silently had no adapter would be worth nothing.
+if (report.ok && plugins.problems.length === 0) {
   process.stdout.write(`${path} is valid — ${summary}${warnings > 0 ? `, ${warnings} warning(s)` : ""}\n`);
   process.exit(0);
 }

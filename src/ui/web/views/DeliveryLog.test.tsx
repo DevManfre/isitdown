@@ -35,8 +35,8 @@ const config = {
   services: [],
   polling: { intervalMinutes: 3, requestTimeoutSeconds: 8, maxRetries: 3, failureThreshold: 5 },
   channels: [
-    { id: "telegram", enabled: true, fields: [] },
-    { id: "webhook", enabled: true, fields: [] },
+    { id: "telegram", enabled: true, fields: [], locale: "", template: "" },
+    { id: "webhook", enabled: true, fields: [], locale: "", template: "" },
   ],
   routing: { rules: [], invalid: 0 },
 };

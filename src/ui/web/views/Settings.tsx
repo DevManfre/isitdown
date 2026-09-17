@@ -24,6 +24,7 @@ import {
   useSettingVisible,
 } from "@/components/settings/SettingsChrome.tsx";
 import { SettingsNav } from "@/components/settings/SettingsNav.tsx";
+import { SettingsToastsProvider, useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import {
   useConfig,
   useConfigImport,
@@ -180,14 +181,7 @@ function SettingsView() {
   const { data: storage } = useStorage();
   const storageMaintenance = useStorageMaintenance();
   const restoreBackup = useRestoreBackup();
-  const [restoreStatus, setRestoreStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
-    undefined,
-  );
-  const [maintenanceStatus, setMaintenanceStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
-    undefined,
-  );
   const configImport = useConfigImport();
-  const [importStatus, setImportStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(undefined);
   const { restore: serviceRestore, purge: servicePurge } = useServiceMutations();
   // Above the early return below: a hook cannot be called conditionally.
   const fieldProps = useFieldProps();
@@ -195,13 +189,21 @@ function SettingsView() {
   const [interval_, setInterval_] = useState<number | undefined>(undefined);
   const [timeout_, setTimeout_] = useState<number | undefined>(undefined);
   const [retries, setRetries] = useState<number | undefined>(undefined);
-  const [pollingStatus, setPollingStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(undefined);
+  // Every instant-apply answer on this page — receipt or refusal — leaves as a
+  // card in the bottom-right stack rather than a line in the card that saved.
+  const toast = useSettingsToastReport();
+  /** The receipt every plain write leaves, and the refusal when one fails. */
+  const receipt = (kind: Parameters<typeof toast>[0], text?: string) => ({
+    onSuccess: () => toast(kind, { text: text ?? t("settings.saved"), tone: "ok" as const }),
+    onError: (error: unknown) =>
+      toast(kind, {
+        text: t("toast.failed", { error: error instanceof Error ? error.message : String(error) }),
+        tone: "error" as const,
+      }),
+  });
   const [adaptiveInterval_, setAdaptiveInterval] = useState<number | undefined>(undefined);
   const [confirmSamples_, setConfirmSamples] = useState<number | undefined>(undefined);
   const [retentionDays_, setRetentionDays] = useState<number | undefined>(undefined);
-  const [retentionStatus, setRetentionStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
-    undefined,
-  );
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [openChannel, setOpenChannel] = useState<string | undefined>(undefined);
   // One provider's actions open at a time, same rule as the channel rows: every
@@ -213,9 +215,6 @@ function SettingsView() {
   const [showAllChannels, setShowAllChannels] = useState(false);
   const [digestWindow_, setDigestWindow] = useState<number | undefined>(undefined);
   const [capPerHour_, setCapPerHour] = useState<number | undefined>(undefined);
-  const [deliveryStatus, setDeliveryStatus] = useState<{ text: string; tone: "ok" | "error" } | undefined>(
-    undefined,
-  );
 
   useEffect(() => {
     return () => {
@@ -267,13 +266,13 @@ function SettingsView() {
     cap?: Partial<DeliveryPolicy["cap"]>;
     updateInPlace?: boolean;
   }): void => {
-    setDeliveryStatus(undefined);
+    toast("delivery", undefined);
     settingsMutation.mutate(
       { delivery: patch },
       {
-        onSuccess: () => setDeliveryStatus({ text: t("settings.saved"), tone: "ok" }),
+        onSuccess: () => toast("delivery", { text: t("settings.saved"), tone: "ok" }),
         onError: (error) =>
-          setDeliveryStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+          toast("delivery", { text: error instanceof Error ? error.message : String(error), tone: "error" }),
       },
     );
   };
@@ -282,7 +281,7 @@ function SettingsView() {
   const commitDeliveryNumber = (field: keyof typeof DELIVERY_BOUNDS, value: number): void => {
     const bound = DELIVERY_BOUNDS[field];
     if (!Number.isInteger(value) || value < bound.min || value > bound.max) {
-      setDeliveryStatus({
+      toast("delivery", {
         text: t("settings.out-of-range", { field: t(bound.labelKey), min: bound.min, max: bound.max }),
         tone: "error",
       });
@@ -303,7 +302,7 @@ function SettingsView() {
     for (const [key, bound] of Object.entries(POLLING_BOUNDS)) {
       const value = next[key as keyof typeof next];
       if (!Number.isInteger(value) || value < bound.min || value > bound.max) {
-        setPollingStatus({
+        toast("engine", {
           text: t("settings.out-of-range", { field: t(bound.labelKey), min: bound.min, max: bound.max }),
           tone: "error",
         });
@@ -311,11 +310,11 @@ function SettingsView() {
       }
     }
 
-    setPollingStatus(undefined);
+    toast("engine", undefined);
     settingsMutation.mutate(next, {
-      onSuccess: () => setPollingStatus({ text: t("settings.saved"), tone: "ok" }),
+      onSuccess: () => toast("engine", { text: t("settings.saved"), tone: "ok" }),
       onError: (error) =>
-        setPollingStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+        toast("engine", { text: error instanceof Error ? error.message : String(error), tone: "error" }),
     });
   };
 
@@ -335,7 +334,7 @@ function SettingsView() {
       minutes !== undefined &&
       (!Number.isInteger(minutes) || minutes < ADAPTIVE_BOUNDS.min || minutes > ADAPTIVE_BOUNDS.max)
     ) {
-      setPollingStatus({
+      toast("engine", {
         text: t("settings.out-of-range", {
           field: t("field.adaptive-interval"),
           min: ADAPTIVE_BOUNDS.min,
@@ -345,17 +344,17 @@ function SettingsView() {
       });
       return;
     }
-    setPollingStatus(undefined);
+    toast("engine", undefined);
     settingsMutation.mutate(patch, {
-      onSuccess: () => setPollingStatus({ text: t("settings.saved"), tone: "ok" }),
+      onSuccess: () => toast("engine", { text: t("settings.saved"), tone: "ok" }),
       onError: (error) =>
-        setPollingStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+        toast("engine", { text: error instanceof Error ? error.message : String(error), tone: "error" }),
     });
   };
 
   const commitConfirm = (samples: number): void => {
     if (!Number.isInteger(samples) || samples < CONFIRM_BOUNDS.min || samples > CONFIRM_BOUNDS.max) {
-      setPollingStatus({
+      toast("engine", {
         text: t("settings.out-of-range", {
           field: t("field.confirm-samples"),
           min: CONFIRM_BOUNDS.min,
@@ -365,11 +364,11 @@ function SettingsView() {
       });
       return;
     }
-    setPollingStatus(undefined);
+    toast("engine", undefined);
     settingsMutation.mutate({ confirmSamples: samples }, {
-      onSuccess: () => setPollingStatus({ text: t("settings.saved"), tone: "ok" }),
+      onSuccess: () => toast("engine", { text: t("settings.saved"), tone: "ok" }),
       onError: (error) =>
-        setPollingStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+        toast("engine", { text: error instanceof Error ? error.message : String(error), tone: "error" }),
     });
   };
 
@@ -379,10 +378,10 @@ function SettingsView() {
    * server where the Light edition's loader already is.
    */
   const runImport = async (file: File): Promise<void> => {
-    setImportStatus(undefined);
+    toast("data", undefined);
     try {
       const report = await configImport.mutateAsync(await file.text());
-      setImportStatus({
+      toast("data", {
         text: t("settings.backup.imported", {
           added: report.added.length,
           updated: report.updated.length,
@@ -391,7 +390,7 @@ function SettingsView() {
         tone: "ok",
       });
     } catch (error) {
-      setImportStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+      toast("data", { text: error instanceof Error ? error.message : String(error), tone: "error" });
     }
   };
 
@@ -402,17 +401,17 @@ function SettingsView() {
    * component for a button nobody presses twice a year.
    */
   const runRestore = async (file: File): Promise<void> => {
-    setRestoreStatus(undefined);
+    toast("data", undefined);
     if (!window.confirm(t("settings.restore.confirm", { file: file.name }))) return;
     try {
       const report = await restoreBackup.mutateAsync(file);
       const rows = Object.values(report.tables).reduce((total, count) => total + count, 0);
-      setRestoreStatus({
+      toast("data", {
         text: t("settings.restore.done", { providers: report.tables["services"] ?? 0, rows }),
         tone: "ok",
       });
     } catch (error) {
-      setRestoreStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+      toast("data", { text: error instanceof Error ? error.message : String(error), tone: "error" });
     }
   };
 
@@ -423,18 +422,18 @@ function SettingsView() {
    * second definition of what a vacuum returned.
    */
   const runMaintenance = (): void => {
-    setMaintenanceStatus(undefined);
+    toast("data", undefined);
     storageMaintenance.mutate(undefined, {
       onSuccess: (report) => {
         if (!report.ok) {
-          setMaintenanceStatus({
+          toast("data", {
             text: t("settings.maintenance.failed", { integrity: report.integrity }),
             tone: "error",
           });
           return;
         }
         const current = formatBytes(i18n.language, report.bytesAfter);
-        setMaintenanceStatus({
+        toast("data", {
           text:
             report.reclaimed === 0
               ? t("settings.maintenance.nothing", { current })
@@ -446,13 +445,13 @@ function SettingsView() {
         });
       },
       onError: (error) =>
-        setMaintenanceStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+        toast("data", { text: error instanceof Error ? error.message : String(error), tone: "error" }),
     });
   };
 
   const commitRetention = (days: number): void => {
     if (!Number.isInteger(days) || days < RETENTION_BOUNDS.min || days > RETENTION_BOUNDS.max) {
-      setRetentionStatus({
+      toast("data", {
         text: t("settings.out-of-range", {
           field: t("field.retention"),
           min: RETENTION_BOUNDS.min,
@@ -462,13 +461,13 @@ function SettingsView() {
       });
       return;
     }
-    setRetentionStatus(undefined);
+    toast("data", undefined);
     settingsMutation.mutate(
       { retentionDays: days },
       {
-        onSuccess: () => setRetentionStatus({ text: t("settings.saved"), tone: "ok" }),
+        onSuccess: () => toast("data", { text: t("settings.saved"), tone: "ok" }),
         onError: (error) =>
-          setRetentionStatus({ text: error instanceof Error ? error.message : String(error), tone: "error" }),
+          toast("data", { text: error instanceof Error ? error.message : String(error), tone: "error" }),
       },
     );
   };
@@ -527,13 +526,6 @@ function SettingsView() {
         reel={SECTION_REELS.engine}
         className="lg:col-span-6"
         title={t("settings.section.engine")}
-        status={
-          pollingStatus === undefined ? undefined : (
-            <span className={pollingStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}>
-              {pollingStatus.text}
-            </span>
-          )
-        }
         delay={stagger(0, SECTION_CASCADE)}
       >
         <SettingRow label={t("field.interval")} description={t("field.interval.hint")} align="top">
@@ -730,7 +722,12 @@ function SettingsView() {
                 variant="secondary"
                 size="sm"
                 disabled={serviceRestore.isPending}
-                onClick={() => serviceRestore.mutate(service.id)}
+                onClick={() =>
+                  serviceRestore.mutate(
+                    service.id,
+                    receipt("services", t("toast.service.restored", { name: service.name })),
+                  )
+                }
               >
                 {t("action.restore")}
               </Button>
@@ -741,7 +738,9 @@ function SettingsView() {
                 variant="destructive"
                 size="sm"
                 disabled={servicePurge.isPending}
-                onClick={() => servicePurge.mutate(service.id)}
+                onClick={() =>
+                  servicePurge.mutate(service.id, receipt("services", t("toast.service.purged", { name: service.name })))
+                }
               >
                 {t("action.remove-now")}
               </Button>
@@ -819,15 +818,6 @@ function SettingsView() {
         className="lg:col-span-3"
         title={t("settings.section.delivery")}
         note={t("settings.delivery.note")}
-        status={
-          deliveryStatus === undefined ? undefined : (
-            <span
-              className={deliveryStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}
-            >
-              {deliveryStatus.text}
-            </span>
-          )
-        }
         delay={stagger(3, SECTION_CASCADE)}
       >
         <SettingRow label={t("field.quiet-hours")} description={t("field.quiet-hours.hint")} align="top">
@@ -990,15 +980,6 @@ function SettingsView() {
         reel={SECTION_REELS.data}
         className="lg:col-span-3"
         title={t("settings.section.data")}
-        status={
-          retentionStatus === undefined ? undefined : (
-            <span
-              className={retentionStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}
-            >
-              {retentionStatus.text}
-            </span>
-          )
-        }
         delay={stagger(4, SECTION_CASCADE)}
       >
         <SettingRow
@@ -1044,18 +1025,6 @@ function SettingsView() {
         <SettingRow
           label={t("settings.maintenance.label")}
           description={t("settings.maintenance.hint")}
-          status={
-            maintenanceStatus === undefined ? undefined : (
-              <span
-                data-testid="maintenance-result"
-                className={
-                  maintenanceStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"
-                }
-              >
-                {maintenanceStatus.text}
-              </span>
-            )
-          }
           align="top"
         >
           <Button
@@ -1076,15 +1045,6 @@ function SettingsView() {
         <SettingRow
           label={t("settings.backup.label")}
           description={t("settings.backup.hint")}
-          status={
-            importStatus === undefined ? undefined : (
-              <span
-                className={importStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}
-              >
-                {importStatus.text}
-              </span>
-            )
-          }
           align="top"
         >
           <Button asChild variant="outline" size="sm">
@@ -1117,16 +1077,6 @@ function SettingsView() {
         <SettingRow
           label={t("settings.restore.label")}
           description={t("settings.restore.hint")}
-          status={
-            restoreStatus === undefined ? undefined : (
-              <span
-                data-testid="restore-result"
-                className={restoreStatus.tone === "error" ? "text-destructive" : "text-[var(--status-operational)]"}
-              >
-                {restoreStatus.text}
-              </span>
-            )
-          }
           align="top"
         >
           <Button asChild variant="outline" size="sm">
@@ -1168,7 +1118,7 @@ function SettingsView() {
               // Applied here as well as stored: the mutation only writes the
               // preference back, and the formatters read the module value.
               setTimeZone(value);
-              patchPreferences.mutate({ timeZone: value });
+              patchPreferences.mutate({ timeZone: value }, receipt("appearance"));
             }}
           >
             <SelectTrigger id="time-zone" className="w-56" aria-label={t("settings.timezone.label")}>
@@ -1191,7 +1141,7 @@ function SettingsView() {
         >
           <Select
             value={preferences?.mapView ?? "off"}
-            onValueChange={(value) => patchPreferences.mutate({ mapView: value as MapView })}
+            onValueChange={(value) => patchPreferences.mutate({ mapView: value as MapView }, receipt("appearance"))}
           >
             <SelectTrigger id="map-view" className="w-42" aria-label={t("settings.map-view.label")}>
               <SelectValue />
@@ -1224,8 +1174,10 @@ function SettingsView() {
  */
 export function Settings() {
   return (
-    <SettingsChromeProvider>
-      <SettingsView />
-    </SettingsChromeProvider>
+    <SettingsToastsProvider>
+      <SettingsChromeProvider>
+        <SettingsView />
+      </SettingsChromeProvider>
+    </SettingsToastsProvider>
   );
 }

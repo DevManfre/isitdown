@@ -21,6 +21,9 @@
   "notification.incident.updated": "{provider} — {severity}\n\nIncident: {title}\nStatus: {status}\nUpdated: {updatedAt}\n\n{url}",
   "notification.incident.resolved": "{provider} — {severity}\n\nIncident \"{title}\" has been resolved.\nUpdated: {updatedAt}\n\n{url}",
   "notification.monitoring.degraded": "{provider} — monitoring degraded\n\n{count} consecutive fetches failed. Last known status: {lastStatus}.\nUpdated: {updatedAt}",
+  "notification.correlated.outage": "{provider} — {severity}\n\n{count} providers went bad within {minutes} minute(s): {providers}.\nThis looks like one shared failure rather than {count} separate ones.\n\n{url}",
+  "notification.silent.outage": "{provider} — {severity}\n\nThe status page still reports {previous}, but our own probe {probe} cannot reach the service: {note}\n\n{url}",
+  "notification.sla.burn": "{provider} — error budget\n\nAt this month's rate, {month} lands at {projected}% against a {target}% target.\n{spentMinutes} of {budgetMinutes} allowed minutes are already spent, and measured uptime so far is {uptime}%.\n\n{url}",
   "notification.maintenance.started": "{provider} — maintenance\n\nScheduled maintenance has started: {title}\nEnds: {endsAt}\nAlerts for this provider are paused until it is over.\n\n{url}",
   "notification.maintenance.ended": "{provider} — maintenance over\n\n{title} has finished.\nStatus now: {current} — {count} open incident(s).\nUpdated: {updatedAt}\n\n{url}",
 
@@ -34,6 +37,9 @@
   "notification.digest.maintenance-started": "maintenance started — {title}",
   "notification.digest.maintenance-ended": "maintenance over — {title}",
   "notification.digest.monitoring": "monitoring degraded — {count} consecutive fetches failed",
+  "notification.digest.silent": "the status page still says operational, but probe {probe} reads {current}",
+  "notification.digest.correlated": "{count} providers went bad together — {providers}",
+  "notification.digest.sla": "error budget — at this rate the month lands at {projected}% against {target}%",
 
   "notification.suppressed": "{count} further alert(s) for this provider were suppressed by the hourly cap."
 }

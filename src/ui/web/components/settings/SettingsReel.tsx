@@ -35,14 +35,18 @@ export type ReelPainter = (
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-  /** Seconds since the reel started; always 0 under reduced motion. */
+  /** Seconds since the reel started; never negative, and 0 under reduced motion. */
   time: number,
   ink: ReelInk,
 ) => void;
 
 /** `rgb(…)`/`oklch(…)` from a token, at the alpha a painter asks for. */
 export function fade(color: string, alpha: number): string {
-  return `color-mix(in srgb, ${color} ${Math.round(alpha * 100)}%, transparent)`;
+  // Clamped, because a percentage outside 0–100 is not a colour: canvas ignores
+  // it in `fillStyle` but *throws* in `addColorStop`, and a throw inside the
+  // frame callback stops the reel for good.
+  const percent = Math.min(100, Math.max(0, Math.round(alpha * 100)));
+  return `color-mix(in srgb, ${color} ${percent}%, transparent)`;
 }
 
 const readInk = (element: HTMLElement): ReelInk => {
@@ -100,7 +104,13 @@ export function SettingsReel({ painter, className }: { painter: ReelPainter; cla
     } else {
       const start = performance.now();
       const tick = (now: number): void => {
-        paint((now - start) / 1000);
+        // The frame timestamp is the start of the frame being composited, which
+        // can predate the `performance.now()` above — so the first tick or two
+        // arrive slightly negative. A painter that reads that as a phase gets a
+        // negative one, and a negative alpha reaching `addColorStop` throws out
+        // of this callback, which never schedules the next frame: the reel is
+        // dead for the life of the page. `delivery` went out that way.
+        paint(Math.max(0, (now - start) / 1000));
         frame = requestAnimationFrame(tick);
       };
       frame = requestAnimationFrame(tick);

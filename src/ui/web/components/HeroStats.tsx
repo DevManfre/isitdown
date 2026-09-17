@@ -58,7 +58,7 @@ export function HeroStats({ providers, average }: { providers: ProviderStatus[];
     <div
       data-slot="hero-stats"
       data-testid="hero-stats"
-      className="hero-stats anim-rise anim-rise-hero flex items-center gap-5 border-border md:border-l md:pl-6"
+      className="hero-stats anim-rise anim-rise-hero flex min-w-0 items-center gap-5 border-border lg:border-l lg:pl-6"
       style={{ animationDelay: "120ms" }}
     >
       <UptimeArc value={average} size={112} />

@@ -30,7 +30,10 @@ export function ViewFrame({
     <div
       id="view"
       data-animate={ready ? view : undefined}
-      className="min-w-0 flex-1 px-8 py-6"
+      // 16px gutters on a phone, 32 from `md` up, and room at the bottom for
+      // the tab bar that floats over this region below 768px — without it the
+      // last row of every view sits under five tabs.
+      className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-8 md:pb-6"
     >
       {children}
     </div>

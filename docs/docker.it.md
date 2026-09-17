@@ -23,7 +23,7 @@ poi Vite, poi la copia degli asset — un unico layer `RUN` condiviso da entramb
 stage di runtime sotto di esso. `light` e `ui` sono per il resto invariati: lo
 stage `ui` continua a partire `FROM light`, quindi l'immagine UI è l'immagine
 Light più un unico layer sottile — immagine base, dipendenze di produzione e tutto
-il motore sono condivisi su disco e in un registry.
+il core sono condivisi su disco e in un registry.
 
 `dev`, il terzo stage, è `FROM builder` invece che `FROM light`: lo sviluppo live
 ha bisogno delle devDependencies (Vite, React, gli strumenti di test) che
@@ -157,7 +157,37 @@ reso in una ConfigMap e montato in sola lettura; i riferimenti `${VAR}` al suo
 interno si risolvono contro quello stesso Secret. Una modifica fa ruotare il pod,
 perché una ConfigMap montata che cambia su disco non riavvia nulla da sola.
 
-### 4.5 Unraid e Home Assistant
+### 4.5 Nessuno dei due: l'edizione Light in un solo file
+
+Chi non vuole né Docker né un'installazione di Node può eseguire l'edizione
+Light come un unico eseguibile — roadmap 6.7. Ogni release lo allega accanto
+alle immagini, con un checksum:
+
+```bash
+gh release download vX.Y.Z --pattern 'isitdown-light-*-linux-x64*'
+sha256sum -c isitdown-light-vX.Y.Z-linux-x64.sha256
+chmod +x isitdown-light-vX.Y.Z-linux-x64
+CONFIG_PATH=./config.yml DATA_PATH=./state.json ./isitdown-light-vX.Y.Z-linux-x64
+```
+
+È la stessa edizione, con lo stesso `config.yml` e le stesse variabili
+d'ambiente — qui i due percorsi non hanno un default `/app` su cui ricadere,
+quindi conviene impostarli entrambi. Per costruirne uno in locale basta
+`npm run build:sea`, che scrive `dist/sea/isitdown-light`.
+
+Solo Light, deliberatamente: l'edizione UI serve una dashboard compilata da
+`dist/ui/public`, cioè migliaia di file che un binario dovrebbe portarsi dietro
+e di cui un operatore dovrebbe essere informato. Il file pesa circa 120MB, quasi
+tutti Node stesso — è la forma di un single executable di Node, non un segnale
+che qualcosa sia andato storto — ed è costruito con la versione di Node in
+`.nvmrc`. Per ora Linux x64; macOS e Windows richiedono un runner ciascuno, da
+aggiungere quando qualcuno lo chiede e non prima.
+
+I cataloghi delle notifiche viaggiano dentro il binario come asset SEA, quindi
+non serve nient'altro accanto: il file di configurazione e un posto dove tenere
+lo stato.
+
+### 4.6 Unraid e Home Assistant
 
 Distribuzione più che funzionalità (roadmap 6.6): entrambe raggiungono un
 pubblico che fa girare esattamente questo tipo di container, e nessuna delle due

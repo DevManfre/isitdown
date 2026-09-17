@@ -37,6 +37,9 @@ const VIEWS = [
   { name: "history", hash: "#/history" },
   { name: "delivery-log", hash: "#/delivery-log" },
   { name: "settings", hash: "#/settings" },
+  // Roadmap 5.8. Outside the app shell, so it is the one frame with no rail and
+  // no header in it — which is exactly the property worth a baseline.
+  { name: "wallboard", hash: "#/wallboard" },
 ];
 
 const THEMES = ["light", "dark"];

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { AlertTriangleIcon, ArrowDownIcon, ArrowUpIcon, Trash2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -9,8 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { cn } from "@/lib/utils.ts";
 import type { DescribedChannel, QuietHoursPolicy, RoutingResponse, RoutingRule } from "@/lib/types.ts";
 // `explain` is core's own evaluator, imported rather than copied: a dry run
 // computed from a second copy of the matching logic could disagree with what
@@ -30,7 +31,7 @@ import type { StatusChange, StatusChangeKind } from "../../../core/types.ts";
 
 /**
  * Which earlier rule, if any, makes this one unreachable: one above it that
- * matches everything it would. First-match-wins is invisible in a plain table,
+ * matches everything it would. First-match-wins is invisible in a plain list,
  * and a rule that can never fire is exactly the kind of silent routing change
  * this panel exists to prevent.
  *
@@ -128,6 +129,32 @@ function asComponentChange(
   return { ...change, kind: "component_status_change" as StatusChangeKind, component };
 }
 
+/**
+ * One labelled line inside a rule card: the label in the same narrow column on
+ * every line, the control taking the rest of the width. A card whose labels do
+ * not line up reads as four unrelated controls rather than one rule.
+ */
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-3">
+      <span className="shrink-0 pt-1.5 text-xs font-medium text-muted-foreground sm:w-24 sm:text-right">
+        {label}
+      </span>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
+    </div>
+  );
+}
+
+/** A rule's own warning: why it can never fire, said in the card rather than on hover. */
+function RuleWarning({ children }: { children: ReactNode }) {
+  return (
+    <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
+      <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      <span>{children}</span>
+    </p>
+  );
+}
+
 function DryRun({
   rules,
   channels,
@@ -184,6 +211,8 @@ function DryRun({
   const enabledSet = new Set(enabledChannelIds);
   const delivered = result.targets.filter((id) => enabledSet.has(id));
   let verdict: string;
+  /** Whether the verdict is a delivery or one of the three ways nothing is sent. */
+  let delivers = false;
   if (result.quieted) {
     // Checked first: a rule did win, so every other branch below would report
     // a delivery that quiet hours have already taken away.
@@ -196,25 +225,25 @@ function DryRun({
     verdict = t("routing.dryrun.nobody");
   } else {
     verdict = delivered.map((id) => t(`channel.name.${id}`)).join(" · ");
+    delivers = true;
   }
 
+  /** The picker rows are one control each: same chip size, same gap, same label column. */
+  const chip = (selected: boolean) => ({ size: "xs" as const, variant: selected ? ("default" as const) : ("outline" as const) });
+
   return (
-    <div className="flex flex-col gap-3 rounded-md bg-muted/40 p-3">
-      <span className="text-xs uppercase tracking-widest text-muted-foreground">
+    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
+      <span className="text-xs font-medium tracking-wide text-muted-foreground">
         {t("routing.dryrun.title")}
       </span>
 
       <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
-            {t("routing.dryrun.provider")}
-          </span>
+        <Field label={t("routing.dryrun.provider")}>
           {services.map((service) => (
             <Button
               key={service.id}
               type="button"
-              size="sm"
-              variant={service.id === providerId ? "default" : "outline"}
+              {...chip(service.id === providerId)}
               onClick={() => {
                 setProviderId(service.id);
                 // The component belonged to the provider that was picked before.
@@ -224,54 +253,41 @@ function DryRun({
               {service.name}
             </Button>
           ))}
-        </div>
+        </Field>
         {/* Only for a provider with components selected: a rule can name one
             (roadmap 2.9), so the preview has to be able to ask about one. */}
         {components.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
-              {t("routing.dryrun.component")}
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant={component === undefined ? "default" : "outline"}
-              onClick={() => setComponentId(undefined)}
-            >
+          <Field label={t("routing.dryrun.component")}>
+            <Button type="button" {...chip(component === undefined)} onClick={() => setComponentId(undefined)}>
               {t("routing.dryrun.component.whole")}
             </Button>
             {components.map((candidate) => (
               <Button
                 key={candidate.id}
                 type="button"
-                size="sm"
-                variant={candidate.id === componentId ? "default" : "outline"}
+                {...chip(candidate.id === componentId)}
                 onClick={() => setComponentId(candidate.id)}
               >
                 {candidate.name}
               </Button>
             ))}
-          </div>
+          </Field>
         )}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
-            {t("routing.dryrun.event")}
-          </span>
+        <Field label={t("routing.dryrun.event")}>
           {DRYRUN_EVENTS.map((candidate) => (
             <Button
               key={candidate.id}
               type="button"
-              size="sm"
-              variant={candidate.id === eventId ? "default" : "outline"}
+              {...chip(candidate.id === eventId)}
               onClick={() => setEventId(candidate.id)}
             >
               {t(`routing.dryrun.event.${candidate.id}`)}
             </Button>
           ))}
-        </div>
+        </Field>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-0.5 border-t pt-2">
         {rules.map((_, index) => {
           const outcome = result.outcomes[index];
           if (outcome === undefined) return null;
@@ -282,11 +298,11 @@ function DryRun({
                 ? t("routing.dryrun.unreached")
                 : t(`routing.dryrun.skipped.${outcome.because}`);
           return (
-            <div key={index} className="flex gap-2 text-sm">
-              <span className="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
+            <div key={index} className="flex gap-3 text-xs">
+              <span className="w-16 shrink-0 text-right font-medium text-muted-foreground">
                 {t("routing.dryrun.rule", { rule: index + 1 })}
               </span>
-              <span className={outcome.kind === "won" ? "text-foreground" : "text-muted-foreground"}>
+              <span className={outcome.kind === "won" ? "font-medium text-foreground" : "text-muted-foreground"}>
                 {text}
               </span>
             </div>
@@ -294,11 +310,14 @@ function DryRun({
         })}
       </div>
 
-      <div className="flex gap-2 text-sm">
-        <span className="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
+      <div className="flex gap-3 border-t pt-2 text-sm">
+        <span className="w-16 shrink-0 pt-0.5 text-right text-xs font-medium text-muted-foreground">
           {t("routing.dryrun.result")}
         </span>
-        <span data-testid="routing-dryrun-verdict" className="font-medium">
+        <span
+          data-testid="routing-dryrun-verdict"
+          className={cn("font-medium", delivers ? "text-foreground" : "text-muted-foreground")}
+        >
           {verdict}
         </span>
       </div>
@@ -306,7 +325,7 @@ function DryRun({
       {/* Said once, not per event: with a window configured, every verdict here
           is a verdict about this hour, whichever way it came out. */}
       {quietHours?.enabled === true && (
-        <span className="text-[10px] text-muted-foreground">{t("routing.dryrun.quiet-note")}</span>
+        <span className="text-xs text-muted-foreground">{t("routing.dryrun.quiet-note")}</span>
       )}
     </div>
   );
@@ -356,7 +375,7 @@ export function RoutingRules({
   };
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-4">
       <p className="text-sm text-muted-foreground">{t("routing.note")}</p>
 
       {routing.invalidRules > 0 && (
@@ -366,208 +385,199 @@ export function RoutingRules({
       )}
 
       {rules.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("routing.empty")}</p>
+        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+          {t("routing.empty")}
+        </p>
       ) : (
-        // A dedicated scroll container, not just BentoTile's own width: on a
-        // narrow viewport the row (five columns, a four-item toggle-group, a
-        // channel multi-select, three action buttons) is wider than any tile
-        // can be, so this is what turns "clipped with no way to reach it"
-        // into "scrolls within its own box" instead. `min-w-0` alongside it
-        // matters as much as the `overflow-x-auto` itself: without it, this
-        // flex/grid ancestry refuses to shrink below the table's natural
-        // width and the grid track blows out past the viewport instead of
-        // this container ever getting the chance to scroll.
-        <div data-testid="routing-table-scroll" className="min-w-0 overflow-x-auto">
-          {/* shadcn's Table defaults to w-full, which happily shrinks the
-              table down to fit whatever width this wrapper offers instead
-              of ever overflowing it — silently squeezing/clipping columns
-              rather than letting overflow-x-auto do its job. min-w-max pins
-              the table to its content's natural width so a narrow ancestor
-              triggers a real horizontal scrollbar instead. */}
-          <Table className="min-w-max">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">{t("routing.column.order")}</TableHead>
-                <TableHead className="w-28">{t("routing.column.provider")}</TableHead>
-                <TableHead>{t("routing.column.classes")}</TableHead>
-                <TableHead className="w-40">{t("routing.column.severity")}</TableHead>
-                <TableHead className="w-56">{t("routing.column.channels")}</TableHead>
-                <TableHead className="w-28" />
-              </TableRow>
-            </TableHeader>
-          <TableBody>
-            {rules.map((rule, index) => {
-              const shadow = shadowedBy(rules, index);
-              const deadNoClasses = hasNoClasses(rule);
-              return (
-                <TableRow key={index} className={shadow === undefined && !deadNoClasses ? undefined : "opacity-60"}>
-                  {/* Rendered, not merely visual: the operator has to be able to
-                      say "rule 2" when reasoning about what shadows what. */}
-                  <TableCell>{index + 1}</TableCell>
+        // A card per rule, not a table. The five columns a rule needs (order,
+        // provider, four event toggles, a severity floor, a channel
+        // multi-select and three actions) are wider than any dialog can be, so
+        // the table spent its life in a horizontal scroll box with the
+        // channels column parked off-screen — the single most consequential
+        // column of the panel, invisible until you thought to scroll sideways.
+        // Stacked cards wrap instead of scrolling, and the fields read top to
+        // bottom in the order the evaluator reads them.
+        <ul data-testid="routing-rules" className="flex flex-col gap-3">
+          {rules.map((rule, index) => {
+            const shadow = shadowedBy(rules, index);
+            const deadNoClasses = hasNoClasses(rule);
+            const dead = shadow !== undefined || deadNoClasses;
+            return (
+              <li
+                key={index}
+                data-testid="routing-rule"
+                className={cn(
+                  "flex flex-col gap-3 rounded-lg border bg-card p-3",
+                  // Dead rules stay legible — they are the ones most in need
+                  // of editing — but read as set aside: dashed, not faded to
+                  // the point of being hard to fix.
+                  dead && "border-dashed bg-muted/20",
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  {/* Rendered, not merely visual: the operator has to be able
+                      to say "rule 2" when reasoning about what shadows what. */}
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium tabular-nums">
+                    {index + 1}
+                  </span>
 
-                  <TableCell>
-                    <Select
-                      value={rule.provider}
-                      disabled={saving}
-                      onValueChange={(provider) => patch(index, { provider })}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="*">{t("routing.provider.any")}</SelectItem>
-                        {/* Groups above the providers (roadmap 2.6): a rule
-                            that had to name four ids to cover one stack went
-                            stale the moment the stack gained a fifth. */}
-                        {groupsOf(services).map((group) => (
-                          <SelectItem key={group} value={`${GROUP_PREFIX}${group}`}>
-                            {t("routing.provider.group", { group })}
-                          </SelectItem>
-                        ))}
-                        {services.flatMap((service) => [
-                          <SelectItem key={service.id} value={service.id}>
-                            {service.name}
-                          </SelectItem>,
-                          // One component of one provider (roadmap 2.9): the
-                          // transition already carries the component's own
-                          // severity, and this is how a rule says which one it
-                          // wants. Only selected components are offered — those
-                          // are the only ones a reading ever reports.
-                          ...(service.components ?? []).map((component) => (
-                            <SelectItem
-                              key={`${service.id}${COMPONENT_SEPARATOR}${component.id}`}
-                              value={`${service.id}${COMPONENT_SEPARATOR}${component.id}`}
-                            >
-                              {t("routing.provider.component", {
-                                service: service.name,
-                                component: component.name,
-                              })}
-                            </SelectItem>
-                          )),
-                        ])}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-
-                  <TableCell className="max-w-64 whitespace-normal">
-                    {/* Same reasoning as the channels column below: four
-                        event-class buttons read better wrapped over two
-                        lines than forcing this column (and the whole row)
-                        to the width of one unbroken line. */}
-                    <ToggleGroup
-                      type="multiple"
-                      value={rule.classes}
-                      onValueChange={(classes: string[]) => patch(index, { classes: classes as EventClass[] })}
-                      className="flex-wrap"
-                      disabled={saving}
-                    >
-                      {EVENT_CLASSES.map((eventClass) => (
-                        <ToggleGroupItem key={eventClass} value={eventClass}>
-                          {t(`routing.class.${eventClass}`)}
-                        </ToggleGroupItem>
+                  <Select
+                    value={rule.provider}
+                    disabled={saving}
+                    onValueChange={(provider) => patch(index, { provider })}
+                  >
+                    {/* The card's one unlabelled control: the field rows below
+                        carry their label, the provider sits in the header next
+                        to the rule number, so its name is said to a screen
+                        reader instead. */}
+                    <SelectTrigger aria-label={t("routing.column.provider")} className="h-8 w-full max-w-72 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="*">{t("routing.provider.any")}</SelectItem>
+                      {/* Groups above the providers (roadmap 2.6): a rule
+                          that had to name four ids to cover one stack went
+                          stale the moment the stack gained a fifth. */}
+                      {groupsOf(services).map((group) => (
+                        <SelectItem key={group} value={`${GROUP_PREFIX}${group}`}>
+                          {t("routing.provider.group", { group })}
+                        </SelectItem>
                       ))}
-                    </ToggleGroup>
-                  </TableCell>
-
-                  <TableCell>
-                    <Select
-                      value={rule.minSeverity}
-                      disabled={saving}
-                      onValueChange={(minSeverity) =>
-                        patch(index, { minSeverity: minSeverity as SeverityFloor })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SEVERITY_FLOORS.map((floor) => (
-                          <SelectItem key={floor} value={floor}>
-                            {t(`routing.severity.${floor}`)}
+                      {services.flatMap((service) => [
+                        <SelectItem key={service.id} value={service.id}>
+                          {service.name}
+                        </SelectItem>,
+                        // One component of one provider (roadmap 2.9): the
+                        // transition already carries the component's own
+                        // severity, and this is how a rule says which one it
+                        // wants. Only selected components are offered — those
+                        // are the only ones a reading ever reports.
+                        ...(service.components ?? []).map((component) => (
+                          <SelectItem
+                            key={`${service.id}${COMPONENT_SEPARATOR}${component.id}`}
+                            value={`${service.id}${COMPONENT_SEPARATOR}${component.id}`}
+                          >
+                            {t("routing.provider.component", {
+                              service: service.name,
+                              component: component.name,
+                            })}
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
+                        )),
+                      ])}
+                    </SelectContent>
+                  </Select>
 
-                  <TableCell className="max-w-56 whitespace-normal">
-                    {/* flex-wrap, not a wider column: five-plus channel
-                        buttons plus the wildcard read better stacked over two
-                        or three short lines than forcing this column (and so
-                        the whole row) wider than the tile can ever be. */}
-                    <ToggleGroup
-                      type="multiple"
-                      value={rule.channels}
-                      onValueChange={(next: string[]) => patch(index, { channels: next })}
-                      className="flex-wrap"
-                      disabled={saving}
+                  <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t("routing.move-up")}
+                      disabled={saving || index === 0}
+                      onClick={() => move(index, -1)}
                     >
-                      {/* The wildcard is an option rather than a computed state:
-                          a rule that says "every channel" must keep meaning that
-                          after a new channel ships. */}
-                      <ToggleGroupItem value="*">{t("routing.channels.all")}</ToggleGroupItem>
-                      {channels.map((channel) => (
-                        <ToggleGroupItem key={channel.id} value={channel.id}>
-                          {t(`channel.name.${channel.id}`)}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
-                    {rule.channels.length === 0 && (
-                      <Badge variant="secondary">{t("routing.channels.none")}</Badge>
-                    )}
-                  </TableCell>
+                      <ArrowUpIcon />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t("routing.move-down")}
+                      disabled={saving || index === rules.length - 1}
+                      onClick={() => move(index, 1)}
+                    >
+                      <ArrowDownIcon />
+                    </Button>
+                    {/* Icon only, and the one destructive control in the card:
+                        a full-width "Remove" button next to two arrows made
+                        deleting a rule the loudest thing in the row. */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      aria-label={t("action.remove")}
+                      disabled={saving}
+                      onClick={() => save(rules.filter((_, at) => at !== index))}
+                    >
+                      <Trash2Icon />
+                    </Button>
+                  </div>
+                </div>
 
-                  <TableCell>
-                    <div className="flex items-center gap-0.5">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon-sm"
-                        aria-label={t("routing.move-up")}
-                        disabled={saving || index === 0}
-                        onClick={() => move(index, -1)}
-                      >
-                        ↑
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon-sm"
-                        aria-label={t("routing.move-down")}
-                        disabled={saving || index === rules.length - 1}
-                        onClick={() => move(index, 1)}
-                      >
-                        ↓
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        aria-label={t("action.remove")}
-                        disabled={saving}
-                        onClick={() => save(rules.filter((_, at) => at !== index))}
-                      >
-                        {t("action.remove")}
-                      </Button>
-                    </div>
-                    {/* Said in the row, not in a tooltip: a rule that can never
-                        fire is the panel's most important warning, and a hover
-                        target hides it from anyone who never hovers. */}
-                    {shadow !== undefined && (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {t("routing.shadowed", { rule: shadow + 1 })}
-                      </p>
-                    )}
-                    {deadNoClasses && (
-                      <p className="mt-1 text-sm text-muted-foreground">{t("routing.no-classes")}</p>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-          </Table>
-        </div>
+                <Field label={t("routing.column.classes")}>
+                  <ToggleGroup
+                    type="multiple"
+                    value={rule.classes}
+                    onValueChange={(classes: string[]) => patch(index, { classes: classes as EventClass[] })}
+                    className="flex-wrap"
+                    disabled={saving}
+                  >
+                    {EVENT_CLASSES.map((eventClass) => (
+                      <ToggleGroupItem key={eventClass} value={eventClass} className="h-7 text-xs">
+                        {t(`routing.class.${eventClass}`)}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                </Field>
+
+                <Field label={t("routing.column.severity")}>
+                  <Select
+                    value={rule.minSeverity}
+                    disabled={saving}
+                    onValueChange={(minSeverity) =>
+                      patch(index, { minSeverity: minSeverity as SeverityFloor })
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-48 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SEVERITY_FLOORS.map((floor) => (
+                        <SelectItem key={floor} value={floor}>
+                          {t(`routing.severity.${floor}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field label={t("routing.column.channels")}>
+                  <ToggleGroup
+                    type="multiple"
+                    value={rule.channels}
+                    onValueChange={(next: string[]) => patch(index, { channels: next })}
+                    className="flex-wrap"
+                    disabled={saving}
+                  >
+                    {/* The wildcard is an option rather than a computed state:
+                        a rule that says "every channel" must keep meaning that
+                        after a new channel ships. */}
+                    <ToggleGroupItem value="*" className="h-7 text-xs">
+                      {t("routing.channels.all")}
+                    </ToggleGroupItem>
+                    {channels.map((channel) => (
+                      <ToggleGroupItem key={channel.id} value={channel.id} className="h-7 text-xs">
+                        {t(`channel.name.${channel.id}`)}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                  {rule.channels.length === 0 && (
+                    <Badge variant="secondary">{t("routing.channels.none")}</Badge>
+                  )}
+                </Field>
+
+                {/* Said in the card, not in a tooltip: a rule that can never
+                    fire is the panel's most important warning, and a hover
+                    target hides it from anyone who never hovers. */}
+                {shadow !== undefined && (
+                  <RuleWarning>{t("routing.shadowed", { rule: shadow + 1 })}</RuleWarning>
+                )}
+                {deadNoClasses && <RuleWarning>{t("routing.no-classes")}</RuleWarning>}
+              </li>
+            );
+          })}
+        </ul>
       )}
 
       <div>

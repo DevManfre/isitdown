@@ -5,6 +5,7 @@ import type { MessageRefStore } from "./messageRefStore.interface.ts";
 import type { Notifier } from "./notifier.interface.ts";
 import { clearsFloor, explain, severityOf, type RoutingRule } from "./routing.ts";
 import type { NotificationPayload, StatusChange, StatusChangeKind } from "./types.ts";
+import { tracer } from "./tracing.ts";
 import { renderMessage } from "../notifiers/formatting.ts";
 
 export interface SentRecord {
@@ -53,6 +54,24 @@ export interface DispatchContext {
    * off", which is the behaviour it had.
    */
   delivery?: DeliveryConfig | undefined;
+  /**
+   * What each channel asked for about the *wording* of its messages, keyed by
+   * channel id: the locale it reads in (roadmap 3.20) and the template it
+   * renders with (roadmap 3.15).
+   *
+   * Separate from `notifiers` because a notifier is a transport and this is
+   * not: the same Telegram notifier posts an Italian message and an English one
+   * depending on nothing but which channel row it was built from. Optional and
+   * defaulted to the context locale, so a caller from before it existed behaves
+   * exactly as it did.
+   */
+  channelMessages?: Record<string, ChannelMessageOptions> | undefined;
+}
+
+/** One channel's answer to "in what words?" — see `DispatchContext.channelMessages`. */
+export interface ChannelMessageOptions {
+  locale?: string | undefined;
+  template?: string | undefined;
 }
 
 export interface Dispatcher {
@@ -64,7 +83,17 @@ export interface Dispatcher {
    * decides whether a *status change* notifies, and diagnostics cannot drift into
    * a second sending path.
    */
-  sendTest(notifier: Notifier, service: DispatchContext["services"][number], locale: string): Promise<SentRecord>;
+  sendTest(
+    notifier: Notifier,
+    service: DispatchContext["services"][number],
+    locale: string,
+    /**
+     * The channel's own locale and template, when it has them. A test that
+     * ignored them would show the operator a message the channel will never
+     * send, which is the one thing a test must not do.
+     */
+    message?: ChannelMessageOptions | undefined,
+  ): Promise<SentRecord>;
 }
 
 export interface DispatcherDeps {
@@ -223,76 +252,88 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       }
     }
 
-    while (attempts < maxAttempts) {
-      if (attempts > 0) {
-        // Jittered, like the poller's own backoff: a provider-wide incident
-        // notifies every channel at once, and a fleet of instances retrying in
-        // lockstep is how a rate limit becomes permanent.
-        await sleep(RETRY_BASE_MS * 2 ** (attempts - 1) + Math.random() * RETRY_JITTER_MS);
-      }
-      attempts += 1;
-      try {
-        const ref = await notifier.send(payload);
-        // A channel that names its messages, an incident to attach it to, and
-        // somewhere to keep it: remember it so the next update edits this one.
-        // Not for the message that closes an incident — there is nothing left
-        // to edit — which is also what keeps the table from growing a row per
-        // incident forever.
-        if (
-          typeof ref === "string" &&
-          ref !== "" &&
-          link !== undefined &&
-          !link.final &&
-          messageRefs !== undefined
-        ) {
-          await messageRefs.saveRef(notifier.id, providerId, link.incidentId, ref);
+    // One span per message per channel — roadmap 6.10. Around the retry loop
+    // rather than inside it: the question a trace answers is "how long did
+    // telling somebody take", and three attempts with backoff between them are
+    // one answer to that, not three.
+    return tracer().span(
+      "notification.send",
+      { "isitdown.channel": notifier.id, "isitdown.provider": providerId, "isitdown.kind": kind },
+      () => attemptDelivery(),
+    );
+
+    async function attemptDelivery(): Promise<SentRecord> {
+      while (attempts < maxAttempts) {
+        if (attempts > 0) {
+          // Jittered, like the poller's own backoff: a provider-wide incident
+          // notifies every channel at once, and a fleet of instances retrying in
+          // lockstep is how a rate limit becomes permanent.
+          await sleep(RETRY_BASE_MS * 2 ** (attempts - 1) + Math.random() * RETRY_JITTER_MS);
         }
-        failure = undefined;
-        break;
-      } catch (error) {
-        failure = error instanceof Error ? error.message : String(error);
-        // Warn, not error: an attempt that has a retry behind it is not yet a
-        // lost notification. The dead letter below is the one worth an error.
-        logger.warn("notification attempt failed", {
+        attempts += 1;
+        try {
+          const ref = await notifier.send(payload);
+          // A channel that names its messages, an incident to attach it to, and
+          // somewhere to keep it: remember it so the next update edits this one.
+          // Not for the message that closes an incident — there is nothing left
+          // to edit — which is also what keeps the table from growing a row per
+          // incident forever.
+          if (
+            typeof ref === "string" &&
+            ref !== "" &&
+            link !== undefined &&
+            !link.final &&
+            messageRefs !== undefined
+          ) {
+            await messageRefs.saveRef(notifier.id, providerId, link.incidentId, ref);
+          }
+          failure = undefined;
+          break;
+        } catch (error) {
+          failure = error instanceof Error ? error.message : String(error);
+          // Warn, not error: an attempt that has a retry behind it is not yet a
+          // lost notification. The dead letter below is the one worth an error.
+          logger.warn("notification attempt failed", {
+            channel: notifier.id,
+            providerId,
+            kind,
+            attempt: attempts,
+            error: failure,
+          });
+        }
+      }
+
+      const record: SentRecord = {
+        providerId,
+        channel: notifier.id,
+        kind,
+        text,
+        // Stamped now rather than before the first attempt: this is when the
+        // message reached the channel, or when it was given up on.
+        sentAt: new Date().toISOString(),
+        ok: failure === undefined,
+        attempts,
+        ...(failure === undefined ? {} : { error: failure }),
+      };
+
+      if (record.ok) {
+        logger.info("notification sent", { channel: notifier.id, providerId, kind, attempts });
+      } else {
+        // The dead letter: every attempt spent, the message gone. The delivery
+        // log is the other half of this — a line in a log nobody tails is not a
+        // channel an operator notices has stopped working.
+        logger.error("notification failed permanently", {
           channel: notifier.id,
           providerId,
           kind,
-          attempt: attempts,
-          error: failure,
+          attempts,
+          error: record.error,
         });
       }
+
+      await audit(record);
+      return record;
     }
-
-    const record: SentRecord = {
-      providerId,
-      channel: notifier.id,
-      kind,
-      text,
-      // Stamped now rather than before the first attempt: this is when the
-      // message reached the channel, or when it was given up on.
-      sentAt: new Date().toISOString(),
-      ok: failure === undefined,
-      attempts,
-      ...(failure === undefined ? {} : { error: failure }),
-    };
-
-    if (record.ok) {
-      logger.info("notification sent", { channel: notifier.id, providerId, kind, attempts });
-    } else {
-      // The dead letter: every attempt spent, the message gone. The delivery
-      // log is the other half of this — a line in a log nobody tails is not a
-      // channel an operator notices has stopped working.
-      logger.error("notification failed permanently", {
-        channel: notifier.id,
-        providerId,
-        kind,
-        attempts,
-        error: record.error,
-      });
-    }
-
-    await audit(record);
-    return record;
   }
 
   /**
@@ -404,12 +445,24 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         continue;
       }
 
+      // The batch is per channel, so its language is that channel's (roadmap
+      // 3.20) — stamped on every member as well as on the payload, because the
+      // digest renders one line per item out of each item's own locale. The
+      // items were collected before anyone knew which channel would take them.
+      const locale = ctx.channelMessages?.[channelId]?.locale ?? ctx.locale;
       const payload: NotificationPayload = {
         ...worst,
+        locale,
+        // Deliberately not templated: a template describes one change and this
+        // is a batch of them. See `src/notifiers/template.ts`.
+        template: undefined,
         // The most severe member stands in as "the change" so a channel that
         // colours or badges by severity still has one to read; `items` is what
         // the message is actually made of.
-        digest: { items: batch.items, windowMinutes: delivery.digest.windowMinutes },
+        digest: {
+          items: batch.items.map((item) => ({ ...item, locale })),
+          windowMinutes: delivery.digest.windowMinutes,
+        },
         suppressedCount: takeSuppressed(worst.change.providerId),
       };
       countSend(worst.change.providerId, at);
@@ -420,7 +473,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
   }
 
   return {
-    async sendTest(notifier, service, locale): Promise<SentRecord> {
+    async sendTest(notifier, service, locale, message): Promise<SentRecord> {
       const payload: NotificationPayload = {
         change: {
           kind: "monitoring_degraded",
@@ -430,7 +483,8 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           at: new Date().toISOString(),
         },
         service: { id: service.id, name: service.name, statusUrl: service.baseUrl },
-        locale,
+        locale: message?.locale ?? locale,
+        ...(message?.template === undefined ? {} : { template: message.template }),
       };
       // One attempt: the operator is waiting on this answer (see `deliver`).
       return deliver(notifier, payload, renderMessage(payload), 1);
@@ -551,7 +605,18 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
             suppressed = takeSuppressed(change.providerId);
             counted = true;
           }
-          const payload: NotificationPayload = { ...base, suppressedCount: suppressed ?? 0 };
+          // The two things the channel itself decides about the message: what
+          // language it is written in (roadmap 3.20) and how it is laid out
+          // (roadmap 3.15). Applied here rather than when `base` was built,
+          // because one change routed to three channels can legitimately be
+          // three different messages.
+          const message = ctx.channelMessages?.[channelId];
+          const payload: NotificationPayload = {
+            ...base,
+            locale: message?.locale ?? base.locale,
+            ...(message?.template === undefined ? {} : { template: message.template }),
+            suppressedCount: suppressed ?? 0,
+          };
           attempts.push(deliver(notifier, payload, renderMessage(payload), MAX_ATTEMPTS, linkOf(change, delivery)));
         }
       }

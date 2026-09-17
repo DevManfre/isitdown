@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { CommandPalette } from "@/components/CommandPalette.tsx";
 import { Rail } from "@/components/Rail.tsx";
 import { Header } from "@/components/Header.tsx";
+import { MobileNav } from "@/components/MobileNav.tsx";
 import { ViewFrame } from "@/components/ViewFrame.tsx";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
@@ -77,6 +78,12 @@ export function App() {
           shortcut has to answer on every screen, and a palette mounted inside
           a view would take its own key listener away with it on navigation. */}
       <CommandPalette />
+      {/* Roadmap 7.6. The rail is `hidden md:block` inside the primitive, so
+          below 768px the console had no navigation at all: this is what stands
+          in for it — a tab bar and one sheet, both `md:hidden`. A sibling of
+          the rail for the same reason the palette is: it has to answer on
+          every screen. */}
+      <MobileNav />
       {/* `SidebarInset` is the page's one <main>, so the animated view below is
           a div. Its stock `bg-background` is dropped: the body carries
           --gradient-page, and an opaque fill here would paint over it. */}

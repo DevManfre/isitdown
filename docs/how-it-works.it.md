@@ -35,7 +35,7 @@
    dallo stesso StateStore, e può chiedere allo scheduler un ciclo immediato.
 ```
 
-Il motore è indipendente dall'edizione. `src/core`, `src/adapters` e `src/notifiers`
+Il core è indipendente dall'edizione. `src/core`, `src/adapters` e `src/notifiers`
 non importano mai da `src/light` o `src/ui` — un test lo impone. Le edizioni
 differiscono solo per il `ConfigSource` e lo `StateStore` che iniettano.
 
@@ -43,7 +43,7 @@ differiscono solo per il `ConfigSource` e lo `StateStore` che iniettano.
 
 1. **Scheduler** — esegue subito un ciclo, poi riarma un `setTimeout` all'intervallo
    ±10% di jitter, così un ciclo lento ritarda il successivo invece di sovrapporsi e
-   una flotta di istanze non colpisce mai un provider all'unisono. Rilegge la
+   più istanze non colpiscono mai un provider all'unisono. Rilegge la
    configurazione a ogni ciclo: è questo che fa avere effetto alle modifiche dalla UI
    senza restart. Un ciclo che solleva un errore viene loggato e il loop continua.
    Il tick segue la cadenza più corta che qualcuno abbia chiesto: prende
@@ -59,7 +59,7 @@ differiscono solo per il `ConfigSource` e lo `StateStore` che iniettano.
    interrogato quando la sua cadenza è trascorsa — il suo `intervalMinutes`, quella
    globale se non ne nomina una, oppure `adaptiveIntervalMinutes` mentre ha un
    incidente aperto — così un tick portato a un minuto da un provider in difficoltà
-   non si trascina dietro tutta la flotta.
+   non si trascina dietro tutto il parco provider.
 
 3. **Adapter** — trasformano la risposta grezza di un provider nella forma
    normalizzata:
@@ -132,6 +132,10 @@ casi limite si aggiungono come righe invece che come test isolati.
 | un silenziamento in corso (`mutedUntil` nel futuro) | qualunque cosa | **no** — l'operatore ha detto che già lo sa; polling e registrazione continuano |
 | `confirmSamples: N` | un cambio visto in meno di N poll consecutivi | **non ancora** — la baseline resta ferma, quindi lo stesso cambio viene annunciato quando N poll concordano |
 | `confirmSamples: N` | un cambio che rientra prima che N poll concordino | **mai** — una pagina che si contraddice non era una notizia |
+| `correlationThreshold: N` | N provider peggiorano entro `correlationWindowMinutes` | sì, **una volta** — `correlated_outage` sostituisce gli avvisi individuali di questo ciclo |
+| `correlationThreshold: N` | gli stessi provider sono ancora giù al ciclo dopo | **no** — il guasto condiviso è già stato annunciato |
+| una sonda con `crossChecks` fallisce | la status page del provider dice ancora operativo, nessun incidente aperto | sì, **una volta** — `silent_outage`, e non di nuovo finché i due non concordano |
+| una sonda con `crossChecks` fallisce | la status page dice già degradato, o ha un incidente aperto | **no** — la pagina non sta nascondendo nulla |
 
 Il **silenziamento** è la stessa regola con l'operatore al posto del provider: è
 un input del diff engine, non un filtro in uscita, ed è per questo che un
@@ -147,12 +151,51 @@ per il numero di poll configurato. Un disservizio reale costa quindi al massimo
 `confirmSamples - 1` poll di ritardo, e una discordanza di un ciclo non costa
 nulla.
 
+Il **controllo incrociato dei guasti silenziosi** (`crossChecks`, roadmap 1.10)
+è l'unica cosa qui che non sta in nessuna status page: sorveglia l'*onestà*
+della pagina. Un provider che è giù e lo dice è già un `status_change`; un
+provider che è giù e non dice nulla è il disservizio di cui un operatore viene
+a sapere prima dai propri utenti, e una sonda puntata sullo stesso servizio
+(`adapter: http`, `tcp` o `dns`) è la prova che lo trasforma in un avviso.
+
+È volutamente stretto, perché il modo in cui può sbagliare è un'accusa falsa.
+La sonda deve avere una lettura — `unknown` non lo è — e deve essere peggiore
+di operativo; la pagina deve dire operativo *e* non avere incidenti aperti,
+così un provider a metà strada dall'ammettere un disservizio non viene mai
+chiamato bugiardo. Il controllo viene saltato del tutto in un ciclo che sembra
+già un guasto della nostra rete, perché un container che non raggiunge nulla
+non deve passare quel disservizio ad accusare le status page. L'avviso della
+sonda resta accanto: questo cambio aggiunge la frase che la sonda non può dire,
+cioè che la pagina non si è ancora aggiornata.
+
+Il **rilevamento dei guasti correlati** (`correlationThreshold`, roadmap 2.7) è
+l'unica regola che *sostituisce* avvisi invece di ritardarli, ed è per questo
+che resta spenta finché un operatore non la chiede. Tre provider che peggiorano
+entro dieci minuti è l'aspetto che un guasto condiviso a monte ha da qui, e tre
+messaggi separati sono il modo meno utile di venirlo a sapere — quindi il ciclo
+manda un unico cambio che li nomina tutti, attribuito al provider messo peggio
+così che routing, log delle consegne e dashboard abbiano comunque un soggetto
+reale.
+
+La finestra attraversa i cicli invece di stare dentro a uno solo: i provider
+sono sfalsati e hanno cadenze proprie, quindi tre pagine raramente peggiorano
+nello stesso ciclo. Contano solo i peggioramenti — una transizione verso
+qualcosa di peggio di prima — quindi un provider già giù che resta giù non è
+prova di nulla di nuovo, e una pagina che non siamo riusciti a leggere non è
+una pagina che ha segnalato problemi. La soppressione è volutamente piccola:
+gli avvisi dei membri *del ciclo che ha superato la soglia* vengono ripiegati
+nell'unico cambio, gli avvisi già usciti restano, e un quarto provider che si
+aggiunge dopo riceve il suo avviso, perché è una notizia che il messaggio di
+guasto condiviso non portava. La finestra vive in memoria, quindi un riavvio
+costa al massimo un avviso ripiegato — nella direzione di dire troppo piuttosto
+che troppo poco.
+
 Tutto ciò che sta nella tabella sopra è il diff engine che decide cosa è
 *notizia*. Cosa succede a un cambiamento dopo di quello è affare della politica
 di consegna — ore di silenzio, finestra di riepilogo, limite orario, un
 messaggio per incidente — ed è
 [3.8](configuration.it.md#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti). L'ordine è
-voluto e mai il contrario: il motore risponde a "è cambiato qualcosa", le regole
+voluto e mai il contrario: il diff engine risponde a "è cambiato qualcosa", le regole
 a "chi se ne occupa", la politica a "gli arriva adesso".
 
 **Regola di soppressione**: finché una finestra di manutenzione dichiarata da
@@ -224,7 +267,7 @@ timestamp restano UTC con suffisso esplicito in ogni lingua.
   "è cambiato tutto". Testato in entrambe le edizioni, anche nel container.
 - **Rate limiting** — la richiesta di ogni provider è sfasata di un valore derivato
   dall'hash del suo id, limitato a un decimo della sua cadenza, e l'intervallo stesso
-  porta jitter, così né una singola istanza né una flotta martellano un provider nello
+  porta jitter, così né una singola istanza né un insieme di istanze martellano un provider nello
   stesso secondo; poiché lo sfasamento è ancorato all'id, aggiungere un provider non
   sposta la richiesta di tutti gli altri. Il validatore memorizzato per provider
   trasforma la maggior parte dei cicli in un `304` senza corpo, e a un provider che

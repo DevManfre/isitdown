@@ -54,7 +54,12 @@ export function PollIndicator() {
   return (
     <div className="header-poll flex items-center gap-3 rounded-full border border-border bg-card/60 py-1 pl-3 pr-1">
       <div className="poll-next flex flex-col leading-tight">
-        <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+        {/* The label, and the LIVE chip beside it, are what makes this cluster
+            326px wide — which on a phone is the whole of the header's second
+            line and left the title and the meta line truncated to nothing. The
+            countdown below carries the meaning on its own; the words come back
+            at `lg`, where there is room for them. */}
+        <span className="hidden items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground lg:flex">
           {t("meta.next-poll-label")}
           {/* Says where the freshness comes from: with the stream connected the
               dashboard is told about a cycle, it no longer asks on a timer. */}
@@ -76,9 +81,12 @@ export function PollIndicator() {
           again read identically, and the beam is the difference. It runs only
           while there is a cycle to wait for — with nothing scheduled the track
           stays dark rather than animating over a dead poller. */}
+      {/* Decoration, and the first thing to go when the header is short of
+          room: between 768 and 1024 the rail is back but the page is not yet
+          wide, and the cluster was taking the title's space. */}
       <span
         aria-hidden="true"
-        className="poll-meter h-1.5 w-9 overflow-hidden rounded-full bg-muted"
+        className="poll-meter hidden h-1.5 w-9 overflow-hidden rounded-full bg-muted lg:block"
       >
         {secondsLeft !== null && (
           <span className="poll-meter-beam block h-full w-1/3 rounded-full bg-linear-to-r from-transparent via-primary to-transparent" />

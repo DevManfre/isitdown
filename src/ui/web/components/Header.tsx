@@ -1,9 +1,10 @@
 import { useCallback } from "react";
-import { Monitor, Moon, Search, Sun } from "lucide-react";
+import { Menu, Monitor, Moon, Search, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler.tsx";
 import { PollIndicator } from "./PollIndicator.tsx";
 import { openCommandPalette } from "./CommandPalette.tsx";
+import { openMoreSheet } from "./MobileNav.tsx";
 import { usePreferencesMutation, useStatusChrome } from "@/hooks/queries.ts";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme.tsx";
 import { supportedLocales, switchLocale } from "@/lib/i18n.ts";
@@ -55,28 +56,57 @@ export function Header({ view }: { view: string }) {
   const ThemeIcon = THEME_ICONS[mode];
 
   return (
-    <header className="header flex items-center justify-between gap-4 border-b border-border px-8 py-3">
-      <div className="header-title flex flex-col">
-        <h1 className="text-lg font-medium">{t(TITLE_KEYS[view] ?? "nav.overview")}</h1>
-        <span className="header-meta min-h-4 text-xs text-muted-foreground">
-          {status !== undefined && (
-            <>
-              {lastSeen === null
-                ? t("meta.never-polled")
-                : t("meta.interval", { minutes: status.pollIntervalMinutes })}
-              {lastSeen !== null && ` · ${formatRelative(i18n.language, lastSeen)}`}
-            </>
-          )}
-        </span>
-      </div>
+    /* One grid for both widths, because the desktop header is the same shape
+       as the phone one with the second column merged: title over meta on the
+       left, controls on the right. On a phone the right column splits in two —
+       the two icon buttons above, the poll cluster below — so seven controls
+       stop competing for one 390px line. */
+    <header className="header grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-4 py-2 md:gap-x-4 md:px-8 md:py-3">
+      <h1 className="header-title col-start-1 row-start-1 truncate text-base font-medium md:text-lg">
+        {t(TITLE_KEYS[view] ?? "nav.overview")}
+      </h1>
 
-      <div className="header-actions flex items-center gap-2">
-        {/* ⌘K existed before this button did, and nothing on screen said so.
-            The button is the palette's only visible surface; it carries the
-            shortcut on it so the second use is the keystroke. */}
+      {/* The phone's own pair: search, and everything the desktop header shows
+          inline. Both are 44px targets; the desktop keeps the labelled
+          controls below. */}
+      <div className="header-compact col-start-2 row-start-1 flex items-center justify-end lg:hidden">
         <button
           type="button"
-          className="header-search flex items-center gap-2 rounded-md border border-border bg-card/60 py-1.5 pl-3 pr-2 text-xs text-muted-foreground"
+          className="header-search-compact flex size-11 items-center justify-center rounded-md text-muted-foreground"
+          aria-label={t("palette.open")}
+          onClick={openCommandPalette}
+        >
+          <Search className="size-5" strokeWidth={1.8} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="header-more flex size-11 items-center justify-center rounded-md text-muted-foreground"
+          aria-label={t("nav.more")}
+          onClick={openMoreSheet}
+        >
+          <Menu className="size-5" strokeWidth={1.8} aria-hidden="true" />
+        </button>
+      </div>
+
+      <span className="header-meta col-start-1 row-start-2 min-h-4 truncate text-xs text-muted-foreground">
+        {status !== undefined && (
+          <>
+            {lastSeen === null
+              ? t("meta.never-polled")
+              : t("meta.interval", { minutes: status.pollIntervalMinutes })}
+            {lastSeen !== null && ` · ${formatRelative(i18n.language, lastSeen)}`}
+          </>
+        )}
+      </span>
+
+      <div className="header-actions col-start-2 row-start-2 flex items-center justify-end gap-2 md:row-span-2 md:row-start-1">
+        {/* ⌘K existed before this button did, and nothing on screen said so.
+            The button is the palette's only visible surface; it carries the
+            shortcut on it so the second use is the keystroke. Hidden on a
+            phone, where the icon button above says the same thing in 44px. */}
+        <button
+          type="button"
+          className="header-search hidden items-center gap-2 rounded-md border border-border bg-card/60 py-1.5 pl-3 pr-2 text-xs text-muted-foreground lg:flex"
           onClick={openCommandPalette}
         >
           <Search className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
@@ -84,7 +114,7 @@ export function Header({ view }: { view: string }) {
           <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">⌘K</kbd>
         </button>
 
-        <div className="lang-switch flex gap-1 rounded-md bg-muted/60 p-0.5">
+        <div className="lang-switch hidden gap-1 rounded-md bg-muted/60 p-0.5 lg:flex">
           {supportedLocales.map((lang) => (
             <button
               key={lang}
@@ -111,7 +141,7 @@ export function Header({ view }: { view: string }) {
             once. Browsers without View Transitions, and operators who asked
             for reduced motion, get the plain swap. */}
         <AnimatedThemeToggler
-          className="theme-btn rounded-md border border-border bg-card/60 p-1.5 text-primary"
+          className="theme-btn hidden rounded-md border border-border bg-card/60 p-1.5 text-primary lg:inline-flex"
           aria-label={themeTitle}
           title={themeTitle}
           onToggle={onToggleTheme}

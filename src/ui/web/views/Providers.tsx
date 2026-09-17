@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   createColumnHelper,
@@ -28,6 +29,7 @@ import { summaryProviders } from "@/lib/history.ts";
 import { isMuted } from "@/lib/mute.ts";
 import { isReorder, rowShifts } from "@/lib/rowShift.ts";
 import { stagger } from "@/lib/stagger.ts";
+import { ROUTE_PATHS } from "../../routePaths.ts";
 import type { ComponentStatus, HistoryBucket, OverallStatus, ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -262,7 +264,7 @@ function useRowShift() {
 export function Providers() {
   const { t, i18n } = useTranslation();
   const { data: status } = useStatus();
-  const { data: summary } = useHistory(WINDOW_DAYS);
+  const { data: summary } = useHistory({ days: WINDOW_DAYS });
   const [filter, setFilter] = useState<Filter>("all");
 
   // Enabled providers only. A disabled one is not being polled, so every figure
@@ -343,7 +345,16 @@ export function Providers() {
               <StatusDot status={row.original.status} glow={8} />
               <span className="flex flex-col">
                 <span className="flex items-center gap-1.5">
-                  {row.original.name}
+                  {/* The name is the way into the provider's own page (roadmap
+                      5.6). A link rather than a row click: the row already
+                      expands its components, and one gesture cannot mean two
+                      things. */}
+                  <Link
+                    className="underline-offset-4 hover:underline"
+                    to={ROUTE_PATHS.providerDetail.replace(":providerId", row.original.id)}
+                  >
+                    {row.original.name}
+                  </Link>
                   {row.original.maintenanceActive && (
                     <Badge variant="muted">{t("provider.maintenance.badge")}</Badge>
                   )}

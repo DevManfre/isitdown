@@ -195,6 +195,39 @@ describe("History", () => {
     expect(await screen.findByText(i18n.t("history.range-active", { days: 90 }))).toBeInTheDocument();
   });
 
+  it("asks the server for a picked range, by date rather than by span", async () => {
+    renderWithProviders(<History />, fixtures);
+    await screen.findByText(/99[.,]42/);
+
+    await userEvent.click(await screen.findByRole("radio", { name: i18n.t("history.range-custom") }));
+
+    const from = await screen.findByLabelText(i18n.t("history.range-from"));
+    const to = await screen.findByLabelText(i18n.t("history.range-to"));
+    // The picker opens on the window that was already on screen, so the
+    // operator never starts from an empty pair of dates.
+    expect((from as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect((to as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    const requested = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
+    expect(requested.some((url) => url.includes("from=") && url.includes("to="))).toBe(true);
+  });
+
+  it("names the picked range beside the toggle instead of a day count", async () => {
+    renderWithProviders(<History />, fixtures);
+    await screen.findByText(/99[.,]42/);
+
+    await userEvent.click(await screen.findByRole("radio", { name: i18n.t("history.range-custom") }));
+
+    expect(screen.queryByText(i18n.t("history.range-active", { days: 90 }))).not.toBeInTheDocument();
+    const from = (await screen.findByLabelText(i18n.t("history.range-from"))) as HTMLInputElement;
+    const to = (await screen.findByLabelText(i18n.t("history.range-to"))) as HTMLInputElement;
+    expect(
+      await screen.findByText(
+        i18n.t("history.range-custom-active", { from: from.value, to: to.value }),
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("collects the downloads behind one labelled menu, not as raw URLs", async () => {
     renderWithProviders(<History />, fixtures);
 

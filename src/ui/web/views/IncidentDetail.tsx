@@ -123,7 +123,7 @@ export function IncidentDetail() {
           beam runs only while the incident is open — a resolved incident is a
           record, and a record does not need to attract the eye. */}
       <div
-        className="incident-band lit-band relative -mx-8 -mt-2 flex flex-wrap items-start justify-between gap-4 overflow-hidden border-b border-border px-8 pt-4 pb-6"
+        className="incident-band lit-band relative -mx-4 -mt-2 flex flex-wrap items-start justify-between gap-4 overflow-hidden border-b border-border px-4 pt-4 pb-6 md:-mx-8 md:px-8"
         style={{
           backgroundImage:
             incident.resolvedAt === null

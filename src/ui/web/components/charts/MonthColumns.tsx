@@ -55,7 +55,10 @@ export function MonthColumns({
       {/* The baseline sits directly under the bar row, not under the month
           labels below it: it is what makes the bars read as columns standing
           on an axis rather than as blocks floating in the strip. */}
-      <div className="flex items-end gap-6 border-b border-border">
+      {/* A narrower gap below `md`: the columns are `flex-1`, but each one is
+          at least as wide as the figure above it, so six months plus six 24px
+          gaps ran past the right edge of a phone. */}
+      <div className="flex items-end gap-2 border-b border-border md:gap-6">
         <svg width="0" height="0" aria-hidden="true" focusable="false">
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -65,8 +68,8 @@ export function MonthColumns({
           </defs>
         </svg>
         {months.map((month, index) => (
-          <div key={month.month} className="month-col flex flex-1 flex-col items-center gap-1">
-            <span className="anim-fade font-mono text-xs text-muted-foreground">
+          <div key={month.month} className="month-col flex min-w-0 flex-1 flex-col items-center gap-1">
+            <span className="anim-fade font-mono text-[10px] text-muted-foreground md:text-xs">
               {month.uptime === null ? (
                 noDataLabel
               ) : (

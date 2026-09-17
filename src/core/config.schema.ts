@@ -56,6 +56,17 @@ export const serviceDefinitionSchema = z.object({
    * a group that happens to be called something.
    */
   group: slug.optional(),
+  /**
+   * Only on a probe (`http`, `tcp`, `dns`): the provider whose status page this
+   * probe is a second opinion on — silent-outage cross-check (roadmap 1.10).
+   * When the probe cannot reach the service and that provider's page still
+   * reports operational, the disagreement is itself the news.
+   *
+   * On the probe rather than on the provider because the probe is the thing
+   * that knows what it is checking: a page can have several probes pointed at
+   * it, and none of them is the page's own business.
+   */
+  crossChecks: slug.optional(),
   /** Omitted, not defaulted: absent has to stay distinguishable from "same as the global". */
   intervalMinutes: z.number().int().positive().max(1440).optional(),
   options: z.record(z.string()).optional(),
@@ -68,6 +79,18 @@ export const serviceDefinitionSchema = z.object({
   mutedUntil: z.string().datetime().optional(),
   components: componentSelectionSchema.default([]),
   scopeToComponents: z.boolean().default(false),
+  /**
+   * The monthly uptime this provider is supposed to deliver, as a percentage —
+   * `99.9` (roadmap 4.13). Optional rather than defaulted: most providers are
+   * watched without anybody having promised anything, and a default would
+   * invent a promise and then report against it.
+   *
+   * Floored at 50 and capped at 100. Below half the month, a "target" is not
+   * one; and the samples this is measured from are polls, so a figure with more
+   * than three decimals is claiming a precision a three-minute cadence does not
+   * have.
+   */
+  slaTarget: z.number().min(50).max(100).optional(),
 });
 
 export const pollingSchema = z.object({
@@ -97,6 +120,20 @@ export const pollingSchema = z.object({
    * with extra steps.
    */
   confirmSamples: z.number().int().positive().max(10).default(1),
+  /**
+   * Correlated-outage detection (roadmap 2.7): how many providers have to go
+   * bad inside `correlationWindowMinutes` before the cycle reports one shared
+   * failure instead of one alert each. 0 and 1 are off, which is the default —
+   * this is the only feature here that *replaces* alerts, and an operator has
+   * to ask for that rather than discover it during an incident.
+   */
+  correlationThreshold: z.number().int().min(0).max(100).default(0),
+  /**
+   * How wide that window is. Wider catches a slow-moving shared failure and
+   * risks folding two unrelated bad days into one; the default is about as
+   * long as a Cloudflare event takes to show up across several status pages.
+   */
+  correlationWindowMinutes: z.number().int().positive().max(1440).default(10),
 });
 
 export const localeSchema = z

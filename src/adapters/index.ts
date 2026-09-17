@@ -15,6 +15,10 @@ import { tcpAdapter } from "./tcp.adapter.ts";
 import { uptimeComAdapter } from "./uptimecom.adapter.ts";
 import { uptimeKumaAdapter } from "./uptimekuma.adapter.ts";
 
+/**
+ * The adapters this build ships with. A plugin may add to this at boot
+ * (roadmap 1.13) but may never replace an entry — see `registerAdapter`.
+ */
 export const adapters: Record<string, Adapter> = {
   [statuspageAdapter.id]: statuspageAdapter,
   [rssAdapter.id]: rssAdapter,
@@ -32,6 +36,23 @@ export const adapters: Record<string, Adapter> = {
   [tcpAdapter.id]: tcpAdapter,
   [dnsAdapter.id]: dnsAdapter,
 };
+
+/**
+ * Adds an adapter the build did not ship with — the one thing a plugin does
+ * (roadmap 1.13).
+ *
+ * Refuses an id that already exists, and says so rather than returning false:
+ * a plugin quietly taking `statuspage` would change what every existing
+ * provider reads, and the caller's job is to report that file as unusable, not
+ * to carry on with a fleet that now behaves differently for reasons nothing on
+ * screen explains.
+ */
+export function registerAdapter(adapter: Adapter): void {
+  if (adapters[adapter.id] !== undefined) {
+    throw new Error(`an adapter with the id "${adapter.id}" is already registered`);
+  }
+  adapters[adapter.id] = adapter;
+}
 
 export function getAdapter(id: string): Adapter {
   const adapter = adapters[id];

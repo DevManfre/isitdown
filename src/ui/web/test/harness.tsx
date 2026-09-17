@@ -146,9 +146,20 @@ export function stubApi(fixtures: Fixtures): void {
  * route does (routes.tsx), and `retry: false` so an `errors`-fixture test
  * doesn't sit through retries before that boundary renders.
  */
-export function renderWithProviders(ui: ReactElement, fixtures: Fixtures = {}, route = "/") {
+export function renderWithProviders(
+  ui: ReactElement,
+  fixtures: Fixtures = {},
+  route = "/",
+  /**
+   * Where to start, when that is not the route pattern itself. A view that
+   * reads `useParams` needs a real location — landing on the pattern gives it
+   * the literal ":providerId" — so a test for one passes both: the pattern to
+   * match on, and the address to be at.
+   */
+  hash = route,
+) {
   stubApi(fixtures);
-  window.location.hash = route;
+  window.location.hash = hash;
   const client = createQueryClient({ retry: false });
   const router = createHashRouter([
     { path: route, element: ui, errorElement: <ViewError /> },

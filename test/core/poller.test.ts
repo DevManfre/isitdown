@@ -66,6 +66,8 @@ const config = (services: ServiceDefinition[], over: Partial<RuntimeConfig["poll
     adaptivePolling: true,
     adaptiveIntervalMinutes: 1,
     confirmSamples: 1,
+    correlationThreshold: 0,
+    correlationWindowMinutes: 10,
     ...over,
   },
   locale: "en",
@@ -1242,4 +1244,238 @@ test("providers that answered badly are not evidence of a network failure of our
     ]),
     false,
   );
+});
+
+test("three providers going bad in one window are reported once, not three times", async () => {
+  let indicator = "none";
+  const respond = (_req: IncomingMessage, res: ServerResponse): void => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary(indicator));
+  };
+  const a = await fakeProvider(respond);
+  const b = await fakeProvider(respond);
+  const c = await fakeProvider(respond);
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const cfg = config(
+    [service("github", a.baseUrl), service("cloudflare", b.baseUrl), service("anthropic", c.baseUrl)],
+    { correlationThreshold: 3, correlationWindowMinutes: 10 },
+  );
+
+  try {
+    await poller.runCycle(cfg);
+    indicator = "critical";
+    clock.advance(ONE_INTERVAL_MS);
+    const cycle = await poller.runCycle(cfg);
+
+    assert.deepEqual(
+      cycle.changes.map((change) => change.kind),
+      ["correlated_outage"],
+      "the three status changes are folded into the one event that explains them",
+    );
+    const [correlated] = cycle.changes;
+    assert.deepEqual(correlated?.correlated?.providerIds.slice().sort(), [
+      "anthropic",
+      "cloudflare",
+      "github",
+    ]);
+    assert.equal(correlated?.correlated?.windowMinutes, 10);
+    assert.equal(correlated?.currentStatus, "major_outage");
+    // Every reading still stands: the dashboard shows three providers down,
+    // it is the alerting that says it once.
+    assert.equal((await store.getState("cloudflare")).last?.overallStatus, "major_outage");
+  } finally {
+    await store.close();
+    await Promise.all([a.close(), b.close(), c.close()]);
+  }
+});
+
+test("the same shared failure is not re-announced on every cycle", async () => {
+  let indicator = "none";
+  const respond = (_req: IncomingMessage, res: ServerResponse): void => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary(indicator));
+  };
+  const a = await fakeProvider(respond);
+  const b = await fakeProvider(respond);
+  const c = await fakeProvider(respond);
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const cfg = config(
+    [service("github", a.baseUrl), service("cloudflare", b.baseUrl), service("anthropic", c.baseUrl)],
+    { correlationThreshold: 3, correlationWindowMinutes: 60 },
+  );
+
+  try {
+    await poller.runCycle(cfg);
+    indicator = "critical";
+    clock.advance(ONE_INTERVAL_MS);
+    await poller.runCycle(cfg);
+    clock.advance(ONE_INTERVAL_MS);
+    const third = await poller.runCycle(cfg);
+    assert.deepEqual(third.changes, [], "the same three still being down is not news again");
+  } finally {
+    await store.close();
+    await Promise.all([a.close(), b.close(), c.close()]);
+  }
+});
+
+test("below the threshold every provider still gets its own alert", async () => {
+  let indicator = "none";
+  const respond = (_req: IncomingMessage, res: ServerResponse): void => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary(indicator));
+  };
+  const a = await fakeProvider(respond);
+  const b = await fakeProvider(respond);
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const cfg = config([service("github", a.baseUrl), service("cloudflare", b.baseUrl)], {
+    correlationThreshold: 3,
+  });
+
+  try {
+    await poller.runCycle(cfg);
+    indicator = "critical";
+    clock.advance(ONE_INTERVAL_MS);
+    const cycle = await poller.runCycle(cfg);
+    assert.deepEqual(
+      cycle.changes.map((change) => change.kind).sort(),
+      ["status_change", "status_change"],
+    );
+  } finally {
+    await store.close();
+    await Promise.all([a.close(), b.close()]);
+  }
+});
+
+test("correlation is off unless the operator asks for it", async () => {
+  let indicator = "none";
+  const respond = (_req: IncomingMessage, res: ServerResponse): void => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary(indicator));
+  };
+  const a = await fakeProvider(respond);
+  const b = await fakeProvider(respond);
+  const c = await fakeProvider(respond);
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const cfg = config([
+    service("github", a.baseUrl),
+    service("cloudflare", b.baseUrl),
+    service("anthropic", c.baseUrl),
+  ]);
+
+  try {
+    await poller.runCycle(cfg);
+    indicator = "critical";
+    clock.advance(ONE_INTERVAL_MS);
+    const cycle = await poller.runCycle(cfg);
+    assert.equal(cycle.changes.length, 3);
+    assert.ok(cycle.changes.every((change) => change.kind === "status_change"));
+  } finally {
+    await store.close();
+    await Promise.all([a.close(), b.close(), c.close()]);
+  }
+});
+
+test("a page claiming to be operational while its probe cannot reach the service is reported", async () => {
+  const page = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  // A probe of the same service, answering the one status the check rejects.
+  const api = await fakeProvider((_req, res) => {
+    res.writeHead(503);
+    res.end("busy");
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const cfg = config([
+    service("github", page.baseUrl),
+    service("github-api", api.baseUrl, { adapter: "http", crossChecks: "github" }),
+  ]);
+
+  try {
+    const cycle = await poller.runCycle(cfg);
+    const silentOne = cycle.changes.find((change) => change.kind === "silent_outage");
+    assert.ok(silentOne, `expected a silent_outage, got ${cycle.changes.map((c) => c.kind).join(", ")}`);
+    // The claim is about the page, not about the probe.
+    assert.equal(silentOne?.providerId, "github");
+    assert.equal(silentOne?.previousStatus, "operational");
+    assert.equal(silentOne?.currentStatus, "major_outage");
+    assert.equal(silentOne?.crossCheck?.probeId, "github-api");
+    assert.match(silentOne?.crossCheck?.note ?? "", /503/);
+  } finally {
+    await store.close();
+    await Promise.all([page.close(), api.close()]);
+  }
+});
+
+test("the accusation is made once, not on every cycle the page stays wrong", async () => {
+  const page = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const api = await fakeProvider((_req, res) => {
+    res.writeHead(503);
+    res.end("busy");
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const cfg = config([
+    service("github", page.baseUrl),
+    service("github-api", api.baseUrl, { adapter: "http", crossChecks: "github" }),
+  ]);
+
+  try {
+    await poller.runCycle(cfg);
+    clock.advance(ONE_INTERVAL_MS);
+    const second = await poller.runCycle(cfg);
+    assert.equal(
+      second.changes.filter((change) => change.kind === "silent_outage").length,
+      0,
+      "a page that stays wrong is one alert, not one per cycle",
+    );
+  } finally {
+    await store.close();
+    await Promise.all([page.close(), api.close()]);
+  }
+});
+
+test("a provider that admits the outage is never accused of hiding it", async () => {
+  const page = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("critical"));
+  });
+  const api = await fakeProvider((_req, res) => {
+    res.writeHead(503);
+    res.end("busy");
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const cfg = config([
+    service("github", page.baseUrl),
+    service("github-api", api.baseUrl, { adapter: "http", crossChecks: "github" }),
+  ]);
+
+  try {
+    const cycle = await poller.runCycle(cfg);
+    assert.equal(cycle.changes.filter((change) => change.kind === "silent_outage").length, 0);
+  } finally {
+    await store.close();
+    await Promise.all([page.close(), api.close()]);
+  }
 });

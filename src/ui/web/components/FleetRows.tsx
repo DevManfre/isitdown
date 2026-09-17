@@ -29,17 +29,23 @@ export function ProviderRow({
   const { t } = useTranslation();
 
   return (
+    /* Two rows on a phone, one from `md` up. Those three fixed columns left the
+       bar row about 20px of a 358px screen — the name and the status word alone
+       are 336 of it — so below 768px the bar takes its own full-width line
+       under the pair that labels it. */
     <div
-      className="overview-row anim-rise grid grid-cols-[minmax(0,180px)_1fr_minmax(0,156px)] items-center gap-4"
+      className="overview-row anim-rise grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 lg:grid-cols-[minmax(0,180px)_1fr_minmax(0,156px)] lg:gap-4"
       style={delay === undefined ? undefined : { animationDelay: delay }}
     >
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
         <StatusDot status={provider.overallStatus} size={12} />
         <span className="provider-name truncate text-sm">{provider.name}</span>
       </div>
-      <UptimeBarRow buckets={buckets} scale="compact" />
+      <div className="col-span-2 col-start-1 row-start-2 lg:col-span-1 lg:col-start-2 lg:row-start-1">
+        <UptimeBarRow buckets={buckets} scale="compact" />
+      </div>
       <span
-        className="font-mono text-right text-[11.5px]"
+        className="col-start-2 row-start-1 font-mono text-right text-[11.5px] lg:col-start-3"
         style={{ color: statusColor(provider.overallStatus) }}
       >
         {t(statusLabelKey(provider.overallStatus)).toUpperCase()}

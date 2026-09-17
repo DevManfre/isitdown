@@ -159,7 +159,7 @@ export function DeliveryLog() {
       />
 
       <div className="anim-rise flex flex-wrap items-center justify-between gap-3" style={{ animationDelay: "60ms" }}>
-        <ToggleGroup type="single" aria-label={t("delivery.filter.state")} value={state} onValueChange={(next) => {
+        <ToggleGroup className="max-w-full flex-wrap" type="single" aria-label={t("delivery.filter.state")} value={state} onValueChange={(next) => {
           if (next !== "") pick(next as DeliveryState);
         }}>
           {STATES.map((entry) => (
@@ -181,7 +181,12 @@ export function DeliveryLog() {
         </ToggleGroup>
 
         {channels.length > 0 && (
-          <ToggleGroup type="single" aria-label={t("delivery.filter.channel")} value={channel} onValueChange={(next) => {
+          /* Fifteen channels are wider than any window under 1440px, and the
+             group ships `w-fit`, so it used to push the page sideways at every
+             narrower width. It wraps instead: the joined pill breaks across
+             lines, which is worth more than a segmented outline nobody can
+             reach the right-hand end of. */
+          <ToggleGroup className="max-w-full flex-wrap" type="single" aria-label={t("delivery.filter.channel")} value={channel} onValueChange={(next) => {
             setChannel(next);
             setPage(1);
           }}>
@@ -217,7 +222,10 @@ export function DeliveryLog() {
               <div key={key} className={cn("flex flex-col border-t border-border first:border-t-0", !record.ok && "bg-destructive/5")}>
                 <button
                   type="button"
-                  className="delivery-row anim-rise anim-rise-row flex items-center gap-3 px-4 py-2.5 text-left"
+                  // Wraps below `md`: the two fixed columns plus the timestamp
+                  // are already wider than a 358px screen, so the headline —
+                  // the only part that can take a line of its own — does.
+                  className="delivery-row anim-rise anim-rise-row flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 text-left lg:flex-nowrap"
                   style={{ animationDelay: stagger(index, { base: 150, step: 28, cap: 420 }) }}
                   aria-expanded={open}
                   onClick={() => setExpanded(open ? null : key)}
@@ -231,7 +239,9 @@ export function DeliveryLog() {
                   <span className="w-20 shrink-0 truncate font-mono text-xs text-muted-foreground">
                     {record.channel}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm">{notificationHeadline(record.text)}</span>
+                  <span className="order-last min-w-0 basis-full truncate text-sm lg:order-none lg:flex-1 lg:basis-auto">
+                    {notificationHeadline(record.text)}
+                  </span>
                   <Badge variant={record.ok ? "muted" : "destructive"}>
                     {t(
                       record.ok
@@ -241,7 +251,7 @@ export function DeliveryLog() {
                           : "delivery.result.failed",
                     )}
                   </Badge>
-                  <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                  <span className="ml-auto shrink-0 font-mono text-xs text-muted-foreground lg:ml-0">
                     {formatDateTime(i18n.language, record.sentAt)}
                   </span>
                 </button>
