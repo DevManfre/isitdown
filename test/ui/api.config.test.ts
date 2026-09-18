@@ -1175,3 +1175,39 @@ test("a group name the schema would reject is a 400, not a stored oddity", async
     await app.close();
   }
 });
+
+test("a declared JSON mapping is refused at save time, naming what is wrong", async () => {
+  const app = await api();
+  try {
+    const service = (options: Record<string, string>) => ({
+      id: "acme",
+      name: "Acme",
+      adapter: "json",
+      baseUrl: "https://status.acme.example",
+      enabled: true,
+      options,
+    });
+
+    // Roadmap 11.1: the moment the operator can still fix it.
+    const bad = await app.request("POST", "/config/services", service({ statusPath: "service.state" }));
+    assert.equal(bad.status, 400);
+    assert.match(JSON.stringify(bad.body), /statusMap/);
+
+    const good = await app.request(
+      "POST",
+      "/config/services",
+      service({ statusPath: "service.state", statusMap: JSON.stringify({ UP: "operational" }) }),
+    );
+    assert.equal(good.status, 201);
+
+    // And on the way back out: an edit that breaks the mapping is refused too,
+    // rather than leaving a provider that saved fine and polls badly.
+    const patched = await app.request("PATCH", "/config/services/acme", {
+      options: { statusPath: "not a path!", statusMap: JSON.stringify({ UP: "operational" }) },
+    });
+    assert.equal(patched.status, 400);
+    assert.match(JSON.stringify(patched.body), /path like/);
+  } finally {
+    await app.close();
+  }
+});

@@ -768,6 +768,57 @@ senza credenziali: le sue pagine si renderizzano lato client e la sua API
 pubblica risponde `403` a tutto ciò che non sia il suo stesso front end, quindi
 serve l'adapter di scraping HTML e non un parser tutto suo.
 
+**JSON generico (`json`)** — roadmap 11.1, ed è la cosa da provare prima di
+scrivere codice. Moltissime status page servono JSON ottimo in una forma che
+nessuno ha standardizzato: il dato è stabile e completo, e l'unica cosa che manca
+è qualcuno che dica quale campo significa cosa. È ciò che questo adapter prende.
+
+```yaml
+services:
+  - name: Acme Cloud
+    id: acme
+    adapter: json
+    baseUrl: https://status.acme.example
+    options:
+      path: /api/status
+      statusPath: service.state
+      statusMap: '{"UP":"operational","DEGRADED":"degraded","PARTIAL":"partial_outage","DOWN":"major_outage"}'
+      incidentsPath: events
+      incidentId: ref
+      incidentName: title
+      incidentStatus: phase
+      incidentImpact: severity
+      incidentUpdatedAt: changedAt
+```
+
+| Opzione | Significato |
+|---|---|
+| `path` | Aggiunto a `baseUrl`. Ometti quando l'URL base è già il documento. |
+| `statusPath` | Dov'è la parola dello stato complessivo. **Obbligatoria.** |
+| `statusMap` | Un oggetto JSON che mappa le parole del provider su `operational`, `degraded`, `partial_outage`, `major_outage` o `unknown`. **Obbligatoria.** Il confronto ignora maiuscole e spazi attorno. |
+| `incidentsPath` | Un array di incidenti aperti. Ometti per una pagina che pubblica solo uno stato. |
+| `incidentName` | Il titolo, *dentro una voce*. Obbligatoria ogni volta che c'è `incidentsPath`: una voce senza nome è una riga vuota sulla timeline, quindi viene scartata anziché mostrata. |
+| `incidentId`, `incidentStatus`, `incidentImpact`, `incidentUpdatedAt` | Il resto di una voce. Opzionali; una voce senza id proprio è identificata dalla posizione, così due letture concordano su quale incidente è quale. |
+
+Un **percorso** è nomi, punti e `[n]` per un indice di array — `page.status`,
+`components[0].state`. Deliberatamente non JSONPath: qui un percorso è una
+lettura, e un linguaggio di espressioni è una superficie con filtri, wildcard e
+prima o poi un parser da mantenere. Una pagina che ha bisogno di più di una
+lettura ha bisogno di un adapter.
+
+Due comportamenti da conoscere. Una parola di stato che la tabella non copre
+legge `unknown` invece di essere indovinata dall'euristica sulle parole usata
+dall'adapter feed: l'operatore ha descritto il vocabolario di questo provider, e
+un buco lì è una cosa di cui *essere avvisati*. E una pagina che riporta
+`operational` mentre elenca un incidente aperto legge `degraded` — è una pagina a
+metà aggiornamento, e riportare la più tranquilla delle due significherebbe
+riportare quella che già sappiamo superata.
+
+La mappatura viene validata quando si **salva**, non quando si legge: `POST`/`PATCH
+/config/services` rispondono `400` nominando ogni problema, e `isitdown check` li
+riporta come errori. Un refuso in un percorso è una cosa da correggere mentre si
+sta ancora guardando il campo in cui lo si è scritto.
+
 Per un provider che non sta su nessuno di questi, aggiungi un adapter sotto
 `src/adapters/`.
 

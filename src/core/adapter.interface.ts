@@ -1,5 +1,9 @@
 import type { StatusPageRead } from "./http.ts";
-import type { HistoricalIncident, NormalizedStatus, OverallStatus } from "./types.ts";
+import type {
+  HistoricalIncident,
+  NormalizedStatus,
+  OverallStatus,
+} from "./types.ts";
 
 /**
  * What an adapter needs to know about the service it is fetching. A generic
@@ -132,18 +136,41 @@ export interface Adapter {
    * the poller's retry and failure accounting can act. Degrades quietly on a
    * missing individual field instead.
    */
-  fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus>;
+  fetchStatus(
+    service: ServiceRef,
+    ctx: FetchContext,
+  ): Promise<NormalizedStatus>;
+  /**
+   * Why a provider's `options` cannot work, one sentence each, empty when they
+   * can — roadmap 11.1.
+   *
+   * Called by the edition's own write path when a provider is saved, not by the
+   * poller: a typo in a declared field path is a thing the operator can fix
+   * while still looking at the field they typed it into, and finding out three
+   * minutes later as a failed poll is the worst possible moment to be told.
+   *
+   * Absent on an adapter whose options cannot be wrong in a way worth stopping
+   * a save for, which is every adapter whose options are a handful of
+   * independent scalars.
+   */
+  validateOptions?(options: Record<string, string> | undefined): string[];
   /**
    * Throws on a network error, a non-2xx response or an unparseable body so
    * the caller logs a warning and skips the provider. Degrades quietly on a
    * missing individual field instead. An adapter without this method simply has
    * no backfillable history.
    */
-  fetchIncidentHistory?(service: ServiceRef, ctx: FetchContext): Promise<IncidentHistoryResult>;
+  fetchIncidentHistory?(
+    service: ServiceRef,
+    ctx: FetchContext,
+  ): Promise<IncidentHistoryResult>;
   /**
    * Lists the components a provider exposes, for the selection picker. Optional:
    * an adapter without it simply offers no component monitoring. Throws like
    * `fetchStatus` does.
    */
-  listComponents?(service: ServiceRef, ctx: FetchContext): Promise<ComponentPreview[]>;
+  listComponents?(
+    service: ServiceRef,
+    ctx: FetchContext,
+  ): Promise<ComponentPreview[]>;
 }
