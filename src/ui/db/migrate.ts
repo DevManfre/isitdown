@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 22;
+export const SCHEMA_VERSION = 23;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -546,6 +546,33 @@ export function migrate(db: DatabaseSync): void {
         providers       INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_poll_cycles_started ON poll_cycles (started_at);
+    `);
+  }
+
+  if (from < 23) {
+    // The operator's own timeline markers — roadmap 12.1. "We deployed at
+    // 14:05" is the one thing on a chart IsItDown can never observe, and it is
+    // the difference between "Cloudflare had a bad afternoon" and "our release
+    // did", which is the question actually being asked during an incident.
+    //
+    // `provider_id` is nullable and carries no foreign key on purpose: a
+    // deploy is usually about the whole fleet, and a marker that named a
+    // provider would vanish with it — which is wrong, because the note about
+    // the afternoon outlives the decision to stop watching that page.
+    //
+    // `colour` is a token name, never a hex value: the dashboard resolves it
+    // through `chartConfig.ts` like every other chart colour, so a marker is
+    // legible in both themes and cannot be set to something invisible.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS annotations (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        at          TEXT NOT NULL,
+        label       TEXT NOT NULL,
+        colour      TEXT NOT NULL,
+        provider_id TEXT,
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_annotations_at ON annotations (at);
     `);
   }
 

@@ -142,6 +142,10 @@ const DYNAMIC_FAMILIES: { prefix: string; reason: string }[] = [
     reason: "IncidentDetail.tsx renders t(`incident.timeline.${entry.label}`) for the labels the incidents route emits",
   },
   {
+    prefix: "annotation.colour.",
+    reason: "AnnotationBar.tsx renders t(`annotation.colour.${option}`) for each colour a marker may carry",
+  },
+  {
     prefix: "routing.class.",
     reason: "RoutingRules.tsx renders t(`routing.class.${eventClass}`) for each event class a rule can carry",
   },

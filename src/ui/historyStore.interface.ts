@@ -115,6 +115,32 @@ export interface DailyBucket {
   totalSamples: number;
 }
 
+/**
+ * A colour a marker may be drawn in — roadmap 12.1.
+ *
+ * A closed set of token names rather than free text, because the dashboard
+ * resolves them through `chartConfig.ts` like every other chart colour. A hex
+ * value stored here would be a colour that looks right in one theme and
+ * disappears in the other, and nothing on the way in could tell.
+ */
+export const ANNOTATION_COLOURS = ["accent", "warn", "danger", "neutral"] as const;
+export type AnnotationColour = (typeof ANNOTATION_COLOURS)[number];
+
+/** One marker the operator put on the timeline — roadmap 12.1. */
+export interface Annotation {
+  id: number;
+  /** When the thing happened, as the operator states it. */
+  at: string;
+  label: string;
+  colour: AnnotationColour;
+  /**
+   * The provider this is about, or null for the whole fleet — which a deploy
+   * usually is.
+   */
+  providerId: string | null;
+  createdAt: string;
+}
+
 /** One operator note on one incident (roadmap 5.3). */
 export interface IncidentNote {
   id: number;
@@ -148,6 +174,22 @@ export interface HistoryStore extends StateStore, MessageRefStore {
   recordPollCycle(cycle: PollCycle & { providers: number }): Promise<void>;
   /** Finished cycles that started inside the window, oldest first. */
   listPollCycles(fromIso: string, toIso: string): Promise<PollCycle[]>;
+  /**
+   * Markers between two instants, oldest first — roadmap 12.1.
+   *
+   * `providerId` widens rather than narrows: asking about one provider returns
+   * its own markers *and* the fleet-wide ones, because a deploy that broke one
+   * provider's page is exactly the marker wanted on that provider's chart.
+   * Omitting it returns everything.
+   */
+  listAnnotations(
+    fromIso: string,
+    toIso: string,
+    providerId?: string | undefined,
+  ): Promise<Annotation[]>;
+  addAnnotation(input: Omit<Annotation, "id" | "createdAt">): Promise<Annotation>;
+  /** Returns whether a row was removed, so a stale id reads 404 rather than 204. */
+  deleteAnnotation(id: number): Promise<boolean>;
   /** Every configured provider, enabled or not: its history is real either way. */
   listProviderIds(): Promise<string[]>;
   recordNotification(record: SentRecord): Promise<void>;

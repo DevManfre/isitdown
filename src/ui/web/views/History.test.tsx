@@ -186,7 +186,10 @@ describe("History", () => {
     });
 
     expect(await screen.findByText(/99[.,]42/)).toBeInTheDocument();
-    expect(screen.queryByText(/pp/)).not.toBeInTheDocument();
+    // Anchored on the unit as it is actually rendered — "+0.12 pp vs …" — rather
+    // than on the bare letters, which now also occur inside ordinary prose on
+    // this page ("What happened", the marker form's label).
+    expect(screen.queryByText(/\d\s*pp\b/)).not.toBeInTheDocument();
   });
 
   it("spells out the active range beside the compact toggle", async () => {

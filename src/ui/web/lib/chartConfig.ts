@@ -43,7 +43,10 @@ export const STATUS_CHART = {
     fill: "var(--status-unknown-fill)",
     bar: 26,
   },
-} as const satisfies Record<OverallStatus, { labelKey: string; color: string; fill: string; bar: number }>;
+} as const satisfies Record<
+  OverallStatus,
+  { labelKey: string; color: string; fill: string; bar: number }
+>;
 
 /**
  * The Overview's dense shape draws one ring for the fleet's average uptime.
@@ -79,9 +82,11 @@ const known = (status: string): OverallStatus =>
 export const severity = (status: string, scale: BarScale = "row") =>
   STATUS_CHART[known(status)].bar * SCALE[scale];
 
-export const statusColor = (status: string) => STATUS_CHART[known(status)].color;
+export const statusColor = (status: string) =>
+  STATUS_CHART[known(status)].color;
 export const statusFill = (status: string) => STATUS_CHART[known(status)].fill;
-export const statusLabelKey = (status: string) => STATUS_CHART[known(status)].labelKey;
+export const statusLabelKey = (status: string) =>
+  STATUS_CHART[known(status)].labelKey;
 /** `unknown` is drawn faded: never measured is not the same claim as down. */
 export const statusMuted = (status: string) => known(status) === "unknown";
 
@@ -103,10 +108,31 @@ export const statusMuted = (status: string) => known(status) === "unknown";
 export const COVERAGE_HATCH_BELOW = 0.95;
 
 /** Whether a day's coverage is poor enough to be marked. `null` never is. */
-export const coverageIsPartial = (observed: number | null | undefined): boolean =>
-  observed !== null && observed !== undefined && observed < COVERAGE_HATCH_BELOW;
+export const coverageIsPartial = (
+  observed: number | null | undefined,
+): boolean =>
+  observed !== null &&
+  observed !== undefined &&
+  observed < COVERAGE_HATCH_BELOW;
 
 /** The stripes themselves, as a CSS background layer to sit over a bar's fill. */
+/**
+ * The colours an operator's own timeline marker may be drawn in — roadmap 12.1.
+ *
+ * A fixed set resolved to the semantic variables in `tokens.css`, never a hex
+ * value carried in the database: a marker has to stay legible in both themes,
+ * and a stored colour cannot know which one it will be read in.
+ */
+export const ANNOTATION_COLOUR: Record<string, string> = {
+  accent: "var(--color-accent)",
+  warn: "var(--status-degraded)",
+  danger: "var(--status-major-outage)",
+  neutral: "var(--color-neutral-600)",
+};
+
+export const annotationColour = (colour: string): string =>
+  ANNOTATION_COLOUR[colour] ?? ANNOTATION_COLOUR["neutral"]!;
+
 export const COVERAGE_HATCH_CSS =
   "repeating-linear-gradient(135deg, transparent 0 2px, var(--color-surface) 2px 3px)";
 
@@ -128,7 +154,12 @@ const TIER: Record<OverallStatus, StatusTier> = {
 };
 
 /** Which tier a tier outranks. The beacon shows the highest one present. */
-const TIER_RANK: Record<StatusTier, number> = { ok: 0, unknown: 1, warn: 2, danger: 3 };
+const TIER_RANK: Record<StatusTier, number> = {
+  ok: 0,
+  unknown: 1,
+  warn: 2,
+  danger: 3,
+};
 
 /**
  * A tier's position in paint order: worse drawn last, so a fault is never
@@ -149,7 +180,8 @@ const TIER_STATUS: Record<StatusTier, OverallStatus> = {
 export const statusTier = (status: string): StatusTier => TIER[known(status)];
 
 /** The tier's colour is a status colour, so it stays a token like every other. */
-export const tierColor = (tier: StatusTier): string => statusColor(TIER_STATUS[tier]);
+export const tierColor = (tier: StatusTier): string =>
+  statusColor(TIER_STATUS[tier]);
 
 /**
  * The worst tier across a set of providers — what the Overview headline is
@@ -165,7 +197,10 @@ export const worstTier = (statuses: string[]): StatusTier =>
     ? "unknown"
     : statuses
         .map(statusTier)
-        .reduce((worst, tier) => (TIER_RANK[tier] > TIER_RANK[worst] ? tier : worst), "ok");
+        .reduce(
+          (worst, tier) => (TIER_RANK[tier] > TIER_RANK[worst] ? tier : worst),
+          "ok",
+        );
 
 /**
  * The worst status in a set, as a status rather than as a tier.
@@ -193,7 +228,9 @@ export const worstStatus = (statuses: string[]): OverallStatus => {
   return statuses
     .map(known)
     .filter((status) => statusTier(status) === tier)
-    .reduce((worst, status) => (STATUS_CHART[status].bar > STATUS_CHART[worst].bar ? status : worst));
+    .reduce((worst, status) =>
+      STATUS_CHART[status].bar > STATUS_CHART[worst].bar ? status : worst,
+    );
 };
 
 /**
@@ -205,7 +242,8 @@ export const worstStatus = (statuses: string[]): OverallStatus => {
  * other chart in this dashboard fills with `--status-*-fill`, and so does the
  * map.
  */
-export const tierFill = (tier: StatusTier): string => statusFill(TIER_STATUS[tier]);
+export const tierFill = (tier: StatusTier): string =>
+  statusFill(TIER_STATUS[tier]);
 
 /**
  * The shadcn chart config, so a tooltip and a legend read the same colours.
@@ -233,7 +271,8 @@ export function chartConfigFor(
  * charts.js in the same pass; nothing about it has to do with favicons, and a
  * test importing a list helper from a favicon module is how that stays hidden.
  */
-export const trimToLatest = <T>(list: T[], size: number): T[] => list.slice(0, size);
+export const trimToLatest = <T>(list: T[], size: number): T[] =>
+  list.slice(0, size);
 
 /**
  * The Y domain for anything that plots an uptime percentage — the month
@@ -253,7 +292,10 @@ export const trimToLatest = <T>(list: T[], size: number): T[] => list.slice(0, s
 export function uptimeDomain(uptimes: (number | null)[]): [number, number] {
   const measured = uptimes.filter((value): value is number => value !== null);
   if (measured.length === 0) return [99, 100];
-  return [Math.max(0, Math.min(Math.floor(Math.min(...measured)) - 1, 99)), 100];
+  return [
+    Math.max(0, Math.min(Math.floor(Math.min(...measured)) - 1, 99)),
+    100,
+  ];
 }
 
 /**

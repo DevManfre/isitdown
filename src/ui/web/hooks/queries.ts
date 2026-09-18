@@ -1,7 +1,18 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type Query } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type Query,
+} from "@tanstack/react-query";
 import * as api from "@/lib/api.ts";
 import type { HistoryWindow } from "@/lib/api.ts";
-import { LIVE_REFRESH_MS, msUntilNextPoll, REFRESH_MS, statusRefetchDelay } from "@/lib/statusRefetch.ts";
+import {
+  LIVE_REFRESH_MS,
+  msUntilNextPoll,
+  REFRESH_MS,
+  statusRefetchDelay,
+} from "@/lib/statusRefetch.ts";
 import type { StatusResponse } from "@/lib/types.ts";
 import { useBusy } from "./useBusy.tsx";
 import { useLive } from "./useLive.tsx";
@@ -19,7 +30,9 @@ import { useLive } from "./useLive.tsx";
  * focus: a dashboard that looks stopped while the server polls on time.
  */
 const statusRefetchInterval = (query: Query<StatusResponse>): number =>
-  statusRefetchDelay(msUntilNextPoll(query.state.data, query.state.dataUpdatedAt, Date.now()));
+  statusRefetchDelay(
+    msUntilNextPoll(query.state.data, query.state.dataUpdatedAt, Date.now()),
+  );
 
 /**
  * How often a query asks on its own: never while the operator is mid-edit, a
@@ -161,7 +174,10 @@ export const useHistory = (window: HistoryWindow) => {
  * the drawer mounts closed, with `provider === null`, and must not fetch for a
  * provider nobody opened.
  */
-export const useProviderHistory = (provider: string | null, window: HistoryWindow) => {
+export const useProviderHistory = (
+  provider: string | null,
+  window: HistoryWindow,
+) => {
   const busy = useBusy();
   const live = useLive();
   return useQuery({
@@ -209,7 +225,11 @@ export const useSla = () =>
  * with it when it fails to load.
  */
 export const useTrust = (days: number) =>
-  useQuery({ queryKey: ["trust", days], queryFn: () => api.getTrust(days), throwOnError: false });
+  useQuery({
+    queryKey: ["trust", days],
+    queryFn: () => api.getTrust(days),
+    throwOnError: false,
+  });
 
 /**
  * Never throws. Vanilla's own reasoning (`history.js:70-82`): "the provider's
@@ -266,20 +286,57 @@ export const useIncident = (providerId: string, incidentId: string) => {
 };
 
 /**
+ * The operator's own timeline markers over a window — roadmap 12.1.
+ *
+ * Its own query rather than a field on `useHistory`: a marker changes when
+ * somebody writes one, history changes when the poller runs, and sharing a key
+ * would make every added marker re-fetch ninety days of buckets. No polling for
+ * the same reason — nothing but this browser writes them.
+ */
+export const useAnnotations = (window: HistoryWindow) =>
+  useQuery({
+    queryKey: ["annotations", window.days, window.range ?? null],
+    queryFn: () => api.getAnnotations(window),
+  });
+
+/** Writing and removing one. Both invalidate every window, since a marker written
+ * on one window is on the others too. */
+export function useAnnotationEdits() {
+  const client = useQueryClient();
+  const refresh = () => client.invalidateQueries({ queryKey: ["annotations"] });
+  return {
+    add: useMutation({
+      mutationFn: (input: Parameters<typeof api.addAnnotation>[0]) =>
+        api.addAnnotation(input),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: (id: number) => api.deleteAnnotation(id),
+      onSuccess: refresh,
+    }),
+  };
+}
+
+/**
  * Adding and removing an operator's notes on one incident (roadmap 5.3). Both
  * invalidate that incident's own query, which is where the notes are served
  * from — there is no second endpoint to keep in step.
  */
 export function useIncidentNotes(providerId: string, incidentId: string) {
   const client = useQueryClient();
-  const refresh = () => client.invalidateQueries({ queryKey: ["incident", providerId, incidentId] });
+  const refresh = () =>
+    client.invalidateQueries({
+      queryKey: ["incident", providerId, incidentId],
+    });
   return {
     add: useMutation({
-      mutationFn: (body: string) => api.addIncidentNote(providerId, incidentId, body),
+      mutationFn: (body: string) =>
+        api.addIncidentNote(providerId, incidentId, body),
       onSuccess: refresh,
     }),
     remove: useMutation({
-      mutationFn: (id: number) => api.deleteIncidentNote(providerId, incidentId, id),
+      mutationFn: (id: number) =>
+        api.deleteIncidentNote(providerId, incidentId, id),
       onSuccess: refresh,
     }),
   };
@@ -321,7 +378,13 @@ export const useDeliveryLog = (query: api.DeliveryLogQuery = {}) => {
   const busy = useBusy();
   const live = useLive();
   return useQuery({
-    queryKey: ["delivery-log", query.state ?? "all", query.channel ?? "", query.page ?? 1, query.pageSize ?? null],
+    queryKey: [
+      "delivery-log",
+      query.state ?? "all",
+      query.channel ?? "",
+      query.page ?? 1,
+      query.pageSize ?? null,
+    ],
     queryFn: () => api.getDeliveryLog(query),
     refetchInterval: idleInterval(busy, live),
   });
@@ -359,7 +422,11 @@ export function useMap(enabled: boolean) {
  * server is not answering yet" (app.js's `start()`).
  */
 export const usePreferences = () =>
-  useQuery({ queryKey: ["preferences"], queryFn: api.getPreferences, throwOnError: false });
+  useQuery({
+    queryKey: ["preferences"],
+    queryFn: api.getPreferences,
+    throwOnError: false,
+  });
 
 /**
  * What removing a provider would delete, read while the confirmation is open.
@@ -394,7 +461,9 @@ const WRITE_KEYS = [
 function useInvalidateAll() {
   const client = useQueryClient();
   return async () => {
-    await Promise.all(WRITE_KEYS.map((key) => client.invalidateQueries({ queryKey: key })));
+    await Promise.all(
+      WRITE_KEYS.map((key) => client.invalidateQueries({ queryKey: key })),
+    );
   };
 }
 
@@ -408,11 +477,18 @@ export function useServiceMutations() {
   return {
     add: useMutation({ mutationFn: api.addService, onSuccess: invalidate }),
     patch: useMutation({
-      mutationFn: ({ id, patch }: { id: string; patch: unknown }) => api.patchService(id, patch),
+      mutationFn: ({ id, patch }: { id: string; patch: unknown }) =>
+        api.patchService(id, patch),
       onSuccess: invalidate,
     }),
-    remove: useMutation({ mutationFn: api.removeService, onSuccess: invalidate }),
-    restore: useMutation({ mutationFn: api.restoreService, onSuccess: invalidate }),
+    remove: useMutation({
+      mutationFn: api.removeService,
+      onSuccess: invalidate,
+    }),
+    restore: useMutation({
+      mutationFn: api.restoreService,
+      onSuccess: invalidate,
+    }),
     purge: useMutation({ mutationFn: api.purgeService, onSuccess: invalidate }),
     test: useMutation({ mutationFn: api.testService }),
   };
@@ -450,7 +526,12 @@ export function useAdapterDebug(enabled: boolean) {
  * stale between two opens, and it has no polling interval for the same reason.
  */
 export function useCatalog(enabled: boolean) {
-  return useQuery({ queryKey: ["catalog"], queryFn: api.getCatalog, enabled, staleTime: Infinity });
+  return useQuery({
+    queryKey: ["catalog"],
+    queryFn: api.getCatalog,
+    enabled,
+    staleTime: Infinity,
+  });
 }
 
 /**
@@ -488,7 +569,10 @@ export function useRestoreBackup() {
  */
 export function useStorageMaintenance() {
   const invalidate = useInvalidateAll();
-  return useMutation({ mutationFn: api.runStorageMaintenance, onSuccess: invalidate });
+  return useMutation({
+    mutationFn: api.runStorageMaintenance,
+    onSuccess: invalidate,
+  });
 }
 
 export function useSettingsMutation() {
@@ -508,7 +592,8 @@ export function useChannelMutations() {
   const invalidate = useInvalidateAll();
   return {
     patch: useMutation({
-      mutationFn: ({ id, patch }: { id: string; patch: unknown }) => api.patchChannel(id, patch),
+      mutationFn: ({ id, patch }: { id: string; patch: unknown }) =>
+        api.patchChannel(id, patch),
       onSuccess: invalidate,
     }),
     // Two mutations rather than one: the variable *name* lives in the database
@@ -516,12 +601,18 @@ export function useChannelMutations() {
     // renames a reference and sets a credential in the same click has to do
     // the rename first — see ChannelRow's save.
     saveSecrets: useMutation({
-      mutationFn: ({ id, fields }: { id: string; fields: Record<string, string> }) =>
-        api.saveChannelSecrets(id, fields),
+      mutationFn: ({
+        id,
+        fields,
+      }: {
+        id: string;
+        fields: Record<string, string>;
+      }) => api.saveChannelSecrets(id, fields),
       onSuccess: invalidate,
     }),
     clearSecret: useMutation({
-      mutationFn: ({ id, field }: { id: string; field: string }) => api.clearChannelSecret(id, field),
+      mutationFn: ({ id, field }: { id: string; field: string }) =>
+        api.clearChannelSecret(id, field),
       onSuccess: invalidate,
     }),
     test: useMutation({ mutationFn: api.testChannel }),
@@ -542,9 +633,13 @@ export function usePushDevices() {
 
 export function usePushMutations() {
   const client = useQueryClient();
-  const invalidate = () => client.invalidateQueries({ queryKey: ["push-devices"] });
+  const invalidate = () =>
+    client.invalidateQueries({ queryKey: ["push-devices"] });
   return {
     add: useMutation({ mutationFn: api.addPushDevice, onSuccess: invalidate }),
-    remove: useMutation({ mutationFn: api.removePushDevice, onSuccess: invalidate }),
+    remove: useMutation({
+      mutationFn: api.removePushDevice,
+      onSuccess: invalidate,
+    }),
   };
 }

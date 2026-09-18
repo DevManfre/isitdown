@@ -136,6 +136,17 @@ export interface ProviderHistory {
  * an install that predates this trace has no cycles recorded for its past, and
  * drawing that as an outage of ours would be a claim made out of missing data.
  */
+/** One marker the operator put on the timeline — roadmap 12.1. */
+export interface Annotation {
+  id: number;
+  at: string;
+  label: string;
+  colour: string;
+  /** null means the whole fleet, which a deploy usually is. */
+  providerId: string | null;
+  createdAt: string;
+}
+
 export interface DayCoverage {
   day: string;
   observed: number | null;

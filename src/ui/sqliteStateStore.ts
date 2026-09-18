@@ -12,7 +12,9 @@ import {
 import { STATUS_CHANGE_KINDS } from "../core/types.ts";
 import type { DampingState, HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { z } from "zod";
+import { ANNOTATION_COLOURS } from "./historyStore.interface.ts";
 import type {
+  Annotation,
   DailyBucket,
   HistoryStore,
   IncidentCounts,
@@ -66,6 +68,15 @@ const incidentRowSchema = z.object({
   started_at: z.string(),
   updated_at: z.string(),
   resolved_at: z.string().nullable(),
+});
+
+const annotationRowSchema = z.object({
+  id: z.number(),
+  at: z.string(),
+  label: z.string(),
+  colour: z.enum(ANNOTATION_COLOURS),
+  provider_id: z.string().nullable(),
+  created_at: z.string(),
 });
 
 const incidentNoteRowSchema = z.object({
@@ -868,6 +879,45 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
           finishedAt: row.finished_at,
           intervalMinutes: row.interval_minutes,
         }));
+    },
+
+    async listAnnotations(
+      fromIso: string,
+      toIso: string,
+      providerId?: string | undefined,
+    ): Promise<Annotation[]> {
+      // The fleet-wide rows come back either way: a deploy is a marker on every
+      // chart, and a provider view that hid it would be the one view where the
+      // question "was it us?" cannot be answered.
+      const where =
+        providerId === undefined
+          ? "at >= ? AND at < ?"
+          : "at >= ? AND at < ? AND (provider_id IS NULL OR provider_id = ?)";
+      const params = providerId === undefined ? [fromIso, toIso] : [fromIso, toIso, providerId];
+      return db
+        .prepare(`SELECT id, at, label, colour, provider_id, created_at FROM annotations WHERE ${where} ORDER BY at ASC, id ASC`)
+        .all(...params)
+        .map((raw) => annotationRowSchema.parse(raw))
+        .map((row) => ({
+          id: row.id,
+          at: row.at,
+          label: row.label,
+          colour: row.colour,
+          providerId: row.provider_id,
+          createdAt: row.created_at,
+        }));
+    },
+
+    async addAnnotation(input: Omit<Annotation, "id" | "createdAt">): Promise<Annotation> {
+      const createdAt = now().toISOString();
+      const { lastInsertRowid } = db
+        .prepare("INSERT INTO annotations (at, label, colour, provider_id, created_at) VALUES (?, ?, ?, ?, ?)")
+        .run(input.at, input.label, input.colour, input.providerId, createdAt);
+      return { ...input, id: Number(lastInsertRowid), createdAt };
+    },
+
+    async deleteAnnotation(id: number): Promise<boolean> {
+      return db.prepare("DELETE FROM annotations WHERE id = ?").run(id).changes > 0;
     },
 
     async listProviderIds(): Promise<string[]> {
