@@ -307,12 +307,23 @@ export function ServiceDialog({
 
   const runConnectionTest = async (): Promise<void> => {
     if (service === undefined) return;
-    const result = await test.mutateAsync(service.id);
-    setMessage(
-      result.ok
-        ? { text: t("add.test-ok", { status: result.overallStatus }), tone: "info" }
-        : { text: t("add.test-failed", { error: result.error }), tone: "error" },
-    );
+    // The wait is a second or two of a silent button otherwise, which reads as
+    // a button that did nothing — and a test that never reaches the route at
+    // all still owes the operator a sentence.
+    setMessage({ text: t("add.test-running"), tone: "info" });
+    try {
+      const result = await test.mutateAsync(service.id);
+      setMessage(
+        result.ok
+          ? { text: t("add.test-ok", { status: result.overallStatus }), tone: "info" }
+          : { text: t("add.test-failed", { error: result.error }), tone: "error" },
+      );
+    } catch (error) {
+      setMessage({
+        text: t("add.test-failed", { error: error instanceof Error ? error.message : String(error) }),
+        tone: "error",
+      });
+    }
   };
 
   /**
@@ -653,15 +664,24 @@ export function ServiceDialog({
                     {hasAdapterOptions(activeAdapter) && <Section title={t("add.advanced")}>{adapterFields}</Section>}
                   </>
                 )}
-
-                {message !== undefined && (
-                  <p className={message.tone === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
-                    {message.text}
-                  </p>
-                )}
               </div>
             </StepPanel>
           </DialogBody>
+
+          {/* Outside the scrolling body on purpose: an answer rendered at the end
+              of a long form is an answer the operator has to go looking for, and
+              the button that asks for it sits in the footer. */}
+          {message !== undefined && (
+            <p
+              className={
+                message.tone === "error"
+                  ? "px-1 pt-3 text-sm text-destructive"
+                  : "px-1 pt-3 text-sm text-muted-foreground"
+              }
+            >
+              {message.text}
+            </p>
+          )}
 
           <DialogFooter className="sm:justify-between">
             <div className="flex items-center gap-2">
