@@ -7,6 +7,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "../../src/ui/db/open.ts";
 import { migrate } from "../../src/ui/db/migrate.ts";
 import { createSqliteStateStore } from "../../src/ui/sqliteStateStore.ts";
+import { segmentsEndingOn } from "../../src/ui/calendarDays.ts";
 import { CONTRACT_PROVIDER_IDS, runStateStoreContract } from "../core/stateStore.contract.ts";
 import type { HistoryStore } from "../../src/ui/historyStore.interface.ts";
 import {
@@ -19,6 +20,9 @@ import {
 
 /** Fixed "today" so a day or retention window never depends on when the suite runs. */
 const NOW = new Date("2026-08-20T18:00:00.000Z");
+
+/** The window the bucket helpers take, in UTC — the zone every figure here meant. */
+const utcDays = (days: number) => segmentsEndingOn(NOW.toISOString().slice(0, 10), days, "UTC");
 
 function seedServices(db: DatabaseSync, ids: readonly string[]): void {
   const insert = db.prepare(
@@ -490,7 +494,7 @@ test("saveStatus persists component state and appends component samples", async 
     { id: "c1", name: "Actions", status: "degraded" },
     { id: "c2", name: "Pages", status: "operational" },
   ]);
-  const buckets = await store.getComponentDailyBuckets("github", "c1", 7);
+  const buckets = await store.getComponentDailyBuckets("github", "c1", utcDays(7));
   assert.equal(buckets.length, 1);
   assert.equal(buckets[0]?.worstStatus, "degraded");
   assert.equal(buckets[0]?.okSamples, 0);
@@ -508,7 +512,7 @@ test("an unknown component status writes no sample", async () => {
     maintenances: [],
     fetchedAt: "2026-08-20T10:00:00.000Z",
   });
-  assert.deepEqual(await store.getComponentDailyBuckets("github", "c1", 7), []);
+  assert.deepEqual(await store.getComponentDailyBuckets("github", "c1", utcDays(7)), []);
   await store.close();
 });
 
@@ -524,7 +528,7 @@ test("pruning removes old component samples", async () => {
     fetchedAt: old,
   });
   await store.pruneOlderThan(30);
-  assert.deepEqual(await store.getComponentDailyBuckets("github", "c1", 365), []);
+  assert.deepEqual(await store.getComponentDailyBuckets("github", "c1", utcDays(365)), []);
   await store.close();
 });
 
@@ -716,6 +720,53 @@ test("a sample records which adapter revision read it, and null when nobody said
   assert.deepEqual(
     components.map((row) => row.adapter_version),
     [3, null],
+  );
+  await store.close();
+});
+
+test("daily buckets follow the operator's calendar day, not UTC's", async () => {
+  const { store } = await harness();
+  // 22:30 UTC on the 19th is already 11:30 on the 20th in Auckland.
+  await store.saveStatus(snap({ overallStatus: "operational", fetchedAt: "2026-01-19T22:30:00.000Z" }));
+  await store.saveStatus(snap({ overallStatus: "major_outage", fetchedAt: "2026-01-19T02:00:00.000Z" }));
+
+  const utc = await store.getDailyBuckets("github", segmentsEndingOn("2026-01-20", 3, "UTC"));
+  assert.deepEqual(
+    utc.map((bucket) => [bucket.day, bucket.totalSamples]),
+    [["2026-01-19", 2]],
+  );
+
+  const auckland = await store.getDailyBuckets(
+    "github",
+    segmentsEndingOn("2026-01-20", 3, "Pacific/Auckland"),
+  );
+  assert.deepEqual(
+    auckland.map((bucket) => [bucket.day, bucket.totalSamples, bucket.worstStatus]),
+    [
+      ["2026-01-19", 1, "major_outage"],
+      ["2026-01-20", 1, "operational"],
+    ],
+  );
+  await store.close();
+});
+
+test("a day cut in half by a DST transition is counted once, from both sides", async () => {
+  const { store } = await harness();
+  // Italy springs forward at 01:00 UTC on 2026-03-29. Both readings are on the
+  // same Italian calendar day, one either side of the seam.
+  await store.saveStatus(snap({ overallStatus: "operational", fetchedAt: "2026-03-29T00:30:00.000Z" }));
+  await store.saveStatus(snap({ overallStatus: "major_outage", fetchedAt: "2026-03-29T05:00:00.000Z" }));
+  // And one on the evening of the 28th in Italy, which UTC still calls the 28th
+  // too — the neighbour that proves the seam did not drag a day across.
+  await store.saveStatus(snap({ overallStatus: "degraded", fetchedAt: "2026-03-28T22:30:00.000Z" }));
+
+  const buckets = await store.getDailyBuckets("github", segmentsEndingOn("2026-03-30", 4, "Europe/Rome"));
+  assert.deepEqual(
+    buckets.map((bucket) => [bucket.day, bucket.totalSamples, bucket.okSamples, bucket.worstStatus]),
+    [
+      ["2026-03-28", 1, 0, "degraded"],
+      ["2026-03-29", 2, 1, "major_outage"],
+    ],
   );
   await store.close();
 });

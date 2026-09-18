@@ -1,3 +1,4 @@
+import type { DaySegment } from "./calendarDays.ts";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { MessageRefStore } from "../core/messageRefStore.interface.ts";
 import type { StateStore } from "../core/stateStore.interface.ts";
@@ -105,7 +106,7 @@ export interface NotificationCounts {
 }
 
 export interface DailyBucket {
-  /** UTC calendar day, `YYYY-MM-DD`. */
+  /** Calendar day in the operator's zone, `YYYY-MM-DD` — roadmap 10.7. */
   day: string;
   /** Worst status seen that day. `unknown` only when nothing better was seen. */
   worstStatus: OverallStatus;
@@ -121,10 +122,23 @@ export interface IncidentNote {
 }
 
 export interface HistoryStore extends StateStore, MessageRefStore {
-  /** One row per day that has samples, oldest first. Days with none are absent. */
-  getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]>;
+  /**
+   * One row per day that has samples, oldest first. Days with none are absent.
+   *
+   * The window arrives as segments of constant UTC offset rather than as a
+   * number of days — roadmap 10.7. The store does not know what zone the
+   * operator reads in, and should not: `calendarDays.ts` turns the preference
+   * into stretches over which one fixed offset is correct, and the store
+   * aggregates each of them with it. A day cut in half by a DST transition is
+   * reported once, summed across the two segments it lies in.
+   */
+  getDailyBuckets(providerId: string, segments: readonly DaySegment[]): Promise<DailyBucket[]>;
   /** Daily buckets for one selected component, same shape as the provider's. */
-  getComponentDailyBuckets(providerId: string, componentId: string, days: number): Promise<DailyBucket[]>;
+  getComponentDailyBuckets(
+    providerId: string,
+    componentId: string,
+    segments: readonly DaySegment[],
+  ): Promise<DailyBucket[]>;
   /** Every configured provider, enabled or not: its history is real either way. */
   listProviderIds(): Promise<string[]>;
   recordNotification(record: SentRecord): Promise<void>;

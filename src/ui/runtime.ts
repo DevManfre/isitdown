@@ -71,6 +71,8 @@ export interface UiRuntimeCore {
   dispatcher: Dispatcher;
   store: HistoryStore;
   history: ReturnType<typeof createHistoryService>;
+  /** The operator's timezone preference, read fresh — roadmap 10.7. */
+  timeZone(): string;
   /** Monthly targets and what the month has spent of them — roadmap 4.13. */
   sla: ReturnType<typeof createSlaService>;
   /** How closely each cross-checked page tracked what a probe observed — roadmap 8.1. */
@@ -162,7 +164,15 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   const secrets = await loadSecretsFile(secretsPath, options.env, logger);
 
   const store = createSqliteStateStore(db);
-  const history = createHistoryService(store);
+  /**
+   * The zone every calendar day in this edition is read in — roadmap 10.7.
+   * A function rather than a value: the preference changes from the dashboard
+   * without a restart, and a captured copy would keep drawing yesterday's day
+   * boundaries onto today's bars.
+   */
+  const timeZone = (): string => readSettings(db, logger).timeZone;
+
+  const history = createHistoryService(store, { timeZone });
   // Roadmap 4.13. Reads the same monthly report the export and the History view
   // are drawn from, so a budget can never disagree with the uptime beside it.
   const sla = createSlaService({ history });
@@ -375,6 +385,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     dispatcher,
     store,
     history,
+    timeZone,
     sla,
     trust,
     trustPairs,

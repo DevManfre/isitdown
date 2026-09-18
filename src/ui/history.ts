@@ -1,7 +1,7 @@
 import type { DailyBucket, HistoryStore, IncidentRow } from "./historyStore.interface.ts";
+import { offsetSegments, resolveZone, shiftDay, zonedDayKey } from "./calendarDays.ts";
 import type { OverallStatus } from "../core/types.ts";
 
-const DAY_MS = 24 * 3600 * 1000;
 /**
  * Enough days to cover a 90-day view, the 90-day window it is compared
  * against, and four calendar months.
@@ -174,6 +174,16 @@ export interface MonthlyReport {
 export interface HistoryServiceDeps {
   /** Injected so day bucketing does not depend on when a test runs. */
   now?: (() => Date) | undefined;
+  /**
+   * Which zone a calendar day is read in — roadmap 10.7. Read per call rather
+   * than captured at construction, because it is an operator preference that
+   * changes without a restart, and a service holding a stale one would draw
+   * yesterday's boundaries onto today's bars.
+   *
+   * Absent means UTC, which is what every figure here meant before the
+   * preference reached it.
+   */
+  timeZone?: (() => Promise<string> | string) | undefined;
 }
 
 /**
@@ -188,30 +198,27 @@ export interface HistoryServiceDeps {
  */
 export function createHistoryService(store: HistoryStore, deps: HistoryServiceDeps = {}) {
   const now = deps.now ?? (() => new Date());
-
-  const dayKey = (date: Date): string => date.toISOString().slice(0, 10);
-
-  /**
-   * The day a window ends on, as a Date the rest of this file can subtract
-   * from: today, or the end of an arbitrary range (roadmap 5.5). Anchored at
-   * the end of that UTC day so `dayKey` reads it back as the day asked for
-   * whatever the process's own zone.
-   */
-  const anchorOf = (endDay: string | undefined): Date =>
-    endDay === undefined ? now() : new Date(`${endDay}T23:59:59.999Z`);
+  const zoneOf = async (): Promise<string> => resolveZone((await deps.timeZone?.()) ?? "UTC");
 
   /**
-   * How many days of buckets have to be read to cover a window that ends in the
-   * past. The store answers "the last N days from now", so a range ending three
-   * months ago needs those three months on top of its own span.
+   * The day a window ends on: today in the operator's zone, or the end of an
+   * arbitrary range (roadmap 5.5). A day key rather than a Date, because every
+   * window in this file is counted in calendar days and a calendar day is not
+   * always 24 hours long — see `shiftDay`.
    */
-  const lookbackFor = (days: number, anchor: Date): number => {
-    const behind = Math.max(0, Math.ceil((now().getTime() - anchor.getTime()) / DAY_MS));
-    return Math.max(WINDOW_DAYS, days + behind);
-  };
+  const anchorOf = (endDay: string | undefined, zone: string): string =>
+    endDay ?? zonedDayKey(now(), zone);
 
-  function uptimeOver(buckets: DailyBucket[], days: number, today: Date): number {
-    const from = dayKey(new Date(today.getTime() - (days - 1) * DAY_MS));
+  /**
+   * The first day of buckets a window needs. Twice the window, so the
+   * previous-window delta is covered, and never less than `WINDOW_DAYS`, which
+   * is what the four months of month totals need.
+   */
+  const bucketsFrom = (days: number, anchorDay: string): string =>
+    shiftDay(anchorDay, -(Math.max(WINDOW_DAYS, days * 2) - 1));
+
+  function uptimeOver(buckets: DailyBucket[], days: number, todayKey: string): number {
+    const from = shiftDay(todayKey, -(days - 1));
     let ok = 0;
     let total = 0;
     for (const bucket of buckets) {
@@ -223,11 +230,11 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     return total === 0 ? 0 : round2((ok / total) * 100);
   }
 
-  function fill(buckets: DailyBucket[], days: number, today: Date): HistoryBucket[] {
+  function fill(buckets: DailyBucket[], days: number, todayKey: string): HistoryBucket[] {
     const byDay = new Map(buckets.map((bucket) => [bucket.day, bucket]));
     const filled: HistoryBucket[] = [];
     for (let offset = days - 1; offset >= 0; offset -= 1) {
-      const day = dayKey(new Date(today.getTime() - offset * DAY_MS));
+      const day = shiftDay(todayKey, -offset);
       // A day with no samples is rendered, not skipped: dropping it would shift
       // every later bar and quietly misdate the whole row.
       filled.push({ day, status: byDay.get(day)?.worstStatus ?? "unknown" });
@@ -241,11 +248,11 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
    * answer different questions, and on an unmeasured day one is `"unknown"`
    * while the other is `null`.
    */
-  function dailySeriesOf(buckets: DailyBucket[], days: number, today: Date): DayUptime[] {
+  function dailySeriesOf(buckets: DailyBucket[], days: number, todayKey: string): DayUptime[] {
     const byDay = new Map(buckets.map((bucket) => [bucket.day, bucket]));
     const series: DayUptime[] = [];
     for (let offset = days - 1; offset >= 0; offset -= 1) {
-      const day = dayKey(new Date(today.getTime() - offset * DAY_MS));
+      const day = shiftDay(todayKey, -offset);
       const bucket = byDay.get(day);
       series.push({
         day,
@@ -283,13 +290,13 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
    * alignment between two providers' series is an assumption, not a
    * guarantee. A day is `null` when no provider measured it.
    */
-  function aggregateDaily(providers: ProviderHistory[], days: number, today: Date): DayUptime[] {
+  function aggregateDaily(providers: ProviderHistory[], days: number, todayKey: string): DayUptime[] {
     const byProvider = providers.map(
       (provider) => new Map(provider.dailySeries.map((entry) => [entry.day, entry.uptime])),
     );
     const series: DayUptime[] = [];
     for (let offset = days - 1; offset >= 0; offset -= 1) {
-      const day = dayKey(new Date(today.getTime() - offset * DAY_MS));
+      const day = shiftDay(todayKey, -offset);
       const measured: number[] = [];
       for (const provider of byProvider) {
         const uptime = provider.get(day);
@@ -312,8 +319,12 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     intervalMinutes: number,
     endDay?: string | undefined,
   ): Promise<ProviderHistory> {
-    const today = anchorOf(endDay);
-    const buckets = await store.getDailyBuckets(providerId, lookbackFor(days, today));
+    const zone = await zoneOf();
+    const today = anchorOf(endDay, zone);
+    const buckets = await store.getDailyBuckets(
+      providerId,
+      offsetSegments(bucketsFrom(days, today), today, zone),
+    );
     // `days` is anchored on now inside the store, so a window that ends in the
     // past has to name its two ends instead. The fixed windows keep asking the
     // way they always have: `days` counts incidents that *started* in the
@@ -323,16 +334,12 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     const incidents = await store.listIncidents(
       endDay === undefined
         ? { providerId, days }
-        : {
-            providerId,
-            openFrom: dayKey(new Date(today.getTime() - (days - 1) * DAY_MS)),
-            openTo: dayKey(today),
-          },
+        : { providerId, openFrom: shiftDay(today, -(days - 1)), openTo: today },
     );
 
     let notOk = 0;
     let sampleCount = 0;
-    const from = dayKey(new Date(today.getTime() - (days - 1) * DAY_MS));
+    const from = shiftDay(today, -(days - 1));
     for (const bucket of buckets) {
       if (bucket.day < from) continue;
       notOk += bucket.totalSamples - bucket.okSamples;
@@ -349,11 +356,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
       incidentCount: incidents.length,
       downtimeMinutes: notOk * intervalMinutes,
       dailySeries: dailySeriesOf(buckets, days, today),
-      previousUptime: uptimeBetween(
-        buckets,
-        dayKey(new Date(today.getTime() - (2 * days - 1) * DAY_MS)),
-        dayKey(new Date(today.getTime() - days * DAY_MS)),
-      ),
+      previousUptime: uptimeBetween(buckets, shiftDay(today, -(2 * days - 1)), shiftDay(today, -days)),
     };
   }
 
@@ -362,11 +365,13 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     selection: { id: string; name: string }[],
     days: number,
   ): Promise<ComponentHistory[]> {
-    const today = now();
-    const from = dayKey(new Date(today.getTime() - (days - 1) * DAY_MS));
+    const zone = await zoneOf();
+    const today = zonedDayKey(now(), zone);
+    const from = shiftDay(today, -(days - 1));
+    const segments = offsetSegments(shiftDay(today, -(WINDOW_DAYS - 1)), today, zone);
     return Promise.all(
       selection.map(async ({ id, name }) => {
-        const buckets = await store.getComponentDailyBuckets(providerId, id, WINDOW_DAYS);
+        const buckets = await store.getComponentDailyBuckets(providerId, id, segments);
         let sampleCount = 0;
         for (const bucket of buckets) {
           if (bucket.day < from) continue;
@@ -394,8 +399,12 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
    * so the samples are there; this is the view that shows them.
    */
   async function getProviderCalendar(providerId: string, days: number): Promise<ProviderCalendar> {
-    const today = now();
-    const buckets = await store.getDailyBuckets(providerId, days);
+    const zone = await zoneOf();
+    const today = zonedDayKey(now(), zone);
+    const buckets = await store.getDailyBuckets(
+      providerId,
+      offsetSegments(shiftDay(today, -(days - 1)), today, zone),
+    );
     const uptimeByDay = new Map(dailySeriesOf(buckets, days, today).map((entry) => [entry.day, entry.uptime]));
 
     return {
@@ -430,28 +439,27 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     intervalMinutes: number,
     only?: string[] | undefined,
   ): Promise<MonthlyReport> {
-    const today = now();
-    const todayKey = dayKey(today);
-    const start = new Date(`${month}-01T00:00:00.000Z`);
-    // The last day of the month is the day before the first of the next one.
-    const nextMonth = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
-    const lastDay = dayKey(new Date(nextMonth.getTime() - DAY_MS));
-    const to = lastDay > todayKey ? todayKey : lastDay;
+    const zone = await zoneOf();
+    const todayKey = zonedDayKey(now(), zone);
     const from = `${month}-01`;
+    // The last day of the month is the day before the first of the next one.
+    // Calendar arithmetic on the key, so a month containing a DST transition is
+    // still exactly as many days long as the calendar says.
+    const [year, monthNumber] = month.split("-").map(Number) as [number, number];
+    const lastDay = shiftDay(new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10), -1);
+    const to = lastDay > todayKey ? todayKey : lastDay;
 
-    // How far back the store has to reach for the month to be inside the
-    // window. `getDailyBuckets` counts days back from today, which is the one
-    // thing it knows how to do, so the month is selected from what comes back.
-    const daysBack = Math.max(1, Math.round((today.getTime() - start.getTime()) / DAY_MS) + 1);
+    // The month is asked for directly now rather than selected out of a window
+    // counted back from today: the store takes two ends, so a report on a month
+    // two years ago reads that month and nothing else.
+    const segments = offsetSegments(from, to, zone);
 
     const providerIds = only ?? (await store.listProviderIds());
     const providers: MonthlyProviderReport[] = [];
     const incidents: IncidentRow[] = [];
 
     for (const providerId of providerIds) {
-      const buckets = (await store.getDailyBuckets(providerId, daysBack)).filter(
-        (bucket) => bucket.day >= from && bucket.day <= to,
-      );
+      const buckets = await store.getDailyBuckets(providerId, segments);
 
       let ok = 0;
       let total = 0;
@@ -521,20 +529,23 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     only?: string[] | undefined,
     endDay?: string | undefined,
   ): Promise<HistorySummary> {
-    const today = anchorOf(endDay);
+    const zone = await zoneOf();
+    const today = anchorOf(endDay, zone);
     const stored = await store.listProviderIds();
     const providerIds = only === undefined ? stored : stored.filter((id) => only.includes(id));
     const providers = await Promise.all(
       providerIds.map((providerId) => getProviderHistory(providerId, days, intervalMinutes, endDay)),
     );
 
+    const [anchorYear, anchorMonth] = today.split("-").map(Number) as [number, number];
     const monthTotals = new Map<string, { ok: number; total: number }>();
     for (let back = MONTHS_SHOWN - 1; back >= 0; back -= 1) {
-      const month = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - back, 1));
+      const month = new Date(Date.UTC(anchorYear, anchorMonth - 1 - back, 1));
       monthTotals.set(month.toISOString().slice(0, 7), { ok: 0, total: 0 });
     }
+    const segments = offsetSegments(bucketsFrom(days, today), today, zone);
     for (const providerId of providerIds) {
-      for (const bucket of await store.getDailyBuckets(providerId, lookbackFor(days, today))) {
+      for (const bucket of await store.getDailyBuckets(providerId, segments)) {
         const totals = monthTotals.get(bucket.day.slice(0, 7));
         if (totals === undefined) continue;
         totals.ok += bucket.okSamples;
