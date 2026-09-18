@@ -23,6 +23,7 @@ type FixtureKey =
   | "componentHistory"
   | "providerCalendar"
   | "reliability"
+  | "messagePreview"
   | "annotations"
   | "map"
   | "preferences"
@@ -45,6 +46,8 @@ export interface Fixtures {
   providerCalendar?: unknown;
   /** `/reliability` — MTTR, MTBF and the weekday-hour grid (roadmap 12.2, 12.3). */
   reliability?: unknown;
+  /** `/notifications/preview` — what each channel would say (roadmap 14.1). */
+  messagePreview?: unknown;
   /** `/annotations` — the operator's own timeline markers (roadmap 12.1). */
   annotations?: unknown;
   map?: unknown;
@@ -81,7 +84,9 @@ export function stubApi(fixtures: Fixtures): void {
     "fetch",
     vi.fn(async (input: string) => {
       const path = String(input);
-      const key: FixtureKey = path.startsWith("/reliability")
+      const key: FixtureKey = path.startsWith("/notifications/preview")
+        ? "messagePreview"
+        : path.startsWith("/reliability")
         ? "reliability"
         : path.startsWith("/annotations")
           ? "annotations"
@@ -146,6 +151,7 @@ export function stubApi(fixtures: Fixtures): void {
           ),
         },
         annotations: { annotations: [] },
+        messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },
       };
       const fixture = fixtures[key] ?? EMPTY[key];
       const body =

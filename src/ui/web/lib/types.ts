@@ -138,6 +138,23 @@ export interface ProviderHistory {
  * an install that predates this trace has no cycles recorded for its past, and
  * drawing that as an outage of ours would be a claim made out of missing data.
  */
+/** What one channel would say about an invented transition — roadmap 14.1. */
+export interface ChannelPreview {
+  channel: string;
+  enabled: boolean;
+  locale: string;
+  templated: boolean;
+  /** Null for a channel that builds a structure of its own: see `parts`. */
+  text: string | null;
+  parts: { heading: string; detail: string; url: string };
+}
+
+export interface MessagePreview {
+  kind: string;
+  provider: string;
+  channels: ChannelPreview[];
+}
+
 /** One provider's reliability over a window — roadmap 12.2. */
 export interface ProviderReliability {
   providerId: string;

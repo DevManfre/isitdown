@@ -20,6 +20,7 @@ import type {
   MapResponse,
   OverallStatus,
   Preferences,
+  MessagePreview,
   ProviderCalendar,
   ReliabilityReport,
   SlaResponse,
@@ -164,6 +165,13 @@ export const getProviderCalendar = (provider: string) =>
   request<ProviderCalendar>(
     "GET",
     `/history/calendar?provider=${encodeURIComponent(provider)}`,
+  );
+
+/** What every configured channel would say — roadmap 14.1. Sends nothing. */
+export const getMessagePreview = (kind: string) =>
+  request<MessagePreview>(
+    "GET",
+    `/notifications/preview?kind=${encodeURIComponent(kind)}`,
   );
 
 /** Per-provider MTTR and MTBF, and incidents by weekday and hour — roadmap 12.2, 12.3. */

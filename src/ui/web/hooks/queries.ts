@@ -286,6 +286,20 @@ export const useIncident = (providerId: string, incidentId: string) => {
 };
 
 /**
+ * What each channel would say about one invented transition — roadmap 14.1.
+ *
+ * `enabled` rather than always on: nothing here is worth a request on a
+ * Settings page nobody has opened the dialog on. No polling either — the answer
+ * changes when the operator changes a channel, not on a timer.
+ */
+export const useMessagePreview = (kind: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ["message-preview", kind],
+    queryFn: () => api.getMessagePreview(kind),
+    enabled,
+  });
+
+/**
  * Supplier reliability and the weekday-hour grid — roadmap 12.2 and 12.3.
  *
  * One query for both, because the server answers both from one walk of the
