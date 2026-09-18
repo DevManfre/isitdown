@@ -40,6 +40,7 @@ test("migrate creates every table the dashboard reads", async () => {
     "settings",
     "sla_notices",
     "status_samples",
+    "trust_episodes",
   ]);
   db.close();
 });

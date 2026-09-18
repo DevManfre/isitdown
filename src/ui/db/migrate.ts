@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -457,6 +457,43 @@ export function migrate(db: DatabaseSync): void {
         notified_at TEXT NOT NULL,
         PRIMARY KEY (provider_id, month)
       );
+    `);
+  }
+
+  if (from < 20) {
+    // Provider trust episodes — roadmap 8.1. One row per closed disagreement
+    // between a probe and the page that is supposed to speak for it.
+    //
+    // A table rather than an aggregation over `status_samples` on every read,
+    // for the reason 7.4 measured: the two endpoints that fall over at scale
+    // are exactly the ones that aggregate over samples, and a card with a
+    // selectable window would re-aggregate on every change of window. Episodes
+    // are few — ten of them is the floor for showing anything at all — so the
+    // window filter here reads a small table instead.
+    //
+    // `component_id` is `''` rather than NULL for the aggregate comparison:
+    // SQLite counts NULLs as distinct in a UNIQUE constraint, so a nullable
+    // column would let the same episode be written twice.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS trust_episodes (
+        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+        probe_id           TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        page_id            TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        component_id       TEXT NOT NULL DEFAULT '',
+        probe_down_at      TEXT NOT NULL,
+        probe_up_at        TEXT NOT NULL,
+        page_admitted_at   TEXT,
+        page_cleared_at    TEXT,
+        outcome            TEXT NOT NULL,
+        excluded           TEXT,
+        delay_minutes      INTEGER,
+        observed_minutes   INTEGER NOT NULL,
+        admitted_minutes   INTEGER NOT NULL,
+        resolution_minutes INTEGER NOT NULL,
+        UNIQUE (probe_id, page_id, component_id, probe_down_at)
+      );
+      CREATE INDEX IF NOT EXISTS idx_trust_episodes_pair_time
+        ON trust_episodes (probe_id, page_id, component_id, probe_down_at);
     `);
   }
 

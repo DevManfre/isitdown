@@ -268,6 +268,45 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "404": notFound },
     },
   },
+  "/trust": {
+    get: {
+      tags: ["History"],
+      summary: "How closely each cross-checked status page tracked what a probe observed.",
+      description:
+        "Roadmap 8.1. One card per probe that names a page in `crossChecks`: median and p90 admission delay, how much of the observed outage the page had an incident open for, and how many episodes it never mentioned — three axes, never one score. A card whose window holds fewer than ten counted episodes reports the count and nothing else. A fleet with no probe returns an empty list.",
+      parameters: [query("days", "Window in days: 30, 90 or 365.", { type: "integer" })],
+      responses: { "200": ok({ type: "object" }) },
+    },
+  },
+  "/trust/{key}/episodes": {
+    get: {
+      tags: ["History"],
+      summary: "Every disagreement behind one trust card, newest first.",
+      description:
+        "Excluded episodes included, with their reason: they are how the excluded counts on the card can be checked.",
+      parameters: [
+        { name: "key", in: "path", required: true, schema: { type: "string" }, description: "`<probe>-><page>` or `<probe>-><page>#<component>`." },
+        query("days", "Window in days: 30, 90 or 365.", { type: "integer" }),
+      ],
+      responses: { "200": ok({ type: "object" }), "404": notFound },
+    },
+  },
+  "/export/trust.csv": {
+    get: {
+      tags: ["Export"],
+      summary: "One row per trust episode, pair repeated on each.",
+      parameters: [query("days", "Window in days.", { type: "integer" })],
+      responses: { "200": media("text/csv", "The episodes.") },
+    },
+  },
+  "/export/trust.json": {
+    get: {
+      tags: ["Export"],
+      summary: "Trust cards with their episodes, exclusions and vantage point.",
+      parameters: [query("days", "Window in days.", { type: "integer" })],
+      responses: { "200": ok({ type: "object" }) },
+    },
+  },
   "/export/monthly.md": {
     get: {
       tags: ["Export"],

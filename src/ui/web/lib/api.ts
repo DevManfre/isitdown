@@ -21,6 +21,7 @@ import type {
   Preferences,
   ProviderCalendar,
   SlaResponse,
+  TrustResponse,
   ProviderHistory,
   HistorySummary,
   RoutingResponse,
@@ -117,6 +118,9 @@ export const getProviderCalendar = (provider: string) =>
 
 /** Monthly targets and what the month has spent of them — roadmap 4.13. */
 export const getSla = () => request<SlaResponse>("GET", "/sla");
+
+/** Status-page accuracy per cross-checked pair — roadmap 8.1. */
+export const getTrust = (days: number) => request<TrustResponse>("GET", `/trust?days=${days}`);
 
 export const getComponentHistory = (provider: string, days: number) =>
   request<ComponentHistoryResponse>(
