@@ -55,6 +55,22 @@ describe("Overview", () => {
     );
   });
 
+  it("a provider nobody could read is not counted among the ones that are down", async () => {
+    renderWithProviders(<Overview />, {
+      status: {
+        providers: [providerFixture({ overallStatus: "unknown" })],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
+      history,
+    });
+
+    expect(await screen.findByText(i18n.t("overview.title.unreadable", { count: 1 }))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("overview.title.down", { count: 1 }))).toBeNull();
+    expect(screen.queryByText(i18n.t("overview.title.all-operational"))).toBeNull();
+  });
+
   it("offers an incident-details action only when an incident is open", async () => {
     renderWithProviders(<Overview />, {
       status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
