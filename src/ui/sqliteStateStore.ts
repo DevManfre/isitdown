@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { DaySegment } from "./calendarDays.ts";
+import type { PollCycle } from "./coverage.ts";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { ProviderRuntimeState, SaveStatusMeta } from "../core/stateStore.interface.ts";
 import {
@@ -121,6 +122,12 @@ const bucketRowSchema = z.object({
   worst: z.number(),
   ok_samples: z.number(),
   total_samples: z.number(),
+});
+
+const pollCycleRowSchema = z.object({
+  started_at: z.string(),
+  finished_at: z.string(),
+  interval_minutes: z.number(),
 });
 
 const sampleRowSchema = z.object({
@@ -363,6 +370,13 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
   const resolveMissing = db.prepare(
     "UPDATE incidents SET resolved_at = ? WHERE provider_id = ? AND resolved_at IS NULL",
   );
+  // Poller liveness — roadmap 10.1. Append-only and tiny: one row per cycle is
+  // 480 rows a day at the three-minute default, which is two days of one
+  // provider's samples.
+  const insertPollCycle = db.prepare(
+    "INSERT INTO poll_cycles (started_at, finished_at, interval_minutes, providers) VALUES (?, ?, ?, ?)",
+  );
+
   const insertNotification = db.prepare(
     "INSERT INTO notifications (provider_id, channel, kind, text, sent_at, ok, error, attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
@@ -832,6 +846,30 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       );
     },
 
+    async recordPollCycle(cycle: PollCycle & { providers: number }): Promise<void> {
+      insertPollCycle.run(
+        cycle.startedAt,
+        cycle.finishedAt,
+        cycle.intervalMinutes,
+        cycle.providers,
+      );
+    },
+
+    async listPollCycles(fromIso: string, toIso: string): Promise<PollCycle[]> {
+      return db
+        .prepare(
+          `SELECT started_at, finished_at, interval_minutes
+           FROM poll_cycles WHERE started_at >= ? AND started_at < ? ORDER BY started_at ASC`,
+        )
+        .all(fromIso, toIso)
+        .map((raw) => pollCycleRowSchema.parse(raw))
+        .map((row) => ({
+          startedAt: row.started_at,
+          finishedAt: row.finished_at,
+          intervalMinutes: row.interval_minutes,
+        }));
+    },
+
     async listProviderIds(): Promise<string[]> {
       return db
         .prepare("SELECT id FROM services ORDER BY id")
@@ -858,6 +896,9 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       db.prepare("DELETE FROM status_samples WHERE observed_at < ?").run(cutoff);
       db.prepare("DELETE FROM component_samples WHERE observed_at < ?").run(cutoff);
       db.prepare("DELETE FROM notifications WHERE sent_at < ?").run(cutoff);
+      // On the same cutoff as the samples: a day whose samples are gone has no
+      // chart left to hatch, and keeping its liveness would only grow.
+      db.prepare("DELETE FROM poll_cycles WHERE started_at < ?").run(cutoff);
       db.prepare("DELETE FROM incidents WHERE resolved_at IS NOT NULL AND resolved_at < ?").run(cutoff);
       db.prepare("DELETE FROM maintenances WHERE ends_at IS NOT NULL AND ends_at < ?").run(cutoff);
     },

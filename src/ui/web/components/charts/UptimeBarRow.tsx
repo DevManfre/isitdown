@@ -1,8 +1,22 @@
+import { useId } from "react";
 import { Bar, BarChart, Cell, XAxis, YAxis } from "recharts";
 import { useTranslation } from "react-i18next";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart.tsx";
-import { chartConfigFor, severity, statusFill, statusLabelKey, statusMuted, type BarScale } from "@/lib/chartConfig.ts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart.tsx";
+import {
+  chartConfigFor,
+  coverageIsPartial,
+  severity,
+  statusFill,
+  statusLabelKey,
+  statusMuted,
+  type BarScale,
+} from "@/lib/chartConfig.ts";
 import { tallyStatuses } from "@/lib/chartSummary.ts";
+import { useCoverage } from "@/lib/coverage.tsx";
 import { formatDay } from "@/lib/format.ts";
 import type { HistoryBucket } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
@@ -17,14 +31,36 @@ const HEIGHT: Record<BarScale, number> = { row: 44, compact: 22, poll: 26 };
  * the double-play bug this port is meant to end.
  */
 export function UptimeBarRow({
-  buckets, scale = "row", className, showAxis = false,
-}: { buckets: HistoryBucket[]; scale?: BarScale; className?: string; showAxis?: boolean }) {
+  buckets,
+  scale = "row",
+  className,
+  showAxis = false,
+}: {
+  buckets: HistoryBucket[];
+  scale?: BarScale;
+  className?: string;
+  showAxis?: boolean;
+}) {
   const { t, i18n } = useTranslation();
+  // Roadmap 10.1: the days the poller was not running all the way through.
+  const observedByDay = useCoverage();
+  // Namespaced, because two bar rows on one page would otherwise define the
+  // same pattern ids and the second would silently win.
+  const patternPrefix = useId();
   const data = buckets.map((bucket) => ({
     day: bucket.day,
     status: bucket.status,
     value: severity(bucket.status, scale),
+    partial: coverageIsPartial(observedByDay.get(bucket.day)),
   }));
+  // One pattern per status actually drawn partial, at most five. An SVG bar
+  // cannot layer two fills the way a CSS background can, so the status colour
+  // goes inside the pattern and the stripes are drawn over it.
+  const hatched = [
+    ...new Set(
+      data.filter((entry) => entry.partial).map((entry) => entry.status),
+    ),
+  ];
 
   return (
     <ChartContainer
@@ -37,12 +73,19 @@ export function UptimeBarRow({
       // which a keyboard or a screen reader never reaches; the label answers
       // "how did the window go" without one.
       role="img"
-      aria-label={t("chart.days-summary", tallyStatuses(data.map((entry) => entry.status)))}
+      aria-label={t(
+        "chart.days-summary",
+        tallyStatuses(data.map((entry) => entry.status)),
+      )}
       // The tick row is extra height, not a slice out of the bars': without the
       // 22px the axis would draw over the shortest of them.
       style={{ height: HEIGHT[scale] + (showAxis ? 22 : 0) }}
     >
-      <BarChart data={data} barCategoryGap={1} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+      <BarChart
+        data={data}
+        barCategoryGap={1}
+        margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      >
         {/* Opt-in, defaulting to off: `FleetRows` renders this at
             `scale="compact"` (22px), where a tick row would be taller than the
             bars it labels. Only the drawer, which has the room, asks for it. */}
@@ -89,11 +132,30 @@ export function UptimeBarRow({
             />
           }
         />
+        <defs>
+          {hatched.map((status) => (
+            <pattern
+              key={status}
+              id={`${patternPrefix}-${status}`}
+              width="4"
+              height="4"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
+              <rect width="4" height="4" fill={statusFill(status)} />
+              <rect width="1" height="4" fill="var(--color-surface)" />
+            </pattern>
+          ))}
+        </defs>
         <Bar dataKey="value" isAnimationActive={false} radius={1}>
           {data.map((entry) => (
             <Cell
               key={entry.day}
-              fill={statusFill(entry.status)}
+              fill={
+                entry.partial
+                  ? `url(#${patternPrefix}-${entry.status})`
+                  : statusFill(entry.status)
+              }
               opacity={statusMuted(entry.status) ? 0.45 : 1}
             />
           ))}

@@ -86,6 +86,31 @@ export const statusLabelKey = (status: string) => STATUS_CHART[known(status)].la
 export const statusMuted = (status: string) => known(status) === "unknown";
 
 /**
+ * How a day the poller was not running is drawn — roadmap 10.1.
+ *
+ * Hatching rather than another colour, and deliberately not a status: "nobody
+ * was watching" is a statement about us, not about the provider, and giving it
+ * a fill in the status scale would put it on the same axis as `operational` and
+ * `major_outage`. Diagonal stripes over whatever the day's status happened to
+ * be say "this reading covers only part of the day" without claiming the day was
+ * good or bad.
+ *
+ * Below this fraction a day is hatched. Not zero, because a cycle that ran long
+ * or a restart between two of them leaves a sliver missing on a day nothing was
+ * wrong with, and hatching that would make the caveat meaningless by putting it
+ * everywhere.
+ */
+export const COVERAGE_HATCH_BELOW = 0.95;
+
+/** Whether a day's coverage is poor enough to be marked. `null` never is. */
+export const coverageIsPartial = (observed: number | null | undefined): boolean =>
+  observed !== null && observed !== undefined && observed < COVERAGE_HATCH_BELOW;
+
+/** The stripes themselves, as a CSS background layer to sit over a bar's fill. */
+export const COVERAGE_HATCH_CSS =
+  "repeating-linear-gradient(135deg, transparent 0 2px, var(--color-surface) 2px 3px)";
+
+/**
  * The three colours an operator reads at a glance, plus "not measured".
  *
  * The five statuses carry the detail; a tier carries the verdict. `degraded`

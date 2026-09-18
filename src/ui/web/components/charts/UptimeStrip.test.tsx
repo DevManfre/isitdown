@@ -1,6 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { UptimeStrip } from "./UptimeStrip.tsx";
+import { CoverageProvider } from "@/lib/coverage.tsx";
 import type { HistoryBucket, OverallStatus } from "@/lib/types.ts";
 
 const buckets = (...statuses: OverallStatus[]): HistoryBucket[] =>
@@ -39,5 +40,35 @@ describe("UptimeStrip", () => {
   it("draws nothing at all for a provider with no history yet", () => {
     const { container } = render(<UptimeStrip buckets={[]} />);
     expect(bars(container)).toHaveLength(0);
+  });
+});
+
+describe("UptimeStrip and the poller's own gaps", () => {
+  it("hatches a day the poller only partly covered, and leaves a covered day alone", () => {
+    const { container } = render(
+      <CoverageProvider
+        coverage={[
+          { day: "2026-08-01", observed: 1 },
+          { day: "2026-08-02", observed: 0.4 },
+        ]}
+      >
+        <UptimeStrip buckets={buckets("operational", "operational")} />
+      </CoverageProvider>,
+    );
+    expect(bars(container).map((bar) => bar.dataset.partial)).toEqual([undefined, ""]);
+  });
+
+  it("marks nothing when coverage is unknown, rather than claiming the days were watched", () => {
+    const { container } = render(
+      <CoverageProvider coverage={[{ day: "2026-08-01", observed: null }]}>
+        <UptimeStrip buckets={buckets("operational")} />
+      </CoverageProvider>,
+    );
+    expect(bars(container)[0]?.dataset.partial).toBeUndefined();
+  });
+
+  it("draws exactly as before outside a provider, so a chart without coverage makes no claim", () => {
+    const { container } = render(<UptimeStrip buckets={buckets("operational", "degraded")} />);
+    expect(bars(container).every((bar) => bar.dataset.partial === undefined)).toBe(true);
   });
 });
