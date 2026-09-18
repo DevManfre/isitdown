@@ -27,8 +27,25 @@ const ASSETS = "dist/ui/public/assets";
  * Rendering through it costs ~40 kB gzipped, and the whole animated wizard
  * would have to be rewritten in CSS keyframes to give that back. Code
  * splitting does not help here: this check sums every .js the build emits.
+ *
+ * It moved 470k -> 525k for roadmap 5.14's four new languages. Measured, not
+ * estimated: the same build weighed 439.3 kB before `de`, `es`, `fr` and `pt`
+ * landed and 488.4 kB after, so the four catalogs cost **49.1 kB gzipped** —
+ * about 11% of the bundle. That is worth naming plainly, because unlike motion
+ * it is not code every page needs: it is five catalogs a given reader will
+ * never open, and `lib/i18n.ts` imports them eagerly so that no request can ask
+ * the server for a catalog path.
+ *
+ * The way to give it back is per-locale code splitting — `en` eager as the
+ * fallback, the rest behind `import()`. That is a real improvement for readers
+ * and it is deliberately NOT done here, because this check sums every emitted
+ * chunk: splitting would leave the measured total unchanged and would only pay
+ * off if this budget also learned to count a first load rather than the whole
+ * build. Those are two changes, and the second one is a decision about what
+ * this check means, so both are left for their own pass rather than smuggled
+ * in behind a language.
  */
-export const BUDGET = { js: 470_000, css: 20_000 };
+export const BUDGET = { js: 525_000, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

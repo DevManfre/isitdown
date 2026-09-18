@@ -10,6 +10,7 @@ import {
 import { RetryAfterError, type StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
 import type { ProviderRuntimeState, StateStore } from "./stateStore.interface.ts";
+import { componentTargetOf } from "./routing.ts";
 import { tracer } from "./tracing.ts";
 import type { NormalizedStatus, StatusChange } from "./types.ts";
 
@@ -540,7 +541,12 @@ export function createPoller(deps: PollerDeps): Poller {
     const changes: StatusChange[] = [];
 
     for (const probe of probes) {
-      const target = probe.crossChecks as string;
+      // `crossChecks` may name one component (`provider#component`), which only
+      // narrows what the trust card compares against (roadmap 8.1). The
+      // silent-outage check below is about a page claiming nothing at all is
+      // wrong, so it reads the provider either way.
+      const declared = probe.crossChecks as string;
+      const target = componentTargetOf(declared)?.providerId ?? declared;
       const pair = `${probe.id}->${target}`;
       const reading = byId.get(probe.id);
       // Not polled this cycle: its last reading has already been judged, and

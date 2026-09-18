@@ -51,7 +51,17 @@ const ALWAYS_OPEN = new Set(["/health", "/ready"]);
  * it is a POST, which this token refuses on principle. It carries its own
  * credential in the URL instead, and `push.routes.ts` is where that is checked.
  */
-const OPEN_PREFIXES = ["/push/"];
+const OPEN_PREFIXES = [
+  "/push/",
+  /**
+   * Also never gated: the public status page (roadmap 5.1). Its whole purpose
+   * is to be read by people who are not the operator and who therefore hold no
+   * token — gating it would make the feature unusable, and it publishes nothing
+   * private by construction (see `publicPage.ts`). It registers no routes at
+   * all unless the operator turned it on.
+   */
+  "/public",
+];
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 

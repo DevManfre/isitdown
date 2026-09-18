@@ -203,6 +203,15 @@ export const useSla = () =>
   useQuery({ queryKey: ["sla"], queryFn: api.getSla, throwOnError: false });
 
 /**
+ * Status-page accuracy — roadmap 8.1. Never throws, for the same reason the
+ * budget query does not: the provider's own history has already rendered, and
+ * a card about how honest the vendor's page is must not take the page down
+ * with it when it fails to load.
+ */
+export const useTrust = (days: number) =>
+  useQuery({ queryKey: ["trust", days], queryFn: () => api.getTrust(days), throwOnError: false });
+
+/**
  * Never throws. Vanilla's own reasoning (`history.js:70-82`): "the provider's
  * own uptime figures already rendered; a missing component breakdown is not
  * worth surfacing as a page-level error." `History`'s per-provider row (and

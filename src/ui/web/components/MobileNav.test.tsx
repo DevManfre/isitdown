@@ -87,7 +87,6 @@ describe("MobileNav", () => {
     // than through a lifted state — the same contract the palette has.
     openMoreSheet();
     expect(await screen.findByText(i18n.t("nav.theme"))).toBeInTheDocument();
-    expect(screen.getByText(i18n.t("nav.language"))).toBeInTheDocument();
   });
 
   it("names every theme instead of cycling through them", async () => {

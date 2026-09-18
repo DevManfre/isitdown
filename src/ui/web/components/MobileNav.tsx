@@ -20,7 +20,6 @@ import { openCommandPalette } from "./CommandPalette.tsx";
 import { NAV_ROUTES, ROUTE_PATHS, type NavRouteName } from "../../routePaths.ts";
 import { useConfigChrome, usePreferencesMutation, useStatusChrome } from "@/hooks/queries.ts";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme.tsx";
-import { supportedLocales, switchLocale } from "@/lib/i18n.ts";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -68,7 +67,7 @@ export function openMoreSheet(): void {
 }
 
 export function MobileNav() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { data: status } = useStatusChrome();
@@ -186,31 +185,6 @@ export function MobileNav() {
             </button>
           </div>
 
-          <div className="flex flex-col gap-2 border-t border-border px-4 py-3">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-              {t("nav.language")}
-            </span>
-            <div className="mobile-more-group grid grid-cols-2 gap-1 rounded-md bg-muted/60 p-1">
-              {supportedLocales.map((lang) => (
-                <button
-                  key={lang}
-                  type="button"
-                  className={cn(
-                    "min-h-10 rounded text-sm",
-                    i18n.language === lang && "bg-card font-medium text-primary shadow-sm",
-                  )}
-                  aria-pressed={i18n.language === lang}
-                  onClick={() => {
-                    void switchLocale(lang).then((applied) =>
-                      savePreferences.mutate({ uiLocale: applied }),
-                    );
-                  }}
-                >
-                  {lang.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <div className="flex flex-col gap-2 border-t border-border px-4 py-3">
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">

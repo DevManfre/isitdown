@@ -8,10 +8,15 @@ import { createQueryClient } from "@/lib/queryClient.ts";
 import { BusyProvider } from "@/hooks/useBusy.tsx";
 import { LiveProvider } from "@/hooks/useLive.tsx";
 import { ThemeProvider } from "@/hooks/useTheme.tsx";
+import { registerServiceWorker } from "@/lib/pwa.ts";
 import { router } from "@/routes.tsx";
 import "./css/base.css";
 
 const client = createQueryClient();
+
+// Roadmap 5.21. Before the first render, so the shell is cached on this visit
+// rather than on the next one. Does nothing where the browser has no worker.
+registerServiceWorker();
 
 const root = document.getElementById("root");
 if (root === null) throw new Error("#root is missing from index.html");

@@ -106,6 +106,52 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
   };
 
   /**
+   * Provider trust cards, and every episode behind them — roadmap 8.1.
+   *
+   * The one export whose *provenance* matters as much as its numbers, because
+   * this is the one that gets quoted at a provider. So the document carries
+   * what it excluded and why, how coarse its clock was, and the fact that it
+   * looked from exactly one place: a median admission delay with no error bar
+   * and no exclusion count reads like a measurement, and it is an observation
+   * from one container on one network.
+   *
+   * Cards below the ten-episode floor are exported as the floor sees them — a
+   * count and nothing else — rather than dropped. Someone reading the file has
+   * to be able to tell "we have not seen enough" from "this pair does not exist".
+   */
+  const trust = (format: "csv" | "json") => async (req: Request, res: Response): Promise<void> => {
+    const days = parseDays(req.query["days"]) || 90;
+    const pairs = runtime.trustPairs();
+    const rows = pairs.map((pair) => ({
+      pair,
+      card: runtime.trust.card(pair, days),
+      episodes: runtime.trust.episodes(pair, days),
+    }));
+
+    if (format === "csv") {
+      send(res, "csv", "trust", "text/csv; charset=utf-8", trustCsv(rows));
+      return;
+    }
+    send(
+      res,
+      "json",
+      "trust",
+      "application/json; charset=utf-8",
+      `${JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          days,
+          vantagePoint:
+            "one probe, one network, one location — a route broken between this container and the provider reads here as the provider being wrong",
+          pairs: rows,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  };
+
+  /**
    * The month written up — roadmap 4.7. The exports above hand over rows;
    * this hands over the paragraph somebody was going to write from them.
    *
@@ -139,6 +185,8 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
   router.get("/export/incidents.json", incidents("json"));
   router.get("/export/history.csv", history("csv"));
   router.get("/export/history.json", history("json"));
+  router.get("/export/trust.csv", trust("csv"));
+  router.get("/export/trust.json", trust("json"));
   router.get("/export/monthly.md", monthly);
 
   return router;
@@ -193,5 +241,62 @@ function historyCsv(
         uptimeByDay.get(bucket.day) ?? null,
       ]);
     }),
+  );
+}
+
+/**
+ * One row per episode, with the pair repeated on each — a flat file somebody
+ * opens in a spreadsheet, where a nested card would have to be unpacked by
+ * hand. `excluded` carries the reason rather than a boolean, because "this was
+ * declared maintenance" and "our own container was blind" are different answers
+ * to the same objection.
+ */
+function trustCsv(
+  rows: {
+    pair: { probeId: string; pageId: string; componentId: string };
+    episodes: {
+      probeDownAt: string;
+      probeUpAt: string;
+      pageAdmittedAt: string | null;
+      outcome: string;
+      excluded: string | null;
+      delayMinutes: number | null;
+      observedMinutes: number;
+      admittedMinutes: number;
+      resolutionMinutes: number;
+    }[];
+  }[],
+): string {
+  return toCsv(
+    [
+      "probe_id",
+      "page_id",
+      "component_id",
+      "probe_down_at",
+      "probe_up_at",
+      "page_admitted_at",
+      "outcome",
+      "excluded",
+      "delay_minutes",
+      "observed_minutes",
+      "admitted_minutes",
+      "resolution_minutes",
+    ],
+    rows.flatMap((row) =>
+      row.episodes.map((episode) => [
+        row.pair.probeId,
+        row.pair.pageId,
+        row.pair.componentId,
+        episode.probeDownAt,
+        episode.probeUpAt,
+        episode.pageAdmittedAt,
+        episode.outcome,
+        episode.excluded,
+        episode.delayMinutes,
+        episode.observedMinutes,
+        episode.admittedMinutes,
+        episode.resolutionMinutes,
+      ]),
+    ),
   );
 }
