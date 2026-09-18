@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import type { DaySegment } from "./calendarDays.ts";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { ProviderRuntimeState, SaveStatusMeta } from "../core/stateStore.interface.ts";
 import {
@@ -153,6 +154,49 @@ const rankCaseFor = (column: string): string =>
     .map(([status, rank]) => `WHEN '${status}' THEN ${rank}`)
     .join(" ")} ELSE ${SEVERITY_RANK.major_outage} END`;
 const RANK_CASE = rankCaseFor("overall_status");
+
+/**
+ * The SQLite date modifier that turns a stored UTC instant into the operator's
+ * wall clock for a stretch where one offset holds — roadmap 10.7. `date()` then
+ * reads the local calendar day off it.
+ */
+const shiftOf = (segment: DaySegment): string => `${segment.offsetMinutes >= 0 ? "+" : ""}${segment.offsetMinutes} minutes`;
+
+/**
+ * Runs one grouped query per constant-offset stretch and folds the results into
+ * one series.
+ *
+ * Folded rather than concatenated because the day a DST transition falls on is
+ * counted from both sides of the seam: two rows for one day, which have to be
+ * summed, or the day would appear twice and every figure drawn from it would be
+ * taken over half of it.
+ */
+function bucketsOver(
+  segments: readonly DaySegment[],
+  query: (segment: DaySegment) => unknown[],
+): DailyBucket[] {
+  const byDay = new Map<string, DailyBucket>();
+  for (const segment of segments) {
+    for (const raw of query(segment)) {
+      const row = bucketRowSchema.parse(raw);
+      const status = RANK_TO_STATUS[row.worst] ?? "unknown";
+      const existing = byDay.get(row.day);
+      if (existing === undefined) {
+        byDay.set(row.day, {
+          day: row.day,
+          worstStatus: status,
+          okSamples: row.ok_samples,
+          totalSamples: row.total_samples,
+        });
+        continue;
+      }
+      existing.okSamples += row.ok_samples;
+      existing.totalSamples += row.total_samples;
+      if (SEVERITY_RANK[status] > SEVERITY_RANK[existing.worstStatus]) existing.worstStatus = status;
+    }
+  }
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
 
 /**
  * A provider's own timestamp is untrusted input like the rest of its payload.
@@ -752,52 +796,40 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       return rows.map(toMaintenanceRow);
     },
 
-    async getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]> {
-      const from = new Date(now().getTime() - days * 24 * 3600 * 1000).toISOString();
-      const rows = db
-        .prepare(
-          `SELECT date(observed_at) AS day,
-                  MAX(${RANK_CASE}) AS worst,
-                  SUM(ok) AS ok_samples,
-                  COUNT(*) AS total_samples
-           FROM status_samples
-           WHERE provider_id = ? AND observed_at >= ?
-           GROUP BY day
-           ORDER BY day ASC`,
-        )
-        .all(providerId, from)
-        .map((raw) => bucketRowSchema.parse(raw));
-
-      return rows.map((row) => ({
-        day: row.day,
-        worstStatus: RANK_TO_STATUS[row.worst] ?? "unknown",
-        okSamples: row.ok_samples,
-        totalSamples: row.total_samples,
-      }));
+    async getDailyBuckets(providerId: string, segments: readonly DaySegment[]): Promise<DailyBucket[]> {
+      return bucketsOver(segments, (segment) =>
+        db
+          .prepare(
+            `SELECT date(observed_at, ?) AS day,
+                    MAX(${RANK_CASE}) AS worst,
+                    SUM(ok) AS ok_samples,
+                    COUNT(*) AS total_samples
+             FROM status_samples
+             WHERE provider_id = ? AND observed_at >= ? AND observed_at < ?
+             GROUP BY day`,
+          )
+          .all(shiftOf(segment), providerId, segment.fromIso, segment.toIso),
+      );
     },
 
-    async getComponentDailyBuckets(providerId: string, componentId: string, days: number): Promise<DailyBucket[]> {
-      const from = new Date(now().getTime() - days * 24 * 3600 * 1000).toISOString();
-      const rows = db
-        .prepare(
-          `SELECT date(observed_at) AS day,
-                  MAX(${rankCaseFor("status")}) AS worst,
-                  SUM(ok) AS ok_samples,
-                  COUNT(*) AS total_samples
-           FROM component_samples
-           WHERE provider_id = ? AND component_id = ? AND observed_at >= ?
-           GROUP BY day
-           ORDER BY day ASC`,
-        )
-        .all(providerId, componentId, from)
-        .map((raw) => bucketRowSchema.parse(raw));
-
-      return rows.map((row) => ({
-        day: row.day,
-        worstStatus: RANK_TO_STATUS[row.worst] ?? "unknown",
-        okSamples: row.ok_samples,
-        totalSamples: row.total_samples,
-      }));
+    async getComponentDailyBuckets(
+      providerId: string,
+      componentId: string,
+      segments: readonly DaySegment[],
+    ): Promise<DailyBucket[]> {
+      return bucketsOver(segments, (segment) =>
+        db
+          .prepare(
+            `SELECT date(observed_at, ?) AS day,
+                    MAX(${rankCaseFor("status")}) AS worst,
+                    SUM(ok) AS ok_samples,
+                    COUNT(*) AS total_samples
+             FROM component_samples
+             WHERE provider_id = ? AND component_id = ? AND observed_at >= ? AND observed_at < ?
+             GROUP BY day`,
+          )
+          .all(shiftOf(segment), providerId, componentId, segment.fromIso, segment.toIso),
+      );
     },
 
     async listProviderIds(): Promise<string[]> {
