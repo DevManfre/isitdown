@@ -1,7 +1,11 @@
 import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
+import de from "@/locales/de.json";
 import en from "@/locales/en.json";
+import es from "@/locales/es.json";
+import fr from "@/locales/fr.json";
 import it from "@/locales/it.json";
+import pt from "@/locales/pt.json";
 
 /**
  * Dashboard i18n. `en` is the source catalog and the fallback for a missing key
@@ -11,7 +15,9 @@ import it from "@/locales/it.json";
  * plus one line in this registry, and no request can ask the server for a
  * catalog path any more.
  */
-const SUPPORTED = ["en", "it"] as const;
+// Roadmap 5.14. Ordered the way the picker lists them: the source language
+// first, then alphabetically by code.
+const SUPPORTED = ["en", "de", "es", "fr", "it", "pt"] as const;
 export type SupportedLocale = (typeof SUPPORTED)[number];
 
 export const supportedLocales = SUPPORTED;
@@ -29,7 +35,14 @@ const stored = (): string | undefined => {
 };
 
 void i18next.use(initReactI18next).init({
-  resources: { en: { translation: en }, it: { translation: it } },
+  resources: {
+    en: { translation: en },
+    de: { translation: de },
+    es: { translation: es },
+    fr: { translation: fr },
+    it: { translation: it },
+    pt: { translation: pt },
+  },
   lng: resolve(stored()),
   fallbackLng: "en",
   // "overview.title.down" is one key, not a path; a ":" inside a value is text.
@@ -43,6 +56,28 @@ void i18next.use(initReactI18next).init({
   },
   returnNull: false,
 });
+
+/**
+ * What a language calls itself — "Deutsch", not "German" — so a reader who does
+ * not read the current language can still find their own in the list. That is
+ * the whole point of an endonym here: somebody looking at an Italian dashboard
+ * for the German option is looking for "Deutsch".
+ *
+ * `Intl.DisplayNames` is asked in the target locale for its own name, and the
+ * code is the fallback: a browser without the data returns nothing useful, and
+ * "DE" beats an empty row.
+ */
+export function localeName(locale: string): string {
+  try {
+    const name = new Intl.DisplayNames([locale], { type: "language" }).of(locale);
+    if (name === undefined || name.toLowerCase() === locale.toLowerCase()) return locale.toUpperCase();
+    // Capitalised: French and Italian lowercase their own language names, and a
+    // list of options reads better with each one capitalised.
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  } catch {
+    return locale.toUpperCase();
+  }
+}
 
 function resolve(lang: string | undefined): SupportedLocale {
   return SUPPORTED.includes(lang as SupportedLocale) ? (lang as SupportedLocale) : "en";

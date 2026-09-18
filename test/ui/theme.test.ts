@@ -96,6 +96,17 @@ const ALLOWED_HEX: Record<string, string[]> = {
   ],
 };
 
+
+/**
+ * index.html's two `theme-color` metas (roadmap 5.21) colour the browser's own
+ * chrome and the installed app's splash screen. Like the favicon above, they
+ * are read where no stylesheet of ours applies and `var(--token)` resolves to
+ * nothing, so the value has to be a literal. Both are copied from tokens.css:
+ * `--color-bg` in the light block and in the dark one. If a palette moves,
+ * this list moves with it.
+ */
+ALLOWED_HEX["index.html"] = ["#f7f7f8", "#161826"];
+
 const allowedIn = (file: string, hex: string): boolean =>
   Object.entries(ALLOWED_HEX).some(([suffix, hexes]) => file.endsWith(suffix) && hexes.includes(hex));
 

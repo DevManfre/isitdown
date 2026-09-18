@@ -14,6 +14,7 @@ import { SettingsLauncher } from "@/components/settings/SettingsLauncher.tsx";
 import { openCategory, SETTINGS_CATEGORIES } from "@/components/settings/sectionIndex.ts";
 import { Reveal } from "@/components/settings/Reveal.tsx";
 import { ChannelRow, ChannelSummary, channelRank } from "@/components/settings/ChannelRow.tsx";
+import { InstallAppRow } from "@/components/settings/InstallAppRow.tsx";
 import { NumberSetting } from "@/components/settings/NumberSetting.tsx";
 import { RoutingRulesDialog } from "@/components/settings/RoutingRulesDialog.tsx";
 import { ServiceRow } from "@/components/settings/ServiceRow.tsx";
@@ -39,6 +40,7 @@ import {
 import { useFieldProps } from "@/hooks/useBusy.tsx";
 import { formatBytes, formatRelative, hostOf } from "@/lib/format.ts";
 import { isMuted } from "@/lib/mute.ts";
+import { localeName, supportedLocales, switchLocale } from "@/lib/i18n.ts";
 import { effectiveTimeZone, setTimeZone, TIME_ZONES } from "@/lib/timeZone.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { DeliveryPolicy, DescribedChannel, MapView, ServiceDefinition, SeverityFloorName } from "@/lib/types.ts";
@@ -1107,6 +1109,38 @@ function SettingsView() {
         className="lg:col-span-3"
         delay={stagger(5, SECTION_CASCADE)}
       >
+        {/* Language leads the section: it decides the words every other row on
+            this page is read in, so it belongs above them rather than after.
+            It used to sit in the header as six code pills; six is where that
+            stopped being a glance and started being a row of chrome. */}
+        <SettingRow
+          label={t("settings.language.label")}
+          description={t("settings.language.hint")}
+          align="top"
+        >
+          <Select
+            value={i18n.language}
+            onValueChange={(value) => {
+              // Applied here as well as stored, like the time zone beside it:
+              // `switchLocale` is what actually changes the language, and the
+              // mutation only remembers the choice for the next browser.
+              void switchLocale(value).then((applied) =>
+                patchPreferences.mutate({ uiLocale: applied }, receipt("appearance")),
+              );
+            }}
+          >
+            <SelectTrigger id="ui-locale" className="w-56" aria-label={t("settings.language.label")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {supportedLocales.map((locale) => (
+                <SelectItem key={locale} value={locale}>
+                  {localeName(locale)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
         <SettingRow
           label={t("settings.timezone.label")}
           description={t("settings.timezone.hint", { zone: effectiveTimeZone() })}
@@ -1153,6 +1187,9 @@ function SettingsView() {
             </SelectContent>
           </Select>
         </SettingRow>
+        {/* Roadmap 5.21. Last in Appearance: it is about the window the
+            dashboard lives in rather than about what is drawn inside it. */}
+        <InstallAppRow />
       </SettingsSection>
       )}
 

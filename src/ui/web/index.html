@@ -4,6 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <!-- Roadmap 5.21: installable on a phone. The manifest is a static file
+         rather than a generated one so it is served straight from disk, and the
+         icons beside it are rendered from favicon.svg by tools/pwa-icons.mjs. -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="IsItDown" />
+    <!-- Two, so the installed window's chrome follows the theme the operator
+         chose rather than sitting light behind a dark dashboard. -->
+    <meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#161826" media="(prefers-color-scheme: dark)" />
     <title>IsItDown</title>
     <!-- Runs before stylesheets paint anything: without it the page would show
          the light palette for one frame on a dark desktop. "system" stamps

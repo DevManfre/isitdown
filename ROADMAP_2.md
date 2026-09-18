@@ -1,12 +1,12 @@
 # ROADMAP 2
 
-A second brainstorm, written after most of `ROADMAP.md` shipped. Same contract as
+A second brainstorm, written after most of `docs/roadmap/ROADMAP.md` shipped. Same contract as
 the first: **nothing here is committed**, the net is deliberately wide, and the
 file exists to be pruned rather than executed.
 
 Two things are different this time.
 
-First, the numbering continues from `ROADMAP.md` — that file ends at section 8,
+First, the numbering continues from `docs/roadmap/ROADMAP.md` — that file ends at section 8,
 so this one starts at section 9. A row id is unique across both files, and a
 note can point at `2.5` or `12.3` without qualifying which roadmap it means.
 
@@ -29,7 +29,7 @@ The interesting questions left are of a different kind:
   because "no" is a much better answer once somebody has written down what "yes"
   would actually cost.
 
-Legend (unchanged from `ROADMAP.md`):
+Legend (unchanged from `docs/roadmap/ROADMAP.md`):
 
 - **S** — a day or less, fits the existing seams.
 - **M** — a few days, may need a new table, route or interface method.
@@ -38,7 +38,7 @@ Legend (unchanged from `ROADMAP.md`):
 - ⚠️ — collides with a declared non-goal or a core principle in `README.md` (or
   in the manual under `docs/`); needs a deliberate decision before it is planned,
   not just prioritised.
-- 🔁 — carried over from `ROADMAP.md` unshipped, but re-framed here because the
+- 🔁 — carried over from `docs/roadmap/ROADMAP.md` unshipped, but re-framed here because the
   reason it did not ship has changed. The original row id is named in the note.
 
 ---
@@ -126,6 +126,7 @@ available in this codebase.
 | 12.8 | **Plain-language incident summary** | M ⚠️ 🔁 | 8.8. Twelve terse provider updates collapsed into one sentence. Unchanged objection: it wants a model call, and the project's pitch is that it needs nothing. The only version worth considering is strictly optional, off by default, and pointed at a local endpoint the operator already runs. |
 | 12.9 | **What an outage costs** | S | Let the operator declare an hourly cost per provider — a number they already carry in their head — and every incident, every monthly report (4.7) and every reliability ranking (12.2) carries a figure beside the duration. It changes the audience of the export from the person who runs the tool to the person who signs the contract. One field, one multiplication, disproportionate effect. |
 | 12.10 | **Which providers break together, empirically** | M | 11.5 asks the operator to declare dependencies. This derives the same graph from evidence: cluster incidents that overlap in time across the whole stored history and rank the pairs that co-occur far more often than chance. Not a causal claim — a shortlist to hand to 11.5, and a standalone answer to "is it them, or is it the thing underneath them". |
+| 12.11 | **"This day last year"** | S 🔁 | 8.2, which was speculative because nobody had a year of data and a year of raw samples would not have been affordable anyway. 10.6 answers both: daily aggregates kept indefinitely make the year-ago window a single cheap read, and the same rollup the History view already wants. The open questions are not technical — whether the comparison is calendar date against calendar date or weekday against weekday (incidents follow release trains, not the calendar), whether the number shown is uptime, incident count or minutes degraded, and what the view says honestly when the year before does not exist yet. |
 
 ---
 
@@ -151,6 +152,7 @@ operator holding a phone during an outage.
 | 13.12 | **A dashboard the operator composes from widgets** | L | Today every view is a fixed layout decided here, and the fleets using this tool are not alike: one operator watches eight vendors and wants incidents first, another runs a hundred probes and wants a wall of tiles. Ship a catalog of pre-built widgets — fleet grid, single-provider tile, uptime sparkline, open-incident list, delivery health, latency chart, year heat calendar (5.20), group composite, error budget (12.4), annotations feed (12.1), a counter, a clock — and let Overview become a grid the operator arranges: add, remove, resize, reorder, each widget configured (which provider, which window, which group) and the layout persisted as JSON in the database. Rules that keep this from becoming a framework: every widget is an existing component with a declared props schema, never a new rendering path; the layout is data, not code; the stock arrangement is the current Overview, so an operator who never opens the editor sees no change. Prerequisite for 13.3 and 17.2, which are both "the same widgets, rendered somewhere else". |
 | 13.13 | **More than one dashboard** | M | Once 13.12 exists, one grid is immediately too few: *my stack* and *vendors I pay for* want different pages, and an incident wants a page that is nothing but the providers involved. Named dashboards, switchable from the rail, one marked default — cheap on top of a persisted layout, and the thing that makes the editor worth opening twice. |
 | 13.14 | **Every widget is a door** | S | A widget shows a number; the next question is always *which rows*. Clicking through should land on the matching view with its filters already applied — a latency widget opens History scoped to that provider and window, an incident count opens the search (5.19) with the same query. Without this the composed dashboard is a poster; with it, it is the front door. |
+| 13.15 | **A guided tour on first open** | M 🔁 | 13.7 gets an operator configured; nothing then shows them what they configured. The first time the dashboard is opened, run a short product tour over the real UI — anchored coach marks on the rail, a provider tile, the incident timeline, the history window picker, the delivery log and the settings entry — each step one sentence saying what the surface answers, with *Skip* on every step and no modal that cannot be dismissed. Rules that keep it from rotting: the steps are data (an ordered list of `{ anchor, i18n key }`), every string is a catalog key like any other (never a literal, see the `i18n-strings` convention), the anchors are `data-tour` attributes on components that already exist rather than a parallel tour-only DOM, and a missing anchor skips its step instead of leaving a card pointing at nothing. "Seen" is a flag in the settings store, not `localStorage`, so it follows the instance rather than the browser, and **Settings → Replay the tour** makes it repeatable — which is also how it gets a visual baseline (7.1) instead of being the one surface no test can reach twice. Runs after 13.7, not instead of it: the wizard proves the tool notifies, the tour explains the screen it hands back.
 
 ---
 

@@ -344,6 +344,41 @@ export interface SlaResponse {
   providers: SlaBudget[];
 }
 
+/**
+ * How closely one status page tracked what a probe observed — roadmap 8.1.
+ *
+ * A card that has not cleared the ten-episode floor carries `floor` and a count
+ * and nothing else: the three axes are absent rather than zeroed, because a
+ * median of nothing formatted as a number reads exactly like a measurement.
+ */
+export interface TrustPairRef {
+  probeId: string;
+  pageId: string;
+  /** Empty when the comparison is against the page as a whole. */
+  componentId: string;
+}
+
+export interface TrustCardData {
+  key: string;
+  pair: TrustPairRef;
+  days: number;
+  counted: number;
+  /** Present only below the floor. */
+  floor?: number;
+  excluded?: { maintenance: number; fleetBlind: number };
+  delay?: { medianMinutes: number; p90Minutes: number; admitted: number } | null;
+  coverage?: { observedMinutes: number; admittedMinutes: number; percent: number } | null;
+  never?: number;
+  afterRecovery?: number;
+  resolutionMinutes?: number;
+}
+
+export interface TrustResponse {
+  days: number;
+  windows: number[];
+  cards: TrustCardData[];
+}
+
 /** What removing a service would delete along with it — `GET /config/services/:id/impact`. */
 export interface ServiceImpact {
   samples: number;

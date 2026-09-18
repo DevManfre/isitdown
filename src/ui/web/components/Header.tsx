@@ -7,9 +7,7 @@ import { openCommandPalette } from "./CommandPalette.tsx";
 import { openMoreSheet } from "./MobileNav.tsx";
 import { usePreferencesMutation, useStatusChrome } from "@/hooks/queries.ts";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme.tsx";
-import { supportedLocales, switchLocale } from "@/lib/i18n.ts";
 import { formatRelative } from "@/lib/format.ts";
-import { cn } from "@/lib/utils.ts";
 
 /**
  * One glyph per mode, so the button says which theme is on without being read.
@@ -61,7 +59,7 @@ export function Header({ view }: { view: string }) {
        left, controls on the right. On a phone the right column splits in two —
        the two icon buttons above, the poll cluster below — so seven controls
        stop competing for one 390px line. */
-    <header className="header grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-4 py-2 md:gap-x-4 md:px-8 md:py-3">
+    <header className="header grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-4 py-2 md:gap-x-4 md:px-8 md:py-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
       <h1 className="header-title col-start-1 row-start-1 truncate text-base font-medium md:text-lg">
         {t(TITLE_KEYS[view] ?? "nav.overview")}
       </h1>
@@ -99,42 +97,25 @@ export function Header({ view }: { view: string }) {
         )}
       </span>
 
-      <div className="header-actions col-start-2 row-start-2 flex items-center justify-end gap-2 md:row-span-2 md:row-start-1">
-        {/* ⌘K existed before this button did, and nothing on screen said so.
-            The button is the palette's only visible surface; it carries the
-            shortcut on it so the second use is the keystroke. Hidden on a
-            phone, where the icon button above says the same thing in 44px. */}
-        <button
-          type="button"
-          className="header-search hidden items-center gap-2 rounded-md border border-border bg-card/60 py-1.5 pl-3 pr-2 text-xs text-muted-foreground lg:flex"
-          onClick={openCommandPalette}
-        >
-          <Search className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
-          {t("palette.open")}
-          <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">⌘K</kbd>
-        </button>
+      {/* ⌘K existed before this button did, and nothing on screen said so.
+          The button is the palette's only visible surface; it carries the
+          shortcut on it so the second use is the keystroke. Hidden on a phone,
+          where the icon button above says the same thing in 44px.
 
-        <div className="lang-switch hidden gap-1 rounded-md bg-muted/60 p-0.5 lg:flex">
-          {supportedLocales.map((lang) => (
-            <button
-              key={lang}
-              type="button"
-              className={cn(
-                "lang-opt rounded px-2 py-1 text-xs",
-                i18n.language === lang && "bg-card text-primary shadow-sm",
-              )}
-              aria-pressed={i18n.language === lang}
-              onClick={() => {
-                void switchLocale(lang).then((applied) =>
-                  savePreferences.mutate({ uiLocale: applied }),
-                );
-              }}
-            >
-              {lang.toUpperCase()}
-            </button>
-          ))}
-        </div>
+          It sits in the middle column rather than in the cluster on the right:
+          search is the one control here that is not about the current view, and
+          the header had a hole in the middle of it anyway. */}
+      <button
+        type="button"
+        className="header-search hidden items-center gap-2 rounded-md border border-border bg-card/60 py-1.5 pl-3 pr-2 text-xs text-muted-foreground lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:justify-self-center"
+        onClick={openCommandPalette}
+      >
+        <Search className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
+        {t("palette.open")}
+        <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">⌘K</kbd>
+      </button>
 
+      <div className="header-actions col-start-2 row-start-2 flex items-center justify-end gap-2 md:row-span-2 md:row-start-1 lg:col-start-3">
         {/* The switch reveals itself: the next theme is wiped over the page
             through a circle growing out of this button, so the operator sees
             where the change came from instead of the whole screen flipping at

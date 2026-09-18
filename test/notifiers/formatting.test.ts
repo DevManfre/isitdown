@@ -242,7 +242,11 @@ test("both maintenance kinds render in italian too", () => {
     ),
   );
   assert.doesNotMatch(ended, /notification\.maintenance/, "a missing key must not leak as a key");
-  assert.match(ended, /Interruzione grave — 2 incidente\/i aperto\/i/);
+  // The same two facts the English assertion checks — the current status and
+  // the open-incident count — in the wording the Italian catalog's native
+  // review settled on (roadmap 5.15). The old "incidente/i aperto/i" read as
+  // form-filling rather than Italian.
+  assert.match(ended, /Stato attuale: Interruzione grave — incidenti aperti: 2/);
 });
 
 test("the italian rendering differs from the english one but keeps the same data", () => {
