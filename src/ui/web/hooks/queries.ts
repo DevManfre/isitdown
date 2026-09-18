@@ -286,6 +286,18 @@ export const useIncident = (providerId: string, incidentId: string) => {
 };
 
 /**
+ * Supplier reliability and the weekday-hour grid — roadmap 12.2 and 12.3.
+ *
+ * One query for both, because the server answers both from one walk of the
+ * incident table and the two are drawn on the same screen.
+ */
+export const useReliability = (days: number) =>
+  useQuery({
+    queryKey: ["reliability", days],
+    queryFn: () => api.getReliability(days),
+  });
+
+/**
  * The operator's own timeline markers over a window — roadmap 12.1.
  *
  * Its own query rather than a field on `useHistory`: a marker changes when
