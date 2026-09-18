@@ -36,7 +36,12 @@ import { ComponentRows } from "@/components/ComponentRows.tsx";
 import { ProviderCards } from "@/components/ProviderCards.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
-import { useHistory, useStatus } from "@/hooks/queries.ts";
+import {
+  useHistory,
+  usePreferences,
+  usePreferencesMutation,
+  useStatus,
+} from "@/hooks/queries.ts";
 import { CoverageProvider } from "@/lib/coverage.tsx";
 import { severity, statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { hostOf } from "@/lib/format.ts";
@@ -61,6 +66,13 @@ const WINDOW_DAYS = 90;
  * and the table is what a fleet that size is read through.
  */
 const CARD_GRID_MAX = 6;
+
+/**
+ * Above this many providers the density toggle appears — roadmap 13.1. Below
+ * it the breathing room costs nothing, and a control that changes nothing worth
+ * seeing teaches the operator to ignore the row it sits in.
+ */
+const DENSITY_FROM = 12;
 
 /** How long a dropped row stays mounted; in step with `.anim-sink` in motion.css. */
 const EXIT_MS = 220;
@@ -324,6 +336,11 @@ export function Providers() {
   const { data: status } = useStatus();
   const { data: summary } = useHistory({ days: WINDOW_DAYS });
   const [filter, setFilter] = useState<Filter>("all");
+  // Roadmap 13.1. A stored preference, so it follows the instance rather than
+  // the browser: the fleet size it is a reaction to is the same on every device.
+  const { data: preferences } = usePreferences();
+  const density = preferences?.density ?? "comfortable";
+  const setPreferences = usePreferencesMutation();
 
   // Enabled providers only. A disabled one is not being polled, so every figure
   // this table carries — status, uptime, the 90-day strip — would be frozen at
@@ -355,27 +372,46 @@ export function Providers() {
       ]),
     );
     const shown = new Set(shownBy(providers, filter));
-    return providers
-      .filter((provider) => shown.has(provider.id) || leaving.has(provider.id))
-      .map((provider) => {
-        const history = byId.get(provider.id);
-        return {
-          id: provider.id,
-          name: provider.name,
-          host: hostOf(provider.baseUrl),
-          adapter: provider.adapter,
-          status: provider.overallStatus,
-          severity: severity(provider.overallStatus),
-          uptime: history?.uptime90 ?? provider.uptime90,
-          incidents: history?.incidentCount ?? 0,
-          buckets: history?.buckets ?? [],
-          monitored: provider.componentSelection,
-          components: provider.components,
-          maintenanceActive: provider.maintenance.active.length > 0,
-          muted: isMuted(provider.mutedUntil),
-          authority: provider.authority,
-        };
-      });
+    return (
+      providers
+        .filter(
+          (provider) => shown.has(provider.id) || leaving.has(provider.id),
+        )
+        .map((provider) => {
+          const history = byId.get(provider.id);
+          return {
+            id: provider.id,
+            name: provider.name,
+            host: hostOf(provider.baseUrl),
+            adapter: provider.adapter,
+            status: provider.overallStatus,
+            severity: severity(provider.overallStatus),
+            uptime: history?.uptime90 ?? provider.uptime90,
+            incidents: history?.incidentCount ?? 0,
+            buckets: history?.buckets ?? [],
+            monitored: provider.componentSelection,
+            components: provider.components,
+            maintenanceActive: provider.maintenance.active.length > 0,
+            muted: isMuted(provider.mutedUntil),
+            authority: provider.authority,
+          };
+        })
+        // Problems first — roadmap 13.1. Sorted here rather than seeded into the
+        // table's own sorting state, because the two behave differently at the
+        // end of the cycle: a third click on a header *removes* the sort, and a
+        // seeded state would hand the operator the configured order back — the
+        // very order this exists to get away from. Sorting the rows makes
+        // "no sort" mean problems first, which is what the view promises.
+        //
+        // Alphabetical order is fine at eight providers and useless at a hundred:
+        // it buries the two rows the view is being opened for under ninety-eight
+        // that are fine.
+        .sort(
+          (left, right) =>
+            right.severity - left.severity ||
+            left.name.localeCompare(right.name),
+        )
+    );
   }, [providers, summary, filter, leaving]);
 
   // Rebuilt when the catalog language changes, since every header label and
@@ -569,6 +605,30 @@ export function Providers() {
               {t("filter.issues")}
             </ToggleGroupItem>
           </ToggleGroup>
+          {/* Roadmap 13.1. Only once the fleet is big enough for the trade to
+              be worth making: at eight providers the breathing room costs
+              nothing, and a control that changes nothing visible is a control
+              that teaches the operator to ignore the row it sits in. */}
+          {data.length > DENSITY_FROM && (
+            <ToggleGroup
+              type="multiple"
+              aria-label={t("density.label")}
+              value={[density]}
+              onValueChange={(next) => {
+                const picked = next.find((value) => value !== density);
+                if (picked === "comfortable" || picked === "compact") {
+                  setPreferences.mutate({ density: picked });
+                }
+              }}
+            >
+              <ToggleGroupItem value="comfortable">
+                {t("density.comfortable")}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="compact">
+                {t("density.compact")}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
         </div>
         {/* The cards, then the table of the same providers — the two readings the
           one table used to be asked for at once (see ProviderCards). Capped at
@@ -618,7 +678,13 @@ export function Providers() {
                       }}
                     >
                       {row.getAllCells().map((cell) => (
-                        <TableCell key={cell.id}>
+                        // Roadmap 13.1: compact trades the breathing room for
+                        // rows on screen, which is the trade an operator with a
+                        // hundred providers is already making by scrolling.
+                        <TableCell
+                          key={cell.id}
+                          className={cn(density === "compact" && "py-1")}
+                        >
                           <table.FlexRender cell={cell} />
                         </TableCell>
                       ))}

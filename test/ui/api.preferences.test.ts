@@ -55,6 +55,10 @@ test("preferences default to following the system theme and English", async () =
       uiLocale: "en",
       notificationLocale: "en",
       mapView: "off",
+      // The layout the dashboard has always had: compact is a trade an
+      // operator opts into once the fleet is big enough to want it (roadmap
+      // 13.1), not one made for them.
+      density: "comfortable",
       // "auto" rather than a zone name: the default has to stay per-browser.
       timeZone: "auto",
     });
@@ -72,7 +76,8 @@ test("a preference change round-trips and survives a restart", async () => {
     });
     assert.equal(status, 200);
     assert.deepEqual(body, {
-      theme: "dark", uiLocale: "it", notificationLocale: "en", mapView: "off", timeZone: "auto",
+      theme: "dark", uiLocale: "it", notificationLocale: "en", mapView: "off",
+      density: "comfortable", timeZone: "auto",
     });
     await app.close();
 
@@ -83,6 +88,7 @@ test("a preference change round-trips and survives a restart", async () => {
         uiLocale: "it",
         notificationLocale: "en",
         mapView: "off",
+        density: "comfortable",
         timeZone: "auto",
       });
     } finally {
