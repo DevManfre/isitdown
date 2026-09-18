@@ -12,6 +12,20 @@ const slug = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/, "must be a lowercase slug: letters, digits and dashes");
 
+/**
+ * What a probe cross-checks: a provider id, optionally narrowed to one of its
+ * components with the same `provider#component` form a routing rule targets
+ * (roadmap 2.9). The component half only refines what the trust card (roadmap
+ * 8.1) compares the probe against — the silent-outage check itself still reads
+ * the provider, since a page claiming nothing is wrong is the thing it is about.
+ */
+const crossCheckTarget = z
+  .string()
+  .regex(
+    /^[a-z0-9][a-z0-9-]*(#[A-Za-z0-9][A-Za-z0-9 ._-]*)?$/,
+    "must be a provider slug, optionally narrowed with #component",
+  );
+
 const httpUrl = z
   .string()
   .trim()
@@ -66,7 +80,7 @@ export const serviceDefinitionSchema = z.object({
    * that knows what it is checking: a page can have several probes pointed at
    * it, and none of them is the page's own business.
    */
-  crossChecks: slug.optional(),
+  crossChecks: crossCheckTarget.optional(),
   /** Omitted, not defaulted: absent has to stay distinguishable from "same as the global". */
   intervalMinutes: z.number().int().positive().max(1440).optional(),
   options: z.record(z.string()).optional(),

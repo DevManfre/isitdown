@@ -31,7 +31,9 @@ import type { HistoryStore } from "./historyStore.interface.ts";
 import { createMapLane, type MapLane } from "./mapLane.ts";
 import { createMapStore, type MapStore } from "./mapStore.ts";
 import { createMetricsRegistry, type MetricsRegistry } from "./metrics.ts";
+import { componentTargetOf } from "../core/routing.ts";
 import { createSlaService, rememberSlaNotice, slaAlreadyTold } from "./sla.ts";
+import { createTrustService, type TrustPair } from "./trust.ts";
 import { createSqlitePushSubscriptionStore, type SqlitePushSubscriptionStore } from "./sqlitePushSubscriptionStore.ts";
 import { loadSecretsFile, type SecretsFile } from "./secretsFile.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
@@ -71,6 +73,14 @@ export interface UiRuntimeCore {
   history: ReturnType<typeof createHistoryService>;
   /** Monthly targets and what the month has spent of them — roadmap 4.13. */
   sla: ReturnType<typeof createSlaService>;
+  /** How closely each cross-checked page tracked what a probe observed — roadmap 8.1. */
+  trust: ReturnType<typeof createTrustService>;
+  /**
+   * Every probe/page pair a trust card can be built for. Derived from
+   * `crossChecks`, so a fleet with no probe has none and the surface is absent
+   * rather than empty.
+   */
+  trustPairs(): TrustPair[];
   configSource: ConfigSource;
   scheduler: Scheduler;
   /** Built here, run by the server at boot — never by the runtime builder, so tests stay offline. */
@@ -156,6 +166,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   // Roadmap 4.13. Reads the same monthly report the export and the History view
   // are drawn from, so a budget can never disagree with the uptime beside it.
   const sla = createSlaService({ history });
+  const trust = createTrustService(db);
   const configSource = createDbConfigSource(db, options.env, logger);
 
   const pushSubscriptions = createSqlitePushSubscriptionStore(db);
@@ -243,6 +254,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
       });
 
       await reportSlaBurn();
+      await rebuildTrust();
     },
   });
 
@@ -290,6 +302,43 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     }
   }
 
+  /** Every probe that names a page to cross-check, as a pair to fold episodes for. */
+  function trustPairs(): TrustPair[] {
+    const pairs: TrustPair[] = [];
+    for (const service of listServices(db)) {
+      if (service.crossChecks === undefined) continue;
+      const narrowed = componentTargetOf(service.crossChecks);
+      pairs.push({
+        probeId: service.id,
+        pageId: narrowed?.providerId ?? service.crossChecks,
+        componentId: narrowed?.componentId ?? "",
+      });
+    }
+    return pairs;
+  }
+
+  /**
+   * Fold the cycle's samples into trust episodes — roadmap 8.1.
+   *
+   * After the cycle and outside it, like the budget alert above and for the
+   * same reason: it reads stored samples, which only this edition has. Cheap
+   * because it is incremental — each pair resumes from its own last episode —
+   * and a failure is logged rather than thrown, since a card that cannot be
+   * built is not a reason to stop monitoring.
+   */
+  async function rebuildTrust(): Promise<void> {
+    const pairs = trustPairs();
+    if (pairs.length === 0) return;
+    try {
+      const config = await configSource.load();
+      trust.rebuild(pairs, { confirmations: config.polling.confirmSamples });
+    } catch (error) {
+      logger.error("folding trust episodes failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   const backfill = createBackfillService({ getAdapter, store, configSource, logger });
 
   /**
@@ -327,6 +376,8 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     store,
     history,
     sla,
+    trust,
+    trustPairs,
     configSource,
     scheduler,
     backfill,
