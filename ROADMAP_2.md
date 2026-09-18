@@ -1,12 +1,12 @@
 # ROADMAP 2
 
-A second brainstorm, written after most of `ROADMAP.md` shipped. Same contract as
+A second brainstorm, written after most of `docs/roadmap/ROADMAP.md` shipped. Same contract as
 the first: **nothing here is committed**, the net is deliberately wide, and the
 file exists to be pruned rather than executed.
 
 Two things are different this time.
 
-First, the numbering continues from `ROADMAP.md` — that file ends at section 8,
+First, the numbering continues from `docs/roadmap/ROADMAP.md` — that file ends at section 8,
 so this one starts at section 9. A row id is unique across both files, and a
 note can point at `2.5` or `12.3` without qualifying which roadmap it means.
 
@@ -29,7 +29,7 @@ The interesting questions left are of a different kind:
   because "no" is a much better answer once somebody has written down what "yes"
   would actually cost.
 
-Legend (unchanged from `ROADMAP.md`):
+Legend (unchanged from `docs/roadmap/ROADMAP.md`):
 
 - **S** — a day or less, fits the existing seams.
 - **M** — a few days, may need a new table, route or interface method.
@@ -38,7 +38,7 @@ Legend (unchanged from `ROADMAP.md`):
 - ⚠️ — collides with a declared non-goal or a core principle in `README.md` (or
   in the manual under `docs/`); needs a deliberate decision before it is planned,
   not just prioritised.
-- 🔁 — carried over from `ROADMAP.md` unshipped, but re-framed here because the
+- 🔁 — carried over from `docs/roadmap/ROADMAP.md` unshipped, but re-framed here because the
   reason it did not ship has changed. The original row id is named in the note.
 
 ---

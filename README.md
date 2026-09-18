@@ -187,8 +187,11 @@ committed Grafana dashboard.
 Still open:
 
 - A native review of the Italian strings.
-- Direct HTTP probes ("is *my* thing up") and a public read-only status page — the
-  two items that change what IsItDown is, listed in `ROADMAP.md`.
+
+The roadmap that carried the project this far is finished — every row of it
+shipped — and is archived at [`docs/roadmap/ROADMAP.md`](docs/roadmap/ROADMAP.md).
+What comes next is being weighed in `ROADMAP_2.md` and `ROADMAP_3.md`, neither of
+which commits to anything.
 
 Explicit non-goals: multi-user auth (this is a local, single-operator dashboard),
 status pages behind a login, and a packaged mobile app.
