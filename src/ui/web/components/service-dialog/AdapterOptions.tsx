@@ -12,13 +12,27 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
  * this dialog grows fields for.
  */
 export const SCRAPE_ADAPTER = "html";
+/** The declared JSON mapping — roadmap 11.1. */
+export const JSON_ADAPTER = "json";
 
 /** Worst first, the order the reading itself resolves them in. */
 const SCRAPE_SEVERITIES: { key: string; label: string; example: string }[] = [
-  { key: "major_outage", label: "status.major-outage", example: "major outage, down" },
-  { key: "partial_outage", label: "status.partial-outage", example: "partial outage" },
+  {
+    key: "major_outage",
+    label: "status.major-outage",
+    example: "major outage, down",
+  },
+  {
+    key: "partial_outage",
+    label: "status.partial-outage",
+    example: "partial outage",
+  },
   { key: "degraded", label: "status.degraded", example: "degraded, slow" },
-  { key: "operational", label: "status.operational", example: "all systems operational" },
+  {
+    key: "operational",
+    label: "status.operational",
+    example: "all systems operational",
+  },
 ];
 
 /**
@@ -46,7 +60,11 @@ const DNS_RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"] as const;
 
 /** Whether an adapter has any of the blocks below at all. */
 export const hasAdapterOptions = (adapter: string): boolean =>
-  adapter === SCRAPE_ADAPTER || adapter === PROBE_ADAPTER || adapter === TCP_ADAPTER || adapter === DNS_ADAPTER;
+  adapter === SCRAPE_ADAPTER ||
+  adapter === JSON_ADAPTER ||
+  adapter === PROBE_ADAPTER ||
+  adapter === TCP_ADAPTER ||
+  adapter === DNS_ADAPTER;
 
 /**
  * The fields that only one adapter each can use, lifted out of the dialog body
@@ -58,7 +76,12 @@ export const hasAdapterOptions = (adapter: string): boolean =>
  * questions the fields under them answer.
  */
 export function AdapterOptions({
-  adapter, options, setOption, header, setHeader, fieldProps,
+  adapter,
+  options,
+  setOption,
+  header,
+  setHeader,
+  fieldProps,
 }: {
   adapter: string;
   options: Record<string, string>;
@@ -83,25 +106,90 @@ export function AdapterOptions({
             onChange={(event) => setOption("selector", event.target.value)}
             {...fieldProps}
           />
-          <span className="text-xs text-muted-foreground">{t("scrape.selector-hint")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("scrape.selector-hint")}
+          </span>
         </div>
         <OptionGroup title={t("scrape.words")}>
           {SCRAPE_SEVERITIES.map((severity) => (
-            <div key={severity.key} className="grid grid-cols-[8rem_1fr] items-center gap-2">
-              <Label className="text-xs font-normal text-muted-foreground" htmlFor={`service-words-${severity.key}`}>
+            <div
+              key={severity.key}
+              className="grid grid-cols-[8rem_1fr] items-center gap-2"
+            >
+              <Label
+                className="text-xs font-normal text-muted-foreground"
+                htmlFor={`service-words-${severity.key}`}
+              >
                 {t(severity.label)}
               </Label>
               <Input
                 id={`service-words-${severity.key}`}
                 className="font-mono"
-                placeholder={t("scrape.words-placeholder", { example: severity.example })}
+                placeholder={t("scrape.words-placeholder", {
+                  example: severity.example,
+                })}
                 value={options[severity.key] ?? ""}
-                onChange={(event) => setOption(severity.key, event.target.value)}
+                onChange={(event) =>
+                  setOption(severity.key, event.target.value)
+                }
                 {...fieldProps}
               />
             </div>
           ))}
-          <span className="text-xs text-muted-foreground">{t("scrape.words-hint")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("scrape.words-hint")}
+          </span>
+        </OptionGroup>
+      </div>
+    );
+  }
+
+  if (adapter === JSON_ADAPTER) {
+    // Roadmap 11.1. The long tail as a form: one path per field and a table of
+    // status words, which is the whole difference between a provider costing
+    // configuration and a provider costing an adapter.
+    const pathField = (key: string, label: string, hint?: string) => (
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`service-json-${key}`}>{t(label)}</Label>
+        <Input
+          id={`service-json-${key}`}
+          className="font-mono"
+          value={options[key] ?? ""}
+          onChange={(event) => setOption(key, event.target.value)}
+          {...fieldProps}
+        />
+        {hint !== undefined && (
+          <span className="text-xs text-muted-foreground">{t(hint)}</span>
+        )}
+      </div>
+    );
+
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-muted-foreground">{t("jsonmap.warning")}</p>
+        <OptionGroup title={t("jsonmap.group.status")}>
+          {pathField("path", "jsonmap.path", "jsonmap.path-hint")}
+          {pathField(
+            "statusPath",
+            "jsonmap.status-path",
+            "jsonmap.status-path-hint",
+          )}
+          {pathField(
+            "statusMap",
+            "jsonmap.status-map",
+            "jsonmap.status-map-hint",
+          )}
+        </OptionGroup>
+        <OptionGroup title={t("jsonmap.group.incidents")}>
+          {pathField("incidentsPath", "jsonmap.incidents-path")}
+          {pathField("incidentName", "jsonmap.incident-name")}
+          {pathField("incidentId", "jsonmap.incident-id")}
+          {pathField("incidentStatus", "jsonmap.incident-status")}
+          {pathField("incidentImpact", "jsonmap.incident-impact")}
+          {pathField("incidentUpdatedAt", "jsonmap.incident-updated")}
+          <span className="text-xs text-muted-foreground">
+            {t("jsonmap.incidents-hint")}
+          </span>
         </OptionGroup>
       </div>
     );
@@ -144,46 +232,64 @@ export function AdapterOptions({
               />
             </div>
           </div>
-          <span className="text-xs text-muted-foreground">{t("probe.path-hint")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("probe.path-hint")}
+          </span>
 
           <div className="grid grid-cols-[1fr_1fr] gap-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="service-probe-header-name">{t("probe.header-name")}</Label>
+              <Label htmlFor="service-probe-header-name">
+                {t("probe.header-name")}
+              </Label>
               <Input
                 id="service-probe-header-name"
                 className="font-mono"
                 value={header.name}
-                onChange={(event) => setHeader({ ...header, name: event.target.value })}
+                onChange={(event) =>
+                  setHeader({ ...header, name: event.target.value })
+                }
                 {...fieldProps}
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="service-probe-header-value">{t("probe.header-value")}</Label>
+              <Label htmlFor="service-probe-header-value">
+                {t("probe.header-value")}
+              </Label>
               <Input
                 id="service-probe-header-value"
                 className="font-mono"
                 placeholder={t("probe.header-value-placeholder")}
                 value={header.value}
-                onChange={(event) => setHeader({ ...header, value: event.target.value })}
+                onChange={(event) =>
+                  setHeader({ ...header, value: event.target.value })
+                }
                 {...fieldProps}
               />
             </div>
           </div>
-          <span className="text-xs text-muted-foreground">{t("probe.header-hint")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("probe.header-hint")}
+          </span>
         </OptionGroup>
 
         <OptionGroup title={t("probe.group.healthy")}>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="service-probe-status">{t("probe.expect-status")}</Label>
+            <Label htmlFor="service-probe-status">
+              {t("probe.expect-status")}
+            </Label>
             <Input
               id="service-probe-status"
               className="font-mono"
               placeholder={t("probe.expect-status-placeholder")}
               value={options["expectStatus"] ?? ""}
-              onChange={(event) => setOption("expectStatus", event.target.value)}
+              onChange={(event) =>
+                setOption("expectStatus", event.target.value)
+              }
               {...fieldProps}
             />
-            <span className="text-xs text-muted-foreground">{t("probe.expect-status-hint")}</span>
+            <span className="text-xs text-muted-foreground">
+              {t("probe.expect-status-hint")}
+            </span>
           </div>
 
           {/* Only a GET downloads a body to match against, so the two body
@@ -192,26 +298,38 @@ export function AdapterOptions({
           {method === "GET" && (
             <>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="service-probe-expect-body">{t("probe.expect-body")}</Label>
+                <Label htmlFor="service-probe-expect-body">
+                  {t("probe.expect-body")}
+                </Label>
                 <Input
                   id="service-probe-expect-body"
                   className="font-mono"
                   value={options["expectBody"] ?? ""}
-                  onChange={(event) => setOption("expectBody", event.target.value)}
+                  onChange={(event) =>
+                    setOption("expectBody", event.target.value)
+                  }
                   {...fieldProps}
                 />
-                <span className="text-xs text-muted-foreground">{t("probe.expect-body-hint")}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t("probe.expect-body-hint")}
+                </span>
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="service-probe-absent-body">{t("probe.absent-body")}</Label>
+                <Label htmlFor="service-probe-absent-body">
+                  {t("probe.absent-body")}
+                </Label>
                 <Input
                   id="service-probe-absent-body"
                   className="font-mono"
                   value={options["absentBody"] ?? ""}
-                  onChange={(event) => setOption("absentBody", event.target.value)}
+                  onChange={(event) =>
+                    setOption("absentBody", event.target.value)
+                  }
                   {...fieldProps}
                 />
-                <span className="text-xs text-muted-foreground">{t("probe.absent-body-hint")}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t("probe.absent-body-hint")}
+                </span>
               </div>
             </>
           )}
@@ -229,19 +347,27 @@ export function AdapterOptions({
                 onChange={(event) => setOption("slowMs", event.target.value)}
                 {...fieldProps}
               />
-              <span className="text-xs text-muted-foreground">{t("probe.slow-ms-hint")}</span>
+              <span className="text-xs text-muted-foreground">
+                {t("probe.slow-ms-hint")}
+              </span>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="service-probe-tls">{t("probe.tls-warn-days")}</Label>
+              <Label htmlFor="service-probe-tls">
+                {t("probe.tls-warn-days")}
+              </Label>
               <Input
                 id="service-probe-tls"
                 type="number"
                 min={1}
                 value={options["tlsWarnDays"] ?? ""}
-                onChange={(event) => setOption("tlsWarnDays", event.target.value)}
+                onChange={(event) =>
+                  setOption("tlsWarnDays", event.target.value)
+                }
                 {...fieldProps}
               />
-              <span className="text-xs text-muted-foreground">{t("probe.tls-warn-days-hint")}</span>
+              <span className="text-xs text-muted-foreground">
+                {t("probe.tls-warn-days-hint")}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -250,9 +376,13 @@ export function AdapterOptions({
             <Switch
               id="service-probe-redirects"
               checked={(options["followRedirects"] ?? "yes") !== "no"}
-              onCheckedChange={(next) => setOption("followRedirects", next ? "" : "no")}
+              onCheckedChange={(next) =>
+                setOption("followRedirects", next ? "" : "no")
+              }
             />
-            <Label htmlFor="service-probe-redirects">{t("probe.follow-redirects")}</Label>
+            <Label htmlFor="service-probe-redirects">
+              {t("probe.follow-redirects")}
+            </Label>
           </div>
         </OptionGroup>
       </div>
@@ -276,7 +406,9 @@ export function AdapterOptions({
               onChange={(event) => setOption("port", event.target.value)}
               {...fieldProps}
             />
-            <span className="text-xs text-muted-foreground">{t("tcp.port-hint")}</span>
+            <span className="text-xs text-muted-foreground">
+              {t("tcp.port-hint")}
+            </span>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="service-tcp-slow">{t("probe.slow-ms")}</Label>
@@ -288,7 +420,9 @@ export function AdapterOptions({
               onChange={(event) => setOption("slowMs", event.target.value)}
               {...fieldProps}
             />
-            <span className="text-xs text-muted-foreground">{t("tcp.slow-ms-hint")}</span>
+            <span className="text-xs text-muted-foreground">
+              {t("tcp.slow-ms-hint")}
+            </span>
           </div>
         </div>
       </div>
@@ -326,7 +460,9 @@ export function AdapterOptions({
             onChange={(event) => setOption("expectValue", event.target.value)}
             {...fieldProps}
           />
-          <span className="text-xs text-muted-foreground">{t("dns.expect-value-hint")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("dns.expect-value-hint")}
+          </span>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
@@ -339,7 +475,9 @@ export function AdapterOptions({
               onChange={(event) => setOption("resolver", event.target.value)}
               {...fieldProps}
             />
-            <span className="text-xs text-muted-foreground">{t("dns.resolver-hint")}</span>
+            <span className="text-xs text-muted-foreground">
+              {t("dns.resolver-hint")}
+            </span>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="service-dns-slow">{t("probe.slow-ms")}</Label>
@@ -351,7 +489,9 @@ export function AdapterOptions({
               onChange={(event) => setOption("slowMs", event.target.value)}
               {...fieldProps}
             />
-            <span className="text-xs text-muted-foreground">{t("dns.slow-ms-hint")}</span>
+            <span className="text-xs text-muted-foreground">
+              {t("dns.slow-ms-hint")}
+            </span>
           </div>
         </div>
       </div>
@@ -362,11 +502,19 @@ export function AdapterOptions({
 }
 
 /** A titled run of fields, so ten inputs read as three questions. */
-function OptionGroup({ title, children }: { title: string; children: React.ReactNode }) {
+function OptionGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center gap-2">
-        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{title}</span>
+        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          {title}
+        </span>
         <span className="h-px flex-1 bg-border" />
       </div>
       {children}

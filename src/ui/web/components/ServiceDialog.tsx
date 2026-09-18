@@ -37,6 +37,7 @@ import {
   DNS_ADAPTER,
   hasAdapterOptions,
   PROBE_ADAPTER,
+  JSON_ADAPTER,
   SCRAPE_ADAPTER,
   TCP_ADAPTER,
 } from "@/components/service-dialog/AdapterOptions.tsx";
@@ -204,6 +205,7 @@ export function ServiceDialog({
   const activeAdapter = mode === "add" ? adapter : (service?.adapter ?? "");
   const probing = activeAdapter === PROBE_ADAPTER;
   const scraping = activeAdapter === SCRAPE_ADAPTER;
+  const jsonMapping = activeAdapter === JSON_ADAPTER;
   const tcpProbing = activeAdapter === TCP_ADAPTER;
   const dnsProbing = activeAdapter === DNS_ADAPTER;
   const setOption = (key: string, value: string): void => {
@@ -231,7 +233,7 @@ export function ServiceDialog({
   const savedOptions = (): { options?: Record<string, string> } =>
     probing
       ? { options: probeOptions() }
-      : scraping || tcpProbing || dnsProbing
+      : scraping || jsonMapping || tcpProbing || dnsProbing
         ? { options: usedOptions(options) }
         : {};
 

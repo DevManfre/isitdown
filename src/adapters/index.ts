@@ -8,6 +8,7 @@ import { gcpAdapter } from "./gcp.adapter.ts";
 import { htmlAdapter } from "./html.adapter.ts";
 import { httpAdapter } from "./http.adapter.ts";
 import { instatusAdapter } from "./instatus.adapter.ts";
+import { jsonAdapter } from "./json.adapter.ts";
 import { rssAdapter } from "./rss.adapter.ts";
 import { slackAdapter } from "./slack.adapter.ts";
 import { statuspageAdapter } from "./statuspage.adapter.ts";
@@ -27,6 +28,7 @@ export const adapters: Record<string, Adapter> = {
   [gcpAdapter.id]: gcpAdapter,
   [azureAdapter.id]: azureAdapter,
   [instatusAdapter.id]: instatusAdapter,
+  [jsonAdapter.id]: jsonAdapter,
   [betterStackAdapter.id]: betterStackAdapter,
   [cachetAdapter.id]: cachetAdapter,
   [uptimeKumaAdapter.id]: uptimeKumaAdapter,
@@ -49,15 +51,31 @@ export const adapters: Record<string, Adapter> = {
  */
 export function registerAdapter(adapter: Adapter): void {
   if (adapters[adapter.id] !== undefined) {
-    throw new Error(`an adapter with the id "${adapter.id}" is already registered`);
+    throw new Error(
+      `an adapter with the id "${adapter.id}" is already registered`,
+    );
   }
   adapters[adapter.id] = adapter;
+}
+
+/**
+ * Why a provider's options cannot work under this adapter, one sentence each —
+ * roadmap 11.1. Empty when they can, and empty for an unknown adapter, whose
+ * own error the caller reports separately.
+ */
+export function optionProblems(
+  adapter: string,
+  options: Record<string, string> | undefined,
+): string[] {
+  return adapters[adapter]?.validateOptions?.(options) ?? [];
 }
 
 export function getAdapter(id: string): Adapter {
   const adapter = adapters[id];
   if (adapter === undefined) {
-    throw new Error(`unknown adapter: ${id} (known: ${Object.keys(adapters).join(", ")})`);
+    throw new Error(
+      `unknown adapter: ${id} (known: ${Object.keys(adapters).join(", ")})`,
+    );
   }
   return adapter;
 }

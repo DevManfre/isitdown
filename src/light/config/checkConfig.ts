@@ -1,4 +1,4 @@
-import { adapters } from "../../adapters/index.ts";
+import { adapters, optionProblems } from "../../adapters/index.ts";
 import { detectAdapter } from "../../adapters/detect.ts";
 import { httpAdapter, probeConfig } from "../../adapters/http.adapter.ts";
 import type { RuntimeConfig } from "../../core/configSource.interface.ts";
@@ -45,7 +45,10 @@ export interface CheckOptions {
 
 export async function checkConfig(options: CheckOptions): Promise<CheckReport> {
   const { problems, config } = await inspectConfig(options.path, options.env);
-  const findings: CheckFinding[] = problems.map((message) => ({ level: "error", message }));
+  const findings: CheckFinding[] = problems.map((message) => ({
+    level: "error",
+    message,
+  }));
 
   if (config === null) {
     return {
@@ -75,8 +78,21 @@ export async function checkConfig(options: CheckOptions): Promise<CheckReport> {
       try {
         probeConfig(service);
       } catch (error) {
-        findings.push({ level: "error", message: error instanceof Error ? error.message : String(error) });
+        findings.push({
+          level: "error",
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
+    }
+    // Roadmap 11.1, and the same argument as the probe above: an adapter
+    // configured by a declared mapping fails on a path that reads nothing, and
+    // a check that reads the configuration offline is the right place to be
+    // told rather than a dashboard three minutes later.
+    for (const problem of optionProblems(service.adapter, service.options)) {
+      findings.push({
+        level: "error",
+        message: `service "${service.id}": ${problem}`,
+      });
     }
   }
 
@@ -86,8 +102,11 @@ export async function checkConfig(options: CheckOptions): Promise<CheckReport> {
   return {
     findings,
     services: config.services.length,
-    enabledServices: config.services.filter((service) => service.enabled).length,
-    enabledChannels: config.channels.filter((channel) => channel.enabled).map((channel) => channel.id),
+    enabledServices: config.services.filter((service) => service.enabled)
+      .length,
+    enabledChannels: config.channels
+      .filter((channel) => channel.enabled)
+      .map((channel) => channel.id),
     probed,
     ok: !findings.some((finding) => finding.level === "error"),
   };
@@ -138,7 +157,9 @@ async function probeServices(config: RuntimeConfig): Promise<CheckFinding[]> {
       findings.push({
         level: "warning",
         message: `service "${service.id}" names adapter "${service.adapter}" but ${service.baseUrl} looks like "${detected.adapter}"${
-          detected.baseUrl === null || detected.baseUrl === service.baseUrl ? "" : ` (base url ${detected.baseUrl})`
+          detected.baseUrl === null || detected.baseUrl === service.baseUrl
+            ? ""
+            : ` (base url ${detected.baseUrl})`
         }`,
       });
     }

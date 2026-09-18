@@ -747,7 +747,57 @@ credentials: its pages render client-side and its public API answers `403` to
 anything but its own front end, so it needs the HTML-scrape adapter rather than a
 parser of its own.
 
-For a provider on none of these, add an adapter under `src/adapters/`.
+**Generic JSON (`json`)** — roadmap 11.1, and the thing to try before writing
+code. An enormous number of status pages serve perfectly good JSON in a shape
+nobody standardised: the data is stable and complete, and the only thing missing
+is somebody to say which field means what. That is what this adapter takes.
+
+```yaml
+services:
+  - name: Acme Cloud
+    id: acme
+    adapter: json
+    baseUrl: https://status.acme.example
+    options:
+      path: /api/status
+      statusPath: service.state
+      statusMap: '{"UP":"operational","DEGRADED":"degraded","PARTIAL":"partial_outage","DOWN":"major_outage"}'
+      incidentsPath: events
+      incidentId: ref
+      incidentName: title
+      incidentStatus: phase
+      incidentImpact: severity
+      incidentUpdatedAt: changedAt
+```
+
+| Option | Meaning |
+|---|---|
+| `path` | Appended to `baseUrl`. Omit when the base URL is already the document. |
+| `statusPath` | Where the overall status word is. **Required.** |
+| `statusMap` | A JSON object mapping the provider's words to `operational`, `degraded`, `partial_outage`, `major_outage` or `unknown`. **Required.** Matching ignores case and surrounding space. |
+| `incidentsPath` | An array of open incidents. Omit for a page that publishes a status and nothing else. |
+| `incidentName` | The title, *within one entry*. Required whenever `incidentsPath` is set: an entry with no name is a blank row on the timeline, so one is dropped rather than shown. |
+| `incidentId`, `incidentStatus`, `incidentImpact`, `incidentUpdatedAt` | The rest of one entry. Optional; an entry with no id of its own is identified by its position, so two reads agree about which incident is which. |
+
+A **path** is names, dots, and `[n]` for an array index — `page.status`,
+`components[0].state`. Deliberately not JSONPath: a path here is a lookup, and an
+expression language is a surface with filters, wildcards and eventually a parser
+of its own to maintain. A page that needs more than a lookup needs an adapter.
+
+Two behaviours worth knowing. A status word the table does not cover reads
+`unknown` rather than being guessed at by the word-matching heuristic the feed
+adapter uses: the operator has described this provider's vocabulary, and a gap in
+it is a thing to be *told* about. And a page reporting `operational` while
+listing an open incident reads `degraded` — it is a page mid-update, and
+reporting the calmer of the two would be reporting the one already known to be
+out of date.
+
+The mapping is validated when it is **saved**, not when it is read: `POST`/`PATCH
+/config/services` answers `400` naming each problem, and `isitdown check` reports
+them as errors. A typo in a path is a thing to fix while still looking at the
+field it was typed into.
+
+For a provider none of these fit, add an adapter under `src/adapters/`.
 
 #### Conditional requests
 
