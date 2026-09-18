@@ -55,7 +55,7 @@ most competitors in the self-hosted category do not have at all.
 The findings below are what remains after subtracting that.
 
 Legend: **S** a day or less · **M** a few days · **L** a structural change ·
-⚠️ collides with a declared non-goal · 🔁 overlaps a row in `ROADMAP.md` or
+⚠️ collides with a declared non-goal · 🔁 overlaps a row in `docs/roadmap/ROADMAP.md` or
 `ROADMAP_2.md`, with the new part named in the note.
 
 ---

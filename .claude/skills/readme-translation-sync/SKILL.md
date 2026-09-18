@@ -39,7 +39,7 @@ cancelled out.
   new roadmap row that the README's own roadmap section names.
 - Before saying a documentation task is done.
 
-It does **not** apply to `ROADMAP.md`, `CLAUDE.md` or the skills: those are
+It does **not** apply to `docs/roadmap/ROADMAP.md`, `CLAUDE.md` or the skills: those are
 English-only by design and have no translated twin.
 
 ## Procedure

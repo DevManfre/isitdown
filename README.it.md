@@ -190,8 +190,10 @@ Grafana committata.
 Ancora aperto:
 
 - Una revisione madrelingua delle stringhe italiane.
-- Probe HTTP diretti ("il *mio* servizio è su?") e una status page pubblica in sola
-  lettura: i due punti che cambiano cosa è IsItDown, elencati in `ROADMAP.md`.
+
+La roadmap che ha portato il progetto fin qui è finita — ogni riga spedita — ed è
+archiviata in [`docs/roadmap/ROADMAP.md`](docs/roadmap/ROADMAP.md). Quello che viene
+dopo si sta valutando in `ROADMAP_2.md` e `ROADMAP_3.md`, che non impegnano a nulla.
 
 Non-obiettivi espliciti: autenticazione multi-utente (questa è una dashboard locale per
 un singolo operatore), status page dietro login, e un'app mobile pacchettizzata.

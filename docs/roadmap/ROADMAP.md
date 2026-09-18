@@ -201,17 +201,13 @@ is additive and independently shippable.
 
 ## 8. Speculative
 
-Ideas worth writing down and probably not worth building — kept here so they are
-not re-invented from scratch later.
+Ideas worth writing down and probably not worth building. Only 8.1 was built. The
+rest were carried forward, re-framed, into `ROADMAP_2.md` — 8.2 into 12.11, 8.3 into
+17.3, 8.4 into 17.7, 8.6 into 9.6, 8.7 into 12.6, 8.8 into 12.8 and 8.9 into 17.6 —
+and were dropped here rather than kept in two places, where only one of the two would
+ever be updated. 8.5, a browser extension, was carried nowhere: web push shipped and
+made it redundant.
 
 | # | Item | Notes |
 |---|---|---|
-| 8.1 | **Provider trust score** | Compare a provider's self-declared status against observed reality (needs 1.8/1.10) and score how honest their status page is. Nobody publishes this. It would be genuinely interesting and slightly inflammatory. |
-| 8.2 | **"This day last year"** | Seasonal comparison on the history view. Requires more than a year of data before it says anything — possible now that 4.5 lets retention go past a year, but only for an instance that opted into it. |
-| 8.3 | **Anomaly detection on uptime patterns** | Statistically dubious at this data volume. Listed to be explicitly dismissed. |
-| 8.4 | **Terminal client / TUI** | `isitdown watch` in a pane. Fun, and the API already supports it. |
-| 8.5 | **Browser extension** | Fleet status in the toolbar. Mostly redundant with web push, which already exists. |
-| 8.6 | **Federation between instances** | One instance aggregates several others read-only. Interesting for multi-site setups, hard to justify for a single-operator tool. |
-| 8.7 | **Incident postmortem export** | Generate a Markdown postmortem skeleton from an incident's timeline plus operator notes (5.3). Cute, narrow. |
-| 8.8 | **Plain-language incident summary** | Collapse a provider's twelve terse updates into one sentence an operator can act on. Wants a model call — a network dependency and an API key, in a project whose pitch is three dependencies and no key. A product decision, not a feature; listed so the "just add AI" reflex meets an argument rather than a blank page. |
-| 8.9 | **Watch a provider edit its own past** | Status pages quietly rewrite resolved incidents. Keeping the first version read here and diffing later ones would catch it. Same family as 8.1, about as inflammatory, and it needs 4.5's longer retention before it says anything. |
+| 8.1 ✅ | **Provider trust score** | Built, and not as a score: a **card**, three axes kept apart — median and p90 admission delay, how much of the observed outage the page had an incident open for, and how many episodes it never mentioned. Fusing them into one grade would print "always admits, ninety minutes late" and "admits instantly, half the time" as the same letter, and one number is also the most aggressible claim in the project. The data needed nothing new at poll time: 1.8 made a probe a provider, so both series are rows in `status_samples` and `crossChecks` already names the pair — which is why the same builder folds a live cycle and backfills years of stored samples, and why `src/core` and the Light edition are untouched. Episodes are stored closed (`trust_episodes`), because 7.4 measured that aggregating over samples is exactly what falls over, and a selectable window would re-aggregate on every change. Everything else is about not accusing anyone falsely: declared maintenance and any cycle where every page failed to read are recorded and excluded rather than dropped (the export carries the excluded counts, or it is not a score), an episode opens only after the diff engine's own `confirmations` rather than a threshold invented here, a page that opens the incident inside a grace window after recovery counts as late rather than never, the error bar the coarser cadence imposes travels with every duration, and the card says out loud that it looked from one probe on one network. The floor is ten counted episodes *inside the selected window* — on an honest provider that is years, so the surface is rare by construction, and below it the axes are absent rather than zeroed. `crossChecks` grew 2.9's `provider#component` form so a probe aimed at one endpoint is compared against that component instead of the whole page. Exportable at `/export/trust.{csv,json}`. `ROADMAP_3.md` 17.6 is the other half of this and still open. |
