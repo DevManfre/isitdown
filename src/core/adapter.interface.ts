@@ -98,6 +98,22 @@ export interface Adapter {
   /** Registry key, e.g. "statuspage". */
   id: string;
   /**
+   * How this adapter reads a page, as a number bumped by hand — roadmap 10.4.
+   *
+   * A sample records what was read, never how it was read. The day a severity
+   * mapping changes here, every sample already stored keeps its old verdict
+   * while every new one is produced by different rules, and nothing in the
+   * database says where the seam is: the past appears to redraw itself, and an
+   * uptime figure spanning the change is two measurements added together.
+   *
+   * So the number travels with the reading and is stored beside it. Bump it in
+   * the same commit that changes what a status word means here — a new
+   * provider, a new field or a bug fix that leaves the mapping alone is not a
+   * bump. Absent means 1, which is what an external plugin (`plugins.ts`) that
+   * has never heard of this field is recorded as.
+   */
+  version?: number | undefined;
+  /**
    * Throws on a network error, a non-2xx response or an unparseable body so
    * the poller's retry and failure accounting can act. Degrades quietly on a
    * missing individual field instead.

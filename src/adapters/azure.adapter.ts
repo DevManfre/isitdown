@@ -132,6 +132,7 @@ async function readFeed(service: ServiceRef, ctx: FetchContext): Promise<string>
 
 export const azureAdapter: Adapter = {
   id: "azure",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     return parseAzureStatus(await readFeed(service, ctx), service);

@@ -301,10 +301,10 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     ON CONFLICT (provider_id) DO UPDATE SET degraded_notified = excluded.degraded_notified
   `);
   const insertSample = db.prepare(
-    "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok, latency_ms) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok, latency_ms, adapter_version) VALUES (?, ?, ?, ?, ?, ?)",
   );
   const insertComponentSample = db.prepare(
-    "INSERT INTO component_samples (provider_id, component_id, observed_at, status, ok) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO component_samples (provider_id, component_id, observed_at, status, ok, adapter_version) VALUES (?, ?, ?, ?, ?, ?)",
   );
   const upsertIncident = db.prepare(`
     INSERT INTO incidents (provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at)
@@ -407,6 +407,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
           status.overallStatus,
           status.overallStatus === "operational" ? 1 : 0,
           meta?.latencyMs ?? null,
+          meta?.adapterVersion ?? null,
         );
 
         // `unknown` writes no sample: an unmeasured component must not read as
@@ -419,6 +420,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
             status.fetchedAt,
             component.status,
             component.status === "operational" ? 1 : 0,
+            meta?.adapterVersion ?? null,
           );
         }
 

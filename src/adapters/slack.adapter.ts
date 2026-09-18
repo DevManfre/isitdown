@@ -169,6 +169,7 @@ async function readJson(path: string, service: ServiceRef, ctx: FetchContext): P
 
 export const slackAdapter: Adapter = {
   id: "slack",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     return parseSlackStatus(await readJson(CURRENT_PATH, service, ctx), service);

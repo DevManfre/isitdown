@@ -185,6 +185,7 @@ export function parseAwsStatus(raw: string, service: ServiceRef): NormalizedStat
 
 export const awsAdapter: Adapter = {
   id: "aws",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const raw = await fetchConditional(`${service.baseUrl}${EVENTS_PATH}`, {

@@ -691,3 +691,31 @@ test("saveStatus records the read's latency on the sample, null when none was me
     [137, null],
   );
 });
+
+test("a sample records which adapter revision read it, and null when nobody said", async () => {
+  const { db, store } = await harness();
+  await store.saveStatus(snap({ components: [{ id: "c1", name: "API", status: "degraded" }] }), {
+    adapterVersion: 3,
+  });
+  await store.saveStatus(
+    { ...snap({ components: [{ id: "c1", name: "API", status: "degraded" }] }), fetchedAt: "2026-08-19T14:08:00.000Z" },
+  );
+  const rows = db
+    .prepare("SELECT adapter_version FROM status_samples ORDER BY id")
+    .all() as { adapter_version: number | null }[];
+  assert.deepEqual(
+    rows.map((row) => row.adapter_version),
+    [3, null],
+  );
+  // The component sample is written on the same reading, so it carries the
+  // same revision: a component uptime bar and its provider's must never be
+  // attributable to two different parsers.
+  const components = db
+    .prepare("SELECT adapter_version FROM component_samples ORDER BY id")
+    .all() as { adapter_version: number | null }[];
+  assert.deepEqual(
+    components.map((row) => row.adapter_version),
+    [3, null],
+  );
+  await store.close();
+});
