@@ -19,8 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
-import { useHistory, useStatus } from "@/hooks/queries.ts";
+import { useAnnotations, useHistory, useStatus } from "@/hooks/queries.ts";
+import { AnnotationBar } from "@/components/AnnotationBar.tsx";
 import { CoverageProvider } from "@/lib/coverage.tsx";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip.tsx";
 import { COMPARE_CHART } from "@/lib/chartConfig.ts";
 import { formatDuration } from "@/lib/format.ts";
 import { Input } from "@/components/ui/input.tsx";
@@ -133,6 +140,8 @@ export function History() {
   });
   const { data } = useHistory(window_);
   const { data: status } = useStatus();
+  // Roadmap 12.1. Its own query: see `useAnnotations`.
+  const { data: annotations } = useAnnotations(window_);
 
   // useHistory throws on an initial-load failure (routes.tsx's errorElement
   // catches it); while still in flight there is nothing to render yet.
@@ -246,14 +255,30 @@ export function History() {
               <span className="text-xs uppercase tracking-widest text-primary">
                 {t("history.kicker")}
               </span>
-              <span className="font-mono text-3xl font-medium">
-                <NumberTicker
-                  locale={i18n.language}
-                  value={summary.aggregateUptime}
-                  decimalPlaces={2}
-                  suffix="%"
-                />
-              </span>
+              {/* The definition, on the number itself — roadmap 10.2. The
+                  figure has always had an answer to "does degraded count";
+                  until now the operator did not. The full table is in
+                  docs/how-it-works.md §7.6. */}
+              {/* Its own provider rather than one at the app root: this is the
+                  page's only tooltip, and the primitive's context is what these
+                  components need rather than a shell concern. */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="w-fit cursor-help font-mono text-3xl font-medium decoration-dotted underline-offset-4 hover:underline">
+                      <NumberTicker
+                        locale={i18n.language}
+                        value={summary.aggregateUptime}
+                        decimalPlaces={2}
+                        suffix="%"
+                      />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    {t("uptime.definition")}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <div className="flex flex-wrap items-baseline gap-3">
                 <span className="text-sm text-muted-foreground">
                   <Trans
@@ -465,7 +490,10 @@ export function History() {
           <UptimeTrendChart
             series={summary.dailyUptime}
             label={t("history.trend-title")}
+            annotations={annotations?.annotations ?? []}
           />
+
+          <AnnotationBar annotations={annotations?.annotations ?? []} />
 
           <MonthColumns
             months={summary.months}
