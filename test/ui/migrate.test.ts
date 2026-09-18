@@ -24,6 +24,7 @@ test("migrate creates every table the dashboard reads", async () => {
   const db = await freshDb();
   migrate(db);
   assert.deepEqual(names(db, "table"), [
+    "annotations",
     "channels",
     "component_samples",
     "incident_notes",

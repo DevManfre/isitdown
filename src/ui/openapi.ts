@@ -20,6 +20,7 @@ export const API_VERSION = "1.0.0";
 type Json = Record<string, unknown>;
 
 /** A query parameter, in the one shape every path below spells it. */
+import { ANNOTATION_COLOURS } from "./historyStore.interface.ts";
 const query = (name: string, description: string, schema: Json = { type: "string" }): Json => ({
   name,
   in: "query",
@@ -149,6 +150,47 @@ const paths: Json = {
       summary: "Per-component uptime for one provider's selected components.",
       parameters: [query("provider", "Provider id. Required."), query("days", "Window in days.", { type: "integer" })],
       responses: { "200": ok({ type: "object" }), "404": notFound },
+    },
+  },
+  "/annotations": {
+    get: {
+      tags: ["History"],
+      summary: "The operator's own timeline markers over a window.",
+      description:
+        "A provider's markers include the fleet-wide ones: a deploy that broke one provider's page is exactly the marker wanted on its chart.",
+      parameters: [
+        query("days", "Window in days.", { type: "integer" }),
+        query("from", "Range start, YYYY-MM-DD."),
+        query("to", "Range end, YYYY-MM-DD."),
+        query("provider", "Narrow to one provider, fleet-wide markers included."),
+      ],
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+    post: {
+      tags: ["History"],
+      summary: "Write one marker — a deploy, a config change, anything of ours.",
+      requestBody: {
+        required: true,
+        ...json({
+          type: "object",
+          required: ["at", "label", "colour"],
+          properties: {
+            at: { type: "string", format: "date-time" },
+            label: { type: "string", minLength: 1, maxLength: 120 },
+            colour: { type: "string", enum: [...ANNOTATION_COLOURS] },
+            providerId: { type: "string", description: "Omit for a marker about the whole fleet." },
+          },
+        }),
+      },
+      responses: { "201": ok({ type: "object" }, "The stored marker."), "400": badRequest, "404": notFound },
+    },
+  },
+  "/annotations/{id}": {
+    delete: {
+      tags: ["History"],
+      summary: "Remove one marker.",
+      parameters: [path("id", "Marker id.")],
+      responses: { "204": { description: "Removed." }, "400": badRequest, "404": notFound },
     },
   },
   "/incidents": {
