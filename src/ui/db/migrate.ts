@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -574,6 +574,26 @@ export function migrate(db: DatabaseSync): void {
       );
       CREATE INDEX IF NOT EXISTS idx_annotations_at ON annotations (at);
     `);
+  }
+
+  if (from < 24) {
+    // Which source is the record for this provider — roadmap 9.1. A column
+    // beside `group_name`, `cross_checks` and `sla_target` for the same reason
+    // all three are one: it is a fact the provider carries, written identically
+    // in the Light edition's `config.yml`, and a table would let the two
+    // editions describe one fact two ways.
+    //
+    // Nullable and left null on every existing row: absent means "whatever this
+    // adapter implies" (`src/adapters/authority.ts`), so a probe reads
+    // `observed` and a status page reads `declared` without anybody being
+    // migrated into an answer they did not give — and the rule stays a rule
+    // rather than being frozen onto rows the day it was written.
+    const columns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!columns.includes("authority")) {
+      db.exec("ALTER TABLE services ADD COLUMN authority TEXT");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

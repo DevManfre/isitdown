@@ -70,6 +70,14 @@ export interface ServiceDefinition {
    * 100%.
    */
   slaTarget?: number | undefined;
+  /**
+   * Which source is the record for this provider — roadmap 9.1. Absent means
+   * "whatever this adapter implies", which `authorityOf` resolves: a probe is
+   * `observed`, a status page is `declared`. Absent rather than defaulted so
+   * the rule stays a rule and a row does not carry a copy of it taken the day
+   * the provider was added.
+   */
+  authority?: "declared" | "observed" | undefined;
 }
 
 /**

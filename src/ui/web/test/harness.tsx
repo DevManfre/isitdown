@@ -237,6 +237,7 @@ export const providerFixture = (
   components: [],
   componentSelection: [],
   scopeToComponents: false,
+  authority: "declared",
   fetchedAt: "2026-08-21T10:00:00Z",
   failureCount: 0,
   uptime90: 99.9,

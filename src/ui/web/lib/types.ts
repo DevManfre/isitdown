@@ -58,6 +58,12 @@ export interface ProviderStatus {
   failureCount: number;
   /** ISO 8601 while the provider is muted; null when it is not. */
   mutedUntil?: string | null;
+  /**
+   * Which source is the record for this provider — roadmap 9.1. Always present
+   * and always resolved: a provider that has never said still has an answer,
+   * and the figures beside it mean different things depending on which.
+   */
+  authority: "declared" | "observed";
   uptime90: number;
   /** Running now, and windows still to come — a window that has already ended appears in neither. */
   maintenance: { active: MaintenanceWindow[]; upcoming: MaintenanceWindow[] };
@@ -364,6 +370,11 @@ export interface ServiceDefinition {
    * sent, on a patch, to drop the promise.
    */
   slaTarget?: number | null;
+  /**
+   * Which source is the record for this provider — roadmap 9.1. Absent means
+   * "whatever this adapter implies", which is how most providers are left.
+   */
+  authority?: "declared" | "observed" | null;
 }
 
 /** One provider's month against its target — `GET /sla` (roadmap 4.13). */

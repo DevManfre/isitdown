@@ -193,6 +193,16 @@ shipped — and is archived at [`docs/roadmap/ROADMAP.md`](docs/roadmap/ROADMAP.
 What comes next is being weighed in `ROADMAP_2.md` and `ROADMAP_3.md`, neither of
 which commits to anything.
 
+**What IsItDown is.** Both an aggregator of status pages and a monitor of
+things that publish none — and every provider says which of the two answers for
+it. A status page provider is `declared`: its own page is the record, and a
+probe that disagrees is reported as a disagreement rather than as an overrule. A
+probe is `observed`: our reading is the record, and a page that contradicts it is
+an opinion. The default comes from the adapter and needs no configuration; the
+`authority` field is only there for the cases where the operator disagrees with
+that default. This was left open for two roadmaps, and leaving it open is why
+"what does 93% mean here" had two answers on one screen.
+
 Explicit non-goals: multi-user auth (this is a local, single-operator dashboard),
 status pages behind a login, and a packaged mobile app.
 

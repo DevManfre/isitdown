@@ -114,6 +114,20 @@ export interface Adapter {
    */
   version?: number | undefined;
   /**
+   * What this adapter is — roadmap 9.1.
+   *
+   * `page` reads a status page somebody else publishes; `probe` takes a reading
+   * of its own. It decides which source is the record for a provider that has
+   * not said (`src/core/authority.ts`), and it lives here rather than in a list
+   * of adapter ids somewhere else because a probe is a probe by what it does: a
+   * list would be a second place to update whenever one is added, and the kind
+   * of list that stays right until it silently is not.
+   *
+   * Absent means `page`, which is what every adapter but three is and what an
+   * external plugin almost certainly is.
+   */
+  kind?: "page" | "probe" | undefined;
+  /**
    * Throws on a network error, a non-2xx response or an unparseable body so
    * the poller's retry and failure accounting can act. Degrades quietly on a
    * missing individual field instead.

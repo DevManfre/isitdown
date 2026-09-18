@@ -308,3 +308,36 @@ hatching on the days it happened. Days before the first cycle the database ever
 recorded report *no answer* rather than zero: there is no evidence either way,
 and drawing an install's past as our own outage would be a claim made out of
 missing data.
+
+### 7.7 Which source is the record
+
+IsItDown reads status pages *and* takes readings of its own (HTTP, TCP and DNS
+probes). Those are two different products in one binary, and they do not agree
+about what a provider's status **is**: an aggregator reports what the provider
+admits, a monitor reports what it measured. Left unsaid, that ambiguity lands on
+every figure — the same 93% on one row means "their page said so" and on the next
+means "we measured it".
+
+So every provider carries an `authority`, and the dashboard prints it beside the
+adapter:
+
+| Value | The record is | A contradiction is |
+| --- | --- | --- |
+| `declared` | The provider's own status page. | News in its own right — the silent-outage alert (§7.3) says the page has not caught up. The page's word is still what the provider's status *is*. |
+| `observed` | Our own reading. | The page is an opinion. The same alert fires, worded to say that our measurement is what counts here. |
+
+The default is not stored: it comes from the adapter. A probe is `observed`
+because it *is* the reading; everything that parses somebody's page is
+`declared`. That keeps the rule a rule instead of freezing the answer onto each
+row the day it was added — a provider migrated from a probe to a real status
+page follows the rule without anybody remembering to change a field. Setting
+`authority` explicitly, in `config.yml` or from the provider dialog, is only for
+the case where the operator disagrees with the default: a status page they have
+learned to distrust, or a probe they do not want treated as the record.
+
+What this changes today is what the dashboard and the alerts **say** — the badge,
+and which sentence a silent-outage message uses. It does not change which samples
+back a percentage: an `observed` provider's uptime is still computed from that
+provider's own samples, as §7.6 describes, because a probe and the page it
+cross-checks are two separate providers with two separate histories. Folding one
+into the other is a larger change and is deliberately not made here.
