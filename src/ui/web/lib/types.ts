@@ -12,11 +12,7 @@
 
 /** Normalised severity vocabulary. Providers' own words are mapped onto this. */
 export type OverallStatus =
-  | "operational"
-  | "degraded"
-  | "partial_outage"
-  | "major_outage"
-  | "unknown";
+  "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown";
 
 export interface Incident {
   id: string;
@@ -136,6 +132,27 @@ export interface ProviderHistory {
  * an install that predates this trace has no cycles recorded for its past, and
  * drawing that as an outage of ours would be a claim made out of missing data.
  */
+/** One provider's reliability over a window — roadmap 12.2. */
+export interface ProviderReliability {
+  providerId: string;
+  incidents: number;
+  /** null when nothing in the window has been resolved — not a flawless zero. */
+  mttrMinutes: number | null;
+  resolved: number;
+  /** null with fewer than two incidents: one has nothing to be between. */
+  mtbfMinutes: number | null;
+  longestOutageMinutes: number | null;
+  downtimeMinutes: number;
+  previousIncidents: number;
+}
+
+export interface ReliabilityReport {
+  days: number;
+  providers: ProviderReliability[];
+  /** [weekday][hour] in the operator's zone, Monday first — roadmap 12.3. */
+  byWeekdayHour: number[][];
+}
+
 /** One marker the operator put on the timeline — roadmap 12.1. */
 export interface Annotation {
   id: number;
@@ -396,8 +413,16 @@ export interface TrustCardData {
   /** Present only below the floor. */
   floor?: number;
   excluded?: { maintenance: number; fleetBlind: number };
-  delay?: { medianMinutes: number; p90Minutes: number; admitted: number } | null;
-  coverage?: { observedMinutes: number; admittedMinutes: number; percent: number } | null;
+  delay?: {
+    medianMinutes: number;
+    p90Minutes: number;
+    admitted: number;
+  } | null;
+  coverage?: {
+    observedMinutes: number;
+    admittedMinutes: number;
+    percent: number;
+  } | null;
   never?: number;
   afterRecovery?: number;
   resolutionMinutes?: number;
@@ -454,7 +479,8 @@ export interface ComponentPreview {
 
 /** Mirrors `src/core/routing.ts`'s own `EventClass`/`SeverityFloor`/`RoutingRule`. */
 export type EventClass = "status" | "incident" | "maintenance" | "monitoring";
-export type SeverityFloor = "any" | "degraded" | "partial_outage" | "major_outage";
+export type SeverityFloor =
+  "any" | "degraded" | "partial_outage" | "major_outage";
 
 export interface RoutingRule {
   provider: string;
@@ -502,7 +528,8 @@ export interface RuntimeConfigResponse {
 }
 
 /** A severity floor, as the routing rules and the two floors below spell it. */
-export type SeverityFloorName = "any" | "degraded" | "partial_outage" | "major_outage";
+export type SeverityFloorName =
+  "any" | "degraded" | "partial_outage" | "major_outage";
 
 /** Quiet hours — roadmap 3.11. Mirrors `QuietHours` in `src/core/routing.ts`. */
 export interface QuietHoursPolicy {
@@ -519,7 +546,11 @@ export interface QuietHoursPolicy {
 export interface DeliveryPolicy {
   quietHours: QuietHoursPolicy;
   /** Roadmap 3.12: batch everything under the floor into one message a window. */
-  digest: { enabled: boolean; windowMinutes: number; immediateFloor: SeverityFloorName };
+  digest: {
+    enabled: boolean;
+    windowMinutes: number;
+    immediateFloor: SeverityFloorName;
+  };
   /** Roadmap 3.13: a ceiling of messages per hour, per provider. */
   cap: { enabled: boolean; maxPerHour: number };
   /** Roadmap 3.19: an incident's updates edit its first message. */
@@ -595,7 +626,11 @@ export interface AdapterDetection {
   /** Null when no adapter recognised the page. */
   adapter: string | null;
   baseUrl: string | null;
-  probes: { adapter: string; url: string; outcome: "match" | "other-shape" | "unreachable" }[];
+  probes: {
+    adapter: string;
+    url: string;
+    outcome: "match" | "other-shape" | "unreachable";
+  }[];
 }
 
 export interface AdapterProbeResult {

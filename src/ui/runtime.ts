@@ -26,6 +26,7 @@ import { openDatabase } from "./db/open.ts";
 import { seedDefaults } from "./db/seed.ts";
 import { loadGeoTables } from "./geo/resolveLocation.ts";
 import { createHistoryService } from "./history.ts";
+import { createReliabilityService } from "./reliability.ts";
 import { createLiveEvents, type LiveEvents } from "./liveEvents.ts";
 import type { HistoryStore } from "./historyStore.interface.ts";
 import { createMapLane, type MapLane } from "./mapLane.ts";
@@ -71,6 +72,7 @@ export interface UiRuntimeCore {
   dispatcher: Dispatcher;
   store: HistoryStore;
   history: ReturnType<typeof createHistoryService>;
+  reliability: ReturnType<typeof createReliabilityService>;
   /** The operator's timezone preference, read fresh — roadmap 10.7. */
   timeZone(): string;
   /** Monthly targets and what the month has spent of them — roadmap 4.13. */
@@ -173,6 +175,9 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   const timeZone = (): string => readSettings(db, logger).timeZone;
 
   const history = createHistoryService(store, { timeZone });
+  // Roadmap 12.2 and 12.3: the incident table, asked two questions it already
+  // holds the answers to.
+  const reliability = createReliabilityService(store, { timeZone });
   // Roadmap 4.13. Reads the same monthly report the export and the History view
   // are drawn from, so a budget can never disagree with the uptime beside it.
   const sla = createSlaService({ history });
@@ -400,6 +405,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     dispatcher,
     store,
     history,
+    reliability,
     timeZone,
     sla,
     trust,

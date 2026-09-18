@@ -19,8 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
-import { useAnnotations, useHistory, useStatus } from "@/hooks/queries.ts";
+import {
+  useAnnotations,
+  useHistory,
+  useReliability,
+  useStatus,
+} from "@/hooks/queries.ts";
 import { AnnotationBar } from "@/components/AnnotationBar.tsx";
+import { ReliabilityTable } from "@/components/ReliabilityTable.tsx";
+import { IncidentHeatmap } from "@/components/charts/IncidentHeatmap.tsx";
 import { CoverageProvider } from "@/lib/coverage.tsx";
 import {
   Tooltip,
@@ -142,6 +149,10 @@ export function History() {
   const { data: status } = useStatus();
   // Roadmap 12.1. Its own query: see `useAnnotations`.
   const { data: annotations } = useAnnotations(window_);
+  // Roadmap 12.2 and 12.3. The fixed window a range falls inside: the incident
+  // arithmetic is defined over the three documented spans, and asking for an
+  // arbitrary range would mean a second definition of "the previous window".
+  const { data: reliability } = useReliability(nearestFixed(window_.days));
 
   // useHistory throws on an initial-load failure (routes.tsx's errorElement
   // catches it); while still in flight there is nothing to render yet.
@@ -494,6 +505,16 @@ export function History() {
           />
 
           <AnnotationBar annotations={annotations?.annotations ?? []} />
+
+          {reliability !== undefined && (
+            <>
+              <ReliabilityTable
+                providers={reliability.providers}
+                nameOf={nameOf}
+              />
+              <IncidentHeatmap grid={reliability.byWeekdayHour} />
+            </>
+          )}
 
           <MonthColumns
             months={summary.months}

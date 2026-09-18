@@ -152,6 +152,16 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "404": notFound },
     },
   },
+  "/reliability": {
+    get: {
+      tags: ["History"],
+      summary: "Per-provider MTTR, MTBF and the longest outage, plus incidents by weekday and hour.",
+      description:
+        "Roadmap 12.2 and 12.3, over rows the poller already wrote. `mttrMinutes` counts only incidents that have been resolved, `mtbfMinutes` needs at least two, and both are null rather than 0 when the window cannot answer. `byWeekdayHour` is [weekday][hour] in the operator's zone, Monday first, counted by when an incident started.",
+      parameters: [query("days", "Window in days.", { type: "integer" })],
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
   "/annotations": {
     get: {
       tags: ["History"],

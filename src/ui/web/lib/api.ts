@@ -21,6 +21,7 @@ import type {
   OverallStatus,
   Preferences,
   ProviderCalendar,
+  ReliabilityReport,
   SlaResponse,
   TrustResponse,
   ProviderHistory,
@@ -164,6 +165,10 @@ export const getProviderCalendar = (provider: string) =>
     "GET",
     `/history/calendar?provider=${encodeURIComponent(provider)}`,
   );
+
+/** Per-provider MTTR and MTBF, and incidents by weekday and hour — roadmap 12.2, 12.3. */
+export const getReliability = (days: number) =>
+  request<ReliabilityReport>("GET", `/reliability?days=${days}`);
 
 /** Monthly targets and what the month has spent of them — roadmap 4.13. */
 export const getSla = () => request<SlaResponse>("GET", "/sla");
