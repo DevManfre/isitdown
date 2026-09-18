@@ -235,6 +235,21 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     onCycle: async (result) => {
       lastCycle = result;
       metrics.recordCycle(result);
+      // The poller's own liveness, as its own trace — roadmap 10.1. Written
+      // before anything else the cycle produces, because this is the row that
+      // later says whether a stretch with no samples was a quiet fleet or a
+      // stopped container, and a failure further down this callback must not be
+      // able to turn the second into the first.
+      //
+      // The cadence stored is the one this cycle ran at, not today's: it is what
+      // decides how long a following silence has to be before it is an absence,
+      // and a cadence changed since says nothing about that.
+      await store.recordPollCycle({
+        startedAt: result.startedAt,
+        finishedAt: result.finishedAt,
+        intervalMinutes: await poller.nextIntervalMinutes(await configSource.load()),
+        providers: result.results.length,
+      });
       // Recorded next to the metrics and for the same reason: both are read
       // from a page rather than from the logs, and the debug panel is the one
       // that says *why* a read failed.

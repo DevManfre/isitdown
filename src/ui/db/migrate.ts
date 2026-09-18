@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 22;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -524,6 +524,29 @@ export function migrate(db: DatabaseSync): void {
         db.exec("ALTER TABLE component_samples ADD COLUMN adapter_version INTEGER");
       }
     }
+  }
+
+  if (from < 22) {
+    // Poller liveness as a trace of its own — roadmap 10.1. Until now a stretch
+    // where nothing was running left no mark at all: the samples are simply
+    // absent, and absent reads as "nothing bad happened" on a bar and as a hole
+    // in a line, depending on which query asked. One row per finished cycle is
+    // what lets a gap be named as a gap.
+    //
+    // `interval_minutes` is stored rather than read from today's configuration
+    // because it is what decides how long a silence has to be before it is an
+    // outage of ours, and the cadence the operator has since changed says
+    // nothing about a cycle that ran under the old one.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS poll_cycles (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        started_at      TEXT NOT NULL,
+        finished_at     TEXT NOT NULL,
+        interval_minutes REAL NOT NULL,
+        providers       INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_poll_cycles_started ON poll_cycles (started_at);
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

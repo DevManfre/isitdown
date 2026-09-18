@@ -1,5 +1,6 @@
 import type { DailyBucket, HistoryStore, IncidentRow } from "./historyStore.interface.ts";
 import { offsetSegments, resolveZone, shiftDay, zonedDayKey } from "./calendarDays.ts";
+import { coverageByDay, coverageOver, type DayCoverage } from "./coverage.ts";
 import type { OverallStatus } from "../core/types.ts";
 
 /**
@@ -51,6 +52,23 @@ export interface ProviderHistory {
    * samples.
    */
   previousUptime: number | null;
+  /**
+   * How much of each day the poller was running — roadmap 10.1. Same length and
+   * same days as `dailySeries`, so a chart can hatch the stretch nobody was
+   * watching directly under the bar it belongs to.
+   *
+   * A property of the poller rather than of this provider: one loop reads the
+   * whole fleet, so it is the same series on every provider in a response. It is
+   * repeated rather than published once because a single provider's history is
+   * also served on its own, and a figure that needs a caveat must not be able to
+   * arrive without it.
+   */
+  dailyCoverage: DayCoverage[];
+  /**
+   * The window's coverage as one number, 0 to 1 — what the uptime figure beside
+   * it has to be read against. `null` when no day in the window has an answer.
+   */
+  coverage: number | null;
 }
 
 /**
@@ -123,6 +141,9 @@ export interface HistorySummary {
   /** `uptime` is null for a month with no samples: 0% would read as an outage. */
   months: { month: string; uptime: number | null }[];
   providers: ProviderHistory[];
+  /** The fleet's coverage, day by day — roadmap 10.1. See `ProviderHistory`. */
+  dailyCoverage: DayCoverage[];
+  coverage: number | null;
 }
 
 /**
@@ -313,6 +334,28 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     return series;
   }
 
+  /**
+   * The poller's coverage over the window a view is drawing — roadmap 10.1.
+   *
+   * Reads the cycles for exactly the days being shown, on exactly the day seams
+   * the samples were bucketed on, so "how much of Tuesday was watched" and "how
+   * much of Tuesday was up" are measured over the same hours.
+   */
+  async function coverageFor(
+    days: number,
+    todayKey: string,
+    zone: string,
+  ): Promise<{ dailyCoverage: DayCoverage[]; coverage: number | null }> {
+    const segments = offsetSegments(shiftDay(todayKey, -(days - 1)), todayKey, zone);
+    const first = segments[0];
+    const last = segments.at(-1);
+    if (first === undefined || last === undefined) return { dailyCoverage: [], coverage: null };
+    const cycles = await store.listPollCycles(first.fromIso, last.toIso);
+    const shown = Array.from({ length: days }, (_, index) => shiftDay(todayKey, -(days - 1 - index)));
+    const dailyCoverage = coverageByDay(cycles, segments, shown, now());
+    return { dailyCoverage, coverage: coverageOver(dailyCoverage) };
+  }
+
   async function getProviderHistory(
     providerId: string,
     days: number,
@@ -357,6 +400,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
       downtimeMinutes: notOk * intervalMinutes,
       dailySeries: dailySeriesOf(buckets, days, today),
       previousUptime: uptimeBetween(buckets, shiftDay(today, -(2 * days - 1)), shiftDay(today, -days)),
+      ...(await coverageFor(days, today, zone)),
     };
   }
 
@@ -587,6 +631,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
         uptime: totals.total === 0 ? null : round2((totals.ok / totals.total) * 100),
       })),
       providers,
+      ...(await coverageFor(days, today, zone)),
     };
   }
 

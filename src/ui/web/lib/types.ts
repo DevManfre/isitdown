@@ -123,6 +123,22 @@ export interface ProviderHistory {
   dailySeries: DayUptime[];
   /** The equal-length window before this one. null = nothing measured then. */
   previousUptime: number | null;
+  /** How much of each day the poller was running — roadmap 10.1. */
+  dailyCoverage: DayCoverage[];
+  /** The window's coverage as one number, 0 to 1. null = no day can say. */
+  coverage: number | null;
+}
+
+/**
+ * One day's worth of poller liveness — roadmap 10.1.
+ *
+ * `observed` is `null` when there is no evidence either way, which is not zero:
+ * an install that predates this trace has no cycles recorded for its past, and
+ * drawing that as an outage of ours would be a claim made out of missing data.
+ */
+export interface DayCoverage {
+  day: string;
+  observed: number | null;
 }
 
 export interface ComponentHistory {
@@ -149,6 +165,9 @@ export interface HistorySummary {
   /** `uptime` null for a month with no samples: 0% would read as an outage. */
   months: { month: string; uptime: number | null }[];
   providers: ProviderHistory[];
+  /** The fleet's coverage, day by day — roadmap 10.1. */
+  dailyCoverage: DayCoverage[];
+  coverage: number | null;
 }
 
 export interface ComponentHistoryResponse {

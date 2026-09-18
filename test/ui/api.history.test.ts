@@ -647,3 +647,52 @@ test("a half-written or impossible range is refused in words", async () => {
     await app.close();
   }
 });
+
+test("history reports how much of the window the poller was actually running", async () => {
+  const app = await api();
+  try {
+    await save(app.runtime, "github", "operational", at(1));
+
+    // Nothing recorded yet: the window says "we cannot tell" rather than 0, so
+    // an install upgrading into this trace does not have its past redrawn as an
+    // outage of ours.
+    const before = (await app.get("/history?days=7")).body as { coverage: number | null };
+    assert.equal(before.coverage, null);
+
+    // Two cycles a minute apart on a three-minute cadence, then silence: today
+    // is covered for that minute and missing for the rest.
+    await app.runtime.store.recordPollCycle({
+      startedAt: at(0, 0),
+      finishedAt: at(0, 0),
+      intervalMinutes: 3,
+      providers: 1,
+    });
+    await app.runtime.store.recordPollCycle({
+      startedAt: at(0, 1),
+      finishedAt: at(0, 1),
+      intervalMinutes: 3,
+      providers: 1,
+    });
+
+    const { body } = await app.get("/history?days=7");
+    const summary = body as {
+      coverage: number | null;
+      dailyCoverage: { day: string; observed: number | null }[];
+      providers: { coverage: number | null; dailyCoverage: unknown[] }[];
+    };
+    assert.equal(summary.dailyCoverage.length, 7, "one entry per day shown, gap-filled");
+    // Only today has evidence; the six days before the first cycle stay unjudged.
+    assert.deepEqual(
+      summary.dailyCoverage.slice(0, 6).map((entry) => entry.observed),
+      [null, null, null, null, null, null],
+    );
+    const today = summary.dailyCoverage.at(-1);
+    assert.ok(today !== undefined && today.observed !== null && today.observed < 1, String(today?.observed));
+    // The same caveat travels on every provider, because the gap is the
+    // poller's and not any one provider's.
+    assert.equal(summary.providers[0]?.dailyCoverage.length, 7);
+    assert.equal(summary.providers[0]?.coverage, summary.coverage);
+  } finally {
+    await app.close();
+  }
+});

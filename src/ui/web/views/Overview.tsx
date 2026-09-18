@@ -14,6 +14,7 @@ import { StackBand } from "@/components/StackBand.tsx";
 import { GeoCard } from "@/components/GeoCard.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
+import { CoverageProvider } from "@/lib/coverage.tsx";
 import { worstTier } from "@/lib/chartConfig.ts";
 import { formatRelative } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
@@ -50,13 +51,23 @@ export function Overview() {
   const configured = status?.providers ?? [];
   const providers = configured.filter((provider) => provider.enabled);
   const allDisabled = configured.length > 0 && providers.length === 0;
-  const buckets = new Map(summaryProviders(summary).map((p) => [p.providerId, p.buckets]));
+  const buckets = new Map(
+    summaryProviders(summary).map((p) => [p.providerId, p.buckets]),
+  );
   const shape = overviewShape(providers.length);
 
   // The headline is chosen by plural rule, never assembled from fragments —
   // "one provider is off the line" and "3 providers are off the line" are
   // separate catalog entries, selected by i18next's count-based plural rule.
-  const down = providers.filter((p) => p.overallStatus !== "operational");
+  // `unknown` is held apart from `down` on purpose: a provider nobody could read
+  // — a bot challenge, a page we could not parse — has not been reported as off
+  // the line by anyone, and saying it is would be a claim this dashboard cannot
+  // back. It still earns its own sentence rather than being folded into "all
+  // operational", because it is not that either.
+  const down = providers.filter(
+    (p) => p.overallStatus !== "operational" && p.overallStatus !== "unknown",
+  );
+  const unreadable = providers.filter((p) => p.overallStatus === "unknown");
   const lastSeen = providers
     .map((p) => p.fetchedAt)
     .filter((v): v is string => v !== null)
@@ -66,7 +77,11 @@ export function Overview() {
   const average =
     providers.length === 0
       ? 0
-      : Math.round((providers.reduce((sum, p) => sum + p.uptime90, 0) / providers.length) * 100) / 100;
+      : Math.round(
+          (providers.reduce((sum, p) => sum + p.uptime90, 0) /
+            providers.length) *
+            100,
+        ) / 100;
 
   // One copy block for all three shapes: the words do not change with the
   // fleet's size, only where the fleet is drawn does.
@@ -78,32 +93,39 @@ export function Overview() {
       {/* The beacon shares the headline's line rather than sitting above
           it: the two say the same thing, and splitting them reads as two
           separate claims. */}
-      <div className="anim-rise anim-rise-hero flex items-center gap-3" style={{ animationDelay: "50ms" }}>
+      <div
+        className="anim-rise anim-rise-hero flex items-center gap-3"
+        style={{ animationDelay: "50ms" }}
+      >
         <StatusBeacon tier={worstTier(providers.map((p) => p.overallStatus))} />
         {/* 28px on a phone: at `text-4xl` the four-word headline took six
             lines of a 390px screen and pushed the fleet under the fold. */}
         <h2 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance md:text-3xl lg:text-4xl lg:leading-[1.1]">
-          {allDisabled
-            ? t("overview.title.all-disabled")
-            : down.length === 0
-              ? t("overview.title.all-operational")
-              : down.length === 1
-                ? (
-                    // The one-provider headline is a plain sentence — the plural
-                    // entry is the only one that carries a figure — so it types
-                    // itself in instead of arriving whole. The count-bearing
-                    // entry keeps the ticker: a number counting up inside a line
-                    // that is still being typed reads as two flourishes fighting.
-                    <TypingAnimation text={t("overview.title.down", { count: 1 })} />
-                  )
-                : (
-                    <Trans
-                      i18nKey="overview.title.down"
-                      count={down.length}
-                      values={{ count: down.length }}
-                      components={[<NumberTicker locale={i18n.language} value={down.length} />]}
-                    />
-                  )}
+          {allDisabled ? (
+            t("overview.title.all-disabled")
+          ) : down.length === 0 ? (
+            unreadable.length === 0 ? (
+              t("overview.title.all-operational")
+            ) : (
+              t("overview.title.unreadable", { count: unreadable.length })
+            )
+          ) : down.length === 1 ? (
+            // The one-provider headline is a plain sentence — the plural
+            // entry is the only one that carries a figure — so it types
+            // itself in instead of arriving whole. The count-bearing
+            // entry keeps the ticker: a number counting up inside a line
+            // that is still being typed reads as two flourishes fighting.
+            <TypingAnimation text={t("overview.title.down", { count: 1 })} />
+          ) : (
+            <Trans
+              i18nKey="overview.title.down"
+              count={down.length}
+              values={{ count: down.length }}
+              components={[
+                <NumberTicker locale={i18n.language} value={down.length} />,
+              ]}
+            />
+          )}
         </h2>
       </div>
       {/* Capped in `ch` rather than by its grid column: in the band shape the
@@ -117,32 +139,55 @@ export function Overview() {
           className="anim-rise anim-rise-hero max-w-[68ch] text-muted-foreground"
           style={{ animationDelay: "100ms" }}
         >
-          {down.length === 0 ? (
+          {down.length === 0 && unreadable.length > 0 ? (
+            t("overview.body.unreadable", {
+              providers: unreadable.map((p) => p.name).join(", "),
+            })
+          ) : down.length === 0 ? (
             <Trans
               i18nKey="overview.body.all-operational"
               values={{
                 count: providers.length,
-                since: lastSeen === undefined ? t("meta.never-polled") : formatRelative(i18n.language, lastSeen),
+                since:
+                  lastSeen === undefined
+                    ? t("meta.never-polled")
+                    : formatRelative(i18n.language, lastSeen),
               }}
-              components={[<NumberTicker locale={i18n.language} value={providers.length} />]}
+              components={[
+                <NumberTicker
+                  locale={i18n.language}
+                  value={providers.length}
+                />,
+              ]}
             />
           ) : (
-            t("overview.body.down", { providers: down.map((p) => p.name).join(", ") })
+            t("overview.body.down", {
+              providers: down.map((p) => p.name).join(", "),
+            })
           )}
         </p>
       )}
-      <div className="anim-rise anim-rise-hero flex gap-2" style={{ animationDelay: "150ms" }}>
+      <div
+        className="anim-rise anim-rise-hero flex gap-2"
+        style={{ animationDelay: "150ms" }}
+      >
         {withIncident !== undefined && (
           <Button
             type="button"
             onClick={() =>
-              navigate(`/incidents/${withIncident.id}/${withIncident.activeIncidents[0]?.id ?? ""}`)
+              navigate(
+                `/incidents/${withIncident.id}/${withIncident.activeIncidents[0]?.id ?? ""}`,
+              )
             }
           >
             {t("action.incident-details")}
           </Button>
         )}
-        <Button type="button" variant="ghost" onClick={() => navigate(ROUTE_PATHS.history)}>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => navigate(ROUTE_PATHS.history)}
+        >
           {t("action.history-90d")}
         </Button>
       </div>
@@ -150,7 +195,8 @@ export function Overview() {
   );
 
   return (
-    <>
+    // Roadmap 10.1: the bar rows below draw the poller's own gaps.
+    <CoverageProvider coverage={summary?.dailyCoverage}>
       {/* The standard view padding is dropped here (there is no `.view` class
           left to remove — the whole layer moved to Tailwind), so the hero's own
           light can bleed to the true edges of #view instead of stopping at the
@@ -210,14 +256,19 @@ export function Overview() {
               alarm={down.length}
             />
           ) : (
-            providers.length > 0 && <HeroStats providers={providers} average={average} />
+            providers.length > 0 && (
+              <HeroStats providers={providers} average={average} />
+            )
           )}
         </div>
       </div>
 
       <div className="overview-rows flex flex-col gap-4">
         {/* The rule sweeps in under the hero, before the rows arrive. */}
-        <div className="fade-rule anim-sweep h-px bg-border" style={{ animationDelay: "170ms" }} />
+        <div
+          className="fade-rule anim-sweep h-px bg-border"
+          style={{ animationDelay: "170ms" }}
+        />
 
         {/* The fleet as tiles, in the two shapes that still draw them. Out of
             the hero (see above) and into the page's own column, where a wrap is
@@ -247,19 +298,26 @@ export function Overview() {
             )}
             <div
               className="anim-fade text-sm text-muted-foreground"
-              style={{ animationDelay: stagger(providers.length, FLEET_ROW_STAGGER) }}
+              style={{
+                animationDelay: stagger(providers.length, FLEET_ROW_STAGGER),
+              }}
             >
               <Trans
                 i18nKey="overview.uptime-window"
                 values={{ uptime: average }}
                 components={[
-                  <NumberTicker locale={i18n.language} value={average} decimalPlaces={2} suffix="%" />,
+                  <NumberTicker
+                    locale={i18n.language}
+                    value={average}
+                    decimalPlaces={2}
+                    suffix="%"
+                  />,
                 ]}
               />
             </div>
           </>
         )}
       </div>
-    </>
+    </CoverageProvider>
   );
 }

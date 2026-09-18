@@ -1,4 +1,5 @@
 import type { DaySegment } from "./calendarDays.ts";
+import type { PollCycle } from "./coverage.ts";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { MessageRefStore } from "../core/messageRefStore.interface.ts";
 import type { StateStore } from "../core/stateStore.interface.ts";
@@ -139,6 +140,14 @@ export interface HistoryStore extends StateStore, MessageRefStore {
     componentId: string,
     segments: readonly DaySegment[],
   ): Promise<DailyBucket[]>;
+  /**
+   * Records that a cycle finished — roadmap 10.1. The poller's own liveness,
+   * kept as its own trace so a stretch with no samples can say which kind of
+   * nothing it was.
+   */
+  recordPollCycle(cycle: PollCycle & { providers: number }): Promise<void>;
+  /** Finished cycles that started inside the window, oldest first. */
+  listPollCycles(fromIso: string, toIso: string): Promise<PollCycle[]>;
   /** Every configured provider, enabled or not: its history is real either way. */
   listProviderIds(): Promise<string[]>;
   recordNotification(record: SentRecord): Promise<void>;

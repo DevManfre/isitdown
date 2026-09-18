@@ -33,6 +33,7 @@ test("migrate creates every table the dashboard reads", async () => {
     "map_points",
     "message_refs",
     "notifications",
+    "poll_cycles",
     "provider_state",
     "push_subscriptions",
     "routing_rules",
