@@ -106,6 +106,8 @@ interface ProviderRow {
   maintenanceActive: boolean;
   /** The operator asked for silence, and it has not run out yet. */
   muted: boolean;
+  /** Which source is the record for this provider — roadmap 9.1. */
+  authority: "declared" | "observed";
 }
 
 /**
@@ -371,6 +373,7 @@ export function Providers() {
           components: provider.components,
           maintenanceActive: provider.maintenance.active.length > 0,
           muted: isMuted(provider.mutedUntil),
+          authority: provider.authority,
         };
       });
   }, [providers, summary, filter, leaving]);

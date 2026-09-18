@@ -1,3 +1,5 @@
+import { authorityOf } from "../../core/authority.ts";
+import { getAdapter } from "../../adapters/index.ts";
 import { Router } from "express";
 import { deriveGroups } from "../../core/groups.ts";
 import { isActive } from "../../core/maintenance.ts";
@@ -78,10 +80,19 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
           // Only ever a live mute: `listServices` drops one that has expired,
           // so the dashboard never has to work out whether it still counts.
           mutedUntil: service.mutedUntil ?? null,
+          // Roadmap 9.1. Resolved rather than echoed, so the dashboard shows
+          // what this provider's authority actually *is* — including for the
+          // majority of rows that have never said, which is where a raw null
+          // would tell the operator nothing.
+          authority: authorityOf(service, getAdapter(service.adapter)),
           uptime90: history.uptime90,
           maintenance: {
-            active: (state.last?.maintenances ?? []).filter((window) => isActive(window, serverNow)),
-            upcoming: (state.last?.maintenances ?? []).filter((window) => window.startsAt > serverNow),
+            active: (state.last?.maintenances ?? []).filter((window) =>
+              isActive(window, serverNow),
+            ),
+            upcoming: (state.last?.maintenances ?? []).filter(
+              (window) => window.startsAt > serverNow,
+            ),
           },
         };
       }),
@@ -90,7 +101,9 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
     // Roadmap 2.6. Derived here rather than in the browser for the same reason
     // every other figure is: a composite the dashboard computed itself could
     // disagree with the providers printed under it.
-    const byId = new Map(providers.map((provider) => [provider.id, provider.overallStatus]));
+    const byId = new Map(
+      providers.map((provider) => [provider.id, provider.overallStatus]),
+    );
     const groups = deriveGroups(services, (id) => byId.get(id) ?? "unknown");
 
     res.json({

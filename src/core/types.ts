@@ -6,11 +6,7 @@
 
 /** Normalised severity vocabulary. Providers' own words are mapped onto this. */
 export type OverallStatus =
-  | "operational"
-  | "degraded"
-  | "partial_outage"
-  | "major_outage"
-  | "unknown";
+  "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown";
 
 export interface Incident {
   id: string;
@@ -132,7 +128,20 @@ export interface StatusChange {
    * about why. The change names the *provider* in `providerId`, because the
    * claim is about that page's honesty rather than about the probe.
    */
-  crossCheck?: { probeId: string; note?: string | undefined } | undefined;
+  crossCheck?:
+    | {
+        probeId: string;
+        note?: string | undefined;
+        /**
+         * Which source the operator has declared the record for this provider
+         * — roadmap 9.1. It does not change whether the disagreement is
+         * reported, only what the report says it means: with a `declared` page
+         * the news is that the page has not caught up, and with an `observed`
+         * one it is that the page disagrees with the reading that counts.
+         */
+        authority?: "declared" | "observed" | undefined;
+      }
+    | undefined;
   /**
    * Present for sla_burn only (roadmap 4.13): the provider's monthly target,
    * how much of the error budget the month has spent, and where the month ends

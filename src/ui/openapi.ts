@@ -21,6 +21,7 @@ type Json = Record<string, unknown>;
 
 /** A query parameter, in the one shape every path below spells it. */
 import { ANNOTATION_COLOURS } from "./historyStore.interface.ts";
+import { AUTHORITIES } from "../core/authority.ts";
 const query = (name: string, description: string, schema: Json = { type: "string" }): Json => ({
   name,
   in: "query",
@@ -852,6 +853,13 @@ const schemas: Json = {
       options: { type: "object", additionalProperties: { type: "string" } },
       components: { type: "array", items: { type: "object" } },
       scopeToComponents: { type: "boolean" },
+      authority: {
+        type: "string",
+        enum: [...AUTHORITIES],
+        nullable: true,
+        description:
+          "Which source is the record for this provider (roadmap 9.1). Null — the normal case — means the adapter decides: a probe is `observed`, a status page is `declared`.",
+      },
     },
   },
 };

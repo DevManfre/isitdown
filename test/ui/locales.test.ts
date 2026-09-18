@@ -142,6 +142,11 @@ const DYNAMIC_FAMILIES: { prefix: string; reason: string }[] = [
     reason: "IncidentDetail.tsx renders t(`incident.timeline.${entry.label}`) for the labels the incidents route emits",
   },
   {
+    prefix: "authority.source.",
+    reason:
+      "ProviderCards.tsx renders t(`authority.source.${provider.authority}`) for whichever source is the record",
+  },
+  {
     prefix: "annotation.colour.",
     reason: "AnnotationBar.tsx renders t(`annotation.colour.${option}`) for each colour a marker may carry",
   },

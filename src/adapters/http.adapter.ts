@@ -426,6 +426,7 @@ export const httpAdapter: Adapter = {
   id: "http",
   // 2: a bot challenge reads `unknown` where it used to read `major_outage`.
   version: 2,
+  kind: "probe",
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const config = probeConfig(service);

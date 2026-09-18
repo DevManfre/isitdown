@@ -324,3 +324,38 @@ ciclo mai registrato dal database riportano *nessuna risposta* invece di zero:
 non esistono prove in nessuna direzione, e disegnare il passato di
 un'installazione come un nostro disservizio sarebbe un'affermazione ricavata da
 dati mancanti.
+
+### 7.7 Quale fonte fa fede
+
+IsItDown legge status page *e* prende misure proprie (sonde HTTP, TCP e DNS).
+Sono due prodotti diversi nello stesso binario, e non concordano su cosa **sia**
+lo stato di un provider: un aggregatore riporta ciò che il provider ammette, un
+monitor riporta ciò che ha misurato. Non detta, quell'ambiguità finisce su ogni
+cifra — lo stesso 93% su una riga significa "lo dice la loro pagina" e su quella
+sotto significa "l'abbiamo misurato noi".
+
+Quindi ogni provider porta un `authority`, e la dashboard lo stampa accanto
+all'adapter:
+
+| Valore | Fa fede | Una contraddizione è |
+| --- | --- | --- |
+| `declared` | La status page del provider. | Una notizia a sé — l'avviso di disservizio silenzioso (§7.3) dice che la pagina non si è aggiornata. La parola della pagina resta ciò che lo stato del provider *è*. |
+| `observed` | La nostra misura. | La pagina è un'opinione. Lo stesso avviso scatta, formulato per dire che qui conta la nostra misura. |
+
+Il default non viene memorizzato: viene dall'adapter. Una sonda è `observed`
+perché *è* la misura; tutto ciò che legge la pagina di qualcun altro è
+`declared`. Così la regola resta una regola invece di congelare la risposta su
+ogni riga il giorno in cui è stata aggiunta — un provider che passa da sonda a
+status page vera segue la regola senza che nessuno debba ricordarsi di cambiare
+un campo. Impostare `authority` esplicitamente, in `config.yml` o dal dialog del
+provider, serve solo al caso in cui l'operatore non è d'accordo con il default:
+una status page di cui ha imparato a diffidare, o una sonda che non vuole sia
+trattata come il riferimento.
+
+Ciò che questo cambia oggi è quello che dashboard e avvisi **dicono** — il
+badge, e quale frase usa il messaggio di disservizio silenzioso. Non cambia quali
+campioni sostengono una percentuale: l'uptime di un provider `observed` è
+calcolato dai campioni di quel provider, come descrive la §7.6, perché una sonda
+e la pagina che verifica sono due provider distinti con due storie distinte.
+Fondere l'una nell'altra è un cambiamento più grande e qui deliberatamente non
+viene fatto.

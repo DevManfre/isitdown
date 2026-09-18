@@ -195,6 +195,16 @@ La roadmap che ha portato il progetto fin qui è finita — ogni riga spedita �
 archiviata in [`docs/roadmap/ROADMAP.md`](docs/roadmap/ROADMAP.md). Quello che viene
 dopo si sta valutando in `ROADMAP_2.md` e `ROADMAP_3.md`, che non impegnano a nulla.
 
+**Cos'è IsItDown.** Sia un aggregatore di status page sia un monitor di cose che
+non ne pubblicano nessuna — e ogni provider dichiara quale delle due risponde per
+lui. Un provider con status page è `declared`: fa fede la sua pagina, e una sonda
+che non concorda viene riportata come disaccordo, non come scavalcamento. Una
+sonda è `observed`: fa fede la nostra misura, e una pagina che la contraddice è
+un'opinione. Il default viene dall'adapter e non richiede configurazione; il
+campo `authority` esiste solo per i casi in cui l'operatore non è d'accordo con
+quel default. Questa domanda è rimasta aperta per due roadmap, ed è il motivo per
+cui "cosa significa 93% qui" aveva due risposte sulla stessa schermata.
+
 Non-obiettivi espliciti: autenticazione multi-utente (questa è una dashboard locale per
 un singolo operatore), status page dietro login, e un'app mobile pacchettizzata.
 
