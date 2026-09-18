@@ -381,6 +381,7 @@ async function readJson(path: string, service: ServiceRef, ctx: FetchContext): P
 
 export const cachetAdapter: Adapter = {
   id: "cachet",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     // Three reads, because Cachet publishes the three halves of a status page in

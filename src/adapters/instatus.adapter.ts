@@ -239,6 +239,7 @@ async function readJson(path: string, service: ServiceRef, ctx: FetchContext): P
 
 export const instatusAdapter: Adapter = {
   id: "instatus",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const status = parseInstatusSummary(await readJson(SUMMARY_PATH, service, ctx), service);

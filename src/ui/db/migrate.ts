@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -495,6 +495,35 @@ export function migrate(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_trust_episodes_pair_time
         ON trust_episodes (probe_id, page_id, component_id, probe_down_at);
     `);
+  }
+
+  if (from < 21) {
+    // Which revision of the adapter read this sample — roadmap 10.4. Nullable
+    // rather than defaulted to 1: an existing row was written before any
+    // adapter declared a version, and "1" there would be a claim nobody made.
+    // A null reads as "unknown revision", which is the honest answer and the
+    // one an uptime figure spanning the seam has to be able to say.
+    const sampleColumns = (db.prepare("PRAGMA table_info(status_samples)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!sampleColumns.includes("adapter_version")) {
+      db.exec("ALTER TABLE status_samples ADD COLUMN adapter_version INTEGER");
+    }
+    // Existence-checked, unlike the table above: `component_samples` is created
+    // by the step below rather than by the base schema, so a database old
+    // enough to predate it reaches here without one.
+    const hasComponentSamples =
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'component_samples'")
+        .all().length > 0;
+    if (hasComponentSamples) {
+      const componentColumns = (
+        db.prepare("PRAGMA table_info(component_samples)").all() as { name: string }[]
+      ).map((column) => column.name);
+      if (!componentColumns.includes("adapter_version")) {
+        db.exec("ALTER TABLE component_samples ADD COLUMN adapter_version INTEGER");
+      }
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

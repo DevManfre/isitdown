@@ -122,6 +122,7 @@ export const HTML_SEVERITY_OPTIONS: readonly OverallStatus[] = SEVERITY_KEYS;
 
 export const htmlAdapter: Adapter = {
   id: "html",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const html = await fetchConditional(service.baseUrl, {

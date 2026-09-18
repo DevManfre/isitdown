@@ -358,6 +358,7 @@ async function readJson(service: ServiceRef, ctx: FetchContext): Promise<string>
 
 export const betterStackAdapter: Adapter = {
   id: "betterstack",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     return parseBetterStackStatus(await readJson(service, ctx), service);

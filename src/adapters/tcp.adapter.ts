@@ -172,6 +172,7 @@ export function attemptConnect(config: TcpProbeConfig, timeoutMs: number): Promi
 
 export const tcpAdapter: Adapter = {
   id: "tcp",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const config = tcpConfig(service);

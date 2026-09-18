@@ -381,7 +381,13 @@ export function createPoller(deps: PollerDeps): Poller {
       mutedUntil: service.mutedUntil ?? null,
     });
     const changes = gate.changes;
-    await store.saveStatus(outcome.status, { latencyMs: outcome.latencyMs });
+    await store.saveStatus(outcome.status, {
+      latencyMs: outcome.latencyMs,
+      // Read off the adapter that took this reading, not off the service row:
+      // the service says which adapter, the adapter says which revision of it,
+      // and only the second one changes without the configuration changing.
+      adapterVersion: getAdapter(service.adapter).version ?? 1,
+    });
     await store.saveNotifyState(service.id, gate.baseline, gate.pending);
     if (before.failureCount > 0) await store.clearFailures(service.id);
     if (before.degradedNotified) await store.setDegradedNotified(service.id, false);

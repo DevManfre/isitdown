@@ -158,6 +158,7 @@ async function readIncidents(service: ServiceRef, ctx: FetchContext): Promise<st
 
 export const gcpAdapter: Adapter = {
   id: "gcp",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     return parseGcpStatus(await readIncidents(service, ctx), service);
