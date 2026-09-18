@@ -26,7 +26,13 @@ const map = (over: Partial<MapResponse> = {}): MapResponse => ({
 const mount = (mapView: Preferences["mapView"], mapResponse: MapResponse = map()) =>
   renderWithProviders(<IncidentMap providerId="github" providerName="GitHub" delay="0ms" className="md:col-span-3" />, {
     map: mapResponse,
-    preferences: { theme: "dark", uiLocale: "en", notificationLocale: "en", mapView } satisfies Preferences,
+    preferences: {
+      theme: "dark",
+      uiLocale: "en",
+      notificationLocale: "en",
+      mapView,
+      density: "comfortable",
+    } satisfies Preferences,
   });
 
 afterEach(() => vi.unstubAllGlobals());

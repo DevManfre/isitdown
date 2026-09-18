@@ -116,6 +116,17 @@ const settingsSchema = z.object({
    * an empty world map is worse than no card.
    */
   mapView: z.enum(["off", "map", "globe"]).catch("off"),
+  /**
+   * How tightly the fleet lists pack — roadmap 13.1. `comfortable` is the
+   * layout the dashboard has always had; `compact` trades the breathing room
+   * for rows on screen, which is the trade an operator with a hundred providers
+   * is already making by scrolling.
+   *
+   * A stored preference rather than a viewport rule: it is about how many
+   * providers there are, not how big the window is, and a laptop watching a
+   * hundred of them wants compact at any width.
+   */
+  density: z.enum(["comfortable", "compact"]).catch("comfortable"),
 
   /**
    * Quiet hours (roadmap 3.11). Stored as five flat rows like every other

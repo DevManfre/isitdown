@@ -716,6 +716,12 @@ export interface Preferences {
   uiLocale: string;
   notificationLocale: string;
   mapView: MapView;
+  /**
+   * How tightly the fleet lists pack — roadmap 13.1. A stored preference rather
+   * than a viewport rule: it is about how many providers there are, not how big
+   * the window is.
+   */
+  density: "comfortable" | "compact";
   /** `auto` is the browser's own zone; anything else is an IANA name. */
   timeZone?: string;
 }
