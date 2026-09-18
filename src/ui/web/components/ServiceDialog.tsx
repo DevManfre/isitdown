@@ -579,7 +579,10 @@ export function ServiceDialog({
                 the step swap, the advanced disclosure opening, a message
                 arriving. The panel is centred, so a jump moves the whole
                 dialog under the pointer. */}
-            <StepPanel>
+            {/* The panel carries an animated pixel height; as a flex child of
+                the scrolling body it would otherwise be shrunk below that
+                height, clipping its tail instead of scrolling to it. */}
+            <StepPanel className="shrink-0">
               <div className="flex flex-col gap-4">
                 {adding ? (
                   <div key={step} className={stepBack ? "anim-step-back" : "anim-step"}>
