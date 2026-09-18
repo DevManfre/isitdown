@@ -149,6 +149,7 @@ Le letture che ne escono:
 | Stato e corpo accettati, certificato entro `tlsWarnDays` | `degraded` |
 | Stato fuori dall'insieme, testo mancante o vietato nel corpo | `major_outage` |
 | Connessione rifiutata, host non risolto, TLS respinto o timeout superato | `major_outage` |
+| Una sfida anti-bot (`cf-mitigated`) su uno stato che non hai accettato | `unknown` |
 
 Quattro cose da sapere prima di affidarcisi:
 
@@ -181,6 +182,19 @@ Quattro cose da sapere prima di affidarcisi:
   token API in sola lettura o una pagina pubblica in sola lettura (roadmap 4.15
   e 5.1) dovranno decidere chi può scrivere una definizione di servizio prima di
   esistere.
+- **una sfida anti-bot non è un disservizio.** Cloudflare e simili rispondono a
+  un client che non sa eseguire il loro JavaScript con `403` e un header
+  `cf-mitigated` — la pagina "Just a moment…". Il bordo non ha mai chiesto nulla
+  al tuo servizio, quindi la sonda legge `unknown`, che non sveglia nessuno, e
+  lo scrive in **Diagnostica**. Il tuo browser apre la stessa URL perché risolve
+  la sfida; questo container no. Tre vie d'uscita, nell'ordine in cui vale la
+  pena provarle: sondare un `path` che la sfida salta (`/robots.txt`, un
+  endpoint di salute), far passare questa macchina oltre la sfida (una regola di
+  skip del WAF sul suo IP di uscita), oppure mettere lo stato in `expectStatus`
+  — che legge "il bordo è in piedi" e smette di dire qualsiasi cosa sul servizio
+  dietro. Ogni richiesta di questo progetto si presenta come
+  `IsItDown (+https://github.com/devmanfre/isitdown)`, quindi una regola di skip
+  può agganciarsi lì; `header.User-Agent` lo sostituisce se un host vuole altro.
 - un'opzione sbagliata (`expectStatus: 2xx`, un `${VAR}` senza nulla dietro, un
   `expectBody` su un `HEAD`) solleva un errore a ogni ciclo e si vede come
   provider che fallisce, mai come servizio che legge giù in silenzio. `node

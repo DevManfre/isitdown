@@ -146,6 +146,7 @@ The readings this produces:
 | Accepted status and body, certificate inside `tlsWarnDays` | `degraded` |
 | Status outside the set, missing/forbidden body text | `major_outage` |
 | Refused, unresolvable, TLS rejected, or past the request timeout | `major_outage` |
+| A bot challenge (`cf-mitigated`) at a status you did not accept | `unknown` |
 
 Four things worth knowing before relying on it:
 
@@ -177,6 +178,18 @@ Four things worth knowing before relying on it:
   single-operator dashboard bound to `127.0.0.1`; it is also the reason a
   read-only API token or a public read-only page (roadmap 4.15 and 5.1) would
   have to decide who may write a service definition before either ships.
+- **a bot challenge is not an outage.** Cloudflare and friends answer a client
+  that cannot run their JavaScript with `403` and a `cf-mitigated` header — the
+  "Just a moment…" page. The edge never asked your service anything, so the
+  probe reads `unknown`, which wakes nobody, and says so in **Diagnose**. Your
+  browser opens the same URL because it solves the challenge; this container
+  cannot. Three ways out, in the order worth trying: probe a `path` the
+  challenge skips (`/robots.txt`, a health endpoint), let this machine past the
+  challenge (a WAF skip rule on its egress IP), or put the status in
+  `expectStatus` — which reads "the edge is up" and stops saying anything about
+  the service behind it. Every request this project sends names itself
+  `IsItDown (+https://github.com/devmanfre/isitdown)`, so a skip rule can match
+  on that; `header.User-Agent` replaces it when a host wants something else.
 - a wrong option (`expectStatus: 2xx`, a `${VAR}` with nothing behind it, an
   `expectBody` on a `HEAD`) throws every cycle and shows up as a failing
   provider, never as a service quietly reading down. `node dist/light/check.js

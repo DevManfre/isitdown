@@ -16,6 +16,8 @@ import {
   type ProbeConfig,
 } from "../../src/adapters/http.adapter.ts";
 import type { FetchContext, ReadingNote, ServiceRef } from "../../src/core/adapter.interface.ts";
+import type { NormalizedStatus } from "../../src/core/types.ts";
+import { USER_AGENT } from "../../src/core/http.ts";
 import type { StatusPageRead } from "../../src/core/http.ts";
 import { withServer } from "../helpers/localServer.ts";
 import { runAdapterContract } from "./adapter.contract.ts";
@@ -247,6 +249,70 @@ test("configured headers reach the endpoint", async () => {
   );
 
   assert.equal(seen, "abc");
+});
+
+test("the probe names itself, because a nameless request reads as a bot to a WAF", async () => {
+  let seen: string | undefined;
+
+  await withServer(
+    (req, res) => {
+      seen = req.headers["user-agent"];
+      answering(200, "ok")(req, res);
+    },
+    async (baseUrl) => {
+      await httpAdapter.fetchStatus(service({}, baseUrl), ctx);
+    },
+  );
+
+  assert.equal(seen, USER_AGENT);
+});
+
+test("an operator's own User-Agent replaces the default rather than arriving beside it", async () => {
+  const seen: string[] = [];
+
+  await withServer(
+    (req, res) => {
+      seen.push(req.headers["user-agent"] ?? "");
+      answering(200, "ok")(req, res);
+    },
+    async (baseUrl) => {
+      await httpAdapter.fetchStatus(service({ "header.user-agent": "Mine/1" }, baseUrl), ctx);
+    },
+  );
+
+  assert.deepEqual(seen, ["Mine/1"]);
+});
+
+test("a bot challenge reads unknown, not an outage: the edge never asked the service", async () => {
+  const notes: ReadingNote[] = [];
+
+  let status: NormalizedStatus | undefined;
+
+  await withServer(
+    answering(403, "Just a moment...", { "cf-mitigated": "challenge" }),
+    async (baseUrl) => {
+      status = await httpAdapter.fetchStatus(service({}, baseUrl), {
+        ...ctx,
+        onNote: (note) => void notes.push(note),
+      });
+    },
+  );
+
+  assert.equal(status?.overallStatus, "unknown");
+  assert.match(notes[0]?.text ?? "", /bot challenge/);
+});
+
+test("an operator who allows the challenged status keeps their own reading", async () => {
+  let status: NormalizedStatus | undefined;
+
+  await withServer(
+    answering(403, "Just a moment...", { "cf-mitigated": "challenge" }),
+    async (baseUrl) => {
+      status = await httpAdapter.fetchStatus(service({ expectStatus: "200-299,403" }, baseUrl), ctx);
+    },
+  );
+
+  assert.equal(status?.overallStatus, "operational");
 });
 
 test("a certificate close to expiry reads degraded, and one with time left does not", () => {

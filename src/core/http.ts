@@ -133,6 +133,15 @@ export interface ConditionalFetchOptions {
  * reached by churn, and the oldest entry losing its validator costs one
  * unconditional request.
  */
+/**
+ * Sent on every read this project makes. Node's `fetch` sends no user agent at
+ * all, and a host behind a WAF reads that as a bot worth a 403 — a reading of
+ * "down" for a site the operator's browser opens fine. Naming ourselves is
+ * both the fix and the honest thing to do: an operator reading their own
+ * access log can see who is knocking every minute.
+ */
+export const USER_AGENT = "IsItDown (+https://github.com/devmanfre/isitdown)";
+
 const MAX_ENTRIES = 256;
 
 const cache = new Map<string, CacheEntry>();
@@ -169,7 +178,7 @@ export async function fetchConditional(url: string, opts: ConditionalFetchOption
   const key = keyOf(opts.providerId, url);
   const cached = cache.get(key);
 
-  const headers: Record<string, string> = { accept: opts.accept };
+  const headers: Record<string, string> = { accept: opts.accept, "user-agent": USER_AGENT };
   if (cached?.etag !== undefined) headers["if-none-match"] = cached.etag;
   else if (cached?.lastModified !== undefined) headers["if-modified-since"] = cached.lastModified;
 
