@@ -79,6 +79,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * with `Page.addScriptToEvaluateOnNewDocument`, so it is in place before the
  * bundle's first line — the dashboard's relative timestamps and its countdown
  * then render the same words forever.
+ *
+ * `timeZone` is the zone that instant is rendered in. Freezing the clock alone
+ * is not enough: an hour column, a date input's default and a daily bucket are
+ * wall-clock readings, so without an override they follow whichever machine is
+ * capturing and a laptop's frames never match a CI runner's.
  */
 export async function withBrowser(options, body) {
   const binary = findChromium();
@@ -205,6 +210,9 @@ export async function withBrowser(options, body) {
         deviceScaleFactor: 1,
         mobile: false,
       });
+      // Must precede navigation, like the frozen clock: the bundle reads the
+      // zone as it formats its first labels.
+      await send("Emulation.setTimezoneOverride", { timezoneId: options.timeZone });
       await send("Emulation.setEmulatedMedia", {
         media: "screen",
         features: [

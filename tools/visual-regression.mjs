@@ -24,6 +24,23 @@ import { comparePng, decodePng, downscale } from "./visual/png.mjs";
  * can see the change rather than being told a number.
  */
 
+/**
+ * The zone every frame is rendered in, on both sides of the protocol.
+ *
+ * The frozen instant below fixes *when* each page believes it is, but not
+ * *where*: the History heatmap's hour columns, the marker form's default
+ * datetime and the daily uptime buckets all render that instant as a wall
+ * clock in the operator's own zone. A baseline captured in Europe/Rome and
+ * checked on a UTC runner therefore differs by the offset, and the pair can
+ * never both be green — which is exactly how four History frames drifted.
+ *
+ * `TZ` covers what the server formats, the browser override (see chrome.mjs)
+ * covers what the bundle formats; they are the same value so the two halves
+ * cannot drift apart.
+ */
+const TIME_ZONE = "UTC";
+process.env["TZ"] = TIME_ZONE;
+
 const ROOT = new URL("../", import.meta.url).pathname;
 const BASELINE_DIR = join(ROOT, "test/visual/baseline");
 const OUTPUT_DIR = join(ROOT, "test/visual/current");
@@ -157,7 +174,7 @@ async function main() {
   const written = [];
 
   await withServer(async (base) => {
-    await withBrowser({ frozenAt: NOW }, async ({ shot }) => {
+    await withBrowser({ frozenAt: NOW, timeZone: TIME_ZONE }, async ({ shot }) => {
       for (const view of VIEWS) {
         if (only !== undefined && view.name !== only) continue;
         for (const theme of THEMES) {
