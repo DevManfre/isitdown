@@ -347,7 +347,11 @@ Notable suites:
   token change) — with limits measured against both the cross-machine noise and
   real regressions rather than guessed. Chromium comes from Playwright's own
   cache and is driven over the DevTools protocol, so nothing imports the package
-  and it stays out of `package.json`. Run
+  and it stays out of `package.json`. The clock is frozen at an instant *and* at
+  a zone, on both sides — the harness renders in UTC and tells the browser to do
+  the same — because an hour column, a date field's default and a daily bucket
+  are wall-clock readings: pinned only to the instant, a baseline agreed in
+  Rome can never be green on a runner in UTC. Run
   `node tools/visual-regression.mjs --update` to agree to an intended change, and
   `--only=<view>` while iterating on one.
 - **README translation parity** — the numbered heading skeleton, the per-level
