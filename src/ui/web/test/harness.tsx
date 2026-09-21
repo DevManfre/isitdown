@@ -22,6 +22,9 @@ type FixtureKey =
   | "deliveryLog"
   | "componentHistory"
   | "providerCalendar"
+  | "reliability"
+  | "messagePreview"
+  | "annotations"
   | "map"
   | "preferences"
   | "maintenances"
@@ -41,6 +44,12 @@ export interface Fixtures {
   componentHistory?: unknown;
   /** `/history/calendar`, matched before `/history` — the year heat calendar's own shape. */
   providerCalendar?: unknown;
+  /** `/reliability` — MTTR, MTBF and the weekday-hour grid (roadmap 12.2, 12.3). */
+  reliability?: unknown;
+  /** `/notifications/preview` — what each channel would say (roadmap 14.1). */
+  messagePreview?: unknown;
+  /** `/annotations` — the operator's own timeline markers (roadmap 12.1). */
+  annotations?: unknown;
   map?: unknown;
   preferences?: unknown;
   maintenances?: unknown;
@@ -75,37 +84,43 @@ export function stubApi(fixtures: Fixtures): void {
     "fetch",
     vi.fn(async (input: string) => {
       const path = String(input);
-      const key: FixtureKey = path.startsWith("/history/calendar")
-        ? "providerCalendar"
-        : path.startsWith("/history/components")
-        ? "componentHistory"
-        : path.startsWith("/history")
-          ? "history"
-          : path.startsWith("/incidents/")
-            ? "incident"
-            : path.startsWith("/incidents")
-              ? "incidents"
-              : path.startsWith("/maintenances")
-                ? "maintenances"
-                : path.startsWith("/notifications/log")
-                  ? "deliveryLog"
-                  : path.startsWith("/notifications")
-                    ? "notifications"
-                    : path.endsWith("/impact")
-                      ? "serviceImpact"
-                      : path.startsWith("/config/storage")
-                        ? "storage"
-                        : path.startsWith("/config/catalog")
-                        ? "catalog"
-                        : path.startsWith("/config")
-                        ? "config"
-                        : path.startsWith("/debug/adapters")
-                          ? "adapterDebug"
-                        : path.startsWith("/map")
-                          ? "map"
-                          : path.startsWith("/api/preferences")
-                            ? "preferences"
-                            : "status";
+      const key: FixtureKey = path.startsWith("/notifications/preview")
+        ? "messagePreview"
+        : path.startsWith("/reliability")
+        ? "reliability"
+        : path.startsWith("/annotations")
+          ? "annotations"
+          : path.startsWith("/history/calendar")
+            ? "providerCalendar"
+            : path.startsWith("/history/components")
+              ? "componentHistory"
+              : path.startsWith("/history")
+                ? "history"
+                : path.startsWith("/incidents/")
+                  ? "incident"
+                  : path.startsWith("/incidents")
+                    ? "incidents"
+                    : path.startsWith("/maintenances")
+                      ? "maintenances"
+                      : path.startsWith("/notifications/log")
+                        ? "deliveryLog"
+                        : path.startsWith("/notifications")
+                          ? "notifications"
+                          : path.endsWith("/impact")
+                            ? "serviceImpact"
+                            : path.startsWith("/config/storage")
+                              ? "storage"
+                              : path.startsWith("/config/catalog")
+                                ? "catalog"
+                                : path.startsWith("/config")
+                                  ? "config"
+                                  : path.startsWith("/debug/adapters")
+                                    ? "adapterDebug"
+                                    : path.startsWith("/map")
+                                      ? "map"
+                                      : path.startsWith("/api/preferences")
+                                        ? "preferences"
+                                        : "status";
       const errorStatus = fixtures.errors?.[key];
       if (errorStatus !== undefined) {
         return { ok: false, status: errorStatus, text: async () => "" };
@@ -116,12 +131,38 @@ export function stubApi(fixtures: Fixtures): void {
       // An unset calendar fixture answers an empty year rather than `{}`: the
       // drawer renders the calendar for every provider it opens, and a body
       // with no `cells` is a shape no server ever sends.
-      const fixture =
-        key === "providerCalendar" && fixtures.providerCalendar === undefined
-          ? { providerId: "", days: 365, cells: [], uptime: 0, measuredDays: 0 }
-          : fixtures[key];
-      const body = typeof fixture === "function" ? (fixture as (path: string) => unknown)(path) : fixture;
-      return { ok: true, status: 200, text: async () => JSON.stringify(body ?? {}) };
+      // Unset fixtures answer the empty shape the server would send rather
+      // than `{}`: a view renders these unconditionally, and a body with no
+      // `cells`, no `byWeekdayHour` or no `annotations` is a shape no server
+      // ever produces — a crash there would be the harness's, not the view's.
+      const EMPTY: Partial<Record<FixtureKey, unknown>> = {
+        providerCalendar: {
+          providerId: "",
+          days: 365,
+          cells: [],
+          uptime: 0,
+          measuredDays: 0,
+        },
+        reliability: {
+          days: 90,
+          providers: [],
+          byWeekdayHour: Array.from({ length: 7 }, () =>
+            Array.from({ length: 24 }, () => 0),
+          ),
+        },
+        annotations: { annotations: [] },
+        messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },
+      };
+      const fixture = fixtures[key] ?? EMPTY[key];
+      const body =
+        typeof fixture === "function"
+          ? (fixture as (path: string) => unknown)(path)
+          : fixture;
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify(body ?? {}),
+      };
     }),
   );
 }
@@ -184,10 +225,14 @@ export function renderWithProviders(
  * the browser never shows those, `Trans` swaps them for the `NumberTicker`. A
  * test asserting on `t()` alone would be asserting on markup nobody reads.
  */
-export const sentence = (key: string, values: Record<string, unknown> = {}): string =>
-  i18n.t(key, values).replace(/<\/?\d+>/g, "");
+export const sentence = (
+  key: string,
+  values: Record<string, unknown> = {},
+): string => i18n.t(key, values).replace(/<\/?\d+>/g, "");
 
-export const providerFixture = (over: Partial<ProviderStatus> = {}): ProviderStatus => ({
+export const providerFixture = (
+  over: Partial<ProviderStatus> = {},
+): ProviderStatus => ({
   id: "github",
   name: "GitHub",
   adapter: "statuspage",
@@ -198,6 +243,7 @@ export const providerFixture = (over: Partial<ProviderStatus> = {}): ProviderSta
   components: [],
   componentSelection: [],
   scopeToComponents: false,
+  authority: "declared",
   fetchedAt: "2026-08-21T10:00:00Z",
   failureCount: 0,
   uptime90: 99.9,

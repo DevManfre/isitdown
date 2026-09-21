@@ -234,6 +234,8 @@ export function resolutionReason(error: unknown): string {
 
 export const dnsAdapter: Adapter = {
   id: "dns",
+  version: 1,
+  kind: "probe",
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const config = dnsConfig(service);

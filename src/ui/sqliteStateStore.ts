@@ -1,4 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
+import type { DaySegment } from "./calendarDays.ts";
+import type { PollCycle } from "./coverage.ts";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { ProviderRuntimeState, SaveStatusMeta } from "../core/stateStore.interface.ts";
 import {
@@ -10,7 +12,9 @@ import {
 import { STATUS_CHANGE_KINDS } from "../core/types.ts";
 import type { DampingState, HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { z } from "zod";
+import { ANNOTATION_COLOURS } from "./historyStore.interface.ts";
 import type {
+  Annotation,
   DailyBucket,
   HistoryStore,
   IncidentCounts,
@@ -64,6 +68,15 @@ const incidentRowSchema = z.object({
   started_at: z.string(),
   updated_at: z.string(),
   resolved_at: z.string().nullable(),
+});
+
+const annotationRowSchema = z.object({
+  id: z.number(),
+  at: z.string(),
+  label: z.string(),
+  colour: z.enum(ANNOTATION_COLOURS),
+  provider_id: z.string().nullable(),
+  created_at: z.string(),
 });
 
 const incidentNoteRowSchema = z.object({
@@ -122,6 +135,12 @@ const bucketRowSchema = z.object({
   total_samples: z.number(),
 });
 
+const pollCycleRowSchema = z.object({
+  started_at: z.string(),
+  finished_at: z.string(),
+  interval_minutes: z.number(),
+});
+
 const sampleRowSchema = z.object({
   observed_at: z.string(),
   overall_status: overallStatusSchema,
@@ -153,6 +172,49 @@ const rankCaseFor = (column: string): string =>
     .map(([status, rank]) => `WHEN '${status}' THEN ${rank}`)
     .join(" ")} ELSE ${SEVERITY_RANK.major_outage} END`;
 const RANK_CASE = rankCaseFor("overall_status");
+
+/**
+ * The SQLite date modifier that turns a stored UTC instant into the operator's
+ * wall clock for a stretch where one offset holds — roadmap 10.7. `date()` then
+ * reads the local calendar day off it.
+ */
+const shiftOf = (segment: DaySegment): string => `${segment.offsetMinutes >= 0 ? "+" : ""}${segment.offsetMinutes} minutes`;
+
+/**
+ * Runs one grouped query per constant-offset stretch and folds the results into
+ * one series.
+ *
+ * Folded rather than concatenated because the day a DST transition falls on is
+ * counted from both sides of the seam: two rows for one day, which have to be
+ * summed, or the day would appear twice and every figure drawn from it would be
+ * taken over half of it.
+ */
+function bucketsOver(
+  segments: readonly DaySegment[],
+  query: (segment: DaySegment) => unknown[],
+): DailyBucket[] {
+  const byDay = new Map<string, DailyBucket>();
+  for (const segment of segments) {
+    for (const raw of query(segment)) {
+      const row = bucketRowSchema.parse(raw);
+      const status = RANK_TO_STATUS[row.worst] ?? "unknown";
+      const existing = byDay.get(row.day);
+      if (existing === undefined) {
+        byDay.set(row.day, {
+          day: row.day,
+          worstStatus: status,
+          okSamples: row.ok_samples,
+          totalSamples: row.total_samples,
+        });
+        continue;
+      }
+      existing.okSamples += row.ok_samples;
+      existing.totalSamples += row.total_samples;
+      if (SEVERITY_RANK[status] > SEVERITY_RANK[existing.worstStatus]) existing.worstStatus = status;
+    }
+  }
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
 
 /**
  * A provider's own timestamp is untrusted input like the rest of its payload.
@@ -301,10 +363,10 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     ON CONFLICT (provider_id) DO UPDATE SET degraded_notified = excluded.degraded_notified
   `);
   const insertSample = db.prepare(
-    "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok, latency_ms) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok, latency_ms, adapter_version) VALUES (?, ?, ?, ?, ?, ?)",
   );
   const insertComponentSample = db.prepare(
-    "INSERT INTO component_samples (provider_id, component_id, observed_at, status, ok) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO component_samples (provider_id, component_id, observed_at, status, ok, adapter_version) VALUES (?, ?, ?, ?, ?, ?)",
   );
   const upsertIncident = db.prepare(`
     INSERT INTO incidents (provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at)
@@ -319,6 +381,13 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
   const resolveMissing = db.prepare(
     "UPDATE incidents SET resolved_at = ? WHERE provider_id = ? AND resolved_at IS NULL",
   );
+  // Poller liveness — roadmap 10.1. Append-only and tiny: one row per cycle is
+  // 480 rows a day at the three-minute default, which is two days of one
+  // provider's samples.
+  const insertPollCycle = db.prepare(
+    "INSERT INTO poll_cycles (started_at, finished_at, interval_minutes, providers) VALUES (?, ?, ?, ?)",
+  );
+
   const insertNotification = db.prepare(
     "INSERT INTO notifications (provider_id, channel, kind, text, sent_at, ok, error, attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
@@ -407,6 +476,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
           status.overallStatus,
           status.overallStatus === "operational" ? 1 : 0,
           meta?.latencyMs ?? null,
+          meta?.adapterVersion ?? null,
         );
 
         // `unknown` writes no sample: an unmeasured component must not read as
@@ -419,6 +489,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
             status.fetchedAt,
             component.status,
             component.status === "operational" ? 1 : 0,
+            meta?.adapterVersion ?? null,
           );
         }
 
@@ -750,52 +821,103 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       return rows.map(toMaintenanceRow);
     },
 
-    async getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]> {
-      const from = new Date(now().getTime() - days * 24 * 3600 * 1000).toISOString();
-      const rows = db
-        .prepare(
-          `SELECT date(observed_at) AS day,
-                  MAX(${RANK_CASE}) AS worst,
-                  SUM(ok) AS ok_samples,
-                  COUNT(*) AS total_samples
-           FROM status_samples
-           WHERE provider_id = ? AND observed_at >= ?
-           GROUP BY day
-           ORDER BY day ASC`,
-        )
-        .all(providerId, from)
-        .map((raw) => bucketRowSchema.parse(raw));
-
-      return rows.map((row) => ({
-        day: row.day,
-        worstStatus: RANK_TO_STATUS[row.worst] ?? "unknown",
-        okSamples: row.ok_samples,
-        totalSamples: row.total_samples,
-      }));
+    async getDailyBuckets(providerId: string, segments: readonly DaySegment[]): Promise<DailyBucket[]> {
+      return bucketsOver(segments, (segment) =>
+        db
+          .prepare(
+            `SELECT date(observed_at, ?) AS day,
+                    MAX(${RANK_CASE}) AS worst,
+                    SUM(ok) AS ok_samples,
+                    COUNT(*) AS total_samples
+             FROM status_samples
+             WHERE provider_id = ? AND observed_at >= ? AND observed_at < ?
+             GROUP BY day`,
+          )
+          .all(shiftOf(segment), providerId, segment.fromIso, segment.toIso),
+      );
     },
 
-    async getComponentDailyBuckets(providerId: string, componentId: string, days: number): Promise<DailyBucket[]> {
-      const from = new Date(now().getTime() - days * 24 * 3600 * 1000).toISOString();
-      const rows = db
-        .prepare(
-          `SELECT date(observed_at) AS day,
-                  MAX(${rankCaseFor("status")}) AS worst,
-                  SUM(ok) AS ok_samples,
-                  COUNT(*) AS total_samples
-           FROM component_samples
-           WHERE provider_id = ? AND component_id = ? AND observed_at >= ?
-           GROUP BY day
-           ORDER BY day ASC`,
-        )
-        .all(providerId, componentId, from)
-        .map((raw) => bucketRowSchema.parse(raw));
+    async getComponentDailyBuckets(
+      providerId: string,
+      componentId: string,
+      segments: readonly DaySegment[],
+    ): Promise<DailyBucket[]> {
+      return bucketsOver(segments, (segment) =>
+        db
+          .prepare(
+            `SELECT date(observed_at, ?) AS day,
+                    MAX(${rankCaseFor("status")}) AS worst,
+                    SUM(ok) AS ok_samples,
+                    COUNT(*) AS total_samples
+             FROM component_samples
+             WHERE provider_id = ? AND component_id = ? AND observed_at >= ? AND observed_at < ?
+             GROUP BY day`,
+          )
+          .all(shiftOf(segment), providerId, componentId, segment.fromIso, segment.toIso),
+      );
+    },
 
-      return rows.map((row) => ({
-        day: row.day,
-        worstStatus: RANK_TO_STATUS[row.worst] ?? "unknown",
-        okSamples: row.ok_samples,
-        totalSamples: row.total_samples,
-      }));
+    async recordPollCycle(cycle: PollCycle & { providers: number }): Promise<void> {
+      insertPollCycle.run(
+        cycle.startedAt,
+        cycle.finishedAt,
+        cycle.intervalMinutes,
+        cycle.providers,
+      );
+    },
+
+    async listPollCycles(fromIso: string, toIso: string): Promise<PollCycle[]> {
+      return db
+        .prepare(
+          `SELECT started_at, finished_at, interval_minutes
+           FROM poll_cycles WHERE started_at >= ? AND started_at < ? ORDER BY started_at ASC`,
+        )
+        .all(fromIso, toIso)
+        .map((raw) => pollCycleRowSchema.parse(raw))
+        .map((row) => ({
+          startedAt: row.started_at,
+          finishedAt: row.finished_at,
+          intervalMinutes: row.interval_minutes,
+        }));
+    },
+
+    async listAnnotations(
+      fromIso: string,
+      toIso: string,
+      providerId?: string | undefined,
+    ): Promise<Annotation[]> {
+      // The fleet-wide rows come back either way: a deploy is a marker on every
+      // chart, and a provider view that hid it would be the one view where the
+      // question "was it us?" cannot be answered.
+      const where =
+        providerId === undefined
+          ? "at >= ? AND at < ?"
+          : "at >= ? AND at < ? AND (provider_id IS NULL OR provider_id = ?)";
+      const params = providerId === undefined ? [fromIso, toIso] : [fromIso, toIso, providerId];
+      return db
+        .prepare(`SELECT id, at, label, colour, provider_id, created_at FROM annotations WHERE ${where} ORDER BY at ASC, id ASC`)
+        .all(...params)
+        .map((raw) => annotationRowSchema.parse(raw))
+        .map((row) => ({
+          id: row.id,
+          at: row.at,
+          label: row.label,
+          colour: row.colour,
+          providerId: row.provider_id,
+          createdAt: row.created_at,
+        }));
+    },
+
+    async addAnnotation(input: Omit<Annotation, "id" | "createdAt">): Promise<Annotation> {
+      const createdAt = now().toISOString();
+      const { lastInsertRowid } = db
+        .prepare("INSERT INTO annotations (at, label, colour, provider_id, created_at) VALUES (?, ?, ?, ?, ?)")
+        .run(input.at, input.label, input.colour, input.providerId, createdAt);
+      return { ...input, id: Number(lastInsertRowid), createdAt };
+    },
+
+    async deleteAnnotation(id: number): Promise<boolean> {
+      return db.prepare("DELETE FROM annotations WHERE id = ?").run(id).changes > 0;
     },
 
     async listProviderIds(): Promise<string[]> {
@@ -824,6 +946,9 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       db.prepare("DELETE FROM status_samples WHERE observed_at < ?").run(cutoff);
       db.prepare("DELETE FROM component_samples WHERE observed_at < ?").run(cutoff);
       db.prepare("DELETE FROM notifications WHERE sent_at < ?").run(cutoff);
+      // On the same cutoff as the samples: a day whose samples are gone has no
+      // chart left to hatch, and keeping its liveness would only grow.
+      db.prepare("DELETE FROM poll_cycles WHERE started_at < ?").run(cutoff);
       db.prepare("DELETE FROM incidents WHERE resolved_at IS NOT NULL AND resolved_at < ?").run(cutoff);
       db.prepare("DELETE FROM maintenances WHERE ends_at IS NOT NULL AND ends_at < ?").run(cutoff);
     },

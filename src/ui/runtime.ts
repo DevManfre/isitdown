@@ -26,6 +26,7 @@ import { openDatabase } from "./db/open.ts";
 import { seedDefaults } from "./db/seed.ts";
 import { loadGeoTables } from "./geo/resolveLocation.ts";
 import { createHistoryService } from "./history.ts";
+import { createReliabilityService } from "./reliability.ts";
 import { createLiveEvents, type LiveEvents } from "./liveEvents.ts";
 import type { HistoryStore } from "./historyStore.interface.ts";
 import { createMapLane, type MapLane } from "./mapLane.ts";
@@ -71,6 +72,9 @@ export interface UiRuntimeCore {
   dispatcher: Dispatcher;
   store: HistoryStore;
   history: ReturnType<typeof createHistoryService>;
+  reliability: ReturnType<typeof createReliabilityService>;
+  /** The operator's timezone preference, read fresh — roadmap 10.7. */
+  timeZone(): string;
   /** Monthly targets and what the month has spent of them — roadmap 4.13. */
   sla: ReturnType<typeof createSlaService>;
   /** How closely each cross-checked page tracked what a probe observed — roadmap 8.1. */
@@ -162,7 +166,18 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   const secrets = await loadSecretsFile(secretsPath, options.env, logger);
 
   const store = createSqliteStateStore(db);
-  const history = createHistoryService(store);
+  /**
+   * The zone every calendar day in this edition is read in — roadmap 10.7.
+   * A function rather than a value: the preference changes from the dashboard
+   * without a restart, and a captured copy would keep drawing yesterday's day
+   * boundaries onto today's bars.
+   */
+  const timeZone = (): string => readSettings(db, logger).timeZone;
+
+  const history = createHistoryService(store, { timeZone });
+  // Roadmap 12.2 and 12.3: the incident table, asked two questions it already
+  // holds the answers to.
+  const reliability = createReliabilityService(store, { timeZone });
   // Roadmap 4.13. Reads the same monthly report the export and the History view
   // are drawn from, so a budget can never disagree with the uptime beside it.
   const sla = createSlaService({ history });
@@ -225,6 +240,21 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     onCycle: async (result) => {
       lastCycle = result;
       metrics.recordCycle(result);
+      // The poller's own liveness, as its own trace — roadmap 10.1. Written
+      // before anything else the cycle produces, because this is the row that
+      // later says whether a stretch with no samples was a quiet fleet or a
+      // stopped container, and a failure further down this callback must not be
+      // able to turn the second into the first.
+      //
+      // The cadence stored is the one this cycle ran at, not today's: it is what
+      // decides how long a following silence has to be before it is an absence,
+      // and a cadence changed since says nothing about that.
+      await store.recordPollCycle({
+        startedAt: result.startedAt,
+        finishedAt: result.finishedAt,
+        intervalMinutes: await poller.nextIntervalMinutes(await configSource.load()),
+        providers: result.results.length,
+      });
       // Recorded next to the metrics and for the same reason: both are read
       // from a page rather than from the logs, and the debug panel is the one
       // that says *why* a read failed.
@@ -375,6 +405,8 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     dispatcher,
     store,
     history,
+    reliability,
+    timeZone,
     sla,
     trust,
     trustPairs,

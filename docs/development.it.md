@@ -352,7 +352,12 @@ Suite notevoli:
   limiti misurati sia sul rumore cross-macchina sia su regressioni reali, non
   scelti a intuito. Chromium arriva dalla cache di Playwright e viene pilotato
   via DevTools protocol, quindi nulla importa il pacchetto e resta fuori da
-  `package.json`. `node tools/visual-regression.mjs --update` accetta un cambio
+  `package.json`. L'orologio è congelato su un istante *e* su un fuso, da
+  entrambe le parti — l'harness rende in UTC e dice al browser di fare lo stesso
+  — perché una colonna oraria, il default di un campo data e un bucket
+  giornaliero sono letture da orologio da parete: fissato solo l'istante, una
+  baseline concordata a Roma non può mai essere verde su un runner in UTC.
+  `node tools/visual-regression.mjs --update` accetta un cambio
   voluto, `--only=<vista>` serve mentre si itera su una sola.
 - **Parità delle traduzioni del README** — lo scheletro delle intestazioni
   numerate, il numero di intestazioni per livello, di blocchi di codice e di

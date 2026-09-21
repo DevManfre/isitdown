@@ -1,19 +1,51 @@
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import {
-  Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog.tsx";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { StepPanel, Stepper } from "@/components/ui/stepper.tsx";
-import { ComponentPicker, type ComponentPickerEntry, type ComponentPickerSelection } from "@/components/ComponentPicker.tsx";
 import {
-  AdapterOptions, DNS_ADAPTER, hasAdapterOptions, PROBE_ADAPTER, SCRAPE_ADAPTER, TCP_ADAPTER,
+  ComponentPicker,
+  type ComponentPickerEntry,
+  type ComponentPickerSelection,
+} from "@/components/ComponentPicker.tsx";
+import {
+  AdapterOptions,
+  DNS_ADAPTER,
+  hasAdapterOptions,
+  PROBE_ADAPTER,
+  JSON_ADAPTER,
+  SCRAPE_ADAPTER,
+  TCP_ADAPTER,
 } from "@/components/service-dialog/AdapterOptions.tsx";
-import { DEFAULT_ADAPTER, SourceStep, type ServiceSource } from "@/components/service-dialog/SourceStep.tsx";
+import {
+  DEFAULT_ADAPTER,
+  SourceStep,
+  type ServiceSource,
+} from "@/components/service-dialog/SourceStep.tsx";
 import { ServiceIdentity } from "@/components/service-dialog/ServiceIdentity.tsx";
 import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useCatalog, useConfig, useServiceMutations } from "@/hooks/queries.ts";
@@ -31,16 +63,24 @@ const HEADER_PREFIX = "header.";
 
 /** Drops the fields the operator left empty, so a blank never travels as a mapping. */
 const usedOptions = (options: Record<string, string>): Record<string, string> =>
-  Object.fromEntries(Object.entries(options).filter(([, value]) => value.trim() !== ""));
+  Object.fromEntries(
+    Object.entries(options).filter(([, value]) => value.trim() !== ""),
+  );
 
 /**
  * The probe's stored header, read back into the two fields that edit it. The
  * option key carries the header's own name (`header.Authorization`), so a
  * half-typed name would otherwise keep renaming the key it is stored under.
  */
-const storedHeader = (options: Record<string, string> | undefined): { name: string; value: string } => {
-  const entry = Object.entries(options ?? {}).find(([key]) => key.startsWith(HEADER_PREFIX));
-  return entry === undefined ? { name: "", value: "" } : { name: entry[0].slice(HEADER_PREFIX.length), value: entry[1] };
+const storedHeader = (
+  options: Record<string, string> | undefined,
+): { name: string; value: string } => {
+  const entry = Object.entries(options ?? {}).find(([key]) =>
+    key.startsWith(HEADER_PREFIX),
+  );
+  return entry === undefined
+    ? { name: "", value: "" }
+    : { name: entry[0].slice(HEADER_PREFIX.length), value: entry[1] };
 };
 
 /**
@@ -73,7 +113,9 @@ const storedHeader = (options: Record<string, string> | undefined): { name: stri
  * they are adding or editing.
  */
 export function ServiceDialog({
-  mode, service, trigger,
+  mode,
+  service,
+  trigger,
 }: {
   mode: "add" | "edit";
   service?: ServiceDefinition;
@@ -97,21 +139,35 @@ export function ServiceDialog({
   const [name, setName] = useState(service?.name ?? "");
   const [adapter, setAdapter] = useState<string>(DEFAULT_ADAPTER);
   const [baseUrl, setBaseUrl] = useState(service?.baseUrl ?? "");
-  const [selection, setSelection] = useState<ComponentPickerSelection[]>(service?.components ?? []);
-  const [scopeToComponents, setScopeToComponents] = useState(service?.scopeToComponents ?? false);
+  const [selection, setSelection] = useState<ComponentPickerSelection[]>(
+    service?.components ?? [],
+  );
+  const [scopeToComponents, setScopeToComponents] = useState(
+    service?.scopeToComponents ?? false,
+  );
   // Kept as the typed string, not a number: an empty field is what "follow the
   // global cadence" looks like, and 0/NaN cannot express it.
-  const [intervalMinutes, setIntervalMinutes] = useState(intervalValue(service));
+  const [intervalMinutes, setIntervalMinutes] = useState(
+    intervalValue(service),
+  );
   // "My stack" (roadmap 2.6). A free-text slug rather than a picker: the first
   // group has to be creatable, and a select with nothing in it cannot do that.
   const [group, setGroup] = useState(service?.group ?? "");
   // Roadmap 4.13. A string rather than a number, like the interval above: a
   // half-typed "99." is a state the input has to be allowed to be in.
-  const [slaTarget, setSlaTarget] = useState(service?.slaTarget == null ? "" : String(service.slaTarget));
+  const [slaTarget, setSlaTarget] = useState(
+    service?.slaTarget == null ? "" : String(service.slaTarget),
+  );
+  // Roadmap 9.1. Empty string is "from the adapter", which is what nearly every
+  // provider is left on: it keeps the rule a rule instead of freezing today's
+  // answer onto this row.
+  const [authority, setAuthority] = useState<string>(service?.authority ?? "");
   // Adapter-specific extras, of which the scrape adapter is so far the only
   // user. Kept as the raw record the service definition carries, rather than as
   // named fields, so an adapter that grows an option later needs no new state.
-  const [options, setOptions] = useState<Record<string, string>>(service?.options ?? {});
+  const [options, setOptions] = useState<Record<string, string>>(
+    service?.options ?? {},
+  );
   // The probe's single header, held apart from `options` and folded back in on
   // save: see `storedHeader`.
   const [header, setHeader] = useState(storedHeader(service?.options));
@@ -121,7 +177,9 @@ export function ServiceDialog({
   >(undefined);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
-  const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | undefined>(undefined);
+  const [message, setMessage] = useState<
+    { text: string; tone: "error" | "info" } | undefined
+  >(undefined);
   const [saving, setSaving] = useState(false);
   // Only while adding, and only while the dialog is open: an edit already has
   // every answer the catalog would offer.
@@ -131,7 +189,9 @@ export function ServiceDialog({
     ...new Set(
       (config?.services ?? [])
         .map((entry) => entry.group)
-        .filter((entry): entry is string => typeof entry === "string" && entry !== ""),
+        .filter(
+          (entry): entry is string => typeof entry === "string" && entry !== "",
+        ),
     ),
   ].sort();
 
@@ -145,6 +205,7 @@ export function ServiceDialog({
   const activeAdapter = mode === "add" ? adapter : (service?.adapter ?? "");
   const probing = activeAdapter === PROBE_ADAPTER;
   const scraping = activeAdapter === SCRAPE_ADAPTER;
+  const jsonMapping = activeAdapter === JSON_ADAPTER;
   const tcpProbing = activeAdapter === TCP_ADAPTER;
   const dnsProbing = activeAdapter === DNS_ADAPTER;
   const setOption = (key: string, value: string): void => {
@@ -158,7 +219,9 @@ export function ServiceDialog({
    */
   const probeOptions = (): Record<string, string> => {
     const base = Object.fromEntries(
-      Object.entries(usedOptions(options)).filter(([key]) => !key.startsWith(HEADER_PREFIX)),
+      Object.entries(usedOptions(options)).filter(
+        ([key]) => !key.startsWith(HEADER_PREFIX),
+      ),
     );
     const headerName = header.name.trim();
     return headerName === "" || header.value.trim() === ""
@@ -170,7 +233,7 @@ export function ServiceDialog({
   const savedOptions = (): { options?: Record<string, string> } =>
     probing
       ? { options: probeOptions() }
-      : scraping || tcpProbing || dnsProbing
+      : scraping || jsonMapping || tcpProbing || dnsProbing
         ? { options: usedOptions(options) }
         : {};
 
@@ -209,6 +272,7 @@ export function ServiceDialog({
     setIntervalMinutes(intervalValue(service));
     setGroup(service?.group ?? "");
     setSlaTarget(service?.slaTarget == null ? "" : String(service.slaTarget));
+    setAuthority(service?.authority ?? "");
     setOptions(service?.options ?? {});
     setHeader(storedHeader(service?.options));
     setPreview(undefined);
@@ -241,16 +305,25 @@ export function ServiceDialog({
   const loadPreview = async (): Promise<void> => {
     setPreviewLoading(true);
     try {
-      const result = await previewComponents({ adapter: activeAdapter, baseUrl: baseUrl.trim() });
+      const result = await previewComponents({
+        adapter: activeAdapter,
+        baseUrl: baseUrl.trim(),
+      });
       // Keep `supported` alongside the (possibly empty) component list —
       // ComponentPicker needs both to tell "this adapter can't list
       // components at all" apart from "it can, and there are just none".
-      setPreview({ supported: result.supported, components: result.components });
+      setPreview({
+        supported: result.supported,
+        components: result.components,
+      });
     } catch (error) {
       // Reaching step two is not a request the operator made, so a failed
       // preload says so where every other failure in this dialog says it,
       // and leaves the button below to retry rather than blocking the save.
-      setMessage({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+      setMessage({
+        text: error instanceof Error ? error.message : String(error),
+        tone: "error",
+      });
     } finally {
       setPreviewLoading(false);
     }
@@ -297,9 +370,15 @@ export function ServiceDialog({
       // The component list belongs to the adapter that was selected when it was
       // loaded, so a detection that changes the adapter invalidates it.
       setPreview(undefined);
-      setMessage({ text: t("add.detect-ok", { adapter: result.adapter }), tone: "info" });
+      setMessage({
+        text: t("add.detect-ok", { adapter: result.adapter }),
+        tone: "info",
+      });
     } catch (error) {
-      setMessage({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+      setMessage({
+        text: error instanceof Error ? error.message : String(error),
+        tone: "error",
+      });
     } finally {
       setDetecting(false);
     }
@@ -307,12 +386,31 @@ export function ServiceDialog({
 
   const runConnectionTest = async (): Promise<void> => {
     if (service === undefined) return;
-    const result = await test.mutateAsync(service.id);
-    setMessage(
-      result.ok
-        ? { text: t("add.test-ok", { status: result.overallStatus }), tone: "info" }
-        : { text: t("add.test-failed", { error: result.error }), tone: "error" },
-    );
+    // The wait is a second or two of a silent button otherwise, which reads as
+    // a button that did nothing — and a test that never reaches the route at
+    // all still owes the operator a sentence.
+    setMessage({ text: t("add.test-running"), tone: "info" });
+    try {
+      const result = await test.mutateAsync(service.id);
+      setMessage(
+        result.ok
+          ? {
+              text: t("add.test-ok", { status: result.overallStatus }),
+              tone: "info",
+            }
+          : {
+              text: t("add.test-failed", { error: result.error }),
+              tone: "error",
+            },
+      );
+    } catch (error) {
+      setMessage({
+        text: t("add.test-failed", {
+          error: error instanceof Error ? error.message : String(error),
+        }),
+        tone: "error",
+      });
+    }
   };
 
   /**
@@ -348,7 +446,13 @@ export function ServiceDialog({
     try {
       if (mode === "add") {
         await add.mutateAsync({
-          id, name, adapter, baseUrl, enabled: true, components: selection, scopeToComponents,
+          id,
+          name,
+          adapter,
+          baseUrl,
+          enabled: true,
+          components: selection,
+          scopeToComponents,
           // Omitted rather than empty: "in no group" is the field being absent,
           // and an empty string is not a slug the schema would take.
           ...(slugify(group) === "" ? {} : { group: slugify(group) }),
@@ -358,10 +462,15 @@ export function ServiceDialog({
           ...savedOptions(),
           // Omitted rather than null on an add: the schema behind the POST takes
           // the field as optional, and absent already means the global cadence.
-          ...(intervalMinutes.trim() === "" ? {} : { intervalMinutes: Number(intervalMinutes) }),
+          ...(intervalMinutes.trim() === ""
+            ? {}
+            : { intervalMinutes: Number(intervalMinutes) }),
           // Omitted rather than null, like the interval: absent means nobody
           // promised anything about this provider (roadmap 4.13).
           ...(slaTarget.trim() === "" ? {} : { slaTarget: Number(slaTarget) }),
+          ...(authority === ""
+            ? {}
+            : { authority: authority as "declared" | "observed" }),
         });
         const result = await test.mutateAsync(id);
         if (!result.ok) {
@@ -369,33 +478,51 @@ export function ServiceDialog({
           // than closing as if the whole action had failed — and, unlike
           // vanilla's near-invisible flash before an unconditional auto-close,
           // stay open so the message is actually readable.
-          setMessage({ text: t("add.test-failed", { error: result.error }), tone: "error" });
+          setMessage({
+            text: t("add.test-failed", { error: result.error }),
+            tone: "error",
+          });
           setSaving(false);
           return;
         }
-        toast("services", { text: t("toast.service.added", { name }), tone: "ok" });
+        toast("services", {
+          text: t("toast.service.added", { name }),
+          tone: "ok",
+        });
       } else if (service !== undefined) {
         await patch.mutateAsync({
           id: service.id,
           patch: {
-            name, baseUrl, components: selection, scopeToComponents,
+            name,
+            baseUrl,
+            components: selection,
+            scopeToComponents,
             // Null, not omitted: a cleared field has to travel as an instruction
             // to forget the interval, or the row keeps the one it had.
-            intervalMinutes: intervalMinutes.trim() === "" ? null : Number(intervalMinutes),
+            intervalMinutes:
+              intervalMinutes.trim() === "" ? null : Number(intervalMinutes),
             // Same rule for the group: cleared means "out of the group", which
             // only null can say (roadmap 2.6).
             group: slugify(group) === "" ? null : slugify(group),
             // And null again for the target: cleared means the promise is off,
             // which only null can say.
             slaTarget: slaTarget.trim() === "" ? null : Number(slaTarget),
+            authority:
+              authority === "" ? null : (authority as "declared" | "observed"),
             ...savedOptions(),
           },
         });
-        toast("services", { text: t("toast.service.saved", { name }), tone: "ok" });
+        toast("services", {
+          text: t("toast.service.saved", { name }),
+          tone: "ok",
+        });
       }
       close();
     } catch (error) {
-      setMessage({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+      setMessage({
+        text: error instanceof Error ? error.message : String(error),
+        tone: "error",
+      });
       setSaving(false);
     }
   };
@@ -422,7 +549,12 @@ export function ServiceDialog({
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="service-name">{t("field.name")}</Label>
-            <Input id="service-name" value={name} onChange={(event) => setName(event.target.value)} {...fieldProps} />
+            <Input
+              id="service-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              {...fieldProps}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="service-id">{t("field.id")}</Label>
@@ -466,11 +598,15 @@ export function ServiceDialog({
               <option key={option} value={option} />
             ))}
           </datalist>
-          <span className="text-xs text-muted-foreground">{t("field.group-hint")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("field.group-hint")}
+          </span>
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="service-interval">{t("field.provider-interval")}</Label>
+          <Label htmlFor="service-interval">
+            {t("field.provider-interval")}
+          </Label>
           <Input
             id="service-interval"
             type="number"
@@ -481,7 +617,9 @@ export function ServiceDialog({
             onChange={(event) => setIntervalMinutes(event.target.value)}
             {...fieldProps}
           />
-          <span className="text-xs text-muted-foreground">{t("field.provider-interval-hint")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("field.provider-interval-hint")}
+          </span>
         </div>
 
         {/* Roadmap 4.13. Empty is the normal state: most providers are watched
@@ -500,20 +638,61 @@ export function ServiceDialog({
             onChange={(event) => setSlaTarget(event.target.value)}
             {...fieldProps}
           />
-          <span className="text-xs text-muted-foreground">{t("field.sla-target-hint")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("field.sla-target-hint")}
+          </span>
+        </div>
+
+        {/* Roadmap 9.1. IsItDown is an aggregator and a monitor at once, and
+            the two disagree about what a provider's status *is*; this is where
+            a provider says which of them answers for it. The default is not a
+            value but the absence of one, so the adapter's own rule keeps
+            applying. */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-authority">{t("field.authority")}</Label>
+          <Select
+            value={authority === "" ? "auto" : authority}
+            onValueChange={(value) =>
+              setAuthority(value === "auto" ? "" : value)
+            }
+          >
+            <SelectTrigger id="service-authority">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">{t("field.authority-auto")}</SelectItem>
+              <SelectItem value="declared">
+                {t("field.authority-declared")}
+              </SelectItem>
+              <SelectItem value="observed">
+                {t("field.authority-observed")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground">
+            {t("field.authority-hint")}
+          </span>
         </div>
       </Section>
 
       <Section
         title={t("components.field")}
         action={
-          <Button type="button" variant="ghost" size="sm" disabled={previewLoading} onClick={() => void loadPreview()}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={previewLoading}
+            onClick={() => void loadPreview()}
+          >
             {t("components.load")}
           </Button>
         }
       >
         {preview === undefined ? (
-          <span className="text-xs text-muted-foreground">{t("components.hint")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("components.hint")}
+          </span>
         ) : (
           <ComponentPicker
             available={preview.components}
@@ -541,7 +720,10 @@ export function ServiceDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? openDialog() : close())}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => (next ? openDialog() : close())}
+    >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className={adding ? "sm:max-w-2xl" : undefined}>
         <form
@@ -561,7 +743,9 @@ export function ServiceDialog({
             {adding ? (
               <>
                 <DialogTitle>{t("add.title")}</DialogTitle>
-                <DialogDescription>{t(onSource ? "add.subtitle-source" : "add.subtitle-details")}</DialogDescription>
+                <DialogDescription>
+                  {t(onSource ? "add.subtitle-source" : "add.subtitle-details")}
+                </DialogDescription>
                 <StepRail step={step} onBack={goToSource} />
               </>
             ) : (
@@ -579,10 +763,16 @@ export function ServiceDialog({
                 the step swap, the advanced disclosure opening, a message
                 arriving. The panel is centred, so a jump moves the whole
                 dialog under the pointer. */}
-            <StepPanel>
+            {/* The panel carries an animated pixel height; as a flex child of
+                the scrolling body it would otherwise be shrunk below that
+                height, clipping its tail instead of scrolling to it. */}
+            <StepPanel className="shrink-0">
               <div className="flex flex-col gap-4">
                 {adding ? (
-                  <div key={step} className={stepBack ? "anim-step-back" : "anim-step"}>
+                  <div
+                    key={step}
+                    className={stepBack ? "anim-step-back" : "anim-step"}
+                  >
                     <div className="flex flex-col gap-4">
                       {onSource ? (
                         <SourceStep
@@ -610,7 +800,12 @@ export function ServiceDialog({
                         />
                       ) : (
                         <>
-                          <ServiceIdentity name={name} adapter={adapter} baseUrl={baseUrl} onChange={goToSource} />
+                          <ServiceIdentity
+                            name={name}
+                            adapter={adapter}
+                            baseUrl={baseUrl}
+                            onChange={goToSource}
+                          />
                           {details}
                           {/* Everything only one adapter can use, folded away. For
                               a Statuspage site it is empty and stays shut; for the
@@ -627,14 +822,22 @@ export function ServiceDialog({
                                   <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                                     {t("add.advanced")}
                                   </span>
-                                  <span className="text-xs text-muted-foreground">{t("add.advanced-hint")}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {t("add.advanced-hint")}
+                                  </span>
                                 </span>
                                 <ChevronDown
-                                  className={advanced ? "size-4 rotate-180 text-muted-foreground transition-transform" : "size-4 text-muted-foreground transition-transform"}
+                                  className={
+                                    advanced
+                                      ? "size-4 rotate-180 text-muted-foreground transition-transform"
+                                      : "size-4 text-muted-foreground transition-transform"
+                                  }
                                 />
                               </CollapsibleTrigger>
                               <CollapsibleContent>
-                                <div className="border-t border-border p-3">{adapterFields}</div>
+                                <div className="border-t border-border p-3">
+                                  {adapterFields}
+                                </div>
                               </CollapsibleContent>
                             </Collapsible>
                           )}
@@ -647,35 +850,65 @@ export function ServiceDialog({
                     {details}
                     {/* No disclosure while editing: tuning these is most of why an
                         operator opens an existing service at all. */}
-                    {hasAdapterOptions(activeAdapter) && <Section title={t("add.advanced")}>{adapterFields}</Section>}
+                    {hasAdapterOptions(activeAdapter) && (
+                      <Section title={t("add.advanced")}>
+                        {adapterFields}
+                      </Section>
+                    )}
                   </>
-                )}
-
-                {message !== undefined && (
-                  <p className={message.tone === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
-                    {message.text}
-                  </p>
                 )}
               </div>
             </StepPanel>
           </DialogBody>
 
+          {/* Outside the scrolling body on purpose: an answer rendered at the end
+              of a long form is an answer the operator has to go looking for, and
+              the button that asks for it sits in the footer. */}
+          {message !== undefined && (
+            <p
+              className={
+                message.tone === "error"
+                  ? "px-1 pt-3 text-sm text-destructive"
+                  : "px-1 pt-3 text-sm text-muted-foreground"
+              }
+            >
+              {message.text}
+            </p>
+          )}
+
           <DialogFooter className="sm:justify-between">
             <div className="flex items-center gap-2">
               {mode === "edit" && (
-                <Button type="button" variant="outline" size="sm" disabled={test.isPending} onClick={() => void runConnectionTest()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={test.isPending}
+                  onClick={() => void runConnectionTest()}
+                >
                   {t("action.test-connection")}
                 </Button>
               )}
               {adding && (
                 <span className="text-xs text-muted-foreground">
-                  {t(onSource ? (ready ? "add.foot-ready" : "add.foot-pick") : "add.foot-tested")}
+                  {t(
+                    onSource
+                      ? ready
+                        ? "add.foot-ready"
+                        : "add.foot-pick"
+                      : "add.foot-tested",
+                  )}
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2">
               {adding && !onSource && (
-                <Button type="button" variant="ghost" className="back-link" onClick={goToSource}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="back-link"
+                  onClick={goToSource}
+                >
                   {t("action.previous-step")}
                 </Button>
               )}
@@ -705,7 +938,9 @@ export function ServiceDialog({
  * interval should be able to find it without reading the component picker.
  */
 function Section({
-  title, action, children,
+  title,
+  action,
+  children,
 }: {
   title: string;
   action?: ReactNode;
@@ -714,7 +949,9 @@ function Section({
   return (
     <section className="flex flex-col gap-3 rounded-md border border-border p-3.5">
       <div className="flex min-h-7 items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{title}</span>
+        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          {title}
+        </span>
         {action}
       </div>
       {children}
@@ -733,7 +970,10 @@ function StepRail({ step, onBack }: { step: 1 | 2; onBack: () => void }) {
       // Backwards only: step two is reached by answering step one, never by
       // clicking its circle, which would skip the form it is built out of.
       onStepClick={step === 2 ? onBack : undefined}
-      steps={[{ label: t("add.step-source") }, { label: t("add.step-details") }]}
+      steps={[
+        { label: t("add.step-source") },
+        { label: t("add.step-details") },
+      ]}
     />
   );
 }

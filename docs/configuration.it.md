@@ -70,6 +70,7 @@ notifications:
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
 | `services[].crossChecks` | — | Solo su una sonda (`http`, `tcp`, `dns`): l'id del provider di cui questa sonda è un secondo parere — controllo incrociato dei guasti silenziosi (roadmap 1.10). Quando la sonda non raggiunge il servizio e la status page di quel provider dichiara ancora operativo senza incidenti aperti, il disaccordo è esso stesso un avviso. Si può restringere a un singolo componente con la stessa forma `provider#componente` con cui una regola di routing indica il bersaglio (roadmap 2.9); la metà componente serve solo a precisare contro cosa la scheda di fiducia (roadmap 8.1) confronta la sonda, dato che il controllo dei guasti silenziosi riguarda una pagina che dichiara che non c'è proprio nulla che non va. |
+| `services[].authority` | dall'adapter | Quale fonte fa fede per questo provider — `declared` (la sua status page) oppure `observed` (la nostra misura), roadmap 9.1. Ometterlo è il caso normale e non è un valore mancante: una sonda (`http`, `tcp`, `dns`) legge `observed` perché *è* la misura, e tutto ciò che legge la pagina di qualcun altro legge `declared`. Va impostato solo per non essere d'accordo con quel default — una status page di cui hai imparato a diffidare, o una sonda che non vuoi sia trattata come il riferimento. Decide cosa la dashboard stampa accanto all'adapter e come è formulato un avviso di disservizio silenzioso, non quali campioni sostengono una percentuale. Vedi [7.7](how-it-works.it.md#77-quale-fonte-fa-fede). |
 | `services[].mutedUntil` | — | ISO 8601. Finché è nel futuro il provider viene interrogato e registrato come sempre ma non notifica nulla — "lo so, smetti di dirmelo, fino ad allora". Nell'edizione UI è ciò che scrive il comando **Silenzia** della dashboard. |
 | `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano quattro: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`), e `http`, `tcp` e `dns` (vedi le loro sezioni qui sotto). |
 
@@ -149,6 +150,7 @@ Le letture che ne escono:
 | Stato e corpo accettati, certificato entro `tlsWarnDays` | `degraded` |
 | Stato fuori dall'insieme, testo mancante o vietato nel corpo | `major_outage` |
 | Connessione rifiutata, host non risolto, TLS respinto o timeout superato | `major_outage` |
+| Una sfida anti-bot (`cf-mitigated`) su uno stato che non hai accettato | `unknown` |
 
 Quattro cose da sapere prima di affidarcisi:
 
@@ -181,6 +183,19 @@ Quattro cose da sapere prima di affidarcisi:
   token API in sola lettura o una pagina pubblica in sola lettura (roadmap 4.15
   e 5.1) dovranno decidere chi può scrivere una definizione di servizio prima di
   esistere.
+- **una sfida anti-bot non è un disservizio.** Cloudflare e simili rispondono a
+  un client che non sa eseguire il loro JavaScript con `403` e un header
+  `cf-mitigated` — la pagina "Just a moment…". Il bordo non ha mai chiesto nulla
+  al tuo servizio, quindi la sonda legge `unknown`, che non sveglia nessuno, e
+  lo scrive in **Diagnostica**. Il tuo browser apre la stessa URL perché risolve
+  la sfida; questo container no. Tre vie d'uscita, nell'ordine in cui vale la
+  pena provarle: sondare un `path` che la sfida salta (`/robots.txt`, un
+  endpoint di salute), far passare questa macchina oltre la sfida (una regola di
+  skip del WAF sul suo IP di uscita), oppure mettere lo stato in `expectStatus`
+  — che legge "il bordo è in piedi" e smette di dire qualsiasi cosa sul servizio
+  dietro. Ogni richiesta di questo progetto si presenta come
+  `IsItDown (+https://github.com/devmanfre/isitdown)`, quindi una regola di skip
+  può agganciarsi lì; `header.User-Agent` lo sostituisce se un host vuole altro.
 - un'opzione sbagliata (`expectStatus: 2xx`, un `${VAR}` senza nulla dietro, un
   `expectBody` su un `HEAD`) solleva un errore a ogni ciclo e si vede come
   provider che fallisce, mai come servizio che legge giù in silenzio. `node
@@ -752,6 +767,57 @@ Freshstatus, la quarta pagina considerata per questa famiglia, non è leggibile
 senza credenziali: le sue pagine si renderizzano lato client e la sua API
 pubblica risponde `403` a tutto ciò che non sia il suo stesso front end, quindi
 serve l'adapter di scraping HTML e non un parser tutto suo.
+
+**JSON generico (`json`)** — roadmap 11.1, ed è la cosa da provare prima di
+scrivere codice. Moltissime status page servono JSON ottimo in una forma che
+nessuno ha standardizzato: il dato è stabile e completo, e l'unica cosa che manca
+è qualcuno che dica quale campo significa cosa. È ciò che questo adapter prende.
+
+```yaml
+services:
+  - name: Acme Cloud
+    id: acme
+    adapter: json
+    baseUrl: https://status.acme.example
+    options:
+      path: /api/status
+      statusPath: service.state
+      statusMap: '{"UP":"operational","DEGRADED":"degraded","PARTIAL":"partial_outage","DOWN":"major_outage"}'
+      incidentsPath: events
+      incidentId: ref
+      incidentName: title
+      incidentStatus: phase
+      incidentImpact: severity
+      incidentUpdatedAt: changedAt
+```
+
+| Opzione | Significato |
+|---|---|
+| `path` | Aggiunto a `baseUrl`. Ometti quando l'URL base è già il documento. |
+| `statusPath` | Dov'è la parola dello stato complessivo. **Obbligatoria.** |
+| `statusMap` | Un oggetto JSON che mappa le parole del provider su `operational`, `degraded`, `partial_outage`, `major_outage` o `unknown`. **Obbligatoria.** Il confronto ignora maiuscole e spazi attorno. |
+| `incidentsPath` | Un array di incidenti aperti. Ometti per una pagina che pubblica solo uno stato. |
+| `incidentName` | Il titolo, *dentro una voce*. Obbligatoria ogni volta che c'è `incidentsPath`: una voce senza nome è una riga vuota sulla timeline, quindi viene scartata anziché mostrata. |
+| `incidentId`, `incidentStatus`, `incidentImpact`, `incidentUpdatedAt` | Il resto di una voce. Opzionali; una voce senza id proprio è identificata dalla posizione, così due letture concordano su quale incidente è quale. |
+
+Un **percorso** è nomi, punti e `[n]` per un indice di array — `page.status`,
+`components[0].state`. Deliberatamente non JSONPath: qui un percorso è una
+lettura, e un linguaggio di espressioni è una superficie con filtri, wildcard e
+prima o poi un parser da mantenere. Una pagina che ha bisogno di più di una
+lettura ha bisogno di un adapter.
+
+Due comportamenti da conoscere. Una parola di stato che la tabella non copre
+legge `unknown` invece di essere indovinata dall'euristica sulle parole usata
+dall'adapter feed: l'operatore ha descritto il vocabolario di questo provider, e
+un buco lì è una cosa di cui *essere avvisati*. E una pagina che riporta
+`operational` mentre elenca un incidente aperto legge `degraded` — è una pagina a
+metà aggiornamento, e riportare la più tranquilla delle due significherebbe
+riportare quella che già sappiamo superata.
+
+La mappatura viene validata quando si **salva**, non quando si legge: `POST`/`PATCH
+/config/services` rispondono `400` nominando ogni problema, e `isitdown check` li
+riporta come errori. Un refuso in un percorso è una cosa da correggere mentre si
+sta ancora guardando il campo in cui lo si è scritto.
 
 Per un provider che non sta su nessuno di questi, aggiungi un adapter sotto
 `src/adapters/`.

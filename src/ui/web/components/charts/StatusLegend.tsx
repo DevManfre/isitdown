@@ -1,5 +1,13 @@
 import { useTranslation } from "react-i18next";
-import { STATUS_CHART, statusFill, statusLabelKey, statusMuted } from "@/lib/chartConfig.ts";
+import {
+  COVERAGE_HATCH_CSS,
+  coverageIsPartial,
+  STATUS_CHART,
+  statusFill,
+  statusLabelKey,
+  statusMuted,
+} from "@/lib/chartConfig.ts";
+import { useCoverage } from "@/lib/coverage.tsx";
 
 /**
  * The colour key the daily bars never had.
@@ -16,6 +24,10 @@ import { STATUS_CHART, statusFill, statusLabelKey, statusMuted } from "@/lib/cha
  */
 export function StatusLegend() {
   const { t } = useTranslation();
+  // Roadmap 10.1. Listed only when the window actually holds a hatched day: the
+  // stripes are a caveat, and a key for a caveat nobody is being shown is one
+  // more thing to read past.
+  const anyPartial = [...useCoverage().values()].some(coverageIsPartial);
 
   return (
     <ul
@@ -32,6 +44,16 @@ export function StatusLegend() {
           {t(statusLabelKey(status))}
         </li>
       ))}
+      {anyPartial && (
+        <li className="flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className="inline-block size-2 rounded-[2px]"
+            style={{ background: `${COVERAGE_HATCH_CSS}, ${statusFill("operational")}` }}
+          />
+          {t("coverage.hatched")}
+        </li>
+      )}
     </ul>
   );
 }

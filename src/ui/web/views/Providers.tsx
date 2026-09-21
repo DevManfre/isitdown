@@ -1,4 +1,11 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -16,13 +23,26 @@ import { ArrowDown, ArrowUp, ChevronRight, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentRows } from "@/components/ComponentRows.tsx";
 import { ProviderCards } from "@/components/ProviderCards.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
-import { useHistory, useStatus } from "@/hooks/queries.ts";
+import {
+  useHistory,
+  usePreferences,
+  usePreferencesMutation,
+  useStatus,
+} from "@/hooks/queries.ts";
+import { CoverageProvider } from "@/lib/coverage.tsx";
 import { severity, statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { hostOf } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
@@ -30,7 +50,12 @@ import { isMuted } from "@/lib/mute.ts";
 import { isReorder, rowShifts } from "@/lib/rowShift.ts";
 import { stagger } from "@/lib/stagger.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
-import type { ComponentStatus, HistoryBucket, OverallStatus, ProviderStatus } from "@/lib/types.ts";
+import type {
+  ComponentStatus,
+  HistoryBucket,
+  OverallStatus,
+  ProviderStatus,
+} from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
 const WINDOW_DAYS = 90;
@@ -41,6 +66,13 @@ const WINDOW_DAYS = 90;
  * and the table is what a fleet that size is read through.
  */
 const CARD_GRID_MAX = 6;
+
+/**
+ * Above this many providers the density toggle appears — roadmap 13.1. Below
+ * it the breathing room costs nothing, and a control that changes nothing worth
+ * seeing teaches the operator to ignore the row it sits in.
+ */
+const DENSITY_FROM = 12;
 
 /** How long a dropped row stays mounted; in step with `.anim-sink` in motion.css. */
 const EXIT_MS = 220;
@@ -86,6 +118,8 @@ interface ProviderRow {
   maintenanceActive: boolean;
   /** The operator asked for silence, and it has not run out yet. */
   muted: boolean;
+  /** Which source is the record for this provider — roadmap 9.1. */
+  authority: "declared" | "observed";
 }
 
 /**
@@ -115,11 +149,23 @@ interface SortableColumn {
  * A column header as the table's sort control: shadcn's data-table pattern of
  * a ghost button inside the `<th>`, the arrow standing in for the state.
  */
-function SortHead({ column, label }: { column: SortableColumn; label: string }) {
+function SortHead({
+  column,
+  label,
+}: {
+  column: SortableColumn;
+  label: string;
+}) {
   const sorted = column.getIsSorted();
-  const Icon = sorted === "asc" ? ArrowUp : sorted === "desc" ? ArrowDown : ChevronsUpDown;
+  const Icon =
+    sorted === "asc" ? ArrowUp : sorted === "desc" ? ArrowDown : ChevronsUpDown;
   return (
-    <Button variant="ghost" size="sm" className="-mx-2" onClick={column.getToggleSortingHandler()}>
+    <Button
+      variant="ghost"
+      size="sm"
+      className="-mx-2"
+      onClick={column.getToggleSortingHandler()}
+    >
       {label}
       <Icon className={cn("size-3", sorted === false && "opacity-40")} />
     </Button>
@@ -130,14 +176,22 @@ function SortHead({ column, label }: { column: SortableColumn; label: string }) 
 const panelId = (rowId: string) => `components-${rowId}`;
 
 /** What `aria-sort` on the header cell says, so the state reaches a screen reader too. */
-const ariaSort = (sorted: false | SortDirection): "ascending" | "descending" | "none" =>
+const ariaSort = (
+  sorted: false | SortDirection,
+): "ascending" | "descending" | "none" =>
   sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none";
 
-const hasIssue = (provider: ProviderStatus) => provider.overallStatus !== "operational";
+const hasIssue = (provider: ProviderStatus) =>
+  provider.overallStatus !== "operational";
 
 /** The ids the filter keeps: the whole fleet, or only what has an open issue. */
-const shownBy = (providers: readonly ProviderStatus[], filter: Filter): string[] =>
-  (filter === "issues" ? providers.filter(hasIssue) : providers).map((provider) => provider.id);
+const shownBy = (
+  providers: readonly ProviderStatus[],
+  filter: Filter,
+): string[] =>
+  (filter === "issues" ? providers.filter(hasIssue) : providers).map(
+    (provider) => provider.id,
+  );
 
 /**
  * The ids that were on the page a render ago and are not any more, held for
@@ -150,11 +204,17 @@ const shownBy = (providers: readonly ProviderStatus[], filter: Filter): string[]
  * the entry already had — `.anim-sink` for a dropped row, `.anim-fold` for a
  * closing panel.
  */
-function useOutgoing(ids: readonly string[], hold: number): ReadonlySet<string> {
+function useOutgoing(
+  ids: readonly string[],
+  hold: number,
+): ReadonlySet<string> {
   // The ids themselves are the identity of a render: `ids` is a fresh array
   // every time, and only a change of membership means anything here.
   const key = ids.join(",");
-  const [tracked, setTracked] = useState<{ key: string; outgoing: ReadonlySet<string> }>(() => ({
+  const [tracked, setTracked] = useState<{
+    key: string;
+    outgoing: ReadonlySet<string>;
+  }>(() => ({
     key,
     outgoing: new Set(),
   }));
@@ -166,15 +226,24 @@ function useOutgoing(ids: readonly string[], hold: number): ReadonlySet<string> 
   // rebuilt just to fade — a flash, which is the thing being fixed.
   if (tracked.key !== key) {
     const present = new Set(ids);
-    const gone = tracked.key === "" ? [] : tracked.key.split(",").filter((id) => !present.has(id));
+    const gone =
+      tracked.key === ""
+        ? []
+        : tracked.key.split(",").filter((id) => !present.has(id));
     setTracked({ key, outgoing: new Set(gone) });
   }
 
   useEffect(() => {
     if (tracked.outgoing.size === 0) return;
     // Reduced motion plays no exit animation, so there is nothing to wait for.
-    const wait = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : hold;
-    const timer = setTimeout(() => setTracked((current) => ({ key: current.key, outgoing: new Set() })), wait);
+    const wait = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 0
+      : hold;
+    const timer = setTimeout(
+      () =>
+        setTracked((current) => ({ key: current.key, outgoing: new Set() })),
+      wait,
+    );
     return () => clearTimeout(timer);
   }, [tracked, hold]);
 
@@ -209,10 +278,11 @@ function useRowShift() {
   useLayoutEffect(() => {
     if (body.current === null) return;
     const rows = new Map(
-      [...body.current.querySelectorAll<HTMLTableRowElement>("tr[data-row-id]")].map((row) => [
-        row.dataset.rowId ?? "",
-        row,
-      ]),
+      [
+        ...body.current.querySelectorAll<HTMLTableRowElement>(
+          "tr[data-row-id]",
+        ),
+      ].map((row) => [row.dataset.rowId ?? "", row]),
     );
     const current = new Map([...rows].map(([id, row]) => [id, row.offsetTop]));
     const previous = tops.current;
@@ -266,6 +336,11 @@ export function Providers() {
   const { data: status } = useStatus();
   const { data: summary } = useHistory({ days: WINDOW_DAYS });
   const [filter, setFilter] = useState<Filter>("all");
+  // Roadmap 13.1. A stored preference, so it follows the instance rather than
+  // the browser: the fleet size it is a reaction to is the same on every device.
+  const { data: preferences } = usePreferences();
+  const density = preferences?.density ?? "comfortable";
+  const setPreferences = usePreferencesMutation();
 
   // Enabled providers only. A disabled one is not being polled, so every figure
   // this table carries — status, uptime, the 90-day strip — would be frozen at
@@ -274,7 +349,10 @@ export function Providers() {
   // rebuilt from this array's identity: a fresh filter each render would rebuild
   // it every render, which is what NO_PROVIDERS exists to avoid.
   const all = status?.providers ?? NO_PROVIDERS;
-  const providers = useMemo(() => all.filter((provider) => provider.enabled), [all]);
+  const providers = useMemo(
+    () => all.filter((provider) => provider.enabled),
+    [all],
+  );
 
   // providers.js:64-67 — showIssuesOnly filters client-side to the providers
   // with an open issue; "all" is otherwise the fleet in its configured order.
@@ -287,28 +365,53 @@ export function Providers() {
   // the three things that actually change it. `leaving` is state: a new Set
   // only when membership changed.
   const data = useMemo<ProviderRow[]>(() => {
-    const byId = new Map(summaryProviders(summary).map((provider) => [provider.providerId, provider]));
+    const byId = new Map(
+      summaryProviders(summary).map((provider) => [
+        provider.providerId,
+        provider,
+      ]),
+    );
     const shown = new Set(shownBy(providers, filter));
-    return providers
-      .filter((provider) => shown.has(provider.id) || leaving.has(provider.id))
-      .map((provider) => {
-        const history = byId.get(provider.id);
-        return {
-          id: provider.id,
-          name: provider.name,
-          host: hostOf(provider.baseUrl),
-          adapter: provider.adapter,
-          status: provider.overallStatus,
-          severity: severity(provider.overallStatus),
-          uptime: history?.uptime90 ?? provider.uptime90,
-          incidents: history?.incidentCount ?? 0,
-          buckets: history?.buckets ?? [],
-          monitored: provider.componentSelection,
-          components: provider.components,
-          maintenanceActive: provider.maintenance.active.length > 0,
-          muted: isMuted(provider.mutedUntil),
-        };
-      });
+    return (
+      providers
+        .filter(
+          (provider) => shown.has(provider.id) || leaving.has(provider.id),
+        )
+        .map((provider) => {
+          const history = byId.get(provider.id);
+          return {
+            id: provider.id,
+            name: provider.name,
+            host: hostOf(provider.baseUrl),
+            adapter: provider.adapter,
+            status: provider.overallStatus,
+            severity: severity(provider.overallStatus),
+            uptime: history?.uptime90 ?? provider.uptime90,
+            incidents: history?.incidentCount ?? 0,
+            buckets: history?.buckets ?? [],
+            monitored: provider.componentSelection,
+            components: provider.components,
+            maintenanceActive: provider.maintenance.active.length > 0,
+            muted: isMuted(provider.mutedUntil),
+            authority: provider.authority,
+          };
+        })
+        // Problems first — roadmap 13.1. Sorted here rather than seeded into the
+        // table's own sorting state, because the two behave differently at the
+        // end of the cycle: a third click on a header *removes* the sort, and a
+        // seeded state would hand the operator the configured order back — the
+        // very order this exists to get away from. Sorting the rows makes
+        // "no sort" mean problems first, which is what the view promises.
+        //
+        // Alphabetical order is fine at eight providers and useless at a hundred:
+        // it buries the two rows the view is being opened for under ninety-eight
+        // that are fine.
+        .sort(
+          (left, right) =>
+            right.severity - left.severity ||
+            left.name.localeCompare(right.name),
+        )
+    );
   }, [providers, summary, filter, leaving]);
 
   // Rebuilt when the catalog language changes, since every header label and
@@ -333,12 +436,19 @@ export function Providers() {
                 aria-label={t("providers.components-toggle")}
                 onClick={row.getToggleExpandedHandler()}
               >
-                <ChevronRight className={cn("size-4 transition-transform", row.getIsExpanded() && "rotate-90")} />
+                <ChevronRight
+                  className={cn(
+                    "size-4 transition-transform",
+                    row.getIsExpanded() && "rotate-90",
+                  )}
+                />
               </Button>
             ) : null,
         }),
         helper.accessor("name", {
-          header: ({ column }) => <SortHead column={column} label={t("column.provider")} />,
+          header: ({ column }) => (
+            <SortHead column={column} label={t("column.provider")} />
+          ),
           sortFn: "text",
           cell: ({ row }) => (
             <span className="flex items-center gap-2">
@@ -351,31 +461,46 @@ export function Providers() {
                       things. */}
                   <Link
                     className="underline-offset-4 hover:underline"
-                    to={ROUTE_PATHS.providerDetail.replace(":providerId", row.original.id)}
+                    to={ROUTE_PATHS.providerDetail.replace(
+                      ":providerId",
+                      row.original.id,
+                    )}
                   >
                     {row.original.name}
                   </Link>
                   {row.original.maintenanceActive && (
-                    <Badge variant="muted">{t("provider.maintenance.badge")}</Badge>
+                    <Badge variant="muted">
+                      {t("provider.maintenance.badge")}
+                    </Badge>
                   )}
                   {/* Shown alongside, not instead: a muted provider inside a
                       maintenance window is silent twice over, and hiding one
                       badge behind the other would make lifting the mute look
                       like it changed nothing. */}
-                  {row.original.muted && <Badge variant="muted">{t("provider.muted.badge")}</Badge>}
+                  {row.original.muted && (
+                    <Badge variant="muted">{t("provider.muted.badge")}</Badge>
+                  )}
                 </span>
-                <span className="font-mono text-[10px] text-muted-foreground">{row.original.host}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {row.original.host}
+                </span>
               </span>
             </span>
           ),
         }),
         helper.accessor("adapter", {
-          header: ({ column }) => <SortHead column={column} label={t("column.adapter")} />,
+          header: ({ column }) => (
+            <SortHead column={column} label={t("column.adapter")} />
+          ),
           sortFn: "text",
-          cell: ({ getValue }) => <span className="font-mono text-xs">{getValue()}</span>,
+          cell: ({ getValue }) => (
+            <span className="font-mono text-xs">{getValue()}</span>
+          ),
         }),
         helper.accessor("severity", {
-          header: ({ column }) => <SortHead column={column} label={t("column.status")} />,
+          header: ({ column }) => (
+            <SortHead column={column} label={t("column.status")} />
+          ),
           sortFn: "basic",
           // Worst first on the first click: that is the row being looked for.
           sortDescFirst: true,
@@ -386,7 +511,9 @@ export function Providers() {
           ),
         }),
         helper.accessor("uptime", {
-          header: ({ column }) => <SortHead column={column} label={t("column.uptime")} />,
+          header: ({ column }) => (
+            <SortHead column={column} label={t("column.uptime")} />
+          ),
           sortFn: "basic",
           // Lowest uptime first, for the same reason.
           sortDescFirst: false,
@@ -394,13 +521,20 @@ export function Providers() {
             <span className="flex min-w-40 items-center gap-3">
               <UptimeStrip buckets={row.original.buckets} />
               <span className="font-mono text-xs">
-                <NumberTicker locale={i18n.language} value={row.original.uptime} decimalPlaces={2} suffix="%" />
+                <NumberTicker
+                  locale={i18n.language}
+                  value={row.original.uptime}
+                  decimalPlaces={2}
+                  suffix="%"
+                />
               </span>
             </span>
           ),
         }),
         helper.accessor("incidents", {
-          header: ({ column }) => <SortHead column={column} label={t("column.incidents")} />,
+          header: ({ column }) => (
+            <SortHead column={column} label={t("column.incidents")} />
+          ),
           sortFn: "basic",
           // Busiest provider first.
           sortDescFirst: true,
@@ -441,108 +575,164 @@ export function Providers() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="anim-fade text-sm text-muted-foreground">{t("providers.intro")}</p>
-        {/* providers.js:73-97 (headerRow) — a seg-pills toggle beside the
+    // Roadmap 10.1: the strips in the table hatch the days the poller missed.
+    <CoverageProvider coverage={summary?.dailyCoverage}>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <p className="anim-fade text-sm text-muted-foreground">
+            {t("providers.intro")}
+          </p>
+          {/* providers.js:73-97 (headerRow) — a seg-pills toggle beside the
             intro line. `type="multiple"` (not "single") so Radix leaves the
             plain `aria-pressed` attribute alone instead of swapping in
             `role="radio"`/`aria-checked` — matching the codebase's own
             convention (Header.tsx's language switcher) and motion.css's
             `[data-slot="toggle-group-item"]` transition hook either way.
             Single-selection is enforced by hand below. */}
-        <ToggleGroup
-          type="multiple"
-          value={[filter]}
-          onValueChange={(next) => {
-            // Clicking the already-active option yields an empty array
-            // (providers.js:86's no-op guard); a real change yields the
-            // newly-picked option alongside the outgoing one.
-            const picked = next.find((v) => v !== filter);
-            if (picked === "all" || picked === "issues") setFilter(picked);
-          }}
-        >
-          <ToggleGroupItem value="all">{t("filter.all")}</ToggleGroupItem>
-          <ToggleGroupItem value="issues">{t("filter.issues")}</ToggleGroupItem>
-        </ToggleGroup>
-      </div>
-      {/* The cards, then the table of the same providers — the two readings the
+          <ToggleGroup
+            type="multiple"
+            value={[filter]}
+            onValueChange={(next) => {
+              // Clicking the already-active option yields an empty array
+              // (providers.js:86's no-op guard); a real change yields the
+              // newly-picked option alongside the outgoing one.
+              const picked = next.find((v) => v !== filter);
+              if (picked === "all" || picked === "issues") setFilter(picked);
+            }}
+          >
+            <ToggleGroupItem value="all">{t("filter.all")}</ToggleGroupItem>
+            <ToggleGroupItem value="issues">
+              {t("filter.issues")}
+            </ToggleGroupItem>
+          </ToggleGroup>
+          {/* Roadmap 13.1. Only once the fleet is big enough for the trade to
+              be worth making: at eight providers the breathing room costs
+              nothing, and a control that changes nothing visible is a control
+              that teaches the operator to ignore the row it sits in. */}
+          {data.length > DENSITY_FROM && (
+            <ToggleGroup
+              type="multiple"
+              aria-label={t("density.label")}
+              value={[density]}
+              onValueChange={(next) => {
+                const picked = next.find((value) => value !== density);
+                if (picked === "comfortable" || picked === "compact") {
+                  setPreferences.mutate({ density: picked });
+                }
+              }}
+            >
+              <ToggleGroupItem value="comfortable">
+                {t("density.comfortable")}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="compact">
+                {t("density.compact")}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
+        </div>
+        {/* The cards, then the table of the same providers — the two readings the
           one table used to be asked for at once (see ProviderCards). Capped at
           CARD_GRID_MAX: past that the grid is a wall to scroll past on the way
           to the table, which is the shape that actually serves a large fleet. */}
-      {data.length > 0 && data.length <= CARD_GRID_MAX && <ProviderCards providers={data} />}
+        {data.length > 0 && data.length <= CARD_GRID_MAX && (
+          <ProviderCards providers={data} />
+        )}
 
-      {data.length === 0 ? (
-        <p className="text-muted-foreground">{t("providers.empty")}</p>
-      ) : (
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((group) => (
-              <TableRow key={group.id}>
-                {group.headers.map((header) => (
-                  <TableHead key={header.id} aria-sort={ariaSort(header.column.getIsSorted())}>
-                    <table.FlexRender header={header} />
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody ref={body}>
-            {rows.map((row, index) => {
-              const isLeaving = leaving.has(row.id);
-              return (
-                <Fragment key={row.id}>
-                  <TableRow
-                    // What useRowShift measures each row by; a key is React's
-                    // own bookkeeping and never reaches the DOM.
-                    data-row-id={row.id}
-                    className={cn(isLeaving ? "anim-sink" : "anim-rise anim-rise-table-row")}
-                    // A row on its way out goes at once; only arrivals stagger.
-                    style={{
-                      animationDelay: isLeaving
-                        ? "0ms"
-                        : stagger(index, { base: 90, step: 30, cap: 400 }),
-                    }}
-                  >
-                    {row.getAllCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        <table.FlexRender cell={cell} />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                  {/* The panel the chevron opens. Deliberately carries no
+        {data.length === 0 ? (
+          <p className="text-muted-foreground">{t("providers.empty")}</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((group) => (
+                <TableRow key={group.id}>
+                  {group.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
+                      aria-sort={ariaSort(header.column.getIsSorted())}
+                    >
+                      <table.FlexRender header={header} />
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody ref={body}>
+              {rows.map((row, index) => {
+                const isLeaving = leaving.has(row.id);
+                return (
+                  <Fragment key={row.id}>
+                    <TableRow
+                      // What useRowShift measures each row by; a key is React's
+                      // own bookkeeping and never reaches the DOM.
+                      data-row-id={row.id}
+                      className={cn(
+                        isLeaving
+                          ? "anim-sink"
+                          : "anim-rise anim-rise-table-row",
+                      )}
+                      // A row on its way out goes at once; only arrivals stagger.
+                      style={{
+                        animationDelay: isLeaving
+                          ? "0ms"
+                          : stagger(index, { base: 90, step: 30, cap: 400 }),
+                      }}
+                    >
+                      {row.getAllCells().map((cell) => (
+                        // Roadmap 13.1: compact trades the breathing room for
+                        // rows on screen, which is the trade an operator with a
+                        // hundred providers is already making by scrolling.
+                        <TableCell
+                          key={cell.id}
+                          className={cn(density === "compact" && "py-1")}
+                        >
+                          <table.FlexRender cell={cell} />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {/* The panel the chevron opens. Deliberately carries no
                       `data-row-id`: useRowShift measures provider rows only, so
                       the rows below still close ranks as this one unfolds. */}
-                  {(row.getIsExpanded() || folding.has(row.id)) && (
-                    // No hover on the panel: TableRow's own `hover:bg-muted/50`
-                    // is for a row an operator can act on, and this is content.
-                    <TableRow id={panelId(row.id)} className="hover:bg-transparent">
-                      <TableCell colSpan={row.getAllCells().length} className="p-0 whitespace-normal">
-                        <div className={row.getIsExpanded() ? "anim-unfold" : "anim-fold"}>
-                          {/* Bare on purpose: this is the clipping box, and the
+                    {(row.getIsExpanded() || folding.has(row.id)) && (
+                      // No hover on the panel: TableRow's own `hover:bg-muted/50`
+                      // is for a row an operator can act on, and this is content.
+                      <TableRow
+                        id={panelId(row.id)}
+                        className="hover:bg-transparent"
+                      >
+                        <TableCell
+                          colSpan={row.getAllCells().length}
+                          className="p-0 whitespace-normal"
+                        >
+                          <div
+                            className={
+                              row.getIsExpanded() ? "anim-unfold" : "anim-fold"
+                            }
+                          >
+                            {/* Bare on purpose: this is the clipping box, and the
                               padding belongs inside it. A `fr` track can never
                               flex below its content's base size, so padding
                               here would floor the fold at 16px and leave only
                               the fade to play. */}
-                          <div>
-                            <div className="px-2 pb-4">
-                              <ComponentRows
-                                providerId={row.original.id}
-                                days={WINDOW_DAYS}
-                                current={row.original.components}
-                              />
+                            <div>
+                              <div className="px-2 pb-4">
+                                <ComponentRows
+                                  providerId={row.original.id}
+                                  days={WINDOW_DAYS}
+                                  current={row.original.components}
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
-      )}
-    </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+    </CoverageProvider>
   );
 }

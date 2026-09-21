@@ -62,8 +62,12 @@ export function diff(
 
   const base = { providerId: next.provider, at: next.fetchedAt };
 
-  const runningBefore = new Map(activeWindows(previous).map((window) => [window.id, window]));
-  const runningNow = new Map(activeWindows(next).map((window) => [window.id, window]));
+  const runningBefore = new Map(
+    activeWindows(previous).map((window) => [window.id, window]),
+  );
+  const runningNow = new Map(
+    activeWindows(next).map((window) => [window.id, window]),
+  );
 
   const maintenanceChanges: StatusChange[] = [];
   for (const [id, window] of runningNow) {
@@ -94,7 +98,8 @@ export function diff(
 
   const changes: StatusChange[] = [...maintenanceChanges];
 
-  const comparable = previous.overallStatus !== "unknown" && next.overallStatus !== "unknown";
+  const comparable =
+    previous.overallStatus !== "unknown" && next.overallStatus !== "unknown";
   if (comparable && previous.overallStatus !== next.overallStatus) {
     changes.push({
       ...base,
@@ -107,7 +112,9 @@ export function diff(
   // Components follow the same two rules: a side the component is missing from
   // is a baseline (newly selected) or a removal (deselected or dropped by the
   // provider), never news; `unknown` is not comparable.
-  const previousComponents = new Map(previous.components.map((component) => [component.id, component]));
+  const previousComponents = new Map(
+    previous.components.map((component) => [component.id, component]),
+  );
   for (const component of next.components) {
     const seen = previousComponents.get(component.id);
     if (seen === undefined) continue;
@@ -123,18 +130,32 @@ export function diff(
     }
   }
 
-  const before = new Map(previous.activeIncidents.map((incident) => [incident.id, incident]));
-  const after = new Map(next.activeIncidents.map((incident) => [incident.id, incident]));
+  const before = new Map(
+    previous.activeIncidents.map((incident) => [incident.id, incident]),
+  );
+  const after = new Map(
+    next.activeIncidents.map((incident) => [incident.id, incident]),
+  );
 
   for (const incident of next.activeIncidents) {
     const seen = before.get(incident.id);
     if (seen === undefined) {
-      changes.push({ ...base, kind: "incident_opened", currentStatus: next.overallStatus, incident });
+      changes.push({
+        ...base,
+        kind: "incident_opened",
+        currentStatus: next.overallStatus,
+        incident,
+      });
       continue;
     }
     // A provider bumping `updatedAt` or rewording the title is not an event.
     if (seen.status !== incident.status || seen.impact !== incident.impact) {
-      changes.push({ ...base, kind: "incident_updated", currentStatus: next.overallStatus, incident });
+      changes.push({
+        ...base,
+        kind: "incident_updated",
+        currentStatus: next.overallStatus,
+        incident,
+      });
     }
   }
 
@@ -168,7 +189,9 @@ export function signatureOf(status: NormalizedStatus): string {
   const incidents = status.activeIncidents
     .map((incident) => `${incident.id}:${incident.status}:${incident.impact}`)
     .sort();
-  const components = status.components.map((component) => `${component.id}:${component.status}`).sort();
+  const components = status.components
+    .map((component) => `${component.id}:${component.status}`)
+    .sort();
   const running = activeWindows(status)
     .map((window) => window.id)
     .sort();
@@ -221,7 +244,10 @@ export interface ConfirmResult {
  * provider stays changed, the same changes are emitted a poll or two later
  * against the same baseline.
  */
-export function confirmedChanges(next: NormalizedStatus, inputs: ConfirmInputs): ConfirmResult {
+export function confirmedChanges(
+  next: NormalizedStatus,
+  inputs: ConfirmInputs,
+): ConfirmResult {
   const against = inputs.baseline ?? inputs.last;
   const changes = diff(against, next, inputs);
 
@@ -240,12 +266,18 @@ export function confirmedChanges(next: NormalizedStatus, inputs: ConfirmInputs):
   }
 
   const signature = signatureOf(next);
-  const count = inputs.pending?.signature === signature ? inputs.pending.count + 1 : 1;
-  if (count >= inputs.confirmations) return { changes, baseline: next, pending: null };
+  const count =
+    inputs.pending?.signature === signature ? inputs.pending.count + 1 : 1;
+  if (count >= inputs.confirmations)
+    return { changes, baseline: next, pending: null };
 
   // Held: the baseline stays where it is, so the next poll asks the same
   // question again rather than treating this reading as the new normal.
-  return { changes: [], baseline: inputs.baseline, pending: { signature, count } };
+  return {
+    changes: [],
+    baseline: inputs.baseline,
+    pending: { signature, count },
+  };
 }
 
 /** A provider going worse, remembered long enough to be compared with others. */
@@ -288,7 +320,9 @@ export interface CorrelationInputs {
  * The change names the worst-hit provider so routing, the delivery log and the
  * dashboard have a real subject, and carries the whole set in `correlated`.
  */
-export function correlatedOutage(inputs: CorrelationInputs): StatusChange | null {
+export function correlatedOutage(
+  inputs: CorrelationInputs,
+): StatusChange | null {
   if (!Number.isInteger(inputs.threshold) || inputs.threshold < 2) return null;
   const end = Date.parse(inputs.at);
   if (Number.isNaN(end)) return null;
@@ -300,7 +334,8 @@ export function correlatedOutage(inputs: CorrelationInputs): StatusChange | null
   for (const reading of inputs.recent) {
     const taken = Date.parse(reading.at);
     if (Number.isNaN(taken) || taken < opens || taken > end) continue;
-    if (reading.status === "unknown" || reading.status === "operational") continue;
+    if (reading.status === "unknown" || reading.status === "operational")
+      continue;
     const seen = worst.get(reading.providerId);
     if (seen === undefined || rank(reading.status) > rank(seen.status)) {
       worst.set(reading.providerId, reading);
@@ -309,7 +344,8 @@ export function correlatedOutage(inputs: CorrelationInputs): StatusChange | null
   if (worst.size < inputs.threshold) return null;
 
   const members = [...worst.values()].sort(
-    (a, b) => rank(b.status) - rank(a.status) || Date.parse(a.at) - Date.parse(b.at),
+    (a, b) =>
+      rank(b.status) - rank(a.status) || Date.parse(a.at) - Date.parse(b.at),
   );
   const [lead] = members;
   if (lead === undefined) return null;
@@ -351,18 +387,34 @@ function rank(status: OverallStatus): number {
 export function worseningsIn(changes: StatusChange[]): WorseningReading[] {
   const readings: WorseningReading[] = [];
   for (const change of changes) {
-    if (change.kind === "correlated_outage" || change.kind === "monitoring_degraded") continue;
+    if (
+      change.kind === "correlated_outage" ||
+      change.kind === "monitoring_degraded"
+    )
+      continue;
     // A page that is lying is not a page that reported trouble: counting it
     // here would let one probe's failure pull an unrelated provider into a
     // shared-failure window.
     if (change.kind === "silent_outage") continue;
-    if (change.kind === "incident_updated" || change.kind === "incident_resolved") continue;
-    if (change.kind === "maintenance_started" || change.kind === "maintenance_ended") continue;
+    if (
+      change.kind === "incident_updated" ||
+      change.kind === "incident_resolved"
+    )
+      continue;
+    if (
+      change.kind === "maintenance_started" ||
+      change.kind === "maintenance_ended"
+    )
+      continue;
     const current = change.currentStatus;
     if (current === "unknown" || current === "operational") continue;
     const previous = change.previousStatus;
     if (previous !== undefined && rank(current) <= rank(previous)) continue;
-    readings.push({ providerId: change.providerId, at: change.at, status: current });
+    readings.push({
+      providerId: change.providerId,
+      at: change.at,
+      status: current,
+    });
   }
   return readings;
 }
@@ -379,7 +431,13 @@ export interface CrossCheckInputs {
    * What the provider's own page last reported. Null when we have never read
    * it — which is not evidence of dishonesty, only of not knowing.
    */
-  page: { id: string; status: OverallStatus; openIncidents: number } | null;
+  page: {
+    id: string;
+    status: OverallStatus;
+    openIncidents: number;
+    /** Which source is the record for it — roadmap 9.1. */
+    authority?: "declared" | "observed" | undefined;
+  } | null;
   /** ISO 8601, UTC. */
   at: string;
 }
@@ -413,7 +471,11 @@ export function silentOutage(inputs: CrossCheckInputs): StatusChange | null {
     providerId: page.id,
     previousStatus: page.status,
     currentStatus: probe.status,
-    crossCheck: { probeId: probe.id, ...(probe.note === undefined ? {} : { note: probe.note }) },
+    crossCheck: {
+      probeId: probe.id,
+      ...(probe.note === undefined ? {} : { note: probe.note }),
+      ...(page.authority === undefined ? {} : { authority: page.authority }),
+    },
     at: inputs.at,
   };
 }

@@ -1,5 +1,6 @@
 import { connect as tlsConnect } from "node:tls";
 import type { Adapter, FetchContext, ReadingNote, ServiceRef } from "../core/adapter.interface.ts";
+import { USER_AGENT } from "../core/http.ts";
 import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
 
 /**
@@ -182,11 +183,19 @@ export function probeConfig(service: ServiceRef): ProbeConfig {
     throw new Error(`http probe for ${service.id}: a HEAD request downloads no body to match against`);
   }
 
-  const headers: Record<string, string> = { accept: ACCEPT };
+  // The user agent is a default, not a fixture: Node's `fetch` sends none, and
+  // a host behind a WAF answers a nameless request with 403 — a probe reading
+  // "down" for a site the operator's own browser opens. An operator who needs
+  // a different one sets `header.User-Agent`, which replaces this rather than
+  // arriving alongside it, whatever case they typed the name in.
+  const headers: Record<string, string> = { accept: ACCEPT, "user-agent": USER_AGENT };
   for (const [key, value] of Object.entries(options)) {
     if (!key.startsWith(PROBE_HEADER_PREFIX)) continue;
     const name = key.slice(PROBE_HEADER_PREFIX.length).trim();
     if (name === "") throw new Error(`http probe for ${service.id}: an option named "${key}" has no header name`);
+    for (const existing of Object.keys(headers)) {
+      if (existing !== name && existing.toLowerCase() === name.toLowerCase()) delete headers[existing];
+    }
     headers[name] = resolveEnv(value, service, key);
   }
 
@@ -226,6 +235,12 @@ export type ProbeOutcome =
        * handshake told us nothing — neither is a reason to call a service down.
        */
       tlsDaysLeft?: number | undefined;
+      /**
+       * The edge answered instead of the service: Cloudflare and friends mark a
+       * bot challenge with `cf-mitigated`, and what came back is their
+       * interstitial, not a word from the origin about its own health.
+       */
+      challenged?: boolean | undefined;
     }
   | { answered: false; reason: string };
 
@@ -235,16 +250,21 @@ export type ProbeOutcome =
  * the wrong body is down; one that answered correctly but slowly is degraded;
  * anything else is operational.
  *
- * `unknown` is never produced here. It is the honest reading for a status page
- * whose document we could not make sense of, and the dishonest one for a probe:
- * an endpoint that refuses a connection has answered the only question this
- * check asks.
+ * `unknown` comes out of exactly one case: a bot challenge. Everywhere else it
+ * would be dishonest — an endpoint that refuses a connection has answered the
+ * only question this check asks — but a challenge is the edge declining to pass
+ * the question on, so the service itself has said nothing at all.
  */
 export function severityFromOutcome(outcome: ProbeOutcome, config: ProbeConfig): OverallStatus {
   if (!outcome.answered) return "major_outage";
 
   const accepted = config.accepted.some(([from, to]) => outcome.status >= from && outcome.status <= to);
-  if (!accepted) return "major_outage";
+  // A challenge is the one answer this check cannot read as an outage. The edge
+  // refused to ask the origin, so nobody has said anything about the service —
+  // which is what `unknown` means, and why it wakes nobody. An operator who has
+  // put the status in `expectStatus` has already decided otherwise, and that
+  // decision is respected above this one.
+  if (!accepted) return outcome.challenged === true ? "unknown" : "major_outage";
 
   const body = outcome.body ?? "";
   if (config.expectBody !== undefined && !body.includes(config.expectBody)) return "major_outage";
@@ -276,6 +296,11 @@ export function noteFromOutcome(outcome: ProbeOutcome, config: ProbeConfig): Rea
 
   const accepted = config.accepted.some(([from, to]) => outcome.status >= from && outcome.status <= to);
   if (!accepted) {
+    if (outcome.challenged === true) {
+      return {
+        text: `HTTP ${outcome.status} from a bot challenge, not from the service: the edge never asked it. Probe a path the challenge skips, allow ${outcome.status} in expectStatus, or let this machine past the challenge.`,
+      };
+    }
     return { text: `answered HTTP ${outcome.status}, outside the accepted ${describe(config.accepted)}` };
   }
 
@@ -399,6 +424,9 @@ export function readingFromOutcome(
 
 export const httpAdapter: Adapter = {
   id: "http",
+  // 2: a bot challenge reads `unknown` where it used to read `major_outage`.
+  version: 2,
+  kind: "probe",
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const config = probeConfig(service);
@@ -459,6 +487,7 @@ export const httpAdapter: Adapter = {
       {
         answered: true,
         status: response.status,
+        challenged: response.headers.get("cf-mitigated") !== null,
         body,
         latencyMs,
         ...(tlsDaysLeft === null ? {} : { tlsDaysLeft }),

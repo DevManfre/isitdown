@@ -1,3 +1,5 @@
+import type { DaySegment } from "./calendarDays.ts";
+import type { PollCycle } from "./coverage.ts";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { MessageRefStore } from "../core/messageRefStore.interface.ts";
 import type { StateStore } from "../core/stateStore.interface.ts";
@@ -105,12 +107,38 @@ export interface NotificationCounts {
 }
 
 export interface DailyBucket {
-  /** UTC calendar day, `YYYY-MM-DD`. */
+  /** Calendar day in the operator's zone, `YYYY-MM-DD` — roadmap 10.7. */
   day: string;
   /** Worst status seen that day. `unknown` only when nothing better was seen. */
   worstStatus: OverallStatus;
   okSamples: number;
   totalSamples: number;
+}
+
+/**
+ * A colour a marker may be drawn in — roadmap 12.1.
+ *
+ * A closed set of token names rather than free text, because the dashboard
+ * resolves them through `chartConfig.ts` like every other chart colour. A hex
+ * value stored here would be a colour that looks right in one theme and
+ * disappears in the other, and nothing on the way in could tell.
+ */
+export const ANNOTATION_COLOURS = ["accent", "warn", "danger", "neutral"] as const;
+export type AnnotationColour = (typeof ANNOTATION_COLOURS)[number];
+
+/** One marker the operator put on the timeline — roadmap 12.1. */
+export interface Annotation {
+  id: number;
+  /** When the thing happened, as the operator states it. */
+  at: string;
+  label: string;
+  colour: AnnotationColour;
+  /**
+   * The provider this is about, or null for the whole fleet — which a deploy
+   * usually is.
+   */
+  providerId: string | null;
+  createdAt: string;
 }
 
 /** One operator note on one incident (roadmap 5.3). */
@@ -121,10 +149,47 @@ export interface IncidentNote {
 }
 
 export interface HistoryStore extends StateStore, MessageRefStore {
-  /** One row per day that has samples, oldest first. Days with none are absent. */
-  getDailyBuckets(providerId: string, days: number): Promise<DailyBucket[]>;
+  /**
+   * One row per day that has samples, oldest first. Days with none are absent.
+   *
+   * The window arrives as segments of constant UTC offset rather than as a
+   * number of days — roadmap 10.7. The store does not know what zone the
+   * operator reads in, and should not: `calendarDays.ts` turns the preference
+   * into stretches over which one fixed offset is correct, and the store
+   * aggregates each of them with it. A day cut in half by a DST transition is
+   * reported once, summed across the two segments it lies in.
+   */
+  getDailyBuckets(providerId: string, segments: readonly DaySegment[]): Promise<DailyBucket[]>;
   /** Daily buckets for one selected component, same shape as the provider's. */
-  getComponentDailyBuckets(providerId: string, componentId: string, days: number): Promise<DailyBucket[]>;
+  getComponentDailyBuckets(
+    providerId: string,
+    componentId: string,
+    segments: readonly DaySegment[],
+  ): Promise<DailyBucket[]>;
+  /**
+   * Records that a cycle finished — roadmap 10.1. The poller's own liveness,
+   * kept as its own trace so a stretch with no samples can say which kind of
+   * nothing it was.
+   */
+  recordPollCycle(cycle: PollCycle & { providers: number }): Promise<void>;
+  /** Finished cycles that started inside the window, oldest first. */
+  listPollCycles(fromIso: string, toIso: string): Promise<PollCycle[]>;
+  /**
+   * Markers between two instants, oldest first — roadmap 12.1.
+   *
+   * `providerId` widens rather than narrows: asking about one provider returns
+   * its own markers *and* the fleet-wide ones, because a deploy that broke one
+   * provider's page is exactly the marker wanted on that provider's chart.
+   * Omitting it returns everything.
+   */
+  listAnnotations(
+    fromIso: string,
+    toIso: string,
+    providerId?: string | undefined,
+  ): Promise<Annotation[]>;
+  addAnnotation(input: Omit<Annotation, "id" | "createdAt">): Promise<Annotation>;
+  /** Returns whether a row was removed, so a stale id reads 404 rather than 204. */
+  deleteAnnotation(id: number): Promise<boolean>;
   /** Every configured provider, enabled or not: its history is real either way. */
   listProviderIds(): Promise<string[]>;
   recordNotification(record: SentRecord): Promise<void>;

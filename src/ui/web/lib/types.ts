@@ -12,11 +12,7 @@
 
 /** Normalised severity vocabulary. Providers' own words are mapped onto this. */
 export type OverallStatus =
-  | "operational"
-  | "degraded"
-  | "partial_outage"
-  | "major_outage"
-  | "unknown";
+  "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown";
 
 export interface Incident {
   id: string;
@@ -62,6 +58,12 @@ export interface ProviderStatus {
   failureCount: number;
   /** ISO 8601 while the provider is muted; null when it is not. */
   mutedUntil?: string | null;
+  /**
+   * Which source is the record for this provider — roadmap 9.1. Always present
+   * and always resolved: a provider that has never said still has an answer,
+   * and the figures beside it mean different things depending on which.
+   */
+  authority: "declared" | "observed";
   uptime90: number;
   /** Running now, and windows still to come — a window that has already ended appears in neither. */
   maintenance: { active: MaintenanceWindow[]; upcoming: MaintenanceWindow[] };
@@ -123,6 +125,71 @@ export interface ProviderHistory {
   dailySeries: DayUptime[];
   /** The equal-length window before this one. null = nothing measured then. */
   previousUptime: number | null;
+  /** How much of each day the poller was running — roadmap 10.1. */
+  dailyCoverage: DayCoverage[];
+  /** The window's coverage as one number, 0 to 1. null = no day can say. */
+  coverage: number | null;
+}
+
+/**
+ * One day's worth of poller liveness — roadmap 10.1.
+ *
+ * `observed` is `null` when there is no evidence either way, which is not zero:
+ * an install that predates this trace has no cycles recorded for its past, and
+ * drawing that as an outage of ours would be a claim made out of missing data.
+ */
+/** What one channel would say about an invented transition — roadmap 14.1. */
+export interface ChannelPreview {
+  channel: string;
+  enabled: boolean;
+  locale: string;
+  templated: boolean;
+  /** Null for a channel that builds a structure of its own: see `parts`. */
+  text: string | null;
+  parts: { heading: string; detail: string; url: string };
+}
+
+export interface MessagePreview {
+  kind: string;
+  provider: string;
+  channels: ChannelPreview[];
+}
+
+/** One provider's reliability over a window — roadmap 12.2. */
+export interface ProviderReliability {
+  providerId: string;
+  incidents: number;
+  /** null when nothing in the window has been resolved — not a flawless zero. */
+  mttrMinutes: number | null;
+  resolved: number;
+  /** null with fewer than two incidents: one has nothing to be between. */
+  mtbfMinutes: number | null;
+  longestOutageMinutes: number | null;
+  downtimeMinutes: number;
+  previousIncidents: number;
+}
+
+export interface ReliabilityReport {
+  days: number;
+  providers: ProviderReliability[];
+  /** [weekday][hour] in the operator's zone, Monday first — roadmap 12.3. */
+  byWeekdayHour: number[][];
+}
+
+/** One marker the operator put on the timeline — roadmap 12.1. */
+export interface Annotation {
+  id: number;
+  at: string;
+  label: string;
+  colour: string;
+  /** null means the whole fleet, which a deploy usually is. */
+  providerId: string | null;
+  createdAt: string;
+}
+
+export interface DayCoverage {
+  day: string;
+  observed: number | null;
 }
 
 export interface ComponentHistory {
@@ -149,6 +216,9 @@ export interface HistorySummary {
   /** `uptime` null for a month with no samples: 0% would read as an outage. */
   months: { month: string; uptime: number | null }[];
   providers: ProviderHistory[];
+  /** The fleet's coverage, day by day — roadmap 10.1. */
+  dailyCoverage: DayCoverage[];
+  coverage: number | null;
 }
 
 export interface ComponentHistoryResponse {
@@ -317,6 +387,11 @@ export interface ServiceDefinition {
    * sent, on a patch, to drop the promise.
    */
   slaTarget?: number | null;
+  /**
+   * Which source is the record for this provider — roadmap 9.1. Absent means
+   * "whatever this adapter implies", which is how most providers are left.
+   */
+  authority?: "declared" | "observed" | null;
 }
 
 /** One provider's month against its target — `GET /sla` (roadmap 4.13). */
@@ -366,8 +441,16 @@ export interface TrustCardData {
   /** Present only below the floor. */
   floor?: number;
   excluded?: { maintenance: number; fleetBlind: number };
-  delay?: { medianMinutes: number; p90Minutes: number; admitted: number } | null;
-  coverage?: { observedMinutes: number; admittedMinutes: number; percent: number } | null;
+  delay?: {
+    medianMinutes: number;
+    p90Minutes: number;
+    admitted: number;
+  } | null;
+  coverage?: {
+    observedMinutes: number;
+    admittedMinutes: number;
+    percent: number;
+  } | null;
   never?: number;
   afterRecovery?: number;
   resolutionMinutes?: number;
@@ -424,7 +507,8 @@ export interface ComponentPreview {
 
 /** Mirrors `src/core/routing.ts`'s own `EventClass`/`SeverityFloor`/`RoutingRule`. */
 export type EventClass = "status" | "incident" | "maintenance" | "monitoring";
-export type SeverityFloor = "any" | "degraded" | "partial_outage" | "major_outage";
+export type SeverityFloor =
+  "any" | "degraded" | "partial_outage" | "major_outage";
 
 export interface RoutingRule {
   provider: string;
@@ -472,7 +556,8 @@ export interface RuntimeConfigResponse {
 }
 
 /** A severity floor, as the routing rules and the two floors below spell it. */
-export type SeverityFloorName = "any" | "degraded" | "partial_outage" | "major_outage";
+export type SeverityFloorName =
+  "any" | "degraded" | "partial_outage" | "major_outage";
 
 /** Quiet hours — roadmap 3.11. Mirrors `QuietHours` in `src/core/routing.ts`. */
 export interface QuietHoursPolicy {
@@ -489,7 +574,11 @@ export interface QuietHoursPolicy {
 export interface DeliveryPolicy {
   quietHours: QuietHoursPolicy;
   /** Roadmap 3.12: batch everything under the floor into one message a window. */
-  digest: { enabled: boolean; windowMinutes: number; immediateFloor: SeverityFloorName };
+  digest: {
+    enabled: boolean;
+    windowMinutes: number;
+    immediateFloor: SeverityFloorName;
+  };
   /** Roadmap 3.13: a ceiling of messages per hour, per provider. */
   cap: { enabled: boolean; maxPerHour: number };
   /** Roadmap 3.19: an incident's updates edit its first message. */
@@ -565,7 +654,11 @@ export interface AdapterDetection {
   /** Null when no adapter recognised the page. */
   adapter: string | null;
   baseUrl: string | null;
-  probes: { adapter: string; url: string; outcome: "match" | "other-shape" | "unreachable" }[];
+  probes: {
+    adapter: string;
+    url: string;
+    outcome: "match" | "other-shape" | "unreachable";
+  }[];
 }
 
 export interface AdapterProbeResult {
@@ -623,6 +716,12 @@ export interface Preferences {
   uiLocale: string;
   notificationLocale: string;
   mapView: MapView;
+  /**
+   * How tightly the fleet lists pack — roadmap 13.1. A stored preference rather
+   * than a viewport rule: it is about how many providers there are, not how big
+   * the window is.
+   */
+  density: "comfortable" | "compact";
   /** `auto` is the browser's own zone; anything else is an IANA name. */
   timeZone?: string;
 }

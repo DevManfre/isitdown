@@ -26,6 +26,12 @@ export interface SaveStatusMeta {
    * Absent when the reading came from somewhere that did not measure one.
    */
   latencyMs?: number | undefined;
+  /**
+   * Which revision of the adapter produced this reading — roadmap 10.4. See
+   * `Adapter.version` for why a sample has to carry it. Absent when the caller
+   * did not name one, which the store records as 1.
+   */
+  adapterVersion?: number | undefined;
 }
 
 /**

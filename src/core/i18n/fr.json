@@ -23,6 +23,7 @@
   "notification.monitoring.degraded": "{provider} — surveillance dégradée\n\nLectures consécutives en échec : {count}. Dernier état connu : {lastStatus}.\nMis à jour : {updatedAt}",
   "notification.correlated.outage": "{provider} — {severity}\n\n{count} fournisseurs se sont dégradés en {minutes} minutes : {providers}.\nCela ressemble à une seule panne commune plutôt qu'à {count} pannes distinctes.\n\n{url}",
   "notification.silent.outage": "{provider} — {severity}\n\nLa page d'état indique toujours {previous}, mais notre sonde {probe} n'arrive pas à joindre le service : {note}\n\n{url}",
+  "notification.silent.outage-observed": "{provider} — {severity}\n\nNotre sonde {probe} n'atteint pas le service, et pour ce fournisseur c'est notre mesure qui fait foi : {note}\n\nSa page de statut annonce toujours {previous}, ce qui ici est un avis et non la réponse.\n\n{url}",
   "notification.sla.burn": "{provider} — budget d'erreur\n\nÀ ce rythme, {month} finira à {projected}% pour un objectif de {target}%.\n{spentMinutes} des {budgetMinutes} minutes autorisées sont déjà consommées et la disponibilité mesurée jusqu'ici est de {uptime}%.\n\n{url}",
   "notification.maintenance.started": "{provider} — maintenance\n\nUne maintenance planifiée a commencé : {title}\nFin prévue : {endsAt}\nLes alertes pour ce fournisseur sont suspendues jusqu'à la fin.\n\n{url}",
   "notification.maintenance.ended": "{provider} — maintenance terminée\n\n{title} est terminée.\nÉtat actuel : {current} — incidents ouverts : {count}.\nMis à jour : {updatedAt}\n\n{url}",

@@ -70,6 +70,7 @@ notifications:
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
 | `services[].crossChecks` | — | Only on a probe (`http`, `tcp`, `dns`): the id of the provider whose status page this probe is a second opinion on — silent-outage cross-check (roadmap 1.10). When the probe cannot reach the service and that provider's page still reports operational with no open incident, the disagreement is itself an alert. Optionally narrowed to one component with the same `provider#component` form a routing rule targets (roadmap 2.9); the component half only refines what the trust card (roadmap 8.1) compares the probe against, since the silent-outage check itself is about a page claiming nothing at all is wrong. |
+| `services[].authority` | from the adapter | Which source is the record for this provider — `declared` (its own status page) or `observed` (our own reading), roadmap 9.1. Omitted is the normal case and is not a missing value: a probe (`http`, `tcp`, `dns`) reads `observed` because it *is* the reading, and everything that parses somebody's page reads `declared`. Set it only to disagree with that — a status page you have learned to distrust, or a probe you do not want treated as the record. It decides what the dashboard prints beside the adapter and how a silent-outage alert is worded, not which samples back a percentage. See [7.7](how-it-works.md#77-which-source-is-the-record). |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
 | `services[].options` | — | Adapter-specific extras. Four adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), and `http`, `tcp` and `dns` (see their own sections below). |
 
@@ -146,6 +147,7 @@ The readings this produces:
 | Accepted status and body, certificate inside `tlsWarnDays` | `degraded` |
 | Status outside the set, missing/forbidden body text | `major_outage` |
 | Refused, unresolvable, TLS rejected, or past the request timeout | `major_outage` |
+| A bot challenge (`cf-mitigated`) at a status you did not accept | `unknown` |
 
 Four things worth knowing before relying on it:
 
@@ -177,6 +179,18 @@ Four things worth knowing before relying on it:
   single-operator dashboard bound to `127.0.0.1`; it is also the reason a
   read-only API token or a public read-only page (roadmap 4.15 and 5.1) would
   have to decide who may write a service definition before either ships.
+- **a bot challenge is not an outage.** Cloudflare and friends answer a client
+  that cannot run their JavaScript with `403` and a `cf-mitigated` header — the
+  "Just a moment…" page. The edge never asked your service anything, so the
+  probe reads `unknown`, which wakes nobody, and says so in **Diagnose**. Your
+  browser opens the same URL because it solves the challenge; this container
+  cannot. Three ways out, in the order worth trying: probe a `path` the
+  challenge skips (`/robots.txt`, a health endpoint), let this machine past the
+  challenge (a WAF skip rule on its egress IP), or put the status in
+  `expectStatus` — which reads "the edge is up" and stops saying anything about
+  the service behind it. Every request this project sends names itself
+  `IsItDown (+https://github.com/devmanfre/isitdown)`, so a skip rule can match
+  on that; `header.User-Agent` replaces it when a host wants something else.
 - a wrong option (`expectStatus: 2xx`, a `${VAR}` with nothing behind it, an
   `expectBody` on a `HEAD`) throws every cycle and shows up as a failing
   provider, never as a service quietly reading down. `node dist/light/check.js
@@ -733,7 +747,57 @@ credentials: its pages render client-side and its public API answers `403` to
 anything but its own front end, so it needs the HTML-scrape adapter rather than a
 parser of its own.
 
-For a provider on none of these, add an adapter under `src/adapters/`.
+**Generic JSON (`json`)** — roadmap 11.1, and the thing to try before writing
+code. An enormous number of status pages serve perfectly good JSON in a shape
+nobody standardised: the data is stable and complete, and the only thing missing
+is somebody to say which field means what. That is what this adapter takes.
+
+```yaml
+services:
+  - name: Acme Cloud
+    id: acme
+    adapter: json
+    baseUrl: https://status.acme.example
+    options:
+      path: /api/status
+      statusPath: service.state
+      statusMap: '{"UP":"operational","DEGRADED":"degraded","PARTIAL":"partial_outage","DOWN":"major_outage"}'
+      incidentsPath: events
+      incidentId: ref
+      incidentName: title
+      incidentStatus: phase
+      incidentImpact: severity
+      incidentUpdatedAt: changedAt
+```
+
+| Option | Meaning |
+|---|---|
+| `path` | Appended to `baseUrl`. Omit when the base URL is already the document. |
+| `statusPath` | Where the overall status word is. **Required.** |
+| `statusMap` | A JSON object mapping the provider's words to `operational`, `degraded`, `partial_outage`, `major_outage` or `unknown`. **Required.** Matching ignores case and surrounding space. |
+| `incidentsPath` | An array of open incidents. Omit for a page that publishes a status and nothing else. |
+| `incidentName` | The title, *within one entry*. Required whenever `incidentsPath` is set: an entry with no name is a blank row on the timeline, so one is dropped rather than shown. |
+| `incidentId`, `incidentStatus`, `incidentImpact`, `incidentUpdatedAt` | The rest of one entry. Optional; an entry with no id of its own is identified by its position, so two reads agree about which incident is which. |
+
+A **path** is names, dots, and `[n]` for an array index — `page.status`,
+`components[0].state`. Deliberately not JSONPath: a path here is a lookup, and an
+expression language is a surface with filters, wildcards and eventually a parser
+of its own to maintain. A page that needs more than a lookup needs an adapter.
+
+Two behaviours worth knowing. A status word the table does not cover reads
+`unknown` rather than being guessed at by the word-matching heuristic the feed
+adapter uses: the operator has described this provider's vocabulary, and a gap in
+it is a thing to be *told* about. And a page reporting `operational` while
+listing an open incident reads `degraded` — it is a page mid-update, and
+reporting the calmer of the two would be reporting the one already known to be
+out of date.
+
+The mapping is validated when it is **saved**, not when it is read: `POST`/`PATCH
+/config/services` answers `400` naming each problem, and `isitdown check` reports
+them as errors. A typo in a path is a thing to fix while still looking at the
+field it was typed into.
+
+For a provider none of these fit, add an adapter under `src/adapters/`.
 
 #### Conditional requests
 

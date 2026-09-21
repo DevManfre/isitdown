@@ -23,6 +23,7 @@
   "notification.monitoring.degraded": "{provider} — monitoraggio degradato\n\nLetture consecutive fallite: {count}. Ultimo stato noto: {lastStatus}.\nAggiornato: {updatedAt}",
   "notification.correlated.outage": "{provider} — {severity}\n\n{count} provider sono peggiorati nell'arco di {minutes} minuti: {providers}.\nSembra un unico guasto condiviso, non {count} guasti distinti.\n\n{url}",
   "notification.silent.outage": "{provider} — {severity}\n\nLa pagina di stato riporta ancora {previous}, ma la nostra sonda {probe} non riesce a raggiungere il servizio: {note}\n\n{url}",
+  "notification.silent.outage-observed": "{provider} — {severity}\n\nLa nostra sonda {probe} non riesce a raggiungere il servizio, e per questo provider fa fede ciò che misuriamo noi: {note}\n\nLa sua pagina di stato riporta ancora {previous}, che qui è un'opinione e non la risposta.\n\n{url}",
   "notification.sla.burn": "{provider} — budget di errore\n\nDi questo passo {month} chiude al {projected}%, contro un obiettivo del {target}%.\nSono già stati spesi {spentMinutes} dei {budgetMinutes} minuti disponibili e l'uptime misurato finora è {uptime}%.\n\n{url}",
   "notification.maintenance.started": "{provider} — manutenzione\n\nÈ iniziata una manutenzione programmata: {title}\nFine prevista: {endsAt}\nGli avvisi per questo provider restano sospesi fino al termine.\n\n{url}",
   "notification.maintenance.ended": "{provider} — manutenzione conclusa\n\n{title} è terminata.\nStato attuale: {current} — incidenti aperti: {count}.\nAggiornato: {updatedAt}\n\n{url}",

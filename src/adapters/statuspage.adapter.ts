@@ -363,6 +363,7 @@ async function readJson(path: string, service: ServiceRef, ctx: FetchContext, la
 
 export const statuspageAdapter: Adapter = {
   id: "statuspage",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     return parseSummary(await readJson(SUMMARY_PATH, service, ctx, "statuspage fetch"), service);

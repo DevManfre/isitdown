@@ -204,6 +204,7 @@ async function readFeed(service: ServiceRef, ctx: FetchContext): Promise<string>
 
 export const rssAdapter: Adapter = {
   id: "rss",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     return parseFeedStatus(await readFeed(service, ctx), service);

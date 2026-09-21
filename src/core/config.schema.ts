@@ -10,7 +10,10 @@ import { EVENT_CLASSES, SEVERITY_FLOORS } from "./routing.ts";
 
 const slug = z
   .string()
-  .regex(/^[a-z0-9][a-z0-9-]*$/, "must be a lowercase slug: letters, digits and dashes");
+  .regex(
+    /^[a-z0-9][a-z0-9-]*$/,
+    "must be a lowercase slug: letters, digits and dashes",
+  );
 
 /**
  * What a probe cross-checks: a provider id, optionally narrowed to one of its
@@ -52,9 +55,13 @@ export const componentSelectionSchema = z
       name: z.string().trim().min(1),
     }),
   )
-  .refine((list) => new Set(list.map((component) => component.id)).size === list.length, {
-    message: "component ids must be unique",
-  });
+  .refine(
+    (list) =>
+      new Set(list.map((component) => component.id)).size === list.length,
+    {
+      message: "component ids must be unique",
+    },
+  );
 
 export const serviceDefinitionSchema = z.object({
   id: slug,
@@ -105,6 +112,17 @@ export const serviceDefinitionSchema = z.object({
    * have.
    */
   slaTarget: z.number().min(50).max(100).optional(),
+  /**
+   * Which source is the record for this provider — roadmap 9.1. `declared` is
+   * the provider's own page, `observed` is our own reading.
+   *
+   * Optional rather than defaulted, and deliberately so: absent means "whatever
+   * this adapter implies", so a probe stays `observed` and a status page stays
+   * `declared` without every row having to repeat it — and a row written today
+   * does not freeze today's rule into itself. `src/core/authority.ts` is
+   * where the rule lives; this is only where an operator overrides it.
+   */
+  authority: z.enum(["declared", "observed"]).optional(),
 });
 
 export const pollingSchema = z.object({
@@ -152,7 +170,10 @@ export const pollingSchema = z.object({
 
 export const localeSchema = z
   .string()
-  .regex(/^[a-z]{2}(-[a-z0-9]+)*$/, "must be a lowercase locale tag such as en or pt-br")
+  .regex(
+    /^[a-z]{2}(-[a-z0-9]+)*$/,
+    "must be a lowercase locale tag such as en or pt-br",
+  )
   .default("en");
 
 /**
@@ -175,7 +196,10 @@ export const localeSchema = z
  */
 const groupTarget = z
   .string()
-  .regex(/^group:[a-z0-9][a-z0-9-]*$/, "must be group: followed by a lowercase slug");
+  .regex(
+    /^group:[a-z0-9][a-z0-9-]*$/,
+    "must be group: followed by a lowercase slug",
+  );
 
 const componentTarget = z
   .string()

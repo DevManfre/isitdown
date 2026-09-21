@@ -378,6 +378,7 @@ async function readJson(path: string, service: ServiceRef, ctx: FetchContext): P
 
 export const uptimeComAdapter: Adapter = {
   id: "uptimecom",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     return parseUptimeComStatus(await readJson(AJAX_PATH, service, ctx), service);
