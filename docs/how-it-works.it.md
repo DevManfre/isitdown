@@ -287,3 +287,75 @@ timestamp restano UTC con suffisso esplicito in ogni lingua.
 - **Scritture concorrenti** — un ciclo modifica lo stato di tutti i provider insieme,
   quindi lo store su file serializza le scritture e dà a ognuna il proprio file
   temporaneo.
+
+### 7.6 Cosa significa uptime
+
+Ogni percentuale sulla dashboard — il numero in testa, la cifra per provider,
+le barre mensili, il budget SLA, il badge — è una sola frazione, calcolata in
+un solo punto (`src/ui/history.ts`) e mai ri-derivata nel browser. È questa,
+scritta perché si possa non essere d'accordo:
+
+> **L'uptime è la quota di letture nella finestra il cui stato era
+> `operational`.**
+
+Tutto ciò che segue discende da quella frase, e ogni riga è asserita da un test
+table-driven in `test/ui/uptimeDefinition.test.ts`:
+
+| Domanda | Risposta |
+| --- | --- |
+| `degraded` conta come su? | **No.** `degraded`, `partial_outage` e `major_outage` contano tutti come giù. Non c'è mezzo credito: una lettura è `operational` oppure no. |
+| Una finestra di manutenzione conta come giù? | **Sì, se durante quella il provider si dichiara degradato.** La manutenzione silenzia le *notifiche* (7.3), non riscrive le letture. Un provider che resta `operational` per tutta la propria finestra è su per tutta la finestra. |
+| Un fetch fallito conta come giù? | **No — non viene contato affatto.** Un ciclo che non è riuscito a leggere la pagina non scrive alcun campione: il guasto è del nostro monitoraggio, e registrarlo come disservizio del provider significherebbe incolpare il provider della nostra rete. Emerge invece come avviso "monitoring degraded". |
+| Una lettura `unknown` conta come giù? | **Sì**, quando ne è stata registrata una: `unknown` non è `operational`. Un giorno che contiene solo unknown è disegnato come unknown e non come disservizio, ma i suoi campioni restano al denominatore. |
+| E un giorno senza alcun campione? | **Resta fuori da entrambi i lati.** Un giorno che nessuno ha misurato non è un giorno al 100% né uno allo 0%: è disegnato come buco ed escluso dalla frazione. |
+| I giorni pesano uguale? | **No — pesano le letture.** Un giorno con 12 campioni contribuisce 12 letture, non un giorno. Un provider su cadenza più lenta pesa quindi meno al giorno, che è la lettura onesta di "quanto di ciò che abbiamo visto era buono". |
+| La cifra di flotta è media di provider o di letture? | **Di provider.** Un provider, un voto, sui provider con campioni nella finestra. Un provider interrogato più spesso non deve trascinare il numero della flotta. |
+| Cosa legge una finestra senza campioni? | **0% accanto a un conteggio campioni pari a zero**, che è il modo in cui la vista dice "mai misurato". La variazione rispetto alla finestra precedente legge `—` invece di un crollo di 92 punti. |
+| Un buco nel nostro polling lo abbassa? | **No, ed è per questo che accanto viene pubblicata la copertura** (continua sotto). |
+
+**Copertura.** Poiché un tratto in cui non girava nulla non lascia campioni,
+lascia la frazione intatta: 100% di uptime su un'ora di osservazione e 100% su
+un mese dicono la stessa cosa e significano cose molto diverse. Quindi il
+poller registra ogni ciclo concluso, un silenzio più lungo del doppio della
+cadenza a cui stava girando è un'assenza, e la quota di finestra realmente
+osservata viene riportata accanto alla percentuale — come frase sotto il numero
+in testa e come tratteggio sui giorni interessati. I giorni precedenti al primo
+ciclo mai registrato dal database riportano *nessuna risposta* invece di zero:
+non esistono prove in nessuna direzione, e disegnare il passato di
+un'installazione come un nostro disservizio sarebbe un'affermazione ricavata da
+dati mancanti.
+
+### 7.7 Quale fonte fa fede
+
+IsItDown legge status page *e* prende misure proprie (sonde HTTP, TCP e DNS).
+Sono due prodotti diversi nello stesso binario, e non concordano su cosa **sia**
+lo stato di un provider: un aggregatore riporta ciò che il provider ammette, un
+monitor riporta ciò che ha misurato. Non detta, quell'ambiguità finisce su ogni
+cifra — lo stesso 93% su una riga significa "lo dice la loro pagina" e su quella
+sotto significa "l'abbiamo misurato noi".
+
+Quindi ogni provider porta un `authority`, e la dashboard lo stampa accanto
+all'adapter:
+
+| Valore | Fa fede | Una contraddizione è |
+| --- | --- | --- |
+| `declared` | La status page del provider. | Una notizia a sé — l'avviso di disservizio silenzioso (§7.3) dice che la pagina non si è aggiornata. La parola della pagina resta ciò che lo stato del provider *è*. |
+| `observed` | La nostra misura. | La pagina è un'opinione. Lo stesso avviso scatta, formulato per dire che qui conta la nostra misura. |
+
+Il default non viene memorizzato: viene dall'adapter. Una sonda è `observed`
+perché *è* la misura; tutto ciò che legge la pagina di qualcun altro è
+`declared`. Così la regola resta una regola invece di congelare la risposta su
+ogni riga il giorno in cui è stata aggiunta — un provider che passa da sonda a
+status page vera segue la regola senza che nessuno debba ricordarsi di cambiare
+un campo. Impostare `authority` esplicitamente, in `config.yml` o dal dialog del
+provider, serve solo al caso in cui l'operatore non è d'accordo con il default:
+una status page di cui ha imparato a diffidare, o una sonda che non vuole sia
+trattata come il riferimento.
+
+Ciò che questo cambia oggi è quello che dashboard e avvisi **dicono** — il
+badge, e quale frase usa il messaggio di disservizio silenzioso. Non cambia quali
+campioni sostengono una percentuale: l'uptime di un provider `observed` è
+calcolato dai campioni di quel provider, come descrive la §7.6, perché una sonda
+e la pagina che verifica sono due provider distinti con due storie distinte.
+Fondere l'una nell'altra è un cambiamento più grande e qui deliberatamente non
+viene fatto.

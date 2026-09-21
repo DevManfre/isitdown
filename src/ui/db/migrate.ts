@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 24;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -495,6 +495,105 @@ export function migrate(db: DatabaseSync): void {
       CREATE INDEX IF NOT EXISTS idx_trust_episodes_pair_time
         ON trust_episodes (probe_id, page_id, component_id, probe_down_at);
     `);
+  }
+
+  if (from < 21) {
+    // Which revision of the adapter read this sample — roadmap 10.4. Nullable
+    // rather than defaulted to 1: an existing row was written before any
+    // adapter declared a version, and "1" there would be a claim nobody made.
+    // A null reads as "unknown revision", which is the honest answer and the
+    // one an uptime figure spanning the seam has to be able to say.
+    const sampleColumns = (db.prepare("PRAGMA table_info(status_samples)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!sampleColumns.includes("adapter_version")) {
+      db.exec("ALTER TABLE status_samples ADD COLUMN adapter_version INTEGER");
+    }
+    // Existence-checked, unlike the table above: `component_samples` is created
+    // by the step below rather than by the base schema, so a database old
+    // enough to predate it reaches here without one.
+    const hasComponentSamples =
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'component_samples'")
+        .all().length > 0;
+    if (hasComponentSamples) {
+      const componentColumns = (
+        db.prepare("PRAGMA table_info(component_samples)").all() as { name: string }[]
+      ).map((column) => column.name);
+      if (!componentColumns.includes("adapter_version")) {
+        db.exec("ALTER TABLE component_samples ADD COLUMN adapter_version INTEGER");
+      }
+    }
+  }
+
+  if (from < 22) {
+    // Poller liveness as a trace of its own — roadmap 10.1. Until now a stretch
+    // where nothing was running left no mark at all: the samples are simply
+    // absent, and absent reads as "nothing bad happened" on a bar and as a hole
+    // in a line, depending on which query asked. One row per finished cycle is
+    // what lets a gap be named as a gap.
+    //
+    // `interval_minutes` is stored rather than read from today's configuration
+    // because it is what decides how long a silence has to be before it is an
+    // outage of ours, and the cadence the operator has since changed says
+    // nothing about a cycle that ran under the old one.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS poll_cycles (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        started_at      TEXT NOT NULL,
+        finished_at     TEXT NOT NULL,
+        interval_minutes REAL NOT NULL,
+        providers       INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_poll_cycles_started ON poll_cycles (started_at);
+    `);
+  }
+
+  if (from < 23) {
+    // The operator's own timeline markers — roadmap 12.1. "We deployed at
+    // 14:05" is the one thing on a chart IsItDown can never observe, and it is
+    // the difference between "Cloudflare had a bad afternoon" and "our release
+    // did", which is the question actually being asked during an incident.
+    //
+    // `provider_id` is nullable and carries no foreign key on purpose: a
+    // deploy is usually about the whole fleet, and a marker that named a
+    // provider would vanish with it — which is wrong, because the note about
+    // the afternoon outlives the decision to stop watching that page.
+    //
+    // `colour` is a token name, never a hex value: the dashboard resolves it
+    // through `chartConfig.ts` like every other chart colour, so a marker is
+    // legible in both themes and cannot be set to something invisible.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS annotations (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        at          TEXT NOT NULL,
+        label       TEXT NOT NULL,
+        colour      TEXT NOT NULL,
+        provider_id TEXT,
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_annotations_at ON annotations (at);
+    `);
+  }
+
+  if (from < 24) {
+    // Which source is the record for this provider — roadmap 9.1. A column
+    // beside `group_name`, `cross_checks` and `sla_target` for the same reason
+    // all three are one: it is a fact the provider carries, written identically
+    // in the Light edition's `config.yml`, and a table would let the two
+    // editions describe one fact two ways.
+    //
+    // Nullable and left null on every existing row: absent means "whatever this
+    // adapter implies" (`src/adapters/authority.ts`), so a probe reads
+    // `observed` and a status page reads `declared` without anybody being
+    // migrated into an answer they did not give — and the rule stays a rule
+    // rather than being frozen onto rows the day it was written.
+    const columns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!columns.includes("authority")) {
+      db.exec("ALTER TABLE services ADD COLUMN authority TEXT");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

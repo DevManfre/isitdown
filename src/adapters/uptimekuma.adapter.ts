@@ -314,6 +314,7 @@ async function readPage(service: ServiceRef, ctx: FetchContext): Promise<[string
 
 export const uptimeKumaAdapter: Adapter = {
   id: "uptimekuma",
+  version: 1,
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const [page, heartbeat] = await readPage(service, ctx);

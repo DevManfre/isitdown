@@ -1,6 +1,7 @@
 import type { ChatHistory, ChatopsBackend, ChatProvider } from "../core/chatops/backend.interface.ts";
 import { handleMessage } from "../core/chatops/execute.ts";
 import { isActive } from "../core/maintenance.ts";
+import { offsetSegments, resolveZone, shiftDay, zonedDayKey } from "./calendarDays.ts";
 import type { MaintenanceWindow } from "../core/types.ts";
 import { createTelegramBot, type TelegramBot } from "../notifiers/telegram.bot.ts";
 import { updateService } from "./dbConfigSource.ts";
@@ -35,11 +36,18 @@ export function createChatopsBackend(runtime: UiRuntimeCore): ChatopsBackend {
       const now = new Date();
       const serverNow = now.toISOString();
       const services = runtime.listAllServices().filter((service) => service.enabled);
+      // The same 90 days the dashboard's headline covers, cut into the operator's
+      // own calendar days (roadmap 10.7) so a reply in chat and the History view
+      // cannot disagree about where a day ends. Built once for the whole fleet:
+      // the window is the same for every provider.
+      const zone = resolveZone(runtime.timeZone());
+      const today = zonedDayKey(now, zone);
+      const segments = offsetSegments(shiftDay(today, -89), today, zone);
       return Promise.all(
         services.map(async (service): Promise<ChatProvider> => {
           const state = await runtime.store.getState(service.id);
           const last = state.last;
-          const history = await runtime.store.getDailyBuckets(service.id, 90).catch(() => []);
+          const history = await runtime.store.getDailyBuckets(service.id, segments).catch(() => []);
           const totals = history.reduce(
             (sum, bucket) => ({
               ok: sum.ok + bucket.okSamples,

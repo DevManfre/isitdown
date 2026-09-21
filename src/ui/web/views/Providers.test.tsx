@@ -1,4 +1,8 @@
-import { screen, waitForElementToBeRemoved, within } from "@testing-library/react";
+import {
+  screen,
+  waitForElementToBeRemoved,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
@@ -10,7 +14,11 @@ const status = {
   providers: [
     providerFixture(),
     providerFixture({ id: "cf", name: "Cloudflare" }),
-    providerFixture({ id: "discord", name: "Discord", overallStatus: "major_outage" }),
+    providerFixture({
+      id: "discord",
+      name: "Discord",
+      overallStatus: "major_outage",
+    }),
   ],
   pollIntervalMinutes: 5,
   lastPollAt: null,
@@ -19,7 +27,9 @@ const status = {
 const history = {
   aggregateUptime: 99,
   months: [],
-  providers: [{ providerId: "github", buckets: [], uptime90: 99.9, incidentCount: 2 }],
+  providers: [
+    { providerId: "github", buckets: [], uptime90: 99.9, incidentCount: 2 },
+  ],
 };
 
 // Every fixture provider shares one baseUrl, so the host line the provider
@@ -31,7 +41,12 @@ const renderedOrder = (): string[] =>
   screen
     .getAllByRole("row")
     .slice(1)
-    .map((row) => (within(row).getAllByRole("cell")[1]?.textContent ?? "").replace(HOST, ""));
+    .map((row) =>
+      (within(row).getAllByRole("cell")[1]?.textContent ?? "").replace(
+        HOST,
+        "",
+      ),
+    );
 
 /** Clicks a column header, which is the data table's sort control. */
 const sortBy = (user: ReturnType<typeof userEvent.setup>, columnKey: string) =>
@@ -51,29 +66,50 @@ describe("Providers", () => {
   it("renders one row per configured provider", async () => {
     renderWithProviders(<Providers />, { status, history });
     expect(await (await inTable()).findByText("GitHub")).toBeInTheDocument();
-    expect(await (await inTable()).findByText("Cloudflare")).toBeInTheDocument();
+    expect(
+      await (await inTable()).findByText("Cloudflare"),
+    ).toBeInTheDocument();
   });
 
   it("is read-only: no edit or remove control lives here", async () => {
     renderWithProviders(<Providers />, { status, history });
     await (await inTable()).findByText("GitHub");
-    expect(screen.queryByRole("button", { name: i18n.t("action.edit") })).toBeNull();
-    expect(screen.queryByRole("button", { name: i18n.t("action.remove") })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: i18n.t("action.edit") }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: i18n.t("action.remove") }),
+    ).toBeNull();
   });
 
   it("labels every column from the catalog", async () => {
     renderWithProviders(<Providers />, { status, history });
-    for (const key of ["column.provider", "column.adapter", "column.status", "column.uptime", "column.incidents"]) {
-      expect(await (await inTable()).findByText(i18n.t(key))).toBeInTheDocument();
+    for (const key of [
+      "column.provider",
+      "column.adapter",
+      "column.status",
+      "column.uptime",
+      "column.incidents",
+    ]) {
+      expect(
+        await (await inTable()).findByText(i18n.t(key)),
+      ).toBeInTheDocument();
     }
   });
 
   it("shows the empty state with no providers", async () => {
     renderWithProviders(<Providers />, {
-      status: { providers: [], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+      status: {
+        providers: [],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
       history: { aggregateUptime: 0, months: [], providers: [] },
     });
-    expect(await screen.findByText(i18n.t("providers.empty"))).toBeInTheDocument();
+    expect(
+      await screen.findByText(i18n.t("providers.empty")),
+    ).toBeInTheDocument();
   });
 
   // A disabled provider is not being polled, so every figure this table carries
@@ -123,13 +159,21 @@ describe("Providers", () => {
       history,
     });
 
-    const githubRow = (await (await inTable()).findByText("GitHub")).closest("tr");
+    const githubRow = (await (await inTable()).findByText("GitHub")).closest(
+      "tr",
+    );
     expect(githubRow).not.toBeNull();
-    expect(within(githubRow!).getByText(i18n.t("provider.maintenance.badge"))).toBeInTheDocument();
+    expect(
+      within(githubRow!).getByText(i18n.t("provider.maintenance.badge")),
+    ).toBeInTheDocument();
 
-    const cfRow = (await (await inTable()).findByText("Cloudflare")).closest("tr");
+    const cfRow = (await (await inTable()).findByText("Cloudflare")).closest(
+      "tr",
+    );
     expect(cfRow).not.toBeNull();
-    expect(within(cfRow!).queryByText(i18n.t("provider.maintenance.badge"))).toBeNull();
+    expect(
+      within(cfRow!).queryByText(i18n.t("provider.maintenance.badge")),
+    ).toBeNull();
   });
 
   // An upcoming window is not running yet — the badge says "running now",
@@ -162,7 +206,9 @@ describe("Providers", () => {
     });
 
     await (await inTable()).findByText("GitHub");
-    expect((await inTable()).queryByText(i18n.t("provider.maintenance.badge"))).toBeNull();
+    expect(
+      (await inTable()).queryByText(i18n.t("provider.maintenance.badge")),
+    ).toBeNull();
   });
 
   // No test above asserts rendered copy against anything but t() itself,
@@ -172,11 +218,23 @@ describe("Providers", () => {
   // proves the cell reads history's uptime90, not the status one.
   it("renders the literal uptime percentage from history, not the status uptime90", async () => {
     renderWithProviders(<Providers />, {
-      status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+      status: {
+        providers: [providerFixture()],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
       history: {
         aggregateUptime: 87.65,
         months: [],
-        providers: [{ providerId: "github", buckets: [], uptime90: 87.65, incidentCount: 0 }],
+        providers: [
+          {
+            providerId: "github",
+            buckets: [],
+            uptime90: 87.65,
+            incidentCount: 0,
+          },
+        ],
       },
     });
     expect(await (await inTable()).findByText("87.65%")).toBeInTheDocument();
@@ -187,10 +245,13 @@ describe("Providers", () => {
   // the delay value is caught, not just "some animation exists".
   it("starts the table after the intro and steps each row 30ms further", async () => {
     renderWithProviders(<Providers />, { status, history });
-    const first = (await (await inTable()).findByText("GitHub")).closest("tr");
-    const second = (await (await inTable()).findByText("Cloudflare")).closest("tr");
-    expect(first).not.toBeNull();
-    expect(second).not.toBeNull();
+    await (await inTable()).findByText("GitHub");
+    // By position rather than by name: the cascade is about the first two rows
+    // the operator sees, and which providers those are is the default sort's
+    // business (roadmap 13.1), not this test's.
+    const [, first, second] = screen.getAllByRole("row");
+    expect(first).not.toBeUndefined();
+    expect(second).not.toBeUndefined();
     expect(first).toHaveStyle({ animationDelay: "90ms" });
     expect(second).toHaveStyle({ animationDelay: "120ms" });
   });
@@ -215,8 +276,12 @@ describe("Providers", () => {
   // intro line. Catalog keys filter.all / filter.issues already exist.
   it("renders the all/issues filter defaulting to all", async () => {
     renderWithProviders(<Providers />, { status, history });
-    const allButton = await screen.findByRole("button", { name: i18n.t("filter.all") });
-    const issuesButton = await screen.findByRole("button", { name: i18n.t("filter.issues") });
+    const allButton = await screen.findByRole("button", {
+      name: i18n.t("filter.all"),
+    });
+    const issuesButton = await screen.findByRole("button", {
+      name: i18n.t("filter.issues"),
+    });
     expect(allButton).toHaveAttribute("aria-pressed", "true");
     expect(issuesButton).toHaveAttribute("aria-pressed", "false");
   });
@@ -225,14 +290,22 @@ describe("Providers", () => {
     const user = userEvent.setup();
     renderWithProviders(<Providers />, { status, history });
     await (await inTable()).findByText("GitHub");
-    await user.click(screen.getByRole("button", { name: i18n.t("filter.issues") }));
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("filter.issues") }),
+    );
     // The dropped rows animate out first (see below), so they leave the DOM a
     // beat later rather than on the click itself.
-    await waitForElementToBeRemoved(() => within(screen.getByRole("table")).queryByText("GitHub"));
+    await waitForElementToBeRemoved(() =>
+      within(screen.getByRole("table")).queryByText("GitHub"),
+    );
     expect((await inTable()).queryByText("Cloudflare")).toBeNull();
     expect(await (await inTable()).findByText("Discord")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: i18n.t("filter.issues") })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: i18n.t("filter.all") })).toHaveAttribute("aria-pressed", "false");
+    expect(
+      screen.getByRole("button", { name: i18n.t("filter.issues") }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: i18n.t("filter.all") }),
+    ).toHaveAttribute("aria-pressed", "false");
   });
 
   // The entry animation was one-sided: rows rose in on a filter change and
@@ -242,16 +315,21 @@ describe("Providers", () => {
     const user = userEvent.setup();
     renderWithProviders(<Providers />, { status, history });
     await (await inTable()).findByText("GitHub");
-    await user.click(screen.getByRole("button", { name: i18n.t("filter.issues") }));
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("filter.issues") }),
+    );
 
     const leaving = (await inTable()).getByText("GitHub").closest("tr");
-    if (leaving === null) throw new Error("expected the dropped provider to still have a row");
+    if (leaving === null)
+      throw new Error("expected the dropped provider to still have a row");
     expect(leaving).toHaveClass("anim-sink");
     expect(leaving).not.toHaveClass("anim-rise");
     // No stagger on the way out: every dropped row goes at once.
     expect(leaving).toHaveStyle({ animationDelay: "0ms" });
 
-    await waitForElementToBeRemoved(() => within(screen.getByRole("table")).queryByText("GitHub"));
+    await waitForElementToBeRemoved(() =>
+      within(screen.getByRole("table")).queryByText("GitHub"),
+    );
   });
 
   // Coming back to "all" must not leave the outgoing rows stuck mid-fade: the
@@ -260,8 +338,12 @@ describe("Providers", () => {
     const user = userEvent.setup();
     renderWithProviders(<Providers />, { status, history });
     await (await inTable()).findByText("GitHub");
-    await user.click(screen.getByRole("button", { name: i18n.t("filter.issues") }));
-    await user.click(screen.getByRole("button", { name: i18n.t("filter.all") }));
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("filter.issues") }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: i18n.t("filter.all") }),
+    );
 
     const row = (await (await inTable()).findByText("GitHub")).closest("tr");
     expect(row).toHaveClass("anim-rise");
@@ -273,7 +355,9 @@ describe("Providers", () => {
   it("clicking the already-active filter option is a no-op", async () => {
     const user = userEvent.setup();
     renderWithProviders(<Providers />, { status, history });
-    const allButton = await screen.findByRole("button", { name: i18n.t("filter.all") });
+    const allButton = await screen.findByRole("button", {
+      name: i18n.t("filter.all"),
+    });
     await user.click(allButton);
     expect(allButton).toHaveAttribute("aria-pressed", "true");
     expect(await (await inTable()).findByText("GitHub")).toBeInTheDocument();
@@ -286,11 +370,20 @@ describe("Providers", () => {
   // makes /status fail with nothing to show yet.
   it("shows the load-failed message instead of the empty state when /status fails", async () => {
     renderWithProviders(<Providers />, {
-      status: { providers: [], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+      status: {
+        providers: [],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
       history,
       errors: { status: 500 },
     });
-    expect(await screen.findByText(i18n.t("error.load-failed", { error: "HTTP 500" }))).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        i18n.t("error.load-failed", { error: "HTTP 500" }),
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText(i18n.t("providers.empty"))).toBeNull();
   });
 
@@ -321,20 +414,46 @@ describe("Providers", () => {
       provider: "anthropic",
       days: 90,
       components: [
-        { componentId: "api", name: "API", buckets: [], uptime7: 100, uptime30: 100, uptime90: 99.4, sampleCount: 12 },
-        { componentId: "console", name: "Console", buckets: [], uptime7: 0, uptime30: 0, uptime90: 0, sampleCount: 0 },
+        {
+          componentId: "api",
+          name: "API",
+          buckets: [],
+          uptime7: 100,
+          uptime30: 100,
+          uptime90: 99.4,
+          sampleCount: 12,
+        },
+        {
+          componentId: "console",
+          name: "Console",
+          buckets: [],
+          uptime7: 0,
+          uptime30: 0,
+          uptime90: 0,
+          sampleCount: 0,
+        },
       ],
     };
-    const fixtures = { status: statusWithComponents, history, componentHistory };
+    const fixtures = {
+      status: statusWithComponents,
+      history,
+      componentHistory,
+    };
 
     /** Every path the stubbed fetch has been asked for so far. */
     const fetched = (): string[] =>
-      (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.map((call) => String(call[0]));
+      (
+        globalThis.fetch as unknown as { mock: { calls: unknown[][] } }
+      ).mock.calls.map((call) => String(call[0]));
 
-    const toggles = () => screen.queryAllByRole("button", { name: i18n.t("providers.components-toggle") });
+    const toggles = () =>
+      screen.queryAllByRole("button", {
+        name: i18n.t("providers.components-toggle"),
+      });
 
     /** The panel a chevron controls, read off the control itself. */
-    const panelIdOf = (toggle: HTMLElement): string => toggle.getAttribute("aria-controls") ?? "";
+    const panelIdOf = (toggle: HTMLElement): string =>
+      toggle.getAttribute("aria-controls") ?? "";
 
     it("offers an expand control only for a provider that monitors components", async () => {
       renderWithProviders(<Providers />, fixtures);
@@ -359,7 +478,9 @@ describe("Providers", () => {
       // The component's own 90-day uptime, not the provider's.
       expect((await inTable()).getByText("99.40%")).toBeInTheDocument();
       // Never sampled is not 0% uptime.
-      expect((await inTable()).getByText(i18n.t("components.never-measured"))).toBeInTheDocument();
+      expect(
+        (await inTable()).getByText(i18n.t("components.never-measured")),
+      ).toBeInTheDocument();
     });
 
     // The breakdown costs a request, so it must not be paid for on load for
@@ -368,11 +489,15 @@ describe("Providers", () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, fixtures);
       await (await inTable()).findByText("Anthropic");
-      expect(fetched().filter((path) => path.startsWith("/history/components"))).toHaveLength(0);
+      expect(
+        fetched().filter((path) => path.startsWith("/history/components")),
+      ).toHaveLength(0);
 
       await user.click(toggles()[0]!);
       await (await inTable()).findByText("API");
-      const breakdowns = fetched().filter((path) => path.startsWith("/history/components"));
+      const breakdowns = fetched().filter((path) =>
+        path.startsWith("/history/components"),
+      );
       expect(breakdowns).toHaveLength(1);
       expect(breakdowns[0]).toContain("provider=anthropic");
     });
@@ -407,7 +532,9 @@ describe("Providers", () => {
       expect(toggles()[0]).toHaveAttribute("aria-expanded", "false");
       // Gone once the fold has played, the way a filtered-out row is gone once
       // `.anim-sink` has.
-      await waitForElementToBeRemoved(() => within(screen.getByRole("table")).queryByText("API"));
+      await waitForElementToBeRemoved(() =>
+        within(screen.getByRole("table")).queryByText("API"),
+      );
     });
 
     // The open was choreographed and the close was a cut: the panel went in a
@@ -421,14 +548,17 @@ describe("Providers", () => {
       await user.click(toggles()[0]!);
       await (await inTable()).findByText("API");
       const panel = document.getElementById(panelIdOf(toggles()[0]!));
-      if (panel === null) throw new Error("expected the chevron to have opened a panel");
+      if (panel === null)
+        throw new Error("expected the chevron to have opened a panel");
       expect(panel.querySelector(".anim-unfold")).not.toBeNull();
 
       await user.click(toggles()[0]!);
       expect(panel.querySelector(".anim-fold")).not.toBeNull();
       expect(panel.querySelector(".anim-unfold")).toBeNull();
 
-      await waitForElementToBeRemoved(() => within(screen.getByRole("table")).queryByText("API"));
+      await waitForElementToBeRemoved(() =>
+        within(screen.getByRole("table")).queryByText("API"),
+      );
     });
 
     // Two providers open at once: comparing a degraded provider against a
@@ -444,7 +574,9 @@ describe("Providers", () => {
       await user.click(toggles()[0]!);
       await (await inTable()).findByText("API");
 
-      expect((await inTable()).queryByText(i18n.t("components.rows-title"))).toBeNull();
+      expect(
+        (await inTable()).queryByText(i18n.t("components.rows-title")),
+      ).toBeNull();
       const panel = document.getElementById(panelIdOf(toggles()[0]!));
       expect(panel).toHaveClass("hover:bg-transparent");
     });
@@ -502,11 +634,13 @@ describe("Providers", () => {
   // header is a sort control: clicking one re-orders the rows client-side.
   // These pin the order an operator reads, not the sorting state object.
   describe("sorting", () => {
-    it("sorts by provider name, reverses, then returns to the configured order", async () => {
+    it("sorts by provider name, reverses, then returns to problems first", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, { status, history });
       await (await inTable()).findByText("GitHub");
-      expect(renderedOrder()).toEqual(["GitHub", "Cloudflare", "Discord"]);
+      // Roadmap 13.1: the default is worst first, then alphabetical among
+      // equals — Discord is in major outage, the other two are operational.
+      expect(renderedOrder()).toEqual(["Discord", "Cloudflare", "GitHub"]);
 
       await sortBy(user, "column.provider");
       expect(renderedOrder()).toEqual(["Cloudflare", "Discord", "GitHub"]);
@@ -514,10 +648,11 @@ describe("Providers", () => {
       await sortBy(user, "column.provider");
       expect(renderedOrder()).toEqual(["GitHub", "Discord", "Cloudflare"]);
 
-      // Third click drops the sort rather than cycling back to ascending, so
-      // the configured order stays reachable.
+      // Third click drops the sort rather than cycling back to ascending — and
+      // what it drops back to is the default the view promises, not the order
+      // the providers happen to be configured in.
       await sortBy(user, "column.provider");
-      expect(renderedOrder()).toEqual(["GitHub", "Cloudflare", "Discord"]);
+      expect(renderedOrder()).toEqual(["Discord", "Cloudflare", "GitHub"]);
     });
 
     // Status has to sort by how bad it is, not by its label: alphabetically
@@ -529,8 +664,16 @@ describe("Providers", () => {
         status: {
           providers: [
             providerFixture({ id: "github", name: "GitHub" }),
-            providerFixture({ id: "cf", name: "Cloudflare", overallStatus: "degraded" }),
-            providerFixture({ id: "discord", name: "Discord", overallStatus: "major_outage" }),
+            providerFixture({
+              id: "cf",
+              name: "Cloudflare",
+              overallStatus: "degraded",
+            }),
+            providerFixture({
+              id: "discord",
+              name: "Discord",
+              overallStatus: "major_outage",
+            }),
           ],
           pollIntervalMinutes: 5,
           lastPollAt: null,
@@ -565,9 +708,19 @@ describe("Providers", () => {
           aggregateUptime: 70,
           months: [],
           providers: [
-            { providerId: "github", buckets: [], uptime90: 100, incidentCount: 0 },
+            {
+              providerId: "github",
+              buckets: [],
+              uptime90: 100,
+              incidentCount: 0,
+            },
             { providerId: "cf", buckets: [], uptime90: 9.5, incidentCount: 0 },
-            { providerId: "discord", buckets: [], uptime90: 99.9, incidentCount: 0 },
+            {
+              providerId: "discord",
+              buckets: [],
+              uptime90: 99.9,
+              incidentCount: 0,
+            },
           ],
         },
       });
@@ -596,8 +749,16 @@ describe("Providers", () => {
       renderWithProviders(<Providers />, {
         status: {
           providers: [
-            providerFixture({ id: "github", name: "GitHub", adapter: "statuspage" }),
-            providerFixture({ id: "cf", name: "Cloudflare", adapter: "atlassian" }),
+            providerFixture({
+              id: "github",
+              name: "GitHub",
+              adapter: "statuspage",
+            }),
+            providerFixture({
+              id: "cf",
+              name: "Cloudflare",
+              adapter: "atlassian",
+            }),
           ],
           pollIntervalMinutes: 5,
           lastPollAt: null,
@@ -617,7 +778,10 @@ describe("Providers", () => {
       const user = userEvent.setup();
       renderWithProviders(<Providers />, { status, history });
       await (await inTable()).findByText("GitHub");
-      const header = () => screen.getByRole("button", { name: i18n.t("column.provider") }).closest("th");
+      const header = () =>
+        screen
+          .getByRole("button", { name: i18n.t("column.provider") })
+          .closest("th");
 
       expect(header()).toHaveAttribute("aria-sort", "none");
       await sortBy(user, "column.provider");
@@ -625,5 +789,50 @@ describe("Providers", () => {
       await sortBy(user, "column.provider");
       expect(header()).toHaveAttribute("aria-sort", "descending");
     });
+  });
+});
+
+describe("a fleet large enough to be a problem", () => {
+  const many = (count: number) =>
+    Array.from({ length: count }, (_, index) =>
+      providerFixture({
+        id: `p${index}`,
+        name: `Provider ${String(index).padStart(3, "0")}`,
+        // One provider in ten is in trouble, the rest are fine — the shape the
+        // default sort exists for.
+        overallStatus: index % 10 === 3 ? "major_outage" : "operational",
+      }),
+    );
+
+  it("leads with the providers in trouble rather than with the alphabet", async () => {
+    renderWithProviders(<Providers />, {
+      status: { ...status, providers: many(30) },
+      history,
+    });
+    await (await inTable()).findByText("Provider 003");
+    // Alphabetical order would put "Provider 000" first and bury the three
+    // that are down at rows 4, 14 and 24.
+    expect(renderedOrder()[0]).toContain("Provider 003");
+  });
+
+  it("offers the density toggle only once the fleet is big enough for it to matter", async () => {
+    renderWithProviders(<Providers />, {
+      status: { ...status, providers: many(4) },
+      history,
+    });
+    await (await inTable()).findByText("Provider 000");
+    // A control that changes nothing worth seeing teaches the operator to
+    // ignore the row it sits in.
+    expect(screen.queryByText(i18n.t("density.compact"))).toBeNull();
+  });
+
+  it("shows the density toggle on a fleet past a dozen", async () => {
+    renderWithProviders(<Providers />, {
+      status: { ...status, providers: many(30) },
+      history,
+    });
+    expect(
+      await screen.findByText(i18n.t("density.compact")),
+    ).toBeInTheDocument();
   });
 });

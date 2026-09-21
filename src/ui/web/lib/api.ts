@@ -1,5 +1,6 @@
 import type {
   AdapterDebugResponse,
+  Annotation,
   AdapterDetection,
   AdapterProbeResult,
   CatalogProvider,
@@ -19,7 +20,9 @@ import type {
   MapResponse,
   OverallStatus,
   Preferences,
+  MessagePreview,
   ProviderCalendar,
+  ReliabilityReport,
   SlaResponse,
   TrustResponse,
   ProviderHistory,
@@ -43,16 +46,24 @@ import type { PushSubscriptionBody } from "./push.ts";
  * routes like `/incidents/github/xyz`, where a relative `./status` would
  * resolve against the wrong base.
  */
-async function request<T>(method: string, path: string, body?: unknown, contentType?: string): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  contentType?: string,
+): Promise<T> {
   const response = await fetch(path, {
     method,
     ...(body === undefined
       ? {}
       : contentType === undefined
-        ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }
-        // The config import sends the file's own bytes (roadmap 4.3), so the
-        // body is text and the type says which text it is.
-        : { headers: { "content-type": contentType }, body: String(body) }),
+        ? {
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          }
+        : // The config import sends the file's own bytes (roadmap 4.3), so the
+          // body is text and the type says which text it is.
+          { headers: { "content-type": contentType }, body: String(body) }),
   });
   const text = await response.text();
   // A non-JSON body (an empty string, an upstream proxy's HTML error page, a
@@ -68,7 +79,8 @@ async function request<T>(method: string, path: string, body?: unknown, contentT
     }
   }
   if (!response.ok) {
-    const message = (payload as { error?: { message?: string } })?.error?.message;
+    const message = (payload as { error?: { message?: string } })?.error
+      ?.message;
     throw new Error(message ?? `HTTP ${response.status}`);
   }
   return payload as T;
@@ -76,10 +88,13 @@ async function request<T>(method: string, path: string, body?: unknown, contentT
 
 export const getStatus = () => request<StatusResponse>("GET", "/status");
 export const pollNow = () =>
-  request<{ providers: number; failed: number; changes: number; startedAt: string; finishedAt: string }>(
-    "POST",
-    "/poll",
-  );
+  request<{
+    providers: number;
+    failed: number;
+    changes: number;
+    startedAt: string;
+    finishedAt: string;
+  }>("POST", "/poll");
 
 /**
  * The window a history request asks for: one of the fixed spans, or an
@@ -109,18 +124,66 @@ export const getHistory = (
       : `from=${window.range.from}&to=${window.range.to}`;
   return provider === undefined
     ? request<HistorySummary>("GET", `/history?${span}`)
-    : request<ProviderHistory>("GET", `/history?${span}&provider=${encodeURIComponent(provider)}`);
+    : request<ProviderHistory>(
+        "GET",
+        `/history?${span}&provider=${encodeURIComponent(provider)}`,
+      );
 };
+
+/**
+ * The operator's own markers over the same window — roadmap 12.1.
+ *
+ * A second request rather than a field on the history payload: markers change
+ * when somebody writes one, history changes when the poller runs, and folding
+ * them together would make every added marker re-fetch ninety days of buckets.
+ */
+export const getAnnotations = (window: HistoryWindow, provider?: string) => {
+  const span =
+    window.range === undefined
+      ? `days=${window.days}`
+      : `from=${window.range.from}&to=${window.range.to}`;
+  const scope =
+    provider === undefined ? "" : `&provider=${encodeURIComponent(provider)}`;
+  return request<{ annotations: Annotation[] }>(
+    "GET",
+    `/annotations?${span}${scope}`,
+  );
+};
+
+export const addAnnotation = (input: {
+  at: string;
+  label: string;
+  colour: string;
+  providerId?: string | undefined;
+}) => request<Annotation>("POST", "/annotations", input);
+
+export const deleteAnnotation = (id: number) =>
+  request<void>("DELETE", `/annotations/${id}`);
 
 /** A year of day cells for one provider — roadmap 5.20. The window is the server's. */
 export const getProviderCalendar = (provider: string) =>
-  request<ProviderCalendar>("GET", `/history/calendar?provider=${encodeURIComponent(provider)}`);
+  request<ProviderCalendar>(
+    "GET",
+    `/history/calendar?provider=${encodeURIComponent(provider)}`,
+  );
+
+/** What every configured channel would say — roadmap 14.1. Sends nothing. */
+export const getMessagePreview = (kind: string) =>
+  request<MessagePreview>(
+    "GET",
+    `/notifications/preview?kind=${encodeURIComponent(kind)}`,
+  );
+
+/** Per-provider MTTR and MTBF, and incidents by weekday and hour — roadmap 12.2, 12.3. */
+export const getReliability = (days: number) =>
+  request<ReliabilityReport>("GET", `/reliability?days=${days}`);
 
 /** Monthly targets and what the month has spent of them — roadmap 4.13. */
 export const getSla = () => request<SlaResponse>("GET", "/sla");
 
 /** Status-page accuracy per cross-checked pair — roadmap 8.1. */
-export const getTrust = (days: number) => request<TrustResponse>("GET", `/trust?days=${days}`);
+export const getTrust = (days: number) =>
+  request<TrustResponse>("GET", `/trust?days=${days}`);
 
 export const getComponentHistory = (provider: string, days: number) =>
   request<ComponentHistoryResponse>(
@@ -150,7 +213,10 @@ export const getIncidents = (query: IncidentListQuery = {}) => {
     if (value !== undefined) params.set(key, String(value));
   }
   const search = params.toString();
-  return request<IncidentsResponse>("GET", `/incidents${search === "" ? "" : `?${search}`}`);
+  return request<IncidentsResponse>(
+    "GET",
+    `/incidents${search === "" ? "" : `?${search}`}`,
+  );
 };
 
 export const getIncident = (providerId: string, incidentId: string) =>
@@ -163,14 +229,22 @@ export const getIncident = (providerId: string, incidentId: string) =>
  * An operator's note on one incident (roadmap 5.3) — the one thing about an
  * incident nothing here can observe.
  */
-export const addIncidentNote = (providerId: string, incidentId: string, body: string) =>
+export const addIncidentNote = (
+  providerId: string,
+  incidentId: string,
+  body: string,
+) =>
   request<IncidentNote>(
     "POST",
     `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/notes`,
     { body },
   );
 
-export const deleteIncidentNote = (providerId: string, incidentId: string, id: number) =>
+export const deleteIncidentNote = (
+  providerId: string,
+  incidentId: string,
+  id: number,
+) =>
   request<void>(
     "DELETE",
     `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/notes/${id}`,
@@ -189,11 +263,17 @@ export const getMaintenances = (query: MaintenanceListQuery = {}) => {
     if (value !== undefined) params.set(key, String(value));
   }
   const search = params.toString();
-  return request<MaintenancesResponse>("GET", `/maintenances${search === "" ? "" : `?${search}`}`);
+  return request<MaintenancesResponse>(
+    "GET",
+    `/maintenances${search === "" ? "" : `?${search}`}`,
+  );
 };
 
 export const getNotifications = (limit = 20) =>
-  request<{ notifications: SentRecord[] }>("GET", `/notifications?limit=${limit}`);
+  request<{ notifications: SentRecord[] }>(
+    "GET",
+    `/notifications?limit=${limit}`,
+  );
 
 export interface DeliveryLogQuery {
   state?: DeliveryState | undefined;
@@ -204,16 +284,23 @@ export interface DeliveryLogQuery {
 
 export const getDeliveryLog = (query: DeliveryLogQuery = {}) => {
   const params = new URLSearchParams();
-  if (query.state !== undefined && query.state !== "all") params.set("state", query.state);
-  if (query.channel !== undefined && query.channel !== "") params.set("channel", query.channel);
+  if (query.state !== undefined && query.state !== "all")
+    params.set("state", query.state);
+  if (query.channel !== undefined && query.channel !== "")
+    params.set("channel", query.channel);
   if (query.page !== undefined) params.set("page", String(query.page));
-  if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+  if (query.pageSize !== undefined)
+    params.set("pageSize", String(query.pageSize));
   const search = params.toString();
-  return request<DeliveryLogResponse>("GET", `/notifications/log${search === "" ? "" : `?${search}`}`);
+  return request<DeliveryLogResponse>(
+    "GET",
+    `/notifications/log${search === "" ? "" : `?${search}`}`,
+  );
 };
 
 export const getConfig = () => request<RuntimeConfigResponse>("GET", "/config");
-export const addService = (service: unknown) => request<unknown>("POST", "/config/services", service);
+export const addService = (service: unknown) =>
+  request<unknown>("POST", "/config/services", service);
 export const previewComponents = (body: unknown) =>
   request<{ supported: boolean; components: ComponentPreview[] }>(
     "POST",
@@ -238,25 +325,34 @@ export const restoreBackup = async (file: File): Promise<DbRestoreReport> => {
     body: await file.arrayBuffer(),
   });
   const payload = (await response.json().catch(() => undefined)) as
-    | { error?: { message?: string } }
-    | DbRestoreReport
-    | undefined;
+    { error?: { message?: string } } | DbRestoreReport | undefined;
   if (!response.ok) {
-    throw new Error((payload as { error?: { message?: string } })?.error?.message ?? `HTTP ${response.status}`);
+    throw new Error(
+      (payload as { error?: { message?: string } })?.error?.message ??
+        `HTTP ${response.status}`,
+    );
   }
   return payload as DbRestoreReport;
 };
 
 /** The bundled provider menu, with the ids already watched marked (roadmap 5.11). */
-export const getCatalog = () => request<{ providers: CatalogProvider[] }>("GET", "/config/catalog");
+export const getCatalog = () =>
+  request<{ providers: CatalogProvider[] }>("GET", "/config/catalog");
 /** Which adapter reads a pasted url, and the base url that adapter wants. */
 export const detectAdapter = (url: string) =>
   request<AdapterDetection>("POST", "/config/services/detect", { url });
 export const patchService = (id: string, patch: unknown) =>
-  request<unknown>("PATCH", `/config/services/${encodeURIComponent(id)}`, patch);
+  request<unknown>(
+    "PATCH",
+    `/config/services/${encodeURIComponent(id)}`,
+    patch,
+  );
 /** Read before the remove, so the confirmation can name what the cascade takes. */
 export const getServiceImpact = (id: string) =>
-  request<ServiceImpact>("GET", `/config/services/${encodeURIComponent(id)}/impact`);
+  request<ServiceImpact>(
+    "GET",
+    `/config/services/${encodeURIComponent(id)}/impact`,
+  );
 /** A soft delete: the provider leaves the dashboard, its history waits out the window. */
 export const removeService = (id: string) =>
   request<{ removed: string; removedAt: string; restoreUntil: string }>(
@@ -265,54 +361,88 @@ export const removeService = (id: string) =>
   );
 /** Undo, for as long as the window lasts. */
 export const restoreService = (id: string) =>
-  request<unknown>("POST", `/config/services/${encodeURIComponent(id)}/restore`);
+  request<unknown>(
+    "POST",
+    `/config/services/${encodeURIComponent(id)}/restore`,
+  );
 /** The destructive half, on its own path so nothing reaches it by accident. */
 export const purgeService = (id: string) =>
-  request<unknown>("DELETE", `/config/services/${encodeURIComponent(id)}/permanently`);
+  request<unknown>(
+    "DELETE",
+    `/config/services/${encodeURIComponent(id)}/permanently`,
+  );
 export const testService = (id: string) =>
   request<{ ok: boolean; overallStatus?: OverallStatus; error?: string }>(
     "POST",
     `/config/services/${encodeURIComponent(id)}/test`,
   );
-export const patchSettings = (patch: unknown) => request<unknown>("PATCH", "/config/settings", patch);
-export const getStorage = () => request<StorageReport>("GET", "/config/storage");
+export const patchSettings = (patch: unknown) =>
+  request<unknown>("PATCH", "/config/settings", patch);
+export const getStorage = () =>
+  request<StorageReport>("GET", "/config/storage");
 /** Integrity check then vacuum, on demand — roadmap 6.13. */
 export const runStorageMaintenance = () =>
   request<DbMaintenanceReport>("POST", "/config/storage/maintenance");
 /** The adapter debug panel's two halves — roadmap 5.18. */
-export const getAdapterDebug = () => request<AdapterDebugResponse>("GET", "/debug/adapters");
+export const getAdapterDebug = () =>
+  request<AdapterDebugResponse>("GET", "/debug/adapters");
 /** One read, right now. Records nothing and notifies nothing, like the connection test. */
 export const probeAdapter = (id: string) =>
-  request<AdapterProbeResult>("POST", `/debug/adapters/${encodeURIComponent(id)}/probe`);
+  request<AdapterProbeResult>(
+    "POST",
+    `/debug/adapters/${encodeURIComponent(id)}/probe`,
+  );
 /** Every edit, add, delete and reorder saves the whole ordered list — see RoutingRules.tsx. */
 export const putRouting = (rules: RoutingRule[]) =>
   request<RoutingResponse>("PUT", "/config/routing", { rules });
 export const patchChannel = (id: string, patch: unknown) =>
-  request<unknown>("PATCH", `/config/channels/${encodeURIComponent(id)}`, patch);
+  request<unknown>(
+    "PATCH",
+    `/config/channels/${encodeURIComponent(id)}`,
+    patch,
+  );
 /**
  * Write-only, like the route behind it: a credential goes out, and what comes
  * back is the channel's usual name-and-isSet shape, never the value.
  */
-export const saveChannelSecrets = (id: string, fields: Record<string, string>) =>
-  request<DescribedChannel>("PUT", `/config/channels/${encodeURIComponent(id)}/secrets`, { fields });
+export const saveChannelSecrets = (
+  id: string,
+  fields: Record<string, string>,
+) =>
+  request<DescribedChannel>(
+    "PUT",
+    `/config/channels/${encodeURIComponent(id)}/secrets`,
+    { fields },
+  );
 export const clearChannelSecret = (id: string, field: string) =>
   request<DescribedChannel>(
     "DELETE",
     `/config/channels/${encodeURIComponent(id)}/secrets/${encodeURIComponent(field)}`,
   );
 export const testChannel = (id: string) =>
-  request<{ ok: boolean; error?: string }>("POST", `/config/channels/${encodeURIComponent(id)}/test`);
+  request<{ ok: boolean; error?: string }>(
+    "POST",
+    `/config/channels/${encodeURIComponent(id)}/test`,
+  );
 
 export const getMap = () => request<MapResponse>("GET", "/map");
 
-export const getPreferences = () => request<Preferences>("GET", "/api/preferences");
+export const getPreferences = () =>
+  request<Preferences>("GET", "/api/preferences");
 export const patchPreferences = (patch: Partial<Preferences>) =>
   request<Preferences>("PATCH", "/api/preferences", patch);
 
-export const getPushKey = () => request<{ publicKey: string }>("GET", "/config/push");
+export const getPushKey = () =>
+  request<{ publicKey: string }>("GET", "/config/push");
 export const getPushDevices = () =>
-  request<{ devices: { id: string; label: string; createdAt: string }[] }>("GET", "/config/push/subscriptions");
+  request<{ devices: { id: string; label: string; createdAt: string }[] }>(
+    "GET",
+    "/config/push/subscriptions",
+  );
 export const addPushDevice = (body: PushSubscriptionBody) =>
   request<unknown>("POST", "/config/push/subscriptions", body);
 export const removePushDevice = (id: string) =>
-  request<unknown>("DELETE", `/config/push/subscriptions/${encodeURIComponent(id)}`);
+  request<unknown>(
+    "DELETE",
+    `/config/push/subscriptions/${encodeURIComponent(id)}`,
+  );

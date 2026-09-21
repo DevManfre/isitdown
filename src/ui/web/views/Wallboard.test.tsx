@@ -24,6 +24,7 @@ const provider = (id: string, over: Partial<ProviderStatus> = {}): ProviderStatu
   components: [],
   componentSelection: [],
   scopeToComponents: false,
+  authority: "declared",
   fetchedAt: "2026-08-19T12:00:00.000Z",
   failureCount: 0,
   uptime90: 99.98,

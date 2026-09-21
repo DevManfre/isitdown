@@ -96,6 +96,18 @@ services:
   #   options:
   #     path: /meta
   #     expectStatus: "200-299"
+  #
+  # Which source is the record for a provider — `declared` (its own status page)
+  # or `observed` (our own reading), roadmap 9.1. Left out, which is the normal
+  # case, the adapter decides: a probe is `observed` because it *is* the
+  # reading, and anything that parses somebody's page is `declared`. Set it only
+  # to disagree with that default.
+  #
+  # - name: Acme
+  #   id: acme
+  #   adapter: statuspage
+  #   baseUrl: https://status.acme.example
+  #   authority: observed
 
 notifications:
   telegram:

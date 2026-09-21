@@ -43,13 +43,22 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
   const patchSchema = z.object({
     theme: z.enum(["light", "dark", "system"]).optional(),
     uiLocale: z.enum(uiLocales as [string, ...string[]]).optional(),
-    notificationLocale: z.enum(notificationLocales as unknown as [string, ...string[]]).optional(),
+    notificationLocale: z
+      .enum(notificationLocales as unknown as [string, ...string[]])
+      .optional(),
     mapView: z.enum(["off", "map", "globe"]).optional(),
+    density: z.enum(["comfortable", "compact"]).optional(),
     // Validated against the runtime's own zone table rather than a hand-kept
     // list: "is this a zone?" is a question Intl can answer exactly, and a
     // preference that stores a name nothing can format is a dashboard of
     // Invalid Dates.
-    timeZone: z.string().max(64).refine(isTimeZone, { message: "must be \"auto\" or an IANA time zone name" }).optional(),
+    timeZone: z
+      .string()
+      .max(64)
+      .refine(isTimeZone, {
+        message: 'must be "auto" or an IANA time zone name',
+      })
+      .optional(),
   });
 
   const current = () => {
@@ -59,6 +68,7 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
       uiLocale: settings.uiLocale,
       notificationLocale: settings.notificationLocale,
       mapView: settings.mapView,
+      density: settings.density,
       timeZone: settings.timeZone,
     };
   };

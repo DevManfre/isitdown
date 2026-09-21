@@ -41,7 +41,7 @@ const mountWithMap = () =>
       unlocated: [],
       generatedAt: "2026-08-21T09:30:00Z",
     },
-    preferences: { theme: "dark", uiLocale: "en", notificationLocale: "en", mapView: "map" },
+    preferences: { theme: "dark", uiLocale: "en", notificationLocale: "en", mapView: "map", density: "comfortable" },
   }, "/incidents/:providerId/:incidentId");
 
 /** Same fixture, with actionLog swapped out — for the empty-state case. */

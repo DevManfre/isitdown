@@ -4,6 +4,7 @@ import { z } from "zod";
 import { detectAdapter } from "../../adapters/detect.ts";
 import { resetValidators } from "../../core/http.ts";
 import { CATALOG } from "../../adapters/catalog.ts";
+import { optionProblems } from "../../adapters/index.ts";
 import { getAdapter } from "../../adapters/index.ts";
 import {
   alertCapSchema,
@@ -42,7 +43,10 @@ import { runDbMaintenance } from "../dbMaintenance.ts";
 import { storageReport } from "../storageReport.ts";
 import { ensureVapidKeys } from "../vapidKeys.ts";
 
-const previewComponentsSchema = serviceDefinitionSchema.pick({ adapter: true, baseUrl: true });
+const previewComponentsSchema = serviceDefinitionSchema.pick({
+  adapter: true,
+  baseUrl: true,
+});
 
 /** Whatever the operator pasted into the base url field, before it is a service. */
 const detectSchema = z.object({ url: z.string().min(1).max(2048) });
@@ -89,9 +93,11 @@ const channelPatchSchema = z.object({
 // because an empty save is a request that would report success having done
 // nothing; the value rules themselves live in the secrets file.
 const channelSecretsSchema = z.object({
-  fields: z.record(z.string()).refine((fields) => Object.keys(fields).length > 0, {
-    message: "at least one field is required",
-  }),
+  fields: z
+    .record(z.string())
+    .refine((fields) => Object.keys(fields).length > 0, {
+      message: "at least one field is required",
+    }),
 });
 // Push endpoints are https by protocol (no browser issues a plain-http one),
 // and none of these fields has any business being large — a browser-supplied
@@ -117,22 +123,38 @@ function deliveryPatch(
   if (patch === undefined) return {};
   const { quietHours, digest, cap, updateInPlace } = patch;
   return {
-    ...(quietHours?.enabled === undefined ? {} : { quietHoursEnabled: quietHours.enabled }),
-    ...(quietHours?.start === undefined ? {} : { quietHoursStart: quietHours.start }),
+    ...(quietHours?.enabled === undefined
+      ? {}
+      : { quietHoursEnabled: quietHours.enabled }),
+    ...(quietHours?.start === undefined
+      ? {}
+      : { quietHoursStart: quietHours.start }),
     ...(quietHours?.end === undefined ? {} : { quietHoursEnd: quietHours.end }),
-    ...(quietHours?.timeZone === undefined ? {} : { quietHoursTimeZone: quietHours.timeZone }),
-    ...(quietHours?.minSeverity === undefined ? {} : { quietHoursMinSeverity: quietHours.minSeverity }),
+    ...(quietHours?.timeZone === undefined
+      ? {}
+      : { quietHoursTimeZone: quietHours.timeZone }),
+    ...(quietHours?.minSeverity === undefined
+      ? {}
+      : { quietHoursMinSeverity: quietHours.minSeverity }),
     ...(digest?.enabled === undefined ? {} : { digestEnabled: digest.enabled }),
-    ...(digest?.windowMinutes === undefined ? {} : { digestWindowMinutes: digest.windowMinutes }),
-    ...(digest?.immediateFloor === undefined ? {} : { digestImmediateFloor: digest.immediateFloor }),
+    ...(digest?.windowMinutes === undefined
+      ? {}
+      : { digestWindowMinutes: digest.windowMinutes }),
+    ...(digest?.immediateFloor === undefined
+      ? {}
+      : { digestImmediateFloor: digest.immediateFloor }),
     ...(cap?.enabled === undefined ? {} : { alertCapEnabled: cap.enabled }),
-    ...(cap?.maxPerHour === undefined ? {} : { alertCapPerHour: cap.maxPerHour }),
+    ...(cap?.maxPerHour === undefined
+      ? {}
+      : { alertCapPerHour: cap.maxPerHour }),
     ...(updateInPlace === undefined ? {} : { updateInPlace }),
   };
 }
 
 const issues = (error: z.ZodError): string =>
-  error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
+  error.issues
+    .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+    .join("; ");
 
 /**
  * Runtime configuration, which in the UI edition replaces `config.yml` entirely.
@@ -192,7 +214,10 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
   router.get("/config/catalog", (_req, res) => {
     const taken = new Set(listServices(db).map((service) => service.id));
     res.json({
-      providers: CATALOG.map((entry) => ({ ...entry, configured: taken.has(entry.id) })),
+      providers: CATALOG.map((entry) => ({
+        ...entry,
+        configured: taken.has(entry.id),
+      })),
     });
   });
 
@@ -208,7 +233,10 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
   router.get("/config/export", (_req, res) => {
     const day = new Date().toISOString().slice(0, 10);
     res.setHeader("content-type", "text/yaml; charset=utf-8");
-    res.setHeader("content-disposition", `attachment; filename="isitdown-config-${day}.yml"`);
+    res.setHeader(
+      "content-disposition",
+      `attachment; filename="isitdown-config-${day}.yml"`,
+    );
     res.send(exportConfigYaml(db, runtime.logger));
   });
 
@@ -228,10 +256,16 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       typeof body === "string"
         ? body
         : typeof (body as { yaml?: unknown } | undefined)?.yaml === "string"
-          ? ((body as { yaml: string }).yaml)
+          ? (body as { yaml: string }).yaml
           : null;
     if (source === null || source.trim() === "") {
-      res.status(400).json({ error: { message: "send the config.yml as the request body, or as { yaml }" } });
+      res
+        .status(400)
+        .json({
+          error: {
+            message: "send the config.yml as the request body, or as { yaml }",
+          },
+        });
       return;
     }
 
@@ -239,7 +273,13 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     try {
       report = importConfigYaml(db, source, runtime.logger);
     } catch (error) {
-      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      res
+        .status(400)
+        .json({
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
       return;
     }
     res.json(report);
@@ -255,11 +295,25 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       return;
     }
     if (listServices(db).some((service) => service.id === parsed.data.id)) {
-      res.status(409).json({ error: { message: `service ${parsed.data.id} already exists` } });
+      res
+        .status(409)
+        .json({
+          error: { message: `service ${parsed.data.id} already exists` },
+        });
+      return;
+    }
+    // Roadmap 11.1: an adapter whose options are a declared mapping checks them
+    // here, while the operator is still looking at the form, rather than
+    // letting a typo surface three minutes later as a failed poll.
+    const problems = optionProblems(parsed.data.adapter, parsed.data.options);
+    if (problems.length > 0) {
+      res.status(400).json({ error: { message: problems.join("; ") } });
       return;
     }
     insertService(db, parsed.data);
-    res.status(201).json(listServices(db).find((service) => service.id === parsed.data.id));
+    res
+      .status(201)
+      .json(listServices(db).find((service) => service.id === parsed.data.id));
     // Fire-and-forget: the response must not wait on a provider's status page.
     // backfillOne never rejects; failures are logged inside the service.
     void runtime.backfill.backfillOne(parsed.data.id);
@@ -278,7 +332,11 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     try {
       adapter = getAdapter(parsed.data.adapter);
     } catch {
-      res.status(400).json({ error: { message: `unknown adapter: ${parsed.data.adapter}` } });
+      res
+        .status(400)
+        .json({
+          error: { message: `unknown adapter: ${parsed.data.adapter}` },
+        });
       return;
     }
     if (adapter.listComponents === undefined) {
@@ -293,7 +351,13 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       );
       res.json({ supported: true, components });
     } catch (error) {
-      res.status(502).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      res
+        .status(502)
+        .json({
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
     }
   });
 
@@ -315,11 +379,21 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     }
     const { requestTimeoutSeconds } = readSettings(db, runtime.logger);
     try {
-      res.json(await detectAdapter(parsed.data.url, { timeoutMs: requestTimeoutSeconds * 1000 }));
+      res.json(
+        await detectAdapter(parsed.data.url, {
+          timeoutMs: requestTimeoutSeconds * 1000,
+        }),
+      );
     } catch (error) {
       // Only an unusable url reaches here — every probe failure is an outcome,
       // not an exception — so this is the request's own fault.
-      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      res
+        .status(400)
+        .json({
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
     }
   });
 
@@ -329,8 +403,25 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       res.status(400).json({ error: { message: issues(parsed.error) } });
       return;
     }
+    const existing = listServices(db).find(
+      (service) => service.id === req.params.id,
+    );
+    if (existing !== undefined && parsed.data.options !== undefined) {
+      // Against the adapter the row will have once the patch lands, which is
+      // not always the one it has now.
+      const problems = optionProblems(
+        parsed.data.adapter ?? existing.adapter,
+        parsed.data.options,
+      );
+      if (problems.length > 0) {
+        res.status(400).json({ error: { message: problems.join("; ") } });
+        return;
+      }
+    }
     if (!updateService(db, req.params.id, parsed.data)) {
-      res.status(404).json({ error: { message: `unknown service: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `unknown service: ${req.params.id}` } });
       return;
     }
     res.json(listServices(db).find((service) => service.id === req.params.id));
@@ -341,7 +432,9 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
   router.get("/config/services/:id/impact", (req, res) => {
     const impact = describeServiceImpact(db, req.params.id);
     if (impact === null) {
-      res.status(404).json({ error: { message: `unknown service: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `unknown service: ${req.params.id}` } });
       return;
     }
     res.json(impact);
@@ -356,16 +449,24 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
   router.delete("/config/services/:id", (req, res) => {
     const removedAt = new Date().toISOString();
     if (!softDeleteService(db, req.params.id, new Date(removedAt))) {
-      res.status(404).json({ error: { message: `unknown service: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `unknown service: ${req.params.id}` } });
       return;
     }
-    res.json({ removed: req.params.id, removedAt, restoreUntil: restoreDeadline(removedAt) });
+    res.json({
+      removed: req.params.id,
+      removedAt,
+      restoreUntil: restoreDeadline(removedAt),
+    });
   });
 
   /** Undo, for as long as the grace period lasts: nothing was taken, so nothing is rebuilt. */
   router.post("/config/services/:id/restore", (req, res) => {
     if (!restoreService(db, req.params.id)) {
-      res.status(404).json({ error: { message: `no removed service: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `no removed service: ${req.params.id}` } });
       return;
     }
     res.json(listServices(db).find((service) => service.id === req.params.id));
@@ -382,7 +483,9 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
    */
   router.delete("/config/services/:id/permanently", (req, res) => {
     if (!purgeService(db, req.params.id)) {
-      res.status(404).json({ error: { message: `unknown service: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `unknown service: ${req.params.id}` } });
       return;
     }
     // The provider is gone, so are its diagnostics: probes for an id nothing
@@ -404,22 +507,30 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       ...(parsed.data.requestTimeoutSeconds === undefined
         ? {}
         : { requestTimeoutSeconds: parsed.data.requestTimeoutSeconds }),
-      ...(parsed.data.maxRetries === undefined ? {} : { maxRetries: parsed.data.maxRetries }),
+      ...(parsed.data.maxRetries === undefined
+        ? {}
+        : { maxRetries: parsed.data.maxRetries }),
       ...(parsed.data.failureThreshold === undefined
         ? {}
         : { failureThreshold: parsed.data.failureThreshold }),
-      ...(parsed.data.adaptivePolling === undefined ? {} : { adaptivePolling: parsed.data.adaptivePolling }),
+      ...(parsed.data.adaptivePolling === undefined
+        ? {}
+        : { adaptivePolling: parsed.data.adaptivePolling }),
       ...(parsed.data.adaptiveIntervalMinutes === undefined
         ? {}
         : { adaptiveIntervalMinutes: parsed.data.adaptiveIntervalMinutes }),
-      ...(parsed.data.confirmSamples === undefined ? {} : { confirmSamples: parsed.data.confirmSamples }),
+      ...(parsed.data.confirmSamples === undefined
+        ? {}
+        : { confirmSamples: parsed.data.confirmSamples }),
       ...(parsed.data.correlationThreshold === undefined
         ? {}
         : { correlationThreshold: parsed.data.correlationThreshold }),
       ...(parsed.data.correlationWindowMinutes === undefined
         ? {}
         : { correlationWindowMinutes: parsed.data.correlationWindowMinutes }),
-      ...(parsed.data.retentionDays === undefined ? {} : { retentionDays: parsed.data.retentionDays }),
+      ...(parsed.data.retentionDays === undefined
+        ? {}
+        : { retentionDays: parsed.data.retentionDays }),
       ...deliveryPatch(parsed.data.delivery),
     });
     const settings = readSettings(db, runtime.logger);
@@ -449,7 +560,8 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     const settings = readSettings(db, runtime.logger);
     res.json(
       storageReport(db, {
-        providerCount: listServices(db).filter((service) => service.enabled).length,
+        providerCount: listServices(db).filter((service) => service.enabled)
+          .length,
         intervalMinutes: settings.pollIntervalMinutes,
       }),
     );
@@ -484,7 +596,10 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
   router.get("/config/backup", (_req, res) => {
     const snapshot = createBackup(db);
     res.setHeader("content-type", "application/octet-stream");
-    res.setHeader("content-disposition", `attachment; filename="${snapshot.filename}"`);
+    res.setHeader(
+      "content-disposition",
+      `attachment; filename="${snapshot.filename}"`,
+    );
     res.setHeader("x-isitdown-secrets", "excluded");
     res.send(snapshot.bytes);
   });
@@ -505,15 +620,30 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     if (!Buffer.isBuffer(body) || body.length === 0) {
       res
         .status(400)
-        .json({ error: { message: "send the .db file as the request body, as application/octet-stream" } });
+        .json({
+          error: {
+            message:
+              "send the .db file as the request body, as application/octet-stream",
+          },
+        });
       return;
     }
 
     let report;
     try {
-      report = restoreBackup(db, body, join(dirname(runtime.dbPath), "secrets.env"));
+      report = restoreBackup(
+        db,
+        body,
+        join(dirname(runtime.dbPath), "secrets.env"),
+      );
     } catch (error) {
-      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      res
+        .status(400)
+        .json({
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
       return;
     }
 
@@ -534,16 +664,28 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       return;
     }
     if (!listChannels(db).some((channel) => channel.id === req.params.id)) {
-      res.status(404).json({ error: { message: `unknown channel: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `unknown channel: ${req.params.id}` } });
       return;
     }
     try {
       updateChannel(db, req.params.id, parsed.data);
     } catch (error) {
-      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      res
+        .status(400)
+        .json({
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
       return;
     }
-    res.json(describeChannels(db, runtime.env).find((channel) => channel.id === req.params.id));
+    res.json(
+      describeChannels(db, runtime.env).find(
+        (channel) => channel.id === req.params.id,
+      ),
+    );
   });
 
   /**
@@ -566,9 +708,13 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       res.status(400).json({ error: { message: issues(parsed.error) } });
       return;
     }
-    const stored = listChannels(db).find((channel) => channel.id === req.params.id);
+    const stored = listChannels(db).find(
+      (channel) => channel.id === req.params.id,
+    );
     if (stored === undefined) {
-      res.status(404).json({ error: { message: `unknown channel: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `unknown channel: ${req.params.id}` } });
       return;
     }
 
@@ -578,7 +724,13 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     for (const [name, value] of Object.entries(parsed.data.fields)) {
       const envVar = stored.config[`${name}Env`];
       if (envVar === undefined) {
-        res.status(400).json({ error: { message: `channel ${req.params.id} has no field "${name}"` } });
+        res
+          .status(400)
+          .json({
+            error: {
+              message: `channel ${req.params.id} has no field "${name}"`,
+            },
+          });
         return;
       }
       values[envVar] = value;
@@ -587,10 +739,20 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     try {
       await runtime.secrets.set(values);
     } catch (error) {
-      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      res
+        .status(400)
+        .json({
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
       return;
     }
-    res.json(describeChannels(db, runtime.env).find((channel) => channel.id === req.params.id));
+    res.json(
+      describeChannels(db, runtime.env).find(
+        (channel) => channel.id === req.params.id,
+      ),
+    );
   });
 
   /**
@@ -599,31 +761,51 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
    * delete, and reporting that plainly beats a success that changes nothing.
    */
   router.delete("/config/channels/:id/secrets/:field", async (req, res) => {
-    const stored = listChannels(db).find((channel) => channel.id === req.params.id);
+    const stored = listChannels(db).find(
+      (channel) => channel.id === req.params.id,
+    );
     if (stored === undefined) {
-      res.status(404).json({ error: { message: `unknown channel: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `unknown channel: ${req.params.id}` } });
       return;
     }
     const envVar = stored.config[`${req.params.field}Env`];
     if (envVar === undefined) {
-      res.status(400).json({ error: { message: `channel ${req.params.id} has no field "${req.params.field}"` } });
+      res
+        .status(400)
+        .json({
+          error: {
+            message: `channel ${req.params.id} has no field "${req.params.field}"`,
+          },
+        });
       return;
     }
     if (!(await runtime.secrets.clear(envVar))) {
       res.status(409).json({
-        error: { message: `${envVar} was not saved here — it comes from the container's environment` },
+        error: {
+          message: `${envVar} was not saved here — it comes from the container's environment`,
+        },
       });
       return;
     }
-    res.json(describeChannels(db, runtime.env).find((channel) => channel.id === req.params.id));
+    res.json(
+      describeChannels(db, runtime.env).find(
+        (channel) => channel.id === req.params.id,
+      ),
+    );
   });
 
   // The only route that reaches a provider on demand. It records nothing: a
   // connection test is diagnostics, not history and not an alert.
   router.post("/config/services/:id/test", async (req, res) => {
-    const service = listServices(db).find((entry) => entry.id === req.params.id);
+    const service = listServices(db).find(
+      (entry) => entry.id === req.params.id,
+    );
     if (service === undefined) {
-      res.status(404).json({ error: { message: `unknown service: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `unknown service: ${req.params.id}` } });
       return;
     }
     const { requestTimeoutSeconds } = readSettings(db, runtime.logger);
@@ -641,7 +823,10 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       );
       res.json({ ok: true, overallStatus: status.overallStatus });
     } catch (error) {
-      res.json({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      res.json({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -665,7 +850,9 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       for (const channel of rule.channels) {
         if (channel === "*" || known.has(channel)) continue;
         res.status(400).json({
-          error: { message: `rule ${index + 1} targets the channel "${channel}", which does not exist` },
+          error: {
+            message: `rule ${index + 1} targets the channel "${channel}", which does not exist`,
+          },
         });
         return;
       }
@@ -674,7 +861,13 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     try {
       replaceRoutingRules(db, parsed.data.rules);
     } catch (error) {
-      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      res
+        .status(400)
+        .json({
+          error: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        });
       return;
     }
     res.json(describeRouting(db, runtime.logger));
@@ -708,36 +901,51 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
 
   router.delete("/config/push/subscriptions/:id", (req, res) => {
     if (!runtime.pushSubscriptions.remove(req.params.id)) {
-      res.status(404).json({ error: { message: `unknown device: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `unknown device: ${req.params.id}` } });
       return;
     }
     res.status(204).end();
   });
 
   router.post("/config/channels/:id/test", async (req, res) => {
-    const stored = listChannels(db).find((channel) => channel.id === req.params.id);
+    const stored = listChannels(db).find(
+      (channel) => channel.id === req.params.id,
+    );
     if (stored === undefined) {
-      res.status(404).json({ error: { message: `unknown channel: ${req.params.id}` } });
+      res
+        .status(404)
+        .json({ error: { message: `unknown channel: ${req.params.id}` } });
       return;
     }
 
     const config = await runtime.configSource.load();
-    const resolved = config.channels.find((channel) => channel.id === req.params.id);
-    const missing = describeChannels(db, runtime.env)
-      .find((channel) => channel.id === req.params.id)
-      // Optional credentials are skipped: an unset signing secret means
-      // "send unsigned", not "this channel cannot be tested".
-      ?.fields.filter((field) => !field.isSet && !field.optional)
-      .map((field) => field.envVar) ?? [];
+    const resolved = config.channels.find(
+      (channel) => channel.id === req.params.id,
+    );
+    const missing =
+      describeChannels(db, runtime.env)
+        .find((channel) => channel.id === req.params.id)
+        // Optional credentials are skipped: an unset signing secret means
+        // "send unsigned", not "this channel cannot be tested".
+        ?.fields.filter((field) => !field.isSet && !field.optional)
+        .map((field) => field.envVar) ?? [];
 
     if (missing.length > 0 || resolved === undefined) {
-      res.json({ ok: false, error: `not configured: ${missing.join(", ")} is not set in the environment` });
+      res.json({
+        ok: false,
+        error: `not configured: ${missing.join(", ")} is not set in the environment`,
+      });
       return;
     }
 
     const [notifier] = runtime.buildNotifiers([{ ...resolved, enabled: true }]);
     if (notifier === undefined) {
-      res.json({ ok: false, error: `channel ${req.params.id} could not be built` });
+      res.json({
+        ok: false,
+        error: `channel ${req.params.id} could not be built`,
+      });
       return;
     }
 
@@ -753,10 +961,17 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     // The channel's own wording, so the test shows what the channel will
     // actually send rather than a message in the fleet's default language
     // (roadmap 3.20) and the default layout (roadmap 3.15).
-    const record = await runtime.dispatcher.sendTest(notifier, service, config.locale, {
-      ...(resolved.locale === undefined ? {} : { locale: resolved.locale }),
-      ...(resolved.template === undefined ? {} : { template: resolved.template }),
-    });
+    const record = await runtime.dispatcher.sendTest(
+      notifier,
+      service,
+      config.locale,
+      {
+        ...(resolved.locale === undefined ? {} : { locale: resolved.locale }),
+        ...(resolved.template === undefined
+          ? {}
+          : { template: resolved.template }),
+      },
+    );
     res.json(record.ok ? { ok: true } : { ok: false, error: record.error });
   });
 

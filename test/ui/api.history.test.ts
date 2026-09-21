@@ -16,6 +16,8 @@ const DAY_MS = 24 * 3600 * 1000;
 interface Api {
   runtime: UiRuntime;
   get: (path: string) => Promise<{ status: number; body: unknown }>;
+  post: (path: string, body: unknown) => Promise<{ status: number; body: unknown }>;
+  del: (path: string) => Promise<{ status: number; body: unknown }>;
   close: () => Promise<void>;
 }
 
@@ -30,6 +32,20 @@ async function api(): Promise<Api> {
     runtime,
     get: async (path) => {
       const response = await fetch(`http://127.0.0.1:${port}${path}`);
+      const text = await response.text();
+      return { status: response.status, body: text === "" ? undefined : (JSON.parse(text) as unknown) };
+    },
+    post: async (path, body) => {
+      const response = await fetch(`http://127.0.0.1:${port}${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const text = await response.text();
+      return { status: response.status, body: text === "" ? undefined : (JSON.parse(text) as unknown) };
+    },
+    del: async (path) => {
+      const response = await fetch(`http://127.0.0.1:${port}${path}`, { method: "DELETE" });
       const text = await response.text();
       return { status: response.status, body: text === "" ? undefined : (JSON.parse(text) as unknown) };
     },
@@ -643,6 +659,111 @@ test("a half-written or impossible range is refused in words", async () => {
       assert.equal(status, 400, query);
       assert.match((body as { error: { message: string } }).error.message, expected, query);
     }
+  } finally {
+    await app.close();
+  }
+});
+
+test("history reports how much of the window the poller was actually running", async () => {
+  const app = await api();
+  try {
+    await save(app.runtime, "github", "operational", at(1));
+
+    // Nothing recorded yet: the window says "we cannot tell" rather than 0, so
+    // an install upgrading into this trace does not have its past redrawn as an
+    // outage of ours.
+    const before = (await app.get("/history?days=7")).body as { coverage: number | null };
+    assert.equal(before.coverage, null);
+
+    // Two cycles a minute apart on a three-minute cadence, then silence: today
+    // is covered for that minute and missing for the rest.
+    await app.runtime.store.recordPollCycle({
+      startedAt: at(0, 0),
+      finishedAt: at(0, 0),
+      intervalMinutes: 3,
+      providers: 1,
+    });
+    await app.runtime.store.recordPollCycle({
+      startedAt: at(0, 1),
+      finishedAt: at(0, 1),
+      intervalMinutes: 3,
+      providers: 1,
+    });
+
+    const { body } = await app.get("/history?days=7");
+    const summary = body as {
+      coverage: number | null;
+      dailyCoverage: { day: string; observed: number | null }[];
+      providers: { coverage: number | null; dailyCoverage: unknown[] }[];
+    };
+    assert.equal(summary.dailyCoverage.length, 7, "one entry per day shown, gap-filled");
+    // Only today has evidence; the six days before the first cycle stay unjudged.
+    assert.deepEqual(
+      summary.dailyCoverage.slice(0, 6).map((entry) => entry.observed),
+      [null, null, null, null, null, null],
+    );
+    const today = summary.dailyCoverage.at(-1);
+    assert.ok(today !== undefined && today.observed !== null && today.observed < 1, String(today?.observed));
+    // The same caveat travels on every provider, because the gap is the
+    // poller's and not any one provider's.
+    assert.equal(summary.providers[0]?.dailyCoverage.length, 7);
+    assert.equal(summary.providers[0]?.coverage, summary.coverage);
+  } finally {
+    await app.close();
+  }
+});
+
+test("an annotation is written, read back inside its window, and removed", async () => {
+  const app = await api();
+  try {
+    const created = await app.post("/annotations", {
+      at: at(1, 0),
+      label: "v2.4.0 shipped",
+      colour: "accent",
+    });
+    assert.equal(created.status, 201);
+    const marker = created.body as { id: number; providerId: string | null; colour: string };
+    assert.equal(marker.providerId, null, "no provider means the whole fleet");
+
+    const listed = (await app.get("/annotations?days=7")).body as { annotations: { label: string }[] };
+    assert.deepEqual(
+      listed.annotations.map((entry) => entry.label),
+      ["v2.4.0 shipped"],
+    );
+
+    // A window that ends before it does not show it.
+    const older = (await app.get("/annotations?from=2020-01-01&to=2020-01-07")).body as {
+      annotations: unknown[];
+    };
+    assert.deepEqual(older.annotations, []);
+
+    assert.equal((await app.del(`/annotations/${marker.id}`)).status, 204);
+    assert.equal((await app.del(`/annotations/${marker.id}`)).status, 404, "a stale id is not a silent no-op");
+  } finally {
+    await app.close();
+  }
+});
+
+test("a provider's markers include the fleet-wide ones, and a bad colour is refused", async () => {
+  const app = await api();
+  try {
+    await app.post("/annotations", { at: at(1, 0), label: "fleet deploy", colour: "accent" });
+    await app.post("/annotations", { at: at(1, 0), label: "github config", colour: "warn", providerId: "github" });
+
+    const scoped = (await app.get("/annotations?days=7&provider=github")).body as {
+      annotations: { label: string }[];
+    };
+    // Both: a deploy that broke GitHub's page is exactly the marker wanted here.
+    assert.deepEqual(
+      scoped.annotations.map((entry) => entry.label).sort(),
+      ["fleet deploy", "github config"],
+    );
+
+    assert.equal((await app.post("/annotations", { at: at(0, 0), label: "x", colour: "#ff0000" })).status, 400);
+    assert.equal(
+      (await app.post("/annotations", { at: at(0, 0), label: "x", colour: "accent", providerId: "nope" })).status,
+      404,
+    );
   } finally {
     await app.close();
   }

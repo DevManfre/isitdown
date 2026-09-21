@@ -1,5 +1,8 @@
 import type { Adapter, ReadingNote } from "./adapter.interface.ts";
-import type { RuntimeConfig, ServiceDefinition } from "./configSource.interface.ts";
+import type {
+  RuntimeConfig,
+  ServiceDefinition,
+} from "./configSource.interface.ts";
 import {
   confirmedChanges,
   correlatedOutage,
@@ -9,8 +12,12 @@ import {
 } from "./diffEngine.ts";
 import { RetryAfterError, type StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
-import type { ProviderRuntimeState, StateStore } from "./stateStore.interface.ts";
+import type {
+  ProviderRuntimeState,
+  StateStore,
+} from "./stateStore.interface.ts";
 import { componentTargetOf } from "./routing.ts";
+import { authorityOf } from "./authority.ts";
 import { tracer } from "./tracing.ts";
 import type { NormalizedStatus, StatusChange } from "./types.ts";
 
@@ -54,8 +61,14 @@ function hash(value: string): number {
  * instances watching the same provider still collide — the id is the same on
  * both — which is what the scheduler's per-instance jitter is for.
  */
-export function staggerOffsetMs(providerId: string, intervalMinutes: number): number {
-  const budget = Math.min(Math.round(intervalMinutes * 60_000 * STAGGER_FRACTION), MAX_STAGGER_MS);
+export function staggerOffsetMs(
+  providerId: string,
+  intervalMinutes: number,
+): number {
+  const budget = Math.min(
+    Math.round(intervalMinutes * 60_000 * STAGGER_FRACTION),
+    MAX_STAGGER_MS,
+  );
   if (budget <= 0) return 0;
   return hash(providerId) % budget;
 }
@@ -109,8 +122,13 @@ export interface ProviderResult {
  */
 export function looksLikeOurOwnNetwork(results: ProviderResult[]): boolean {
   if (results.length < 2) return false;
-  const blind = results.filter((result) => !result.ok || result.unreachable === true);
-  return blind.length === results.length && results.some((result) => result.unreachable === true);
+  const blind = results.filter(
+    (result) => !result.ok || result.unreachable === true,
+  );
+  return (
+    blind.length === results.length &&
+    results.some((result) => result.unreachable === true)
+  );
 }
 
 export interface CycleResult {
@@ -245,7 +263,9 @@ export function createPoller(deps: PollerDeps): Poller {
       if (attempt > 0) {
         // Exponential backoff with jitter, so a provider recovering from an
         // outage is not hit by every IsItDown instance in lockstep.
-        const delay = BACKOFF_BASE_MS * 2 ** (attempt - 1) + Math.random() * BACKOFF_JITTER_MS;
+        const delay =
+          BACKOFF_BASE_MS * 2 ** (attempt - 1) +
+          Math.random() * BACKOFF_JITTER_MS;
         await sleep(Math.round(delay));
       }
       // The read the successful attempt made; a retried attempt's own timing
@@ -309,7 +329,12 @@ export function createPoller(deps: PollerDeps): Poller {
     // operator pressed the button and is watching, so a deliberate wait of up
     // to a fifth of a minute is a dashboard that looks stuck.
     if (options.ignoreSchedule !== true) {
-      await sleep(staggerOffsetMs(service.id, service.intervalMinutes ?? config.polling.intervalMinutes));
+      await sleep(
+        staggerOffsetMs(
+          service.id,
+          service.intervalMinutes ?? config.polling.intervalMinutes,
+        ),
+      );
     }
 
     const before = await store.getState(service.id);
@@ -346,7 +371,10 @@ export function createPoller(deps: PollerDeps): Poller {
       });
 
       const changes: StatusChange[] = [];
-      if (failureCount >= config.polling.failureThreshold && !before.degradedNotified) {
+      if (
+        failureCount >= config.polling.failureThreshold &&
+        !before.degradedNotified
+      ) {
         changes.push({
           kind: "monitoring_degraded",
           providerId: service.id,
@@ -381,10 +409,17 @@ export function createPoller(deps: PollerDeps): Poller {
       mutedUntil: service.mutedUntil ?? null,
     });
     const changes = gate.changes;
-    await store.saveStatus(outcome.status, { latencyMs: outcome.latencyMs });
+    await store.saveStatus(outcome.status, {
+      latencyMs: outcome.latencyMs,
+      // Read off the adapter that took this reading, not off the service row:
+      // the service says which adapter, the adapter says which revision of it,
+      // and only the second one changes without the configuration changing.
+      adapterVersion: getAdapter(service.adapter).version ?? 1,
+    });
     await store.saveNotifyState(service.id, gate.baseline, gate.pending);
     if (before.failureCount > 0) await store.clearFailures(service.id);
-    if (before.degradedNotified) await store.setDegradedNotified(service.id, false);
+    if (before.degradedNotified)
+      await store.setDegradedNotified(service.id, false);
 
     return {
       result: {
@@ -393,7 +428,9 @@ export function createPoller(deps: PollerDeps): Poller {
         status: outcome.status,
         attempts: outcome.attempts,
         durationMs: Date.now() - startedAt,
-        ...(outcome.notModified === undefined ? {} : { notModified: outcome.notModified }),
+        ...(outcome.notModified === undefined
+          ? {}
+          : { notModified: outcome.notModified }),
         ...(outcome.note === undefined ? {} : { note: outcome.note.text }),
         ...(outcome.note?.unreachable === true ? { unreachable: true } : {}),
       },
@@ -433,7 +470,8 @@ export function createPoller(deps: PollerDeps): Poller {
     config: RuntimeConfig,
     state: ProviderRuntimeState,
   ): number {
-    const configured = service.intervalMinutes ?? config.polling.intervalMinutes;
+    const configured =
+      service.intervalMinutes ?? config.polling.intervalMinutes;
     if (!config.polling.adaptivePolling || !inTrouble(state)) return configured;
     return Math.min(configured, config.polling.adaptiveIntervalMinutes);
   }
@@ -446,7 +484,11 @@ export function createPoller(deps: PollerDeps): Poller {
    * provider in trouble pulls the tick down to the adaptive cadence, and the
    * rest of the fleet must not come along with it.
    */
-  async function isDue(service: ServiceDefinition, at: number, config: RuntimeConfig): Promise<boolean> {
+  async function isDue(
+    service: ServiceDefinition,
+    at: number,
+    config: RuntimeConfig,
+  ): Promise<boolean> {
     const held = holdUntil.get(service.id);
     if (held !== undefined) {
       if (at < held) return false;
@@ -457,7 +499,11 @@ export function createPoller(deps: PollerDeps): Poller {
     }
     const last = lastAttemptAt.get(service.id);
     if (last === undefined) return true;
-    const interval = effectiveIntervalMinutes(service, config, await store.getState(service.id));
+    const interval = effectiveIntervalMinutes(
+      service,
+      config,
+      await store.getState(service.id),
+    );
     return at - last >= interval * 60_000 * (1 - DUE_SLACK);
   }
 
@@ -510,8 +556,7 @@ export function createPoller(deps: PollerDeps): Poller {
 
     const folded = changes.filter(
       (change) =>
-        !members.has(change.providerId) ||
-        worseningsIn([change]).length === 0,
+        !members.has(change.providerId) || worseningsIn([change]).length === 0,
     );
     changes.length = 0;
     changes.push(...folded, correlated);
@@ -555,10 +600,13 @@ export function createPoller(deps: PollerDeps): Poller {
 
       const page = config.services.find((service) => service.id === target);
       if (page === undefined || !page.enabled) {
-        logger.warn("a probe cross-checks a provider that is not being polled", {
-          providerId: probe.id,
-          crossChecks: target,
-        });
+        logger.warn(
+          "a probe cross-checks a provider that is not being polled",
+          {
+            providerId: probe.id,
+            crossChecks: target,
+          },
+        );
         continue;
       }
 
@@ -566,7 +614,11 @@ export function createPoller(deps: PollerDeps): Poller {
       const change =
         reading.ok && reading.status !== undefined
           ? silentOutage({
-              probe: { id: probe.id, status: reading.status.overallStatus, note: reading.note },
+              probe: {
+                id: probe.id,
+                status: reading.status.overallStatus,
+                note: reading.note,
+              },
               page:
                 state.last === null
                   ? null
@@ -574,6 +626,10 @@ export function createPoller(deps: PollerDeps): Poller {
                       id: target,
                       status: state.last.overallStatus,
                       openIncidents: state.last.activeIncidents.length,
+                      // Roadmap 9.1. Resolved here rather than stored, so a
+                      // provider that never said follows the rule instead of
+                      // carrying a copy of it taken the day it was added.
+                      authority: authorityOf(page, getAdapter(page.adapter)),
                     },
               at,
             })
@@ -599,19 +655,27 @@ export function createPoller(deps: PollerDeps): Poller {
         if (!service.enabled) continue;
         shortest = Math.min(
           shortest,
-          effectiveIntervalMinutes(service, config, await store.getState(service.id)),
+          effectiveIntervalMinutes(
+            service,
+            config,
+            await store.getState(service.id),
+          ),
         );
       }
       return shortest;
     },
 
-    async runCycle(config: RuntimeConfig, options: CycleOptions = {}): Promise<CycleResult> {
+    async runCycle(
+      config: RuntimeConfig,
+      options: CycleOptions = {},
+    ): Promise<CycleResult> {
       const startedAt = new Date().toISOString();
       const at = now();
       // A loop rather than `filter`: whether a provider is due now depends on
       // its stored state, and reading that is asynchronous.
       const enabled: ServiceDefinition[] = [];
-      const narrowed = options.only === undefined ? null : new Set(options.only);
+      const narrowed =
+        options.only === undefined ? null : new Set(options.only);
       for (const service of config.services) {
         if (!service.enabled) continue;
         // Narrowed before the schedule is consulted: a push is a reason to read
@@ -620,7 +684,11 @@ export function createPoller(deps: PollerDeps): Poller {
         // A manual poll overrides the schedule, a `Retry-After` hold included:
         // the operator asked for one request now, which is not the hammering
         // the hold exists to prevent.
-        if (options.ignoreSchedule === true || (await isDue(service, at, config))) enabled.push(service);
+        if (
+          options.ignoreSchedule === true ||
+          (await isDue(service, at, config))
+        )
+          enabled.push(service);
       }
       for (const service of enabled) lastAttemptAt.set(service.id, at);
       // A provider removed from the configuration must not keep its slot here,
@@ -641,7 +709,10 @@ export function createPoller(deps: PollerDeps): Poller {
           // waiting, or the trace explains a slow cycle with nothing in it.
           tracer().span(
             "provider.read",
-            { "isitdown.provider": service.id, "isitdown.adapter": service.adapter },
+            {
+              "isitdown.provider": service.id,
+              "isitdown.adapter": service.adapter,
+            },
             () => pollOne(service, config, options),
           ),
         ),
@@ -659,7 +730,9 @@ export function createPoller(deps: PollerDeps): Poller {
         // failure is already handled inside pollOne.
         const service = enabled[index];
         const message =
-          outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+          outcome.reason instanceof Error
+            ? outcome.reason.message
+            : String(outcome.reason);
         logger.error("polling a provider crashed unexpectedly", {
           providerId: service?.id,
           error: message,
@@ -679,12 +752,16 @@ export function createPoller(deps: PollerDeps): Poller {
         // from this container those services really are unreachable — but the
         // operator reading three "down" messages at once deserves to find this
         // line in the log and this sentence in the diagnostics panel.
-        logger.warn("every provider in this cycle failed or never answered — this looks like a local network failure", {
-          providers: results.length,
-        });
+        logger.warn(
+          "every provider in this cycle failed or never answered — this looks like a local network failure",
+          {
+            providers: results.length,
+          },
+        );
         for (const result of results) {
           if (result.unreachable !== true) continue;
-          result.note = `${result.note ?? ""} — and nothing else answered in this cycle either, so this looks like a failure on our side rather than theirs`.trim();
+          result.note =
+            `${result.note ?? ""} — and nothing else answered in this cycle either, so this looks like a failure on our side rather than theirs`.trim();
         }
       }
 
@@ -712,7 +789,9 @@ export function createPoller(deps: PollerDeps): Poller {
 
       logger.info("poll cycle finished", {
         providers: results.length,
-        skipped: config.services.filter((service) => service.enabled).length - enabled.length,
+        skipped:
+          config.services.filter((service) => service.enabled).length -
+          enabled.length,
         failed: results.filter((result) => !result.ok).length,
         changes: changes.length,
       });

@@ -20,6 +20,8 @@ export interface ProviderCard {
   buckets: HistoryBucket[];
   muted: boolean;
   maintenanceActive: boolean;
+  /** Which source is the record for this provider — roadmap 9.1. */
+  authority: "declared" | "observed";
 }
 
 /** The tint and the edge a card takes from its own severity. */
@@ -28,7 +30,8 @@ function severityChrome(status: OverallStatus): string {
   if (status === "degraded" || status === "partial_outage") {
     return "border-status-degraded/40 bg-status-degraded/[0.06]";
   }
-  if (status === "major_outage") return "border-destructive/40 bg-destructive/[0.06]";
+  if (status === "major_outage")
+    return "border-destructive/40 bg-destructive/[0.06]";
   return "border-border";
 }
 
@@ -58,7 +61,9 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
             "tile-lit anim-rise flex gap-4 rounded-lg border bg-card/70 p-4",
             severityChrome(provider.status),
           )}
-          style={{ animationDelay: stagger(index, { base: 60, step: 40, cap: 320 }) }}
+          style={{
+            animationDelay: stagger(index, { base: 60, step: 40, cap: 320 }),
+          }}
         >
           <UptimeArc
             value={provider.uptime}
@@ -66,9 +71,9 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
             color={statusColor(provider.status)}
             label={t("chart.ring-summary", {
               status: t(statusLabelKey(provider.status)),
-              uptime: new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 2 }).format(
-                provider.uptime,
-              ),
+              uptime: new Intl.NumberFormat(i18n.language, {
+                maximumFractionDigits: 2,
+              }).format(provider.uptime),
             })}
           />
 
@@ -78,8 +83,13 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
               {provider.maintenanceActive && (
                 <Badge variant="muted">{t("provider.maintenance.badge")}</Badge>
               )}
-              {provider.muted && <Badge variant="muted">{t("provider.muted.badge")}</Badge>}
-              <span className="ml-auto text-xs" style={{ color: statusColor(provider.status) }}>
+              {provider.muted && (
+                <Badge variant="muted">{t("provider.muted.badge")}</Badge>
+              )}
+              <span
+                className="ml-auto text-xs"
+                style={{ color: statusColor(provider.status) }}
+              >
                 {t(statusLabelKey(provider.status))}
               </span>
             </div>
@@ -88,6 +98,18 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
               <span className="truncate">{provider.host}</span>
               <span aria-hidden="true">·</span>
               <span>{provider.adapter}</span>
+              <span aria-hidden="true">·</span>
+              {/* Roadmap 9.1, beside the adapter rather than in a badge of its
+                  own: it is the same kind of fact — how this row is read — and
+                  the numbers under it mean different things depending on it. */}
+              <span
+                data-authority={provider.authority}
+                title={t("authority.badge", {
+                  source: t(`authority.source.${provider.authority}`),
+                })}
+              >
+                {t(`authority.source.${provider.authority}`)}
+              </span>
             </span>
 
             <UptimeStrip buckets={provider.buckets} />
@@ -111,7 +133,10 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
                   {t("column.incidents")}
                 </span>
                 <span className="font-mono text-xs">
-                  <NumberTicker locale={i18n.language} value={provider.incidents} />
+                  <NumberTicker
+                    locale={i18n.language}
+                    value={provider.incidents}
+                  />
                 </span>
               </span>
             </div>

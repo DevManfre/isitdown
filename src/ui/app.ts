@@ -16,6 +16,7 @@ import { metricsRoutes } from "./routes/metrics.routes.ts";
 import { notificationsRoutes } from "./routes/notifications.routes.ts";
 import { preferencesRoutes } from "./routes/preferences.routes.ts";
 import { publicRoutes } from "./routes/public.routes.ts";
+import { reliabilityRoutes } from "./routes/reliability.routes.ts";
 import { pushRoutes } from "./routes/push.routes.ts";
 import { slaRoutes } from "./routes/sla.routes.ts";
 import { trustRoutes } from "./routes/trust.routes.ts";
@@ -50,6 +51,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(eventsRoutes(runtime));
   app.use(historyRoutes(runtime));
   app.use(slaRoutes(runtime));
+  app.use(reliabilityRoutes(runtime));
   app.use(trustRoutes(runtime));
   app.use(pushRoutes(runtime));
   app.use(incidentsRoutes(runtime));

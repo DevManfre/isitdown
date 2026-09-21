@@ -80,10 +80,16 @@ function accentFor(change: StatusChange): { emoji: string; color: number } {
   if (change.kind === "monitoring_degraded") {
     return { emoji: EMOJI.unknown, color: COLOR.unknown };
   }
-  if (change.kind === "maintenance_started" || change.kind === "maintenance_ended") {
+  if (
+    change.kind === "maintenance_started" ||
+    change.kind === "maintenance_ended"
+  ) {
     return { emoji: MAINTENANCE_EMOJI, color: MAINTENANCE_COLOR };
   }
-  return { emoji: emojiFor(change.currentStatus), color: COLOR[change.currentStatus] };
+  return {
+    emoji: emojiFor(change.currentStatus),
+    color: COLOR[change.currentStatus],
+  };
 }
 
 export function colorFor(change: StatusChange): number {
@@ -153,7 +159,10 @@ export function renderMessage(payload: NotificationPayload): string {
  * message is: layout and emoji are formatting, and a channel that assembled its
  * own digest would drift from the others by a version or two.
  */
-export function renderDigest(items: NotificationPayload[], windowMinutes: number): string {
+export function renderDigest(
+  items: NotificationPayload[],
+  windowMinutes: number,
+): string {
   const [first] = items;
   if (first === undefined) return "";
   const locale = first.locale;
@@ -183,7 +192,10 @@ function summarise(payload: NotificationPayload): string {
   switch (change.kind) {
     case "status_change":
       return t(locale, "notification.digest.status", {
-        previous: change.previousStatus === undefined ? "" : statusLabel(change.previousStatus, locale),
+        previous:
+          change.previousStatus === undefined
+            ? ""
+            : statusLabel(change.previousStatus, locale),
         current,
       });
     case "component_status_change":
@@ -192,34 +204,42 @@ function summarise(payload: NotificationPayload): string {
         current,
       });
     case "incident_opened":
-      return t(locale, "notification.digest.incident-opened", { title: change.incident?.name ?? "" });
+      return t(locale, "notification.digest.incident-opened", {
+        title: change.incident?.name ?? "",
+      });
     case "incident_updated":
       return t(locale, "notification.digest.incident-updated", {
         title: change.incident?.name ?? "",
         status: incidentStatusLabel(change.incident?.status ?? "", locale),
       });
     case "incident_resolved":
-      return t(locale, "notification.digest.incident-resolved", { title: change.incident?.name ?? "" });
+      return t(locale, "notification.digest.incident-resolved", {
+        title: change.incident?.name ?? "",
+      });
     case "maintenance_started":
       return t(locale, "notification.digest.maintenance-started", {
         title: change.maintenance?.name ?? "",
       });
     case "maintenance_ended":
-      return t(locale, "notification.digest.maintenance-ended", { title: change.maintenance?.name ?? "" });
+      return t(locale, "notification.digest.maintenance-ended", {
+        title: change.maintenance?.name ?? "",
+      });
     case "monitoring_degraded":
-      return t(locale, "notification.digest.monitoring", { count: change.failureCount ?? 0 });
+      return t(locale, "notification.digest.monitoring", {
+        count: change.failureCount ?? 0,
+      });
     case "silent_outage":
       return t(locale, "notification.digest.silent", {
         probe: change.crossCheck?.probeId ?? "",
-    // The SLA burn's own numbers (roadmap 4.13). Formatted to two decimals
-    // here rather than in the catalog: a percentage printed as 99.87333333 is
-    // the kind of detail that makes a message read like a debug dump.
-    month: change.sla?.month ?? "",
-    target: (change.sla?.target ?? 0).toFixed(2),
-    uptime: (change.sla?.uptime ?? 0).toFixed(2),
-    projected: (change.sla?.projectedUptime ?? 0).toFixed(2),
-    budgetMinutes: Math.round(change.sla?.budgetMinutes ?? 0),
-    spentMinutes: Math.round(change.sla?.spentMinutes ?? 0),
+        // The SLA burn's own numbers (roadmap 4.13). Formatted to two decimals
+        // here rather than in the catalog: a percentage printed as 99.87333333 is
+        // the kind of detail that makes a message read like a debug dump.
+        month: change.sla?.month ?? "",
+        target: (change.sla?.target ?? 0).toFixed(2),
+        uptime: (change.sla?.uptime ?? 0).toFixed(2),
+        projected: (change.sla?.projectedUptime ?? 0).toFixed(2),
+        budgetMinutes: Math.round(change.sla?.budgetMinutes ?? 0),
+        spentMinutes: Math.round(change.sla?.spentMinutes ?? 0),
         current,
       });
     case "correlated_outage":
@@ -269,7 +289,10 @@ export function templateValues(
     kind: change.kind,
     severity: severityLabel(change.currentStatus, locale),
     status: statusLabel(change.currentStatus, locale),
-    previous: change.previousStatus === undefined ? "" : statusLabel(change.previousStatus, locale),
+    previous:
+      change.previousStatus === undefined
+        ? ""
+        : statusLabel(change.previousStatus, locale),
     component: change.component?.name ?? "",
     title: change.incident?.name ?? change.maintenance?.name ?? "",
     incidentStatus: incidentStatusLabel(change.incident?.status ?? "", locale),
@@ -281,12 +304,18 @@ export function templateValues(
   };
 }
 
-function render(payload: NotificationPayload, options: { omitUrl: boolean }): string {
+function render(
+  payload: NotificationPayload,
+  options: { omitUrl: boolean },
+): string {
   // A digest is its own message shape, so it short-circuits the per-kind
   // template below — but it still goes through here, which is what keeps the
   // suppressed line and every channel's own rendering path shared.
   if (payload.digest !== undefined) {
-    return withSuppressed(renderDigest(payload.digest.items, payload.digest.windowMinutes), payload);
+    return withSuppressed(
+      renderDigest(payload.digest.items, payload.digest.windowMinutes),
+      payload,
+    );
   }
 
   // The channel's own template, when it has one (roadmap 3.15). Checked after
@@ -298,7 +327,10 @@ function render(payload: NotificationPayload, options: { omitUrl: boolean }): st
   // shape here: it is not about the change, so a template has no token for it
   // and no way to lose it.
   if (payload.template !== undefined && payload.template.trim() !== "") {
-    return withSuppressed(fillTemplate(payload.template, templateValues(payload, options)), payload);
+    return withSuppressed(
+      fillTemplate(payload.template, templateValues(payload, options)),
+      payload,
+    );
   }
 
   const { change, service, locale } = payload;
@@ -311,14 +343,32 @@ function render(payload: NotificationPayload, options: { omitUrl: boolean }): st
       ? t(locale, "incident.status.resolved").toLocaleUpperCase(locale)
       : severityLabel(change.currentStatus, locale);
 
-  const body = t(locale, TEMPLATE[change.kind], {
+  // Roadmap 9.1. The disagreement is reported either way; what changes is what
+  // the message says it means. With a `declared` page the news is that the page
+  // has not caught up with its own service; with an `observed` one the page is
+  // an opinion and our reading is the record, so the sentence has to stop
+  // implying the page is the thing that was supposed to be right.
+  const key =
+    change.kind === "silent_outage" &&
+    change.crossCheck?.authority === "observed"
+      ? "notification.silent.outage-observed"
+      : TEMPLATE[change.kind];
+
+  const body = t(locale, key, {
     provider: service.name,
     severity: heading,
-    previous: change.previousStatus === undefined ? "" : statusLabel(change.previousStatus, locale),
+    previous:
+      change.previousStatus === undefined
+        ? ""
+        : statusLabel(change.previousStatus, locale),
     current: statusLabel(change.currentStatus, locale),
     title: change.incident?.name ?? change.maintenance?.name ?? "",
     status: incidentStatusLabel(change.incident?.status ?? "", locale),
-    count: change.failureCount ?? change.openIncidents ?? change.correlated?.providerIds.length ?? 0,
+    count:
+      change.failureCount ??
+      change.openIncidents ??
+      change.correlated?.providerIds.length ??
+      0,
     // Provider ids rather than names: only the change's own provider has a
     // name here, and a list that mixed one display name with N slugs would
     // read as two different things.
@@ -327,7 +377,8 @@ function render(payload: NotificationPayload, options: { omitUrl: boolean }): st
     probe: change.crossCheck?.probeId ?? "",
     note: change.crossCheck?.note ?? "",
     endsAt:
-      change.maintenance?.endsAt === null || change.maintenance?.endsAt === undefined
+      change.maintenance?.endsAt === null ||
+      change.maintenance?.endsAt === undefined
         ? t(locale, "maintenance.no-end")
         : formatUtc(change.maintenance.endsAt),
     lastStatus: statusLabel(change.currentStatus, locale),
@@ -338,7 +389,10 @@ function render(payload: NotificationPayload, options: { omitUrl: boolean }): st
     url: options.omitUrl ? "" : service.statusUrl,
   });
 
-  return withSuppressed(`${accentFor(change).emoji} ${body}`.trimEnd(), payload);
+  return withSuppressed(
+    `${accentFor(change).emoji} ${body}`.trimEnd(),
+    payload,
+  );
 }
 
 /**

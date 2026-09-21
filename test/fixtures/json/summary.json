@@ -1,0 +1,23 @@
+{
+  "service": {
+    "name": "Acme Cloud",
+    "state": "PARTIAL",
+    "checkedAt": "2026-09-01T09:00:00.000Z"
+  },
+  "events": [
+    {
+      "ref": "EV-4411",
+      "title": "Elevated error rates in eu-west",
+      "phase": "investigating",
+      "severity": "major",
+      "changedAt": "2026-09-01T08:40:00.000Z"
+    },
+    {
+      "ref": "EV-4412",
+      "title": "Slow uploads",
+      "phase": "monitoring",
+      "severity": "minor",
+      "changedAt": "2026-09-01T08:55:00.000Z"
+    }
+  ]
+}

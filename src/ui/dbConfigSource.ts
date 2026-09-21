@@ -44,7 +44,9 @@ const ENV_SUFFIX = "Env";
  * Stated once here: three of the rows below are flags, and three hand-written
  * transforms is three chances for one of them to read a missing row as true.
  */
-const booleanSetting = z.enum(["true", "false"]).transform((value) => value === "true");
+const booleanSetting = z
+  .enum(["true", "false"])
+  .transform((value) => value === "true");
 
 /** A 24-hour wall clock time, the shape `quietHoursSchema` accepts. */
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
@@ -66,7 +68,12 @@ const settingsSchema = z.object({
     .enum(["true", "false"])
     .transform((value) => value === "true")
     .catch(true),
-  adaptiveIntervalMinutes: z.coerce.number().int().positive().max(1440).catch(1),
+  adaptiveIntervalMinutes: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(1440)
+    .catch(1),
   /**
    * Flap damping (roadmap 2.5): consecutive polls that must agree before a
    * transition notifies. Off by default — one sample is what every existing
@@ -81,7 +88,12 @@ const settingsSchema = z.object({
    * alerts, and an installation must not discover that mid-incident.
    */
   correlationThreshold: z.coerce.number().int().min(0).max(100).catch(0),
-  correlationWindowMinutes: z.coerce.number().int().positive().max(1440).catch(10),
+  correlationWindowMinutes: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(1440)
+    .catch(10),
   /**
    * How long history is kept. Four months by default — a month beyond the
    * 90-day view, so a full window is always available — and up to ten years for
@@ -104,6 +116,17 @@ const settingsSchema = z.object({
    * an empty world map is worse than no card.
    */
   mapView: z.enum(["off", "map", "globe"]).catch("off"),
+  /**
+   * How tightly the fleet lists pack — roadmap 13.1. `comfortable` is the
+   * layout the dashboard has always had; `compact` trades the breathing room
+   * for rows on screen, which is the trade an operator with a hundred providers
+   * is already making by scrolling.
+   *
+   * A stored preference rather than a viewport rule: it is about how many
+   * providers there are, not how big the window is, and a laptop watching a
+   * hundred of them wants compact at any width.
+   */
+  density: z.enum(["comfortable", "compact"]).catch("comfortable"),
 
   /**
    * Quiet hours (roadmap 3.11). Stored as five flat rows like every other
@@ -160,6 +183,7 @@ const serviceRowSchema = z.object({
   group_name: z.string().nullable(),
   cross_checks: z.string().nullable(),
   sla_target: z.number().nullable(),
+  authority: z.enum(["declared", "observed"]).nullable(),
 });
 
 const removedRowSchema = z.object({
@@ -244,7 +268,11 @@ export function deliveryOf(settings: Settings): {
     timeZone: string;
     minSeverity: Settings["quietHoursMinSeverity"];
   };
-  digest: { enabled: boolean; windowMinutes: number; immediateFloor: Settings["digestImmediateFloor"] };
+  digest: {
+    enabled: boolean;
+    windowMinutes: number;
+    immediateFloor: Settings["digestImmediateFloor"];
+  };
   cap: { enabled: boolean; maxPerHour: number };
   updateInPlace: boolean;
 } {
@@ -261,12 +289,18 @@ export function deliveryOf(settings: Settings): {
       windowMinutes: settings.digestWindowMinutes,
       immediateFloor: settings.digestImmediateFloor,
     },
-    cap: { enabled: settings.alertCapEnabled, maxPerHour: settings.alertCapPerHour },
+    cap: {
+      enabled: settings.alertCapEnabled,
+      maxPerHour: settings.alertCapPerHour,
+    },
     updateInPlace: settings.updateInPlace,
   };
 }
 
-export function writeSettings(db: DatabaseSync, patch: Partial<Record<keyof Settings, unknown>>): void {
+export function writeSettings(
+  db: DatabaseSync,
+  patch: Partial<Record<keyof Settings, unknown>>,
+): void {
   const upsert = db.prepare(
     "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
   );
@@ -282,7 +316,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks, sla_target
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks, sla_target, authority
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -294,12 +328,20 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       baseUrl: row.base_url,
       enabled: row.enabled === 1,
       components:
-        row.components === null ? [] : componentSelectionSchema.catch([]).parse(JSON.parse(row.components)),
+        row.components === null
+          ? []
+          : componentSelectionSchema
+              .catch([])
+              .parse(JSON.parse(row.components)),
       scopeToComponents: row.scope_to_components === 1,
       // Left off rather than passed as null: absent is what the poller reads as
       // "follow the global cadence".
-      ...(row.interval_minutes === null ? {} : { intervalMinutes: row.interval_minutes }),
-      ...(row.options === null ? {} : { options: JSON.parse(row.options) as Record<string, string> }),
+      ...(row.interval_minutes === null
+        ? {}
+        : { intervalMinutes: row.interval_minutes }),
+      ...(row.options === null
+        ? {}
+        : { options: JSON.parse(row.options) as Record<string, string> }),
       // Absent rather than null for the same reason as the interval: the
       // engine reads "no mute" from the field not being there, and an expired
       // mute is dropped here so nothing downstream has to know today's date to
@@ -315,13 +357,17 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // anything about this provider" has to stay distinguishable from a
       // target that happens to be 100 (roadmap 4.13).
       ...(row.sla_target === null ? {} : { slaTarget: row.sla_target }),
+      ...(row.authority === null ? {} : { authority: row.authority }),
     }));
 }
 
-export function insertService(db: DatabaseSync, definition: ServiceDefinition): void {
+export function insertService(
+  db: DatabaseSync,
+  definition: ServiceDefinition,
+): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks, sla_target, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks, sla_target, authority, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -336,6 +382,7 @@ export function insertService(db: DatabaseSync, definition: ServiceDefinition): 
     parsed.group ?? null,
     parsed.crossChecks ?? null,
     parsed.slaTarget ?? null,
+    parsed.authority ?? null,
     new Date().toISOString(),
   );
 }
@@ -349,16 +396,28 @@ export const servicePatchSchema = serviceDefinitionSchema
   .partial()
   .omit({ id: true })
   .extend({
-    intervalMinutes: z.number().int().positive().max(1440).nullable().optional(),
+    intervalMinutes: z
+      .number()
+      .int()
+      .positive()
+      .max(1440)
+      .nullable()
+      .optional(),
     // Null is how the dashboard lifts a mute early, for the same reason: on a
     // patch `undefined` already means "leave it alone".
     mutedUntil: z.string().datetime().nullable().optional(),
     /** Null takes the provider out of its group (roadmap 2.6). */
     group: serviceDefinitionSchema.shape.group.unwrap().nullable().optional(),
     /** Null stops a probe cross-checking anything (roadmap 1.10). */
-    crossChecks: serviceDefinitionSchema.shape.crossChecks.unwrap().nullable().optional(),
+    crossChecks: serviceDefinitionSchema.shape.crossChecks
+      .unwrap()
+      .nullable()
+      .optional(),
     /** Null means nobody is promising anything about this provider any more (roadmap 4.13). */
-    slaTarget: serviceDefinitionSchema.shape.slaTarget.unwrap().nullable().optional(),
+    slaTarget: serviceDefinitionSchema.shape.slaTarget
+      .unwrap()
+      .nullable()
+      .optional(),
   });
 
 /** Returns false when there was no such service, so a route can answer 404. */
@@ -373,20 +432,26 @@ export function updateService(
   if (parsed.adapter !== undefined) columns["adapter"] = parsed.adapter;
   if (parsed.baseUrl !== undefined) columns["base_url"] = parsed.baseUrl;
   if (parsed.enabled !== undefined) columns["enabled"] = parsed.enabled ? 1 : 0;
-  if (parsed.options !== undefined) columns["options"] = JSON.stringify(parsed.options);
+  if (parsed.options !== undefined)
+    columns["options"] = JSON.stringify(parsed.options);
   // Null is how the dashboard takes a provider out of its group, the way it
   // clears an interval: on a patch `undefined` already means "leave it alone".
   if (parsed.group !== undefined) columns["group_name"] = parsed.group;
-  if (parsed.crossChecks !== undefined) columns["cross_checks"] = parsed.crossChecks;
+  if (parsed.crossChecks !== undefined)
+    columns["cross_checks"] = parsed.crossChecks;
   if (parsed.components !== undefined) {
-    columns["components"] = parsed.components.length === 0 ? null : JSON.stringify(parsed.components);
+    columns["components"] =
+      parsed.components.length === 0 ? null : JSON.stringify(parsed.components);
   }
   if (parsed.scopeToComponents !== undefined) {
     columns["scope_to_components"] = parsed.scopeToComponents ? 1 : 0;
   }
-  if (parsed.intervalMinutes !== undefined) columns["interval_minutes"] = parsed.intervalMinutes;
-  if (parsed.mutedUntil !== undefined) columns["muted_until"] = parsed.mutedUntil;
+  if (parsed.intervalMinutes !== undefined)
+    columns["interval_minutes"] = parsed.intervalMinutes;
+  if (parsed.mutedUntil !== undefined)
+    columns["muted_until"] = parsed.mutedUntil;
   if (parsed.slaTarget !== undefined) columns["sla_target"] = parsed.slaTarget;
+  if (parsed.authority !== undefined) columns["authority"] = parsed.authority;
   if (Object.keys(columns).length === 0) return exists(db, id);
 
   const assignments = Object.keys(columns)
@@ -395,7 +460,9 @@ export function updateService(
   // A removed provider is on its way out: editing it back into service through
   // a patch would be an update nothing on the dashboard could see.
   const result = db
-    .prepare(`UPDATE services SET ${assignments} WHERE id = ? AND deleted_at IS NULL`)
+    .prepare(
+      `UPDATE services SET ${assignments} WHERE id = ? AND deleted_at IS NULL`,
+    )
     .run(...Object.values(columns), id);
   return result.changes > 0;
 }
@@ -422,7 +489,10 @@ export interface ServiceImpact {
  * `purgeService`), and a confirmation that claims otherwise is worse than one
  * that says nothing.
  */
-export function describeServiceImpact(db: DatabaseSync, id: string): ServiceImpact | null {
+export function describeServiceImpact(
+  db: DatabaseSync,
+  id: string,
+): ServiceImpact | null {
   if (!exists(db, id)) return null;
   const count = (sql: string, ...extra: string[]): number =>
     z.object({ n: z.number() }).parse(db.prepare(sql).get(id, ...extra)).n;
@@ -431,14 +501,27 @@ export function describeServiceImpact(db: DatabaseSync, id: string): ServiceImpa
   const componentRules = `${id}#%`;
   const oldest = z
     .object({ oldest: z.string().nullable() })
-    .parse(db.prepare("SELECT MIN(observed_at) AS oldest FROM status_samples WHERE provider_id = ?").get(id))
-    .oldest;
+    .parse(
+      db
+        .prepare(
+          "SELECT MIN(observed_at) AS oldest FROM status_samples WHERE provider_id = ?",
+        )
+        .get(id),
+    ).oldest;
   const oldestMs = oldest === null ? null : Date.parse(oldest);
   return {
-    samples: count("SELECT COUNT(*) AS n FROM status_samples WHERE provider_id = ?"),
-    componentSamples: count("SELECT COUNT(*) AS n FROM component_samples WHERE provider_id = ?"),
-    incidents: count("SELECT COUNT(*) AS n FROM incidents WHERE provider_id = ?"),
-    maintenances: count("SELECT COUNT(*) AS n FROM maintenances WHERE provider_id = ?"),
+    samples: count(
+      "SELECT COUNT(*) AS n FROM status_samples WHERE provider_id = ?",
+    ),
+    componentSamples: count(
+      "SELECT COUNT(*) AS n FROM component_samples WHERE provider_id = ?",
+    ),
+    incidents: count(
+      "SELECT COUNT(*) AS n FROM incidents WHERE provider_id = ?",
+    ),
+    maintenances: count(
+      "SELECT COUNT(*) AS n FROM maintenances WHERE provider_id = ?",
+    ),
     // Its own rules and its components' (roadmap 2.9): `github#api` names this
     // provider as surely as `github` does, and a removal takes both.
     routingRules: count(
@@ -463,7 +546,9 @@ export const RESTORE_WINDOW_DAYS = 7;
 
 /** When the grace period on a removal runs out. */
 export const restoreDeadline = (deletedAt: string): string =>
-  new Date(Date.parse(deletedAt) + RESTORE_WINDOW_DAYS * 86_400_000).toISOString();
+  new Date(
+    Date.parse(deletedAt) + RESTORE_WINDOW_DAYS * 86_400_000,
+  ).toISOString();
 
 /**
  * Marks a provider removed without taking anything with it yet. It leaves the
@@ -473,18 +558,29 @@ export const restoreDeadline = (deletedAt: string): string =>
  * Returns false for an id that is not there or is already removed, so a route
  * can answer 404 and a second click cannot restart the clock.
  */
-export function softDeleteService(db: DatabaseSync, id: string, at: Date = new Date()): boolean {
+export function softDeleteService(
+  db: DatabaseSync,
+  id: string,
+  at: Date = new Date(),
+): boolean {
   return (
     db
-      .prepare("UPDATE services SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL")
+      .prepare(
+        "UPDATE services SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+      )
       .run(at.toISOString(), id).changes > 0
   );
 }
 
 /** Puts a removed provider back, history and rules included — nothing was taken. */
 export function restoreService(db: DatabaseSync, id: string): boolean {
-  return db.prepare("UPDATE services SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL").run(id)
-    .changes > 0;
+  return (
+    db
+      .prepare(
+        "UPDATE services SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
+      )
+      .run(id).changes > 0
+  );
 }
 
 /** Every removed provider still inside its grace period, oldest removal last. */
@@ -513,10 +609,17 @@ export function listRemovedServices(db: DatabaseSync): RemovedService[] {
  * Returns the ids it took, for the log line: a deletion nobody asked for today
  * should still be traceable to the removal that scheduled it.
  */
-export function purgeExpiredServices(db: DatabaseSync, at: Date = new Date()): string[] {
-  const cutoff = new Date(at.getTime() - RESTORE_WINDOW_DAYS * 86_400_000).toISOString();
+export function purgeExpiredServices(
+  db: DatabaseSync,
+  at: Date = new Date(),
+): string[] {
+  const cutoff = new Date(
+    at.getTime() - RESTORE_WINDOW_DAYS * 86_400_000,
+  ).toISOString();
   const expired = db
-    .prepare("SELECT id FROM services WHERE deleted_at IS NOT NULL AND deleted_at <= ?")
+    .prepare(
+      "SELECT id FROM services WHERE deleted_at IS NOT NULL AND deleted_at <= ?",
+    )
     .all(cutoff)
     .map((row) => z.object({ id: z.string() }).parse(row).id);
   for (const id of expired) purgeService(db, id);
@@ -530,7 +633,8 @@ export function purgeExpiredServices(db: DatabaseSync, at: Date = new Date()): s
  * second deletion path to keep in step.
  */
 export function purgeService(db: DatabaseSync, id: string): boolean {
-  const deleted = db.prepare("DELETE FROM services WHERE id = ?").run(id).changes > 0;
+  const deleted =
+    db.prepare("DELETE FROM services WHERE id = ?").run(id).changes > 0;
   if (deleted) {
     // Nothing cached for a provider that no longer exists — a re-added id must
     // not be revalidated against the validator of the one that is gone.
@@ -540,7 +644,9 @@ export function purgeService(db: DatabaseSync, id: string): boolean {
     // when a row actually went away — a 404 on an unknown id must not mutate.
     // Its components' rules go with it: `github#api` names this provider as
     // surely as `github` does (roadmap 2.9).
-    db.prepare("DELETE FROM routing_rules WHERE provider = ? OR provider LIKE ?").run(id, `${id}#%`);
+    db.prepare(
+      "DELETE FROM routing_rules WHERE provider = ? OR provider LIKE ?",
+    ).run(id, `${id}#%`);
   }
   return deleted;
 }
@@ -567,13 +673,17 @@ export function listRoutingRules(
   let invalid = 0;
 
   for (const raw of db
-    .prepare("SELECT provider, classes, min_severity, channels FROM routing_rules ORDER BY position, id")
+    .prepare(
+      "SELECT provider, classes, min_severity, channels FROM routing_rules ORDER BY position, id",
+    )
     .all()) {
     const row = routingRowSchema.safeParse(raw);
     if (!row.success) {
       invalid += 1;
       logger.error("skipping an unreadable routing rule row", {
-        issues: row.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`),
+        issues: row.error.issues.map(
+          (issue) => `${issue.path.join(".")}: ${issue.message}`,
+        ),
       });
       continue;
     }
@@ -599,7 +709,9 @@ export function listRoutingRules(
       invalid += 1;
       logger.error("skipping an invalid routing rule row", {
         provider: row.data.provider,
-        issues: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`),
+        issues: parsed.error.issues.map(
+          (issue) => `${issue.path.join(".")}: ${issue.message}`,
+        ),
       });
       continue;
     }
@@ -615,7 +727,10 @@ export function listRoutingRules(
  * settle in an order neither writer asked for, and the dashboard holds the full
  * list anyway.
  */
-export function replaceRoutingRules(db: DatabaseSync, rules: RoutingRule[]): void {
+export function replaceRoutingRules(
+  db: DatabaseSync,
+  rules: RoutingRule[],
+): void {
   // Validated before anything is deleted: a rejected write must leave the
   // previous rules in place, not an empty table.
   const validated = routingRulesSchema.parse(rules);
@@ -627,7 +742,13 @@ export function replaceRoutingRules(db: DatabaseSync, rules: RoutingRule[]): voi
       "INSERT INTO routing_rules (position, provider, classes, min_severity, channels) VALUES (?, ?, ?, ?, ?)",
     );
     validated.forEach((rule, index) => {
-      insert.run(index, rule.provider, JSON.stringify(rule.classes), rule.minSeverity, JSON.stringify(rule.channels));
+      insert.run(
+        index,
+        rule.provider,
+        JSON.stringify(rule.classes),
+        rule.minSeverity,
+        JSON.stringify(rule.channels),
+      );
     });
     db.exec("COMMIT");
   } catch (error) {
@@ -672,7 +793,11 @@ export interface ChannelPatch {
   template?: string | undefined;
 }
 
-export function updateChannel(db: DatabaseSync, id: string, patch: ChannelPatch): boolean {
+export function updateChannel(
+  db: DatabaseSync,
+  id: string,
+  patch: ChannelPatch,
+): boolean {
   const current = listChannels(db).find((channel) => channel.id === id);
   if (current === undefined) return false;
 
@@ -691,7 +816,9 @@ export function updateChannel(db: DatabaseSync, id: string, patch: ChannelPatch)
       // requests. There is no legitimate reason to store an empty variable
       // name, so refuse it outright.
       if (value === "") {
-        throw new Error(`channel ${id}: "${key}" must name an environment variable, so it cannot be blank`);
+        throw new Error(
+          `channel ${id}: "${key}" must name an environment variable, so it cannot be blank`,
+        );
       }
     }
     config = { ...config, ...patch.fields };
@@ -714,7 +841,9 @@ export function updateChannel(db: DatabaseSync, id: string, patch: ChannelPatch)
     // sharing a variable name (from before this guard existed, or a direct
     // edit) locked the operator out of toggling *any* channel with a 400 about
     // a field they never touched.
-    const merged = listChannels(db).map((channel) => (channel.id === id ? { ...channel, config } : channel));
+    const merged = listChannels(db).map((channel) =>
+      channel.id === id ? { ...channel, config } : channel,
+    );
     const byVariable = new Map<string, string>();
     for (const channel of merged) {
       for (const [key, value] of Object.entries(channel.config)) {
@@ -740,7 +869,8 @@ export function updateChannel(db: DatabaseSync, id: string, patch: ChannelPatch)
     if (value === undefined) continue;
     if (key === "template" && value !== "") {
       const problems = templateProblems(value);
-      if (problems.length > 0) throw new Error(`channel ${id}: template — ${problems.join("; ")}`);
+      if (problems.length > 0)
+        throw new Error(`channel ${id}: template — ${problems.join("; ")}`);
     }
     const { [key]: _dropped, ...rest } = config;
     config = value === "" ? rest : { ...rest, [key]: value };
@@ -755,7 +885,10 @@ export function updateChannel(db: DatabaseSync, id: string, patch: ChannelPatch)
 }
 
 /** The only channel shape the API returns: names and whether they resolve. */
-export function describeChannels(db: DatabaseSync, env: NodeJS.ProcessEnv): DescribedChannel[] {
+export function describeChannels(
+  db: DatabaseSync,
+  env: NodeJS.ProcessEnv,
+): DescribedChannel[] {
   return listChannels(db).map((channel) => ({
     id: channel.id,
     enabled: channel.enabled,
@@ -767,7 +900,10 @@ export function describeChannels(db: DatabaseSync, env: NodeJS.ProcessEnv): Desc
         name: key.slice(0, -ENV_SUFFIX.length),
         envVar,
         isSet: (env[envVar] ?? "") !== "",
-        optional: isOptionalSetting(channel.id, key.slice(0, -ENV_SUFFIX.length)),
+        optional: isOptionalSetting(
+          channel.id,
+          key.slice(0, -ENV_SUFFIX.length),
+        ),
       })),
   }));
 }
@@ -788,7 +924,9 @@ export function createDbConfigSource(
           // One unusable row must not stop the other providers being polled.
           logger.warn("skipping an invalid service row", {
             providerId: row.id,
-            issues: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`),
+            issues: parsed.error.issues.map(
+              (issue) => `${issue.path.join(".")}: ${issue.message}`,
+            ),
           });
           continue;
         }
@@ -802,7 +940,8 @@ export function createDbConfigSource(
           // Not transport: how the message reads, not where it goes. Read off
           // below rather than resolved into `settings`, so a notifier factory
           // is never handed a setting it has no schema for.
-          if ((CHANNEL_MESSAGE_KEYS as readonly string[]).includes(key)) continue;
+          if ((CHANNEL_MESSAGE_KEYS as readonly string[]).includes(key))
+            continue;
           if (!key.endsWith(ENV_SUFFIX)) {
             resolved[key] = value;
             continue;
@@ -818,18 +957,35 @@ export function createDbConfigSource(
         }
 
         const message = {
-          ...(channel.config["locale"] === undefined ? {} : { locale: channel.config["locale"] }),
-          ...(channel.config["template"] === undefined ? {} : { template: channel.config["template"] }),
+          ...(channel.config["locale"] === undefined
+            ? {}
+            : { locale: channel.config["locale"] }),
+          ...(channel.config["template"] === undefined
+            ? {}
+            : { template: channel.config["template"] }),
         };
 
         if (channel.enabled && missing.length > 0) {
-          logger.warn("channel disabled for this cycle: its environment variables are not set", {
-            channel: channel.id,
-            missing,
-          });
-          return { id: channel.id, enabled: false, ...message, settings: resolved };
+          logger.warn(
+            "channel disabled for this cycle: its environment variables are not set",
+            {
+              channel: channel.id,
+              missing,
+            },
+          );
+          return {
+            id: channel.id,
+            enabled: false,
+            ...message,
+            settings: resolved,
+          };
         }
-        return { id: channel.id, enabled: channel.enabled, ...message, settings: resolved };
+        return {
+          id: channel.id,
+          enabled: channel.enabled,
+          ...message,
+          settings: resolved,
+        };
       });
 
       const routing = listRoutingRules(db, logger);
@@ -863,4 +1019,8 @@ export function createDbConfigSource(
 }
 
 const exists = (db: DatabaseSync, id: string): boolean =>
-  db.prepare("SELECT 1 AS one FROM services WHERE id = ? AND deleted_at IS NULL").get(id) !== undefined;
+  db
+    .prepare(
+      "SELECT 1 AS one FROM services WHERE id = ? AND deleted_at IS NULL",
+    )
+    .get(id) !== undefined;

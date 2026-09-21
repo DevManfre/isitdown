@@ -272,3 +272,72 @@ Timestamps stay UTC with an explicit suffix in every language.
   while the provider's own claim is still recorded.
 - **Concurrent writes** — a cycle mutates state for every provider at once, so the
   file store serialises writes and gives each its own temporary file.
+
+### 7.6 What uptime means
+
+Every percentage on the dashboard — the headline, the per-provider figure, the
+month bars, the SLA budget, the badge — is one fraction, computed in one place
+(`src/ui/history.ts`) and never re-derived in the browser. This is that
+fraction, written down so it can be disagreed with:
+
+> **Uptime is the share of readings in the window whose status was
+> `operational`.**
+
+Everything below follows from that sentence, and each line is asserted by a
+table-driven test in `test/ui/uptimeDefinition.test.ts`:
+
+| Question | Answer |
+| --- | --- |
+| Does `degraded` count as up? | **No.** `degraded`, `partial_outage` and `major_outage` all count as down. There is no half credit: a reading is `operational` or it is not. |
+| Does a maintenance window count as down? | **Yes, if the provider says it is degraded during it.** Maintenance silences *notifications* (7.3); it does not rewrite the readings. A provider that stays `operational` through its own window is up throughout it. |
+| Does a failed fetch count as down? | **No — it is not counted at all.** A cycle that could not read the page writes no sample: the failure is our monitoring's, and recording it as the provider's downtime would blame a provider for our network. It surfaces as a "monitoring degraded" warning instead. |
+| Does an `unknown` reading count as down? | **Yes**, when one was recorded: `unknown` is not `operational`. A day holding nothing but unknowns is drawn as unknown rather than as an outage, but its samples still sit in the denominator. |
+| What about a day with no samples at all? | **It is left out of both sides.** A day nobody measured is not a day at 100% and not a day at 0%; it is drawn as a gap and excluded from the fraction. |
+| Are days weighted equally? | **No — readings are.** A day with 12 samples contributes 12 readings, not one day. A provider on a slower cadence therefore weighs less per day, which is the honest reading of "how much of what we saw was good". |
+| Is the fleet figure a mean of providers or of readings? | **Of providers.** One provider, one vote, across the providers with samples in the window. A busy provider polled more often must not drag the fleet's number. |
+| What does a window with no samples read? | **0% beside a sample count of zero**, which is how the view says "never measured". The delta against the previous window reads `—` rather than a fall of 92 points. |
+| Does a gap in our own polling lower it? | **No, and that is why coverage is published beside it** (7.6 continues below). |
+
+**Coverage.** Because a stretch when nothing was running leaves no samples, it
+leaves the fraction untouched: 100% uptime over an hour of watching and 100%
+over a month say the same thing and mean very different ones. So the poller
+records every finished cycle, a silence longer than twice the cadence it was
+running at is an absence, and the share of the window actually watched is
+reported next to the percentage — as a sentence under the headline, and as
+hatching on the days it happened. Days before the first cycle the database ever
+recorded report *no answer* rather than zero: there is no evidence either way,
+and drawing an install's past as our own outage would be a claim made out of
+missing data.
+
+### 7.7 Which source is the record
+
+IsItDown reads status pages *and* takes readings of its own (HTTP, TCP and DNS
+probes). Those are two different products in one binary, and they do not agree
+about what a provider's status **is**: an aggregator reports what the provider
+admits, a monitor reports what it measured. Left unsaid, that ambiguity lands on
+every figure — the same 93% on one row means "their page said so" and on the next
+means "we measured it".
+
+So every provider carries an `authority`, and the dashboard prints it beside the
+adapter:
+
+| Value | The record is | A contradiction is |
+| --- | --- | --- |
+| `declared` | The provider's own status page. | News in its own right — the silent-outage alert (§7.3) says the page has not caught up. The page's word is still what the provider's status *is*. |
+| `observed` | Our own reading. | The page is an opinion. The same alert fires, worded to say that our measurement is what counts here. |
+
+The default is not stored: it comes from the adapter. A probe is `observed`
+because it *is* the reading; everything that parses somebody's page is
+`declared`. That keeps the rule a rule instead of freezing the answer onto each
+row the day it was added — a provider migrated from a probe to a real status
+page follows the rule without anybody remembering to change a field. Setting
+`authority` explicitly, in `config.yml` or from the provider dialog, is only for
+the case where the operator disagrees with the default: a status page they have
+learned to distrust, or a probe they do not want treated as the record.
+
+What this changes today is what the dashboard and the alerts **say** — the badge,
+and which sentence a silent-outage message uses. It does not change which samples
+back a percentage: an `observed` provider's uptime is still computed from that
+provider's own samples, as §7.6 describes, because a probe and the page it
+cross-checks are two separate providers with two separate histories. Folding one
+into the other is a larger change and is deliberately not made here.

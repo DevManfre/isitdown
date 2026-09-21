@@ -1,3 +1,8 @@
+import {
+  PREVIEW_KINDS,
+  previewChannels,
+  type PreviewKind,
+} from "../notificationPreview.ts";
 import { Router } from "express";
 import { z } from "zod";
 import type { UiRuntimeCore } from "../runtime.ts";
@@ -41,7 +46,10 @@ export function notificationsRoutes(runtime: UiRuntimeCore): Router {
     // its answer keeps the limit honest — filtering afterwards would return
     // fewer rows than were asked for.
     res.json({
-      notifications: await runtime.store.listNotifications(limit, runtime.enabledProviderIds()),
+      notifications: await runtime.store.listNotifications(
+        limit,
+        runtime.enabledProviderIds(),
+      ),
     });
   });
 
@@ -61,7 +69,10 @@ export function notificationsRoutes(runtime: UiRuntimeCore): Router {
    */
   router.get("/notifications/log", async (req, res) => {
     const channelQuery = req.query["channel"];
-    const channel = typeof channelQuery === "string" && channelQuery !== "" ? { channel: channelQuery } : {};
+    const channel =
+      typeof channelQuery === "string" && channelQuery !== ""
+        ? { channel: channelQuery }
+        : {};
     const state = stateSchema.parse(req.query["state"] ?? undefined);
     const page = pageSchema.parse(req.query["page"] ?? undefined);
     const pageSize = pageSizeSchema.parse(req.query["pageSize"] ?? undefined);
@@ -79,6 +90,27 @@ export function notificationsRoutes(runtime: UiRuntimeCore): Router {
     ]);
 
     res.json({ page: { items, page, pageSize, total: counts[state] }, counts });
+  });
+
+  /**
+   * What every configured channel would say about one invented transition —
+   * roadmap 14.1. Nothing is sent and nothing is recorded: it renders from the
+   * same pure functions the notifiers build their bodies with.
+   */
+  router.get("/notifications/preview", async (req, res) => {
+    const asked = req.query["kind"];
+    const kind = asked === undefined ? PREVIEW_KINDS[0] : asked;
+    if (!PREVIEW_KINDS.includes(kind as PreviewKind)) {
+      res
+        .status(400)
+        .json({
+          error: { message: `kind must be one of ${PREVIEW_KINDS.join(", ")}` },
+        });
+      return;
+    }
+    res.json(
+      previewChannels(await runtime.configSource.load(), kind as PreviewKind),
+    );
   });
 
   return router;

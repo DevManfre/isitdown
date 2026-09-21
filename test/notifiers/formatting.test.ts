@@ -338,3 +338,32 @@ test("maintenance and a monitoring warning do not borrow the provider's colour",
   assert.notEqual(maintenance, colorFor({ kind: "status_change", providerId: "github", currentStatus: "major_outage", at: incident.updatedAt }));
   assert.equal(monitoring, colorFor({ kind: "status_change", providerId: "github", currentStatus: "unknown", at: incident.updatedAt }));
 });
+
+test("a silent outage says what the disagreement means, per the provider's authority", () => {
+  const change = (authority: "declared" | "observed"): StatusChange => ({
+    kind: "silent_outage",
+    providerId: "github",
+    previousStatus: "operational",
+    currentStatus: "major_outage",
+    crossCheck: { probeId: "github-api", note: "connection refused", authority },
+    at: "2026-08-19T14:32:07.000Z",
+  });
+
+  // Roadmap 9.1. With a declared page the news is that the page has not caught
+  // up with its own service.
+  const declared = renderMessage(payloadFor(change("declared")));
+  assert.ok(declared.includes("The status page still reports"), declared);
+
+  // With an observed one the page is an opinion and our reading is the record,
+  // so the sentence stops implying the page was supposed to be right.
+  const observed = renderMessage(payloadFor(change("observed")));
+  assert.ok(observed.includes("this provider's record is what we measure"), observed);
+  assert.ok(observed.includes("an opinion rather than the answer"), observed);
+
+  // Both name the probe and carry its reason: the authority changes the
+  // framing, never the evidence.
+  for (const message of [declared, observed]) {
+    assert.ok(message.includes("github-api"), message);
+    assert.ok(message.includes("connection refused"), message);
+  }
+});
