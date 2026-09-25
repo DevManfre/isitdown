@@ -30,7 +30,7 @@ server) e **UI** (lo stesso core più una dashboard locale, configurabile a runt
 ## Indice
 
 In questa pagina: [1. Cosa fa](#1-cosa-fa) · [2. Avvio rapido](#2-avvio-rapido) ·
-[10. Roadmap](#10-roadmap) · [11. Layout dei branch e politica di merge](#11-layout-dei-branch-e-politica-di-merge)
+[10. Client da terminale](#10-client-da-terminale) · [11. Roadmap](#11-roadmap) · [12. Layout dei branch e politica di merge](#12-layout-dei-branch-e-politica-di-merge)
 
 Il manuale, un file per sezione:
 
@@ -41,6 +41,7 @@ Il manuale, un file per sezione:
 - [7. Come funziona](docs/how-it-works.it.md) — flusso dei dati, componenti, quando scatta una notifica, resilienza
 - [8. Tema e localizzazione](docs/theming.it.md) — temi, `en`/`it`, accessibilità
 - [9. Sviluppo](docs/development.it.md) — struttura, stack tecnico, sviluppo live, test, rilasci
+- [10. Client da terminale](docs/cli.it.md) — `isitdown watch`, una vista di sola lettura della flotta per il terminale
 
 Ogni pagina ha accanto la sua gemella inglese (`docs/<nome>.md`).
 
@@ -158,7 +159,7 @@ Variabili utili in locale: `CONFIG_PATH`, `DATA_PATH`, `DB_PATH`, `PORT`,
 
 ---
 
-## 10. Roadmap
+## 11. Roadmap
 
 Consegnato:
 
@@ -210,7 +211,7 @@ un singolo operatore), status page dietro login, e un'app mobile pacchettizzata.
 
 ---
 
-## 11. Layout dei branch e politica di merge
+## 12. Layout dei branch e politica di merge
 
 Il tooling di Claude Code (`.claude/`, `CLAUDE.md`) e il filtro di merge stesso
 (`.mergeexclude`, `.githooks/`, `scripts/`) sono versionati **solo su `dev`**. Su
