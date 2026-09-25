@@ -62,6 +62,7 @@ left is not a way to read a file like this.
 | ✅ 12.3 — incidents by hour and weekday | `2ab9838` |
 | ◐ 13.1 — problems first and density; not virtualisation | `694d6c7` |
 | ✅ 14.1 — the real message preview per channel | `2db60e7` |
+| ✅ 17.4 — export the fleet as a Gatus config.yaml | `b8cf142` |
 
 Two of the three rows this file's closing section argued hardest for — **10.1**
 and **12.1** — are through. The third, **15.1**, is not.
@@ -254,7 +255,7 @@ re-invented from scratch in a year. A row here is a conversation, not a plan.
 | 17.1 | **An MCP server over the fleet** | Expose the fleet's state and incident history as tools an assistant can query: "was Cloudflare degraded when our error rate spiked". The API already exists; this is an adapter onto it. Cheap, on-trend, and completely optional — which is the only way it belongs in a project whose pitch is that it needs nothing. |
 | 17.2 | **An e-ink endpoint** | A PNG of the fleet, sized for a cheap e-ink frame, refreshed on a cadence. Pure homelab charm, ~50 lines on top of the wallboard renderer (13.3). |
 | 17.3 | **Anomaly detection on latency** | 8.3 was dismissed for want of data. Status-page fetch latency (2.8) has since been recorded on every sample, so the data now exists — and the objection becomes statistical rather than practical. Still probably a trap. |
-| 17.4 | **Export to a neighbour's format** | Write the fleet out as Uptime Kuma or Gatus configuration. The inverse of 11.7, and a genuinely friendly thing to do — it says the project is not trying to trap anybody. |
+| ✅ 17.4 | **Export to a neighbour's format** | Write the fleet out as Uptime Kuma or Gatus configuration. The inverse of 11.7, and a genuinely friendly thing to do — it says the project is not trying to trap anybody. **✅ `b8cf142`.** Gatus only: Uptime Kuma's own JSON backup/restore was removed in 2.x with nothing upstream to read it back in (issue #6045, open, unimplemented). `GET /export/gatus.yaml` translates `http`/`tcp`/`dns` probes to endpoints; status-page adapters have no Gatus equivalent and are counted in the file's header instead. |
 | 17.5 | **A voice call for the one alert that matters** | Twilio, for the single provider whose outage means getting out of bed. PagerDuty (3.7) covers this for anybody who has PagerDuty; most of this audience does not. |
 | 17.6 | **Watch a provider edit its own past** | 8.9, unchanged and still good: status pages quietly rewrite resolved incidents. Storing the first version read and diffing later ones would catch it. Blocked on nothing except appetite — and it becomes nearly free if 10.4 and 10.8 land, which is the argument for those rows. |
 | 17.7 | **A terminal client** | 8.4. `isitdown watch` in a pane. The API supports it; the single binary (6.7) makes distribution trivial; nobody has asked. |
