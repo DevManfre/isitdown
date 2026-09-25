@@ -475,6 +475,13 @@ const paths: Json = {
       responses: { "200": media("text/markdown", "The report.") },
     },
   },
+  "/export/gatus.yaml": {
+    get: {
+      tags: ["Export"],
+      summary: "The fleet as a Gatus config.yaml endpoint list.",
+      responses: { "200": media("text/yaml", "Only http/tcp/dns probes translate; the rest are counted in the header.") },
+    },
+  },
   "/feeds/incidents.xml": {
     get: {
       tags: ["Export"],
