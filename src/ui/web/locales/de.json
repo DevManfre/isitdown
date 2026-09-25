@@ -285,6 +285,7 @@
   "settings.backup.label": "Sicherung und Umzug",
   "settings.backup.hint": "Exportiert alles auf dieser Seite als config.yml der Light-Edition, oder liest eines wieder ein. Zugangsdaten reisen als ${VARIABLE}-Verweise, nie als Werte.",
   "settings.backup.export": "config.yml exportieren",
+  "settings.backup.exportGatus": "Als Gatus-Endpunkte exportieren",
   "settings.backup.import": "config.yml importieren",
   "settings.backup.imported": "Importiert: {added} hinzugefügt, {updated} aktualisiert, {removed} entfernt.",
   "settings.retention.cost": "≈ {projected} Verlauf · {current} derzeit auf der Platte",

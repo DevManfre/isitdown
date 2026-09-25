@@ -1340,6 +1340,13 @@ function SettingsView() {
               <Button asChild variant="outline" size="sm">
                 <a href="/config/export">{t("settings.backup.export")}</a>
               </Button>
+              {/* Roadmap 17.4. A second neighbour's format in the same card — not a
+              new surface, the same download this row already offers in a shape
+              Gatus reads. Probes translate; status-page providers are counted in
+              the file's own header rather than silently dropped. */}
+              <Button asChild variant="outline" size="sm">
+                <a href="/export/gatus.yaml">{t("settings.backup.exportGatus")}</a>
+              </Button>
               {/* A real, focusable file input rather than a hidden one behind a
               button: a hidden input is out of the tab order, which is exactly
               the kind of control 5.13 exists to stop adding. */}
