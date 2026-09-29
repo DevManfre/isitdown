@@ -1178,6 +1178,80 @@ describe("Settings", () => {
   });
 });
 
+describe("Settings update check", () => {
+  /** `GET /config`'s `updateCheck` shape, off by default like the option itself. */
+  const off = { enabled: false, status: "unknown" as const, currentVersion: "2.5.0", latestVersion: null, checkedAt: null };
+
+  it("is off by default, with no badge and no status line", async () => {
+    renderSettings("data", { ...fixtures, config: { ...config, updateCheck: off } });
+
+    const toggle = await screen.findByLabelText(i18n.t("field.update-check"));
+    expect(toggle).not.toBeChecked();
+    expect(screen.queryByText(/available/i)).not.toBeInTheDocument();
+  });
+
+  it("always shows the disclosure, even switched off", async () => {
+    renderSettings("data", { ...fixtures, config: { ...config, updateCheck: off } });
+    expect(await screen.findByText(i18n.t("field.update-check.hint"))).toBeInTheDocument();
+  });
+
+  it("shows the version badge once a newer release is found", async () => {
+    renderSettings("data", {
+      ...fixtures,
+      config: {
+        ...config,
+        updateCheck: {
+          enabled: true,
+          status: "available" as const,
+          currentVersion: "2.5.0",
+          latestVersion: "2.6.0",
+          checkedAt: "2026-09-25T06:00:00Z",
+        },
+      },
+    });
+
+    const toggle = await screen.findByLabelText(i18n.t("field.update-check"));
+    expect(toggle).toBeChecked();
+    expect(
+      await screen.findByText(i18n.t("settings.update-check.badge", { version: "2.6.0" })),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no badge when the instance is already on the highest release", async () => {
+    renderSettings("data", {
+      ...fixtures,
+      config: {
+        ...config,
+        updateCheck: {
+          enabled: true,
+          status: "current" as const,
+          currentVersion: "2.5.0",
+          latestVersion: null,
+          checkedAt: "2026-09-25T06:00:00Z",
+        },
+      },
+    });
+
+    await screen.findByLabelText(i18n.t("field.update-check"));
+    expect(screen.queryByText(/available/i)).not.toBeInTheDocument();
+  });
+
+  it("switching it on sends only that field", async () => {
+    renderSettings("data", { ...fixtures, config: { ...config, updateCheck: off } });
+    const calls = interceptWrites({
+      "PATCH /config/settings": { updateCheck: { ...off, enabled: true } },
+    });
+
+    await userEvent.click(await screen.findByLabelText(i18n.t("field.update-check")));
+
+    await waitFor(() =>
+      expect(writesIn(calls)).toEqual([
+        { path: "/config/settings", method: "PATCH", body: { updateCheckEnabled: true } },
+      ]),
+    );
+  });
+});
+
 describe("Settings retention", () => {
   it("shows the retention setting with what it costs on disk", async () => {
     renderSettings("data", fixtures);

@@ -38,6 +38,7 @@ import { createTrustService, type TrustPair } from "./trust.ts";
 import { createSqlitePushSubscriptionStore, type SqlitePushSubscriptionStore } from "./sqlitePushSubscriptionStore.ts";
 import { loadSecretsFile, type SecretsFile } from "./secretsFile.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
+import { createUpdateChecker, CHECK_INTERVAL_MS as UPDATE_CHECK_INTERVAL_MS, type UpdateChecker } from "./updateCheck.ts";
 import { ensureVapidKeys } from "./vapidKeys.ts";
 
 const PRUNE_INTERVAL_MS = 24 * 3600 * 1000;
@@ -100,6 +101,8 @@ export interface UiRuntimeCore {
    * (roadmap 5.18). In memory: diagnostics for the run in front of you.
    */
   adapterDebug: AdapterDebugStore;
+  /** Roadmap 15.11a: the opt-in "is a newer version out" check against GHCR. */
+  updateCheck: UpdateChecker;
   /**
    * The shared registry cannot build `webpush` on its own: that channel needs the
    * device list, which only this edition has. Composed once here so the scheduler
@@ -397,6 +400,26 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   }, PRUNE_INTERVAL_MS);
   pruneTimer.unref();
 
+  /**
+   * Roadmap 15.11a. Off by default and read fresh on every run, like `prune`
+   * above reads `retentionDays`: a toggle flipped from the dashboard takes
+   * effect on the next run without a restart. `maybeRun` returns immediately
+   * when `enabled` is false, before touching the network — an installation
+   * that never turns this on makes zero requests to GHCR, ever.
+   */
+  const updateChecker = createUpdateChecker({ logger });
+  await updateChecker.maybeRun(readSettings(db, logger).updateCheckEnabled);
+  const updateCheckTimer = setInterval(() => {
+    void updateChecker
+      .maybeRun(readSettings(db, logger).updateCheckEnabled)
+      .catch((error: unknown) => {
+        logger.error("checking for an update failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  }, UPDATE_CHECK_INTERVAL_MS);
+  updateCheckTimer.unref();
+
   const core: UiRuntimeCore = {
     db,
     dbPath: options.dbPath,
@@ -418,6 +441,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     live,
     pushSubscriptions,
     adapterDebug,
+    updateCheck: updateChecker,
     buildNotifiers: buildAllNotifiers,
     mapLane,
     logger,
@@ -439,6 +463,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     notificationFeedLimit: NOTIFICATION_FEED_LIMIT,
     async close(): Promise<void> {
       clearInterval(pruneTimer);
+      clearInterval(updateCheckTimer);
       mapLane.stop();
       scheduler.stop();
       await scheduler.settled();

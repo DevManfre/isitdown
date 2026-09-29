@@ -793,6 +793,43 @@ test("an out-of-range retention is refused", async () => {
   }
 });
 
+test("update check is off by default and reports its status through GET /config", async () => {
+  const app = await api();
+  try {
+    const { body } = await app.request("GET", "/config");
+    assert.deepEqual(
+      (body as { updateCheck: unknown }).updateCheck,
+      { enabled: false, status: "unknown", currentVersion: app.runtime.updateCheck.state().currentVersion, latestVersion: null, checkedAt: null },
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("switching update check on is a settings patch like any other, and nothing else changes", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.request("PATCH", "/config/settings", { updateCheckEnabled: true });
+    assert.equal(status, 200);
+    assert.equal((body as { updateCheck: { enabled: boolean } }).updateCheck.enabled, true);
+
+    const reread = (await app.request("GET", "/config")).body as { updateCheck: { enabled: boolean } };
+    assert.equal(reread.updateCheck.enabled, true);
+  } finally {
+    await app.close();
+  }
+});
+
+test("the update check flag rejects a non-boolean rather than coercing it", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.request("PATCH", "/config/settings", { updateCheckEnabled: "yes" });
+    assert.equal(status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
 test("the storage report measures the database so a retention choice can be costed", async () => {
   const app = await api();
   try {
