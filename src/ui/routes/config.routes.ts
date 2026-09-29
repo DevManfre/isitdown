@@ -71,6 +71,9 @@ const settingsPatchSchema = pollingSchema
   .extend({
     retentionDays: z.number().int().min(7).max(3650).optional(),
     delivery: deliveryPatchSchema.optional(),
+    // Roadmap 15.11a. Not part of `delivery`: it never sends a notification,
+    // it just controls whether the dashboard itself reads GHCR.
+    updateCheckEnabled: z.boolean().optional(),
   });
 const channelPatchSchema = z.object({
   enabled: z.boolean().optional(),
@@ -193,6 +196,11 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       // config source uses, so what the dashboard shows is what the dispatcher
       // is running on.
       delivery: deliveryOf(settings),
+      // Roadmap 15.11a. `runtime.updateCheck.state()` is in-memory, refreshed
+      // by the daily timer in `runtime.ts` — the setting itself lives here in
+      // SQLite like every other one, so a toggle survives a restart even
+      // though the last result does not.
+      updateCheck: { enabled: settings.updateCheckEnabled, ...runtime.updateCheck.state() },
       channels: describeChannels(db, runtime.env),
       routing: describeRouting(db, runtime.logger),
       // Removed but still restorable. Part of the config payload rather than a
@@ -531,11 +539,15 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       ...(parsed.data.retentionDays === undefined
         ? {}
         : { retentionDays: parsed.data.retentionDays }),
+      ...(parsed.data.updateCheckEnabled === undefined
+        ? {}
+        : { updateCheckEnabled: parsed.data.updateCheckEnabled }),
       ...deliveryPatch(parsed.data.delivery),
     });
     const settings = readSettings(db, runtime.logger);
     res.json({
       delivery: deliveryOf(settings),
+      updateCheck: { enabled: settings.updateCheckEnabled, ...runtime.updateCheck.state() },
       polling: {
         intervalMinutes: settings.pollIntervalMinutes,
         requestTimeoutSeconds: settings.requestTimeoutSeconds,
