@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { toCsv } from "../csv.ts";
+import { exportGatusYaml } from "../exportNeighbour.ts";
 import { renderMonthlyReport } from "../monthlyReport.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { ALLOWED_DAYS, parseDays } from "./historyWindow.ts";
@@ -177,6 +178,17 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
     send(res, "md", `uptime-${month}`, "text/markdown; charset=utf-8", renderMonthlyReport(report, names));
   };
 
+  /**
+   * The fleet as a Gatus `config.yaml` endpoint list (roadmap 17.4) — one file
+   * a neighbour reads natively, built the same way `/config/export` builds a
+   * Light `config.yml`: a pure translation over the same database, nothing
+   * Express-specific inside it. See `exportNeighbour.ts` for what does and does
+   * not have a Gatus equivalent, and why.
+   */
+  const gatus = (_req: Request, res: Response): void => {
+    send(res, "yaml", "gatus", "text/yaml; charset=utf-8", exportGatusYaml(runtime.db, runtime.logger));
+  };
+
   // Two paths per resource rather than one with a `format` parameter: the
   // extension in the url is what makes the downloaded file open in the right
   // application, and Express 5 no longer accepts an inline pattern to constrain
@@ -188,6 +200,7 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
   router.get("/export/trust.csv", trust("csv"));
   router.get("/export/trust.json", trust("json"));
   router.get("/export/monthly.md", monthly);
+  router.get("/export/gatus.yaml", gatus);
 
   return router;
 }
@@ -195,7 +208,7 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
 /** `isitdown-incidents-2026-09-09.csv`: dated, so two exports never collide in a downloads folder. */
 function send(
   res: Response,
-  format: "csv" | "json" | "md",
+  format: "csv" | "json" | "md" | "yaml",
   name: string,
   contentType: string,
   body: string,

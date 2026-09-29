@@ -20,6 +20,7 @@ src/notifiers/  per-channel notification senders (telegram, webhook, ...)
 src/light/      Light edition entrypoint, file-based config loader, file state store
 src/ui/         UI edition entrypoint, Express server, SQLite state store, dashboard routes
 src/ui/web/     React dashboard: Vite, shadcn/ui, Recharts — bundled into dist/ui/public
+src/cli/        Terminal client entrypoint (`isitdown watch`, roadmap 17.7) — a read-only HTTP client for the UI edition's API; never imports src/ui itself, only its response shapes (validated with zod like any other external input)
 design/         Claude Design exports/prototypes for the UI dashboard (source of truth for visual direction before implementation) — git-ignored, so present on disk only
 ```
 
@@ -35,6 +36,8 @@ docker compose --profile light up -d --build        # Light edition, container
 docker compose --profile ui up -d --build           # UI edition, container
 
 npm run build:sea && ./dist/sea/isitdown-light      # Light edition, one file, no Node install (roadmap 6.7)
+
+npm run build:cli && node dist/cli/index.js watch --url http://localhost:3000   # Terminal client, local (roadmap 17.7)
 
 npm run dev:docker                                  # UI edition, container, rebuild-on-save
 npm run dev:ui                                      # UI edition, local, HMR on :5173
