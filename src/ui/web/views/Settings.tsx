@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router";
 import { ArrowLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
@@ -302,6 +303,10 @@ function SettingsView() {
   // damping answers without the field, and one sample is what it was doing.
   const confirmSamples = confirmSamples_ ?? config.polling.confirmSamples ?? 1;
   const retentionDays = retentionDays_ ?? config.retention.days;
+  // Roadmap 15.11a. Optional, like `removed` above: a server from before this
+  // existed answers without it, which reads as off with nothing to show.
+  const updateCheck = config.updateCheck;
+  const updateCheckEnabled = updateCheck?.enabled ?? false;
   // Defaulted rather than assumed: the section only exists when a removal is
   // waiting, and an older payload carries no list at all.
   const removed = config.removed ?? [];
@@ -584,6 +589,23 @@ function SettingsView() {
           tone: "error",
         }),
     });
+  };
+
+  /** Roadmap 15.11a: the switch is the whole form, so it applies on click. */
+  const commitUpdateCheck = (enabled: boolean): void => {
+    toast("data", undefined);
+    settingsMutation.mutate(
+      { updateCheckEnabled: enabled },
+      {
+        onSuccess: () =>
+          toast("data", { text: t("settings.saved"), tone: "ok" }),
+        onError: (error) =>
+          toast("data", {
+            text: error instanceof Error ? error.message : String(error),
+            tone: "error",
+          }),
+      },
+    );
   };
 
   const commitRetention = (days: number): void => {
@@ -1391,6 +1413,53 @@ function SettingsView() {
                   if (file !== undefined) void runRestore(file);
                   event.target.value = "";
                 }}
+              />
+            </SettingRow>
+
+            {/* Roadmap 15.11a. Off by default: the switch is the whole form. The
+            disclosure below is always visible, even with the switch off — what
+            turning it on does must be understood before it is turned on. */}
+            <SettingRow
+              label={
+                <span className="inline-flex items-center gap-2">
+                  {t("field.update-check")}
+                  {updateCheckEnabled &&
+                    updateCheck?.status === "available" &&
+                    updateCheck.latestVersion !== null && (
+                      <Badge variant="muted">
+                        {t("settings.update-check.badge", {
+                          version: updateCheck.latestVersion,
+                        })}
+                      </Badge>
+                    )}
+                </span>
+              }
+              description={t("field.update-check.hint")}
+              status={
+                updateCheckEnabled &&
+                updateCheck !== undefined &&
+                updateCheck.status !== "unknown" &&
+                updateCheck.status !== "available" ? (
+                  <span className="text-muted-foreground">
+                    {updateCheck.status === "failed"
+                      ? t("settings.update-check.status.failed")
+                      : t("settings.update-check.status.current", {
+                          version: updateCheck.currentVersion,
+                          time:
+                            updateCheck.checkedAt === null
+                              ? ""
+                              : formatRelative(i18n.language, updateCheck.checkedAt),
+                        })}
+                  </span>
+                ) : undefined
+              }
+              align="top"
+            >
+              <Switch
+                id="update-check"
+                aria-label={t("field.update-check")}
+                checked={updateCheckEnabled}
+                onCheckedChange={commitUpdateCheck}
               />
             </SettingRow>
           </SettingsSection>

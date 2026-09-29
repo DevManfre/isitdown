@@ -313,6 +313,27 @@ sbagliate viene segnalato, non riscritto — e non cancella mai nulla: è la
 pulizia giornaliera a rimuovere le righe oltre la finestra di retention, e
 questo è ciò che ne restituisce le pagine.
 
+**Settings → Dati → Controllo aggiornamenti** (roadmap 15.11a) è un
+**controllo aggiornamenti**, spento di default. Acceso, legge una volta al
+giorno l'elenco pubblico dei tag su GHCR per l'immagine UI di questo
+progetto — al massimo una volta al giorno per ogni processo in esecuzione,
+compreso un controllo all'avvio — e confronta il tag `ui-v<semver>` più
+recente trovato con la versione con cui è stato compilato questo processo; i
+tag che non sono semver (`ui-latest`, `latest`, …) vengono ignorati. Se
+esiste un tag più recente, accanto all'impostazione compare un badge
+"`<versione>` disponibile"; se questa istanza è già sul tag più recente, nulla
+cambia a schermo. Solo la lettura dell'elenco tag lascia la macchina — nessun
+download automatico, nessuna installazione automatica, e nulla oltre alla
+richiesta stessa: nessun provider configurato, nessun conteggio, nessun
+identificativo di istanza e nessun header che descriva questa istanza viaggia
+con essa, solo ciò che una normale lettura anonima di un registro pubblico
+rivela a GitHub (l'indirizzo IP di questa istanza e l'ora della richiesta). Un
+errore di rete, un timeout o una risposta che non si può interpretare non
+emergono mai come errore nella dashboard e non inviano mai una notifica su
+nessun canale — l'impostazione si limita a mostrare "ultimo controllo non
+riuscito, si riprova domani", registrato a livello debug sul server e per il
+resto silenzioso.
+
 Le scritture hanno effetto al **ciclo di poll successivo**, senza restart, perché lo
 scheduler rilegge la configurazione a ogni passaggio. Un database nuovo viene
 inizializzato con GitHub, Cloudflare e Anthropic così la dashboard è subito utile; la
