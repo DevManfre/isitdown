@@ -157,6 +157,14 @@ const settingsSchema = z.object({
    * otherwise watch its channel history collapse without having asked.
    */
   updateInPlace: booleanSetting.catch(false),
+
+  /**
+   * "Is a newer version out" (roadmap 15.11a). Off by default: it is the only
+   * setting here that reaches out to a host this instance did not choose to
+   * monitor, and an installation must opt into that deliberately rather than
+   * discover it happening.
+   */
+  updateCheckEnabled: booleanSetting.catch(false),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
