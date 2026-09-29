@@ -553,6 +553,22 @@ export interface RuntimeConfigResponse {
   routing: RoutingResponse;
   /** Removed but still restorable, newest removal first. */
   removed: RemovedService[];
+  /**
+   * Roadmap 15.11a: the opt-in "is a newer version out" check. Optional for
+   * the same reason `delivery` is — a server from before this existed answers
+   * without it, which the Settings row reads as off with nothing to show.
+   */
+  updateCheck?: UpdateCheckStatus;
+}
+
+/** Mirrors `UpdateCheckState` in `src/ui/updateCheck.ts`, plus whether the option is on. */
+export interface UpdateCheckStatus {
+  enabled: boolean;
+  status: "unknown" | "current" | "available" | "failed";
+  currentVersion: string;
+  /** Set only when `status` is `"available"`. */
+  latestVersion: string | null;
+  checkedAt: string | null;
 }
 
 /** A severity floor, as the routing rules and the two floors below spell it. */

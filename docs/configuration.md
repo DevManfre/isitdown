@@ -301,6 +301,24 @@ The order is deliberate — a file whose pages are already wrong is reported, no
 rewritten — and nothing is ever deleted: the daily prune is what removes rows
 past the retention window, and this is what gives their pages back.
 
+**Settings → Data → Check for updates** (roadmap 15.11a) is a **check for
+updates**, off by default. Switched on, it reads GHCR's public tag list for
+this project's UI image once a day — at most once a day per running process,
+including a check at boot — and compares the newest `ui-v<semver>` tag it
+finds against the version this process was built at; tags that are not
+semver (`ui-latest`, `latest`, …) are ignored. If a newer tag exists, a
+"`<version>` available" badge appears next to the setting; if this instance is
+already on the newest tag, nothing changes on screen. Only reading the tag
+list leaves the machine — no automatic download, no automatic install, and
+nothing beyond the request itself: no configured provider, no count, no
+instance identifier and no header describing this instance travel with it,
+only what a plain anonymous read of a public registry reveals to GitHub (this
+instance's IP address and the time of the request). A network error, a
+timeout or an answer that does not parse never surfaces as an error in the
+dashboard and never sends a notification through any channel — the setting
+just falls back to "last check didn't go through, retrying tomorrow", logged
+at debug level on the server and otherwise silent.
+
 Writes take effect on the **next poll cycle**, with no restart, because the
 scheduler re-reads its configuration every pass. A fresh database is seeded with
 GitHub, Cloudflare and Anthropic so the dashboard is useful immediately; your own

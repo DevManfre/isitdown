@@ -30,7 +30,7 @@ server) and **UI** (the same engine plus a local dashboard, configured at runtim
 ## Contents
 
 On this page: [1. What it does](#1-what-it-does) · [2. Quick start](#2-quick-start) ·
-[10. Roadmap](#10-roadmap) · [11. Branch layout and merge policy](#11-branch-layout-and-merge-policy)
+[10. Terminal client](#10-terminal-client) · [11. Roadmap](#11-roadmap) · [12. Branch layout and merge policy](#12-branch-layout-and-merge-policy)
 
 The manual, one file per section:
 
@@ -41,6 +41,7 @@ The manual, one file per section:
 - [7. How it works](docs/how-it-works.md) — data flow, components, when a notification fires, resilience
 - [8. Theming and localisation](docs/theming.md) — themes, `en`/`it`, accessibility
 - [9. Development](docs/development.md) — layout, tech stack, live development, tests, releases
+- [10. Terminal client](docs/cli.md) — `isitdown watch`, a read-only fleet view for a terminal
 
 Each page has an Italian twin beside it (`docs/<name>.it.md`).
 
@@ -157,7 +158,7 @@ Useful overrides when running locally: `CONFIG_PATH`, `DATA_PATH`, `DB_PATH`,
 
 ---
 
-## 10. Roadmap
+## 11. Roadmap
 
 Delivered:
 
@@ -208,7 +209,7 @@ status pages behind a login, and a packaged mobile app.
 
 ---
 
-## 11. Branch layout and merge policy
+## 12. Branch layout and merge policy
 
 The Claude Code tooling (`.claude/`, `CLAUDE.md`) and the merge filter itself
 (`.mergeexclude`, `.githooks/`, `scripts/`) are tracked on **`dev` only**. On
