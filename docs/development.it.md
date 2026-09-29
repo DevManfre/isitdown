@@ -51,7 +51,7 @@ isitdown/
 │   │       ├── schema.ts              forma di config.yml
 │   │       ├── loadConfig.ts          YAML + sostituzione ${ENV} + validazione
 │   │       └── checkConfig.ts         tutti i problemi in una volta, non il primo
-│   └── ui/                            (solo edizione UI)
+│   ├── ui/                            (solo edizione UI)
 │       ├── server.ts                  entrypoint
 │       ├── runtime.ts                 wiring, condiviso coi test delle API
 │       ├── app.ts                     app Express: route, dashboard statica, errori JSON
@@ -82,6 +82,17 @@ isitdown/
 │           ├── css/tokens.css         l'unico file con un colore letterale
 │           ├── css/motion.css         keyframes, animazioni d'ingresso, transizioni
 │           └── locales/               en.json (sorgente) + it.json
+│   └── cli/                            (solo client da terminale, roadmap 17.7 — legge l'API dell'edizione UI, non importa mai src/ui)
+│       ├── index.ts                    entrypoint, smista verso l'unico sottocomando qui sotto
+│       └── watch/
+│           ├── run.ts                  l'unica parte che tocca un terminale, un orologio e una rete veri
+│           ├── args.ts                 --url / --token / --interval
+│           ├── client.ts               client di sola GET per /status e /events
+│           ├── sse.ts                  lettore di frame server-sent-events scritto a mano
+│           ├── schema.ts               validazione zod delle due risposte che legge
+│           ├── watcher.ts              il ciclo lettura → stream → fallback di polling
+│           ├── state.ts                riduttori puri: piega una lettura di /status nel modello della vista
+│           └── render.ts               il renderer ANSI puro del pannello
 ├── tools/
 │   ├── copy-assets.mjs                copia in dist i cataloghi i18n e delle lingue della dashboard (il
 │   │                                   bundle della dashboard è già output di Vite, non di questo script)
@@ -93,6 +104,7 @@ isitdown/
 │   ├── notifiers/
 │   ├── light/
 │   ├── ui/                            contratto dello store, aggregazione, ogni route API, guardie tema e lingue
+│   ├── cli/                           args, riduttori e renderer di watch, e il ciclo contro un server finto
 │   ├── fixtures/statuspage/           payload registrati dalle pagine vere, mai scaricati in un test
 │   ├── helpers/
 │   └── integration/                   *.itest.ts — provider finto e ricevitore webhook end to end
@@ -106,6 +118,7 @@ isitdown/
 ├── .nvmrc  .npmrc                     fissano Node 24 e fanno fallire in modo esplicito una versione più vecchia
 ├── tsconfig.json                      TypeScript del server
 ├── tsconfig.light.json                la build Light: esclude src/ui
+├── tsconfig.cli.json                   la build del client da terminale: solo src/core/i18n e src/cli
 ├── tsconfig.web.json                  la dashboard: lib DOM + react-jsx
 ├── vite.config.ts                     bundle, proxy di sviluppo, config di vitest
 └── components.json                    configurazione della CLI shadcn
@@ -227,6 +240,7 @@ npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
 npm run build:light      # tsc + copia asset, escludendo src/ui
 npm run build:ui         # tsc + vite build + copia asset
+npm run build:cli        # tsc + copia asset, solo src/core/i18n e src/cli (10.1)
 ```
 
 Il budget del bundle (roadmap 5.16) pesa ciò che `build:ui` ha prodotto, in
