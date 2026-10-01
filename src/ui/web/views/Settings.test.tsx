@@ -620,10 +620,20 @@ describe("Settings", () => {
     it("summarises what is on without the operator reading the rows", async () => {
       renderSettings("notifications", listFixtures);
       expect(
-        await screen.findByText(i18n.t("channel.summary.count", { active: 1, total: 3 })),
+        await screen.findByText(i18n.t("channel.summary.count", { count: 1, total: 3 })),
       ).toBeInTheDocument();
       expect(
         screen.getByText(i18n.t("channel.summary.sending", { channels: i18n.t("channel.name.webpush") })),
+      ).toBeInTheDocument();
+    });
+
+    it("uses the plural count form once more than one channel is on", async () => {
+      const channels = manyChannels.map((channel) =>
+        channel.id === "discord" ? { ...channel, enabled: true } : channel,
+      );
+      renderSettings("notifications", { ...fixtures, config: { ...config, channels } });
+      expect(
+        await screen.findByText(i18n.t("channel.summary.count", { count: 2, total: 3 })),
       ).toBeInTheDocument();
     });
 
