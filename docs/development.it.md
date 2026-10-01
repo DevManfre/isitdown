@@ -373,6 +373,29 @@ Suite notevoli:
   baseline concordata a Roma non può mai essere verde su un runner in UTC.
   `node tools/visual-regression.mjs --update` accetta un cambio
   voluto, `--only=<vista>` serve mentre si itera su una sola.
+
+  Quel rumore dell'1,5% lungo i bordi del testo presuppone che la macchina su
+  cui gira Chromium abbia i font di sistema che la build di Chromium di
+  Playwright si aspetta — la CI li ha perché installa il browser con `npx
+  playwright install --with-deps`, che tira dentro `fontconfig` e
+  `fonts-liberation` come root insieme a Chromium stesso (vedi `deb.deps`
+  accanto al binario in cache per l'elenco completo). Un sandbox che non può
+  eseguire quell'installer come root e invece spacchetta a mano gli stessi
+  file `.deb` ottiene il binario di Chromium ma non quei due: senza di essi
+  Chromium non ha alcun percorso di fallback per i font di sistema, un guasto
+  diverso dal normale rumore cross-macchina — ogni vista tornava con 20-30×
+  il valore di `MAX_MOVED` in celle spostate, non una manciata, anche su testo
+  che nessuna modifica aveva toccato. Puntare `FONTCONFIG_FILE` su una
+  configurazione minima il cui `<dir>` è i file di `fonts-liberation`
+  spacchettati, e `LD_LIBRARY_PATH` sulle `libfontconfig`/`libcairo`/`libpango`
+  spacchettate, ha richiuso il divario tornando alla normale fascia di rumore
+  su ogni vista senza cambi di testo. Il testo del corpo della dashboard
+  continua comunque a rendere come Inter in entrambi i casi — `index.html` lo
+  scarica da Google Fonts via rete, che l'harness lascia raggiungibile proprio
+  per questo motivo (vedi `tools/visual/chrome.mjs`) — quindi i pacchetti
+  mancanti non riguardavano mai il carattere principale, solo il percorso di
+  fallback di cui ha ancora bisogno ogni altro pezzo di interfaccia (le icone,
+  le parole chiave CSS di famiglia generica).
 - **Parità delle traduzioni del README** — lo scheletro delle intestazioni
   numerate, il numero di intestazioni per livello, di blocchi di codice e di
   righe di tabella, e gli identificatori (route, nomi di variabili in
