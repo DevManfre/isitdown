@@ -119,7 +119,7 @@ export function MobileNav() {
               to={ROUTE_PATHS[name]}
               className={({ isActive }) =>
                 cn(
-                  "mobile-tab relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px]",
+                  "mobile-tab relative flex min-h-[var(--mobile-nav-height)] flex-col items-center justify-center gap-1 px-1 py-2 text-[10px]",
                   isActive ? "text-primary" : "text-muted-foreground",
                 )
               }
@@ -138,7 +138,7 @@ export function MobileNav() {
         <button
           type="button"
           className={cn(
-            "mobile-tab flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px]",
+            "mobile-tab flex min-h-[var(--mobile-nav-height)] flex-col items-center justify-center gap-1 px-1 py-2 text-[10px]",
             moreActive ? "text-primary" : "text-muted-foreground",
           )}
           aria-haspopup="dialog"

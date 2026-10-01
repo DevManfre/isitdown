@@ -72,6 +72,16 @@ describe("MobileNav", () => {
     expect(await screen.findByText("2")).toBeInTheDocument();
   });
 
+  // SEM-224/SEM-275: `ViewFrame` reserves bottom padding sized from
+  // `--mobile-nav-height`, the same var this row's own height comes from.
+  // A row that went back to a bare `min-h-14` would drift from that padding
+  // silently — the whole point of the shared var is that it cannot.
+  it("sizes its own rows from the var ViewFrame's padding is computed against", async () => {
+    mount();
+    const tab = (await screen.findByText(i18n.t("nav.overview"))).closest("a");
+    expect(tab?.className).toContain("min-h-[var(--mobile-nav-height)]");
+  });
+
   it("puts the views that have no tab behind the More sheet", async () => {
     const user = userEvent.setup();
     mount();

@@ -174,6 +174,12 @@
 
   --ring-icon-bg: #ffffff;
   --rail-width-collapsed: 30px;
+  
+  /* `MobileNav`'s own row height below 768px — matches `min-h-14`. The one
+     other place this number may ever appear is `ViewFrame`'s bottom padding,
+     computed from this var plus env(safe-area-inset-bottom) so the two can
+     never drift apart the way a second guessed constant would. */
+  --mobile-nav-height: 3.5rem;
 
   /* ── shadcn semantic contract ─────────────────────────────────────────────
      shadcn components address colour through these names. Mapping them onto
@@ -343,6 +349,8 @@
 
   --ring-icon-bg: #ffffff;
   --rail-width-collapsed: 30px;
+  
+  --mobile-nav-height: 3.5rem;
 
   /* ── shadcn semantic contract ─────────────────────────────────────────────
      shadcn components address colour through these names. Mapping them onto
@@ -495,6 +503,8 @@
 
     --ring-icon-bg: #ffffff;
     --rail-width-collapsed: 30px;
+    
+    --mobile-nav-height: 3.5rem;
 
     /* ── shadcn semantic contract ───────────────────────────────────────────
        shadcn components address colour through these names. Mapping them onto

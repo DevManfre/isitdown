@@ -32,8 +32,12 @@ export function ViewFrame({
       data-animate={ready ? view : undefined}
       // 16px gutters on a phone, 32 from `md` up, and room at the bottom for
       // the tab bar that floats over this region below 768px — without it the
-      // last row of every view sits under five tabs.
-      className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-8 md:pb-6"
+      // last row of every view sits under five tabs. The reserved space is
+      // `--mobile-nav-height` (the bar's own row height, set in tokens.css)
+      // plus its safe-area inset plus its 1px top hairline, the same three
+      // quantities `MobileNav` renders with — never a fixed guess that could
+      // drift from the bar's real, device-dependent height.
+      className="min-w-0 flex-1 px-4 py-6 pb-[calc(var(--mobile-nav-height)_+_env(safe-area-inset-bottom)_+_1px)] md:px-8 md:pb-6"
     >
       {children}
     </div>
