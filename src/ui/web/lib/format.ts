@@ -25,6 +25,10 @@ export const formatDay = (locale: string, day: string) =>
     new Date(`${day}T00:00:00Z`),
   );
 
+/** A list of names joined the locale's own way, e.g. "GitHub and Cloudflare" / "GitHub e Cloudflare". */
+export const formatList = (locale: string, items: string[]) =>
+  new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items);
+
 /** Relative time from now, e.g. "3 minutes ago" / "fra 2 ore". */
 export function formatRelative(locale: string, iso: string): string {
   const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });

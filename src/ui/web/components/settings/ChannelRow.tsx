@@ -585,7 +585,7 @@ export function ChannelSummary({ channels }: { channels: DescribedChannel[] }) {
   return (
     <div className="flex flex-col gap-1 pb-1">
       <span className="font-mono text-xs text-muted-foreground">
-        {t("channel.summary.count", { active: active.length, total: channels.length })}
+        {t("channel.summary.count", { count: active.length, total: channels.length })}
       </span>
       <span className="text-xs text-muted-foreground">
         {active.length === 0

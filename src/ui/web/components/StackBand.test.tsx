@@ -38,6 +38,41 @@ describe("the stack band", () => {
     expect(band.getByText(/Vercel/)).toBeInTheDocument();
   });
 
+  it("names a single affected member with the singular count form", async () => {
+    renderWithProviders(<Overview />, base);
+
+    const band = within(await screen.findByRole("region", { name: i18n.t("stack.title") }));
+    expect(
+      band.getByText(i18n.t("stack.affected", { count: 1, names: "Vercel", total: 2 })),
+    ).toBeInTheDocument();
+  });
+
+  it("joins several affected members with the locale's own conjunction", async () => {
+    renderWithProviders(<Overview />, {
+      ...base,
+      status: {
+        ...base.status,
+        providers: [
+          ...providers,
+          providerFixture({ id: "fly", name: "Fly.io", overallStatus: "partial_outage" }),
+        ],
+        groups: [
+          {
+            id: "deploy-path",
+            providers: ["github", "vercel", "fly"],
+            status: "partial_outage",
+            affected: ["vercel", "fly"],
+          },
+        ],
+      },
+    });
+
+    const band = within(await screen.findByRole("region", { name: i18n.t("stack.title") }));
+    expect(
+      band.getByText(i18n.t("stack.affected", { count: 2, names: "Vercel and Fly.io", total: 3 })),
+    ).toBeInTheDocument();
+  });
+
   it("says a healthy group is healthy, with how many providers that covers", async () => {
     renderWithProviders(<Overview />, {
       ...base,

@@ -221,7 +221,7 @@ export function MobileNav() {
           {channels.length > 0 && (
             <div className="flex items-center gap-2 border-t border-border px-4 py-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <span className="flex-1 text-xs text-muted-foreground">
-                {t("channel.summary.count", { active: activeChannels, total: channels.length })}
+                {t("channel.summary.count", { count: activeChannels, total: channels.length })}
               </span>
             </div>
           )}
