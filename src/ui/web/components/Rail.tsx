@@ -147,7 +147,7 @@ export function Rail() {
         </div>
         {channels.length > 0 && (
           <span className="rail-channels text-xs text-muted-foreground">
-            {t("channel.summary.count", { active, total: channels.length })}
+            {t("channel.summary.count", { count: active, total: channels.length })}
           </span>
         )}
       </SidebarFooter>

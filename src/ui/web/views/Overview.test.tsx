@@ -33,6 +33,10 @@ describe("Overview", () => {
       history,
     });
     expect(await screen.findByText(i18n.t("overview.title.down", { count: 1 }))).toBeInTheDocument();
+    // The body agrees the verb with the single provider named, not a fixed plural.
+    expect(
+      await screen.findByText(i18n.t("overview.body.down", { count: 1, providers: "GitHub" }), { exact: false }),
+    ).toBeInTheDocument();
   });
 
   it("uses the plural headline for several", async () => {
@@ -53,6 +57,14 @@ describe("Overview", () => {
     expect(await screen.findByText("providers are off the line.", { exact: false })).toHaveTextContent(
       sentence("overview.title.down", { count: 2 }),
     );
+    // The names join with the locale's own conjunction ("and"), not a raw
+    // comma, and the verb agrees with the plural list.
+    expect(
+      await screen.findByText(
+        i18n.t("overview.body.down", { count: 2, providers: "GitHub and Cloudflare" }),
+        { exact: false },
+      ),
+    ).toBeInTheDocument();
   });
 
   it("a provider nobody could read is not counted among the ones that are down", async () => {
@@ -69,6 +81,11 @@ describe("Overview", () => {
     expect(await screen.findByText(i18n.t("overview.title.unreadable", { count: 1 }))).toBeInTheDocument();
     expect(screen.queryByText(i18n.t("overview.title.down", { count: 1 }))).toBeNull();
     expect(screen.queryByText(i18n.t("overview.title.all-operational"))).toBeNull();
+    expect(
+      await screen.findByText(i18n.t("overview.body.unreadable", { count: 1, providers: "GitHub" }), {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("offers an incident-details action only when an incident is open", async () => {
