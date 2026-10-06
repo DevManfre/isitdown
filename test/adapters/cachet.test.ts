@@ -129,6 +129,19 @@ test("an unresolved incident is open, with Cachet's own word for its state", () 
   ]);
 });
 
+// Roadmap 1.1. `occurred_at` may be backdated by whoever wrote the incident;
+// `created_at` is when Cachet published it.
+test("an open incident's creation time is Cachet's created_at, not its occurred_at", () => {
+  const backdated = incident({ occurred_at: "2026-09-01 08:00:00", created_at: "2026-09-01 08:40:00" });
+  const status = parseCachetStatus(component({}), page([backdated]), EMPTY, service);
+  assert.equal(status.activeIncidents[0]?.createdAt, "2026-09-01T08:40:00.000Z");
+});
+
+test("an incident with no created_at carries no creation time at all", () => {
+  const status = parseCachetStatus(component({}), page([incident({})]), EMPTY, service);
+  assert.equal("createdAt" in (status.activeIncidents[0] ?? {}), false);
+});
+
 test("a resolved incident is not open", () => {
   const status = parseCachetStatus(component({}), page([incident({ is_resolved: true })]), EMPTY, service);
 

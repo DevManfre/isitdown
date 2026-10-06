@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 25;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -594,6 +594,24 @@ export function migrate(db: DatabaseSync): void {
     if (!columns.includes("authority")) {
       db.exec("ALTER TABLE services ADD COLUMN authority TEXT");
     }
+  }
+
+  if (from < 25) {
+    // Detection delay — roadmap 1.1. `started_at` cannot answer it: it is the
+    // provider's last-update time at first sight, clamped to the poll, so it is
+    // neither when the provider declared the incident nor when we noticed.
+    //
+    // `declared_at` is the provider's own publication stamp, null for a page
+    // that publishes none. `first_seen_at` is the poll that first carried the
+    // incident, and stays null when that poll was the provider's very first
+    // reading: an incident already open on the day a page is added was not
+    // *detected* late, it predates the watching. Both stay null on every
+    // existing row for the same reason — nobody was measuring.
+    const columns = (db.prepare("PRAGMA table_info(incidents)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!columns.includes("declared_at")) db.exec("ALTER TABLE incidents ADD COLUMN declared_at TEXT");
+    if (!columns.includes("first_seen_at")) db.exec("ALTER TABLE incidents ADD COLUMN first_seen_at TEXT");
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

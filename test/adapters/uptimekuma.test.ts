@@ -123,6 +123,7 @@ test("the pinned notice is an open incident, carrying Kuma's own style word", ()
       status: "warning",
       // Kuma's server-local timestamp, read as UTC.
       updatedAt: "2026-09-12T12:24:51.000Z",
+      createdAt: "2026-09-12T12:24:51.000Z",
     },
   ]);
 });

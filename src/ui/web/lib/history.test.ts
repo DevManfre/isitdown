@@ -15,6 +15,7 @@ const provider = (over: Partial<ProviderHistory> = {}): ProviderHistory => ({
   previousUptime: null,
   dailyCoverage: [],
   coverage: null,
+  detectionDelay: null,
   ...over,
 });
 

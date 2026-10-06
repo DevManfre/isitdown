@@ -35,6 +35,7 @@ const summary = {
       sampleCount: 400,
       incidentCount: 2,
       downtimeMinutes: 35,
+      detectionDelay: null,
     },
   ],
 };
@@ -63,6 +64,7 @@ const cloudflare = {
   sampleCount: 400,
   incidentCount: 63,
   downtimeMinutes: 8661,
+  detectionDelay: null,
 };
 
 const twoProviders = {

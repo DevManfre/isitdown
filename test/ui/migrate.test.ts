@@ -623,3 +623,18 @@ test("an existing database gains the message reference table", async () => {
   assert.ok(names(db, "table").includes("message_refs"));
   db.close();
 });
+
+test("a schema-24 database gains the detection-delay columns", async () => {
+  const db = await freshDb();
+  migrate(db);
+  db.exec("ALTER TABLE incidents DROP COLUMN declared_at");
+  db.exec("ALTER TABLE incidents DROP COLUMN first_seen_at");
+  db.exec("PRAGMA user_version = 24");
+
+  migrate(db);
+
+  const columns = (db.prepare("PRAGMA table_info(incidents)").all() as { name: string }[]).map((c) => c.name);
+  assert.ok(columns.includes("declared_at"), "declared_at missing after upgrade");
+  assert.ok(columns.includes("first_seen_at"), "first_seen_at missing after upgrade");
+  db.close();
+});
