@@ -16,7 +16,7 @@ import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { CoverageProvider } from "@/lib/coverage.tsx";
 import { worstTier } from "@/lib/chartConfig.ts";
-import { formatRelative } from "@/lib/format.ts";
+import { formatList, formatRelative } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
 import { overviewShape } from "@/lib/overviewShape.ts";
 import { stagger } from "@/lib/stagger.ts";
@@ -141,7 +141,8 @@ export function Overview() {
         >
           {down.length === 0 && unreadable.length > 0 ? (
             t("overview.body.unreadable", {
-              providers: unreadable.map((p) => p.name).join(", "),
+              count: unreadable.length,
+              providers: formatList(i18n.language, unreadable.map((p) => p.name)),
             })
           ) : down.length === 0 ? (
             <Trans
@@ -162,7 +163,8 @@ export function Overview() {
             />
           ) : (
             t("overview.body.down", {
-              providers: down.map((p) => p.name).join(", "),
+              count: down.length,
+              providers: formatList(i18n.language, down.map((p) => p.name)),
             })
           )}
         </p>

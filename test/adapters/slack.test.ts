@@ -66,6 +66,8 @@ test("an open Slack incident is reported, with its severity read from the title"
       status: "active",
       // The provider answers in -07:00; everything downstream is UTC.
       updatedAt: "2026-09-01T22:51:21.000Z",
+      // When Slack published it, not when it last changed — roadmap 1.1.
+      createdAt: "2026-08-13T21:21:41.000Z",
     },
   ]);
 });

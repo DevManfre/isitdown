@@ -368,6 +368,26 @@ Notable suites:
   Rome can never be green on a runner in UTC. Run
   `node tools/visual-regression.mjs --update` to agree to an intended change, and
   `--only=<view>` while iterating on one.
+
+  That 1.5%-of-edge-pixels noise assumes the machine running Chromium has the
+  system fonts Playwright's own Chromium build expects — CI gets them because
+  it installs the browser with `npx playwright install --with-deps`, which
+  pulls in `fontconfig` and `fonts-liberation` as root alongside Chromium
+  itself (see `deb.deps` next to the cached binary for the full list). A
+  sandbox that cannot run that installer as root and instead unpacks the same
+  `.deb` files by hand gets the Chromium binary but not those two: without
+  them Chromium has no system font-fallback path at all, which is a different
+  failure from ordinary cross-machine noise — every view came back with 20-30×
+  `MAX_MOVED`'s worth of moved cells, not a handful, even on text no change had
+  touched. Pointing `FONTCONFIG_FILE` at a minimal config whose `<dir>` is the
+  unpacked `fonts-liberation` files and `LD_LIBRARY_PATH` at the unpacked
+  `libfontconfig`/`libcairo`/`libpango` closed the gap back to the normal
+  noise band on every view with no text change. Dashboard body text still
+  renders as Inter either way — `index.html` fetches it from Google Fonts over
+  the network, which the harness leaves reachable for exactly this reason (see
+  `tools/visual/chrome.mjs`) — so the missing packages were never about the
+  primary typeface, only about the fallback path every other piece of chrome
+  (icons, the generic-family CSS keywords) still needs.
 - **README translation parity** — the numbered heading skeleton, the per-level
   heading, fence and table-row counts, and the identifiers (routes, shouted
   variable names, npm scripts) each file names, compared between `README.md` and

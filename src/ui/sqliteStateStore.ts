@@ -68,6 +68,8 @@ const incidentRowSchema = z.object({
   started_at: z.string(),
   updated_at: z.string(),
   resolved_at: z.string().nullable(),
+  declared_at: z.string().nullable(),
+  first_seen_at: z.string().nullable(),
 });
 
 const annotationRowSchema = z.object({
@@ -247,6 +249,8 @@ const toIncidentRow = (row: IncidentDbRow): IncidentRow => ({
   startedAt: row.started_at,
   updatedAt: row.updated_at,
   resolvedAt: row.resolved_at,
+  ...(row.declared_at === null ? {} : { declaredAt: row.declared_at }),
+  ...(row.first_seen_at === null ? {} : { firstSeenAt: row.first_seen_at }),
 });
 
 const toMaintenanceRow = (row: MaintenanceDbRow): MaintenanceRow => ({
@@ -369,15 +373,17 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     "INSERT INTO component_samples (provider_id, component_id, observed_at, status, ok, adapter_version) VALUES (?, ?, ?, ?, ?, ?)",
   );
   const upsertIncident = db.prepare(`
-    INSERT INTO incidents (provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+    INSERT INTO incidents (provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at, declared_at, first_seen_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
     ON CONFLICT (provider_id, incident_id) DO UPDATE SET
+      declared_at = COALESCE(incidents.declared_at, excluded.declared_at),
       name = excluded.name,
       impact = excluded.impact,
       status = excluded.status,
       updated_at = excluded.updated_at,
       resolved_at = NULL
   `);
+  const selectFetchedAt = db.prepare("SELECT fetched_at FROM provider_state WHERE provider_id = ?");
   const resolveMissing = db.prepare(
     "UPDATE incidents SET resolved_at = ? WHERE provider_id = ? AND resolved_at IS NULL",
   );
@@ -462,6 +468,11 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     async saveStatus(status: NormalizedStatus, meta?: SaveStatusMeta | undefined): Promise<void> {
       db.exec("BEGIN");
       try {
+        // Read before this reading overwrites it: whether anybody was watching
+        // this provider before now decides whether a new incident's arrival
+        // is a detection (roadmap 1.1) or just the first look at the page.
+        const previous = selectFetchedAt.get(status.provider) as { fetched_at: string } | undefined;
+        const watching = previous !== undefined && previous.fetched_at !== "";
         upsertState.run(
           status.provider,
           status.overallStatus,
@@ -505,6 +516,8 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
             incident.status,
             startedAt(incident.updatedAt, status.fetchedAt),
             incident.updatedAt,
+            incident.createdAt ?? null,
+            watching ? status.fetchedAt : null,
           );
         }
 
@@ -701,7 +714,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
 
       const rows = db
         .prepare(
-          `SELECT provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at
+          `SELECT provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at, declared_at, first_seen_at
            FROM incidents ${where} ORDER BY started_at DESC, incident_id DESC ${window}`,
         )
         .all(...params)
@@ -746,7 +759,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     async getIncident(providerId: string, incidentId: string): Promise<IncidentRow | null> {
       const row = db
         .prepare(
-          `SELECT provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at
+          `SELECT provider_id, incident_id, name, impact, status, started_at, updated_at, resolved_at, declared_at, first_seen_at
            FROM incidents WHERE provider_id = ? AND incident_id = ?`,
         )
         .get(providerId, incidentId);

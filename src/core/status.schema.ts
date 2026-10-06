@@ -12,6 +12,7 @@ export const incidentSchema = z.object({
   impact: z.string(),
   status: z.string(),
   updatedAt: z.string(),
+  createdAt: z.string().optional(),
 });
 
 export const componentStatusSchema = z.object({

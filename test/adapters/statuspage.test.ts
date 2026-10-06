@@ -57,6 +57,7 @@ test("indicator minor maps to degraded and surfaces the incident as recorded", (
     impact: "minor",
     status: "monitoring",
     updatedAt: "2026-08-19T16:16:18.869Z",
+    createdAt: "2026-08-19T16:15:29.000Z",
   });
 });
 

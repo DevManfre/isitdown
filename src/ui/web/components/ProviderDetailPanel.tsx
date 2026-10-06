@@ -6,7 +6,7 @@ import { StatusLegend } from "@/components/charts/StatusLegend.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
 import { YearHeatCalendar } from "@/components/charts/YearHeatCalendar.tsx";
 import { useProviderCalendar, useProviderHistory } from "@/hooks/queries.ts";
-import { formatDateTime, formatTime } from "@/lib/format.ts";
+import { formatDateTime, formatDuration, formatTime } from "@/lib/format.ts";
 import type { ComponentStatus, MaintenanceWindow, ProviderHistory } from "@/lib/types.ts";
 import type { HistoryWindow } from "@/lib/api.ts";
 
@@ -70,6 +70,32 @@ export function ProviderDetailPanel({
                 </dd>
               </div>
             ))}
+            {/* Roadmap 1.1. Omitted, not zeroed, while nothing in the window
+                can be measured: a page that publishes no creation time has a
+                detection delay nobody knows, which is not a fast one. */}
+            {provider.detectionDelay !== null && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <dt className="text-xs uppercase tracking-widest text-muted-foreground">
+                    {t("history.detection.median")}
+                  </dt>
+                  <dd className="font-mono text-sm">
+                    {formatDuration(i18n.language, provider.detectionDelay.medianMinutes)}
+                    <span className="ml-2 font-sans text-xs text-muted-foreground">
+                      {t("history.detection.note", { count: provider.detectionDelay.measured })}
+                    </span>
+                  </dd>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <dt className="text-xs uppercase tracking-widest text-muted-foreground">
+                    {t("history.detection.worst")}
+                  </dt>
+                  <dd className="font-mono text-sm">
+                    {formatDuration(i18n.language, provider.detectionDelay.worstMinutes)}
+                  </dd>
+                </div>
+              </>
+            )}
           </dl>
 
           {/* Omitted entirely when nothing is upcoming, rather than an empty

@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 import type { UiRuntimeCore } from "../runtime.ts";
+import { mayWrite } from "../apiToken.ts";
+import { createPushReceipts } from "../pushReceipts.ts";
 
 /**
  * Provider push instead of poll — roadmap 2.10.
@@ -39,6 +41,22 @@ import type { UiRuntimeCore } from "../runtime.ts";
  * operator.
  */
 
+/**
+ * Which adapters the dashboard offers a push subscription for — roadmap 1.2.
+ *
+ * The route itself would take a post for any provider, but the guide beside
+ * the URL is Atlassian Statuspage's "Subscribe to updates → Webhook", and
+ * offering a URL with no way to use it would be the half of the feature that
+ * misleads.
+ */
+const PUSH_ADAPTERS = new Set(["statuspage"]);
+
+/**
+ * Stands in for the token in a URL shown to a read-only token holder: the
+ * shape of the URL is no secret, its credential is.
+ */
+const TOKEN_PLACEHOLDER = "<PUSH_TOKEN>";
+
 /** A provider may trigger at most one read this often, however many events it sends. */
 const COOLDOWN_MS = 10_000;
 
@@ -69,6 +87,46 @@ export function pushRoutes(runtime: UiRuntimeCore): Router {
 
   /** When each provider last had a push honoured — the coalescing window. */
   const lastPush = new Map<string, number>();
+  const receipts = createPushReceipts(runtime.db);
+
+  /**
+   * What the dashboard needs to help the operator subscribe — roadmap 1.2:
+   * whether push is on at all, and per provider the URL to paste and when a
+   * post last arrived, which is the only verification Statuspage allows (it
+   * sends no test event).
+   *
+   * The URL carries `PUSH_TOKEN`, so it is shown whole only to a request that
+   * could also write — the operator's own dashboard. A read-only token holder
+   * gets the same URL with a placeholder: secrets stay write-only to anyone
+   * who is not the operator.
+   */
+  router.get("/config/provider-push", (req, res) => {
+    const token = (runtime.env["PUSH_TOKEN"] ?? "").trim();
+    const enabled = token !== "";
+    const revealed = enabled && mayWrite(runtime.env, req);
+    const origin = `${req.protocol}://${req.host}`;
+    const lastReceived = new Map(receipts.list().map((receipt) => [receipt.providerId, receipt]));
+    res.json({
+      enabled,
+      tokenRevealed: revealed,
+      providers: runtime.listAllServices().map((service) => {
+        const receipt = lastReceived.get(service.id);
+        // A disabled provider is refused by the push route below, so offering
+        // it an address would hand the operator a URL that answers 404.
+        const eligible = service.enabled && PUSH_ADAPTERS.has(service.adapter);
+        return {
+          providerId: service.id,
+          eligible,
+          url:
+            enabled && eligible
+              ? `${origin}/push/${encodeURIComponent(service.id)}?token=${revealed ? encodeURIComponent(token) : TOKEN_PLACEHOLDER}`
+              : null,
+          lastReceivedAt: receipt?.receivedAt ?? null,
+          received: receipt?.count ?? 0,
+        };
+      }),
+    });
+  });
 
   router.post("/push/:providerId", async (req, res) => {
     const token = (runtime.env["PUSH_TOKEN"] ?? "").trim();
@@ -99,6 +157,7 @@ export function pushRoutes(runtime: UiRuntimeCore): Router {
     }
 
     const now = Date.now();
+    receipts.record(service.id, new Date(now).toISOString());
     const since = now - (lastPush.get(service.id) ?? 0);
     if (since < COOLDOWN_MS) {
       // Statuspage sends several posts within seconds of one change — the

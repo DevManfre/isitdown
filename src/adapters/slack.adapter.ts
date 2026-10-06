@@ -3,6 +3,7 @@ import type { Adapter, FetchContext, IncidentHistoryResult, ServiceRef } from ".
 import type { HistoricalIncident, Incident, NormalizedStatus } from "../core/types.ts";
 import { fetchConditional } from "../core/http.ts";
 import { severityFromWords, worstStatus } from "./severity.ts";
+import { createdAtOf } from "./createdAt.ts";
 
 /**
  * Slack publishes its own small JSON API rather than running on Statuspage:
@@ -102,6 +103,7 @@ export function parseSlackStatus(raw: string, service: ServiceRef): NormalizedSt
     // adapter's, so a notifier can quote the provider rather than us.
     status: entry.status ?? "active",
     updatedAt: toUtc(entry.date_updated) ?? toUtc(entry.date_created) ?? fetchedAt,
+    ...createdAtOf(toUtc(entry.date_created)),
   }));
 
   return {

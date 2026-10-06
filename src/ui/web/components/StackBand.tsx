@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
+import { formatList } from "@/lib/format.ts";
 import type { ProviderGroupStatus, ProviderStatus } from "@/lib/types.ts";
 
 /**
@@ -22,7 +23,7 @@ export function StackBand({
   groups: ProviderGroupStatus[];
   providers: ProviderStatus[];
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   if (groups.length === 0) return null;
 
   const nameOf = (id: string): string => providers.find((provider) => provider.id === id)?.name ?? id;
@@ -50,7 +51,7 @@ export function StackBand({
                 ? t("stack.all-well", { count: group.providers.length })
                 : t("stack.affected", {
                     count: group.affected.length,
-                    names: group.affected.map(nameOf).join(", "),
+                    names: formatList(i18n.language, group.affected.map(nameOf)),
                     total: group.providers.length,
                   })}
             </span>

@@ -169,6 +169,28 @@ export function decide(input: {
 }
 
 /**
+ * Whether this request would be let through to *write* — the operator's own
+ * dashboard rather than a read-only token holder.
+ *
+ * For a route that answers everybody but may show a secret only to the
+ * operator (the provider push URL, roadmap 1.2): asking `decide` the write
+ * question keeps one rule for "who is the operator" instead of a second copy
+ * that could drift from it.
+ */
+export function mayWrite(env: NodeJS.ProcessEnv, req: Request): boolean {
+  return decide({
+    policy: readTokenPolicy(env),
+    path: req.path,
+    method: "POST",
+    presented: presentedToken({
+      authorization: req.get("authorization"),
+      apiToken: req.get("x-api-token"),
+    }),
+    local: isLocalAddress(req.socket.remoteAddress),
+  }).allow;
+}
+
+/**
  * The middleware. Mounted first, so nothing downstream — not a route, not the
  * static dashboard — can be reached around it.
  */

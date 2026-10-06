@@ -192,9 +192,7 @@ Ancora aperto:
 
 - Una revisione madrelingua delle stringhe italiane.
 
-La roadmap che ha portato il progetto fin qui è finita — ogni riga spedita — ed è
-archiviata in [`docs/roadmap/ROADMAP.md`](docs/roadmap/ROADMAP.md). Quello che viene
-dopo si sta valutando in `ROADMAP_2.md` e `ROADMAP_3.md`, che non impegnano a nulla.
+La roadmap che ha portato il progetto fin qui è finita — ogni riga spedita.
 
 **Cos'è IsItDown.** Sia un aggregatore di status page sia un monitor di cose che
 non ne pubblicano nessuna — e ogni provider dichiara quale delle due risponde per

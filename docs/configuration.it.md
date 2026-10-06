@@ -1537,6 +1537,22 @@ Imposta `PUSH_TOKEN` sull'edizione UI e registra l'URL sulla pagina del provider
 https://isitdown.example.com/push/github?token=<PUSH_TOKEN>
 ```
 
+Non serve comporre quell'indirizzo a mano. La pagina di ogni provider Statuspage
+nella dashboard ha una scheda **Push dal provider** (roadmap 1.2): con
+`PUSH_TOKEN` non impostato spiega come attivare il push; una volta impostato
+mostra l'indirizzo da incollare, con un bottone per copiarlo e i passaggi per la
+pagina di quel provider. Quando la dashboard è aperta su `localhost` la scheda
+avvisa che Statuspage non può raggiungere quell'host — va sostituito con
+l'indirizzo pubblico di IsItDown, stesso percorso. Il token completo è visibile
+solo sulla dashboard dell'operatore; chi usa un `API_TOKEN` in sola lettura vede
+`<PUSH_TOKEN>` al suo posto.
+
+Statuspage non manda eventi di prova, quindi la scheda non può verificare
+un'iscrizione nel momento in cui viene fatta. Fa la cosa onesta: registra ogni
+post che arriva — nel database, così sopravvive a un riavvio — e passa a
+**Funziona**, con l'ora dell'ultimo post, al prossimo aggiornamento reale del
+provider.
+
 **Ciò che arriva è un innesco, non una lettura.** È la decisione di progetto che
 vale la pena conoscere. IsItDown non interpreta il corpo del webhook per
 ricavarne uno stato: legge il provider, in quel momento, attraverso l'adapter che

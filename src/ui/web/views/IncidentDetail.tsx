@@ -186,6 +186,20 @@ export function IncidentDetail() {
                 label: t("incident.stat.started"),
                 value: formatDateTime(i18n.language, incident.startedAt),
               },
+              ...(incident.declaredAt !== undefined && incident.firstSeenAt !== undefined
+                ? [
+                    {
+                      // Roadmap 1.1: how long the page said it before we read it.
+                      id: "detected",
+                      label: t("incident.stat.detected"),
+                      value: formatDuration(
+                        i18n.language,
+                        Math.max(0, Date.parse(incident.firstSeenAt) - Date.parse(incident.declaredAt)) / 60_000,
+                      ),
+                      note: t("incident.stat.detected-note"),
+                    },
+                  ]
+                : []),
               {
                 id: "elapsed",
                 label: t(

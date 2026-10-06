@@ -14,6 +14,7 @@ import type { ProviderStatus } from "@/lib/types.ts";
 type FixtureKey =
   | "status"
   | "config"
+  | "providerPush"
   | "storage"
   | "history"
   | "incidents"
@@ -61,6 +62,8 @@ export interface Fixtures {
   adapterDebug?: unknown;
   /** `/config/catalog`, matched before `/config` — the bundled provider menu. */
   catalog?: unknown;
+  /** `/config/provider-push`, matched before `/config` — roadmap 1.2's subscription card. */
+  providerPush?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -112,6 +115,8 @@ export function stubApi(fixtures: Fixtures): void {
                               ? "storage"
                               : path.startsWith("/config/catalog")
                                 ? "catalog"
+                                : path.startsWith("/config/provider-push")
+                                  ? "providerPush"
                                 : path.startsWith("/config")
                                   ? "config"
                                   : path.startsWith("/debug/adapters")
@@ -151,6 +156,7 @@ export function stubApi(fixtures: Fixtures): void {
           ),
         },
         annotations: { annotations: [] },
+        providerPush: { enabled: false, tokenRevealed: false, providers: [] },
         messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },
       };
       const fixture = fixtures[key] ?? EMPTY[key];

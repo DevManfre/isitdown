@@ -129,6 +129,15 @@ export interface ProviderHistory {
   dailyCoverage: DayCoverage[];
   /** The window's coverage as one number, 0 to 1. null = no day can say. */
   coverage: number | null;
+  /** Roadmap 1.1. null = no incident in the window can be measured. */
+  detectionDelay: DetectionDelay | null;
+}
+
+/** How long after a provider declared an incident the poller first carried it. */
+export interface DetectionDelay {
+  medianMinutes: number;
+  worstMinutes: number;
+  measured: number;
 }
 
 /**
@@ -236,6 +245,29 @@ export interface IncidentRow {
   startedAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  /** Roadmap 1.1. When the provider published it; absent when the page says nothing. */
+  declaredAt?: string;
+  /** The poll that first carried it; absent when it was open on the first reading. */
+  firstSeenAt?: string;
+}
+
+/** One provider's row in `GET /config/provider-push` — roadmap 1.2. */
+export interface ProviderPush {
+  providerId: string;
+  /** Whether the dashboard has a subscription guide for this provider's adapter. */
+  eligible: boolean;
+  /** The address to paste on the provider's page; null when push is off or not eligible. */
+  url: string | null;
+  lastReceivedAt: string | null;
+  received: number;
+}
+
+export interface ProviderPushConfig {
+  /** Whether PUSH_TOKEN is set. */
+  enabled: boolean;
+  /** False for a read-only token holder, whose URLs carry a placeholder. */
+  tokenRevealed: boolean;
+  providers: ProviderPush[];
 }
 
 /** Which slice of the incident list the view is asking for. */
