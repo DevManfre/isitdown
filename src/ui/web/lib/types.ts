@@ -251,6 +251,25 @@ export interface IncidentRow {
   firstSeenAt?: string;
 }
 
+/** One provider's row in `GET /config/provider-push` — roadmap 1.2. */
+export interface ProviderPush {
+  providerId: string;
+  /** Whether the dashboard has a subscription guide for this provider's adapter. */
+  eligible: boolean;
+  /** The address to paste on the provider's page; null when push is off or not eligible. */
+  url: string | null;
+  lastReceivedAt: string | null;
+  received: number;
+}
+
+export interface ProviderPushConfig {
+  /** Whether PUSH_TOKEN is set. */
+  enabled: boolean;
+  /** False for a read-only token holder, whose URLs carry a placeholder. */
+  tokenRevealed: boolean;
+  providers: ProviderPush[];
+}
+
 /** Which slice of the incident list the view is asking for. */
 export type IncidentState = "all" | "active" | "resolved";
 
