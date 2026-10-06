@@ -129,6 +129,15 @@ export interface ProviderHistory {
   dailyCoverage: DayCoverage[];
   /** The window's coverage as one number, 0 to 1. null = no day can say. */
   coverage: number | null;
+  /** Roadmap 1.1. null = no incident in the window can be measured. */
+  detectionDelay: DetectionDelay | null;
+}
+
+/** How long after a provider declared an incident the poller first carried it. */
+export interface DetectionDelay {
+  medianMinutes: number;
+  worstMinutes: number;
+  measured: number;
 }
 
 /**
@@ -236,6 +245,10 @@ export interface IncidentRow {
   startedAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  /** Roadmap 1.1. When the provider published it; absent when the page says nothing. */
+  declaredAt?: string;
+  /** The poll that first carried it; absent when it was open on the first reading. */
+  firstSeenAt?: string;
 }
 
 /** Which slice of the incident list the view is asking for. */

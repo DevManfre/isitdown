@@ -341,3 +341,37 @@ back a percentage: an `observed` provider's uptime is still computed from that
 provider's own samples, as §7.6 describes, because a probe and the page it
 cross-checks are two separate providers with two separate histories. Folding one
 into the other is a larger change and is deliberately not made here.
+
+### 7.8 How fast an incident is detected
+
+"How quickly would we have heard?" is a number, not an opinion: the provider
+page and the poller each say when, and the difference is the detection delay.
+The provider page shows the median and the worst case over the window, beside
+the uptime, and an incident's own page shows its delay as **Detected after**.
+
+Two timestamps are stored on every incident:
+
+- **Declared** — when the provider *published* the incident, by its own clock.
+  Only a publication stamp counts: Statuspage's `created_at`, Google Cloud's
+  `created`, Cachet's `created_at`, Slack's `date_created`, Uptime Kuma's
+  `createdDate`. A page that publishes only when an incident *began* (Instatus,
+  Uptime.com, Better Stack, AWS, Azure, RSS) has no declared time, because an
+  incident is routinely backdated — "degraded since 09:00", posted at 09:40 —
+  and measuring from 09:00 would charge IsItDown for the forty minutes the
+  provider took to say anything.
+- **First seen** — the poll that first carried it. Left empty when that poll was
+  the provider's very first reading: an incident already open the day a page is
+  added predates the watching rather than being detected late.
+
+An incident missing either one is left out of the figures, never counted as a
+zero — so a page that publishes no creation time shows no detection figure at
+all. A provider clock running ahead of ours reads as an instant detection
+rather than a negative one. Time IsItDown itself was not running counts against
+it: an incident declared while the container was stopped was detected late,
+and the figure says so.
+
+The delay is to the first *reading*, not to the first *notification*. Quiet
+hours, routing and digests decide when — or whether — an operator is told, and
+folding that into the figure would make it measure policy instead of detection.
+This is the number to look at before shortening `POLL_INTERVAL_MINUTES`: if the
+median is already a minute, a faster cadence buys little.

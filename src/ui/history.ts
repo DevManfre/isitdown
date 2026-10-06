@@ -69,6 +69,50 @@ export interface ProviderHistory {
    * it has to be read against. `null` when no day in the window has an answer.
    */
   coverage: number | null;
+  /**
+   * How long after the provider declared an incident the poller first carried
+   * it — roadmap 1.1 — over the window's incidents that can be measured.
+   * `null` when none can.
+   */
+  detectionDelay: DetectionDelay | null;
+}
+
+export interface DetectionDelay {
+  medianMinutes: number;
+  worstMinutes: number;
+  /** The incidents behind both figures — a median of one is one incident. */
+  measured: number;
+}
+
+const MINUTE_MS = 60_000;
+
+/**
+ * Minutes from a provider declaring an incident to the poll that first carried
+ * it, or `undefined` when the row cannot say: the page published no creation
+ * stamp, or the incident was already open on the first reading anybody took.
+ *
+ * Clamped at zero. A provider's clock running ahead of ours would otherwise
+ * report that we saw the incident before it was declared, and a negative delay
+ * would drag the median towards a speed nobody has.
+ */
+export function detectionDelayMinutes(incident: IncidentRow): number | undefined {
+  if (incident.declaredAt === undefined || incident.firstSeenAt === undefined) return undefined;
+  const declared = Date.parse(incident.declaredAt);
+  const seen = Date.parse(incident.firstSeenAt);
+  if (Number.isNaN(declared) || Number.isNaN(seen)) return undefined;
+  return Math.max(0, seen - declared) / MINUTE_MS;
+}
+
+/** Median and worst detection delay over `incidents`, `null` when none is measurable. */
+export function detectionDelayOf(incidents: readonly IncidentRow[]): DetectionDelay | null {
+  const delays = incidents
+    .map(detectionDelayMinutes)
+    .filter((delay): delay is number => delay !== undefined)
+    .sort((a, b) => a - b);
+  if (delays.length === 0) return null;
+  const middle = Math.floor(delays.length / 2);
+  const median = delays.length % 2 === 1 ? delays[middle]! : (delays[middle - 1]! + delays[middle]!) / 2;
+  return { medianMinutes: median, worstMinutes: delays[delays.length - 1]!, measured: delays.length };
 }
 
 /**
@@ -401,6 +445,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
       dailySeries: dailySeriesOf(buckets, days, today),
       previousUptime: uptimeBetween(buckets, shiftDay(today, -(2 * days - 1)), shiftDay(today, -days)),
       ...(await coverageFor(days, today, zone)),
+      detectionDelay: detectionDelayOf(incidents),
     };
   }
 

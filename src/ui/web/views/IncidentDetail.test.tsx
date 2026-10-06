@@ -60,6 +60,28 @@ describe("IncidentDetail", () => {
     expect(await screen.findAllByText(/GitHub/)).not.toHaveLength(0);
   });
 
+  // Roadmap 1.1: only an incident whose page published a creation time, and that
+  // arrived while somebody was watching, has a detection delay to show.
+  it("says how long after the provider's announcement the incident was detected", async () => {
+    renderWithProviders(<IncidentDetail />, {
+      incident: {
+        ...detail,
+        incident: { ...detail.incident, declaredAt: "2026-08-21T09:00:00Z", firstSeenAt: "2026-08-21T09:04:00Z" },
+      },
+      status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+    }, "/incidents/:providerId/:incidentId");
+    const stats = await screen.findByTestId("incident-stats");
+    const detected = stats.querySelector('[data-stat="detected"]');
+    expect(detected).toHaveTextContent(i18n.t("incident.stat.detected"));
+    expect(detected).toHaveTextContent("4 min");
+  });
+
+  it("shows no detection delay for an incident that cannot be measured", async () => {
+    mount();
+    const stats = await screen.findByTestId("incident-stats");
+    expect(stats.querySelector('[data-stat="detected"]')).toBeNull();
+  });
+
   it("marks the stepper at the incident's current lifecycle word", async () => {
     mount();
     // Scoped to the element that actually carries aria-current: the status

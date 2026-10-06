@@ -18,6 +18,13 @@ export interface Incident {
   status: string;
   /** ISO 8601, UTC. */
   updatedAt: string;
+  /**
+   * ISO 8601, UTC. When the provider says it declared the incident — roadmap
+   * 1.1. Absent when the page publishes no creation time of its own: never
+   * filled from `updatedAt` or the poll time, because a made-up value here
+   * would read as a zero detection delay.
+   */
+  createdAt?: string | undefined;
 }
 
 export interface HistoricalIncident {

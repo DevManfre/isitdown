@@ -359,3 +359,41 @@ calcolato dai campioni di quel provider, come descrive la §7.6, perché una son
 e la pagina che verifica sono due provider distinti con due storie distinte.
 Fondere l'una nell'altra è un cambiamento più grande e qui deliberatamente non
 viene fatto.
+
+### 7.8 Quanto velocemente viene rilevato un incidente
+
+"In quanto tempo l'avremmo saputo?" è un numero, non un'opinione: la pagina del
+provider e il poller dicono ciascuno *quando*, e la differenza è il ritardo di
+rilevamento. La pagina del provider mostra mediana e caso peggiore sulla
+finestra, accanto all'uptime, e la pagina di un incidente mostra il suo ritardo
+come **Rilevato dopo**.
+
+Su ogni incidente sono salvati due istanti:
+
+- **Dichiarato** — quando il provider ha *pubblicato* l'incidente, secondo il
+  suo orologio. Conta solo un timestamp di pubblicazione: `created_at` di
+  Statuspage, `created` di Google Cloud, `created_at` di Cachet,
+  `date_created` di Slack, `createdDate` di Uptime Kuma. Una pagina che pubblica
+  solo quando un incidente è *iniziato* (Instatus, Uptime.com, Better Stack,
+  AWS, Azure, RSS) non ha un istante dichiarato, perché un incidente viene
+  spesso retrodatato — "degradato dalle 09:00", pubblicato alle 09:40 — e
+  misurare dalle 09:00 addebiterebbe a IsItDown i quaranta minuti che il
+  provider ha impiegato per dire qualcosa.
+- **Visto per la prima volta** — il poll che lo ha riportato per primo. Resta
+  vuoto quando quel poll era la primissima lettura del provider: un incidente
+  già aperto il giorno in cui la pagina viene aggiunta precede l'osservazione,
+  non è stato rilevato in ritardo.
+
+Un incidente a cui manca uno dei due resta fuori dai numeri, non viene mai
+contato come zero — così una pagina che non pubblica un istante di creazione
+non mostra alcun dato di rilevamento. Un orologio del provider avanti rispetto
+al nostro si legge come rilevamento istantaneo, non come ritardo negativo. Il
+tempo in cui IsItDown stesso non era in esecuzione conta contro di lui: un
+incidente dichiarato mentre il container era fermo è stato rilevato in
+ritardo, e il numero lo dice.
+
+Il ritardo è fino alla prima *lettura*, non alla prima *notifica*. Quiet hours,
+routing e digest decidono quando — o se — l'operatore viene avvisato, e
+includerli nel numero gli farebbe misurare la policy invece del rilevamento.
+È il numero da guardare prima di accorciare `POLL_INTERVAL_MINUTES`: se la
+mediana è già di un minuto, una cadenza più rapida guadagna poco.
