@@ -843,6 +843,15 @@ const paths: Json = {
       },
     },
   },
+  "/config/provider-push": {
+    get: {
+      tags: ["Diagnostics"],
+      summary: "What subscribing each provider's webhook takes, and whether one has arrived.",
+      description:
+        "Roadmap 1.2. `{ enabled, tokenRevealed, providers: [{ providerId, eligible, url, lastReceivedAt, received }] }`. `enabled` is whether `PUSH_TOKEN` is set; `eligible` whether the provider is enabled and the dashboard has a subscription guide for its adapter (Atlassian Statuspage today); `url` the address to paste on the provider's page, `null` when either is false. The URL carries the push token only for a request that could also write — a read-only `API_TOKEN` holder gets `<PUSH_TOKEN>` in its place, and `tokenRevealed` says which. `lastReceivedAt` and `received` count every accepted post, coalesced ones included: Statuspage sends no test event, so a real post arriving is the only proof the subscription works.",
+      responses: { "200": ok({ type: "object" }) },
+    },
+  },
   "/push/{providerId}": {
     post: {
       tags: ["Diagnostics"],

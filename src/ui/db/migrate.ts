@@ -612,6 +612,19 @@ export function migrate(db: DatabaseSync): void {
     );
     if (!columns.includes("declared_at")) db.exec("ALTER TABLE incidents ADD COLUMN declared_at TEXT");
     if (!columns.includes("first_seen_at")) db.exec("ALTER TABLE incidents ADD COLUMN first_seen_at TEXT");
+
+    // The provider push subscription's only proof of life — roadmap 1.2.
+    // Statuspage sends no test event, so "this works" can only ever mean "a
+    // real one arrived", and that has to outlive a restart to be worth
+    // showing. One row per provider, overwritten: the question the dashboard
+    // asks is "when did the last one come", never "list them all".
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS push_receipts (
+        provider_id TEXT PRIMARY KEY REFERENCES services(id) ON DELETE CASCADE,
+        received_at TEXT NOT NULL,
+        count INTEGER NOT NULL
+      );
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

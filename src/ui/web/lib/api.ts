@@ -24,6 +24,7 @@ import type {
   ProviderCalendar,
   ReliabilityReport,
   SlaResponse,
+  ProviderPushConfig,
   TrustResponse,
   ProviderHistory,
   HistorySummary,
@@ -182,6 +183,8 @@ export const getReliability = (days: number) =>
 export const getSla = () => request<SlaResponse>("GET", "/sla");
 
 /** Status-page accuracy per cross-checked pair — roadmap 8.1. */
+export const getProviderPush = () => request<ProviderPushConfig>("GET", "/config/provider-push");
+
 export const getTrust = (days: number) =>
   request<TrustResponse>("GET", `/trust?days=${days}`);
 

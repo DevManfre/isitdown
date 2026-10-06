@@ -7,6 +7,7 @@ import { IncidentMap } from "@/components/IncidentMap.tsx";
 import { ProviderDetailPanel } from "@/components/ProviderDetailPanel.tsx";
 import { SlaBudgetCard } from "@/components/SlaBudgetCard.tsx";
 import { TrustCard } from "@/components/TrustCard.tsx";
+import { ProviderPushCard } from "@/components/ProviderPushCard.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { useIncidents, useStatus } from "@/hooks/queries.ts";
 import { statusLabelKey } from "@/lib/chartConfig.ts";
@@ -108,6 +109,13 @@ export function ProviderDetail() {
           Renders nothing at all for a provider with no target. */}
       <SlaBudgetCard providerId={providerId} />
       <TrustCard providerId={providerId} />
+      {/* Roadmap 1.2. Renders nothing for a provider the guide does not cover. */}
+      <ProviderPushCard
+        providerId={providerId}
+        providerName={provider.name}
+        pageUrl={provider.baseUrl}
+        pollMinutes={status.pollIntervalMinutes}
+      />
 
       <section aria-label={t("incidents.list")} className="flex flex-col gap-2">
         <span className="text-xs uppercase tracking-widest text-primary">{t("incidents.list")}</span>

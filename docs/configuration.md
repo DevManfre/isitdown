@@ -1485,6 +1485,20 @@ Set `PUSH_TOKEN` on the UI edition and register the URL on the provider's page
 https://isitdown.example.com/push/github?token=<PUSH_TOKEN>
 ```
 
+You do not have to build that address by hand. Each Statuspage provider's page in
+the dashboard carries a **Push from the provider** card (roadmap 1.2): with
+`PUSH_TOKEN` unset it says how to turn push on; once it is set it shows the
+address to paste, with a copy button and the steps for that provider's own page.
+When the dashboard is open on `localhost` the card warns that Statuspage cannot
+reach that host — substitute the address IsItDown is published at, same path.
+The full token is shown only to the operator's own dashboard; a read-only
+`API_TOKEN` holder sees `<PUSH_TOKEN>` in its place.
+
+Statuspage sends no test event, so the card cannot verify a subscription the
+moment it is made. It does the honest thing instead: it records every post that
+arrives — in the database, so it survives a restart — and turns to **Working**,
+with the time of the last post, when the provider's next real update comes in.
+
 **What arrives is a trigger, not a reading.** This is the design decision worth
 knowing about. IsItDown does not parse the webhook body into a status: it reads
 the provider, right then, through the adapter that already knows how. Everything

@@ -224,6 +224,18 @@ export const useSla = () =>
  * a card about how honest the vendor's page is must not take the page down
  * with it when it fails to load.
  */
+/**
+ * Provider push subscription — roadmap 1.2. Never throws, like the other cards
+ * on the provider page: a helper for subscribing a webhook must not take the
+ * provider's history down with it.
+ */
+export const useProviderPush = () =>
+  useQuery({
+    queryKey: ["provider-push"],
+    queryFn: api.getProviderPush,
+    throwOnError: false,
+  });
+
 export const useTrust = (days: number) =>
   useQuery({
     queryKey: ["trust", days],
