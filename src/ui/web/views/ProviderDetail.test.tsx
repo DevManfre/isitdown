@@ -15,6 +15,7 @@ const history = {
   downtimeMinutes: 12,
   dailySeries: [{ day: "2026-08-21", uptime: 100 }],
   previousUptime: null,
+  detectionDelay: { medianMinutes: 4, worstMinutes: 11, measured: 3 },
 };
 
 const incidents = {
@@ -71,6 +72,13 @@ describe("ProviderDetail", () => {
     // The panel is shared with the drawer, so this is the one assertion that
     // says the page is showing history at all rather than an empty frame.
     expect(await screen.findByText(i18n.t("column.range", { days: 30 }))).toBeInTheDocument();
+  });
+
+  it("shows how fast incidents were detected beside the uptime, and over how many", async () => {
+    mount();
+    expect(await screen.findByText(i18n.t("history.detection.median"))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("history.detection.worst"))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("history.detection.note", { count: 3 }))).toBeInTheDocument();
   });
 
   it("lists the provider's own incidents, each linking to its detail page", async () => {

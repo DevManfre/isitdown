@@ -190,9 +190,7 @@ Still open:
 - A native review of the Italian strings.
 
 The roadmap that carried the project this far is finished — every row of it
-shipped — and is archived at [`docs/roadmap/ROADMAP.md`](docs/roadmap/ROADMAP.md).
-What comes next is being weighed in `ROADMAP_2.md` and `ROADMAP_3.md`, neither of
-which commits to anything.
+shipped.
 
 **What IsItDown is.** Both an aggregator of status pages and a monitor of
 things that publish none — and every provider says which of the two answers for

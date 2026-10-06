@@ -8,6 +8,7 @@ import type {
   OverallStatus,
 } from "../core/types.ts";
 import { fetchConditional } from "../core/http.ts";
+import { createdAtOf } from "./createdAt.ts";
 
 /**
  * Uptime Kuma's published status pages (roadmap 1.15).
@@ -222,6 +223,7 @@ export function parseUptimeKumaStatus(pageRaw: string, heartbeatRaw: string, ser
       impact: incident.style ?? "",
       status: incident.style ?? "",
       updatedAt: isoOf(incident.lastUpdatedDate) ?? isoOf(incident.createdDate) ?? fetchedAt,
+      ...createdAtOf(isoOf(incident.createdDate)),
     }));
 
   const maintenances: MaintenanceWindow[] = page.maintenanceList.flatMap((window) => {

@@ -15,6 +15,7 @@ import type {
   OverallStatus,
 } from "../core/types.ts";
 import { fetchConditional } from "../core/http.ts";
+import { createdAtOf } from "./createdAt.ts";
 
 /**
  * The generic adapter for Atlassian Statuspage, which most providers run on —
@@ -203,6 +204,7 @@ export function parseSummary(raw: unknown, service: ServiceRef): NormalizedStatu
         impact: incident.impact ?? "",
         status: incident.status ?? "",
         updatedAt: incident.updated_at ?? incident.created_at ?? fetchedAt,
+        ...createdAtOf(incident.created_at),
       },
     ];
   });

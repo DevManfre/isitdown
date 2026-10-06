@@ -177,6 +177,48 @@ test("an incident id that becomes active again reopens its row rather than stayi
   await store.close();
 });
 
+// Roadmap 1.1: detection delay needs when the provider declared an incident and
+// when a poll first carried it, and the second only counts while somebody was
+// already watching.
+test("an incident that arrives after the first reading records when it was declared and first seen", async () => {
+  const { store } = await harness();
+  await store.saveStatus(snap({ overallStatus: "operational", activeIncidents: [] }));
+  await store.saveStatus({
+    ...snap({ activeIncidents: [inc({ createdAt: "2026-08-19T14:01:00.000Z" })] }),
+    fetchedAt: "2026-08-19T14:05:00.000Z",
+  });
+  await store.saveStatus({
+    ...snap({ activeIncidents: [inc({ status: "monitoring", createdAt: "2026-08-19T14:01:00.000Z" })] }),
+    fetchedAt: "2026-08-19T14:08:00.000Z",
+  });
+
+  const [row] = await store.listIncidents({ providerId: "github" });
+  assert.equal(row?.declaredAt, "2026-08-19T14:01:00.000Z");
+  assert.equal(row?.firstSeenAt, "2026-08-19T14:05:00.000Z", "a later poll must not move first sight");
+  await store.close();
+});
+
+test("an incident already open on the provider's first reading has no first sight", async () => {
+  const { store } = await harness();
+  await store.saveStatus(snap({ activeIncidents: [inc({ createdAt: "2026-08-10T09:00:00.000Z" })] }));
+
+  const [row] = await store.listIncidents({ providerId: "github" });
+  assert.equal(row?.declaredAt, "2026-08-10T09:00:00.000Z");
+  assert.equal(row?.firstSeenAt, undefined, "it predates the watching rather than being detected late");
+  await store.close();
+});
+
+test("an incident from a page with no creation stamp has no declared time", async () => {
+  const { store } = await harness();
+  await store.saveStatus(snap({ overallStatus: "operational", activeIncidents: [] }));
+  await store.saveStatus(snap());
+
+  const [row] = await store.listIncidents({ providerId: "github" });
+  assert.equal(row?.declaredAt, undefined);
+  assert.equal(row?.firstSeenAt, "2026-08-19T14:05:00.000Z");
+  await store.close();
+});
+
 test("listIncidents can split active from resolved", async () => {
   const { store } = await harness();
   await store.saveStatus(snap({ activeIncidents: [inc({ id: "open" }), inc({ id: "closing" })] }));

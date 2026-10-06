@@ -3,6 +3,7 @@ import type { Adapter, FetchContext, IncidentHistoryResult, ServiceRef } from ".
 import { fetchConditional } from "../core/http.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { worstStatus } from "./severity.ts";
+import { createdAtOf } from "./createdAt.ts";
 
 /**
  * Google Cloud publishes one flat incident list, `/incidents.json`, and no
@@ -94,6 +95,7 @@ export function parseGcpStatus(raw: string, service: ServiceRef): NormalizedStat
     // end — so the impact doubles as the status the notifier quotes.
     status: incident.status_impact ?? "SERVICE_DISRUPTION",
     updatedAt: toUtc(incident.modified) ?? toUtc(incident.begin) ?? fetchedAt,
+    ...createdAtOf(toUtc(incident.created)),
   }));
 
   return {

@@ -53,6 +53,13 @@ test("an incident with no end is open, and one with an end is not", () => {
   assert.equal(status.activeIncidents[0]?.updatedAt, "2026-09-03T17:47:02.000Z");
 });
 
+// Roadmap 1.1. Google backdates `begin` to when the trouble started; `created`
+// is when the page said so, and only that one measures how fast we noticed.
+test("an open incident's creation time is when Google published it, not when it began", () => {
+  const status = parseGcpStatus(fixture("incident"), service);
+  assert.equal(status.activeIncidents[0]?.createdAt, "2026-09-01T16:03:12.000Z");
+});
+
 test("a document whose every incident has ended reads as operational", () => {
   const status = parseGcpStatus(fixture("operational"), service);
 

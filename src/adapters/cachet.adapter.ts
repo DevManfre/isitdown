@@ -15,6 +15,7 @@ import type {
   OverallStatus,
 } from "../core/types.ts";
 import { fetchConditional } from "../core/http.ts";
+import { createdAtOf } from "./createdAt.ts";
 
 /**
  * Cachet, the status page this project's own audience self-hosts (roadmap 1.15).
@@ -186,6 +187,8 @@ interface Reading {
     resolved: boolean;
     componentId: string | null;
     startedAt: string | null;
+    /** When the page published it, which `occurred_at` may backdate. */
+    createdAt: string | null;
     updatedAt: string;
   }[];
 }
@@ -226,6 +229,7 @@ function readPage(componentsRaw: string, incidentsRaw: string, service: ServiceR
             ? null
             : String(incident.component_id),
         startedAt: isoOf(incident.occurred_at ?? incident.created_at),
+        createdAt: isoOf(incident.created_at),
         updatedAt: isoOf(incident.updated_at) ?? isoOf(incident.occurred_at) ?? fetchedAt,
       };
     });
@@ -258,6 +262,7 @@ export function parseCachetStatus(
       impact: incident.status,
       status: incident.status,
       updatedAt: incident.updatedAt,
+      ...createdAtOf(incident.createdAt),
     }));
 
   const components: ComponentStatus[] = (service.components ?? []).map((selection) => ({

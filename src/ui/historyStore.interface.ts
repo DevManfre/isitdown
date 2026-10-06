@@ -20,6 +20,16 @@ export interface IncidentRow {
   startedAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  /**
+   * Roadmap 1.1. When the provider published the incident, by its own clock.
+   * Absent when the page publishes no such stamp.
+   */
+  declaredAt?: string | undefined;
+  /**
+   * The poll that first carried it. Absent for an incident that was already
+   * open on the provider's very first reading, or that predates the column.
+   */
+  firstSeenAt?: string | undefined;
 }
 
 export interface SampleRow {

@@ -20,3 +20,6 @@ test/visual/current/
 
 # graphify
 graphify-out
+
+# Local brainstorming, not versioned
+/roadmap.md
