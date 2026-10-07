@@ -56,7 +56,17 @@ import type { CatalogProvider, ServiceDefinition } from "@/lib/types.ts";
 
 /** The stored interval as a form value; empty when the provider follows the global cadence. */
 const intervalValue = (service: ServiceDefinition | undefined): string =>
-  service?.intervalMinutes == null ? "" : String(service.intervalMinutes);
+  service?.intervalSeconds != null
+    ? String(service.intervalSeconds)
+    : service?.intervalMinutes == null
+      ? ""
+      : String(service.intervalMinutes);
+
+/** What the interval field counts in: seconds only for a probe (roadmap 1.6). */
+type IntervalUnit = "minutes" | "seconds";
+
+const intervalUnitOf = (service: ServiceDefinition | undefined): IntervalUnit =>
+  service?.intervalSeconds != null ? "seconds" : "minutes";
 
 /** The prefix an option carrying a request header is stored under. */
 const HEADER_PREFIX = "header.";
@@ -150,6 +160,9 @@ export function ServiceDialog({
   const [intervalMinutes, setIntervalMinutes] = useState(
     intervalValue(service),
   );
+  const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>(
+    intervalUnitOf(service),
+  );
   // "My stack" (roadmap 2.6). A free-text slug rather than a picker: the first
   // group has to be creatable, and a select with nothing in it cannot do that.
   const [group, setGroup] = useState(service?.group ?? "");
@@ -207,6 +220,13 @@ export function ServiceDialog({
   const tcpProbing = activeAdapter === TCP_ADAPTER;
   const dnsProbing = activeAdapter === DNS_ADAPTER;
   const mailReading = activeAdapter === IMAP_ADAPTER;
+  // A status page is never read faster than once a minute (roadmap 1.6), so
+  // the unit picker only exists for a probe, and a seconds value left over from
+  // switching away from one is read as minutes rather than sent and refused.
+  const anyProbe = probing || tcpProbing || dnsProbing;
+  const unit: IntervalUnit = anyProbe ? intervalUnit : "minutes";
+  const interval =
+    intervalMinutes.trim() === "" ? null : Number(intervalMinutes);
   const setOption = (key: string, value: string): void => {
     setOptions((current) => ({ ...current, [key]: value }));
   };
@@ -281,6 +301,7 @@ export function ServiceDialog({
     setSelection(service?.components ?? []);
     setScopeToComponents(service?.scopeToComponents ?? false);
     setIntervalMinutes(intervalValue(service));
+    setIntervalUnit(intervalUnitOf(service));
     setGroup(service?.group ?? "");
     setSlaTarget(service?.slaTarget == null ? "" : String(service.slaTarget));
     setAuthority(service?.authority ?? "");
@@ -473,9 +494,11 @@ export function ServiceDialog({
           ...savedOptions(),
           // Omitted rather than null on an add: the schema behind the POST takes
           // the field as optional, and absent already means the global cadence.
-          ...(intervalMinutes.trim() === ""
+          ...(interval === null
             ? {}
-            : { intervalMinutes: Number(intervalMinutes) }),
+            : unit === "seconds"
+              ? { intervalSeconds: interval }
+              : { intervalMinutes: interval }),
           // Omitted rather than null, like the interval: absent means nobody
           // promised anything about this provider (roadmap 4.13).
           ...(slaTarget.trim() === "" ? {} : { slaTarget: Number(slaTarget) }),
@@ -510,8 +533,10 @@ export function ServiceDialog({
             scopeToComponents,
             // Null, not omitted: a cleared field has to travel as an instruction
             // to forget the interval, or the row keeps the one it had.
-            intervalMinutes:
-              intervalMinutes.trim() === "" ? null : Number(intervalMinutes),
+            // Both, always: the one not in use travels as null so a probe
+            // moved between seconds and minutes never keeps the old one.
+            intervalMinutes: unit === "minutes" ? interval : null,
+            intervalSeconds: unit === "seconds" ? interval : null,
             // Same rule for the group: cleared means "out of the group", which
             // only null can say (roadmap 2.6).
             group: slugify(group) === "" ? null : slugify(group),
@@ -618,18 +643,45 @@ export function ServiceDialog({
           <Label htmlFor="service-interval">
             {t("field.provider-interval")}
           </Label>
-          <Input
-            id="service-interval"
-            type="number"
-            min={1}
-            max={1440}
-            placeholder={t("field.provider-interval-placeholder")}
-            value={intervalMinutes}
-            onChange={(event) => setIntervalMinutes(event.target.value)}
-            {...fieldProps}
-          />
+          <div className="flex gap-2">
+            <Input
+              id="service-interval"
+              type="number"
+              min={unit === "seconds" ? 10 : 1}
+              max={unit === "seconds" ? 3600 : 1440}
+              placeholder={t("field.provider-interval-placeholder")}
+              value={intervalMinutes}
+              onChange={(event) => setIntervalMinutes(event.target.value)}
+              {...fieldProps}
+            />
+            {anyProbe && (
+              <Select
+                value={intervalUnit}
+                onValueChange={(value) => setIntervalUnit(value as IntervalUnit)}
+              >
+                <SelectTrigger
+                  className="w-36 shrink-0"
+                  aria-label={t("field.provider-interval-unit")}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="minutes">
+                    {t("field.provider-interval-minutes")}
+                  </SelectItem>
+                  <SelectItem value="seconds">
+                    {t("field.provider-interval-seconds")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
           <span className="text-xs text-muted-foreground">
-            {t("field.provider-interval-hint")}
+            {t(
+              unit === "seconds"
+                ? "field.provider-interval-hint-seconds"
+                : "field.provider-interval-hint",
+            )}
           </span>
         </div>
 

@@ -75,6 +75,31 @@ export function optionProblems(
 }
 
 /**
+ * Why a provider's cadence cannot work, one sentence each — roadmap 1.6. A
+ * cadence in seconds is for a probe: a status page read every ten seconds says
+ * nothing it did not say a minute ago, and costs its owner six requests for
+ * it. Empty for an unknown adapter, like `optionProblems`.
+ */
+export function cadenceProblems(service: {
+  adapter: string;
+  intervalMinutes?: number | null | undefined;
+  intervalSeconds?: number | null | undefined;
+}): string[] {
+  if (service.intervalSeconds === undefined || service.intervalSeconds === null) return [];
+  const problems: string[] = [];
+  const adapter = adapters[service.adapter];
+  if (adapter !== undefined && adapter.kind !== "probe") {
+    problems.push(
+      `intervalSeconds is only for a probe (http, tcp, dns); the ${service.adapter} adapter reads a status page, use intervalMinutes`,
+    );
+  }
+  if (service.intervalMinutes !== undefined && service.intervalMinutes !== null) {
+    problems.push("intervalSeconds and intervalMinutes cannot both be set");
+  }
+  return problems;
+}
+
+/**
  * The adapters whose reads go through `fetchConditional`, and so carry a
  * provider's credentials (roadmap 1.5). Not the probes, which have their own
  * `header.<Name>`, and not `imap`, which logs in rather than sending a header.

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { parse } from "yaml";
+import { cadenceProblems } from "../../adapters/index.ts";
 import { deliverySchema, pollingSchema } from "../../core/config.schema.ts";
 import {
   CHANNEL_MESSAGE_KEYS,
@@ -98,6 +99,9 @@ export async function inspectConfig(path: string, env: NodeJS.ProcessEnv): Promi
       problems.push(`config file ${path} defines the service id "${service.id}" more than once`);
     }
     seen.add(service.id);
+    for (const problem of cadenceProblems(service)) {
+      problems.push(`config file ${path}: service "${service.id}": ${problem}`);
+    }
   }
 
   const channels = buildChannels(file.notifications, unresolved, path, problems);

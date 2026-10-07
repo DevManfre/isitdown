@@ -746,6 +746,32 @@ test("a provider with its own interval is left alone until that interval has ela
   await provider.close();
 });
 
+test("a probe on a cadence in seconds is polled between the minute ticks", async () => {
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const store = await freshStore();
+  let clock = Date.parse("2026-09-01T10:00:00.000Z");
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: fakeSleep().sleep, now: () => clock });
+  const services = [
+    service("page", provider.baseUrl),
+    service("probe", provider.baseUrl, { intervalSeconds: 15 }),
+  ];
+
+  await poller.runCycle(config(services, { intervalMinutes: 1 }));
+  clock += 15_000;
+  const next = await poller.runCycle(config(services, { intervalMinutes: 1 }));
+
+  assert.deepEqual(
+    next.results.map((result) => result.providerId),
+    ["probe"],
+    "fifteen seconds in, only the probe is due",
+  );
+  assert.equal(await poller.nextIntervalMinutes(config(services, { intervalMinutes: 1 })), 0.25);
+  await provider.close();
+});
+
 test("a cycle asked to ignore the schedule polls every provider", async () => {
   const provider = await fakeProvider((_req, res) => {
     res.writeHead(200, { "content-type": "application/json" });

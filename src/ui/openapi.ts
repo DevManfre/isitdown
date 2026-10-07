@@ -1077,6 +1077,12 @@ const schemas: Json = {
           "On a probe: the provider whose page it cross-checks (roadmap 1.10).",
       },
       intervalMinutes: { type: "integer", nullable: true },
+      intervalSeconds: {
+        type: "integer",
+        nullable: true,
+        description:
+          "On a probe only: a cadence in seconds, 10 to 3600, instead of intervalMinutes (roadmap 1.6).",
+      },
       mutedUntil: { type: "string", nullable: true },
       options: { type: "object", additionalProperties: { type: "string" } },
       components: { type: "array", items: { type: "object" } },
