@@ -9,6 +9,7 @@ import { ProviderRow } from "@/components/FleetRows.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { stagger } from "@/lib/stagger.ts";
+import { shownStatus } from "@/lib/suspicion.ts";
 import type { HistoryBucket, ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -64,7 +65,11 @@ function DotStrip({ providers }: { providers: ProviderStatus[] }) {
         <HoverCard key={provider.id} openDelay={120} closeDelay={60}>
           <HoverCardTrigger asChild>
             <span className="cursor-default">
-              <StatusDot status={provider.overallStatus} size={10} />
+              <StatusDot
+                status={shownStatus(provider).status}
+                hatched={shownStatus(provider).hatched}
+                size={10}
+              />
             </span>
           </HoverCardTrigger>
           <HoverCardContent className="flex w-auto flex-col gap-1 p-3">
@@ -112,8 +117,11 @@ export function FleetGroups({
   const [openProblems, setOpenProblems] = useState(true);
   const [openHealthy, setOpenHealthy] = useState(false);
 
-  const problems = providers.filter((provider) => provider.overallStatus !== "operational");
-  const healthy = providers.filter((provider) => provider.overallStatus === "operational");
+  // Roadmap 1.3: a suspected provider needs attention as much as a declared
+  // one, so it opens with the problems — its own row still says the page has
+  // not confirmed it, and no count here claims it did.
+  const problems = providers.filter((provider) => shownStatus(provider).status !== "operational");
+  const healthy = providers.filter((provider) => shownStatus(provider).status === "operational");
 
   return (
     <div className="fleet-groups flex flex-col gap-5">

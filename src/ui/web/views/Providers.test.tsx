@@ -71,6 +71,28 @@ describe("Providers", () => {
     ).toBeInTheDocument();
   });
 
+  // Roadmap 1.3: the card, the dot and the status column all say the same thing.
+  it("marks a suspected provider in its card, its dot and its status column", async () => {
+    const suspected = {
+      ...status,
+      providers: status.providers.map((provider) =>
+        provider.id === "github"
+          ? {
+              ...provider,
+              overallStatus: "operational" as const,
+              suspected: { status: "major_outage" as const, probeId: "github-api", since: "2026-10-06T20:06:00Z" },
+            }
+          : provider,
+      ),
+    };
+    const { container } = renderWithProviders(<Providers />, { status: suspected, history });
+    const table = await inTable();
+    const label = i18n.t("suspected.short", { status: i18n.t("status.major-outage").toLowerCase() });
+    expect(await table.findByText(label, { exact: false })).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="provider-card"][data-suspected]')).not.toBeNull();
+    expect(container.querySelector("table [data-suspected]")).not.toBeNull();
+  });
+
   it("is read-only: no edit or remove control lives here", async () => {
     renderWithProviders(<Providers />, { status, history });
     await (await inTable()).findByText("GitHub");

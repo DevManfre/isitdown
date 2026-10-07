@@ -67,6 +67,42 @@ describe("Overview", () => {
     ).toBeInTheDocument();
   });
 
+  // Roadmap 1.3: a suspicion is shown, but never counted as the provider's word.
+  const suspicion = { status: "major_outage" as const, probeId: "github-api", since: "2026-10-06T20:06:00Z" };
+
+  it("keeps a suspected provider out of the headline and lists it on a line of its own", async () => {
+    renderWithProviders(<Overview />, {
+      status: {
+        providers: [providerFixture({ overallStatus: "operational", suspected: suspicion })],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
+      history,
+    });
+    // Waits on the suspected line first: before /status answers the fleet is
+    // empty, and an empty fleet already reads all-operational — asserting the
+    // headline first would pass whatever the rule said.
+    const line = await screen.findByTestId("overview-suspected");
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(i18n.t("overview.title.all-operational"));
+    expect(line).toHaveTextContent("GitHub");
+    expect(line.querySelector("a")).toHaveAttribute("href", "#/providers/github");
+  });
+
+  it("counts a suspicion on an observed provider as off the line, with no separate line", async () => {
+    renderWithProviders(<Overview />, {
+      status: {
+        providers: [providerFixture({ overallStatus: "operational", authority: "observed", suspected: suspicion })],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
+      history,
+    });
+    expect(await screen.findByText(i18n.t("overview.title.down", { count: 1 }))).toBeInTheDocument();
+    expect(screen.queryByTestId("overview-suspected")).toBeNull();
+  });
+
   it("a provider nobody could read is not counted among the ones that are down", async () => {
     renderWithProviders(<Overview />, {
       status: {

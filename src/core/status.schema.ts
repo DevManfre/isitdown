@@ -44,6 +44,13 @@ export const dampingStateSchema = z.object({
   count: z.number().int().positive(),
 });
 
+export const suspicionSchema = z.object({
+  status: z.enum(["operational", "degraded", "partial_outage", "major_outage", "unknown"]),
+  probeId: z.string(),
+  since: z.string(),
+  note: z.string().optional(),
+});
+
 export const providerRuntimeStateSchema = z.object({
   last: normalizedStatusSchema.nullable(),
   failureCount: z.number().int().min(0),
@@ -53,4 +60,7 @@ export const providerRuntimeStateSchema = z.object({
   // of its own yet", which the gate reads as the undamped behaviour.
   notifyBaseline: normalizedStatusSchema.nullable().default(null),
   pending: dampingStateSchema.nullable().default(null),
+  // Defaulted for the same reason: a store written before roadmap 1.3 simply
+  // holds no suspicion.
+  suspicions: z.array(suspicionSchema).default([]),
 });

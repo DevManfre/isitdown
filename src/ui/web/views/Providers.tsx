@@ -35,6 +35,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentRows } from "@/components/ComponentRows.tsx";
 import { ProviderCards } from "@/components/ProviderCards.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
+import { SuspicionTooltip } from "@/components/SuspicionTooltip.tsx";
+import { shownStatus, type ShownStatus } from "@/lib/suspicion.ts";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import {
   useHistory,
@@ -120,6 +122,8 @@ interface ProviderRow {
   muted: boolean;
   /** Which source is the record for this provider — roadmap 9.1. */
   authority: "declared" | "observed";
+  /** Roadmap 1.3. What the dot draws: the status shown, hatched when unconfirmed. */
+  shown: ShownStatus;
 }
 
 /**
@@ -181,8 +185,10 @@ const ariaSort = (
 ): "ascending" | "descending" | "none" =>
   sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none";
 
+// Roadmap 1.3: the "issues" filter is about what to look at, so a suspected
+// provider is in it alongside a declared one.
 const hasIssue = (provider: ProviderStatus) =>
-  provider.overallStatus !== "operational";
+  shownStatus(provider).status !== "operational";
 
 /** The ids the filter keeps: the whole fleet, or only what has an open issue. */
 const shownBy = (
@@ -394,6 +400,7 @@ export function Providers() {
             maintenanceActive: provider.maintenance.active.length > 0,
             muted: isMuted(provider.mutedUntil),
             authority: provider.authority,
+            shown: shownStatus(provider),
           };
         })
         // Problems first — roadmap 13.1. Sorted here rather than seeded into the
@@ -452,7 +459,13 @@ export function Providers() {
           sortFn: "text",
           cell: ({ row }) => (
             <span className="flex items-center gap-2">
-              <StatusDot status={row.original.status} glow={8} />
+              <SuspicionTooltip suspicion={row.original.shown.suspicion}>
+                <StatusDot
+                  status={row.original.shown.status}
+                  hatched={row.original.shown.hatched}
+                  glow={8}
+                />
+              </SuspicionTooltip>
               <span className="flex flex-col">
                 <span className="flex items-center gap-1.5">
                   {/* The name is the way into the provider's own page (roadmap
@@ -504,11 +517,21 @@ export function Providers() {
           sortFn: "basic",
           // Worst first on the first click: that is the row being looked for.
           sortDescFirst: true,
-          cell: ({ row }) => (
-            <span style={{ color: statusColor(row.original.status) }}>
-              {t(statusLabelKey(row.original.status))}
-            </span>
-          ),
+          cell: ({ row }) =>
+            row.original.shown.hatched ? (
+              // Roadmap 1.3: the page's word first, then the suspicion — the
+              // same pair the Overview row prints.
+              <span className="flex flex-wrap gap-x-1.5">
+                <span className="text-muted-foreground">{t(statusLabelKey(row.original.status))}</span>
+                <span style={{ color: statusColor(row.original.shown.status) }}>
+                  · {t("suspected.short", { status: t(statusLabelKey(row.original.shown.status)).toLowerCase() })}
+                </span>
+              </span>
+            ) : (
+              <span style={{ color: statusColor(row.original.shown.status) }}>
+                {t(statusLabelKey(row.original.shown.status))}
+              </span>
+            ),
         }),
         helper.accessor("uptime", {
           header: ({ column }) => (

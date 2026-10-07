@@ -19,7 +19,7 @@ import type {
 import { componentTargetOf } from "./routing.ts";
 import { authorityOf } from "./authority.ts";
 import { tracer } from "./tracing.ts";
-import type { NormalizedStatus, StatusChange } from "./types.ts";
+import type { NormalizedStatus, StatusChange, Suspicion } from "./types.ts";
 
 /**
  * How much of a provider's own cadence the staggered start may spread over, and
@@ -237,13 +237,6 @@ export function createPoller(deps: PollerDeps): Poller {
    * news and re-announces; the same three still being down is not.
    */
   let announced: string | null = null;
-
-  /**
-   * Cross-check pairs already reported (roadmap 1.10), so a page that keeps
-   * disagreeing with its probe is one alert rather than one per cycle. Dropped
-   * again the moment the two agree, so the next disagreement is news.
-   */
-  const accused = new Set<string>();
 
   async function attemptFetch(
     service: ServiceDefinition,
@@ -592,7 +585,6 @@ export function createPoller(deps: PollerDeps): Poller {
       // wrong, so it reads the provider either way.
       const declared = probe.crossChecks as string;
       const target = componentTargetOf(declared)?.providerId ?? declared;
-      const pair = `${probe.id}->${target}`;
       const reading = byId.get(probe.id);
       // Not polled this cycle: its last reading has already been judged, and
       // re-judging it here would re-accuse the page every cycle in between.
@@ -635,14 +627,31 @@ export function createPoller(deps: PollerDeps): Poller {
             })
           : null;
 
+      // The open disagreement is the provider's stored suspicion (roadmap
+      // 1.3), one per accusing probe. Kept in the store rather than in memory,
+      // so the dashboard can show it and a restart neither forgets it nor
+      // announces it a second time.
+      const others = state.suspicions.filter((suspicion) => suspicion.probeId !== probe.id);
+      const existing = state.suspicions.find((suspicion) => suspicion.probeId === probe.id);
+
       if (change === null) {
-        accused.delete(pair);
+        // Dropped the moment the two agree, so the next disagreement is news.
+        if (existing !== undefined) await store.setSuspicions(target, others);
         continue;
+      }
+
+      const suspicion: Suspicion = {
+        status: change.currentStatus,
+        probeId: probe.id,
+        since: existing?.since ?? at,
+        ...(reading.note === undefined ? {} : { note: reading.note }),
+      };
+      if (existing === undefined || existing.status !== suspicion.status || existing.note !== suspicion.note) {
+        await store.setSuspicions(target, [...others, suspicion]);
       }
       // Said once per disagreement: a page that stays wrong for an hour is one
       // alert, the way a failing fetch is one `monitoring_degraded`.
-      if (accused.has(pair)) continue;
-      accused.add(pair);
+      if (existing !== undefined) continue;
       changes.push(change);
     }
     return changes;

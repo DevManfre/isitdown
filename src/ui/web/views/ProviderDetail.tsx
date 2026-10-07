@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -10,7 +10,9 @@ import { TrustCard } from "@/components/TrustCard.tsx";
 import { ProviderPushCard } from "@/components/ProviderPushCard.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { useIncidents, useStatus } from "@/hooks/queries.ts";
-import { statusLabelKey } from "@/lib/chartConfig.ts";
+import { statusColor, statusFill, statusLabelKey } from "@/lib/chartConfig.ts";
+import { shownStatus } from "@/lib/suspicion.ts";
+import { SuspicionTooltip } from "@/components/SuspicionTooltip.tsx";
 import { formatDateTime, hostOf } from "@/lib/format.ts";
 import { impactKey } from "@/lib/incidents.ts";
 import { stagger } from "@/lib/stagger.ts";
@@ -68,14 +70,33 @@ export function ProviderDetail() {
 
   const rows = incidents?.page.items ?? [];
 
+  // Roadmap 1.3. The header dot keeps the page's own word while a suspicion is
+  // unconfirmed — the badge beside it carries the suspicion — and shows the
+  // probe's reading only where the operator declared the probe the record.
+  const shown = shownStatus(provider);
+  const headerStatus = shown.hatched ? provider.overallStatus : shown.status;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <StatusDot status={provider.overallStatus} label={t(statusLabelKey(provider.overallStatus))} />
+        <div className="flex flex-wrap items-center gap-3">
+          <StatusDot status={headerStatus} label={t(statusLabelKey(headerStatus))} />
           <h1 className="text-xl font-semibold">{provider.name}</h1>
           {provider.mutedUntil !== undefined && provider.mutedUntil !== null && (
             <Badge variant="muted">{t("provider.muted")}</Badge>
+          )}
+          {shown.hatched && (
+            <SuspicionTooltip suspicion={shown.suspicion}>
+              <Badge
+                variant="outline"
+                data-testid="provider-suspected"
+                className="gap-2 border-dashed font-mono"
+                style={{ borderColor: statusFill(shown.status), color: statusColor(shown.status) }}
+              >
+                <StatusDot status={shown.status} hatched size={8} />
+                {t("suspected.short", { status: t(statusLabelKey(shown.status)).toLowerCase() })}
+              </Badge>
+            </SuspicionTooltip>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -93,6 +114,29 @@ export function ProviderDetail() {
           </Button>
         </div>
       </div>
+
+      {shown.hatched && shown.suspicion !== null && (
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          <Trans
+            i18nKey="suspected.detail"
+            values={{
+              probe: shown.suspicion.probeId,
+              status: t(statusLabelKey(shown.status)).toLowerCase(),
+              since: formatDateTime(i18n.language, shown.suspicion.since),
+              note: shown.suspicion.note === undefined ? "" : ` (${shown.suspicion.note})`,
+            }}
+            components={[
+              <strong key="page" className="font-semibold text-foreground" />,
+              <Link
+                key="probe"
+                className="text-primary hover:underline"
+                to={ROUTE_PATHS.providerDetail.replace(":providerId", shown.suspicion.probeId)}
+              />,
+              <strong key="measured" className="font-semibold" style={{ color: statusColor(shown.status) }} />,
+            ]}
+          />
+        </p>
+      )}
 
       <section aria-label={t("history.list")} className="flex flex-col gap-2">
         <ProviderDetailPanel

@@ -43,6 +43,15 @@ export interface MaintenanceWindow {
   componentIds: string[];
 }
 
+/** A status IsItDown suspects but the provider has not declared — roadmap 1.3. */
+export interface Suspicion {
+  status: OverallStatus;
+  probeId: string;
+  /** ISO 8601, UTC. */
+  since: string;
+  note?: string;
+}
+
 export interface ProviderStatus {
   id: string;
   name: string;
@@ -64,6 +73,12 @@ export interface ProviderStatus {
    * and the figures beside it mean different things depending on which.
    */
   authority: "declared" | "observed";
+  /**
+   * Roadmap 1.3. A reading a probe measured and the page has not declared;
+   * null when there is none. Optional so a dashboard served by an older server
+   * still renders — absent reads as none.
+   */
+  suspected?: Suspicion | null;
   uptime90: number;
   /** Running now, and windows still to come — a window that has already ended appears in neither. */
   maintenance: { active: MaintenanceWindow[]; upcoming: MaintenanceWindow[] };

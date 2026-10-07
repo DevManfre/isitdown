@@ -2,6 +2,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { UptimeArc } from "@/components/charts/UptimeArc.tsx";
 import type { ProviderStatus } from "@/lib/types.ts";
+import { shownStatus } from "@/lib/suspicion.ts";
 
 /**
  * The hero's right-hand column: the one figure the fleet adds up to, and the
@@ -20,7 +21,12 @@ import type { ProviderStatus } from "@/lib/types.ts";
 export function HeroStats({ providers, average }: { providers: ProviderStatus[]; average: number }) {
   const { t, i18n } = useTranslation();
 
-  const alarm = providers.filter((p) => p.overallStatus !== "operational").length;
+  // Roadmap 1.3: a hatched suspicion keeps the page's word here, as in the
+  // headline; an `observed` one is the record and counts.
+  const alarm = providers.filter((p) => {
+    const shown = shownStatus(p);
+    return (shown.hatched ? p.overallStatus : shown.status) !== "operational";
+  }).length;
   const answered = providers.filter((p) => p.failureCount === 0 && p.fetchedAt !== null).length;
 
   const rows = [

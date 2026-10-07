@@ -1,4 +1,4 @@
-import { statusFill } from "@/lib/chartConfig.ts";
+import { statusFill, suspectedHatchCss } from "@/lib/chartConfig.ts";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -12,10 +12,12 @@ import { cn } from "@/lib/utils.ts";
  *   thing saying it (roadmap 5.13). Without it the dot is decorative and is
  *   hidden from the accessibility tree — which is right wherever the status is
  *   already written next to it, and wrong wherever it is not.
+ * @param hatched a suspected status (roadmap 1.3): the same colour in stripes
+ *   with a hairline ring, so it is never mistaken for one the provider declared.
  */
 export function StatusDot({
-  status, size = 8, glow = 0, pulse = false, label,
-}: { status: string; size?: number; glow?: number; pulse?: boolean; label?: string }) {
+  status, size = 8, glow = 0, pulse = false, label, hatched = false,
+}: { status: string; size?: number; glow?: number; pulse?: boolean; label?: string; hatched?: boolean }) {
   const fill = statusFill(status);
   return (
     <span
@@ -25,15 +27,18 @@ export function StatusDot({
       // as what the dot *means*), instead of the `.dot` styling class, which a
       // restyle could rename without changing anything an operator sees.
       data-status={status}
+      {...(hatched ? { "data-suspected": true } : {})}
       {...(label === undefined ? { "aria-hidden": true } : { role: "img", "aria-label": label })}
       className={cn("dot inline-block rounded-full", pulse && "dot-pulse")}
       style={{
         width: size,
         height: size,
-        background: fill,
-        ...(glow > 0
-          ? { boxShadow: `0 0 ${glow}px color-mix(in srgb, ${fill} 55%, transparent)` }
-          : {}),
+        background: hatched ? suspectedHatchCss(status) : fill,
+        ...(hatched
+          ? { boxShadow: `0 0 0 1px ${fill}` }
+          : glow > 0
+            ? { boxShadow: `0 0 ${glow}px color-mix(in srgb, ${fill} 55%, transparent)` }
+            : {}),
         // The pulse expands in currentColor, so the dot carries its colour twice.
         ...(pulse ? { color: fill } : {}),
       }}
