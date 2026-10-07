@@ -55,8 +55,13 @@ const ASSETS = "dist/ui/public/assets";
  * adapter. Measured: 513.3 kB before it, 517.2 kB after — 3.9 kB gzipped, of
  * which the twenty-three new strings in six catalogs alone gzip to 3.3 kB; the
  * rest is the form's one block of fields. The same remedy again.
+ *
+ * It moved 530,330 -> 532,275 (517.9 -> 519.8 kB) for roadmap 1.5's
+ * credentials. Measured: 517.2 kB before it, 519.1 kB after — 1.9 kB gzipped,
+ * most of it the twelve new strings in six catalogs, the rest the one block of
+ * fields every page adapter now shares. The same remedy again.
  */
-export const BUDGET = { js: 530_330, css: 20_000 };
+export const BUDGET = { js: 532_275, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
