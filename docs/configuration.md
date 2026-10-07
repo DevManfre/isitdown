@@ -878,6 +878,47 @@ field it was typed into.
 
 For a provider none of these fit, add an adapter under `src/adapters/`.
 
+#### Private and authenticated sources
+
+Every adapter that reads a page over HTTP — all of them but the probes and
+`imap` — can carry credentials, for a source that only answers somebody it knows:
+Microsoft 365 Service Health on the Graph API, an authenticated Atlassian Cloud
+page, Meraki, Zendesk, anything behind a token. Three shapes, set in the
+provider's `options` and combinable:
+
+| Option | What it sends |
+|---|---|
+| `header.<Name>` | One request header per option, exactly as on the `http` probe: `${VAR}` in the value is resolved from the environment at request time. Written last, so `header.Authorization` overrides the two below. |
+| `tokenEnv` | `Authorization: Bearer <value>` — the *name* of the variable holding the token. |
+| `oauthTokenUrl`, `oauthClientId`, `oauthClientSecretEnv`, `oauthScope` | OAuth 2.0 client credentials. The first three go together; `oauthScope` is optional. The token is requested on the first read, reused until a minute before it expires, and dropped on a `401`/`403` so the next read asks for a new one. |
+
+A secret is only ever *named*: `tokenEnv` and `oauthClientSecretEnv` take a
+variable's name, and an inline `token` or `oauthClientSecret` is refused when the
+provider is saved (`400` from `POST`/`PATCH /config/services`, an error from
+`isitdown check`), as are half an OAuth block and both `tokenEnv` and an OAuth
+block at once. A variable that is unset when the read happens fails that read
+with its name rather than sending an empty bearer and reporting the provider down
+over a `401`. In the dashboard the fields sit under **Advanced → Credentials**.
+
+Microsoft 365 Service Health for one tenant, through the generic JSON adapter above
+and an app registration granted `ServiceHealth.Read.All`:
+
+```yaml
+services:
+  - id: exchange-online
+    name: Exchange Online
+    adapter: json
+    baseUrl: https://graph.microsoft.com/v1.0
+    options:
+      path: /admin/serviceAnnouncement/healthOverviews/Exchange%20Online
+      statusPath: status
+      statusMap: '{"serviceOperational":"operational","serviceRestored":"operational","investigating":"degraded","serviceDegradation":"degraded","restoringService":"partial_outage","extendedRecovery":"partial_outage","serviceInterruption":"major_outage"}'
+      oauthTokenUrl: https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+      oauthClientId: <application-id>
+      oauthClientSecretEnv: M365_CLIENT_SECRET
+      oauthScope: https://graph.microsoft.com/.default
+```
+
 #### Conditional requests
 
 Every adapter reads through one HTTP helper that remembers the `ETag` (or

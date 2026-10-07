@@ -906,6 +906,48 @@ sta ancora guardando il campo in cui lo si è scritto.
 Per un provider che non sta su nessuno di questi, aggiungi un adapter sotto
 `src/adapters/`.
 
+#### Fonti private e autenticate
+
+Ogni adapter che legge una pagina via HTTP — tutti tranne le sonde e `imap` — può
+portare delle credenziali, per una fonte che risponde solo a chi conosce:
+Microsoft 365 Service Health sulla Graph API, una pagina Atlassian Cloud
+autenticata, Meraki, Zendesk, qualunque cosa dietro un token. Tre forme, da
+mettere nelle `options` del provider e combinabili:
+
+| Opzione | Cosa invia |
+|---|---|
+| `header.<Nome>` | Un header di richiesta per opzione, esattamente come sulla sonda `http`: un `${VAR}` nel valore viene risolto dall'ambiente al momento della richiesta. Scritto per ultimo, quindi `header.Authorization` prevale sulle due sotto. |
+| `tokenEnv` | `Authorization: Bearer <valore>` — il *nome* della variabile che contiene il token. |
+| `oauthTokenUrl`, `oauthClientId`, `oauthClientSecretEnv`, `oauthScope` | Client credentials OAuth 2.0. Le prime tre vanno insieme; `oauthScope` è facoltativo. Il token viene richiesto alla prima lettura, riusato fino a un minuto prima della scadenza, e scartato su un `401`/`403` così che la lettura successiva ne chieda uno nuovo. |
+
+Un segreto viene solo *nominato*: `tokenEnv` e `oauthClientSecretEnv` prendono il
+nome di una variabile, e un `token` o un `oauthClientSecret` scritti in chiaro
+vengono rifiutati al salvataggio del provider (`400` da `POST`/`PATCH
+/config/services`, un errore da `isitdown check`), come mezzo blocco OAuth o
+`tokenEnv` insieme a un blocco OAuth. Una variabile non impostata al momento della
+lettura fa fallire quella lettura col suo nome, invece di inviare un bearer vuoto
+e dare il provider giù per un `401`. Nella dashboard i campi stanno sotto
+**Avanzate → Credenziali**.
+
+Microsoft 365 Service Health per un tenant, attraverso l'adapter JSON generico qui sopra
+e una app registration con il permesso `ServiceHealth.Read.All`:
+
+```yaml
+services:
+  - id: exchange-online
+    name: Exchange Online
+    adapter: json
+    baseUrl: https://graph.microsoft.com/v1.0
+    options:
+      path: /admin/serviceAnnouncement/healthOverviews/Exchange%20Online
+      statusPath: status
+      statusMap: '{"serviceOperational":"operational","serviceRestored":"operational","investigating":"degraded","serviceDegradation":"degraded","restoringService":"partial_outage","extendedRecovery":"partial_outage","serviceInterruption":"major_outage"}'
+      oauthTokenUrl: https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+      oauthClientId: <application-id>
+      oauthClientSecretEnv: M365_CLIENT_SECRET
+      oauthScope: https://graph.microsoft.com/.default
+```
+
 #### Richieste condizionali
 
 Ogni adapter legge attraverso un unico helper HTTP che ricorda l'`ETag` (o il

@@ -1,4 +1,5 @@
 import type { Adapter } from "../core/adapter.interface.ts";
+import { authProblems } from "../core/requestAuth.ts";
 import { awsAdapter } from "./aws.adapter.ts";
 import { azureAdapter } from "./azure.adapter.ts";
 import { betterStackAdapter } from "./betterstack.adapter.ts";
@@ -69,8 +70,30 @@ export function optionProblems(
   adapter: string,
   options: Record<string, string> | undefined,
 ): string[] {
-  return adapters[adapter]?.validateOptions?.(options) ?? [];
+  const own = adapters[adapter]?.validateOptions?.(options) ?? [];
+  return AUTHENTICATED_READERS.has(adapter) ? [...own, ...authProblems(options)] : own;
 }
+
+/**
+ * The adapters whose reads go through `fetchConditional`, and so carry a
+ * provider's credentials (roadmap 1.5). Not the probes, which have their own
+ * `header.<Name>`, and not `imap`, which logs in rather than sending a header.
+ */
+const AUTHENTICATED_READERS = new Set([
+  statuspageAdapter.id,
+  rssAdapter.id,
+  slackAdapter.id,
+  awsAdapter.id,
+  gcpAdapter.id,
+  azureAdapter.id,
+  htmlAdapter.id,
+  jsonAdapter.id,
+  instatusAdapter.id,
+  betterStackAdapter.id,
+  cachetAdapter.id,
+  uptimeKumaAdapter.id,
+  uptimeComAdapter.id,
+]);
 
 export function getAdapter(id: string): Adapter {
   const adapter = adapters[id];

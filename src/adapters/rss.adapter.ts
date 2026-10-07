@@ -198,6 +198,7 @@ async function readFeed(service: ServiceRef, ctx: FetchContext): Promise<string>
     accept: ACCEPT,
     timeoutMs: ctx.timeoutMs,
     onRead: ctx.onRead,
+    auth: service.options,
     label: "rss fetch",
   });
 }
