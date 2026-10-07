@@ -488,3 +488,25 @@ notifications:
   // being paged, so the container refuses to start on it.
   await assert.rejects(loadConfig(path, {}), /notifications\.telegram\.template.*\{\{provder\}\}/s);
 });
+
+test("a cadence in seconds on a status page is fatal, and fine on a probe", async () => {
+  const page = await configFile(`
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    intervalSeconds: 15
+`);
+  await assert.rejects(loadConfig(page, {}), /github.*only for a probe/);
+
+  const probe = await configFile(`
+services:
+  - name: API
+    id: api
+    adapter: http
+    baseUrl: https://api.example.com
+    intervalSeconds: 15
+`);
+  assert.equal((await loadConfig(probe, {})).services[0]?.intervalSeconds, 15);
+});

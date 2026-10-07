@@ -416,6 +416,11 @@ export interface ServiceDefinition {
    * is only ever sent, on a patch, to put it back on that cadence.
    */
   intervalMinutes?: number | null;
+  /**
+   * The same, in seconds, on a probe only (roadmap 1.6). Never set together
+   * with `intervalMinutes`; `null` is only ever sent, on a patch, to clear it.
+   */
+  intervalSeconds?: number | null;
   components: { id: string; name: string }[];
   scopeToComponents: boolean;
   /**

@@ -8,6 +8,9 @@ import { EVENT_CLASSES, SEVERITY_FLOORS } from "./routing.ts";
  * divergent definitions.
  */
 
+/** The fastest cadence a probe may ask for (roadmap 1.6). */
+export const MIN_INTERVAL_SECONDS = 10;
+
 const slug = z
   .string()
   .regex(
@@ -91,6 +94,17 @@ export const serviceDefinitionSchema = z.object({
   crossChecks: crossCheckTarget.optional(),
   /** Omitted, not defaulted: absent has to stay distinguishable from "same as the global". */
   intervalMinutes: z.number().int().positive().max(1440).optional(),
+  /**
+   * A cadence in seconds, for a probe only — roadmap 1.6. A status page
+   * publishes on a human's schedule and reading it more than once a minute
+   * buys nothing, but an endpoint can be down for thirty seconds and a probe on
+   * the minute floor would never see it. Ten seconds is the floor: below it
+   * the request timeout and its retries are longer than the cadence itself.
+   *
+   * Which adapters may carry it, and that it excludes `intervalMinutes`, is
+   * `cadenceProblems`' business: the schema cannot see the adapter registry.
+   */
+  intervalSeconds: z.number().int().min(MIN_INTERVAL_SECONDS).max(3600).optional(),
   options: z.record(z.string()).optional(),
   /**
    * ISO 8601, UTC. While it is in the future the provider notifies nothing —

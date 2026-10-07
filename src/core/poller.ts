@@ -1,7 +1,8 @@
 import type { Adapter, ReadingNote } from "./adapter.interface.ts";
-import type {
-  RuntimeConfig,
-  ServiceDefinition,
+import {
+  configuredIntervalMinutes,
+  type RuntimeConfig,
+  type ServiceDefinition,
 } from "./configSource.interface.ts";
 import {
   confirmedChanges,
@@ -325,7 +326,7 @@ export function createPoller(deps: PollerDeps): Poller {
       await sleep(
         staggerOffsetMs(
           service.id,
-          service.intervalMinutes ?? config.polling.intervalMinutes,
+          configuredIntervalMinutes(service, config.polling),
         ),
       );
     }
@@ -463,8 +464,7 @@ export function createPoller(deps: PollerDeps): Poller {
     config: RuntimeConfig,
     state: ProviderRuntimeState,
   ): number {
-    const configured =
-      service.intervalMinutes ?? config.polling.intervalMinutes;
+    const configured = configuredIntervalMinutes(service, config.polling);
     if (!config.polling.adaptivePolling || !inTrouble(state)) return configured;
     return Math.min(configured, config.polling.adaptiveIntervalMinutes);
   }
