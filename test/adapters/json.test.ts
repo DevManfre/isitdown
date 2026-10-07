@@ -258,3 +258,26 @@ test("an adapter with nothing to validate reports no problems", () => {
     "its own error is reported elsewhere",
   );
 });
+
+test("a provider's credentials travel with the read (roadmap 1.5)", async () => {
+  let authorization: string | undefined;
+  const handler = (
+    req: { headers: Record<string, string | string[] | undefined> },
+    res: { setHeader: (k: string, v: string) => void; end: (b: string) => void },
+  ) => {
+    authorization = req.headers["authorization"] as string | undefined;
+    serving(fixture)(req, res);
+  };
+  process.env["ACME_STATUS_TOKEN"] = "tok";
+  try {
+    await withServer(handler, async (baseUrl) => {
+      await jsonAdapter.fetchStatus(
+        service(baseUrl, { ...OPTIONS, tokenEnv: "ACME_STATUS_TOKEN" }),
+        ctx,
+      );
+    });
+  } finally {
+    delete process.env["ACME_STATUS_TOKEN"];
+  }
+  assert.equal(authorization, "Bearer tok");
+});

@@ -154,6 +154,7 @@ async function readIncidents(service: ServiceRef, ctx: FetchContext): Promise<st
     accept: "application/json",
     timeoutMs: ctx.timeoutMs,
     onRead: ctx.onRead,
+    auth: service.options,
     label: "gcp fetch",
   });
 }

@@ -34,12 +34,11 @@ import {
 } from "@/components/ComponentPicker.tsx";
 import {
   AdapterOptions,
+  AUTH_ADAPTERS,
   DNS_ADAPTER,
   IMAP_ADAPTER,
   hasAdapterOptions,
   PROBE_ADAPTER,
-  JSON_ADAPTER,
-  SCRAPE_ADAPTER,
   TCP_ADAPTER,
 } from "@/components/service-dialog/AdapterOptions.tsx";
 import {
@@ -205,8 +204,6 @@ export function ServiceDialog({
   // adapter the service already has.
   const activeAdapter = mode === "add" ? adapter : (service?.adapter ?? "");
   const probing = activeAdapter === PROBE_ADAPTER;
-  const scraping = activeAdapter === SCRAPE_ADAPTER;
-  const jsonMapping = activeAdapter === JSON_ADAPTER;
   const tcpProbing = activeAdapter === TCP_ADAPTER;
   const dnsProbing = activeAdapter === DNS_ADAPTER;
   const mailReading = activeAdapter === IMAP_ADAPTER;
@@ -215,11 +212,12 @@ export function ServiceDialog({
   };
 
   /**
-   * What a probe saves: the plain fields, plus the header pair put back under
-   * the key the adapter reads. A header with no name is dropped rather than
-   * stored under an empty one, which the adapter rejects on the next poll.
+   * What a probe or a page source with credentials saves: the plain fields,
+   * plus the header pair put back under the key the adapter reads. A header
+   * with no name is dropped rather than stored under an empty one, which the
+   * adapter rejects on the next poll.
    */
-  const probeOptions = (): Record<string, string> => {
+  const headerOptions = (): Record<string, string> => {
     const base = Object.fromEntries(
       Object.entries(usedOptions(options)).filter(
         ([key]) => !key.startsWith(HEADER_PREFIX),
@@ -231,13 +229,24 @@ export function ServiceDialog({
       : { ...base, [`${HEADER_PREFIX}${headerName}`]: header.value.trim() };
   };
 
-  /** The options block a save carries, or nothing for the adapters that take none. */
-  const savedOptions = (): { options?: Record<string, string> } =>
-    probing
-      ? { options: probeOptions() }
-      : scraping || jsonMapping || tcpProbing || dnsProbing || mailReading
-        ? { options: usedOptions(options) }
+  /**
+   * The options block a save carries, or nothing for the adapters that take
+   * none. A page source with nothing filled in and nothing stored sends no
+   * block either: a Statuspage edit should not start writing an empty record
+   * onto a row that never had one.
+   */
+  const savedOptions = (): { options?: Record<string, string> } => {
+    if (probing) return { options: headerOptions() };
+    if (AUTH_ADAPTERS.has(activeAdapter)) {
+      const next = headerOptions();
+      return Object.keys(next).length > 0 || service?.options !== undefined
+        ? { options: next }
         : {};
+    }
+    return tcpProbing || dnsProbing || mailReading
+      ? { options: usedOptions(options) }
+      : {};
+  };
 
   // Claim-it-release-it: every close path below releases the busy state this
   // dialog claimed on open, but an unmount is not a close path — it runs no
@@ -810,9 +819,10 @@ export function ServiceDialog({
                           />
                           {details}
                           {/* Everything only one adapter can use, folded away. For
-                              a Statuspage site it is empty and stays shut; for the
-                              http probe it is where ten extra fields live instead
-                              of in the middle of the form. */}
+                              a Statuspage site it is only the credentials a
+                              private page needs, and stays shut; for the http
+                              probe it is where ten extra fields live instead of in
+                              the middle of the form. */}
                           {hasAdapterOptions(activeAdapter) && (
                             <Collapsible
                               className="panel-advanced rounded-md border border-border"

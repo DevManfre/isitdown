@@ -64,8 +64,30 @@ export const IMAP_ADAPTER = "imap";
 /** What the DNS probe can ask for; the adapter refuses anything else. */
 const DNS_RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"] as const;
 
+/**
+ * The adapters that read a page over HTTP, and so can carry credentials for a
+ * source behind a token (roadmap 1.5). Mirrors `AUTHENTICATED_READERS` in
+ * `src/adapters/index.ts`, which the dashboard cannot import.
+ */
+export const AUTH_ADAPTERS = new Set([
+  "statuspage",
+  "rss",
+  "slack",
+  "aws",
+  "gcp",
+  "azure",
+  SCRAPE_ADAPTER,
+  JSON_ADAPTER,
+  "instatus",
+  "betterstack",
+  "cachet",
+  "uptimekuma",
+  "uptimecom",
+]);
+
 /** Whether an adapter has any of the blocks below at all. */
 export const hasAdapterOptions = (adapter: string): boolean =>
+  AUTH_ADAPTERS.has(adapter) ||
   adapter === SCRAPE_ADAPTER ||
   adapter === JSON_ADAPTER ||
   adapter === PROBE_ADAPTER ||
@@ -93,12 +115,21 @@ export function AdapterOptions({
   adapter: string;
   options: Record<string, string>;
   setOption: (key: string, value: string) => void;
-  /** The probe's single request header, held apart from `options`: see `storedHeader`. */
+  /** The single request header a probe or a page source sends, held apart from `options`: see `storedHeader`. */
   header: { name: string; value: string };
   setHeader: (next: { name: string; value: string }) => void;
   fieldProps: Record<string, unknown>;
 }) {
   const { t } = useTranslation();
+  const credentials = (
+    <AuthOptions
+      options={options}
+      setOption={setOption}
+      header={header}
+      setHeader={setHeader}
+      fieldProps={fieldProps}
+    />
+  );
 
   if (adapter === SCRAPE_ADAPTER) {
     return (
@@ -147,6 +178,7 @@ export function AdapterOptions({
             {t("scrape.words-hint")}
           </span>
         </OptionGroup>
+        {credentials}
       </div>
     );
   }
@@ -198,6 +230,7 @@ export function AdapterOptions({
             {t("jsonmap.incidents-hint")}
           </span>
         </OptionGroup>
+        {credentials}
       </div>
     );
   }
@@ -623,7 +656,102 @@ export function AdapterOptions({
     );
   }
 
+  if (AUTH_ADAPTERS.has(adapter)) return credentials;
+
   return null;
+}
+
+/**
+ * Credentials for a source that answers only to somebody it knows — roadmap
+ * 1.5. Every field that would hold a secret holds a variable's *name* instead,
+ * and the header reuses the probe's pair: the same `header.<Name>` option, read
+ * the same way, on a page adapter.
+ */
+function AuthOptions({
+  options,
+  setOption,
+  header,
+  setHeader,
+  fieldProps,
+}: {
+  options: Record<string, string>;
+  setOption: (key: string, value: string) => void;
+  header: { name: string; value: string };
+  setHeader: (next: { name: string; value: string }) => void;
+  fieldProps: Record<string, unknown>;
+}) {
+  const { t } = useTranslation();
+  const field = (key: string, label: string, placeholder?: string) => (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={`service-auth-${key}`}>{t(label)}</Label>
+      <Input
+        id={`service-auth-${key}`}
+        className="font-mono"
+        placeholder={placeholder === undefined ? undefined : t(placeholder)}
+        value={options[key] ?? ""}
+        onChange={(event) => setOption(key, event.target.value)}
+        {...fieldProps}
+      />
+    </div>
+  );
+
+  return (
+    <OptionGroup title={t("auth.group")}>
+      <span className="text-xs text-muted-foreground">{t("auth.hint")}</span>
+      {field("tokenEnv", "auth.token-env", "auth.token-env-placeholder")}
+      <div className="grid grid-cols-2 gap-3">
+        {field(
+          "oauthTokenUrl",
+          "auth.oauth-token-url",
+          "auth.oauth-token-url-placeholder",
+        )}
+        {field("oauthClientId", "auth.oauth-client-id")}
+        {field(
+          "oauthClientSecretEnv",
+          "auth.oauth-secret-env",
+          "auth.oauth-secret-env-placeholder",
+        )}
+        {field("oauthScope", "auth.oauth-scope", "auth.oauth-scope-placeholder")}
+      </div>
+      <span className="text-xs text-muted-foreground">
+        {t("auth.oauth-hint")}
+      </span>
+      <div className="grid grid-cols-[1fr_1fr] gap-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-auth-header-name">
+            {t("probe.header-name")}
+          </Label>
+          <Input
+            id="service-auth-header-name"
+            className="font-mono"
+            value={header.name}
+            onChange={(event) =>
+              setHeader({ ...header, name: event.target.value })
+            }
+            {...fieldProps}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-auth-header-value">
+            {t("probe.header-value")}
+          </Label>
+          <Input
+            id="service-auth-header-value"
+            className="font-mono"
+            placeholder={t("probe.header-value-placeholder")}
+            value={header.value}
+            onChange={(event) =>
+              setHeader({ ...header, value: event.target.value })
+            }
+            {...fieldProps}
+          />
+        </div>
+      </div>
+      <span className="text-xs text-muted-foreground">
+        {t("probe.header-hint")}
+      </span>
+    </OptionGroup>
+  );
 }
 
 /** A titled run of fields, so ten inputs read as three questions. */
