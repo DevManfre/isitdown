@@ -90,6 +90,22 @@ describe("the wallboard", () => {
     expect(screen.getByText(i18n.t("wallboard.alarm", { count: 1, total: 3 }))).toBeInTheDocument();
   });
 
+  // Roadmap 1.3: the same rule as the Overview's headline.
+  it("draws a suspected tile in the measured colour without counting it as in alarm", () => {
+    status.mockReturnValue(
+      answer([
+        provider("github", {
+          overallStatus: "operational",
+          suspected: { status: "major_outage", probeId: "github-api", since: "2026-08-19T11:50:00.000Z" },
+        }),
+        provider("cloudflare"),
+      ]),
+    );
+    const { container } = show();
+    expect(screen.getByText(i18n.t("wallboard.all-well", { count: 2 }))).toBeInTheDocument();
+    expect(container.querySelectorAll("[data-suspected]")).toHaveLength(1);
+  });
+
   it("leaves a disabled provider off the wall entirely", () => {
     status.mockReturnValue(answer([provider("github"), provider("retired", { enabled: false })]));
     show();

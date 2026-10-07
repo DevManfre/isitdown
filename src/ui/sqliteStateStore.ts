@@ -7,10 +7,18 @@ import {
   componentStatusSchema,
   incidentSchema,
   maintenanceWindowSchema,
+  suspicionSchema,
   normalizedStatusSchema,
 } from "../core/status.schema.ts";
 import { STATUS_CHANGE_KINDS } from "../core/types.ts";
-import type { DampingState, HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
+import type {
+  DampingState,
+  HistoricalIncident,
+  Incident,
+  NormalizedStatus,
+  OverallStatus,
+  Suspicion,
+} from "../core/types.ts";
 import { z } from "zod";
 import { ANNOTATION_COLOURS } from "./historyStore.interface.ts";
 import type {
@@ -31,6 +39,7 @@ import type {
 const incidentsColumnSchema = z.array(incidentSchema);
 const componentsColumnSchema = z.array(componentStatusSchema);
 const maintenancesColumnSchema = z.array(maintenanceWindowSchema);
+const suspicionsColumnSchema = z.array(suspicionSchema);
 
 /**
  * Rows come back from SQLite untyped, and a column read is external input like a
@@ -57,6 +66,7 @@ const stateRowSchema = z.object({
   notify_baseline: z.string().nullable(),
   pending_signature: z.string().nullable(),
   pending_count: z.number(),
+  suspicions: z.string(),
 });
 
 const incidentRowSchema = z.object({
@@ -238,6 +248,7 @@ const baseline = (): ProviderRuntimeState => ({
   degradedNotified: false,
   notifyBaseline: null,
   pending: null,
+  suspicions: [],
 });
 
 const toIncidentRow = (row: IncidentDbRow): IncidentRow => ({
@@ -334,7 +345,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
   const now = deps.now ?? ((): Date => new Date());
   const selectState = db.prepare(
     `SELECT overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified,
-            notify_baseline, pending_signature, pending_count
+            notify_baseline, pending_signature, pending_count, suspicions
      FROM provider_state WHERE provider_id = ?`,
   );
   const upsertState = db.prepare(`
@@ -360,6 +371,11 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       notify_baseline = excluded.notify_baseline,
       pending_signature = excluded.pending_signature,
       pending_count = excluded.pending_count
+  `);
+  const setSuspicions = db.prepare(`
+    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified, suspicions)
+    VALUES (?, 'unknown', '[]', '[]', '[]', '', 0, 0, ?)
+    ON CONFLICT (provider_id) DO UPDATE SET suspicions = excluded.suspicions
   `);
   const setDegraded = db.prepare(`
     INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified)
@@ -462,6 +478,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
           row.pending_signature === null
             ? null
             : { signature: row.pending_signature, count: row.pending_count },
+        suspicions: suspicionsColumnSchema.parse(JSON.parse(row.suspicions)),
       };
     },
 
@@ -553,6 +570,10 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
 
     async setDegradedNotified(providerId: string, value: boolean): Promise<void> {
       setDegraded.run(providerId, "", value ? 1 : 0);
+    },
+
+    async setSuspicions(providerId: string, suspicions: Suspicion[]): Promise<void> {
+      setSuspicions.run(providerId, JSON.stringify(suspicions));
     },
 
     async saveNotifyState(

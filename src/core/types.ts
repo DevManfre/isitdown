@@ -185,6 +185,25 @@ export interface StatusChange {
  * store: the signature of the reading and how many consecutive polls agreed on
  * it. Flap damping is the only thing that reads it — see `confirmedChanges`.
  */
+/**
+ * A status IsItDown suspects but the provider has not declared — roadmap 1.3.
+ *
+ * Kept beside the provider's own reading, never in place of it: `overallStatus`
+ * stays what the page says, so uptime, bars and every count built on the
+ * declared word are untouched by a suspicion. Today the only source is a probe
+ * cross-checking the page (roadmap 1.10); `probeId` names it, so a second
+ * source can be told apart later without reinterpreting rows already stored.
+ */
+export interface Suspicion {
+  /** What the probe measured — the status the provider is suspected of. */
+  status: OverallStatus;
+  probeId: string;
+  /** ISO 8601, UTC. When this disagreement began, kept across later cycles. */
+  since: string;
+  /** Whatever the probe had to say about its reading, e.g. an HTTP status. */
+  note?: string | undefined;
+}
+
 export interface DampingState {
   signature: string;
   count: number;

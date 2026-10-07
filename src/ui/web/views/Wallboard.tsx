@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils.ts";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
@@ -6,6 +7,7 @@ import { useStatus } from "@/hooks/queries.ts";
 import { statusColor, statusFill, statusLabelKey } from "@/lib/chartConfig.ts";
 import { formatPercent, formatTime } from "@/lib/format.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
+import { isOffLine, shownStatus } from "@/lib/suspicion.ts";
 
 /**
  * The office screen — roadmap 5.8.
@@ -71,9 +73,8 @@ export function Wallboard() {
   }, [page, pages]);
 
   const shown = providers.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
-  const alarm = providers.filter(
-    (provider) => provider.overallStatus !== "operational" && provider.overallStatus !== "unknown",
-  );
+  // Roadmap 1.3: the same rule as the Overview's headline.
+  const alarm = providers.filter(isOffLine);
 
   const goFullscreen = (): void => {
     // Best effort: a browser that refuses (no gesture, an iframe, a policy) is
@@ -144,21 +145,29 @@ export function Wallboard() {
         // fleet of three would otherwise become three half-empty columns a
         // metre tall, which reads as a broken screen rather than a calm one.
         <div className="grid grid-cols-1 content-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {shown.map((provider) => (
+          {shown.map((provider) => {
+            const look = shownStatus(provider);
+            return (
             <article
               key={provider.id}
-              className="flex min-h-40 flex-col justify-between gap-3 rounded-lg border p-5"
+              data-suspected={look.hatched || undefined}
+              className={cn(
+                "flex min-h-40 flex-col justify-between gap-3 rounded-lg border p-5",
+                look.hatched && "border-dashed",
+              )}
               style={{
                 // The tile itself carries the status, because at four metres a
                 // dot is not a signal — the whole card has to be the signal.
-                borderColor: statusColor(provider.overallStatus),
-                background: `color-mix(in srgb, ${statusFill(provider.overallStatus)} 12%, transparent)`,
+                borderColor: statusColor(look.status),
+                background: `color-mix(in srgb, ${statusFill(look.status)} 12%, transparent)`,
               }}
             >
               <div className="flex flex-col gap-1">
                 <span className="truncate text-2xl font-semibold">{provider.name}</span>
-                <span className="text-xl" style={{ color: statusColor(provider.overallStatus) }}>
-                  {t(statusLabelKey(provider.overallStatus))}
+                <span className="text-xl" style={{ color: statusColor(look.status) }}>
+                  {look.hatched
+                    ? t("suspected.short", { status: t(statusLabelKey(look.status)).toLowerCase() })
+                    : t(statusLabelKey(look.status))}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
@@ -172,7 +181,8 @@ export function Wallboard() {
                 )}
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
     </main>

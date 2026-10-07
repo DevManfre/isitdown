@@ -7,6 +7,8 @@ import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { HistoryBucket, OverallStatus } from "@/lib/types.ts";
+import type { ShownStatus } from "@/lib/suspicion.ts";
+import { SuspicionTooltip } from "@/components/SuspicionTooltip.tsx";
 import { cn } from "@/lib/utils.ts";
 
 export interface ProviderCard {
@@ -22,6 +24,8 @@ export interface ProviderCard {
   maintenanceActive: boolean;
   /** Which source is the record for this provider — roadmap 9.1. */
   authority: "declared" | "observed";
+  /** Roadmap 1.3. What the card draws; absent reads as the declared status, plainly. */
+  shown?: ShownStatus;
 }
 
 /** The tint and the edge a card takes from its own severity. */
@@ -53,13 +57,17 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
 
   return (
     <div className="provider-cards grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-2">
-      {providers.map((provider, index) => (
+      {providers.map((provider, index) => {
+        const look = provider.shown ?? { status: provider.status, hatched: false, suspicion: null };
+        return (
         <SpotlightCard
           key={provider.id}
           data-slot="provider-card"
+          {...(look.hatched ? { "data-suspected": true } : {})}
           className={cn(
             "tile-lit anim-rise flex gap-4 rounded-lg border bg-card/70 p-4",
-            severityChrome(provider.status),
+            severityChrome(look.status),
+            look.hatched && "border-dashed",
           )}
           style={{
             animationDelay: stagger(index, { base: 60, step: 40, cap: 320 }),
@@ -68,7 +76,7 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
           <UptimeArc
             value={provider.uptime}
             size={72}
-            color={statusColor(provider.status)}
+            color={statusColor(look.status)}
             label={t("chart.ring-summary", {
               status: t(statusLabelKey(provider.status)),
               uptime: new Intl.NumberFormat(i18n.language, {
@@ -86,12 +94,16 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
               {provider.muted && (
                 <Badge variant="muted">{t("provider.muted.badge")}</Badge>
               )}
-              <span
-                className="ml-auto text-xs"
-                style={{ color: statusColor(provider.status) }}
-              >
-                {t(statusLabelKey(provider.status))}
-              </span>
+              <SuspicionTooltip suspicion={look.suspicion} className="ml-auto">
+                <span
+                  className="ml-auto text-xs"
+                  style={{ color: statusColor(look.status) }}
+                >
+                  {look.hatched
+                    ? t("suspected.short", { status: t(statusLabelKey(look.status)).toLowerCase() })
+                    : t(statusLabelKey(look.status))}
+                </span>
+              </SuspicionTooltip>
             </div>
 
             <span className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
@@ -142,7 +154,8 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
             </div>
           </div>
         </SpotlightCard>
-      ))}
+        );
+      })}
     </div>
   );
 }

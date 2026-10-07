@@ -375,3 +375,39 @@ hours, routing and digests decide when — or whether — an operator is told, a
 folding that into the figure would make it measure policy instead of detection.
 This is the number to look at before shortening `POLL_INTERVAL_MINUTES`: if the
 median is already a minute, a faster cadence buys little.
+
+### 7.9 Suspected status
+
+A status page says what the provider admits. When a probe cross-checking it
+(`crossChecks`, §7.3) measures trouble while the page still says operational and
+admits nothing, IsItDown holds a second, weaker reading: a **suspicion**. It is
+what powers the silent-outage alert, and since roadmap 1.3 it is also kept and
+shown, rather than living only in that one message.
+
+| | Declared | Suspected |
+| --- | --- | --- |
+| Source | The provider's own page | A probe's reading the page contradicts |
+| Stored as | `overallStatus`, samples, incidents | A list of suspicions beside the provider's state, one per accusing probe |
+| Counts toward uptime, history, the headline | Yes | No |
+| Drawn as | Solid status colour | The measured status colour, hatched at 45°, dashed outline |
+
+A suspicion opens on the cycle the probe first disagrees, keeps its start time
+while the disagreement lasts, and closes the moment the two agree — the probe
+recovers or the page admits something. It is persisted (in SQLite, or the Light
+edition's state file), so a restart neither forgets an open disagreement nor
+announces it a second time. Once the page itself admits trouble, its own word is
+the news and the suspicion is no longer shown, even before the probe is read
+again.
+
+On the dashboard a suspected provider is drawn in the colour of what the probe
+measured, hatched, with a tooltip naming the probe, its note and how long the
+disagreement has run. The Overview keeps its headline on the provider's word and
+lists suspected providers on a line of their own; the provider page carries a
+**Suspected** badge and says, side by side, what the page reports and what the
+probe measured. The 45° hatch is deliberately unlike the 135° coverage hatch
+(§7.6): one says "we saw it, they did not say", the other "we were not watching".
+
+When the operator has declared the probe the record for that provider
+(`authority: observed`, §7.7), there is nothing unconfirmed to mark: the probe's
+reading is drawn in solid colour and counted as off the line like any declared
+outage. Provider groups ([3.10](configuration.md#310-provider-groups--my-stack)) are still composed from the declared status only.

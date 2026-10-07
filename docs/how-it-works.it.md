@@ -397,3 +397,43 @@ routing e digest decidono quando — o se — l'operatore viene avvisato, e
 includerli nel numero gli farebbe misurare la policy invece del rilevamento.
 È il numero da guardare prima di accorciare `POLL_INTERVAL_MINUTES`: se la
 mediana è già di un minuto, una cadenza più rapida guadagna poco.
+
+### 7.9 Stato sospetto
+
+Una status page dice ciò che il provider ammette. Quando una sonda che la
+verifica (`crossChecks`, §7.3) misura un problema mentre la pagina dice ancora
+operativo e non ammette nulla, IsItDown tiene una seconda lettura, più debole:
+un **sospetto**. È ciò che fa scattare l'avviso di disservizio silenzioso, e
+dalla roadmap 1.3 viene anche conservato e mostrato, invece di vivere solo in
+quel messaggio.
+
+| | Dichiarato | Sospetto |
+| --- | --- | --- |
+| Fonte | La pagina del provider | Una lettura della sonda che la pagina contraddice |
+| Salvato come | `overallStatus`, campioni, incidenti | Un elenco di sospetti accanto allo stato del provider, uno per sonda che lo accusa |
+| Conta per uptime, storico, titolo | Sì | No |
+| Disegnato come | Colore di stato pieno | Il colore dello stato misurato, tratteggiato a 45°, bordo tratteggiato |
+
+Un sospetto si apre al ciclo in cui la sonda per prima non concorda, mantiene
+l'ora di inizio finché il disaccordo dura, e si chiude appena i due concordano —
+la sonda si riprende o la pagina ammette qualcosa. È persistito (in SQLite, o
+nel file di stato dell'edizione Light), quindi un riavvio non dimentica un
+disaccordo aperto né lo annuncia una seconda volta. Quando la pagina stessa
+ammette un problema, la sua parola è la notizia e il sospetto non viene più
+mostrato, anche prima che la sonda venga riletta.
+
+Sulla dashboard un provider sospetto è disegnato nel colore di ciò che la sonda
+ha misurato, tratteggiato, con un tooltip che indica la sonda, la sua nota e da
+quanto dura il disaccordo. La Panoramica tiene il titolo sulla parola del
+provider ed elenca i provider sospetti su una riga a sé; la pagina del provider
+ha un badge **Sospetto** e dice, affiancati, cosa riporta la pagina e cosa ha
+misurato la sonda. Il tratteggio a 45° è volutamente diverso da quello a 135°
+della copertura (§7.6): uno dice "l'abbiamo visto, loro non l'hanno detto",
+l'altro "non stavamo osservando".
+
+Quando l'operatore ha dichiarato la sonda come riferimento per quel provider
+(`authority: observed`, §7.7), non c'è nulla di non confermato da segnalare: la
+lettura della sonda è disegnata a colore pieno e conta come fuori linea come
+qualunque interruzione dichiarata. I gruppi di provider
+([3.10](configuration.it.md#310-gruppi-di-provider--il-mio-stack)) restano
+composti solo dallo stato dichiarato.

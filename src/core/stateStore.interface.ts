@@ -1,4 +1,4 @@
-import type { DampingState, NormalizedStatus } from "./types.ts";
+import type { DampingState, NormalizedStatus, Suspicion } from "./types.ts";
 
 export interface ProviderRuntimeState {
   /** null until the provider has been polled successfully at least once. */
@@ -17,6 +17,13 @@ export interface ProviderRuntimeState {
   notifyBaseline: NormalizedStatus | null;
   /** The transition being held, if any. Null when nothing is pending. */
   pending: DampingState | null;
+  /**
+   * Readings that contradict the page without the page admitting them —
+   * roadmap 1.3. One per probe that accuses this provider; empty when none
+   * does. Persisted so a restart neither forgets an open disagreement nor
+   * announces it a second time.
+   */
+  suspicions: Suspicion[];
 }
 
 /** What the poller observed while taking a reading, beyond the reading itself. */
@@ -57,5 +64,7 @@ export interface StateStore {
     baseline: NormalizedStatus | null,
     pending: DampingState | null,
   ): Promise<void>;
+  /** Replaces the provider's open suspicions (roadmap 1.3); an empty list clears them. */
+  setSuspicions(providerId: string, suspicions: Suspicion[]): Promise<void>;
   close(): Promise<void>;
 }
