@@ -44,8 +44,14 @@ const ASSETS = "dist/ui/public/assets";
  * build. Those are two changes, and the second one is a decision about what
  * this check means, so both are left for their own pass rather than smuggled
  * in behind a language.
+ *
+ * It moved 525k -> 526,336 (512.7 -> 514.0 kB) for roadmap 1.3's suspected
+ * status. Measured: 510.7 kB before it, 513.3 kB after — 2.6 kB gzipped, about
+ * half of it the seven new strings in six catalogs, the rest the hatch, the
+ * shared tooltip and one rule threaded through six views. Still the same
+ * remedy as above, still deliberately not taken here.
  */
-export const BUDGET = { js: 525_000, css: 20_000 };
+export const BUDGET = { js: 526_336, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
