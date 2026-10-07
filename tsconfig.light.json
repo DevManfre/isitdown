@@ -4,6 +4,7 @@
     "src/core/**/*.ts",
     "src/adapters/**/*.ts",
     "src/notifiers/**/*.ts",
-    "src/light/**/*.ts"
+    "src/light/**/*.ts",
+    "src/outpost/**/*.ts"
   ]
 }

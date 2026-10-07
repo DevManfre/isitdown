@@ -4,7 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, normalize, sep } from "node:path";
 
 const SHARED = ["src/core", "src/adapters", "src/notifiers"];
-const EDITIONS = ["src/light", "src/ui"];
+const EDITIONS = ["src/light", "src/ui", "src/outpost"];
 /**
  * Packages that belong to one edition and must never appear in the shared
  * engine. `express` and `node:sqlite` are the UI edition's server; everything

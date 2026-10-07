@@ -374,6 +374,8 @@ tua lista non viene più sovrascritta in seguito.
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | entrambe | — | L'endpoint delle tracce esatto, quando non è `<base>/v1/traces`. Ha la precedenza sulla variabile qui sopra. |
 | `OTEL_EXPORTER_OTLP_HEADERS` | entrambe | — | `chiave=valore,altra=valore` — una API key che un collector gestito richiede. |
 | `OTEL_SERVICE_NAME` | entrambe | `isitdown` | Come il collector etichetta questo processo. |
+| `OUTPOSTS` | entrambe | — | Gli outpost a cui chiedere una seconda lettura di ogni sonda, URL base separati da virgola (`https://vps-1.example.com:8080`) — roadmap 1.7, vedi [Docker §4.7](docker.it.md#47-outpost--un-secondo-punto-di-vista-per-le-sonde). Non impostata — il default — ogni sonda resta la sola lettura di questo container. |
+| `OUTPOST_TOKEN` | entrambe, outpost | — | Il bearer token con cui è stato avviato ogni outpost. Obbligatoria insieme a `OUTPOSTS`; un outpost senza non parte. |
 | `LOG_FILE` | entrambe | — | Accoda ogni riga di log anche a questo file, ruotato per dimensione. Se non è impostata, i log vanno solo su stdout. |
 | `LOG_MAX_BYTES` | entrambe | `5242880` | Dimensione alla quale `LOG_FILE` ruota. |
 | `LOG_MAX_FILES` | entrambe | `5` | Quante generazioni ruotate (`.1` … `.5`) sopravvivono accanto al file vivo. |
