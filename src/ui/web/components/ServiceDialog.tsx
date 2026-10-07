@@ -35,6 +35,7 @@ import {
 import {
   AdapterOptions,
   DNS_ADAPTER,
+  IMAP_ADAPTER,
   hasAdapterOptions,
   PROBE_ADAPTER,
   JSON_ADAPTER,
@@ -208,6 +209,7 @@ export function ServiceDialog({
   const jsonMapping = activeAdapter === JSON_ADAPTER;
   const tcpProbing = activeAdapter === TCP_ADAPTER;
   const dnsProbing = activeAdapter === DNS_ADAPTER;
+  const mailReading = activeAdapter === IMAP_ADAPTER;
   const setOption = (key: string, value: string): void => {
     setOptions((current) => ({ ...current, [key]: value }));
   };
@@ -233,7 +235,7 @@ export function ServiceDialog({
   const savedOptions = (): { options?: Record<string, string> } =>
     probing
       ? { options: probeOptions() }
-      : scraping || jsonMapping || tcpProbing || dnsProbing
+      : scraping || jsonMapping || tcpProbing || dnsProbing || mailReading
         ? { options: usedOptions(options) }
         : {};
 

@@ -384,6 +384,12 @@ admits nothing, IsItDown holds a second, weaker reading: a **suspicion**. It is
 what powers the silent-outage alert, and since roadmap 1.3 it is also kept and
 shown, rather than living only in that one message.
 
+The accuser need not be a probe. Since roadmap 1.4 a mailbox reading (`imap`,
+[configuration §3.5](configuration.md#the-imap-adapter--the-vendors-own-email))
+with `crossChecks` does the same job from the other direction: the vendor's
+support desk mailed customers about trouble its page has not admitted. The
+suspicion, the alert and the hatch are the same; the note is the mail's subject.
+
 | | Declared | Suspected |
 | --- | --- | --- |
 | Source | The provider's own page | A probe's reading the page contradicts |

@@ -66,13 +66,13 @@ notifications:
 | `correlationWindowMinutes` | `10` | 1–1440. Quanto è larga quella finestra. Più larga intercetta un guasto condiviso che attraversa lentamente le status page, e rischia di unire due giornate storte non collegate. |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto (vedi sotto). |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto (vedi sotto). |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
-| `services[].crossChecks` | — | Solo su una sonda (`http`, `tcp`, `dns`): l'id del provider di cui questa sonda è un secondo parere — controllo incrociato dei guasti silenziosi (roadmap 1.10). Quando la sonda non raggiunge il servizio e la status page di quel provider dichiara ancora operativo senza incidenti aperti, il disaccordo è esso stesso un avviso. Si può restringere a un singolo componente con la stessa forma `provider#componente` con cui una regola di routing indica il bersaglio (roadmap 2.9); la metà componente serve solo a precisare contro cosa la scheda di fiducia (roadmap 8.1) confronta la sonda, dato che il controllo dei guasti silenziosi riguarda una pagina che dichiara che non c'è proprio nulla che non va. |
+| `services[].crossChecks` | — | Solo su una sonda (`http`, `tcp`, `dns`) o su una lettura di posta (`imap`): l'id del provider di cui questa sonda è un secondo parere — controllo incrociato dei guasti silenziosi (roadmap 1.10). Quando la sonda non raggiunge il servizio e la status page di quel provider dichiara ancora operativo senza incidenti aperti, il disaccordo è esso stesso un avviso. Si può restringere a un singolo componente con la stessa forma `provider#componente` con cui una regola di routing indica il bersaglio (roadmap 2.9); la metà componente serve solo a precisare contro cosa la scheda di fiducia (roadmap 8.1) confronta la sonda, dato che il controllo dei guasti silenziosi riguarda una pagina che dichiara che non c'è proprio nulla che non va. |
 | `services[].authority` | dall'adapter | Quale fonte fa fede per questo provider — `declared` (la sua status page) oppure `observed` (la nostra misura), roadmap 9.1. Ometterlo è il caso normale e non è un valore mancante: una sonda (`http`, `tcp`, `dns`) legge `observed` perché *è* la misura, e tutto ciò che legge la pagina di qualcun altro legge `declared`. Va impostato solo per non essere d'accordo con quel default — una status page di cui hai imparato a diffidare, o una sonda che non vuoi sia trattata come il riferimento. Decide cosa la dashboard stampa accanto all'adapter e come è formulato un avviso di disservizio silenzioso, non quali campioni sostengono una percentuale. Vedi [7.7](how-it-works.it.md#77-quale-fonte-fa-fede). |
 | `services[].mutedUntil` | — | ISO 8601. Finché è nel futuro il provider viene interrogato e registrato come sempre ma non notifica nulla — "lo so, smetti di dirmelo, fino ad allora". Nell'edizione UI è ciò che scrive il comando **Silenzia** della dashboard. |
-| `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano quattro: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`), e `http`, `tcp` e `dns` (vedi le loro sezioni qui sotto). |
+| `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano cinque: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`), `http`, `tcp` e `dns`, e `imap` (vedi le loro sezioni qui sotto). |
 
 #### L'adapter `html`
 
@@ -543,6 +543,69 @@ qualunque altra cosa il provider abbia ritenuto di annunciare → degradato.
 Due conseguenze da sapere prima di affidarcisi: l'adapter non elenca componenti,
 perché un feed non ne ha; e la sua cronologia incidenti non dichiara mai di
 essere completa, perché un feed è una finestra su una storia, non la storia.
+
+#### L'adapter IMAP — le email del vendor
+
+Alcuni vendor non pubblicano nessuna pagina di stato leggibile da una macchina e
+annunciano i problemi scrivendo ai clienti. `adapter: imap` legge quegli avvisi
+da una casella di posta (roadmap 1.4) — dagliene una che riceve solo gli avvisi
+dei vendor, un indirizzo dedicato o una cartella in cui una regola li smista:
+
+```yaml
+  - id: acme-mail
+    name: Acme (mail)
+    adapter: imap
+    baseUrl: https://imap.example.com     # il server di posta; lo schema è ignorato
+    crossChecks: acme                     # facoltativo: la pagina di Acme, vedi sotto
+    options:
+      user: ${ACME_IMAP_USER}
+      passwordEnv: ACME_IMAP_PASSWORD     # il nome della variabile, mai la password
+      from: status@acme.example, acme.example
+      mailbox: Vendors/Acme
+```
+
+| Opzione | Predefinito | Significato |
+|---|---|---|
+| `user` | — | Obbligatoria. Il login della casella, così com'è o come riferimento `${VAR}`. |
+| `passwordEnv` | — | Obbligatoria. Il **nome** della variabile d'ambiente che contiene la password. Un'opzione `password` viene rifiutata del tutto: il segreto non sta mai in `config.yml` né in un export delle impostazioni. Un nome invece di `${VAR}` perché la Light risolve ogni `${VAR}` al caricamento, e a quel punto l'adapter non potrebbe più distinguere un riferimento da una password scritta lì. |
+| `from` | — | Obbligatoria. Indirizzi o domini del mittente, separati da virgola; le email di chiunque altro vengono ignorate. |
+| `subject` | — | Parole, separate da virgola: contano solo gli oggetti che ne contengono una. Se manca, conta ogni email del mittente. |
+| `mailbox` | `INBOX` | La cartella da leggere. |
+| `port` | `993`, o `143` con `tls: no` | |
+| `tls` | `yes` | TLS implicito. `no` solo per un bridge o un relay sul loopback — altrimenti il login attraverserebbe la rete in chiaro. |
+| `windowHours` | `24` | Per quanto un annuncio conta come aperto se nessuna email lo chiude. |
+
+La casella viene aperta **in sola lettura** (`EXAMINE`, intestazioni lette con
+`BODY.PEEK`): niente viene segnato come letto, spostato o cancellato, quindi chi
+legge la stessa cartella a mano la trova intatta. Ogni poll legge Da, Oggetto e
+Data delle email ricevute nella finestra — al massimo le 200 più recenti — e
+nient'altro.
+
+Le email si leggono come l'adapter RSS legge le voci, con un miglioramento: le
+email di uno stesso incidente vengono raggruppate in un thread, per oggetto,
+tolti i prefissi di risposta, i `[tag]` e le parole di ciclo di vita
+(`investigating`, `update`, `resolved`, …), così "[Acme] Resolved: API errors"
+chiude "[Acme] Investigating: API errors".
+
+| Ultima email di un thread | Lettura |
+|---|---|
+| Ricevuta entro `windowHours`, nessuna parola di chiusura | Un incidente aperto |
+| Dice `resolved`, `completed`, `restored`, `closed`, `fixed` | Chiuso |
+| Più vecchia di `windowHours` | Non più attuale |
+| Senza data | Trattata come attuale |
+
+La gravità viene dalle parole dell'oggetto, come per un feed. Un server
+irraggiungibile, un login rifiutato o una casella inesistente sono una **lettura
+fallita**, non un guasto: vuol dire che IsItDown non vede la casella, il che non
+dice nulla del vendor.
+
+Con `crossChecks` che indica la pagina del vendor, un'email che annuncia un
+problema mentre la pagina dice ancora operativo diventa lo **stato sospetto** di
+quella pagina (roadmap 1.3, [come funziona §7.9](how-it-works.it.md#79-stato-sospetto))
+e un unico avviso di guasto silenzioso, esattamente come la lettura di una
+sonda — l'oggetto dell'email è la nota mostrata accanto. Senza `crossChecks` la
+casella è semplicemente lo stato del provider, per un vendor che nessun altro
+adapter può raggiungere.
 
 #### L'adapter Slack
 
@@ -1720,7 +1783,7 @@ durante il guasto che esiste per raccontare.
 
 Un caso vale la pena conoscerlo. Il link di un provider punta alla pagina di
 stato del fornitore, che è pubblica per definizione — ma per gli adattatori
-`http`, `tcp`, `dns` e `uptimekuma` l'URL base è *tuo*, un hostname interno.
+`http`, `tcp`, `dns`, `uptimekuma` e `imap` l'URL base è *tuo*, un hostname interno.
 Quei provider compaiono lo stesso, con il nome che hai dato loro, ma senza link.
 
 Non è autenticazione: chiunque raggiunga la porta può leggere la pagina, ed è

@@ -55,6 +55,12 @@ const PROBE_METHODS = ["GET", "HEAD"] as const;
 export const TCP_ADAPTER = "tcp";
 export const DNS_ADAPTER = "dns";
 
+/**
+ * The vendor's own mail, read from a mailbox (roadmap 1.4). Nothing about it
+ * can be inferred from a URL — whose mail, which login — so it grows fields.
+ */
+export const IMAP_ADAPTER = "imap";
+
 /** What the DNS probe can ask for; the adapter refuses anything else. */
 const DNS_RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"] as const;
 
@@ -64,7 +70,8 @@ export const hasAdapterOptions = (adapter: string): boolean =>
   adapter === JSON_ADAPTER ||
   adapter === PROBE_ADAPTER ||
   adapter === TCP_ADAPTER ||
-  adapter === DNS_ADAPTER;
+  adapter === DNS_ADAPTER ||
+  adapter === IMAP_ADAPTER;
 
 /**
  * The fields that only one adapter each can use, lifted out of the dialog body
@@ -494,6 +501,124 @@ export function AdapterOptions({
             </span>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (adapter === IMAP_ADAPTER) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-muted-foreground">{t("imap.warning")}</p>
+        <OptionGroup title={t("imap.login")}>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="service-imap-user">{t("imap.user")}</Label>
+              <Input
+                id="service-imap-user"
+                className="font-mono"
+                placeholder={t("imap.user-placeholder")}
+                value={options["user"] ?? ""}
+                onChange={(event) => setOption("user", event.target.value)}
+                {...fieldProps}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="service-imap-password-env">{t("imap.password-env")}</Label>
+              <Input
+                id="service-imap-password-env"
+                className="font-mono"
+                placeholder={t("imap.password-env-placeholder")}
+                value={options["passwordEnv"] ?? ""}
+                onChange={(event) => setOption("passwordEnv", event.target.value)}
+                {...fieldProps}
+              />
+            </div>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {t("imap.credentials-hint")}
+          </span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="service-imap-port">{t("tcp.port")}</Label>
+              <Input
+                id="service-imap-port"
+                type="number"
+                min={1}
+                max={65535}
+                placeholder={t("imap.port-placeholder")}
+                value={options["port"] ?? ""}
+                onChange={(event) => setOption("port", event.target.value)}
+                {...fieldProps}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="service-imap-mailbox">{t("imap.mailbox")}</Label>
+              <Input
+                id="service-imap-mailbox"
+                className="font-mono"
+                placeholder={t("imap.mailbox-placeholder")}
+                value={options["mailbox"] ?? ""}
+                onChange={(event) => setOption("mailbox", event.target.value)}
+                {...fieldProps}
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="service-imap-tls" className="font-normal">
+              {t("imap.tls")}
+            </Label>
+            <Switch
+              id="service-imap-tls"
+              checked={!["no", "false", "0", "off"].includes((options["tls"] ?? "").toLowerCase())}
+              onCheckedChange={(checked) => setOption("tls", checked ? "" : "no")}
+            />
+          </div>
+        </OptionGroup>
+        <OptionGroup title={t("imap.which-mail")}>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="service-imap-from">{t("imap.from")}</Label>
+            <Input
+              id="service-imap-from"
+              className="font-mono"
+              placeholder={t("imap.from-placeholder")}
+              value={options["from"] ?? ""}
+              onChange={(event) => setOption("from", event.target.value)}
+              {...fieldProps}
+            />
+            <span className="text-xs text-muted-foreground">
+              {t("imap.from-hint")}
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="service-imap-subject">{t("imap.subject")}</Label>
+            <Input
+              id="service-imap-subject"
+              className="font-mono"
+              placeholder={t("imap.subject-placeholder")}
+              value={options["subject"] ?? ""}
+              onChange={(event) => setOption("subject", event.target.value)}
+              {...fieldProps}
+            />
+            <span className="text-xs text-muted-foreground">
+              {t("imap.subject-hint")}
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="service-imap-window">{t("imap.window-hours")}</Label>
+            <Input
+              id="service-imap-window"
+              type="number"
+              min={1}
+              placeholder={t("imap.window-hours-placeholder")}
+              value={options["windowHours"] ?? ""}
+              onChange={(event) => setOption("windowHours", event.target.value)}
+              {...fieldProps}
+            />
+            <span className="text-xs text-muted-foreground">
+              {t("imap.window-hours-hint")}
+            </span>
+          </div>
+        </OptionGroup>
       </div>
     );
   }

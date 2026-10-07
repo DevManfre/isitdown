@@ -78,8 +78,9 @@ export const serviceDefinitionSchema = z.object({
    */
   group: slug.optional(),
   /**
-   * Only on a probe (`http`, `tcp`, `dns`): the provider whose status page this
-   * probe is a second opinion on — silent-outage cross-check (roadmap 1.10).
+   * Only on a probe (`http`, `tcp`, `dns`) or a mailbox reading (`imap`,
+   * roadmap 1.4): the provider whose status page this probe is a second
+   * opinion on — silent-outage cross-check (roadmap 1.10).
    * When the probe cannot reach the service and that provider's page still
    * reports operational, the disagreement is itself the news.
    *
