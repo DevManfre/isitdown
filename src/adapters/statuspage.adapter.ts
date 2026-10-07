@@ -354,6 +354,7 @@ async function readJson(path: string, service: ServiceRef, ctx: FetchContext, la
     accept: "application/json",
     timeoutMs: ctx.timeoutMs,
     onRead: ctx.onRead,
+    auth: service.options,
     label,
   });
   try {

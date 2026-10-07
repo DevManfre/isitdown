@@ -58,7 +58,35 @@ export function runStateStoreContract(name: string, makeStore: () => Promise<Sto
       degradedNotified: false,
       notifyBaseline: null,
       pending: null,
+      suspicions: [],
     });
+    await store.close();
+  });
+
+  // Roadmap 1.3: an open suspicion is what stops a restart from re-accusing a
+  // page, so it has to outlive the process like the notification baseline does.
+  test(`${name}: suspicions survive a reopen, and an empty list clears them`, async () => {
+    const { store, reopen } = await makeStore();
+    const suspicion = { status: "major_outage" as const, probeId: "github-api", since: "2026-08-19T14:00:00.000Z", note: "HTTP 503" };
+    await store.setSuspicions("github", [suspicion]);
+    await store.close();
+
+    const reopened = await reopen();
+    assert.deepEqual((await reopened.getState("github")).suspicions, [suspicion]);
+    await reopened.setSuspicions("github", []);
+    assert.deepEqual((await reopened.getState("github")).suspicions, []);
+    await reopened.close();
+  });
+
+  test(`${name}: a suspicion never touches the provider's own reading`, async () => {
+    const { store } = await makeStore();
+    const reading = snap("github", "operational");
+    await store.saveStatus(reading);
+    await store.setSuspicions("github", [{ status: "major_outage", probeId: "github-api", since: "2026-08-19T14:00:00.000Z" }]);
+    await store.saveStatus(reading);
+    const state = await store.getState("github");
+    assert.deepEqual(state.last, reading);
+    assert.equal(state.suspicions.length, 1, "saving the page's own status must not clear a suspicion");
     await store.close();
   });
 

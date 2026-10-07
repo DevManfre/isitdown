@@ -219,6 +219,7 @@ export const jsonAdapter: Adapter = {
         accept: "application/json",
         timeoutMs: ctx.timeoutMs,
         onRead: ctx.onRead,
+        auth: service.options,
         label: "json fetch",
       },
     );

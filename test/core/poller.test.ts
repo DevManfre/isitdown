@@ -1454,6 +1454,78 @@ test("the accusation is made once, not on every cycle the page stays wrong", asy
   }
 });
 
+// Roadmap 1.3: the open disagreement is stored on the page as a suspicion, so
+// the dashboard can show it, and so a restart neither forgets nor re-announces it.
+test("an accusation is stored as a suspicion on the page, and cleared when the probe recovers", async () => {
+  let probeDown = true;
+  const page = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const api = await fakeProvider((_req, res) => {
+    res.writeHead(probeDown ? 503 : 200);
+    res.end("x");
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const cfg = config([
+    service("github", page.baseUrl),
+    service("github-api", api.baseUrl, { adapter: "http", crossChecks: "github" }),
+  ]);
+
+  try {
+    await poller.runCycle(cfg);
+    const [suspicion] = (await store.getState("github")).suspicions;
+    assert.equal(suspicion?.probeId, "github-api");
+    assert.equal(suspicion?.status, "major_outage");
+    const since = suspicion?.since;
+
+    clock.advance(ONE_INTERVAL_MS);
+    await poller.runCycle(cfg);
+    assert.equal((await store.getState("github")).suspicions[0]?.since, since, "a lasting disagreement keeps its start");
+    assert.equal((await store.getState("github")).last?.overallStatus, "operational", "the page's own word is untouched");
+
+    probeDown = false;
+    clock.advance(ONE_INTERVAL_MS);
+    await poller.runCycle(cfg);
+    assert.deepEqual((await store.getState("github")).suspicions, []);
+  } finally {
+    await store.close();
+    await Promise.all([page.close(), api.close()]);
+  }
+});
+
+test("a restarted poller does not accuse the same page a second time", async () => {
+  const page = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const api = await fakeProvider((_req, res) => {
+    res.writeHead(503);
+    res.end("busy");
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const cfg = config([
+    service("github", page.baseUrl),
+    service("github-api", api.baseUrl, { adapter: "http", crossChecks: "github" }),
+  ]);
+
+  try {
+    await createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now }).runCycle(cfg);
+    clock.advance(ONE_INTERVAL_MS);
+    // A fresh poller over the same store is what a container restart looks like.
+    const again = await createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now }).runCycle(cfg);
+    assert.equal(again.changes.filter((change) => change.kind === "silent_outage").length, 0);
+  } finally {
+    await store.close();
+    await Promise.all([page.close(), api.close()]);
+  }
+});
+
 test("a provider that admits the outage is never accused of hiding it", async () => {
   const page = await fakeProvider((_req, res) => {
     res.writeHead(200, { "content-type": "application/json" });

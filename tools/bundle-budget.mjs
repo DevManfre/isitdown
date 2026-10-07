@@ -44,8 +44,24 @@ const ASSETS = "dist/ui/public/assets";
  * build. Those are two changes, and the second one is a decision about what
  * this check means, so both are left for their own pass rather than smuggled
  * in behind a language.
+ *
+ * It moved 525k -> 526,336 (512.7 -> 514.0 kB) for roadmap 1.3's suspected
+ * status. Measured: 510.7 kB before it, 513.3 kB after — 2.6 kB gzipped, about
+ * half of it the seven new strings in six catalogs, the rest the hatch, the
+ * shared tooltip and one rule threaded through six views. Still the same
+ * remedy as above, still deliberately not taken here.
+ *
+ * It moved 526,336 -> 530,330 (514.0 -> 517.9 kB) for roadmap 1.4's IMAP
+ * adapter. Measured: 513.3 kB before it, 517.2 kB after — 3.9 kB gzipped, of
+ * which the twenty-three new strings in six catalogs alone gzip to 3.3 kB; the
+ * rest is the form's one block of fields. The same remedy again.
+ *
+ * It moved 530,330 -> 532,275 (517.9 -> 519.8 kB) for roadmap 1.5's
+ * credentials. Measured: 517.2 kB before it, 519.1 kB after — 1.9 kB gzipped,
+ * most of it the twelve new strings in six catalogs, the rest the one block of
+ * fields every page adapter now shares. The same remedy again.
  */
-export const BUDGET = { js: 525_000, css: 20_000 };
+export const BUDGET = { js: 532_275, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
