@@ -444,3 +444,32 @@ lettura della sonda è disegnata a colore pieno e conta come fuori linea come
 qualunque interruzione dichiarata. I gruppi di provider
 ([3.10](configuration.it.md#310-gruppi-di-provider--il-mio-stack)) restano
 composti solo dallo stato dichiarato.
+
+### 7.10 Outpost e consenso
+
+Con degli outpost configurati ([Docker §4.7](docker.it.md#47-outpost--un-secondo-punto-di-vista-per-le-sonde)),
+la lettura di una sonda è un voto anziché un verdetto. A ogni ciclo il poller
+invia la sonda a ogni outpost nello stesso momento in cui prende la propria
+lettura, così un outpost non costa al provider tempo in più, poi tiene la
+**severità peggiore che una maggioranza stretta vede come almeno così grave**:
+
+| Voti | Cosa serve per essere "down" |
+| --- | --- |
+| Solo questo container | La sua lettura, come senza outpost |
+| Questo container + 1 outpost | Entrambi: un outpost può porre il veto su un "down" locale, mai inventarne uno |
+| Questo container + 2 outpost | Due qualsiasi dei tre |
+
+Vota solo un punto che ha visto qualcosa. Un outpost che non ha risposto si
+astiene, e così una lettura `unknown`; un `unknown` locale non viene mai
+ribaltato dai soli outpost. La lettura locale mantiene i suoi retry; quella di
+un outpost è un solo tentativo, così un outpost lento non può trattenere un
+provider oltre la sua cadenza.
+
+Ciò che viene salvato è la lettura decisa, quindi notifiche, flap damping,
+cross-check e uptime vedono uno stato per poll esattamente come prima. Quando il
+voto ribalta la lettura locale, o un outpost dissente o tace, la nota
+diagnostica del provider lo dice — `connection refused … — overruled by the
+outposts: here major_outage, vps-1 operational, vps-2 operational`. Una sonda
+ribaltata a operational perde anche il segno "non ha mai risposto", così un
+target che ha risposto agli outpost non conta nel controllo "sembra la nostra
+rete" (§7.3).

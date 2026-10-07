@@ -35,10 +35,10 @@ In questa pagina: [1. Cosa fa](#1-cosa-fa) · [2. Avvio rapido](#2-avvio-rapido)
 Il manuale, un file per sezione:
 
 - [3. Configurazione](docs/configuration.it.md) — `config.yml`, impostazioni a runtime, segreti, provider, canali, instradamento, politica di consegna
-- [4. Docker](docs/docker.it.md) — immagini, profili Compose, volumi e probe, Kubernetes
+- [4. Docker](docs/docker.it.md) — immagini, profili Compose, volumi e probe, Kubernetes, outpost
 - [5. Verificare un deployment](docs/verifying.it.md) — controlli rapidi, la dashboard, una notifica end-to-end, risoluzione dei problemi
 - [6. API HTTP](docs/api.it.md) — ogni route, le metriche, gli aggiornamenti live, i badge
-- [7. Come funziona](docs/how-it-works.it.md) — flusso dei dati, componenti, quando scatta una notifica, resilienza
+- [7. Come funziona](docs/how-it-works.it.md) — flusso dei dati, componenti, quando scatta una notifica, resilienza, consenso degli outpost
 - [8. Tema e localizzazione](docs/theming.it.md) — temi, `en`/`it`, accessibilità
 - [9. Sviluppo](docs/development.it.md) — struttura, stack tecnico, sviluppo live, test, rilasci
 - [10. Client da terminale](docs/cli.it.md) — `isitdown watch`, una vista di sola lettura della flotta per il terminale
@@ -61,6 +61,9 @@ Anthropic       operational    ████████████████�
 
 - **Nessuna dipendenza esterna a runtime.** Nessun database server, nessun broker,
   nessun account cloud. A questa scala bastano un file JSON o un SQLite embedded.
+  L'unica eccezione è opt-in: gli outpost ([Docker §4.7](docs/docker.it.md#47-outpost--un-secondo-punto-di-vista-per-le-sonde))
+  sono container che gestisci tu per una seconda lettura delle sonde, e senza
+  nessuno configurato non se ne cerca nessuno.
 - **Guidato dalla configurazione.** Aggiungere un provider non significa mai
   toccare codice: una voce in `config.yml` (Light) o un dialog nella dashboard (UI).
 - **Notifiche idempotenti.** Notificano solo le *transizioni* di stato: operational

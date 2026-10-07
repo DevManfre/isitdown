@@ -417,3 +417,31 @@ When the operator has declared the probe the record for that provider
 (`authority: observed`, §7.7), there is nothing unconfirmed to mark: the probe's
 reading is drawn in solid colour and counted as off the line like any declared
 outage. Provider groups ([3.10](configuration.md#310-provider-groups--my-stack)) are still composed from the declared status only.
+
+### 7.10 Outposts and consensus
+
+With outposts configured ([Docker §4.7](docker.md#47-outposts--a-second-point-of-view-for-probes)),
+a probe's reading is a vote rather than a verdict. Each cycle the poller sends
+the probe to every outpost at the same moment it takes its own reading, so an
+outpost costs the provider no time of its own, then keeps the **worst severity a
+strict majority sees as at least that bad**:
+
+| Votes | What it takes to be "down" |
+| --- | --- |
+| This container alone | Its own reading, as without outposts |
+| This container + 1 outpost | Both — one outpost can veto a local "down", never invent one |
+| This container + 2 outposts | Any two of the three |
+
+Only a point that saw something votes. An outpost that did not answer abstains,
+and so does a reading of `unknown`; a local `unknown` is never overturned by
+outposts alone. The local read keeps its retries; an outpost's is a single
+attempt, so one slow outpost cannot hold a provider past its cadence.
+
+What is stored is the decided reading, so notifications, flap damping,
+cross-checks and uptime all see one status per poll exactly as before. When the
+vote overrules the local reading, or an outpost disagreed or said nothing, the
+provider's diagnostics note says so — `connection refused … — overruled by the
+outposts: here major_outage, vps-1 operational, vps-2 operational`. A probe
+overruled to operational also drops its "never answered" mark, so a target that
+answered the outposts is not counted toward the "this looks like our own
+network" check (§7.3).

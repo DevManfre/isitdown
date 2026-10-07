@@ -359,6 +359,8 @@ list is never overwritten afterwards.
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | both | — | The traces endpoint exactly, when it is not `<base>/v1/traces`. Wins over the variable above. |
 | `OTEL_EXPORTER_OTLP_HEADERS` | both | — | `key=value,other=value` — an API key a hosted collector wants. |
 | `OTEL_SERVICE_NAME` | both | `isitdown` | What the collector labels this process. |
+| `OUTPOSTS` | both | — | Outposts to ask for a second reading of every probe, comma-separated base URLs (`https://vps-1.example.com:8080`) — roadmap 1.7, see [Docker §4.7](docker.md#47-outposts--a-second-point-of-view-for-probes). Unset — the default — leaves every probe this container's reading alone. |
+| `OUTPOST_TOKEN` | both, outpost | — | The bearer token every outpost was started with. Required beside `OUTPOSTS`; an outpost refuses to start without one. |
 | `LOG_FILE` | both | — | Also append every log line to this file, rotated by size. Unset, logs go to stdout only. |
 | `LOG_MAX_BYTES` | both | `5242880` | Size at which `LOG_FILE` rotates. |
 | `LOG_MAX_FILES` | both | `5` | How many rotated generations (`.1` … `.5`) survive beside the live file. |

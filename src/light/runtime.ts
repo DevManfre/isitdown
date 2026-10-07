@@ -3,6 +3,7 @@ import { registerPluginAdapters } from "../adapters/plugins.ts";
 import type { ConfigSource } from "../core/configSource.interface.ts";
 import { createLogger, parseLogLevel, type Logger } from "../core/logger.ts";
 import { createDispatcher } from "../core/notificationDispatcher.ts";
+import { readOutposts } from "../core/outpost.ts";
 import { createPoller } from "../core/poller.ts";
 import { createScheduler, type Scheduler } from "../core/scheduler.ts";
 import { initTracing, tracer } from "../core/tracing.ts";
@@ -51,7 +52,7 @@ export async function buildLightRuntime(options: LightRuntimeOptions): Promise<L
   const configSource = createFileConfigSource(options.configPath, options.env);
   const store = await createFileStateStore(options.dataPath);
 
-  const poller = createPoller({ getAdapter, store, logger });
+  const poller = createPoller({ getAdapter, store, logger, outposts: readOutposts(options.env) });
   // The state file keeps the message ids too, so an incident's updates can edit
   // the message its opening sent (roadmap 3.19).
   const dispatcher = createDispatcher({ logger, messageRefs: store });

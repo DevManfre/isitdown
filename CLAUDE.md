@@ -20,6 +20,7 @@ src/notifiers/  per-channel notification senders (telegram, webhook, ...)
 src/light/      Light edition entrypoint, file-based config loader, file state store
 src/ui/         UI edition entrypoint, Express server, SQLite state store, dashboard routes
 src/ui/web/     React dashboard: Vite, shadcn/ui, Recharts — bundled into dist/ui/public
+src/outpost/    Outpost entrypoint (roadmap 1.7) — a stateless `POST /probe` server that runs one probe for a remote poller; core + adapters only, ships in the Light image
 src/cli/        Terminal client entrypoint (`isitdown watch`, roadmap 17.7) — a read-only HTTP client for the UI edition's API; never imports src/ui itself, only its response shapes (validated with zod like any other external input)
 design/         Claude Design exports/prototypes for the UI dashboard (source of truth for visual direction before implementation) — git-ignored, so present on disk only
 ```
