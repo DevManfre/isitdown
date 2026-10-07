@@ -66,13 +66,13 @@ notifications:
 | `correlationWindowMinutes` | `10` | 1–1440. How wide that window is. Wider catches a shared failure that rolls across status pages slowly, and risks folding two unrelated bad days into one. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `imap` reads a vendor's notices out of a mailbox (see below); `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
-| `services[].crossChecks` | — | Only on a probe (`http`, `tcp`, `dns`): the id of the provider whose status page this probe is a second opinion on — silent-outage cross-check (roadmap 1.10). When the probe cannot reach the service and that provider's page still reports operational with no open incident, the disagreement is itself an alert. Optionally narrowed to one component with the same `provider#component` form a routing rule targets (roadmap 2.9); the component half only refines what the trust card (roadmap 8.1) compares the probe against, since the silent-outage check itself is about a page claiming nothing at all is wrong. |
+| `services[].crossChecks` | — | Only on a probe (`http`, `tcp`, `dns`) or a mailbox reading (`imap`): the id of the provider whose status page this probe is a second opinion on — silent-outage cross-check (roadmap 1.10). When the probe cannot reach the service and that provider's page still reports operational with no open incident, the disagreement is itself an alert. Optionally narrowed to one component with the same `provider#component` form a routing rule targets (roadmap 2.9); the component half only refines what the trust card (roadmap 8.1) compares the probe against, since the silent-outage check itself is about a page claiming nothing at all is wrong. |
 | `services[].authority` | from the adapter | Which source is the record for this provider — `declared` (its own status page) or `observed` (our own reading), roadmap 9.1. Omitted is the normal case and is not a missing value: a probe (`http`, `tcp`, `dns`) reads `observed` because it *is* the reading, and everything that parses somebody's page reads `declared`. Set it only to disagree with that — a status page you have learned to distrust, or a probe you do not want treated as the record. It decides what the dashboard prints beside the adapter and how a silent-outage alert is worded, not which samples back a percentage. See [7.7](how-it-works.md#77-which-source-is-the-record). |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
-| `services[].options` | — | Adapter-specific extras. Four adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), and `http`, `tcp` and `dns` (see their own sections below). |
+| `services[].options` | — | Adapter-specific extras. Five adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), `http`, `tcp` and `dns`, and `imap` (see their own sections below). |
 
 #### The `html` adapter
 
@@ -526,6 +526,67 @@ Two consequences worth knowing before relying on it: the adapter offers no
 component listing, because a feed has no components; and its incident history
 never claims to be complete, because a feed is a window onto a history rather
 than the history itself.
+
+#### The IMAP adapter — the vendor's own email
+
+Some vendors publish no status page anything can read and announce trouble by
+mailing their customers. `adapter: imap` reads those notices out of a mailbox
+(roadmap 1.4) — give it one that receives only vendor notices, a dedicated
+address or a folder a mail rule files them into:
+
+```yaml
+  - id: acme-mail
+    name: Acme (mail)
+    adapter: imap
+    baseUrl: https://imap.example.com     # the mail server; the scheme is ignored
+    crossChecks: acme                     # optional: Acme's own page, see below
+    options:
+      user: ${ACME_IMAP_USER}
+      passwordEnv: ACME_IMAP_PASSWORD     # the variable's name, never the password
+      from: status@acme.example, acme.example
+      mailbox: Vendors/Acme
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `user` | — | Required. The mailbox login, as is or as a `${VAR}` reference. |
+| `passwordEnv` | — | Required. The **name** of the environment variable holding the password. A `password` option is refused outright: the secret never sits in `config.yml` or in a settings export. A name rather than `${VAR}` because the Light edition resolves every `${VAR}` at load, after which the adapter could no longer tell a reference from a password typed in place. |
+| `from` | — | Required. Sender addresses or domains, comma-separated; mail from anyone else is ignored. |
+| `subject` | — | Words, comma-separated: only subjects containing one of them count. Unset reads every mail from the sender. |
+| `mailbox` | `INBOX` | The folder to read. |
+| `port` | `993`, or `143` with `tls: no` | |
+| `tls` | `yes` | Implicit TLS. `no` only for a bridge or relay on the loopback — the login would otherwise cross the network in clear. |
+| `windowHours` | `24` | How long an announcement counts as open when no mail closes it. |
+
+The mailbox is opened **read-only** (`EXAMINE`, headers fetched with
+`BODY.PEEK`): nothing is marked seen, moved or deleted, so a person reading the
+same folder by hand sees it untouched. Each poll reads the From, Subject and
+Date of the mail received in the window — the newest 200 at most — and nothing
+else.
+
+Mail is read the way the RSS adapter reads entries, with one improvement: mails
+about one incident are grouped into a thread, by subject with reply prefixes,
+`[tags]` and lifecycle words (`investigating`, `update`, `resolved`, …) left out,
+so "[Acme] Resolved: API errors" closes "[Acme] Investigating: API errors".
+
+| Latest mail of a thread | Reading |
+|---|---|
+| Received within `windowHours`, no closing word | An open incident |
+| Says `resolved`, `completed`, `restored`, `closed`, `fixed` | Closed |
+| Older than `windowHours` | No longer current |
+| No date at all | Treated as current |
+
+Severity comes from the subject's wording, as for a feed. An unreachable
+server, a refused login or a missing mailbox is a **failed read**, not an
+outage: it means IsItDown cannot see the mailbox, which says nothing about the
+vendor.
+
+With `crossChecks` naming the vendor's page, a mail announcing trouble while the
+page still says operational becomes that page's **suspected status** (roadmap
+1.3, [how it works §7.9](how-it-works.md#79-suspected-status)) and a single
+silent-outage alert, exactly as a probe's reading does — the mail's subject is
+the note shown beside it. Without `crossChecks` the mailbox is simply the
+provider's status, for a vendor no other adapter can reach.
 
 #### Slack adapter
 
@@ -1657,8 +1718,8 @@ cannot call the dashboard's API because there is nothing on it that could call
 anything. That also means it still renders during the outage it exists to report.
 
 One case is worth knowing about. A provider's link points at the vendor's own
-status page, which is public by definition — but for the `http`, `tcp`, `dns` and
-`uptimekuma` adapters the base URL is *yours*, an internal hostname. Those
+status page, which is public by definition — but for the `http`, `tcp`, `dns`,
+`uptimekuma` and `imap` adapters the base URL is *yours*, an internal hostname. Those
 providers still appear, under the name you gave them, with no link.
 
 It is not authentication: anyone who can reach the port can read the page, which

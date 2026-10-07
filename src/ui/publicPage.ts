@@ -81,12 +81,13 @@ export interface PublicSummary {
 
 /**
  * Adapters whose `baseUrl` is *ours* rather than the vendor's: a direct HTTP
- * probe (roadmap 1.8), a TCP or DNS check, a self-hosted Uptime Kuma. Every
+ * probe (roadmap 1.8), a TCP or DNS check, a self-hosted Uptime Kuma, the
+ * mail server an IMAP reading logs into (roadmap 1.4). Every
  * other adapter points at a third party's own public status page, which is
  * public by definition and safe to link.
  *
  * This is the one place on this page where a leak was genuinely easy to write.
- * `statusUrl` is `baseUrl` everywhere else in the codebase, and for these four
+ * `statusUrl` is `baseUrl` everywhere else in the codebase, and for these five
  * that is an internal hostname — `https://billing.internal.acme.corp/health` —
  * which publishing would hand a stranger a map of the operator's network. The
  * provider still appears on the page, under the name the operator gave it; only
@@ -97,7 +98,7 @@ export interface PublicSummary {
  * lose its link. A plugin that probes the operator's own infrastructure should
  * be named here, and the docs say so.
  */
-const PRIVATE_BASE_URL_ADAPTERS = new Set(["http", "tcp", "dns", "uptimekuma"]);
+const PRIVATE_BASE_URL_ADAPTERS = new Set(["http", "tcp", "dns", "uptimekuma", "imap"]);
 
 const SEVERITY: OverallStatus[] = [
   "operational",

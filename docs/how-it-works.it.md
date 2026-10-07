@@ -407,6 +407,13 @@ un **sospetto**. È ciò che fa scattare l'avviso di disservizio silenzioso, e
 dalla roadmap 1.3 viene anche conservato e mostrato, invece di vivere solo in
 quel messaggio.
 
+Chi accusa non dev'essere per forza una sonda. Dalla roadmap 1.4 una lettura di
+posta (`imap`, [configurazione §3.5](configuration.it.md#ladapter-imap--le-email-del-vendor))
+con `crossChecks` fa lo stesso lavoro dall'altra direzione: il supporto del
+vendor ha scritto ai clienti di un problema che la sua pagina non ha ammesso. Il
+sospetto, l'avviso e il tratteggio sono gli stessi; la nota è l'oggetto
+dell'email.
+
 | | Dichiarato | Sospetto |
 | --- | --- | --- |
 | Fonte | La pagina del provider | Una lettura della sonda che la pagina contraddice |

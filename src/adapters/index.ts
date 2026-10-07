@@ -6,6 +6,7 @@ import { cachetAdapter } from "./cachet.adapter.ts";
 import { dnsAdapter } from "./dns.adapter.ts";
 import { gcpAdapter } from "./gcp.adapter.ts";
 import { htmlAdapter } from "./html.adapter.ts";
+import { imapAdapter } from "./imap.adapter.ts";
 import { httpAdapter } from "./http.adapter.ts";
 import { instatusAdapter } from "./instatus.adapter.ts";
 import { jsonAdapter } from "./json.adapter.ts";
@@ -34,6 +35,7 @@ export const adapters: Record<string, Adapter> = {
   [uptimeKumaAdapter.id]: uptimeKumaAdapter,
   [uptimeComAdapter.id]: uptimeComAdapter,
   [htmlAdapter.id]: htmlAdapter,
+  [imapAdapter.id]: imapAdapter,
   [httpAdapter.id]: httpAdapter,
   [tcpAdapter.id]: tcpAdapter,
   [dnsAdapter.id]: dnsAdapter,
