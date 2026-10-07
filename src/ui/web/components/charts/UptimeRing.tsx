@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RadialBar, RadialBarChart, PolarAngleAxis } from "recharts";
 import { ChartContainer } from "@/components/ui/chart.tsx";
 import { chartConfigFor, statusColor, statusFill, statusLabelKey } from "@/lib/chartConfig.ts";
 import { faviconCandidates } from "@/lib/favicon.ts";
+import { shownStatus } from "@/lib/suspicion.ts";
+import { SuspicionTooltip } from "@/components/SuspicionTooltip.tsx";
 import type { ProviderStatus } from "@/lib/types.ts";
 import { useSpotlight } from "@/components/ui/spotlight-card.tsx";
 import { cn } from "@/lib/utils.ts";
@@ -32,6 +34,11 @@ export function UptimeRing({
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const icon = candidates[attempt];
+  // Roadmap 1.3: the ring is drawn in what the dashboard shows for this
+  // provider, which a hatched suspicion can make differ from the page's word.
+  const shown = shownStatus(provider);
+  const patternId = `suspected-${useId().replace(/:/g, "")}`;
+  const ringFill = shown.hatched ? `url(#${patternId})` : statusFill(shown.status);
 
   const value = provider.uptime90 > 0 ? Math.max(2, provider.uptime90) : 0;
 
@@ -44,11 +51,13 @@ export function UptimeRing({
   const large = size >= 80;
 
   return (
+    <SuspicionTooltip suspicion={shown.suspicion}>
     <div
       // The semantic hook a caller (and a test) reads, rather than the
       // `ring-tile` styling class a restyle could rename — the same idiom as
       // StatusDot's `data-status` and the shadcn primitives' `data-slot`.
       data-slot="uptime-ring"
+      {...(shown.hatched ? { "data-suspected": true } : {})}
       ref={ref}
       {...spotlightProps}
       className={cn(
@@ -58,8 +67,13 @@ export function UptimeRing({
         // than its neighbours in a wrapping row. In the band the width comes
         // from the grid track instead.
         large ? "w-28 gap-2 rounded-lg p-4" : "gap-1.5 rounded-md p-3",
+        // A suspected tile is outlined, dashed, in the measured colour.
+        shown.hatched && "border-dashed",
       )}
-      style={delay === undefined ? undefined : { animationDelay: delay }}
+      style={{
+        ...(delay === undefined ? {} : { animationDelay: delay }),
+        ...(shown.hatched ? { borderColor: statusFill(shown.status) } : {}),
+      }}
     >
       <div className="relative" style={{ width: size, height: size }}>
         <ChartContainer
@@ -70,10 +84,15 @@ export function UptimeRing({
           // visible text is the provider's name alone — so without this the
           // status and the uptime were sighted-only (roadmap 5.13).
           role="img"
-          aria-label={t("chart.ring-summary", {
-            status: t(statusLabelKey(provider.overallStatus)),
-            uptime: new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 2 }).format(provider.uptime90),
-          })}
+          aria-label={[
+            t("chart.ring-summary", {
+              status: t(statusLabelKey(provider.overallStatus)),
+              uptime: new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 2 }).format(provider.uptime90),
+            }),
+            ...(shown.hatched
+              ? [t("suspected.label", { status: t(statusLabelKey(shown.status)).toLowerCase() })]
+              : []),
+          ].join(" · ")}
         >
           <RadialBarChart
             data={[{ name: provider.id, value }]}
@@ -88,12 +107,20 @@ export function UptimeRing({
             startAngle={90}
             endAngle={-270}
           >
+            {shown.hatched && (
+              <defs>
+                <pattern id={patternId} patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
+                  <rect width="7" height="7" fill={statusFill(shown.status)} fillOpacity="0.18" />
+                  <rect width="3" height="7" fill={statusFill(shown.status)} />
+                </pattern>
+              </defs>
+            )}
             <PolarAngleAxis type="number" domain={[0, 100]} tick={false} axisLine={false} />
             <RadialBar
               dataKey="value"
               cornerRadius={4}
               isAnimationActive={false}
-              fill={statusFill(provider.overallStatus)}
+              fill={ringFill}
               background={{ fill: statusFill("unknown") }}
             />
           </RadialBarChart>
@@ -120,7 +147,7 @@ export function UptimeRing({
           {!loaded && (
             <span
               className={cn("font-mono", large ? "text-sm" : "text-[11px]")}
-              style={{ color: statusColor(provider.overallStatus) }}
+              style={{ color: statusColor(shown.status) }}
             >
               {provider.name.slice(0, 3).toUpperCase()}
             </span>
@@ -131,5 +158,6 @@ export function UptimeRing({
         {provider.name}
       </span>
     </div>
+    </SuspicionTooltip>
   );
 }

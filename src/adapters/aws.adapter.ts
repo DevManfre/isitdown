@@ -193,6 +193,7 @@ export const awsAdapter: Adapter = {
       accept: "application/json",
       timeoutMs: ctx.timeoutMs,
       onRead: ctx.onRead,
+      auth: service.options,
       label: "aws fetch",
     });
     return parseAwsStatus(raw, service);

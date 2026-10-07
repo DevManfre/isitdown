@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { BorderBeam } from "@/components/ui/border-beam.tsx";
@@ -15,9 +15,11 @@ import { GeoCard } from "@/components/GeoCard.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useHistory, useStatus } from "@/hooks/queries.ts";
 import { CoverageProvider } from "@/lib/coverage.tsx";
-import { worstTier } from "@/lib/chartConfig.ts";
+import { statusLabelKey, worstTier } from "@/lib/chartConfig.ts";
 import { formatList, formatRelative } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
+import { isOffLine, shownStatus, suspectedOf } from "@/lib/suspicion.ts";
+import { suspectedHatchCss } from "@/lib/chartConfig.ts";
 import { overviewShape } from "@/lib/overviewShape.ts";
 import { stagger } from "@/lib/stagger.ts";
 import { cn } from "@/lib/utils.ts";
@@ -64,10 +66,13 @@ export function Overview() {
   // the line by anyone, and saying it is would be a claim this dashboard cannot
   // back. It still earns its own sentence rather than being folded into "all
   // operational", because it is not that either.
-  const down = providers.filter(
-    (p) => p.overallStatus !== "operational" && p.overallStatus !== "unknown",
-  );
-  const unreadable = providers.filter((p) => p.overallStatus === "unknown");
+  //
+  // Roadmap 1.3: "off the line" is the provider's own word plus any reading the
+  // operator declared to be the record (`observed`). A hatched suspicion is
+  // neither, so it stays out of the headline and gets its own line below.
+  const down = providers.filter(isOffLine);
+  const unreadable = providers.filter((p) => p.overallStatus === "unknown" && !isOffLine(p));
+  const suspected = suspectedOf(providers);
   const lastSeen = providers
     .map((p) => p.fetchedAt)
     .filter((v): v is string => v !== null)
@@ -97,7 +102,11 @@ export function Overview() {
         className="anim-rise anim-rise-hero flex items-center gap-3"
         style={{ animationDelay: "50ms" }}
       >
-        <StatusBeacon tier={worstTier(providers.map((p) => p.overallStatus))} />
+        <StatusBeacon
+          tier={worstTier(
+            providers.map((p) => (shownStatus(p).hatched ? p.overallStatus : shownStatus(p).status)),
+          )}
+        />
         {/* 28px on a phone: at `text-4xl` the four-word headline took six
             lines of a 390px screen and pushed the fleet under the fold. */}
         <h2 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance md:text-3xl lg:text-4xl lg:leading-[1.1]">
@@ -168,6 +177,46 @@ export function Overview() {
             })
           )}
         </p>
+      )}
+      {/* Roadmap 1.3. One line per suspected provider, under the claim the
+          headline makes rather than inside it: the page has not said this, so
+          it must not be counted as if it had. */}
+      {!allDisabled && suspected.length > 0 && (
+        <ul
+          data-testid="overview-suspected"
+          className="anim-rise anim-rise-hero flex max-w-[68ch] flex-col gap-1 text-sm"
+          style={{ animationDelay: "120ms" }}
+        >
+          {suspected.map((p) => {
+            const suspicion = shownStatus(p).suspicion!;
+            return (
+              <li key={p.id} className="flex items-center gap-2.5">
+                <span
+                  aria-hidden="true"
+                  className="size-3 flex-none rounded-full"
+                  style={{ background: suspectedHatchCss(suspicion.status) }}
+                />
+                <span>
+                  <Trans
+                    i18nKey="suspected.overview"
+                    values={{
+                      provider: p.name,
+                      status: t(statusLabelKey(suspicion.status)).toLowerCase(),
+                      since: formatRelative(i18n.language, suspicion.since),
+                    }}
+                    components={[
+                      <Link
+                        key="provider"
+                        className="text-primary hover:underline"
+                        to={ROUTE_PATHS.providerDetail.replace(":providerId", p.id)}
+                      />,
+                    ]}
+                  />
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       )}
       <div
         className="anim-rise anim-rise-hero flex gap-2"

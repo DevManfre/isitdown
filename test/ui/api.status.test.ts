@@ -147,6 +147,40 @@ test("status carries current component statuses and the selection", async () => 
   }
 });
 
+// Roadmap 1.3: a suspicion travels beside the page's own word, never in place of it.
+test("status carries an open suspicion beside the provider's declared status", async () => {
+  const app = await api();
+  try {
+    await app.runtime.store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: "2026-08-19T14:05:00.000Z",
+    });
+    await app.runtime.store.setSuspicions("github", [
+      { status: "major_outage", probeId: "github-api", since: "2026-08-19T14:00:00.000Z", note: "HTTP 503" },
+    ]);
+
+    const { body } = await app.get("/status");
+    const providers = (body as { providers: { id: string; overallStatus: string; suspected: unknown }[] }).providers;
+    const github = providers.find((provider) => provider.id === "github");
+    assert.equal(github?.overallStatus, "operational");
+    assert.deepEqual(github?.suspected, {
+      status: "major_outage",
+      probeId: "github-api",
+      since: "2026-08-19T14:00:00.000Z",
+      note: "HTTP 503",
+    });
+    assert.ok(
+      providers.filter((provider) => provider.id !== "github").every((provider) => provider.suspected === null),
+    );
+  } finally {
+    await app.close();
+  }
+});
+
 test("a provider never polled reports unknown rather than being omitted", async () => {
   const app = await api();
   try {

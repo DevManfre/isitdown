@@ -3,6 +3,7 @@ import { getAdapter } from "../../adapters/index.ts";
 import { Router } from "express";
 import { deriveGroups } from "../../core/groups.ts";
 import { isActive } from "../../core/maintenance.ts";
+import { openSuspicion } from "../../core/suspicion.ts";
 import { readiness } from "../readiness.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 
@@ -85,6 +86,10 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
           // majority of rows that have never said, which is where a raw null
           // would tell the operator nothing.
           authority: authorityOf(service, getAdapter(service.adapter)),
+          // Roadmap 1.3. Beside `overallStatus`, never folded into it: the
+          // dashboard decides how loudly to show a reading the provider has not
+          // declared, and every count built on the declared word stays as it was.
+          suspected: openSuspicion(state),
           uptime90: history.uptime90,
           maintenance: {
             active: (state.last?.maintenances ?? []).filter((window) =>

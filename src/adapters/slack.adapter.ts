@@ -165,6 +165,7 @@ async function readJson(path: string, service: ServiceRef, ctx: FetchContext): P
     accept: "application/json",
     timeoutMs: ctx.timeoutMs,
     onRead: ctx.onRead,
+    auth: service.options,
     label: "slack fetch",
   });
 }

@@ -474,13 +474,18 @@ describe("the service dialog's scrape adapter fields", () => {
     expect(
       within(dialog).queryByLabelText(i18n.t("scrape.selector")),
     ).toBeNull();
-    // A Statuspage site has no adapter fields at all, so there is no
-    // disclosure to open for it either.
+    // A Statuspage site's only extra fields are its credentials (roadmap
+    // 1.5): the scraper's selector is not among them.
+    await openAdvanced(dialog);
     expect(
-      within(dialog).queryByRole("button", {
-        name: new RegExp(i18n.t("add.advanced")),
-      }),
+      within(dialog).getByLabelText(i18n.t("auth.token-env")),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByLabelText(i18n.t("scrape.selector")),
     ).toBeNull();
+    // Shut again, so the scraper's fields below are opened the way an
+    // operator who never looked at the credentials would open them.
+    await openAdvanced(dialog);
 
     await userEvent.click(
       within(dialog).getByRole("button", { name: i18n.t("action.change") }),
@@ -639,6 +644,60 @@ describe("the service dialog's probe fields", () => {
         (addCall?.body as { options: Record<string, string> }).options,
       ),
     ).not.toContain("expectStatus");
+  });
+});
+
+describe("the service dialog's credentials", () => {
+  it("submits a page source's credentials, the header folded under its own name", async () => {
+    const { dialog } = await openAdd();
+    await addByUrl(dialog, "https://status.example.com");
+    await openAdvanced(dialog);
+    const calls = interceptWrites({
+      "POST /config/services": {},
+      "POST /config/services/acme/test": {
+        ok: true,
+        overallStatus: "operational",
+      },
+    });
+
+    await userEvent.type(
+      within(dialog).getByLabelText(i18n.t("field.name")),
+      "Acme",
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText(i18n.t("auth.oauth-token-url")),
+      "https://login.example.com/token",
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText(i18n.t("auth.oauth-client-id")),
+      "app-1",
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText(i18n.t("auth.oauth-secret-env")),
+      "STATUS_SECRET",
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText(i18n.t("probe.header-name")),
+      "X-Tenant",
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText(i18n.t("probe.header-value")),
+      "acme",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: i18n.t("action.add") }),
+    );
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const post = calls.find(
+      (call) => call.method === "POST" && call.path === "/config/services",
+    );
+    expect((post?.body as { options?: unknown }).options).toEqual({
+      oauthTokenUrl: "https://login.example.com/token",
+      oauthClientId: "app-1",
+      oauthClientSecretEnv: "STATUS_SECRET",
+      "header.X-Tenant": "acme",
+    });
   });
 });
 

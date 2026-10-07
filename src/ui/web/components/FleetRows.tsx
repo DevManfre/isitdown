@@ -3,6 +3,8 @@ import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { stagger } from "@/lib/stagger.ts";
+import { shownStatus } from "@/lib/suspicion.ts";
+import { SuspicionTooltip } from "@/components/SuspicionTooltip.tsx";
 import type { HistoryBucket, ProviderStatus } from "@/lib/types.ts";
 
 /**
@@ -27,6 +29,7 @@ export function ProviderRow({
   delay?: string;
 }) {
   const { t } = useTranslation();
+  const shown = shownStatus(provider);
 
   return (
     /* Two rows on a phone, one from `md` up. Those three fixed columns left the
@@ -38,18 +41,31 @@ export function ProviderRow({
       style={delay === undefined ? undefined : { animationDelay: delay }}
     >
       <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
-        <StatusDot status={provider.overallStatus} size={12} />
+        <SuspicionTooltip suspicion={shown.suspicion}>
+          <StatusDot status={shown.status} size={12} hatched={shown.hatched} />
+        </SuspicionTooltip>
         <span className="provider-name truncate text-sm">{provider.name}</span>
       </div>
       <div className="col-span-2 col-start-1 row-start-2 lg:col-span-1 lg:col-start-2 lg:row-start-1">
         <UptimeBarRow buckets={buckets} scale="compact" />
       </div>
-      <span
-        className="col-start-2 row-start-1 font-mono text-right text-[11.5px] lg:col-start-3"
-        style={{ color: statusColor(provider.overallStatus) }}
-      >
-        {t(statusLabelKey(provider.overallStatus)).toUpperCase()}
-      </span>
+      {shown.hatched ? (
+        // Roadmap 1.3: both words, the page's first, so the row never claims
+        // the provider said something it did not.
+        <span className="col-start-2 row-start-1 flex flex-wrap justify-end gap-x-1.5 font-mono text-right text-[11.5px] lg:col-start-3">
+          <span className="text-muted-foreground">{t(statusLabelKey(provider.overallStatus)).toUpperCase()}</span>
+          <span style={{ color: statusColor(shown.status) }}>
+            · {t("suspected.short", { status: t(statusLabelKey(shown.status)).toLowerCase() }).toUpperCase()}
+          </span>
+        </span>
+      ) : (
+        <span
+          className="col-start-2 row-start-1 font-mono text-right text-[11.5px] lg:col-start-3"
+          style={{ color: statusColor(shown.status) }}
+        >
+          {t(statusLabelKey(shown.status)).toUpperCase()}
+        </span>
+      )}
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { authHeaders, forgetToken } from "./requestAuth.ts";
+
 /**
  * The one place a status page is read over HTTP.
  *
@@ -124,6 +126,12 @@ export interface ConditionalFetchOptions {
   label: string;
   /** Called once per successful read, a 304 included. A failed read reports nothing. */
   onRead?: ((read: StatusPageRead) => void) | undefined;
+  /**
+   * The provider's options, read for credentials — `header.<Name>`, `tokenEnv`
+   * or an OAuth client-credentials block (roadmap 1.5, `requestAuth.ts`). Every
+   * other key is ignored here, so an adapter passes its options whole.
+   */
+  auth?: Record<string, string> | undefined;
 }
 
 /**
@@ -150,6 +158,7 @@ const keyOf = (providerId: string, url: string): string => `${providerId}\n${url
 
 /** Drops everything cached for a provider — its rows are gone, so is its body. */
 export function forgetProvider(providerId: string): void {
+  forgetToken(providerId);
   for (const key of cache.keys()) {
     if (key.startsWith(`${providerId}\n`)) cache.delete(key);
   }
@@ -178,7 +187,13 @@ export async function fetchConditional(url: string, opts: ConditionalFetchOption
   const key = keyOf(opts.providerId, url);
   const cached = cache.get(key);
 
-  const headers: Record<string, string> = { accept: opts.accept, "user-agent": USER_AGENT };
+  // Resolved before the clock starts: a token request is our round trip to an
+  // identity provider, not the status page answering slowly.
+  const headers: Record<string, string> = {
+    accept: opts.accept,
+    "user-agent": USER_AGENT,
+    ...(await authHeaders(opts.providerId, opts.auth, opts.timeoutMs)),
+  };
   if (cached?.etag !== undefined) headers["if-none-match"] = cached.etag;
   else if (cached?.lastModified !== undefined) headers["if-modified-since"] = cached.lastModified;
 
@@ -208,6 +223,10 @@ export async function fetchConditional(url: string, opts: ConditionalFetchOption
 
   if (!response.ok) {
     cache.delete(key);
+    // A token the identity provider issued but the source no longer accepts
+    // (revoked, rotated secret, scope changed) would otherwise be offered until
+    // it expires on its own; dropping it makes the next read ask for a new one.
+    if (response.status === 401 || response.status === 403) forgetToken(opts.providerId);
     const stated = parseRetryAfter(response.headers.get("retry-after"));
     // A stated window, or a 429 whatever it stated: both are the provider
     // asking for room, and only these two are turned into a hold. A bare 503

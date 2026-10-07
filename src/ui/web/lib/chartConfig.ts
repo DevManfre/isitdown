@@ -133,6 +133,20 @@ export const ANNOTATION_COLOUR: Record<string, string> = {
 export const annotationColour = (colour: string): string =>
   ANNOTATION_COLOUR[colour] ?? ANNOTATION_COLOUR["neutral"]!;
 
+/**
+ * A suspected status — roadmap 1.3: the status colour in wide 45° stripes over
+ * a faint tint of itself. Drawn in the colour of what the probe measured, so the
+ * severity reads at a glance, and striped so it never reads as declared.
+ *
+ * Deliberately unlike the coverage hatch below (thin surface stripes at 135°):
+ * that one says "we were not watching", this one "we saw it, they did not say",
+ * and an operator has to be able to tell the two apart in one legend.
+ */
+export const suspectedHatchCss = (status: string): string => {
+  const fill = statusFill(status);
+  return `repeating-linear-gradient(45deg, ${fill} 0 3px, color-mix(in srgb, ${fill} 18%, transparent) 3px 7px)`;
+};
+
 export const COVERAGE_HATCH_CSS =
   "repeating-linear-gradient(135deg, transparent 0 2px, var(--color-surface) 2px 3px)";
 

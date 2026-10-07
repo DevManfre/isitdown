@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 25;
+export const SCHEMA_VERSION = 26;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -625,6 +625,18 @@ export function migrate(db: DatabaseSync): void {
         count INTEGER NOT NULL
       );
     `);
+  }
+
+  if (from < 26) {
+    // Suspected readings — roadmap 1.3. A column on the provider's live state
+    // rather than a table: they are part of "what we currently believe", read
+    // with it on every cycle and every /status, and only the open ones matter.
+    const columns = (db.prepare("PRAGMA table_info(provider_state)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!columns.includes("suspicions")) {
+      db.exec("ALTER TABLE provider_state ADD COLUMN suspicions TEXT NOT NULL DEFAULT '[]'");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

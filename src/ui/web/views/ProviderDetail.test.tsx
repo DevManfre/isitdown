@@ -67,6 +67,29 @@ describe("ProviderDetail", () => {
     expect(link).toHaveAttribute("href", "https://www.githubstatus.com");
   });
 
+  // Roadmap 1.3.
+  it("marks a suspected provider in its header and says what each side claims", async () => {
+    mount({
+      overallStatus: "operational",
+      suspected: { status: "major_outage", probeId: "github-api", since: "2026-10-06T20:06:00Z", note: "HTTP 503" },
+    });
+    const badge = await screen.findByTestId("provider-suspected");
+    expect(badge).toHaveTextContent(i18n.t("suspected.short", { status: i18n.t("status.major-outage").toLowerCase() }));
+    const probe = screen.getByRole("link", { name: "github-api" });
+    expect(probe).toHaveAttribute("href", "#/providers/github-api");
+    expect(probe.closest("p")).toHaveTextContent("HTTP 503");
+  });
+
+  it("shows no suspicion badge on an observed provider, whose probe is the record", async () => {
+    mount({
+      overallStatus: "operational",
+      authority: "observed",
+      suspected: { status: "major_outage", probeId: "github-api", since: "2026-10-06T20:06:00Z" },
+    });
+    await screen.findByRole("heading", { name: "GitHub" });
+    expect(screen.queryByTestId("provider-suspected")).toBeNull();
+  });
+
   it("shows the same uptime windows the drawer does", async () => {
     mount();
     // The panel is shared with the drawer, so this is the one assertion that

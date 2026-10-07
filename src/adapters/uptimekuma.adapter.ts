@@ -302,6 +302,7 @@ async function readJson(path: string, origin: string, service: ServiceRef, ctx: 
     accept: "application/json",
     timeoutMs: ctx.timeoutMs,
     onRead: ctx.onRead,
+    auth: service.options,
     label: "uptimekuma fetch",
   });
 }
