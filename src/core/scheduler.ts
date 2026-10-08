@@ -1,4 +1,9 @@
-import type { ChannelConfig, ConfigSource, RuntimeConfig } from "./configSource.interface.ts";
+import {
+  configuredIntervalMinutes,
+  type ChannelConfig,
+  type ConfigSource,
+  type RuntimeConfig,
+} from "./configSource.interface.ts";
 import type { Logger } from "./logger.ts";
 import type { DispatchContext, Dispatcher } from "./notificationDispatcher.ts";
 import type { Notifier } from "./notifier.interface.ts";
@@ -120,7 +125,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     return config.services
       .filter((service) => service.enabled)
       .reduce(
-        (shortest, service) => Math.min(shortest, service.intervalMinutes ?? shortest),
+        (shortest, service) => Math.min(shortest, configuredIntervalMinutes(service, config.polling)),
         config.polling.intervalMinutes,
       );
   }

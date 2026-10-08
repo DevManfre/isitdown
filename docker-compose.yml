@@ -52,6 +52,36 @@ services:
       - isitdown-ui-data:/app/data
     profiles: ["ui"]
 
+  # A second point of view for probes (roadmap 1.7), meant for another
+  # network — a small VPS, a second site — not for the host the main instance
+  # runs on. The Light image under its own command: stateless, no volume, no
+  # config file; the main instance sends every probe it wants run. Point it at
+  # this one with OUTPOSTS=https://<this host>:8080 and the same OUTPOST_TOKEN.
+  isitdown-outpost:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: light
+    image: ghcr.io/devmanfre/isitdown:light-latest
+    pull_policy: missing
+    container_name: isitdown-outpost
+    restart: unless-stopped
+    command: ["node", "dist/outpost/index.js"]
+    # OUTPOST_TOKEN goes in `.env`; the outpost refuses to start without one.
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8080:8080"
+    # The Light image's own healthcheck reads a state file this has none of.
+    healthcheck:
+      test: ["CMD", "node", "dist/outpost/healthcheck.js"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    profiles: ["outpost"]
+
 volumes:
   isitdown-light-data:
   isitdown-ui-data:

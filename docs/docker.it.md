@@ -224,3 +224,45 @@ Due decisioni da conoscere prima di installarlo:
 
 L'edizione Light non ha un add-on. Non ci sarebbe una pagina da aprire in Home
 Assistant, il che rende un container semplice il modo migliore di eseguirla.
+
+### 4.7 Outpost — un secondo punto di vista per le sonde
+
+Una sonda che fallisce dice "non raggiungibile *dalla rete di questo
+container*", che non è lo stesso di "down": un router di casa che perde una
+rotta sembra identico al servizio che sparisce. Un **outpost** (roadmap 1.7) è
+un secondo punto di osservazione: un container senza stato su un'altra rete —
+una piccola VPS, una seconda sede — che esegue una sonda quando glielo si chiede
+e risponde con ciò che ha visto. Il poller interroga ogni outpost insieme alla
+propria lettura e tiene ciò su cui concorda la maggioranza
+([come funziona §7.10](how-it-works.it.md#710-outpost-e-consenso)).
+
+È l'immagine Light con un comando suo, quindi non c'è una terza immagine da
+scaricare:
+
+```bash
+# On the VPS: the outpost listens on :8080 and refuses to start without a token
+echo "OUTPOST_TOKEN=$(openssl rand -hex 32)" > .env
+docker compose --profile outpost up -d
+
+# On the main instance (either edition), the same token and every outpost's URL
+OUTPOSTS=https://vps-1.example.com:8080,https://vps-2.example.com:8080
+OUTPOST_TOKEN=<the token above>
+```
+
+- **È l'istanza principale a chiedere; l'outpost non chiama mai casa.**
+  L'istanza principale di solito sta dietro NAT e l'edizione Light non ha alcun
+  server, quindi è l'outpost a restare in ascolto. Non tiene nemmeno
+  configurazione: ogni richiesta porta con sé l'intera sonda, così un outpost
+  può servire più installazioni e un restart non perde nulla.
+- **Solo sonde.** Vengono inviate `http`, `tcp` e `dns`; una pagina di stato si
+  legge uguale da qualunque posto, quindi non lo è mai. L'outpost rifiuta ogni
+  altro adapter, e questo gli impedisce anche di diventare un fetcher generico
+  per chiunque abbia il token.
+- **Mettici davanti il TLS.** Il token viaggia in un header `Authorization` e le
+  opzioni della sonda nel body, quindi un outpost raggiungibile da internet va
+  dietro un reverse proxy che termina HTTPS, o su una rete privata (WireGuard,
+  Tailscale).
+- **Opt-in, e mai d'intralcio.** Con `OUTPOSTS` non impostata non cambia nulla.
+  Un outpost spento, lento o configurato male si astiene — registrato come
+  `outpost did not answer` e nominato nella nota diagnostica del provider — e
+  non conta mai come voto "down".

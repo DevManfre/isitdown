@@ -4,7 +4,7 @@ import { z } from "zod";
 import { detectAdapter } from "../../adapters/detect.ts";
 import { resetValidators } from "../../core/http.ts";
 import { CATALOG } from "../../adapters/catalog.ts";
-import { optionProblems } from "../../adapters/index.ts";
+import { cadenceProblems, optionProblems } from "../../adapters/index.ts";
 import { getAdapter } from "../../adapters/index.ts";
 import {
   alertCapSchema,
@@ -313,7 +313,10 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     // Roadmap 11.1: an adapter whose options are a declared mapping checks them
     // here, while the operator is still looking at the form, rather than
     // letting a typo surface three minutes later as a failed poll.
-    const problems = optionProblems(parsed.data.adapter, parsed.data.options);
+    const problems = [
+      ...optionProblems(parsed.data.adapter, parsed.data.options),
+      ...cadenceProblems(parsed.data),
+    ];
     if (problems.length > 0) {
       res.status(400).json({ error: { message: problems.join("; ") } });
       return;
@@ -421,6 +424,31 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
         parsed.data.adapter ?? existing.adapter,
         parsed.data.options,
       );
+      if (problems.length > 0) {
+        res.status(400).json({ error: { message: problems.join("; ") } });
+        return;
+      }
+    }
+    if (existing !== undefined) {
+      // The cadence the row will have once the patch lands: naming one of the
+      // two intervals clears the other (see `updateService`), and an adapter
+      // change can turn a probe's seconds into a status page's.
+      const { intervalMinutes, intervalSeconds } = parsed.data;
+      const problems = cadenceProblems({
+        adapter: parsed.data.adapter ?? existing.adapter,
+        intervalMinutes:
+          intervalMinutes !== undefined
+            ? intervalMinutes
+            : typeof intervalSeconds === "number"
+              ? null
+              : existing.intervalMinutes,
+        intervalSeconds:
+          intervalSeconds !== undefined
+            ? intervalSeconds
+            : typeof intervalMinutes === "number"
+              ? null
+              : existing.intervalSeconds,
+      });
       if (problems.length > 0) {
         res.status(400).json({ error: { message: problems.join("; ") } });
         return;

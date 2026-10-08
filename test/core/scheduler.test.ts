@@ -612,6 +612,38 @@ test("the tick follows the shortest interval any provider asked for", async () =
   assert.ok(armedIn > 100_000 && armedIn < 130_000, `armed in ${armedIn}ms`);
 });
 
+test("the tick follows a probe's cadence in seconds", async () => {
+  const configSource = fakeConfigSource(
+    baseConfig({
+      polling: { intervalMinutes: 3, requestTimeoutSeconds: 8, maxRetries: 3, failureThreshold: 5 },
+      services: [
+        {
+          id: "api",
+          name: "API",
+          adapter: "http",
+          baseUrl: "https://api.example.com",
+          enabled: true,
+          intervalSeconds: 20,
+        },
+      ],
+    }),
+  );
+  const scheduler = createScheduler({
+    configSource,
+    poller: fakePoller(),
+    dispatcher: fakeDispatcher(),
+    buildNotifiers: () => [],
+    logger: silent,
+    random: noJitter,
+  });
+
+  await scheduler.start();
+  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - Date.now();
+  scheduler.stop();
+
+  assert.ok(armedIn > 15_000 && armedIn <= 20_000, `armed in ${armedIn}ms`);
+});
+
 test("a disabled provider's short interval does not drag the tick down with it", async () => {
   const configSource = fakeConfigSource(
     baseConfig({

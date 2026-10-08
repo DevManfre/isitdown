@@ -187,6 +187,7 @@ const serviceRowSchema = z.object({
   components: z.string().nullable(),
   scope_to_components: z.number(),
   interval_minutes: z.number().nullable(),
+  interval_seconds: z.number().nullable(),
   muted_until: z.string().nullable(),
   group_name: z.string().nullable(),
   cross_checks: z.string().nullable(),
@@ -324,7 +325,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks, sla_target, authority
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, cross_checks, sla_target, authority
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -347,6 +348,9 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       ...(row.interval_minutes === null
         ? {}
         : { intervalMinutes: row.interval_minutes }),
+      ...(row.interval_seconds === null
+        ? {}
+        : { intervalSeconds: row.interval_seconds }),
       ...(row.options === null
         ? {}
         : { options: JSON.parse(row.options) as Record<string, string> }),
@@ -375,7 +379,7 @@ export function insertService(
 ): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, group_name, cross_checks, sla_target, authority, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, cross_checks, sla_target, authority, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -386,6 +390,7 @@ export function insertService(
     parsed.components.length === 0 ? null : JSON.stringify(parsed.components),
     parsed.scopeToComponents ? 1 : 0,
     parsed.intervalMinutes ?? null,
+    parsed.intervalSeconds ?? null,
     parsed.mutedUntil ?? null,
     parsed.group ?? null,
     parsed.crossChecks ?? null,
@@ -409,6 +414,11 @@ export const servicePatchSchema = serviceDefinitionSchema
       .int()
       .positive()
       .max(1440)
+      .nullable()
+      .optional(),
+    /** Null puts a probe back on the minute cadence (roadmap 1.6). */
+    intervalSeconds: serviceDefinitionSchema.shape.intervalSeconds
+      .unwrap()
       .nullable()
       .optional(),
     // Null is how the dashboard lifts a mute early, for the same reason: on a
@@ -456,6 +466,15 @@ export function updateService(
   }
   if (parsed.intervalMinutes !== undefined)
     columns["interval_minutes"] = parsed.intervalMinutes;
+  if (parsed.intervalSeconds !== undefined)
+    columns["interval_seconds"] = parsed.intervalSeconds;
+  // One cadence at a time (roadmap 1.6): naming one clears the other, so a
+  // probe moved from seconds back to minutes cannot keep both and have the
+  // seconds silently win.
+  if (typeof parsed.intervalMinutes === "number" && parsed.intervalSeconds === undefined)
+    columns["interval_seconds"] = null;
+  if (typeof parsed.intervalSeconds === "number" && parsed.intervalMinutes === undefined)
+    columns["interval_minutes"] = null;
   if (parsed.mutedUntil !== undefined)
     columns["muted_until"] = parsed.mutedUntil;
   if (parsed.slaTarget !== undefined) columns["sla_target"] = parsed.slaTarget;

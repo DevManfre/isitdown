@@ -777,6 +777,9 @@ describe("the service dialog's write path", () => {
       // An empty interval field is the provider following the global cadence,
       // and only a null says so on a patch.
       intervalMinutes: null,
+      // The seconds cadence travels as null beside it (roadmap 1.6), so a
+      // probe moved back to minutes never keeps the old one.
+      intervalSeconds: null,
       // Same for the group (roadmap 2.6): an empty field means "out of the
       // group", which only a null can say.
       group: null,
@@ -819,6 +822,53 @@ describe("the service dialog's write path", () => {
       expect(
         (post?.body as { intervalMinutes?: number })?.intervalMinutes,
       ).toBe(45);
+    });
+  });
+
+  it("offers a cadence in seconds for a probe only, and submits it as one", async () => {
+    const { dialog } = await openAdd();
+    const calls = interceptWrites({
+      "POST /config/services": {},
+      "POST /config/services/my-api/test": {
+        ok: true,
+        overallStatus: "operational",
+      },
+    });
+
+    await addByUrl(dialog, "https://example.com");
+    // A status page is never read faster than once a minute.
+    expect(
+      within(dialog).queryByRole("combobox", { name: i18n.t("field.provider-interval-unit") }),
+    ).toBeNull();
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: i18n.t("action.change") }),
+    );
+
+    await addByAdapter(dialog, "http", "https://app.example.com");
+    await userEvent.type(
+      within(dialog).getByLabelText(i18n.t("field.name")),
+      "My API",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("combobox", { name: i18n.t("field.provider-interval-unit") }),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: i18n.t("field.provider-interval-seconds") }),
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText(i18n.t("field.provider-interval")),
+      "15",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: i18n.t("action.add") }),
+    );
+
+    await waitFor(() => {
+      const post = calls.find(
+        (call) => call.method === "POST" && call.path === "/config/services",
+      );
+      expect(post?.body).toMatchObject({ intervalSeconds: 15 });
+      expect(post?.body).not.toHaveProperty("intervalMinutes");
     });
   });
 

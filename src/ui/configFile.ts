@@ -1,5 +1,6 @@
 import { parse, stringify } from "yaml";
 import { type DatabaseSync } from "node:sqlite";
+import { cadenceProblems } from "../adapters/index.ts";
 import type { Logger } from "../core/logger.ts";
 import { FILE_CHANNEL_IDS, fileConfigSchema } from "../light/config/schema.ts";
 import {
@@ -76,6 +77,7 @@ export function exportConfigYaml(db: DatabaseSync, logger: Logger): string {
       baseUrl: service.baseUrl,
       enabled: service.enabled,
       ...(service.intervalMinutes === undefined ? {} : { intervalMinutes: service.intervalMinutes }),
+      ...(service.intervalSeconds === undefined ? {} : { intervalSeconds: service.intervalSeconds }),
       ...(service.options === undefined ? {} : { options: service.options }),
       ...(service.mutedUntil === undefined ? {} : { mutedUntil: service.mutedUntil }),
       ...(service.components.length === 0 ? {} : { components: service.components }),
@@ -147,6 +149,13 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
     throw new Error(`the file defines the service id "${duplicate.id}" more than once`);
   }
 
+  // Checked before the first write for the same reason as the credentials
+  // below: a cadence the runtime would refuse (roadmap 1.6) changes nothing.
+  for (const service of file.services) {
+    const problems = cadenceProblems(service);
+    if (problems.length > 0) throw new Error(`service ${service.id}: ${problems.join("; ")}`);
+  }
+
   // Every credential is checked before the first write, so a file with one
   // literal secret in it changes nothing at all rather than half the fleet.
   const channelWrites: { id: string; enabled: boolean; fields: Record<string, string> }[] = [];
@@ -215,6 +224,7 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
         baseUrl: service.baseUrl,
         enabled: service.enabled,
         intervalMinutes: service.intervalMinutes ?? null,
+        intervalSeconds: service.intervalSeconds ?? null,
         components: service.components,
         scopeToComponents: service.scopeToComponents,
         // Null rather than omitted: an import is the file's whole fleet, so a

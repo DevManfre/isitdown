@@ -35,10 +35,10 @@ On this page: [1. What it does](#1-what-it-does) · [2. Quick start](#2-quick-st
 The manual, one file per section:
 
 - [3. Configuration](docs/configuration.md) — `config.yml`, runtime settings, secrets, providers, channels, routing, delivery policy
-- [4. Docker](docs/docker.md) — images, Compose profiles, volumes and probes, Kubernetes
+- [4. Docker](docs/docker.md) — images, Compose profiles, volumes and probes, Kubernetes, outposts
 - [5. Verifying a deployment](docs/verifying.md) — smoke checks, the dashboard, an end-to-end notification, troubleshooting
 - [6. HTTP API](docs/api.md) — every route, the metrics, live updates, badges
-- [7. How it works](docs/how-it-works.md) — data flow, components, when a notification fires, resilience
+- [7. How it works](docs/how-it-works.md) — data flow, components, when a notification fires, resilience, outpost consensus
 - [8. Theming and localisation](docs/theming.md) — themes, `en`/`it`, accessibility
 - [9. Development](docs/development.md) — layout, tech stack, live development, tests, releases
 - [10. Terminal client](docs/cli.md) — `isitdown watch`, a read-only fleet view for a terminal
@@ -61,6 +61,9 @@ Anthropic       operational    ████████████████�
 
 - **No external dependencies at runtime.** No database server, no message broker,
   no cloud account. A JSON file or an embedded SQLite file is enough at this scale.
+  The one exception is opt-in: outposts ([Docker §4.7](docs/docker.md#47-outposts--a-second-point-of-view-for-probes))
+  are containers you run yourself for a second reading of your probes, and with
+  none configured nothing reaches for one.
 - **Config-driven.** Adding a provider never means touching code — an entry in
   `config.yml` (Light) or a dialog in the dashboard (UI).
 - **Idempotent notifications.** Only state *transitions* notify: operational →

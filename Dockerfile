@@ -36,6 +36,10 @@ COPY --from=builder /app/dist/core ./dist/core
 COPY --from=builder /app/dist/adapters ./dist/adapters
 COPY --from=builder /app/dist/notifiers ./dist/notifiers
 COPY --from=builder /app/dist/light ./dist/light
+# The outpost (roadmap 1.7) is core + adapters behind one route, so it rides in
+# this image under its own command rather than costing a third one — see the
+# `outpost` profile in docker-compose.yml.
+COPY --from=builder /app/dist/outpost ./dist/outpost
 RUN mkdir -p /app/config /app/data && chown -R node:node /app
 USER node
 VOLUME ["/app/config", "/app/data"]

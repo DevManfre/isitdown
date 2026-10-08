@@ -746,6 +746,32 @@ test("a provider with its own interval is left alone until that interval has ela
   await provider.close();
 });
 
+test("a probe on a cadence in seconds is polled between the minute ticks", async () => {
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const store = await freshStore();
+  let clock = Date.parse("2026-09-01T10:00:00.000Z");
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: fakeSleep().sleep, now: () => clock });
+  const services = [
+    service("page", provider.baseUrl),
+    service("probe", provider.baseUrl, { intervalSeconds: 15 }),
+  ];
+
+  await poller.runCycle(config(services, { intervalMinutes: 1 }));
+  clock += 15_000;
+  const next = await poller.runCycle(config(services, { intervalMinutes: 1 }));
+
+  assert.deepEqual(
+    next.results.map((result) => result.providerId),
+    ["probe"],
+    "fifteen seconds in, only the probe is due",
+  );
+  assert.equal(await poller.nextIntervalMinutes(config(services, { intervalMinutes: 1 })), 0.25);
+  await provider.close();
+});
+
 test("a cycle asked to ignore the schedule polls every provider", async () => {
   const provider = await fakeProvider((_req, res) => {
     res.writeHead(200, { "content-type": "application/json" });
@@ -1549,5 +1575,85 @@ test("a provider that admits the outage is never accused of hiding it", async ()
   } finally {
     await store.close();
     await Promise.all([page.close(), api.close()]);
+  }
+});
+
+/** An outpost that answers every probe with the same severity (roadmap 1.7). */
+async function fakeOutpost(overallStatus: string): Promise<Fake> {
+  return fakeProvider((req, res) => {
+    let body = "";
+    req.on("data", (chunk: Buffer) => (body += chunk.toString()));
+    req.on("end", () => {
+      const { service } = JSON.parse(body) as { service: { id: string } };
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          status: {
+            provider: service.id,
+            overallStatus,
+            activeIncidents: [],
+            components: [],
+            maintenances: [],
+            fetchedAt: new Date().toISOString(),
+          },
+        }),
+      );
+    });
+  });
+}
+
+test("a probe down from here but up from two outposts is kept up, and the note says why", async () => {
+  const api = await fakeProvider((_req, res) => {
+    res.writeHead(503);
+    res.end("busy");
+  });
+  const [one, two] = await Promise.all([fakeOutpost("operational"), fakeOutpost("operational")]);
+  const store = await freshStore();
+  const poller = createPoller({
+    getAdapter,
+    store,
+    logger: silent,
+    sleep: fakeSleep().sleep,
+    outposts: [
+      { id: "one", url: one.baseUrl, token: "t" },
+      { id: "two", url: two.baseUrl, token: "t" },
+    ],
+  });
+
+  try {
+    const cycle = await poller.runCycle(config([service("api", api.baseUrl, { adapter: "http" })]));
+    const result = cycle.results[0];
+    assert.equal(result?.status?.overallStatus, "operational");
+    assert.match(result?.note ?? "", /overruled by the outposts: here major_outage, one operational, two operational/);
+    assert.equal((await store.getState("api")).last?.overallStatus, "operational");
+    assert.deepEqual([one.hits, two.hits], [["/probe"], ["/probe"]]);
+  } finally {
+    await store.close();
+    await Promise.all([api.close(), one.close(), two.close()]);
+  }
+});
+
+test("a status page is never sent to an outpost", async () => {
+  const page = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("major"));
+  });
+  const outpost = await fakeOutpost("operational");
+  const store = await freshStore();
+  const poller = createPoller({
+    getAdapter,
+    store,
+    logger: silent,
+    sleep: fakeSleep().sleep,
+    outposts: [{ id: "one", url: outpost.baseUrl, token: "t" }],
+  });
+
+  try {
+    const cycle = await poller.runCycle(config([service("github", page.baseUrl)]));
+    assert.equal(cycle.results[0]?.status?.overallStatus, "partial_outage");
+    assert.deepEqual(outpost.hits, []);
+  } finally {
+    await store.close();
+    await Promise.all([page.close(), outpost.close()]);
   }
 });

@@ -218,3 +218,42 @@ Two decisions worth knowing before installing it:
 
 The Light edition has no add-on. There would be no page to open in Home
 Assistant, which makes a plain container the better way to run it.
+
+### 4.7 Outposts — a second point of view for probes
+
+A probe that fails says "unreachable *from this container's network*", which is
+not the same as "down" — a home router dropping a route looks exactly like the
+service going away. An **outpost** (roadmap 1.7) is a second vantage point: a
+stateless container on another network — a small VPS, a second site — that runs
+one probe when asked and answers with what it saw. The poller asks every outpost
+alongside its own reading and keeps what the majority agrees on
+([how it works §7.10](how-it-works.md#710-outposts-and-consensus)).
+
+It is the Light image under its own command, so there is no third image to pull:
+
+```bash
+# On the VPS: the outpost listens on :8080 and refuses to start without a token
+echo "OUTPOST_TOKEN=$(openssl rand -hex 32)" > .env
+docker compose --profile outpost up -d
+
+# On the main instance (either edition), the same token and every outpost's URL
+OUTPOSTS=https://vps-1.example.com:8080,https://vps-2.example.com:8080
+OUTPOST_TOKEN=<the token above>
+```
+
+- **The main instance asks; the outpost never calls home.** The main instance
+  usually sits behind NAT and the Light edition has no server at all, so the
+  outpost is the one that listens. It keeps no configuration either: every
+  request carries the whole probe, so one outpost can serve several
+  installations and a restart loses nothing.
+- **Probes only.** `http`, `tcp` and `dns` are sent; a status page reads the same
+  from anywhere, so it never is. The outpost refuses any other adapter, which
+  also keeps it from being a general-purpose fetcher for whoever holds the token.
+- **Put TLS in front of it.** The token travels in an `Authorization` header and
+  a probe's options in the body, so an outpost reachable over the internet
+  belongs behind a reverse proxy terminating HTTPS, or on a private network
+  (WireGuard, Tailscale).
+- **Opt-in, and never in the way.** With `OUTPOSTS` unset nothing changes. An
+  outpost that is down, slow or misconfigured abstains — logged as `outpost did
+  not answer` and named in the provider's diagnostics note — and never counts as
+  a "down" vote.
