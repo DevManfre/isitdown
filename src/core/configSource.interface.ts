@@ -54,6 +54,12 @@ export interface ServiceDefinition {
    * deserve the same one.
    */
   intervalMinutes?: number | undefined;
+  /**
+   * The same, in seconds, for a probe below the minute floor (roadmap 1.6).
+   * Never set together with `intervalMinutes`; read both through
+   * `configuredIntervalMinutes` rather than either alone.
+   */
+  intervalSeconds?: number | undefined;
   options?: Record<string, string> | undefined;
   components: { id: string; name: string }[];
   /** Report only what the selection covers. Meaningless with no selection. */
@@ -145,4 +151,18 @@ export interface RuntimeConfig {
  */
 export interface ConfigSource {
   load(): Promise<RuntimeConfig>;
+}
+
+/**
+ * How often a provider asked to be polled, in minutes — fractional for a probe
+ * on a cadence in seconds (roadmap 1.6). The one place the two fields and the
+ * global fallback are read together, so nothing downstream has to know that a
+ * cadence can be spelled two ways.
+ */
+export function configuredIntervalMinutes(
+  service: Pick<ServiceDefinition, "intervalMinutes" | "intervalSeconds">,
+  polling: Pick<PollingConfig, "intervalMinutes">,
+): number {
+  if (service.intervalSeconds !== undefined) return service.intervalSeconds / 60;
+  return service.intervalMinutes ?? polling.intervalMinutes;
 }

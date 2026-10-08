@@ -159,12 +159,16 @@ export function exportGatusYaml(db: DatabaseSync, logger: Logger): string {
       continue;
     }
 
-    const intervalMinutes = service.intervalMinutes ?? settings.pollIntervalMinutes;
+    // Gatus takes a Go duration, so a probe on seconds (roadmap 1.6) keeps them.
+    const interval =
+      service.intervalSeconds === undefined
+        ? `${service.intervalMinutes ?? settings.pollIntervalMinutes}m`
+        : `${service.intervalSeconds}s`;
     endpoints.push({
       name: mapped.name,
       ...(mapped.group === undefined ? {} : { group: mapped.group }),
       url: mapped.url,
-      interval: `${intervalMinutes}m`,
+      interval,
       ...(service.enabled ? {} : { enabled: false }),
       ...(mapped.dns === undefined ? {} : { dns: mapped.dns }),
       conditions: mapped.conditions,

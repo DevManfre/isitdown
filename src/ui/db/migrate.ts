@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 26;
+export const SCHEMA_VERSION = 27;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -637,6 +637,16 @@ export function migrate(db: DatabaseSync): void {
     if (!columns.includes("suspicions")) {
       db.exec("ALTER TABLE provider_state ADD COLUMN suspicions TEXT NOT NULL DEFAULT '[]'");
     }
+  }
+
+  if (from < 27) {
+    // A probe's cadence in seconds — roadmap 1.6. A column of its own rather
+    // than a fractional `interval_minutes`: the minute column stays the integer
+    // every reader of it has always assumed.
+    const columns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!columns.includes("interval_seconds")) db.exec("ALTER TABLE services ADD COLUMN interval_seconds INTEGER");
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

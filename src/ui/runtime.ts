@@ -7,6 +7,7 @@ import type { ChannelConfig, ConfigSource, ServiceDefinition } from "../core/con
 import { createLogger, parseLogLevel, type Logger } from "../core/logger.ts";
 import { createDispatcher, type Dispatcher } from "../core/notificationDispatcher.ts";
 import type { Notifier } from "../core/notifier.interface.ts";
+import { readOutposts } from "../core/outpost.ts";
 import { createPoller, type CycleResult } from "../core/poller.ts";
 import { createScheduler, dispatchContextOf, type Scheduler } from "../core/scheduler.ts";
 import { initTracing, tracer } from "../core/tracing.ts";
@@ -210,7 +211,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     timeoutMs: 8000,
   });
 
-  const poller = createPoller({ getAdapter, store, logger });
+  const poller = createPoller({ getAdapter, store, logger, outposts: readOutposts(options.env) });
   const live = createLiveEvents();
 
   const metrics = createMetricsRegistry({

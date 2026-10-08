@@ -41,6 +41,10 @@ isitdown/
 │   │   ├── telegram.notifier.ts
 │   │   ├── webhook.notifier.ts
 │   │   └── index.ts                   registro per id di canale
+│   ├── outpost/                       (solo outpost, roadmap 1.7 — viaggia nell'immagine Light)
+│   │   ├── index.ts                   entrypoint, non parte senza OUTPOST_TOKEN
+│   │   ├── server.ts                  POST /probe esegue una sonda, GET /health
+│   │   └── healthcheck.ts             risponde la sua route di health
 │   ├── light/                         (solo edizione Light)
 │   │   ├── index.ts                   entrypoint
 │   │   ├── runtime.ts                 wiring, condiviso col test end-to-end

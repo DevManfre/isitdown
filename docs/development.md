@@ -43,6 +43,10 @@ isitdown/
 │   │   ├── discord.notifier.ts         incoming webhook, one embed per change
 │   │   ├── slack.notifier.ts           incoming webhook, Block Kit section + button
 │   │   └── index.ts                    registry keyed by channel id
+│   ├── outpost/                       (outpost only, roadmap 1.7 — rides in the Light image)
+│   │   ├── index.ts                    entrypoint, refuses to start without OUTPOST_TOKEN
+│   │   ├── server.ts                   POST /probe runs one probe, GET /health
+│   │   └── healthcheck.ts              its own health route answers
 │   ├── light/                         (Light edition only)
 │   │   ├── index.ts                    entrypoint
 │   │   ├── runtime.ts                  wiring, shared with the end-to-end test

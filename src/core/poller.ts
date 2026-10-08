@@ -1,7 +1,8 @@
 import type { Adapter, ReadingNote } from "./adapter.interface.ts";
-import type {
-  RuntimeConfig,
-  ServiceDefinition,
+import {
+  configuredIntervalMinutes,
+  type RuntimeConfig,
+  type ServiceDefinition,
 } from "./configSource.interface.ts";
 import {
   confirmedChanges,
@@ -18,6 +19,7 @@ import type {
 } from "./stateStore.interface.ts";
 import { componentTargetOf } from "./routing.ts";
 import { authorityOf } from "./authority.ts";
+import { askOutpost, decideByConsensus, type Outpost, type OutpostReading } from "./outpost.ts";
 import { tracer } from "./tracing.ts";
 import type { NormalizedStatus, StatusChange, Suspicion } from "./types.ts";
 
@@ -181,6 +183,11 @@ export interface PollerDeps {
   sleep?: ((ms: number) => Promise<void>) | undefined;
   /** Injected so a test can move a provider's interval along without waiting it out. */
   now?: (() => number) | undefined;
+  /**
+   * Second points of view for probes — roadmap 1.7. Empty or absent means a
+   * probe's reading is this container's alone, which is how it always was.
+   */
+  outposts?: Outpost[] | undefined;
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -200,6 +207,7 @@ export function createPoller(deps: PollerDeps): Poller {
   const { getAdapter, store, logger } = deps;
   const sleep = deps.sleep ?? realSleep;
   const now = deps.now ?? Date.now;
+  const outposts = deps.outposts ?? [];
 
   /**
    * When each provider was last reached for, attempt or not. Kept here rather
@@ -312,6 +320,41 @@ export function createPoller(deps: PollerDeps): Poller {
     throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
 
+  /**
+   * Every outpost's reading of one probe, or none for anything else: a status
+   * page says the same from anywhere, so a second vantage point on it is noise.
+   */
+  async function askOutposts(
+    service: ServiceDefinition,
+    config: RuntimeConfig,
+  ): Promise<OutpostReading[]> {
+    if (outposts.length === 0) return [];
+    let adapter: Adapter;
+    try {
+      adapter = getAdapter(service.adapter);
+    } catch {
+      // An unknown adapter fails the local read with the reason; nothing to ask.
+      return [];
+    }
+    if (adapter.kind !== "probe") return [];
+    const ref = { id: service.id, name: service.name, baseUrl: service.baseUrl, options: service.options };
+    const readings = await Promise.all(
+      outposts.map((outpost) =>
+        askOutpost(outpost, service.adapter, ref, config.polling.requestTimeoutSeconds * 1000),
+      ),
+    );
+    for (const reading of readings) {
+      if ("error" in reading) {
+        logger.warn("outpost did not answer", {
+          providerId: service.id,
+          outpost: reading.outpost,
+          error: reading.error,
+        });
+      }
+    }
+    return readings;
+  }
+
   async function pollOne(
     service: ServiceDefinition,
     config: RuntimeConfig,
@@ -325,7 +368,7 @@ export function createPoller(deps: PollerDeps): Poller {
       await sleep(
         staggerOffsetMs(
           service.id,
-          service.intervalMinutes ?? config.polling.intervalMinutes,
+          configuredIntervalMinutes(service, config.polling),
         ),
       );
     }
@@ -333,9 +376,17 @@ export function createPoller(deps: PollerDeps): Poller {
     const before = await store.getState(service.id);
 
     const startedAt = Date.now();
+    // Asked alongside the local read rather than after it, so an outpost costs
+    // a provider no time of its own. Never rejects: a silent outpost abstains.
+    const remote = askOutposts(service, config);
     let outcome: Awaited<ReturnType<typeof attemptFetch>>;
     try {
       outcome = await attemptFetch(service, config);
+      const decided = decideByConsensus(
+        { status: outcome.status, note: outcome.note },
+        await remote,
+      );
+      outcome = { ...outcome, status: decided.status, note: decided.note };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // A provider that said "not now" is held off until it said to come back
@@ -463,8 +514,7 @@ export function createPoller(deps: PollerDeps): Poller {
     config: RuntimeConfig,
     state: ProviderRuntimeState,
   ): number {
-    const configured =
-      service.intervalMinutes ?? config.polling.intervalMinutes;
+    const configured = configuredIntervalMinutes(service, config.polling);
     if (!config.polling.adaptivePolling || !inTrouble(state)) return configured;
     return Math.min(configured, config.polling.adaptiveIntervalMinutes);
   }

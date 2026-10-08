@@ -1248,3 +1248,67 @@ test("a declared JSON mapping is refused at save time, naming what is wrong", as
     await app.close();
   }
 });
+
+test("a cadence in seconds is taken for a probe and refused for a status page", async () => {
+  const app = await api();
+  try {
+    const page = await app.request("POST", "/config/services", {
+      id: "vercel",
+      name: "Vercel",
+      adapter: "statuspage",
+      baseUrl: "https://www.vercel-status.com",
+      intervalSeconds: 15,
+    });
+    assert.equal(page.status, 400);
+    assert.match((page.body as { error: { message: string } }).error.message, /only for a probe/);
+
+    const probe = await app.request("POST", "/config/services", {
+      id: "api",
+      name: "API",
+      adapter: "http",
+      baseUrl: "https://api.example.com",
+      intervalSeconds: 15,
+    });
+    assert.equal(probe.status, 201);
+    assert.equal((probe.body as { intervalSeconds?: number }).intervalSeconds, 15);
+
+    const both = await app.request("POST", "/config/services", {
+      id: "api-two",
+      name: "API two",
+      adapter: "http",
+      baseUrl: "https://api.example.com",
+      intervalSeconds: 15,
+      intervalMinutes: 2,
+    });
+    assert.equal(both.status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
+test("patching one cadence clears the other, and a page cannot be patched onto seconds", async () => {
+  const app = await api();
+  try {
+    await app.request("POST", "/config/services", {
+      id: "api",
+      name: "API",
+      adapter: "http",
+      baseUrl: "https://api.example.com",
+      intervalMinutes: 2,
+    });
+
+    const toSeconds = await app.request("PATCH", "/config/services/api", { intervalSeconds: 20 });
+    assert.equal(toSeconds.status, 200);
+    assert.equal((toSeconds.body as { intervalSeconds?: number }).intervalSeconds, 20);
+    assert.equal((toSeconds.body as { intervalMinutes?: number }).intervalMinutes, undefined);
+
+    const toMinutes = await app.request("PATCH", "/config/services/api", { intervalMinutes: 5 });
+    assert.equal((toMinutes.body as { intervalMinutes?: number }).intervalMinutes, 5);
+    assert.equal((toMinutes.body as { intervalSeconds?: number }).intervalSeconds, undefined);
+
+    const page = await app.request("PATCH", "/config/services/github", { intervalSeconds: 20 });
+    assert.equal(page.status, 400);
+  } finally {
+    await app.close();
+  }
+});
