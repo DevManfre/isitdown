@@ -60,8 +60,13 @@ const ASSETS = "dist/ui/public/assets";
  * credentials. Measured: 517.2 kB before it, 519.1 kB after — 1.9 kB gzipped,
  * most of it the twelve new strings in six catalogs, the rest the one block of
  * fields every page adapter now shares. The same remedy again.
+ *
+ * It moved 532,275 -> 533,875 (519.8 -> 521.4 kB) for roadmap 1.8's suspect
+ * reading. Measured: 519.6 kB before it, 520.7 kB after — 1.1 kB gzipped, the
+ * four new strings in six catalogs and the badge that shows them. The same
+ * remedy again.
  */
-export const BUDGET = { js: 532_275, css: 20_000 };
+export const BUDGET = { js: 533_875, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
