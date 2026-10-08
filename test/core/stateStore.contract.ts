@@ -59,8 +59,35 @@ export function runStateStoreContract(name: string, makeStore: () => Promise<Sto
       notifyBaseline: null,
       pending: null,
       suspicions: [],
+      freshness: null,
     });
     await store.close();
+  });
+
+  // Roadmap 1.8: the evidence that an adapter has gone blind is days old by
+  // the time it means anything, so a restart must not throw it away.
+  test(`${name}: freshness survives a reopen, and never touches the reading`, async () => {
+    const { store, reopen } = await makeStore();
+    const freshness = {
+      fingerprint: "abc",
+      since: "2026-08-01T00:00:00.000Z",
+      changes: 4,
+      longestStillMs: 86_400_000,
+      components: 2,
+      peakComponents: 6,
+      shrunkSince: "2026-08-02T00:00:00.000Z",
+    };
+    const reading = snap("github", "operational");
+    await store.saveStatus(reading);
+    await store.setFreshness("github", freshness);
+    await store.saveStatus(reading);
+    await store.close();
+
+    const reopened = await reopen();
+    const state = await reopened.getState("github");
+    assert.deepEqual(state.freshness, freshness);
+    assert.deepEqual(state.last, reading);
+    await reopened.close();
   });
 
   // Roadmap 1.3: an open suspicion is what stops a restart from re-accusing a

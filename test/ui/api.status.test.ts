@@ -181,6 +181,40 @@ test("status carries an open suspicion beside the provider's declared status", a
   }
 });
 
+// Roadmap 1.8: a reading that stopped looking alive is flagged beside the
+// page's word, judged as of the last read.
+test("status flags a stale reading beside the provider's status", async () => {
+  const app = await api();
+  try {
+    await app.runtime.store.saveStatus({
+      provider: "github",
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: "2026-08-19T14:05:00.000Z",
+    });
+    await app.runtime.store.setFreshness("github", {
+      fingerprint: "abc",
+      since: "2026-08-01T00:00:00.000Z",
+      changes: 5,
+      longestStillMs: 86_400_000,
+      components: 0,
+      peakComponents: 0,
+      shrunkSince: null,
+    });
+
+    const { body } = await app.get("/status");
+    const providers = (body as { providers: { id: string; overallStatus: string; stale: unknown }[] }).providers;
+    const github = providers.find((provider) => provider.id === "github");
+    assert.equal(github?.overallStatus, "operational");
+    assert.deepEqual(github?.stale, { reason: "unchanged", since: "2026-08-01T00:00:00.000Z", longestStillMs: 86_400_000 });
+    assert.ok(providers.filter((provider) => provider.id !== "github").every((provider) => provider.stale === null));
+  } finally {
+    await app.close();
+  }
+});
+
 test("a provider never polled reports unknown rather than being omitted", async () => {
   const app = await api();
   try {

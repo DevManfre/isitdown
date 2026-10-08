@@ -57,6 +57,7 @@ import type {
   HistoryBucket,
   OverallStatus,
   ProviderStatus,
+  StaleReading,
 } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -124,6 +125,8 @@ interface ProviderRow {
   authority: "declared" | "observed";
   /** Roadmap 1.3. What the dot draws: the status shown, hatched when unconfirmed. */
   shown: ShownStatus;
+  /** Roadmap 1.8. The reading has stopped looking alive; null when it has not. */
+  stale: StaleReading | null;
 }
 
 /**
@@ -401,6 +404,7 @@ export function Providers() {
             muted: isMuted(provider.mutedUntil),
             authority: provider.authority,
             shown: shownStatus(provider),
+            stale: provider.stale ?? null,
           };
         })
         // Problems first — roadmap 13.1. Sorted here rather than seeded into the

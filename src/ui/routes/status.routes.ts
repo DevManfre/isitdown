@@ -3,6 +3,7 @@ import { getAdapter } from "../../adapters/index.ts";
 import { Router } from "express";
 import { deriveGroups } from "../../core/groups.ts";
 import { isActive } from "../../core/maintenance.ts";
+import { staleReading } from "../../core/freshness.ts";
 import { openSuspicion } from "../../core/suspicion.ts";
 import { readiness } from "../readiness.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
@@ -90,6 +91,11 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
           // dashboard decides how loudly to show a reading the provider has not
           // declared, and every count built on the declared word stays as it was.
           suspected: openSuspicion(state),
+          // Roadmap 1.8. The reading may be the adapter's last good one rather
+          // than the page's current word; said beside it, never instead of it.
+          // Judged as of the last read, so a provider nobody is polling any
+          // more does not age into a suspicion by the clock alone.
+          stale: state.last === null ? null : staleReading(state.freshness, state.last.fetchedAt),
           uptime90: history.uptime90,
           maintenance: {
             active: (state.last?.maintenances ?? []).filter((window) =>

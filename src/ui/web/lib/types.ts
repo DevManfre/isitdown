@@ -52,6 +52,16 @@ export interface Suspicion {
   note?: string;
 }
 
+/** A reading IsItDown no longer trusts to reflect the page — roadmap 1.8. */
+export interface StaleReading {
+  reason: "unchanged" | "shrunk";
+  /** ISO 8601, UTC. */
+  since: string;
+  longestStillMs?: number;
+  components?: number;
+  expected?: number;
+}
+
 export interface ProviderStatus {
   id: string;
   name: string;
@@ -79,6 +89,11 @@ export interface ProviderStatus {
    * still renders — absent reads as none.
    */
   suspected?: Suspicion | null;
+  /**
+   * Roadmap 1.8. The reading has stopped looking alive — the adapter may no
+   * longer be reading the page. Optional for the same reason as `suspected`.
+   */
+  stale?: StaleReading | null;
   uptime90: number;
   /** Running now, and windows still to come — a window that has already ended appears in neither. */
   maintenance: { active: MaintenanceWindow[]; upcoming: MaintenanceWindow[] };

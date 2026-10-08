@@ -473,3 +473,38 @@ outposts: here major_outage, vps-1 operational, vps-2 operational`. Una sonda
 ribaltata a operational perde anche il segno "non ha mai risposto", così un
 target che ha risposto agli outpost non conta nel controllo "sembra la nostra
 rete" (§7.3).
+
+### 7.11 Letture sospette
+
+Un adapter che smette di leggere una pagina raramente fallisce in modo
+rumoroso. Uno scraper il cui selettore non combacia più legge "operational" per
+sempre; un parser che si è perso in una pagina cambiata di forma legge meno
+componenti di quelli che leggeva. Entrambi sembrano in tutto un provider
+tranquillo. Dalla roadmap 1.8 IsItDown tiene, per ogni provider letto da un
+adapter di pagina (mai una sonda — un servizio che resta su non è un parser
+diventato cieco), un piccolo registro di come si comporta la sua lettura, e la
+segnala come **sospetta** quando smette di sembrare viva:
+
+| Verdetto | Quando |
+| --- | --- |
+| `unchanged` | La pagina è cambiata almeno tre volte prima, e ora è ferma da almeno una settimana e da tre volte il periodo più lungo in cui sia mai rimasta ferma |
+| `shrunk` | La lettura porta meno della metà dei componenti selezionati che portava un tempo |
+
+Il metro è lo storico del provider stesso, non un numero fisso di giorni: un
+mese senza cambiamenti è allarmante su una pagina che si muove ogni pochi
+giorni e normale su una che ha avuto due incidenti in un anno. Un intervallo di
+più di un giorno fra due letture — il container fermo, o la pagina che non si
+lasciava leggere — fa ripartire l'orologio, perché i giorni in cui nessuno
+guardava non sono giorni in cui la pagina è rimasta ferma. Un insieme di
+componenti più piccolo che dura un mese viene preso come il provider che li ha
+ritirati, e il verdetto si azzera.
+
+Il segnale non cambia nient'altro. La lettura resta quella che l'adapter ha
+letto, uptime e notifiche proseguono come prima, e nessun messaggio viene
+inviato: è un dubbio sulla vista di IsItDown, non una notizia sul provider. Il
+log lo dice una volta, quando comincia (`a provider's reading has stopped
+looking alive`); l'edizione UI mostra un badge **Lettura sospetta** sulla card e
+sulla pagina del provider, con un tooltip che dice quale verdetto e da quando, e
+`/status` lo porta come `stale`. Il registro è salvato accanto allo stato del
+provider (SQLite, o il file di stato dell'edizione Light), così un restart
+conserva i giorni di indizi che sono serviti a costruirlo.

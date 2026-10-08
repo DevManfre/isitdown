@@ -6,8 +6,9 @@ import { UptimeArc } from "@/components/charts/UptimeArc.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { stagger } from "@/lib/stagger.ts";
-import type { HistoryBucket, OverallStatus } from "@/lib/types.ts";
+import type { HistoryBucket, OverallStatus, StaleReading } from "@/lib/types.ts";
 import type { ShownStatus } from "@/lib/suspicion.ts";
+import { StaleBadge } from "@/components/StaleBadge.tsx";
 import { SuspicionTooltip } from "@/components/SuspicionTooltip.tsx";
 import { cn } from "@/lib/utils.ts";
 
@@ -26,6 +27,8 @@ export interface ProviderCard {
   authority: "declared" | "observed";
   /** Roadmap 1.3. What the card draws; absent reads as the declared status, plainly. */
   shown?: ShownStatus;
+  /** Roadmap 1.8. Absent or null when the reading still looks alive. */
+  stale?: StaleReading | null;
 }
 
 /** The tint and the edge a card takes from its own severity. */
@@ -94,6 +97,7 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
               {provider.muted && (
                 <Badge variant="muted">{t("provider.muted.badge")}</Badge>
               )}
+              <StaleBadge stale={provider.stale} />
               <SuspicionTooltip suspicion={look.suspicion} className="ml-auto">
                 <span
                   className="ml-auto text-xs"
