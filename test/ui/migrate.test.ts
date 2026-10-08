@@ -656,3 +656,18 @@ test("a schema-25 database gains the suspicions column, empty on every existing 
   assert.equal(row.suspicions, "[]");
   db.close();
 });
+
+test("a schema-27 database gains the freshness column, null on every existing row", async () => {
+  const db = await freshDb();
+  migrate(db);
+  db.exec("INSERT INTO services (id, name, adapter, base_url, options, enabled, created_at) VALUES ('github', 'GitHub', 'statuspage', 'https://x', NULL, 1, '2026-01-01')");
+  db.exec("INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified) VALUES ('github', 'operational', '[]', '[]', '[]', '2026-01-01', 0, 0)");
+  db.exec("ALTER TABLE provider_state DROP COLUMN freshness");
+  db.exec("PRAGMA user_version = 27");
+
+  migrate(db);
+
+  const row = db.prepare("SELECT freshness FROM provider_state WHERE provider_id = 'github'").get() as { freshness: string | null };
+  assert.equal(row.freshness, null);
+  db.close();
+});

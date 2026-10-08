@@ -445,3 +445,36 @@ outposts: here major_outage, vps-1 operational, vps-2 operational`. A probe
 overruled to operational also drops its "never answered" mark, so a target that
 answered the outposts is not counted toward the "this looks like our own
 network" check (§7.3).
+
+### 7.11 Suspect readings
+
+An adapter that stops reading a page rarely fails loudly. A scraper whose
+selector no longer matches reads "operational" forever; a parser that lost its
+way through a reshaped page reads fewer of the components it used to. Both
+look exactly like a calm provider. Since roadmap 1.8 IsItDown keeps, for every
+provider read by a page adapter (never a probe — a service that stays up is not
+a parser that went blind), a small record of how its reading behaves, and flags
+the reading as **suspect** when it stops looking alive:
+
+| Verdict | When |
+| --- | --- |
+| `unchanged` | The page has changed at least three times before, and has now held still for both a week and three times the longest it ever held still |
+| `shrunk` | The reading carries fewer than half the selected components it once did |
+
+The yardstick is the provider's own record, not a fixed number of days: a month
+without a change is alarming on a page that moves every few days and
+unremarkable on one that has had two incidents in a year. A gap of more than a
+day between two reads — the container stopped, or the page failed to read —
+restarts the clock, because the days nobody watched are not days the page held
+still. A smaller set of components that lasts a month is taken as the provider
+retiring them, and the verdict clears.
+
+The flag changes nothing else. The reading stays what the adapter read, uptime
+and notifications carry on as before, and no message is sent: it is a doubt
+about IsItDown's own eyesight, not news about the provider. The log says it
+once, when it starts (`a provider's reading has stopped looking alive`); the
+UI edition shows a **Suspect reading** badge on the provider's card and page,
+with a tooltip saying which verdict and since when, and `/status` carries it as
+`stale`. The record is persisted beside the provider's state (SQLite, or the
+Light edition's state file), so a restart keeps the days of evidence it took
+to build.

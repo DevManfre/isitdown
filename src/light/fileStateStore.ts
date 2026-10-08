@@ -4,7 +4,7 @@ import { z } from "zod";
 import { providerRuntimeStateSchema } from "../core/status.schema.ts";
 import type { MessageRefStore } from "../core/messageRefStore.interface.ts";
 import type { ProviderRuntimeState, StateStore } from "../core/stateStore.interface.ts";
-import type { DampingState, NormalizedStatus, Suspicion } from "../core/types.ts";
+import type { DampingState, Freshness, NormalizedStatus, Suspicion } from "../core/types.ts";
 
 const FORMAT_VERSION = 1;
 
@@ -27,6 +27,7 @@ const baseline = (): ProviderRuntimeState => ({
   notifyBaseline: null,
   pending: null,
   suspicions: [],
+  freshness: null,
 });
 
 /**
@@ -127,6 +128,11 @@ export async function createFileStateStore(path: string): Promise<StateStore & M
 
     async setSuspicions(providerId: string, suspicions: Suspicion[]): Promise<void> {
       stateOf(providerId).suspicions = suspicions;
+      await persist();
+    },
+
+    async setFreshness(providerId: string, freshness: Freshness): Promise<void> {
+      stateOf(providerId).freshness = freshness;
       await persist();
     },
 
