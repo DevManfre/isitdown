@@ -1,3 +1,4 @@
+import { latencyBand } from "./latency.ts";
 import { activeWindows } from "./maintenance.ts";
 import type {
   DampingState,
@@ -389,7 +390,8 @@ export function worseningsIn(changes: StatusChange[]): WorseningReading[] {
   for (const change of changes) {
     if (
       change.kind === "correlated_outage" ||
-      change.kind === "monitoring_degraded"
+      change.kind === "monitoring_degraded" ||
+      change.kind === "slow_status_page"
     )
       continue;
     // A page that is lying is not a page that reported trouble: counting it
@@ -475,6 +477,47 @@ export function silentOutage(inputs: CrossCheckInputs): StatusChange | null {
       probeId: probe.id,
       ...(probe.note === undefined ? {} : { note: probe.note }),
       ...(page.authority === undefined ? {} : { authority: page.authority }),
+    },
+    at: inputs.at,
+  };
+}
+
+export interface SlowPageInputs {
+  providerId: string;
+  /** What the page said this reading — the change carries it, it does not judge it. */
+  status: OverallStatus;
+  /** How long this reading took to answer. */
+  latencyMs: number;
+  /** The page's recent answer times, this reading left out. */
+  recentMs: readonly number[];
+  /** ISO 8601, UTC. */
+  at: string;
+}
+
+/**
+ * Whether a status page answered unusually slowly — roadmap 1.10.
+ *
+ * A page going from 200 ms to 4 s is often the first sign of trouble, before
+ * the provider admits any. So the claim is about the *page*, not about the
+ * service: the change carries the page's own reading untouched, and routes as
+ * a `monitoring` event rather than a `status` one, so a rule can keep it away
+ * from a phone.
+ *
+ * Pure, like the checks beside it. It answers "is this reading slow"; whether
+ * that is news — a second slow reading in a row, not yet announced — is the
+ * poller's business, the way a silent outage is said once per disagreement.
+ */
+export function slowStatusPage(inputs: SlowPageInputs): StatusChange | null {
+  const band = latencyBand(inputs.recentMs);
+  if (band === null || inputs.latencyMs <= band.thresholdMs) return null;
+  return {
+    kind: "slow_status_page",
+    providerId: inputs.providerId,
+    currentStatus: inputs.status,
+    latency: {
+      latencyMs: Math.round(inputs.latencyMs),
+      medianMs: band.medianMs,
+      thresholdMs: band.thresholdMs,
     },
     at: inputs.at,
   };

@@ -10,6 +10,7 @@
   "incident.status.monitoring": "Em acompanhamento",
   "incident.status.resolved": "Resolvido",
   "incident.status.postmortem": "Análise posterior",
+  "incident.status.changed": "Alterado",
 
   "notification.action.open-status": "Abrir a página de estado",
 
@@ -25,6 +26,7 @@
   "notification.silent.outage": "{provider} — {severity}\n\nA página de estado continua a indicar {previous}, mas a nossa sonda {probe} não consegue alcançar o serviço: {note}\n\n{url}",
   "notification.silent.outage-observed": "{provider} — {severity}\n\nA nossa sonda {probe} não alcança o serviço, e para este fornecedor vale o que medimos: {note}\n\nA sua página de estado ainda reporta {previous}, o que aqui é uma opinião e não a resposta.\n\n{url}",
   "notification.sla.burn": "{provider} — orçamento de erro\n\nA este ritmo, {month} fecha em {projected}% face a um objetivo de {target}%.\nJá foram gastos {spentMinutes} dos {budgetMinutes} minutos disponíveis e a disponibilidade medida até agora é de {uptime}%.\n\n{url}",
+  "notification.slow.page": "{provider} — página de estado lenta\n\nA página de estado demorou {latency} a responder, face aos habituais {median} (acima de {threshold} é invulgar). Uma página que abranda assim é muitas vezes o primeiro sinal de um problema que o fornecedor ainda não admitiu.\n\n{url}",
   "notification.maintenance.started": "{provider} — manutenção\n\nComeçou uma manutenção programada: {title}\nFim previsto: {endsAt}\nOs alertas deste fornecedor ficam suspensos até terminar.\n\n{url}",
   "notification.maintenance.ended": "{provider} — manutenção terminada\n\n{title} terminou.\nEstado atual: {current} — incidentes abertos: {count}.\nAtualizado: {updatedAt}\n\n{url}",
 
@@ -41,6 +43,7 @@
   "notification.digest.silent": "a página de estado continua a dizer operacional, mas a sonda {probe} lê {current}",
   "notification.digest.correlated": "{count} fornecedores pioraram ao mesmo tempo — {providers}",
   "notification.digest.sla": "orçamento de erro — a este ritmo o mês fecha em {projected}% face a {target}%",
+  "notification.digest.slow-page": "página de estado lenta — {latency} face aos habituais {median}",
 
   "notification.suppressed": "Outros {count} alertas deste fornecedor foram suprimidos pelo limite horário.",
 

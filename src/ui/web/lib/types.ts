@@ -359,7 +359,9 @@ export type StatusChangeKind =
   | "correlated_outage"
   // A provider's page claiming to be fine while our own probe cannot reach the
   // service it describes (roadmap 1.10).
-  | "silent_outage";
+  | "silent_outage"
+  // A status page answering far slower than it usually does (roadmap 1.10).
+  | "slow_status_page";
 
 /**
  * One dispatch attempt, delivered or failed. Field list follows
@@ -409,6 +411,21 @@ export interface IncidentDetail {
   otherActiveIncidents: IncidentRow[];
   /** The operator's own notes on this incident, oldest first (roadmap 5.3). */
   notes: IncidentNote[];
+  /**
+   * What the provider changed about this incident after resolving it, oldest
+   * first (roadmap 1.11). Empty for nearly every incident.
+   */
+  revisions?: IncidentRevision[];
+}
+
+/** One field a provider edited on an incident it had already resolved (roadmap 1.11). */
+export interface IncidentRevision {
+  field: "impact" | "started_at" | "resolved_at";
+  /** The first version read back: a provider's own impact word, or an ISO timestamp. */
+  before: string;
+  after: string;
+  /** When IsItDown noticed the edit — the provider never says when it made it. */
+  observedAt: string;
 }
 
 /** One note somebody here wrote about an incident (roadmap 5.3). */
@@ -521,6 +538,12 @@ export interface TrustCardData {
   never?: number;
   afterRecovery?: number;
   resolutionMinutes?: number;
+  /**
+   * Roadmap 1.11: how many of the page's incidents resolved inside the window it
+   * edited afterwards, out of how many were read back. Carried below the floor
+   * too, since it is not built from episodes.
+   */
+  revisions?: { revised: number; resolved: number };
 }
 
 export interface TrustResponse {

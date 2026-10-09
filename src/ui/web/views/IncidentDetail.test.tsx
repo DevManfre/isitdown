@@ -311,3 +311,35 @@ describe("the incident's own figures", () => {
     expect(stats.textContent).not.toContain(i18n.t("incident.stat.open-for"));
   });
 });
+
+// Roadmap 1.11: what the provider changed about an incident after resolving it.
+describe("edits made after resolution", () => {
+  const mountWith = (revisions: unknown[]) =>
+    renderWithProviders(<IncidentDetail />, {
+      incident: { ...detail, revisions },
+      status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+    }, "/incidents/:providerId/:incidentId");
+
+  it("leaves the tile out for an incident nobody touched again", async () => {
+    mountWith([]);
+    await screen.findByText("API errors");
+    expect(screen.queryByText(i18n.t("incident.revisions"))).not.toBeInTheDocument();
+  });
+
+  it("says which field moved, from what to what, in the catalog's words", async () => {
+    mountWith([
+      { field: "impact", before: "major", after: "minor", observedAt: "2026-08-22T09:00:00Z" },
+      { field: "resolved_at", before: "2026-08-21T12:00:00Z", after: "2026-08-21T10:00:00Z", observedAt: "2026-08-22T09:00:00Z" },
+    ]);
+    expect(await screen.findByText(i18n.t("incident.revisions"))).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t("incident.revisions.impact", { before: i18n.t("impact.major"), after: i18n.t("impact.minor") })),
+    ).toBeInTheDocument();
+    expect(document.querySelector('[data-revision="resolved_at"]')).toHaveTextContent(/End moved/);
+  });
+
+  it("shows an impact word the catalog does not know as the provider wrote it", async () => {
+    mountWith([{ field: "impact", before: "sev1", after: "sev3", observedAt: "2026-08-22T09:00:00Z" }]);
+    expect(await screen.findByText(i18n.t("incident.revisions.impact", { before: "sev1", after: "sev3" }))).toBeInTheDocument();
+  });
+});

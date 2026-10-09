@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -657,6 +657,41 @@ export function migrate(db: DatabaseSync): void {
       (column) => column.name,
     );
     if (!columns.includes("freshness")) db.exec("ALTER TABLE provider_state ADD COLUMN freshness TEXT");
+  }
+
+  if (from < 29) {
+    // Retroactive incident edits — roadmap 1.11. `incidents` cannot answer it:
+    // its row is overwritten on every poll, which is right for "what is open
+    // now" and exactly wrong for "what did the page first say".
+    //
+    // `incident_versions` holds the first version of a resolved incident read
+    // back from the provider's own feed, and never moves once written. Its
+    // impact is the one last seen live when we watched the incident open,
+    // because a downgrade at resolution time is the commonest rewrite of all.
+    // `incident_revisions` is every field later found to differ from it, one
+    // row per field and new value, so a re-read finding the same edit again
+    // adds nothing.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS incident_versions (
+        provider_id TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        incident_id TEXT NOT NULL,
+        impact      TEXT NOT NULL,
+        started_at  TEXT NOT NULL,
+        resolved_at TEXT NOT NULL,
+        read_at     TEXT NOT NULL,
+        PRIMARY KEY (provider_id, incident_id)
+      );
+      CREATE TABLE IF NOT EXISTS incident_revisions (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider_id TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        incident_id TEXT NOT NULL,
+        field       TEXT NOT NULL,
+        before      TEXT NOT NULL,
+        after       TEXT NOT NULL,
+        observed_at TEXT NOT NULL,
+        UNIQUE (provider_id, incident_id, field, after)
+      );
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

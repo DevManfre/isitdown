@@ -38,6 +38,10 @@ export function trustRoutes(runtime: UiRuntimeCore): Router {
     const cards = runtime.trustPairs().map((pair) => ({
       key: pairKey(pair),
       ...runtime.trust.card(pair, days),
+      // Roadmap 1.11: the fourth axis, about the page alone — how many of its
+      // resolved incidents it edited afterwards. Not built from episodes, so
+      // it is carried whatever the episode floor says.
+      revisions: runtime.revisions.summary(pair.pageId, days),
     }));
     res.json({ days, windows: ALLOWED_DAYS, cards });
   });

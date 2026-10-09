@@ -27,6 +27,7 @@ const KINDS = [
   "maintenance_started",
   "monitoring_degraded",
   "silent_outage",
+  "slow_status_page",
 ] as const;
 
 /**
