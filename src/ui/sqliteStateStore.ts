@@ -8,6 +8,7 @@ import {
   incidentSchema,
   maintenanceWindowSchema,
   suspicionSchema,
+  freshnessSchema,
   normalizedStatusSchema,
 } from "../core/status.schema.ts";
 import { STATUS_CHANGE_KINDS } from "../core/types.ts";
@@ -18,6 +19,7 @@ import type {
   NormalizedStatus,
   OverallStatus,
   Suspicion,
+  Freshness,
 } from "../core/types.ts";
 import { z } from "zod";
 import { ANNOTATION_COLOURS } from "./historyStore.interface.ts";
@@ -40,6 +42,7 @@ const incidentsColumnSchema = z.array(incidentSchema);
 const componentsColumnSchema = z.array(componentStatusSchema);
 const maintenancesColumnSchema = z.array(maintenanceWindowSchema);
 const suspicionsColumnSchema = z.array(suspicionSchema);
+const freshnessColumnSchema = freshnessSchema.nullable();
 
 /**
  * Rows come back from SQLite untyped, and a column read is external input like a
@@ -67,6 +70,7 @@ const stateRowSchema = z.object({
   pending_signature: z.string().nullable(),
   pending_count: z.number(),
   suspicions: z.string(),
+  freshness: z.string().nullable(),
 });
 
 const incidentRowSchema = z.object({
@@ -249,6 +253,7 @@ const baseline = (): ProviderRuntimeState => ({
   notifyBaseline: null,
   pending: null,
   suspicions: [],
+  freshness: null,
 });
 
 const toIncidentRow = (row: IncidentDbRow): IncidentRow => ({
@@ -345,7 +350,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
   const now = deps.now ?? ((): Date => new Date());
   const selectState = db.prepare(
     `SELECT overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified,
-            notify_baseline, pending_signature, pending_count, suspicions
+            notify_baseline, pending_signature, pending_count, suspicions, freshness
      FROM provider_state WHERE provider_id = ?`,
   );
   const upsertState = db.prepare(`
@@ -376,6 +381,11 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified, suspicions)
     VALUES (?, 'unknown', '[]', '[]', '[]', '', 0, 0, ?)
     ON CONFLICT (provider_id) DO UPDATE SET suspicions = excluded.suspicions
+  `);
+  const setFreshness = db.prepare(`
+    INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified, freshness)
+    VALUES (?, 'unknown', '[]', '[]', '[]', '', 0, 0, ?)
+    ON CONFLICT (provider_id) DO UPDATE SET freshness = excluded.freshness
   `);
   const setDegraded = db.prepare(`
     INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified)
@@ -479,6 +489,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
             ? null
             : { signature: row.pending_signature, count: row.pending_count },
         suspicions: suspicionsColumnSchema.parse(JSON.parse(row.suspicions)),
+        freshness: freshnessColumnSchema.parse(row.freshness === null ? null : JSON.parse(row.freshness)),
       };
     },
 
@@ -574,6 +585,10 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
 
     async setSuspicions(providerId: string, suspicions: Suspicion[]): Promise<void> {
       setSuspicions.run(providerId, JSON.stringify(suspicions));
+    },
+
+    async setFreshness(providerId: string, freshness: Freshness): Promise<void> {
+      setFreshness.run(providerId, JSON.stringify(freshness));
     },
 
     async saveNotifyState(

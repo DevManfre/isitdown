@@ -1,4 +1,4 @@
-import type { DampingState, NormalizedStatus, Suspicion } from "./types.ts";
+import type { DampingState, Freshness, NormalizedStatus, Suspicion } from "./types.ts";
 
 export interface ProviderRuntimeState {
   /** null until the provider has been polled successfully at least once. */
@@ -24,6 +24,11 @@ export interface ProviderRuntimeState {
    * announces it a second time.
    */
   suspicions: Suspicion[];
+  /**
+   * How long the reading has looked the same — roadmap 1.8. Null until a page
+   * adapter has read the provider once; never set for a probe.
+   */
+  freshness: Freshness | null;
 }
 
 /** What the poller observed while taking a reading, beyond the reading itself. */
@@ -66,5 +71,7 @@ export interface StateStore {
   ): Promise<void>;
   /** Replaces the provider's open suspicions (roadmap 1.3); an empty list clears them. */
   setSuspicions(providerId: string, suspicions: Suspicion[]): Promise<void>;
+  /** Replaces the provider's freshness (roadmap 1.8). */
+  setFreshness(providerId: string, freshness: Freshness): Promise<void>;
   close(): Promise<void>;
 }

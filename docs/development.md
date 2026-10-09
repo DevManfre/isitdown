@@ -242,6 +242,7 @@ npm run test:integration # end-to-end suite:  test/**/*.itest.ts
 npm run test:visual      # visual baselines: every view, both themes, both locales
 npm run test:mutation    # mutation testing on the diff engine
 npm run test:load        # 200 synthetic providers, a week of history, every read timed
+npm run canary           # every catalog page, live, against its adapter's fixtures (1.9)
 npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
@@ -403,6 +404,21 @@ Notable suites:
   exactly one notification, an unchanged cycle none, a restart none, an unreachable
   provider keeps its last known state, and the entrypoint stays alive between cycles
   and exits 0 on `SIGTERM`.
+- **Nightly canary** (roadmap 1.9) — the one check that talks to real
+  providers, and so the one that is never part of the suite. `tools/canary.mjs`
+  reads every page in the bundled catalog through its real adapter and compares
+  the shape of each JSON answer with the closest committed fixture under
+  `test/fixtures/<adapter>/`. Only what would break a parser counts: a field the
+  fixture has that the page dropped, or one whose kind changed — a field the
+  provider *added* is not drift, and nothing is judged under a list that is
+  empty tonight. A page whose adapter throws is **broken**; a page answering
+  403 or timing out is **did not answer** and listed apart, since a datacentre
+  IP being refused is the network's news, not the adapter's.
+  `.github/workflows/canary.yml` runs it at 03:17 UTC, on no push and no pull
+  request, and keeps a single issue labelled `canary` up to date with the
+  latest report; a clean night closes nothing, the fix does. `npm run canary`
+  runs it by hand, `--only github,openai` narrows it, `--report file.md` writes
+  the report instead of printing it.
 
 The dashboard is real TypeScript now, checked by its own `tsconfig.web.json`
 rather than a JSDoc-driven pass over plain JavaScript; its components and hooks

@@ -204,6 +204,45 @@ export interface Suspicion {
   note?: string | undefined;
 }
 
+/**
+ * How long a provider's reading has looked the same, and how it usually
+ * behaves — roadmap 1.8. Carried between polls by the state store so that a
+ * restart does not reset the evidence that an adapter has stopped reading.
+ * Only `staleReading` interprets it.
+ */
+export interface Freshness {
+  /** Hash of the reading's content, the poll time left out. */
+  fingerprint: string;
+  /** ISO 8601, UTC. When this fingerprint was first read. */
+  since: string;
+  /** How many times the fingerprint has changed since IsItDown started watching. */
+  changes: number;
+  /** The longest a fingerprint has held before changing — the provider's own record of stillness. */
+  longestStillMs: number;
+  /** Selected components the latest reading carried. */
+  components: number;
+  /** The most selected components a reading has carried. */
+  peakComponents: number;
+  /** ISO 8601, UTC. When the reading fell under half of the peak; null while it has not. */
+  shrunkSince: string | null;
+}
+
+/**
+ * A reading IsItDown no longer trusts to reflect the page — roadmap 1.8.
+ * Shown beside the reading, never in place of it.
+ */
+export interface StaleReading {
+  /** `unchanged`: the page used to move and has not; `shrunk`: fewer components than it used to have. */
+  reason: "unchanged" | "shrunk";
+  /** ISO 8601, UTC. */
+  since: string;
+  /** For `unchanged`: the longest the page held still before. */
+  longestStillMs?: number | undefined;
+  /** For `shrunk`: components read now, and how many there used to be. */
+  components?: number | undefined;
+  expected?: number | undefined;
+}
+
 export interface DampingState {
   signature: string;
   count: number;
