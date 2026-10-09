@@ -79,6 +79,7 @@ export const PREVIEW_KINDS = [
   "maintenance_started",
   "monitoring_degraded",
   "silent_outage",
+  "slow_status_page",
 ] as const satisfies readonly StatusChangeKind[];
 
 export type PreviewKind = (typeof PREVIEW_KINDS)[number];
@@ -151,6 +152,13 @@ function fakeChange(
           note: "connection refused",
           authority: "declared",
         },
+      };
+    case "slow_status_page":
+      return {
+        ...base,
+        kind,
+        currentStatus: "operational",
+        latency: { latencyMs: 4200, medianMs: 210, thresholdMs: 1210 },
       };
     default:
       return {

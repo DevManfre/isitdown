@@ -66,14 +66,14 @@ notifications:
 | `correlationWindowMinutes` | `10` | 1–1440. How wide that window is. Wider catches a shared failure that rolls across status pages slowly, and risks folding two unrelated bad days into one. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `imap` reads a vendor's notices out of a mailbox (see below); `html` scrapes a page that publishes neither (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `imap` reads a vendor's notices out of a mailbox (see below); `html` scrapes a page that publishes neither and `watchdog` reports any change to a page's text (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
 | `services[].intervalSeconds` | — | 10–3600, probes only (`http`, `tcp`, `dns`). The same cadence in seconds, for an endpoint that can be down for less than a minute; a status page stays on the minute floor and is refused at load. Never together with `intervalMinutes`. |
 | `services[].crossChecks` | — | Only on a probe (`http`, `tcp`, `dns`) or a mailbox reading (`imap`): the id of the provider whose status page this probe is a second opinion on — silent-outage cross-check (roadmap 1.10). When the probe cannot reach the service and that provider's page still reports operational with no open incident, the disagreement is itself an alert. Optionally narrowed to one component with the same `provider#component` form a routing rule targets (roadmap 2.9); the component half only refines what the trust card (roadmap 8.1) compares the probe against, since the silent-outage check itself is about a page claiming nothing at all is wrong. |
 | `services[].authority` | from the adapter | Which source is the record for this provider — `declared` (its own status page) or `observed` (our own reading), roadmap 9.1. Omitted is the normal case and is not a missing value: a probe (`http`, `tcp`, `dns`) reads `observed` because it *is* the reading, and everything that parses somebody's page reads `declared`. Set it only to disagree with that — a status page you have learned to distrust, or a probe you do not want treated as the record. It decides what the dashboard prints beside the adapter and how a silent-outage alert is worded, not which samples back a percentage. See [7.7](how-it-works.md#77-which-source-is-the-record). |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
-| `services[].options` | — | Adapter-specific extras. Five adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), `http`, `tcp` and `dns`, and `imap` (see their own sections below). |
+| `services[].options` | — | Adapter-specific extras. Six adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), `watchdog` (`baseline`, plus an optional `selector`), `http`, `tcp` and `dns`, and `imap` (see their own sections below). |
 
 #### The `html` adapter
 
@@ -107,6 +107,39 @@ Reading markup is fragile by nature, so the failure modes are deliberate:
   operational" reads as the partial outage;
 - there are no incidents, components or maintenance windows — a page that needed
   scraping has no structure to read them out of.
+
+#### The `watchdog` adapter — any change to a page's text
+
+For the page that is only prose ("All systems normal") and that not even the
+`html` adapter's status words fit (roadmap 1.12). It reports any *change* in
+the page's text against a baseline you write down, and never tries to say what
+the change means:
+
+```yaml
+  - name: Prose-only provider
+    id: example-prose
+    adapter: watchdog
+    baseUrl: https://status.example.com/
+    options:
+      baseline: "All systems normal."
+      selector: ".notice"   # optional — the whole page when absent
+```
+
+- the text is compared with whitespace collapsed and capitals folded, so a
+  re-wrapped line is not a change;
+- a page matching its baseline reads `operational`; one that does not reads
+  `degraded` — the least severe word that still is not "fine" — with one open
+  incident whose title is the new text (cut to 280 characters). Its id is the
+  text's fingerprint, so a page that changes again opens a second incident, and
+  one that changes back resolves it;
+- `baseline` is required and is configuration, not memory: an adapter that
+  learned it from its first read would relearn it after a restart, and a page
+  already changed by then would quietly become the new normal. Saving a
+  watchdog without one is refused, and a poll without one fails with the text
+  the page currently reads — ready to copy in;
+- with no `selector` the whole document's text is watched (script and style
+  bodies left out), which also notices a changed footer or date; name the
+  element when the page carries anything that moves on its own.
 
 #### The `http` adapter — probing your own endpoint
 

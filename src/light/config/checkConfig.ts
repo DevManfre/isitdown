@@ -1,6 +1,7 @@
 import { adapters, optionProblems } from "../../adapters/index.ts";
 import { detectAdapter } from "../../adapters/detect.ts";
 import { httpAdapter, probeConfig } from "../../adapters/http.adapter.ts";
+import { watchdogAdapter } from "../../adapters/watchdog.adapter.ts";
 import type { RuntimeConfig } from "../../core/configSource.interface.ts";
 import { inspectConfig } from "./loadConfig.ts";
 
@@ -133,6 +134,9 @@ async function probeServices(config: RuntimeConfig): Promise<CheckFinding[]> {
     // asking detection about it would report every healthy probe as an
     // unrecognised provider. Its own options are checked offline above.
     if (service.adapter === PROBE_ADAPTER) continue;
+    // The watchdog is for the page nothing recognises (roadmap 1.12), so
+    // detection failing on it is the reason it was chosen, not a finding.
+    if (service.adapter === watchdogAdapter.id) continue;
     let detected: Awaited<ReturnType<typeof detectAdapter>>;
     try {
       detected = await detectAdapter(service.baseUrl, { timeoutMs });

@@ -45,6 +45,9 @@ const CLASS_OF: Record<StatusChangeKind, EventClass> = {
   // status change would send it to every rule that exists to be woken by an
   // outage.
   sla_burn: "monitoring",
+  // A page answering slowly is a hint about the provider, not a status it has
+  // declared (roadmap 1.10). Monitoring, so a rule can keep it off the phone.
+  slow_status_page: "monitoring",
 };
 
 export function classOf(kind: StatusChangeKind): EventClass {

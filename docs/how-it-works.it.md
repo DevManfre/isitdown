@@ -136,6 +136,8 @@ casi limite si aggiungono come righe invece che come test isolati.
 | `correlationThreshold: N` | gli stessi provider sono ancora giù al ciclo dopo | **no** — il guasto condiviso è già stato annunciato |
 | una sonda con `crossChecks` fallisce | la status page del provider dice ancora operativo, nessun incidente aperto | sì, **una volta** — `silent_outage`, e non di nuovo finché i due non concordano |
 | una sonda con `crossChecks` fallisce | la status page dice già degradato, o ha un incidente aperto | **no** — la pagina non sta nascondendo nulla |
+| una status page risponde nei suoi tempi soliti | risponde molto più lentamente, due volte di fila | sì, **una volta** — `slow_status_page`, un evento *monitoring*, e non di nuovo finché una lettura non torna dentro la banda |
+| una status page risponde nei suoi tempi soliti | tutte le pagine del ciclo rispondono molto più lentamente | **no** — è la nostra rete, non la loro |
 
 Il **silenziamento** è la stessa regola con l'operatore al posto del provider: è
 un input del diff engine, non un filtro in uscita, ed è per questo che un
@@ -167,6 +169,33 @@ già un guasto della nostra rete, perché un container che non raggiunge nulla
 non deve passare quel disservizio ad accusare le status page. L'avviso della
 sonda resta accanto: questo cambio aggiunge la frase che la sonda non può dire,
 cioè che la pagina non si è ancora aggiornata.
+
+Le **status page lente** (roadmap 1.10) sono l'altro segnale precoce che un
+provider dà prima di ammettere qualcosa: una pagina che in un giorno normale
+risponde in 200 ms e adesso in 4 s spesso sta soffrendo dello stesso problema
+del suo servizio. Ogni lettura completa di una pagina ne misura già il tempo di
+risposta, quindi il poller tiene le ultime 60 di ogni pagina e ne ricava una
+banda — la mediana, e sei deviazioni assolute mediane scalate sopra di essa.
+Entrambe sono robuste ai picchi che devono individuare, cosa che media e
+deviazione standard non sono. Sopra ci sono due soglie minime, così una pagina
+che non varia quasi mai non viene segnalata per 90 ms contro i suoi soliti 60:
+una lettura deve essere almeno tre volte la mediana *e* più lenta di un secondo
+intero. Nulla viene giudicato prima di 20 letture, un 304 servito dalla cache
+resta fuori (è più veloce per costruzione), e le sonde restano fuori del tutto
+— il tempo di risposta di una sonda è il servizio stesso, che la sua lettura
+già dice.
+
+Una lettura oltre la soglia da sola non è una notizia; due di fila lo sono, e a
+quel punto il cambiamento lo dice una volta — `slow_status_page`, con il tempo
+impiegato, il tempo solito e la soglia superata — finché una lettura non torna
+dentro la banda. È di classe **monitoring**, non status, così una regola di
+routing può tenerlo lontano dal telefono, e non conta mai come peggioramento per
+il rilevamento dei guasti correlati. Un silenziamento o una finestra di
+manutenzione dichiarata lo trattengono come qualunque altra cosa sul provider,
+e un ciclo in cui tutte le pagine sono arrivate lente viene preso per la nostra
+rete: nessuno viene accusato, e nessuna di quelle letture entra in una banda.
+La banda vive in memoria, quindi un riavvio costa le prime 20 letture di
+silenzio.
 
 Il **rilevamento dei guasti correlati** (`correlationThreshold`, roadmap 2.7) è
 l'unica regola che *sostituisce* avvisi invece di ritardarli, ed è per questo
@@ -508,3 +537,38 @@ sulla pagina del provider, con un tooltip che dice quale verdetto e da quando, e
 `/status` lo porta come `stale`. Il registro è salvato accanto allo stato del
 provider (SQLite, o il file di stato dell'edizione Light), così un restart
 conserva i giorni di indizi che sono serviti a costruirlo.
+
+### 7.12 Incidenti modificati dopo la risoluzione
+
+Le status page riscrivono in silenzio gli incidenti risolti — la durata si
+accorcia, l'impatto scende di un gradino — e la storia che un provider mostra il
+trimestre dopo è più clemente di quella che mostrava quel giorno. Dalla roadmap
+1.11 l'edizione UI rilegge lo storico degli incidenti di ogni provider abilitato
+ogni sei ore (e una volta all'avvio), per ogni adapter che ne ha uno, e conserva
+la **prima versione** di ogni incidente risolto che legge: impatto, inizio e
+fine. Ogni lettura successiva viene confrontata con quella prima versione, mai
+con l'ultima, così un provider che modifica due volte mostra entrambe le
+modifiche misurate da dove era partito.
+
+Il primo impatto è quello già registrato — l'impatto visto l'ultima volta dal
+vivo mentre l'incidente era aperto, o quello letto dal backfill — perché la
+riscrittura più comune in assoluto è un declassamento fatto alla risoluzione, e
+sarebbe invisibile rispetto a uno storico già modificato. Gli orari non si
+possono prendere così: quelli di una riga dal vivo sono i nostri poll, non i
+timestamp del provider. Un incidente ancora aperto, nello storico o nella nostra
+lettura, viene lasciato stare; lo stesso istante scritto con un altro fuso, un
+timestamp illeggibile e un impatto vuoto non sono modifiche. Il titolo non viene
+confrontato affatto — un titolo riformulato è un refuso corretto molto più
+spesso che qualcosa di nascosto.
+
+Una modifica viene registrata una volta sola, con il momento in cui IsItDown
+l'ha notata (nessuna pagina dice quando è stata fatta). Non manda messaggi: una
+modifica all'incidente del mese scorso è un indizio sulla pagina, non una
+notizia per cui svegliare qualcuno. Compare invece nella pagina dell'incidente,
+come riquadro **Modificato dopo la risoluzione** — *Impatto cambiato: Grave →
+Minore*, *Fine spostata: …* — e come quarto asse della scheda di accuratezza
+della status page (roadmap 8.1): quanti degli incidenti della pagina
+risolti nella finestra sono stati modificati in seguito, su quanti ne sono stati
+riletti. Una pagina senza storico non rilegge nulla, e lo dice invece di
+dichiarare "0 su 0". Entrambe le tabelle seguono la finestra di conservazione
+come gli incidenti che descrivono.

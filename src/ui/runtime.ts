@@ -36,6 +36,7 @@ import { createMetricsRegistry, type MetricsRegistry } from "./metrics.ts";
 import { componentTargetOf } from "../core/routing.ts";
 import { createSlaService, rememberSlaNotice, slaAlreadyTold } from "./sla.ts";
 import { createTrustService, type TrustPair } from "./trust.ts";
+import { createRevisionService, type RevisionService } from "./incidentRevisions.ts";
 import { createSqlitePushSubscriptionStore, type SqlitePushSubscriptionStore } from "./sqlitePushSubscriptionStore.ts";
 import { loadSecretsFile, type SecretsFile } from "./secretsFile.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
@@ -87,6 +88,11 @@ export interface UiRuntimeCore {
    * rather than empty.
    */
   trustPairs(): TrustPair[];
+  /**
+   * Resolved incidents read back from each provider's feed, and the edits made
+   * to them since — roadmap 1.11. Built here, run by the server, like backfill.
+   */
+  revisions: RevisionService;
   configSource: ConfigSource;
   scheduler: Scheduler;
   /** Built here, run by the server at boot — never by the runtime builder, so tests stay offline. */
@@ -374,6 +380,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   }
 
   const backfill = createBackfillService({ getAdapter, store, configSource, logger });
+  const revisions = createRevisionService({ db, getAdapter, configSource, logger });
 
   /**
    * Two jobs on one timer: history past the retention window, and providers
@@ -434,6 +441,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     sla,
     trust,
     trustPairs,
+    revisions,
     configSource,
     scheduler,
     backfill,

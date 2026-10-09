@@ -2,6 +2,7 @@ import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { createChatops } from "./chatops.ts";
 import { buildUiRuntime } from "./runtime.ts";
+import { REVISION_CHECK_INTERVAL_MS } from "./incidentRevisions.ts";
 
 const DB_PATH = process.env["DB_PATH"] ?? "/app/data/isitdown.db";
 const PORT = Number(process.env["PORT"] ?? 3000);
@@ -51,6 +52,12 @@ await started.backfill.backfillAll();
 await started.scheduler.start();
 
 started.mapLane.start();
+
+// Roadmap 1.11. Read every feed back now and every few hours after, so an edit
+// to an incident a provider already resolved is noticed within the day. Not
+// awaited: it is a comparison lane, and boot must not wait on N history reads.
+void started.revisions.checkAll();
+setInterval(() => void started.revisions.checkAll(), REVISION_CHECK_INTERVAL_MS).unref();
 
 // Roadmap 3.18. Started here rather than in the runtime builder, like the
 // scheduler and the map lane, so tests never open a long poll to Telegram.

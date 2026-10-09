@@ -282,7 +282,7 @@ const paths: Json = {
     get: {
       tags: ["Incidents"],
       summary:
-        "One incident: the timeline, what was sent, the last polls, the operator's notes.",
+        "One incident: the timeline, what was sent, the last polls, the operator's notes, and any edit the provider made to it after resolving it.",
       parameters: [
         path("providerId", "Provider id."),
         path("incidentId", "The provider's own incident id."),
@@ -425,7 +425,7 @@ const paths: Json = {
       summary:
         "How closely each cross-checked status page tracked what a probe observed.",
       description:
-        "Roadmap 8.1. One card per probe that names a page in `crossChecks`: median and p90 admission delay, how much of the observed outage the page had an incident open for, and how many episodes it never mentioned — three axes, never one score. A card whose window holds fewer than ten counted episodes reports the count and nothing else. A fleet with no probe returns an empty list.",
+        "Roadmap 8.1. One card per probe that names a page in `crossChecks`: median and p90 admission delay, how much of the observed outage the page had an incident open for, and how many episodes it never mentioned — three axes, never one score. A card whose window holds fewer than ten counted episodes reports the count and nothing else. Every card also carries `revisions: { revised, resolved }` (roadmap 1.11): how many of the page's incidents resolved inside the window it edited afterwards, out of how many were read back — not built from episodes, so present whatever the floor says. A fleet with no probe returns an empty list.",
       parameters: [
         query("days", "Window in days: 30, 90 or 365.", { type: "integer" }),
       ],

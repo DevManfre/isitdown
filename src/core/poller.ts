@@ -7,10 +7,14 @@ import {
 import {
   confirmedChanges,
   correlatedOutage,
+  isMuted,
   silentOutage,
+  slowStatusPage,
   worseningsIn,
   type WorseningReading,
 } from "./diffEngine.ts";
+import { pushLatency } from "./latency.ts";
+import { activeWindows } from "./maintenance.ts";
 import { RetryAfterError, type StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
 import type {
@@ -91,6 +95,11 @@ export interface ProviderResult {
    * the same.
    */
   notModified?: boolean | undefined;
+  /**
+   * How long the page took to answer the read behind this reading, when the
+   * adapter measured it. What roadmap 1.10's latency band is built from.
+   */
+  latencyMs?: number | undefined;
   error?: string | undefined;
   /**
    * What the reading amounted to, when the severity does not say it — a probe
@@ -246,6 +255,17 @@ export function createPoller(deps: PollerDeps): Poller {
    * news and re-announces; the same three still being down is not.
    */
   let announced: string | null = null;
+
+  /**
+   * Each status page's recent answer times, and how many slow readings in a
+   * row it has given — roadmap 1.10. In memory, like the correlation window:
+   * a restart costs the band its first twenty readings, which is a short spell
+   * of saying nothing rather than a spell of saying something wrong.
+   */
+  const latencies = new Map<string, number[]>();
+  const slowStreak = new Map<string, number>();
+  /** Pages whose slowness has been announced, so a slow hour is one alert. */
+  const slowAnnounced = new Set<string>();
 
   async function attemptFetch(
     service: ServiceDefinition,
@@ -507,6 +527,7 @@ export function createPoller(deps: PollerDeps): Poller {
         ...(outcome.notModified === undefined
           ? {}
           : { notModified: outcome.notModified }),
+        ...(outcome.latencyMs === undefined ? {} : { latencyMs: outcome.latencyMs }),
         ...(outcome.note === undefined ? {} : { note: outcome.note.text }),
         ...(outcome.note?.unreachable === true ? { unreachable: true } : {}),
       },
@@ -739,6 +760,95 @@ export function createPoller(deps: PollerDeps): Poller {
     return changes;
   }
 
+  /**
+   * Status pages answering far slower than they usually do — roadmap 1.10.
+   *
+   * Judged across the cycle rather than inside `pollOne`, for the reason the
+   * cross-check is: a slow container makes every page slow at once, and only
+   * the whole cycle can tell that apart from one page in trouble. When every
+   * page that could be judged came in slow, the readings say something about
+   * our network, so none of them is announced — or folded into a band, where
+   * an evening of our own congestion would teach it that slow is normal.
+   *
+   * Two slow readings in a row before anything is said: one is a page that
+   * stalled for a moment, which is the most ordinary thing a request does.
+   */
+  function judgeLatency(
+    results: ProviderResult[],
+    config: RuntimeConfig,
+  ): StatusChange[] {
+    const judged: {
+      service: ServiceDefinition;
+      status: NormalizedStatus;
+      latencyMs: number;
+      slow: StatusChange | null;
+    }[] = [];
+    for (const result of results) {
+      if (!result.ok || result.status === undefined || result.latencyMs === undefined) continue;
+      // A 304 answers without the body, so it is faster by construction; a band
+      // mixing both would call every full read an anomaly.
+      if (result.notModified === true) continue;
+      const service = config.services.find((candidate) => candidate.id === result.providerId);
+      if (service === undefined) continue;
+      // A probe's answer time is the service itself, which is what its reading
+      // already says; this is about the page that describes a service.
+      if (getAdapter(service.adapter).kind === "probe") continue;
+      judged.push({
+        service,
+        status: result.status,
+        latencyMs: result.latencyMs,
+        slow: slowStatusPage({
+          providerId: service.id,
+          status: result.status.overallStatus,
+          latencyMs: result.latencyMs,
+          recentMs: latencies.get(service.id) ?? [],
+          at: result.status.fetchedAt,
+        }),
+      });
+    }
+
+    const slow = judged.filter((entry) => entry.slow !== null);
+    if (slow.length >= 2 && slow.length === judged.length) {
+      logger.warn("every status page answered slowly this cycle — looks like our own network, not theirs", {
+        providers: slow.length,
+      });
+      return [];
+    }
+
+    const changes: StatusChange[] = [];
+    for (const { service, status, latencyMs, slow: change } of judged) {
+      latencies.set(service.id, pushLatency(latencies.get(service.id) ?? [], latencyMs));
+      if (change === null) {
+        slowStreak.delete(service.id);
+        slowAnnounced.delete(service.id);
+        continue;
+      }
+      const streak = (slowStreak.get(service.id) ?? 0) + 1;
+      slowStreak.set(service.id, streak);
+      if (streak < 2 || slowAnnounced.has(service.id)) continue;
+      // The operator's "I know" and the provider's declared window both cover a
+      // slow page as much as they cover anything else about it.
+      if (isMuted(service.mutedUntil, status.fetchedAt)) continue;
+      if (activeWindows(status).length > 0) continue;
+      slowAnnounced.add(service.id);
+      logger.warn("a status page is answering far slower than it usually does", {
+        providerId: service.id,
+        latencyMs: change.latency?.latencyMs,
+        medianMs: change.latency?.medianMs,
+      });
+      changes.push(change);
+    }
+    // A provider removed from configuration must not keep its window.
+    const known = new Set(config.services.map((service) => service.id));
+    for (const id of latencies.keys()) {
+      if (known.has(id)) continue;
+      latencies.delete(id);
+      slowStreak.delete(id);
+      slowAnnounced.delete(id);
+    }
+    return changes;
+  }
+
   return {
     async nextIntervalMinutes(config: RuntimeConfig): Promise<number> {
       let shortest = config.polling.intervalMinutes;
@@ -866,6 +976,8 @@ export function createPoller(deps: PollerDeps): Poller {
       if (!looksLikeOurOwnNetwork(results)) {
         changes.push(...(await crossCheck(results, config, finishedAt)));
       }
+
+      changes.push(...judgeLatency(results, config));
 
       const correlated = foldCorrelated(changes, config, finishedAt);
       if (correlated !== null) {

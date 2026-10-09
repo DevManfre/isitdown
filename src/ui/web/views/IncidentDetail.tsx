@@ -18,6 +18,7 @@ import {
 } from "@/lib/incidents.ts";
 import { stagger } from "@/lib/stagger.ts";
 import { cn } from "@/lib/utils.ts";
+import type { IncidentRevision } from "@/lib/types.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
 
 /** The lifecycle words, widened for `.indexOf` against the incident's own (plain string) status. */
@@ -33,6 +34,17 @@ const TOAST_MS = 2500;
  * read them.
  */
 const ACTION_LOG_COLLAPSED = 6;
+
+/**
+ * One sentence per field a provider can edit after the fact (roadmap 1.11).
+ * Written out rather than built from the field name, so the catalog check can
+ * see every key that is rendered.
+ */
+const REVISION_KEYS: Record<IncidentRevision["field"], string> = {
+  impact: "incident.revisions.impact",
+  started_at: "incident.revisions.started_at",
+  resolved_at: "incident.revisions.resolved_at",
+};
 
 /** The tiles enter in reading order, after the hero and the stepper have landed. */
 const TILE_CASCADE = { base: 240, step: 60 };
@@ -85,6 +97,11 @@ export function IncidentDetail() {
   if (detail === undefined) return null;
 
   const { incident, timeline, actionLog, polls, otherActiveIncidents, notes } = detail;
+  const revisions = detail.revisions ?? [];
+  // An impact word the catalog knows reads translated; one it does not is the
+  // provider's own, shown as written rather than as "Unknown → Unknown".
+  const impactLabel = (word: string): string =>
+    impactKey(word) === "status.unknown" ? word : t(impactKey(word));
   const shownActionLog = actionLogExpanded ? actionLog : actionLog.slice(0, ACTION_LOG_COLLAPSED);
   const reached = incident.resolvedAt === null ? STEPS.indexOf(incident.status) : STEPS.length - 1;
   const failedSends = actionLog.filter((record) => !record.ok).length;
@@ -367,6 +384,44 @@ export function IncidentDetail() {
             </Button>
           )}
         </BentoTile>
+
+        {/* Roadmap 1.11. Only when there is something to show: an incident the
+            provider never touched again is the normal case, and an empty tile
+            saying so on every incident would be noise. Full width and above the
+            notes, because it changes how the rest of the page should be read. */}
+        {revisions.length > 0 && (
+          <BentoTile
+            title={t("incident.revisions")}
+            note={t("incident.revisions.note")}
+            delay={stagger(2, TILE_CASCADE)}
+            className="md:col-span-6"
+          >
+            {revisions.map((revision, index) => (
+              <div
+                key={`${revision.field}-${revision.after}`}
+                data-revision={revision.field}
+                className="anim-rise grid grid-cols-[140px_1fr] items-baseline gap-3"
+                style={{ animationDelay: stagger(index, { base: 170, step: 38, cap: 420 }) }}
+              >
+                <span className="font-mono text-xs text-muted-foreground">
+                  {t("incident.revisions.noticed", { at: formatDateTime(i18n.language, revision.observedAt) })}
+                </span>
+                <span className="text-sm">
+                  {t(REVISION_KEYS[revision.field], {
+                    before:
+                      revision.field === "impact"
+                        ? impactLabel(revision.before)
+                        : formatDateTime(i18n.language, revision.before),
+                    after:
+                      revision.field === "impact"
+                        ? impactLabel(revision.after)
+                        : formatDateTime(i18n.language, revision.after),
+                  })}
+                </span>
+              </div>
+            ))}
+          </BentoTile>
+        )}
 
         {/* Roadmap 5.3. Full width, under what IsItDown observed and what it
             sent, because it is the third account of the same incident and the

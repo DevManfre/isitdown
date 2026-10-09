@@ -97,6 +97,9 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       // Roadmap 5.3. Part of the detail payload rather than a fetch of its own:
       // the view that shows an incident is the only thing that reads them.
       notes,
+      // Roadmap 1.11: what the provider changed about this incident after it
+      // had already resolved it. Empty for nearly every incident there is.
+      revisions: runtime.revisions.revisions(providerId, incidentId),
     });
   });
 

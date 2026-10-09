@@ -1000,6 +1000,15 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       db.prepare("DELETE FROM poll_cycles WHERE started_at < ?").run(cutoff);
       db.prepare("DELETE FROM incidents WHERE resolved_at IS NOT NULL AND resolved_at < ?").run(cutoff);
       db.prepare("DELETE FROM maintenances WHERE ends_at IS NOT NULL AND ends_at < ?").run(cutoff);
+      // Roadmap 1.11: an edit to an incident nobody keeps any more is a claim
+      // about nothing. Read back from a feed that still carries it, the
+      // incident simply starts a new first version.
+      db.prepare("DELETE FROM incident_versions WHERE resolved_at < ?").run(cutoff);
+      db.prepare(
+        `DELETE FROM incident_revisions WHERE NOT EXISTS (
+           SELECT 1 FROM incident_versions v
+           WHERE v.provider_id = incident_revisions.provider_id AND v.incident_id = incident_revisions.incident_id)`,
+      ).run();
     },
 
     async getEarliestSampleTime(providerId: string): Promise<string | null> {
