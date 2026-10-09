@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -647,6 +647,16 @@ export function migrate(db: DatabaseSync): void {
       (column) => column.name,
     );
     if (!columns.includes("interval_seconds")) db.exec("ALTER TABLE services ADD COLUMN interval_seconds INTEGER");
+  }
+
+  if (from < 28) {
+    // How long each reading has looked the same — roadmap 1.8. A column on the
+    // live state for the reason suspicions are one: it is read with it on every
+    // cycle, and only the current value matters. Null until first read.
+    const columns = (db.prepare("PRAGMA table_info(provider_state)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!columns.includes("freshness")) db.exec("ALTER TABLE provider_state ADD COLUMN freshness TEXT");
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

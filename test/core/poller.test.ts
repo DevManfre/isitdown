@@ -1657,3 +1657,83 @@ test("a status page is never sent to an outpost", async () => {
     await Promise.all([page.close(), outpost.close()]);
   }
 });
+
+// Roadmap 1.8: a page reading leaves a freshness record behind, written only
+// when it moves; a probe leaves none, because a service that stays up is not a
+// parser that went blind.
+test("a page reading records its freshness, a probe's does not, and an unchanged page costs no write", async () => {
+  const page = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const api = await fakeProvider((_req, res) => {
+    res.writeHead(200);
+    res.end("ok");
+  });
+  const inner = await freshStore();
+  let writes = 0;
+  const store: StateStore = {
+    ...inner,
+    getState: (id) => inner.getState(id),
+    setFreshness: async (id, freshness) => {
+      writes += 1;
+      await inner.setFreshness(id, freshness);
+    },
+  };
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: fakeSleep().sleep, now: clock.now });
+  const cfg = config([service("github", page.baseUrl), service("github-api", api.baseUrl, { adapter: "http" })]);
+
+  try {
+    await poller.runCycle(cfg);
+    const recorded = (await inner.getState("github")).freshness;
+    assert.equal(recorded?.changes, 0);
+    assert.equal((await inner.getState("github-api")).freshness, null, "a probe keeps no freshness");
+    assert.equal(writes, 1);
+
+    clock.advance(ONE_INTERVAL_MS);
+    await poller.runCycle(cfg);
+    assert.equal(writes, 1, "the same page read again is not a write");
+    assert.deepEqual((await inner.getState("github")).freshness, recorded);
+  } finally {
+    await inner.close();
+    await Promise.all([page.close(), api.close()]);
+  }
+});
+
+test("a reading that stops looking alive is said once in the log", async () => {
+  const page = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary("none"));
+  });
+  const store = await freshStore();
+  const lines: string[] = [];
+  const logger = createLogger("warn", (line) => lines.push(line));
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger, sleep: fakeSleep().sleep, now: clock.now });
+  const cfg = config([service("github", page.baseUrl)]);
+  const stale = (): string[] => lines.filter((line) => line.includes("stopped looking alive"));
+
+  try {
+    // Seed a lively page whose stillness reaches a week a millisecond after the
+    // read just taken, so the next read is the one that crosses it.
+    await poller.runCycle(cfg);
+    const state = await store.getState("github");
+    const lastRead = Date.parse(state.last!.fetchedAt);
+    const since = new Date(lastRead - 7 * 24 * 60 * 60_000 + 1).toISOString();
+    await store.setFreshness("github", { ...state.freshness!, since, changes: 5, longestStillMs: 60 * 60_000 });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    clock.advance(ONE_INTERVAL_MS);
+    await poller.runCycle(cfg);
+    assert.equal(stale().length, 1);
+    assert.match(stale()[0]!, /"reason":"unchanged"/);
+
+    clock.advance(ONE_INTERVAL_MS);
+    await poller.runCycle(cfg);
+    assert.equal(stale().length, 1, "a page still stale is not news");
+  } finally {
+    await store.close();
+    await page.close();
+  }
+});

@@ -239,6 +239,7 @@ npm run test:integration # suite end-to-end:  test/**/*.itest.ts
 npm run test:visual      # baseline visive: ogni vista, entrambi i temi, entrambe le lingue
 npm run test:mutation    # mutation testing sul diff engine
 npm run test:load        # 200 provider sintetici, una settimana di storico, ogni lettura cronometrata
+npm run canary           # ogni pagina del catalogo, dal vivo, contro i fixture del suo adapter (1.9)
 npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
@@ -412,6 +413,22 @@ Suite notevoli:
   esattamente una notifica, un ciclo invariato nessuna, un restart nessuna, un provider
   irraggiungibile conserva l'ultimo stato noto, e l'entrypoint resta vivo tra i cicli e
   esce con 0 su `SIGTERM`.
+- **Canary notturno** (roadmap 1.9) — l'unico controllo che parla con provider
+  veri, e per questo l'unico che non fa mai parte della suite.
+  `tools/canary.mjs` legge ogni pagina del catalogo incluso attraverso il suo
+  adapter reale e confronta la forma di ogni risposta JSON con il fixture
+  committato più simile sotto `test/fixtures/<adapter>/`. Conta solo ciò che
+  romperebbe un parser: un campo che il fixture ha e la pagina ha perso, o uno
+  che ha cambiato tipo — un campo che il provider ha *aggiunto* non è deriva, e
+  sotto una lista vuota stanotte non si giudica niente. Una pagina il cui adapter
+  lancia un errore è **rotta**; una pagina che risponde 403 o va in timeout è
+  **non ha risposto** ed è elencata a parte, perché un IP di datacenter
+  rifiutato è una notizia della rete, non dell'adapter.
+  `.github/workflows/canary.yml` lo esegue alle 03:17 UTC, su nessun push e
+  nessuna pull request, e tiene aggiornata un'unica issue con etichetta
+  `canary` con l'ultimo report; una notte pulita non chiude niente, la chiude la
+  correzione. `npm run canary` lo esegue a mano, `--only github,openai` lo
+  restringe, `--report file.md` scrive il report invece di stamparlo.
 
 La dashboard è ora TypeScript vero, verificato dal proprio `tsconfig.web.json`
 invece che da un passaggio guidato da JSDoc su JavaScript puro; i suoi componenti e

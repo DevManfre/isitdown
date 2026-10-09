@@ -51,6 +51,16 @@ export const suspicionSchema = z.object({
   note: z.string().optional(),
 });
 
+export const freshnessSchema = z.object({
+  fingerprint: z.string(),
+  since: z.string(),
+  changes: z.number().int().min(0),
+  longestStillMs: z.number().min(0),
+  components: z.number().int().min(0),
+  peakComponents: z.number().int().min(0),
+  shrunkSince: z.string().nullable(),
+});
+
 export const providerRuntimeStateSchema = z.object({
   last: normalizedStatusSchema.nullable(),
   failureCount: z.number().int().min(0),
@@ -63,4 +73,6 @@ export const providerRuntimeStateSchema = z.object({
   // Defaulted for the same reason: a store written before roadmap 1.3 simply
   // holds no suspicion.
   suspicions: z.array(suspicionSchema).default([]),
+  // And again for roadmap 1.8: no freshness yet is where every provider starts.
+  freshness: freshnessSchema.nullable().default(null),
 });

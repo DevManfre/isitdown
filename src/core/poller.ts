@@ -20,6 +20,7 @@ import type {
 import { componentTargetOf } from "./routing.ts";
 import { authorityOf } from "./authority.ts";
 import { askOutpost, decideByConsensus, type Outpost, type OutpostReading } from "./outpost.ts";
+import { advanceFreshness, staleReading } from "./freshness.ts";
 import { tracer } from "./tracing.ts";
 import type { NormalizedStatus, StatusChange, Suspicion } from "./types.ts";
 
@@ -355,6 +356,36 @@ export function createPoller(deps: PollerDeps): Poller {
     return readings;
   }
 
+  /**
+   * Folds a successful page reading into the provider's freshness — roadmap
+   * 1.8 — and says so in the log the moment the reading stops looking alive.
+   *
+   * Pages only: a probe that reads "up" for a month is a service that stayed
+   * up, not a parser that went blind. Written only when something moved, so
+   * the common poll of an unchanged page costs no write.
+   */
+  async function trackFreshness(
+    service: ServiceDefinition,
+    before: ProviderRuntimeState,
+    status: NormalizedStatus,
+  ): Promise<void> {
+    if (getAdapter(service.adapter).kind === "probe") return;
+    const previousReadAt = before.last?.fetchedAt ?? null;
+    const next = advanceFreshness(before.freshness, status, previousReadAt);
+    if (next !== before.freshness) await store.setFreshness(service.id, next);
+    // Judged as of each reading's own time: an `unchanged` verdict arrives by
+    // the clock alone, with no write to hang it on.
+    const was = previousReadAt === null ? null : staleReading(before.freshness, previousReadAt);
+    const is = staleReading(next, status.fetchedAt);
+    if (is !== null && was?.reason !== is.reason) {
+      logger.warn("a provider's reading has stopped looking alive — the adapter may no longer be reading the page", {
+        providerId: service.id,
+        reason: is.reason,
+        since: is.since,
+      });
+    }
+  }
+
   async function pollOne(
     service: ServiceDefinition,
     config: RuntimeConfig,
@@ -461,6 +492,7 @@ export function createPoller(deps: PollerDeps): Poller {
       adapterVersion: getAdapter(service.adapter).version ?? 1,
     });
     await store.saveNotifyState(service.id, gate.baseline, gate.pending);
+    await trackFreshness(service, before, outcome.status);
     if (before.failureCount > 0) await store.clearFailures(service.id);
     if (before.degradedNotified)
       await store.setDegradedNotified(service.id, false);

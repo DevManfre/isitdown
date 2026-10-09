@@ -1,0 +1,64 @@
+# Roadmap 1.9. The test suite never touches a real provider, rightly — but an
+# adapter breaks when someone else changes their JSON, and nothing in the suite
+# can see that. Once a night this reads every page in the bundled catalog
+# through its real adapter, compares the shape with the committed fixtures, and
+# keeps one GitHub issue up to date with what drifted.
+#
+# Outside CI on purpose: it runs on no push and no pull request, so a provider
+# reshaping its page can never block a build. A clean night closes nothing —
+# whoever fixes the adapter closes the issue.
+name: Canary
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Read the catalog through the real adapters
+        run: node tools/canary.mjs --report canary-report.md | tee canary.log
+
+      - name: Job summary
+        if: always()
+        run: cat canary-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      # One open issue at a time, labelled `canary`, its body replaced with the
+      # latest night's report: a comment per night would bury the one that
+      # matters under thirty copies of the same finding.
+      - name: Open or update the drift issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! grep -q '^canary: findings$' canary.log; then
+            echo "No drift tonight."
+            exit 0
+          fi
+          gh label create canary --color FBCA04 --description "Nightly canary: a provider changed shape" 2>/dev/null || true
+          existing=$(gh issue list --label canary --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file canary-report.md
+          else
+            gh issue create --title "Canary: a provider page no longer matches its adapter's fixtures" \
+              --label canary --body-file canary-report.md
+          fi

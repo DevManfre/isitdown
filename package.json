@@ -1,6 +1,6 @@
 {
   "name": "isitdown",
-  "version": "2.9.0",
+  "version": "2.10.0",
   "private": true,
   "description": "Polls the public status pages of third-party providers and notifies on state transitions",
   "license": "MIT",
@@ -15,6 +15,7 @@
     "build:cli": "tsc -p tsconfig.cli.json && node tools/copy-assets.mjs",
     "build:sea": "node tools/build-sea.mjs",
     "check:config": "node src/light/check.ts",
+    "canary": "node tools/canary.mjs",
     "check:bundle": "node tools/bundle-budget.mjs",
     "check:readme": "node tools/readme-parity.mjs",
     "coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"tools/**\" --test-coverage-exclude=\"src/ui/web/**\" --test-coverage-exclude=\"**/isitdown-plugins-*/**\" --test-coverage-lines=95 --test-coverage-branches=88 --test-coverage-functions=93 \"test/**/*.test.ts\" && vitest run --coverage",

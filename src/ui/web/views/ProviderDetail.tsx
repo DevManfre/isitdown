@@ -12,6 +12,7 @@ import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { useIncidents, useStatus } from "@/hooks/queries.ts";
 import { statusColor, statusFill, statusLabelKey } from "@/lib/chartConfig.ts";
 import { shownStatus } from "@/lib/suspicion.ts";
+import { StaleBadge } from "@/components/StaleBadge.tsx";
 import { SuspicionTooltip } from "@/components/SuspicionTooltip.tsx";
 import { formatDateTime, hostOf } from "@/lib/format.ts";
 import { impactKey } from "@/lib/incidents.ts";
@@ -98,6 +99,7 @@ export function ProviderDetail() {
               </Badge>
             </SuspicionTooltip>
           )}
+          <StaleBadge stale={provider.stale} />
         </div>
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm">
