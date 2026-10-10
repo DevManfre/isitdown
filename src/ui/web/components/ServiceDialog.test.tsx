@@ -543,6 +543,34 @@ describe("the service dialog's scrape adapter fields", () => {
   });
 });
 
+// Roadmap 1.12: the content watchdog needs the one thing no url says — what the
+// page reads while nothing is wrong.
+describe("the service dialog's watchdog fields", () => {
+  it("submits the baseline text and the optional selector", async () => {
+    const { dialog } = await openAdd();
+    const calls = interceptWrites({
+      "POST /config/services": {},
+      "POST /config/services/watched/test": { ok: true, overallStatus: "operational" },
+    });
+
+    await addByAdapter(dialog, "watchdog", "https://status.example.com/");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.name")), "Watched");
+    await openAdvanced(dialog);
+    expect(within(dialog).getByText(i18n.t("watchdog.warning"))).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("watchdog.baseline")), "All systems normal.");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("scrape.selector")), ".notice");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const addCall = calls.find((call) => call.method === "POST" && call.path === "/config/services");
+    expect(addCall?.body).toMatchObject({
+      adapter: "watchdog",
+      options: { baseline: "All systems normal.", selector: ".notice" },
+    });
+  });
+});
+
 describe("the service dialog's probe fields", () => {
   it("asks what a healthy answer looks like, only for the probe adapter", async () => {
     const { dialog } = await openAdd();

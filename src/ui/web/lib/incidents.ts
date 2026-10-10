@@ -25,6 +25,8 @@ const STATUS_KEYS: Record<string, string> = {
   monitoring: "incident.status.monitoring",
   resolved: "incident.status.resolved",
   postmortem: "incident.status.postmortem",
+  // The content watchdog's own word (roadmap 1.12): the page's text moved.
+  changed: "incident.status.changed",
 };
 
 export const impactStatus = (impact: string): OverallStatus => IMPACT[impact] ?? "unknown";

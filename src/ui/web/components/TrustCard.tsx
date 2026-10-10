@@ -15,7 +15,7 @@ import type { TrustCardData } from "@/lib/types.ts";
  *
  * Three decisions are visible in the markup, and each of them is the feature:
  *
- *  - **Three axes, never one grade.** A page that always admits but ninety
+ *  - **Separate axes, never one grade.** A page that always admits but ninety
  *    minutes late and one that admits instantly half the time fail differently,
  *    and a single letter would print them the same. Colour lives on an axis;
  *    there is no combined verdict to colour.
@@ -115,7 +115,7 @@ function TrustPairCard({
         </div>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Axis
               label={t("trust.delay.label")}
               value={
@@ -152,6 +152,24 @@ function TrustPairCard({
               value={t("trust.never.value", { never: card.never ?? 0, counted: card.counted })}
               detail={t("trust.never.detail")}
               note={t("trust.after-recovery", { count: card.afterRecovery ?? 0 })}
+            />
+            {/* Roadmap 1.11. About the page alone rather than the pair, so it has
+                its own denominator: incidents read back, not episodes. A page
+                with no history feed has read back nothing, and "0 of 0" would
+                claim an honesty nobody measured. */}
+            <Axis
+              label={t("trust.revisions.label")}
+              value={
+                card.revisions === undefined || card.revisions.resolved === 0
+                  ? "—"
+                  : t("trust.revisions.value", card.revisions)
+              }
+              detail={
+                card.revisions === undefined || card.revisions.resolved === 0
+                  ? t("trust.revisions.none")
+                  : t("trust.revisions.detail")
+              }
+              note=""
             />
           </div>
 

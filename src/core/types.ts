@@ -96,6 +96,7 @@ export const STATUS_CHANGE_KINDS = [
   "correlated_outage",
   "silent_outage",
   "sla_burn",
+  "slow_status_page",
 ] as const;
 
 export type StatusChangeKind = (typeof STATUS_CHANGE_KINDS)[number];
@@ -176,6 +177,13 @@ export interface StatusChange {
         projectedUptime: number;
       }
     | undefined;
+  /**
+   * Present for slow_status_page only (roadmap 1.10): how long the page took
+   * this time, what it usually takes, and the line it crossed — the whole
+   * comparison, so the message can say "4.2 s against a usual 210 ms" rather
+   * than only that something was slow.
+   */
+  latency?: { latencyMs: number; medianMs: number; thresholdMs: number } | undefined;
   /** ISO 8601, UTC. */
   at: string;
 }

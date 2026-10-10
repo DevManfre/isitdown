@@ -365,3 +365,50 @@ test("an empty note, an oversized one, and one about an unknown incident are all
     await app.close();
   }
 });
+
+test("an incident's detail carries what the provider edited after resolving it", async () => {
+  const { runtime, get, close } = await api();
+  try {
+    const [providerId] = runtime.listAllServices().map((service) => service.id);
+    assert.ok(providerId !== undefined);
+    const fetchedAt = new Date().toISOString();
+    await runtime.store.saveStatus({
+      provider: providerId,
+      overallStatus: "major_outage",
+      activeIncidents: [incident("edited", { impact: "critical" })],
+      components: [],
+      maintenances: [],
+      fetchedAt,
+    });
+    await runtime.store.saveStatus({
+      provider: providerId,
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date(Date.parse(fetchedAt) + 60_000).toISOString(),
+    });
+    // The feed, read back after resolution, has quietly lowered the impact.
+    runtime.revisions.record(providerId, [
+      {
+        id: "edited",
+        name: "Elevated error rates",
+        impact: "minor",
+        status: "resolved",
+        startedAt: fetchedAt,
+        resolvedAt: fetchedAt,
+        updatedAt: fetchedAt,
+      },
+    ]);
+
+    const { status, body } = await get(`/incidents/${providerId}/edited`);
+    assert.equal(status, 200);
+    const detail = body as { revisions: { field: string; before: string; after: string }[] };
+    assert.deepEqual(
+      detail.revisions.map((revision) => [revision.field, revision.before, revision.after]),
+      [["impact", "critical", "minor"]],
+    );
+  } finally {
+    await close();
+  }
+});

@@ -5,6 +5,7 @@ import {
   correlatedOutage,
   diff,
   silentOutage,
+  slowStatusPage,
   signatureOf,
   worseningsIn,
   type WorseningReading,
@@ -666,4 +667,54 @@ test("a page caught out is not counted as a worsening for the correlation window
     },
   ]);
   assert.deepEqual(readings, []);
+});
+
+const slowAt = "2026-10-09T10:00:00.000Z";
+const usualMs = Array.from({ length: 30 }, (_, index) => 180 + (index % 5) * 10);
+
+test("a page answering far slower than its own band is a slow-page change carrying the comparison", () => {
+  const change = slowStatusPage({
+    providerId: "github",
+    status: "operational",
+    latencyMs: 4200,
+    recentMs: usualMs,
+    at: slowAt,
+  });
+  assert.equal(change?.kind, "slow_status_page");
+  assert.equal(change?.providerId, "github");
+  assert.equal(change?.currentStatus, "operational", "the page's own reading, untouched");
+  assert.equal(change?.previousStatus, undefined);
+  assert.deepEqual(change?.latency, { latencyMs: 4200, medianMs: 200, thresholdMs: 1200 });
+});
+
+test("a reading inside the band, or on the line itself, is not slow", () => {
+  for (const latencyMs of [250, 900, 1200]) {
+    assert.equal(
+      slowStatusPage({ providerId: "github", status: "operational", latencyMs, recentMs: usualMs, at: slowAt }),
+      null,
+      String(latencyMs),
+    );
+  }
+});
+
+test("a page with too short a history is never called slow", () => {
+  assert.equal(
+    slowStatusPage({ providerId: "github", status: "operational", latencyMs: 9000, recentMs: usualMs.slice(0, 5), at: slowAt }),
+    null,
+  );
+});
+
+test("a slow page is not a worsening for the correlation window", () => {
+  assert.deepEqual(
+    worseningsIn([
+      {
+        kind: "slow_status_page",
+        providerId: "github",
+        currentStatus: "degraded",
+        latency: { latencyMs: 4200, medianMs: 200, thresholdMs: 1200 },
+        at: slowAt,
+      },
+    ]),
+    [],
+  );
 });

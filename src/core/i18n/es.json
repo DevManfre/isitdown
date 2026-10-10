@@ -10,6 +10,7 @@
   "incident.status.monitoring": "En seguimiento",
   "incident.status.resolved": "Resuelto",
   "incident.status.postmortem": "Análisis posterior",
+  "incident.status.changed": "Cambiado",
 
   "notification.action.open-status": "Abrir la página de estado",
 
@@ -25,6 +26,7 @@
   "notification.silent.outage": "{provider} — {severity}\n\nLa página de estado sigue indicando {previous}, pero nuestra sonda {probe} no consigue alcanzar el servicio: {note}\n\n{url}",
   "notification.silent.outage-observed": "{provider} — {severity}\n\nNuestra sonda {probe} no alcanza el servicio, y para este proveedor vale lo que medimos nosotros: {note}\n\nSu página de estado sigue informando {previous}, que aquí es una opinión y no la respuesta.\n\n{url}",
   "notification.sla.burn": "{provider} — presupuesto de error\n\nA este ritmo, {month} cerrará en {projected}% frente a un objetivo del {target}%.\nYa se han consumido {spentMinutes} de los {budgetMinutes} minutos disponibles y la disponibilidad medida hasta ahora es del {uptime}%.\n\n{url}",
+  "notification.slow.page": "{provider} — página de estado lenta\n\nLa página de estado tardó {latency} en responder, frente a los {median} habituales (por encima de {threshold} es inusual). Una página que se ralentiza así suele ser la primera señal de un problema que el proveedor aún no ha reconocido.\n\n{url}",
   "notification.maintenance.started": "{provider} — mantenimiento\n\nHa comenzado un mantenimiento programado: {title}\nFin previsto: {endsAt}\nLos avisos de este proveedor quedan en pausa hasta que termine.\n\n{url}",
   "notification.maintenance.ended": "{provider} — mantenimiento finalizado\n\n{title} ha terminado.\nEstado actual: {current} — incidencias abiertas: {count}.\nActualizado: {updatedAt}\n\n{url}",
 
@@ -41,6 +43,7 @@
   "notification.digest.silent": "la página de estado sigue diciendo operativo, pero la sonda {probe} lee {current}",
   "notification.digest.correlated": "{count} proveedores han empeorado a la vez — {providers}",
   "notification.digest.sla": "presupuesto de error — a este ritmo el mes cierra en {projected}% frente a {target}%",
+  "notification.digest.slow-page": "página de estado lenta — {latency} frente a los {median} habituales",
 
   "notification.suppressed": "Se han suprimido otros {count} avisos de este proveedor por el límite horario.",
 

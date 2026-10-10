@@ -55,6 +55,19 @@ describe("the status-page accuracy card", () => {
     expect(screen.queryByText(/score/i)).not.toBeInTheDocument();
   });
 
+  // Roadmap 1.11: a fourth axis about the page alone, with its own denominator.
+  it("says how many of the page's resolved incidents it edited afterwards", () => {
+    show([card({ revisions: { revised: 3, resolved: 14 } })]);
+    expect(screen.getByText("3 of 14")).toBeInTheDocument();
+    expect(screen.getByText("resolved incidents the page later rewrote")).toBeInTheDocument();
+  });
+
+  it("claims nothing about edits when no incident was ever read back", () => {
+    show([card({ revisions: { revised: 0, resolved: 0 } })]);
+    expect(screen.getByText("no history feed read back yet")).toBeInTheDocument();
+    expect(screen.queryByText("0 of 0")).not.toBeInTheDocument();
+  });
+
   it("carries what it excluded, its error bar and where it looked from", () => {
     show([card()]);
     expect(

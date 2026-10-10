@@ -46,6 +46,7 @@ const ADAPTER_FAMILIES: { title: string; adapters: { id: string; hint: string; n
       { id: "rss", hint: "adapter.hint.rss", note: "add.note.rss" },
       { id: "imap", hint: "adapter.hint.imap", note: "add.note.imap" },
       { id: "html", hint: "adapter.hint.html", note: "add.note.html" },
+      { id: "watchdog", hint: "adapter.hint.watchdog", note: "add.note.watchdog" },
       { id: "slack", hint: "adapter.hint.slack", note: "add.note.slack" },
       { id: "aws", hint: "adapter.hint.aws", note: "add.note.aws" },
       { id: "gcp", hint: "adapter.hint.gcp", note: "add.note.gcp" },

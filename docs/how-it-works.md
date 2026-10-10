@@ -133,6 +133,8 @@ cases get added as rows rather than as one-off tests.
 | `correlationThreshold: N` | the same providers are still down next cycle | **no** — the shared failure was already announced |
 | a probe with `crossChecks` fails | the provider's page still says operational, no incident open | yes, **once** — `silent_outage`, and not again until the two agree |
 | a probe with `crossChecks` fails | the provider's page already says degraded, or has an incident open | **no** — the page is not hiding anything |
+| a status page answers in its usual time | it answers far slower, twice in a row | yes, **once** — `slow_status_page`, a *monitoring* event, and not again until a reading is back inside the band |
+| a status page answers in its usual time | every page in the cycle answers far slower | **no** — that is our network, not theirs |
 
 **Mute** is the same rule with the operator standing in for the provider: it is
 an input to the diff engine rather than a filter on the way out, which is why a
@@ -163,6 +165,29 @@ failing, since a container that cannot reach anything must not spend that
 outage accusing status pages. The probe's own alert still stands beside it:
 this change adds the sentence the probe cannot say, which is that the page has
 not caught up.
+
+**Slow status pages** (roadmap 1.10) are the other early sign a provider gives
+before it admits anything: a page that answers in 200 ms on an ordinary day and
+in 4 s now is often struggling with the same thing its service is. Every full
+read of a page already measures its answer time, so the poller keeps each page's
+last 60 and draws a band from them — the median, and six scaled median absolute
+deviations above it. Both are robust to the spikes they are meant to spot, which
+a mean and a standard deviation are not. Two floors sit on top, so a page that
+barely ever varies is not flagged for 90 ms against its usual 60: a reading has
+to be at least three times the median *and* a full second slower. Nothing is
+judged before 20 readings, a 304 answered from cache is left out (it is faster
+by construction), and probes are left out entirely — a probe's answer time is
+the service itself, which its reading already says.
+
+A reading over the line is not news on its own; two in a row are, and then the
+change says so once — `slow_status_page`, carrying the time it took, the usual
+time and the line it crossed — until a reading comes back inside the band. It is
+classed **monitoring**, not status, so a routing rule can keep it off a phone,
+and it never counts as a worsening for correlated-outage detection. A mute or a
+declared maintenance window holds it back like anything else about the
+provider, and a cycle in which every page came in slow is taken as our own
+network: nobody is accused, and none of those readings is folded into a band.
+The band lives in memory, so a restart costs its first 20 readings of silence.
 
 **Correlated-outage detection** (`correlationThreshold`, roadmap 2.7) is the
 one rule that *replaces* alerts rather than delaying them, which is why it is
@@ -478,3 +503,34 @@ with a tooltip saying which verdict and since when, and `/status` carries it as
 `stale`. The record is persisted beside the provider's state (SQLite, or the
 Light edition's state file), so a restart keeps the days of evidence it took
 to build.
+
+### 7.12 Incidents edited after resolution
+
+Status pages rewrite resolved incidents quietly — the duration shrinks, the
+impact drops a step — and the history a provider shows next quarter is kinder
+than the one it showed on the day. Since roadmap 1.11 the UI edition reads each
+enabled provider's own incident history back every six hours (and once at
+boot), for every adapter that has one, and keeps the **first version** of each
+resolved incident it reads: its impact, its start and its end. Every later read
+is compared against that first version, never against the last one, so a
+provider that edits twice shows both edits measured from where it started.
+
+The first impact is the one already on record — the impact last seen live while
+the incident was open, or the one backfill read — because the commonest rewrite
+of all is a downgrade made at resolution, and it would be invisible against a
+feed that was already edited. The times cannot be taken that way: a live row's
+are our own polls, not the provider's stamps. An incident still open, in the
+feed or in our own reading, is left alone; the same instant written with
+another offset, an unparseable stamp and an empty impact are not edits. The
+title is not compared at all — a reworded title is a typo fixed far more often
+than anything hidden.
+
+An edit is recorded once, with when IsItDown noticed it (no page says when it
+was made). It sends no message: an edit to last month's incident is evidence
+about the page, not news to wake anybody for. It shows instead on the incident's
+page, as an **Edited after resolution** tile — *Impact changed: Major → Minor*,
+*End moved: …* — and as a fourth axis on the status-page accuracy card (roadmap
+8.1): how many of the page's incidents resolved inside the window it
+edited afterwards, out of how many were read back. A page with no history feed
+reads back nothing, and says so rather than claiming "0 of 0". Both tables
+follow the retention window like the incidents they describe.

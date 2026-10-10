@@ -40,6 +40,8 @@ export function incidentKey(change: StatusChange): string {
     // update to August's — which would otherwise resolve and reopen forever.
     case "sla_burn":
       return `isitdown/${change.providerId}/sla/${change.sla?.month ?? "unknown"}`;
+    case "slow_status_page":
+      return `isitdown/${change.providerId}/slow-page`;
   }
 }
 
