@@ -63,6 +63,7 @@ const TEMPLATE: Record<StatusChangeKind, string> = {
   correlated_outage: "notification.correlated.outage",
   silent_outage: "notification.silent.outage",
   sla_burn: "notification.sla.burn",
+  slow_status_page: "notification.slow.page",
 };
 
 export function emojiFor(status: OverallStatus): string {
@@ -77,7 +78,9 @@ export function emojiFor(status: OverallStatus): string {
  * both can never disagree with one that shows only the emoji.
  */
 function accentFor(change: StatusChange): { emoji: string; color: number } {
-  if (change.kind === "monitoring_degraded") {
+  // A slow page is a hint read off our own measurement, not a severity the
+  // provider declared, so it wears the same neutral pair (roadmap 1.10).
+  if (change.kind === "monitoring_degraded" || change.kind === "slow_status_page") {
     return { emoji: EMOJI.unknown, color: COLOR.unknown };
   }
   if (
@@ -102,6 +105,15 @@ export function statusLabel(status: OverallStatus, locale: string): string {
 
 export function severityLabel(status: OverallStatus, locale: string): string {
   return statusLabel(status, locale).toLocaleUpperCase(locale);
+}
+
+/**
+ * An answer time as a person would say it: "840 ms" below a second, "4.2 s"
+ * above. Built here rather than in the catalog because the unit switches with
+ * the value, and the catalog has no way to say that.
+ */
+function durationLabel(ms: number): string {
+  return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
 /** Translates a provider's own lifecycle word, leaving an unknown one visible. */
@@ -252,6 +264,11 @@ function summarise(payload: NotificationPayload): string {
         target: (change.sla?.target ?? 0).toFixed(2),
         projected: (change.sla?.projectedUptime ?? 0).toFixed(2),
       });
+    case "slow_status_page":
+      return t(locale, "notification.digest.slow-page", {
+        latency: durationLabel(change.latency?.latencyMs ?? 0),
+        median: durationLabel(change.latency?.medianMs ?? 0),
+      });
   }
 }
 
@@ -376,6 +393,9 @@ function render(
     minutes: change.correlated?.windowMinutes ?? 0,
     probe: change.crossCheck?.probeId ?? "",
     note: change.crossCheck?.note ?? "",
+    latency: durationLabel(change.latency?.latencyMs ?? 0),
+    median: durationLabel(change.latency?.medianMs ?? 0),
+    threshold: durationLabel(change.latency?.thresholdMs ?? 0),
     endsAt:
       change.maintenance?.endsAt === null ||
       change.maintenance?.endsAt === undefined

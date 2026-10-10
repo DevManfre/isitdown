@@ -1737,3 +1737,115 @@ test("a reading that stops looking alive is said once in the log", async () => {
     await page.close();
   }
 });
+
+/**
+ * A page adapter whose answer time the test sets per provider before each
+ * cycle — roadmap 1.10's slow-page detection is about nothing else.
+ */
+function timedPages(latency: Map<string, number>, over: Partial<{ kind: "probe" }> = {}) {
+  return () => ({
+    id: "stub",
+    ...over,
+    fetchStatus: async (ref: ServiceRef, ctx: { onRead?: ((read: { latencyMs: number; notModified: boolean }) => void) | undefined }) => {
+      ctx.onRead?.({ latencyMs: latency.get(ref.id) ?? 200, notModified: false });
+      return {
+        provider: ref.id,
+        overallStatus: "operational" as const,
+        activeIncidents: [],
+        components: [],
+        maintenances: [],
+        fetchedAt: new Date().toISOString(),
+      };
+    },
+  });
+}
+
+/** Runs `count` cycles back to back, collecting every change they emit. */
+async function cycles(
+  poller: ReturnType<typeof createPoller>,
+  runtime: RuntimeConfig,
+  count: number,
+): Promise<string[]> {
+  const kinds: string[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const result = await poller.runCycle(runtime, { ignoreSchedule: true });
+    kinds.push(...result.changes.map((change) => `${change.kind}:${change.providerId}`));
+  }
+  return kinds;
+}
+
+test("a status page answering far slower than usual is announced once, on its second slow reading", async () => {
+  const store = await freshStore();
+  const latency = new Map([["github", 200]]);
+  const poller = createPoller({ getAdapter: timedPages(latency), store, logger: silent, sleep: fakeSleep().sleep });
+  const runtime = config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]);
+  try {
+    assert.deepEqual(await cycles(poller, runtime, 25), [], "building the band says nothing");
+    latency.set("github", 4200);
+    assert.deepEqual(await cycles(poller, runtime, 1), [], "one stalled read is not news");
+    assert.deepEqual(await cycles(poller, runtime, 1), ["slow_status_page:github"]);
+    assert.deepEqual(await cycles(poller, runtime, 3), [], "still slow is the same slow hour");
+    latency.set("github", 200);
+    await cycles(poller, runtime, 1);
+    latency.set("github", 4200);
+    assert.deepEqual(await cycles(poller, runtime, 2), ["slow_status_page:github"], "a new slow spell is news again");
+  } finally {
+    await store.close();
+  }
+});
+
+test("every page slow in the same cycle is our network, and nobody is accused", async () => {
+  const store = await freshStore();
+  const latency = new Map([["github", 200], ["slack", 200]]);
+  const poller = createPoller({ getAdapter: timedPages(latency), store, logger: silent, sleep: fakeSleep().sleep });
+  const runtime = config([
+    service("github", "http://127.0.0.1:1", { adapter: "stub" }),
+    service("slack", "http://127.0.0.1:1", { adapter: "stub" }),
+  ]);
+  try {
+    await cycles(poller, runtime, 25);
+    latency.set("github", 4200);
+    latency.set("slack", 4200);
+    assert.deepEqual(await cycles(poller, runtime, 3), []);
+    // Only one of the two slow: that one is the page in trouble.
+    latency.set("slack", 200);
+    assert.deepEqual(await cycles(poller, runtime, 2), ["slow_status_page:github"]);
+  } finally {
+    await store.close();
+  }
+});
+
+test("a probe's answer time is never judged as a slow status page", async () => {
+  const store = await freshStore();
+  const latency = new Map([["api", 200]]);
+  const poller = createPoller({
+    getAdapter: timedPages(latency, { kind: "probe" }),
+    store,
+    logger: silent,
+    sleep: fakeSleep().sleep,
+  });
+  const runtime = config([service("api", "http://127.0.0.1:1", { adapter: "stub" })]);
+  try {
+    await cycles(poller, runtime, 25);
+    latency.set("api", 4200);
+    assert.deepEqual(await cycles(poller, runtime, 3), []);
+  } finally {
+    await store.close();
+  }
+});
+
+test("a muted provider's slow page stays quiet", async () => {
+  const store = await freshStore();
+  const latency = new Map([["github", 200]]);
+  const poller = createPoller({ getAdapter: timedPages(latency), store, logger: silent, sleep: fakeSleep().sleep });
+  const runtime = config([
+    service("github", "http://127.0.0.1:1", { adapter: "stub", mutedUntil: "2999-01-01T00:00:00.000Z" }),
+  ]);
+  try {
+    await cycles(poller, runtime, 25);
+    latency.set("github", 4200);
+    assert.deepEqual(await cycles(poller, runtime, 3), []);
+  } finally {
+    await store.close();
+  }
+});

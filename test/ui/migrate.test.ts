@@ -28,6 +28,8 @@ test("migrate creates every table the dashboard reads", async () => {
     "channels",
     "component_samples",
     "incident_notes",
+    "incident_revisions",
+    "incident_versions",
     "incidents",
     "maintenances",
     "map_geo_state",

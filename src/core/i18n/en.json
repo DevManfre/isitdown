@@ -10,6 +10,7 @@
   "incident.status.monitoring": "Monitoring",
   "incident.status.resolved": "Resolved",
   "incident.status.postmortem": "Postmortem",
+  "incident.status.changed": "Changed",
 
   "notification.action.open-status": "Open status page",
 
@@ -25,6 +26,7 @@
   "notification.silent.outage": "{provider} — {severity}\n\nThe status page still reports {previous}, but our own probe {probe} cannot reach the service: {note}\n\n{url}",
   "notification.silent.outage-observed": "{provider} — {severity}\n\nOur probe {probe} cannot reach the service, and this provider's record is what we measure: {note}\n\nIts status page still reports {previous}, which here is an opinion rather than the answer.\n\n{url}",
   "notification.sla.burn": "{provider} — error budget\n\nAt this month's rate, {month} lands at {projected}% against a {target}% target.\n{spentMinutes} of {budgetMinutes} allowed minutes are already spent, and measured uptime so far is {uptime}%.\n\n{url}",
+  "notification.slow.page": "{provider} — status page slow\n\nThe status page took {latency} to answer, against a usual {median} (anything over {threshold} stands out). A page slowing down like this is often the first sign of trouble the provider has not admitted yet.\n\n{url}",
   "notification.maintenance.started": "{provider} — maintenance\n\nScheduled maintenance has started: {title}\nEnds: {endsAt}\nAlerts for this provider are paused until it is over.\n\n{url}",
   "notification.maintenance.ended": "{provider} — maintenance over\n\n{title} has finished.\nStatus now: {current} — {count} open incident(s).\nUpdated: {updatedAt}\n\n{url}",
 
@@ -41,6 +43,7 @@
   "notification.digest.silent": "the status page still says operational, but probe {probe} reads {current}",
   "notification.digest.correlated": "{count} providers went bad together — {providers}",
   "notification.digest.sla": "error budget — at this rate the month lands at {projected}% against {target}%",
+  "notification.digest.slow-page": "status page slow — {latency} against a usual {median}",
 
   "notification.suppressed": "{count} further alert(s) for this provider were suppressed by the hourly cap.",
 

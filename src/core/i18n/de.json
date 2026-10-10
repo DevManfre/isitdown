@@ -10,6 +10,7 @@
   "incident.status.monitoring": "Wird beobachtet",
   "incident.status.resolved": "Behoben",
   "incident.status.postmortem": "Nachbetrachtung",
+  "incident.status.changed": "Geändert",
 
   "notification.action.open-status": "Statusseite öffnen",
 
@@ -25,6 +26,7 @@
   "notification.silent.outage": "{provider} — {severity}\n\nDie Statusseite meldet weiterhin {previous}, aber unsere Sonde {probe} erreicht den Dienst nicht: {note}\n\n{url}",
   "notification.silent.outage-observed": "{provider} — {severity}\n\nUnsere Sonde {probe} erreicht den Dienst nicht, und für diesen Anbieter gilt, was wir messen: {note}\n\nSeine Statusseite meldet weiterhin {previous} — hier eine Meinung und nicht die Antwort.\n\n{url}",
   "notification.sla.burn": "{provider} — Fehlerbudget\n\nBei diesem Tempo landet {month} bei {projected}% gegenüber einem Ziel von {target}%.\n{spentMinutes} von {budgetMinutes} erlaubten Minuten sind bereits verbraucht, die bisher gemessene Verfügbarkeit liegt bei {uptime}%.\n\n{url}",
+  "notification.slow.page": "{provider} — Statusseite langsam\n\nDie Statusseite brauchte {latency} für ihre Antwort, sonst sind es {median} (alles über {threshold} fällt auf). Eine Statusseite, die so langsam wird, ist oft das erste Anzeichen eines Problems, das der Anbieter noch nicht eingeräumt hat.\n\n{url}",
   "notification.maintenance.started": "{provider} — Wartung\n\nEine geplante Wartung hat begonnen: {title}\nVoraussichtliches Ende: {endsAt}\nMeldungen zu diesem Anbieter pausieren bis dahin.\n\n{url}",
   "notification.maintenance.ended": "{provider} — Wartung beendet\n\n{title} ist abgeschlossen.\nAktueller Status: {current} — offene Störungen: {count}.\nAktualisiert: {updatedAt}\n\n{url}",
 
@@ -41,6 +43,7 @@
   "notification.digest.silent": "die Statusseite meldet weiterhin betriebsbereit, aber die Sonde {probe} liest {current}",
   "notification.digest.correlated": "{count} Anbieter haben sich gleichzeitig verschlechtert — {providers}",
   "notification.digest.sla": "Fehlerbudget — bei diesem Tempo landet der Monat bei {projected}% gegenüber {target}%",
+  "notification.digest.slow-page": "Statusseite langsam — {latency} statt sonst {median}",
 
   "notification.suppressed": "{count} weitere Meldungen zu diesem Anbieter wurden durch das Stundenlimit unterdrückt.",
 

@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 
 /**
@@ -12,6 +13,11 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
  * this dialog grows fields for.
  */
 export const SCRAPE_ADAPTER = "html";
+/**
+ * The content watchdog (roadmap 1.12): the page that is only prose. It needs
+ * the one thing no URL can say — what the page reads while nothing is wrong.
+ */
+export const WATCHDOG_ADAPTER = "watchdog";
 /** The declared JSON mapping — roadmap 11.1. */
 export const JSON_ADAPTER = "json";
 
@@ -77,6 +83,7 @@ export const AUTH_ADAPTERS = new Set([
   "gcp",
   "azure",
   SCRAPE_ADAPTER,
+  WATCHDOG_ADAPTER,
   JSON_ADAPTER,
   "instatus",
   "betterstack",
@@ -89,6 +96,7 @@ export const AUTH_ADAPTERS = new Set([
 export const hasAdapterOptions = (adapter: string): boolean =>
   AUTH_ADAPTERS.has(adapter) ||
   adapter === SCRAPE_ADAPTER ||
+  adapter === WATCHDOG_ADAPTER ||
   adapter === JSON_ADAPTER ||
   adapter === PROBE_ADAPTER ||
   adapter === TCP_ADAPTER ||
@@ -178,6 +186,42 @@ export function AdapterOptions({
             {t("scrape.words-hint")}
           </span>
         </OptionGroup>
+        {credentials}
+      </div>
+    );
+  }
+
+  if (adapter === WATCHDOG_ADAPTER) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-muted-foreground">{t("watchdog.warning")}</p>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-watchdog-baseline">{t("watchdog.baseline")}</Label>
+          <Textarea
+            id="service-watchdog-baseline"
+            className="font-mono"
+            rows={3}
+            value={options["baseline"] ?? ""}
+            onChange={(event) => setOption("baseline", event.target.value)}
+            {...fieldProps}
+          />
+          <span className="text-xs text-muted-foreground">
+            {t("watchdog.baseline-hint")}
+          </span>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-watchdog-selector">{t("scrape.selector")}</Label>
+          <Input
+            id="service-watchdog-selector"
+            className="font-mono"
+            value={options["selector"] ?? ""}
+            onChange={(event) => setOption("selector", event.target.value)}
+            {...fieldProps}
+          />
+          <span className="text-xs text-muted-foreground">
+            {t("watchdog.selector-hint")}
+          </span>
+        </div>
         {credentials}
       </div>
     );

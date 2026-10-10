@@ -17,6 +17,7 @@ import { statuspageAdapter } from "./statuspage.adapter.ts";
 import { tcpAdapter } from "./tcp.adapter.ts";
 import { uptimeComAdapter } from "./uptimecom.adapter.ts";
 import { uptimeKumaAdapter } from "./uptimekuma.adapter.ts";
+import { watchdogAdapter } from "./watchdog.adapter.ts";
 
 /**
  * The adapters this build ships with. A plugin may add to this at boot
@@ -36,6 +37,7 @@ export const adapters: Record<string, Adapter> = {
   [uptimeKumaAdapter.id]: uptimeKumaAdapter,
   [uptimeComAdapter.id]: uptimeComAdapter,
   [htmlAdapter.id]: htmlAdapter,
+  [watchdogAdapter.id]: watchdogAdapter,
   [imapAdapter.id]: imapAdapter,
   [httpAdapter.id]: httpAdapter,
   [tcpAdapter.id]: tcpAdapter,
@@ -112,6 +114,7 @@ const AUTHENTICATED_READERS = new Set([
   gcpAdapter.id,
   azureAdapter.id,
   htmlAdapter.id,
+  watchdogAdapter.id,
   jsonAdapter.id,
   instatusAdapter.id,
   betterStackAdapter.id,

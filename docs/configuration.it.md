@@ -66,14 +66,14 @@ notifications:
 | `correlationWindowMinutes` | `10` | 1–1440. Quanto è larga quella finestra. Più larga intercetta un guasto condiviso che attraversa lentamente le status page, e rischia di unire due giornate storte non collegate. |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto (vedi sotto). |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro e `watchdog` segnala qualunque cambiamento nel testo di una pagina (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto (vedi sotto). |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
 | `services[].intervalSeconds` | — | 10–3600, solo sonde (`http`, `tcp`, `dns`). La stessa cadenza in secondi, per un endpoint che può restare giù meno di un minuto; una pagina di stato resta sul pavimento del minuto e viene rifiutata al caricamento. Mai insieme a `intervalMinutes`. |
 | `services[].crossChecks` | — | Solo su una sonda (`http`, `tcp`, `dns`) o su una lettura di posta (`imap`): l'id del provider di cui questa sonda è un secondo parere — controllo incrociato dei guasti silenziosi (roadmap 1.10). Quando la sonda non raggiunge il servizio e la status page di quel provider dichiara ancora operativo senza incidenti aperti, il disaccordo è esso stesso un avviso. Si può restringere a un singolo componente con la stessa forma `provider#componente` con cui una regola di routing indica il bersaglio (roadmap 2.9); la metà componente serve solo a precisare contro cosa la scheda di fiducia (roadmap 8.1) confronta la sonda, dato che il controllo dei guasti silenziosi riguarda una pagina che dichiara che non c'è proprio nulla che non va. |
 | `services[].authority` | dall'adapter | Quale fonte fa fede per questo provider — `declared` (la sua status page) oppure `observed` (la nostra misura), roadmap 9.1. Ometterlo è il caso normale e non è un valore mancante: una sonda (`http`, `tcp`, `dns`) legge `observed` perché *è* la misura, e tutto ciò che legge la pagina di qualcun altro legge `declared`. Va impostato solo per non essere d'accordo con quel default — una status page di cui hai imparato a diffidare, o una sonda che non vuoi sia trattata come il riferimento. Decide cosa la dashboard stampa accanto all'adapter e come è formulato un avviso di disservizio silenzioso, non quali campioni sostengono una percentuale. Vedi [7.7](how-it-works.it.md#77-quale-fonte-fa-fede). |
 | `services[].mutedUntil` | — | ISO 8601. Finché è nel futuro il provider viene interrogato e registrato come sempre ma non notifica nulla — "lo so, smetti di dirmelo, fino ad allora". Nell'edizione UI è ciò che scrive il comando **Silenzia** della dashboard. |
-| `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano cinque: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`), `http`, `tcp` e `dns`, e `imap` (vedi le loro sezioni qui sotto). |
+| `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano sei: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`), `watchdog` (`baseline`, più un `selector` facoltativo), `http`, `tcp` e `dns`, e `imap` (vedi le loro sezioni qui sotto). |
 
 #### L'adapter `html`
 
@@ -110,6 +110,40 @@ deliberati:
   else operational" legge come disservizio parziale;
 - non ci sono incidenti, componenti o finestre di manutenzione — una pagina che
   ha richiesto lo scraping non ha struttura da cui leggerli.
+
+#### L'adapter `watchdog` — qualunque cambiamento nel testo di una pagina
+
+Per la pagina fatta solo di testo ("All systems normal") a cui non si adattano
+nemmeno le parole di stato dell'adapter `html` (roadmap 1.12). Segnala qualunque
+*cambiamento* del testo della pagina rispetto a una baseline che scrivi tu, e non
+prova mai a dire cosa significhi:
+
+```yaml
+  - name: Prose-only provider
+    id: example-prose
+    adapter: watchdog
+    baseUrl: https://status.example.com/
+    options:
+      baseline: "All systems normal."
+      selector: ".notice"   # facoltativo — se assente, tutta la pagina
+```
+
+- il testo viene confrontato con gli spazi compattati e le maiuscole ignorate,
+  così una riga andata a capo diversamente non è un cambiamento;
+- una pagina uguale alla sua baseline legge `operational`; una diversa legge
+  `degraded` — la parola meno grave che comunque non è "va tutto bene" — con un
+  incidente aperto il cui titolo è il nuovo testo (tagliato a 280 caratteri). Il
+  suo id è l'impronta del testo, quindi una pagina che cambia ancora apre un
+  secondo incidente, e una che torna com'era lo risolve;
+- `baseline` è obbligatoria ed è configurazione, non memoria: un adapter che la
+  imparasse dalla prima lettura la reimparerebbe dopo un riavvio, e una pagina
+  già cambiata a quel punto diventerebbe in silenzio la nuova normalità. Un
+  watchdog senza baseline non si può salvare, e una lettura senza baseline
+  fallisce riportando il testo che la pagina dice in quel momento — pronto da
+  copiare;
+- senza `selector` si sorveglia il testo di tutto il documento (esclusi i corpi
+  di script e style), che nota anche un piè di pagina o una data cambiati;
+  indica l'elemento quando la pagina contiene qualcosa che si muove da sé.
 
 #### L'adapter `http` — sondare un endpoint tuo
 
