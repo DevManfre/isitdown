@@ -71,8 +71,13 @@ const ASSETS = "dist/ui/public/assets";
  * it the twenty-odd new strings in six catalogs (the watchdog's form explains
  * itself at length), the rest that form, the edited-after-resolution tile and
  * the trust card's fourth axis. The same remedy again.
+ *
+ * It moved 537,400 -> 539,450 (524.8 -> 526.8 kB) for roadmap 2.2's catalog
+ * updates row. Measured: 524.1 kB before it, 526.1 kB after — 2.0 kB gzipped,
+ * nearly all of it the eight new strings in six catalogs, the disclosure among
+ * them long on purpose. The same remedy again.
  */
-export const BUDGET = { js: 537_400, css: 20_000 };
+export const BUDGET = { js: 539_450, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
