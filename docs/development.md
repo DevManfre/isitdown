@@ -95,7 +95,7 @@ isitdown/
 │           ├── css/tokens.css          the only file with a colour literal
 │           ├── css/motion.css          keyframes, entry animations, transitions
 │           └── locales/                en.json (source) + it.json
-│   └── cli/                            (terminal client only, roadmap 17.7 — `watch` reads the UI edition's API, `discover` reads local files with src/adapters; never imports src/ui)
+│   └── cli/                            (terminal client only, roadmap 17.7 — `watch` reads the UI edition's API, `discover` and `import` read local files with src/adapters; never imports src/ui)
 │       ├── index.ts                    entrypoint, dispatches to the one subcommand below
 │       └── watch/
 │           ├── run.ts                  the one part touching a real terminal, clock and network

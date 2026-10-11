@@ -1,0 +1,60 @@
+# A Gatus config.yaml with one of everything the importer has to decide about.
+endpoints:
+  - name: website
+    group: core
+    url: "https://example.com"
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*Welcome*)"
+      - "[RESPONSE_TIME] < 500"
+      - "[CERTIFICATE_EXPIRATION] > 48h"
+  - name: api
+    group: core
+    url: "https://api.example.com/health"
+    interval: 30s
+    headers:
+      Authorization: "Bearer ${API_TOKEN}"
+    conditions:
+      - "[STATUS] >= 200"
+      - "[STATUS] < 300"
+      - "[BODY].status == UP"
+  - name: postgres
+    url: "tcp://db.example.internal:5432"
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+  - name: resolver
+    url: "8.8.8.8"
+    dns:
+      query-name: "example.com"
+      query-type: "A"
+    conditions:
+      - "[DNS_RCODE] == NOERROR"
+      - "[BODY] == 93.184.216.34"
+  - name: cloudflare
+    url: "https://www.cloudflarestatus.com/api/v2/summary.json"
+    conditions:
+      - "[STATUS] == 200"
+  - name: ping-router
+    url: "icmp://192.168.1.1"
+    conditions:
+      - "[CONNECTED] == true"
+  - name: create-order
+    url: "https://api.example.com/orders"
+    method: POST
+    conditions:
+      - "[STATUS] == 201"
+  - name: disabled-one
+    url: "https://old.example.com"
+    enabled: false
+    conditions:
+      - "[STATUS] == any(200, 301)"
+external-endpoints:
+  - name: backup-job
+    group: jobs
+    token: "secret-token"
+    heartbeat:
+      interval: 24h
+  - name: ad-hoc
+    token: "other-token"

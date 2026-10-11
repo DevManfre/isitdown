@@ -41,7 +41,7 @@ The manual, one file per section:
 - [7. How it works](docs/how-it-works.md) — data flow, components, when a notification fires, resilience, outpost consensus
 - [8. Theming and localisation](docs/theming.md) — themes, `en`/`it`, accessibility
 - [9. Development](docs/development.md) — layout, tech stack, live development, tests, releases
-- [10. Terminal client](docs/cli.md) — `isitdown watch`, a read-only fleet view for a terminal, and `isitdown discover`, a first fleet read from a project's own files
+- [10. Terminal client](docs/cli.md) — `isitdown watch`, a read-only fleet view for a terminal, `isitdown discover`, a first fleet read from a project's own files, and `isitdown import`, a fleet carried over from Uptime Kuma, Gatus, Statping or StatusGator
 
 Each page has an Italian twin beside it (`docs/<name>.it.md`).
 
