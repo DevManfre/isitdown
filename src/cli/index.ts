@@ -1,5 +1,6 @@
 import { SOURCE_LOCALE, t } from "../core/i18n/index.ts";
 import { main as runWatchCommand, WATCH_USAGE } from "./watch/run.ts";
+import { DISCOVER_USAGE, main as runDiscoverCommand } from "./discover/run.ts";
 
 /**
  * `isitdown` — the terminal client (roadmap 17.7), a third entrypoint beside
@@ -7,8 +8,8 @@ import { main as runWatchCommand, WATCH_USAGE } from "./watch/run.ts";
  * `src/ui` itself (golden rule, `CLAUDE.md`) and carries no adapter, no
  * notifier, no state store of its own.
  *
- * One subcommand today. The dispatch exists anyway so a second one is an
- * addition here rather than a rewrite of what `watch` already owns.
+ * Two subcommands: `watch` reads an instance, `discover` (roadmap 2.3) reads
+ * a project's files and needs no instance at all.
  */
 const USAGE = t(SOURCE_LOCALE, "cli.usage");
 
@@ -21,6 +22,14 @@ if (command === "watch") {
   }
   const code = await runWatchCommand(rest, process.env);
   process.exit(code);
+}
+
+if (command === "discover") {
+  if (rest.includes("--help") || rest.includes("-h")) {
+    process.stdout.write(DISCOVER_USAGE);
+    process.exit(0);
+  }
+  process.exit(runDiscoverCommand(rest));
 }
 
 if (command === "--help" || command === "-h" || command === undefined) {

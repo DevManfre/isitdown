@@ -26,7 +26,10 @@ isitdown/
 │   │       ├── en.json                 source locale
 │   │       └── it.json
 │   ├── adapters/                      (shared)
-│   │   ├── catalog.ts                  bundled catalog of well-known providers
+│   │   ├── catalog.ts                  bundled catalog of well-known providers, read from catalog.json
+│   │   ├── catalog.json                the generated catalog (roadmap 2.1) — written by tools/build-catalog.mjs
+│   │   ├── catalogFeed.ts              signature check and move proposals for downloaded catalogs (2.2)
+│   │   ├── discover.ts                 a project's files → catalog providers (2.3)
 │   │   ├── statuspage.adapter.ts       generic Atlassian Statuspage adapter
 │   │   ├── rss.adapter.ts              generic RSS / Atom incident-feed adapter
 │   │   ├── slack.adapter.ts            Slack's own status API
@@ -92,7 +95,7 @@ isitdown/
 │           ├── css/tokens.css          the only file with a colour literal
 │           ├── css/motion.css          keyframes, entry animations, transitions
 │           └── locales/                en.json (source) + it.json
-│   └── cli/                            (terminal client only, roadmap 17.7 — reads the UI edition's API, never imports src/ui)
+│   └── cli/                            (terminal client only, roadmap 17.7 — `watch` reads the UI edition's API, `discover` reads local files with src/adapters; never imports src/ui)
 │       ├── index.ts                    entrypoint, dispatches to the one subcommand below
 │       └── watch/
 │           ├── run.ts                  the one part touching a real terminal, clock and network
@@ -106,7 +109,10 @@ isitdown/
 ├── tools/
 │   ├── copy-assets.mjs                copies i18n and dashboard-locale catalogs into dist (the
 │   │                                   dashboard bundle itself is Vite's own output, not this script's)
-│   └── readme-parity.mjs              README.md against every README.<lang>.md (npm run check:readme)
+│   ├── readme-parity.mjs              README.md against every README.<lang>.md (npm run check:readme)
+│   ├── build-catalog.mjs              regenerates the catalog from tools/catalog/seed.json and the public lists (2.1)
+│   └── sign-catalog.mjs               signs catalog/catalog.json with $CATALOG_SIGNING_KEY (2.2)
+├── catalog/                           the published, signed catalog and the last build's report
 ├── test/
 │   ├── core/                          diff engine, poller, scheduler, dispatcher, i18n, schemas
 │   │   └── stateStore.contract.ts     one suite every StateStore implementation must pass
@@ -419,6 +425,24 @@ Notable suites:
   latest report; a clean night closes nothing, the fix does. `npm run canary`
   runs it by hand, `--only github,openai` narrows it, `--report file.md` writes
   the report instead of printing it.
+- **Weekly catalog build** (roadmap 2.1 and 2.2) — `tools/build-catalog.mjs`
+  reads the curated seed in `tools/catalog/seed.json` and the "Public Status
+  Pages" section of awesome-status-pages, runs every candidate through
+  `detectAdapter`, reads it once through the adapter detection named, and
+  writes what answered to `src/adapters/catalog.json` and `catalog/catalog.json`
+  — one entry per page, redirects followed, every URL https — plus
+  `catalog/report.md` naming everything left out and why. An entry already in
+  the catalog is never removed by one failed read; it is kept and named in the
+  report. `tools/sign-catalog.mjs` then signs the published copy with Ed25519.
+  `.github/workflows/catalog.yml` runs both on Mondays at 04:41 UTC, commits
+  the regenerated list to `dev` without review when it changed, and pushes the
+  three published files to `main`, which is what installs with catalog updates
+  on read. The private key exists only as the `CATALOG_SIGNING_KEY` repository
+  secret; without it the job stops before publishing anything. Rotating it
+  means changing `CATALOG_PUBLIC_KEY` in `src/adapters/catalogFeed.ts` in the
+  same release — the sign step refuses a key that does not match it. To add a
+  provider by hand, add it to the seed (with `adapter` to skip detection) and
+  run `node tools/build-catalog.mjs`.
 
 The dashboard is real TypeScript now, checked by its own `tsconfig.web.json`
 rather than a JSDoc-driven pass over plain JavaScript; its components and hooks

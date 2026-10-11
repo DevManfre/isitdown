@@ -1312,3 +1312,41 @@ test("patching one cadence clears the other, and a page cannot be patched onto s
     await app.close();
   }
 });
+
+// Roadmap 2.3: the dashboard's half of discovery — pasted files in, proposals out.
+test("discovery maps pasted files onto the catalog and marks what is already watched", async () => {
+  const { request, close } = await api();
+  try {
+    const { status, body } = await request("POST", "/config/discover", {
+      files: [
+        { path: "package.json", content: JSON.stringify({ dependencies: { "@aws-sdk/client-s3": "3", openai: "4" } }) },
+        { path: ".env", content: "HOOK=https://hooks.nobody-knows.example\n" },
+      ],
+    });
+    assert.equal(status, 200);
+    const result = body as {
+      providers: { entry: { id: string }; configured: boolean; evidence: { file: string; found: string }[] }[];
+      unmatchedHosts: string[];
+    };
+    assert.deepEqual(result.providers.map((provider) => provider.entry.id).sort(), ["aws", "openai"]);
+    assert.ok(result.providers.every((provider) => typeof provider.configured === "boolean"));
+    assert.deepEqual(result.unmatchedHosts, ["hooks.nobody-knows.example"]);
+    assert.equal((await request("POST", "/config/discover", { files: [] })).status, 400);
+  } finally {
+    await close();
+  }
+});
+
+// Roadmap 2.2: off by default, and with nothing downloaded there is nothing to propose.
+test("catalog updates are off by default and propose nothing until a signed list arrives", async () => {
+  const { request, close } = await api();
+  try {
+    const config = (await request("GET", "/config")).body as { catalogFeed: { enabled: boolean; source: string } };
+    assert.equal(config.catalogFeed.enabled, false);
+    assert.equal(config.catalogFeed.source, "bundled");
+    assert.deepEqual((await request("GET", "/config/catalog/proposals")).body, { proposals: [] });
+    assert.equal((await request("POST", "/config/catalog/proposals/github/dismiss")).status, 404);
+  } finally {
+    await close();
+  }
+});

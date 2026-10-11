@@ -494,6 +494,8 @@ const WRITE_KEYS = [
   // A poll interval or a provider added changes how many samples a day the
   // retention cost is projected from.
   ["storage"],
+  // Accepting a catalog proposal is a service edit (roadmap 2.2).
+  ["catalog-proposals"],
 ];
 
 function useInvalidateAll() {
@@ -563,6 +565,18 @@ export function useAdapterDebug(enabled: boolean) {
  * opens and then left alone: the list ships with the image, so it cannot go
  * stale between two opens, and it has no polling interval for the same reason.
  */
+/**
+ * Proposals from a downloaded catalog (roadmap 2.2). Only asked while catalog
+ * updates are on; refreshed with every write, since accepting one is a write.
+ */
+export function useCatalogProposals(enabled: boolean) {
+  const invalidate = useInvalidateAll();
+  return {
+    query: useQuery({ queryKey: ["catalog-proposals"], queryFn: api.getCatalogProposals, enabled }),
+    dismiss: useMutation({ mutationFn: api.dismissCatalogProposal, onSuccess: invalidate }),
+  };
+}
+
 export function useCatalog(enabled: boolean) {
   return useQuery({
     queryKey: ["catalog"],

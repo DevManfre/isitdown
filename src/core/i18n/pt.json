@@ -80,7 +80,7 @@
   "public.empty": "Ainda não há nenhum serviço publicado.",
   "public.generated": "Última verificação {at}. Esta página é gerada pelo IsItDown a partir da página de estado pública de cada fornecedor.",
 
-  "cli.usage": "uso: isitdown <comando>\n\nComandos:\n  watch   mostra a frota de uma instância da edição UI em execução e se atualiza com as mudanças\n\nExecute 'isitdown watch --help' para ver suas opções.\n",
+  "cli.usage": "uso: isitdown <comando>\n\nComandos:\n  watch    mostra a frota de uma instância da edição UI em execução e se atualiza com as mudanças\n  discover lê os ficheiros de um projeto e propõe os fornecedores de que depende\n\nExecute 'isitdown <comando> --help' para ver suas opções.\n",
   "cli.error.unknownCommand": "comando desconhecido: {command}",
   "cli.error.missingValue": "{option} precisa de um valor",
   "cli.error.unknownOption": "opção desconhecida: {option}",
@@ -106,5 +106,12 @@
   "cli.watch.changes.heading": "Mudanças recentes",
   "cli.watch.changes.empty": "Nenhuma mudança observada ainda.",
   "cli.watch.changes.line": "{at}  {provider} -> {status}",
-  "cli.watch.footer": "Pressione Ctrl+C para sair."
+  "cli.watch.footer": "Pressione Ctrl+C para sair.",
+  "cli.discover.usage": "uso: isitdown discover [caminho...] [--yaml | --json]\n\nLê os ficheiros de um projeto — package.json, ficheiros compose, Dockerfiles, .env,\nTerraform, requirements.txt, pyproject.toml, go.mod, um ficheiro hosts — e\npropõe os fornecedores do catálogo de que depende, com o que denunciou cada um.\nOffline: nada é descarregado nem escrito.\n\n  caminho  ficheiros ou pastas a ler (por omissão: a pasta atual)\n  --yaml   imprime um bloco services: para o config.yml da edição Light\n  --json   imprime o resultado completo em JSON\n",
+  "cli.discover.read": "Lidos {files} ficheiros.",
+  "cli.discover.none": "Nenhum fornecedor do catálogo encontrado.",
+  "cli.discover.unmatched": "Hosts que nenhuma entrada do catálogo reconhece — adiciona-os por URL se tiverem página de estado:",
+  "cli.discover.next": "Executa de novo com --yaml para um bloco services: para config.yml.",
+  "cli.discover.no-files": "Nenhum ficheiro legível encontrado.",
+  "cli.discover.error.read": "não é possível ler o projeto: {reason}"
 }

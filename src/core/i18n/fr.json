@@ -80,7 +80,7 @@
   "public.empty": "Aucun service n'est encore publié.",
   "public.generated": "Dernière vérification {at}. Cette page est générée par IsItDown à partir de la page d'état publique de chaque fournisseur.",
 
-  "cli.usage": "usage : isitdown <commande>\n\nCommandes :\n  watch   affiche la flotte d'une instance de l'édition UI en cours d'exécution et se met à jour aux changements\n\nExécutez 'isitdown watch --help' pour ses options.\n",
+  "cli.usage": "usage : isitdown <commande>\n\nCommandes :\n  watch    affiche la flotte d'une instance de l'édition UI en cours d'exécution et se met à jour aux changements\n  discover lit les fichiers d'un projet et propose les fournisseurs dont il dépend\n\nExécutez 'isitdown <commande> --help' pour ses options.\n",
   "cli.error.unknownCommand": "commande inconnue : {command}",
   "cli.error.missingValue": "{option} nécessite une valeur",
   "cli.error.unknownOption": "option inconnue : {option}",
@@ -106,5 +106,12 @@
   "cli.watch.changes.heading": "Changements récents",
   "cli.watch.changes.empty": "Aucun changement observé pour l'instant.",
   "cli.watch.changes.line": "{at}  {provider} -> {status}",
-  "cli.watch.footer": "Appuyez sur Ctrl+C pour quitter."
+  "cli.watch.footer": "Appuyez sur Ctrl+C pour quitter.",
+  "cli.discover.usage": "usage : isitdown discover [chemin...] [--yaml | --json]\n\nLit les fichiers d'un projet — package.json, fichiers compose, Dockerfiles, .env,\nTerraform, requirements.txt, pyproject.toml, go.mod, un fichier hosts — et\npropose les fournisseurs du catalogue dont il dépend, avec ce qui les a trahis.\nHors ligne : rien n'est téléchargé ni écrit.\n\n  chemin  fichiers ou dossiers à lire (par défaut : le dossier courant)\n  --yaml  affiche un bloc services: pour le config.yml de l'édition Light\n  --json  affiche le résultat complet en JSON\n",
+  "cli.discover.read": "{files} fichiers lus.",
+  "cli.discover.none": "Aucun fournisseur du catalogue trouvé.",
+  "cli.discover.unmatched": "Hôtes qu'aucune entrée du catalogue ne reconnaît — ajoutez-les par URL s'ils ont une page d'état :",
+  "cli.discover.next": "Relancez avec --yaml pour un bloc services: pour config.yml.",
+  "cli.discover.no-files": "Aucun fichier lisible trouvé.",
+  "cli.discover.error.read": "impossible de lire le projet : {reason}"
 }

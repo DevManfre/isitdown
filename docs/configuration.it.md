@@ -498,15 +498,46 @@ sotto **Avanzate**. Modificare un servizio esistente resta una pagina sola: il
 suo adapter è fissato, e ciò che resta è la messa a punto.
 
 Il catalogo (roadmap 5.11) è una griglia di provider noti, cercabile per nome, e
-una scelta riempie adapter, base URL e id. Ogni voce in
-`src/adapters/catalog.ts` è stata confermata eseguendo la detection sulla
-pagina, quindi ciò che la griglia offre è ciò che un adapter legge davvero. I
+una scelta riempie adapter, base URL e id. Dalla roadmap 2.1 è un artefatto
+generato invece che una lista scritta a mano: un job settimanale
+(`tools/build-catalog.mjs`, vedi [9.4](development.it.md#94-test-e-controlli)) legge un seed
+curato e le liste pubbliche di status page, passa ogni candidato per la stessa
+detection usata dalla dashboard, poi lo legge una volta tramite il suo adapter,
+e tiene solo ciò che ha risposto — circa duecento provider, in
+`src/adapters/catalog.json`. Quindi ciò che la griglia offre è ciò che un adapter
+legge davvero. I
 provider la cui status page rifiuta una lettura automatica (Stripe, GitLab,
 Zendesk, Okta) sono volutamente assenti invece che elencati e rotti — per
 quelli, e per tutto ciò che la lista non ha, si incolla l'URL e si lascia che la
 detection (`POST /config/services/detect`) nomini l'adapter. Una voce già
 monitorata resta nella griglia, in grigio, invece di sparire. Servito come
 `GET /config/catalog`.
+
+Gli **aggiornamenti del catalogo** (roadmap 2.2, **Impostazioni → Dati → Aggiorna
+il catalogo dei provider**, spenti di default) tengono aggiornata quella lista
+senza una nuova immagine. Se attivati, l'edizione UI scarica
+`catalog/catalog.json` dal ramo `main` del progetto una volta al giorno — e una
+volta subito quando si attiva l'interruttore — e ne verifica la firma Ed25519
+con la chiave pubblica compilata nella build. Una lista la cui firma non
+corrisponde, che non è un catalogo, o che non è più recente di quella inclusa
+nell'immagine viene ignorata; le righe che nominano un adapter che questa build
+non ha vengono scartate. L'ultima copia valida resta nel database, così un
+riavvio non torna indietro. La richiesta non porta nulla di questa istanza oltre
+a ciò che qualunque lettura anonima di GitHub rivela (indirizzo IP e orario).
+
+Una lista scaricata non modifica mai da sola un provider configurato. Quando un
+provider che monitori ha l'id di una voce del catalogo il cui adapter o URL ora
+è diverso — "GitHub ha spostato la sua pagina di stato" — l'impostazione lo
+elenca con **Aggiorna** e **Tieni il mio**. Aggiorna è una normale modifica del
+servizio; Tieni il mio ricorda quel valore preciso, quindi la domanda torna solo
+se il catalogo si sposta una seconda volta.
+
+**Trovare i provider da un progetto** (roadmap 2.3). `isitdown discover <percorso>`
+([10.2](cli.it.md#102-isitdown-discover)) legge `package.json`, file compose,
+Dockerfile, `.env`, Terraform, `requirements.txt`, `pyproject.toml`, `go.mod` o
+un file hosts di un progetto e propone i provider del catalogo da cui dipende,
+ciascuno con la riga che l'ha tradito; `--yaml` stampa un blocco `services:` per
+`config.yml`. L'edizione UI risponde alla stessa domanda su `POST /config/discover`.
 
 Lo `status.indicator` del provider viene mappato sul modello di severità interno:
 

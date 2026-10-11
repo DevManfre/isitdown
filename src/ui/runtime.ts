@@ -37,6 +37,7 @@ import { componentTargetOf } from "../core/routing.ts";
 import { createSlaService, rememberSlaNotice, slaAlreadyTold } from "./sla.ts";
 import { createTrustService, type TrustPair } from "./trust.ts";
 import { createRevisionService, type RevisionService } from "./incidentRevisions.ts";
+import { createCatalogFeed, CATALOG_CHECK_INTERVAL_MS, type CatalogFeed } from "./catalogFeed.ts";
 import { createSqlitePushSubscriptionStore, type SqlitePushSubscriptionStore } from "./sqlitePushSubscriptionStore.ts";
 import { loadSecretsFile, type SecretsFile } from "./secretsFile.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
@@ -110,6 +111,8 @@ export interface UiRuntimeCore {
   adapterDebug: AdapterDebugStore;
   /** Roadmap 15.11a: the opt-in "is a newer version out" check against GHCR. */
   updateCheck: UpdateChecker;
+  /** The provider catalog in force, and its opt-in signed updates — roadmap 2.2. */
+  catalogFeed: CatalogFeed;
   /**
    * The shared registry cannot build `webpush` on its own: that channel needs the
    * device list, which only this edition has. Composed once here so the scheduler
@@ -428,6 +431,20 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   }, UPDATE_CHECK_INTERVAL_MS);
   updateCheckTimer.unref();
 
+  // Roadmap 2.2. The update check's shape again: off by default, read fresh on
+  // every run, nothing fetched while the switch is off.
+  const catalogFeed = createCatalogFeed({ db, logger });
+  const runCatalogFeed = (): void => {
+    void catalogFeed.maybeRun(readSettings(db, logger).catalogFeedEnabled).catch((error: unknown) => {
+      logger.error("checking the provider catalog failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  };
+  runCatalogFeed();
+  const catalogFeedTimer = setInterval(runCatalogFeed, CATALOG_CHECK_INTERVAL_MS);
+  catalogFeedTimer.unref();
+
   const core: UiRuntimeCore = {
     db,
     dbPath: options.dbPath,
@@ -451,6 +468,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     pushSubscriptions,
     adapterDebug,
     updateCheck: updateChecker,
+    catalogFeed,
     buildNotifiers: buildAllNotifiers,
     mapLane,
     logger,
@@ -473,6 +491,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     async close(): Promise<void> {
       clearInterval(pruneTimer);
       clearInterval(updateCheckTimer);
+      clearInterval(catalogFeedTimer);
       mapLane.stop();
       scheduler.stop();
       await scheduler.settled();

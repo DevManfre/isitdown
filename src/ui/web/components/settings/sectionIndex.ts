@@ -79,6 +79,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       "settings.backup.import",
       "settings.restore.label",
       "field.update-check",
+      "field.catalog-feed",
     ],
   },
   {

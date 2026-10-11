@@ -80,7 +80,7 @@
   "public.empty": "Non è ancora pubblicato nessun servizio.",
   "public.generated": "Ultimo controllo {at}. Questa pagina è generata da IsItDown a partire dalla pagina di stato pubblica di ogni provider.",
 
-  "cli.usage": "utilizzo: isitdown <comando>\n\nComandi:\n  watch   mostra la flotta di un'istanza dell'edizione UI in esecuzione e si aggiorna ai cambiamenti\n\nEsegui 'isitdown watch --help' per le sue opzioni.\n",
+  "cli.usage": "utilizzo: isitdown <comando>\n\nComandi:\n  watch    mostra la flotta di un'istanza dell'edizione UI in esecuzione e si aggiorna ai cambiamenti\n  discover legge i file di un progetto e propone i provider da cui dipende\n\nEsegui 'isitdown <comando> --help' per le sue opzioni.\n",
   "cli.error.unknownCommand": "comando sconosciuto: {command}",
   "cli.error.missingValue": "{option} richiede un valore",
   "cli.error.unknownOption": "opzione sconosciuta: {option}",
@@ -106,5 +106,12 @@
   "cli.watch.changes.heading": "Cambiamenti recenti",
   "cli.watch.changes.empty": "Nessun cambiamento osservato finora.",
   "cli.watch.changes.line": "{at}  {provider} -> {status}",
-  "cli.watch.footer": "Premi Ctrl+C per uscire."
+  "cli.watch.footer": "Premi Ctrl+C per uscire.",
+  "cli.discover.usage": "utilizzo: isitdown discover [percorso...] [--yaml | --json]\n\nLegge i file di un progetto — package.json, file compose, Dockerfile, .env,\nTerraform, requirements.txt, pyproject.toml, go.mod, un file hosts — e\npropone i provider del catalogo da cui dipende, con ciò che ha tradito ciascuno.\nOffline: non scarica nulla e non scrive nulla.\n\n  percorso  file o cartelle da leggere (predefinito: la cartella corrente)\n  --yaml    stampa un blocco services: per il config.yml dell'edizione Light\n  --json    stampa il risultato completo in JSON\n",
+  "cli.discover.read": "Letti {files} file.",
+  "cli.discover.none": "Nessun provider del catalogo trovato.",
+  "cli.discover.unmatched": "Host che nessuna voce del catalogo riconosce — aggiungili per URL se hanno una pagina di stato:",
+  "cli.discover.next": "Rilancia con --yaml per un blocco services: per config.yml.",
+  "cli.discover.no-files": "Nessun file leggibile dalla discovery trovato.",
+  "cli.discover.error.read": "impossibile leggere il progetto: {reason}"
 }

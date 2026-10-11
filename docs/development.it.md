@@ -27,7 +27,10 @@ isitdown/
 │   │       ├── en.json                lingua di partenza
 │   │       └── it.json
 │   ├── adapters/                      (condiviso)
-│   │   ├── catalog.ts                 catalogo di provider noti incluso
+│   │   ├── catalog.ts                 catalogo di provider noti incluso, letto da catalog.json
+│   │   ├── catalog.json               il catalogo generato (roadmap 2.1) — scritto da tools/build-catalog.mjs
+│   │   ├── catalogFeed.ts             verifica della firma e proposte di spostamento per i cataloghi scaricati (2.2)
+│   │   ├── discover.ts                i file di un progetto → provider del catalogo (2.3)
 │   │   ├── statuspage.adapter.ts      adapter generico Atlassian Statuspage
 │   │   ├── rss.adapter.ts             adapter generico per feed RSS / Atom
 │   │   ├── slack.adapter.ts           l'API di stato di Slack
@@ -86,7 +89,7 @@ isitdown/
 │           ├── css/tokens.css         l'unico file con un colore letterale
 │           ├── css/motion.css         keyframes, animazioni d'ingresso, transizioni
 │           └── locales/               en.json (sorgente) + it.json
-│   └── cli/                            (solo client da terminale, roadmap 17.7 — legge l'API dell'edizione UI, non importa mai src/ui)
+│   └── cli/                            (solo client da terminale, roadmap 17.7 — `watch` legge l'API dell'edizione UI, `discover` legge file locali con src/adapters; non importa mai src/ui)
 │       ├── index.ts                    entrypoint, smista verso l'unico sottocomando qui sotto
 │       └── watch/
 │           ├── run.ts                  l'unica parte che tocca un terminale, un orologio e una rete veri
@@ -100,7 +103,10 @@ isitdown/
 ├── tools/
 │   ├── copy-assets.mjs                copia in dist i cataloghi i18n e delle lingue della dashboard (il
 │   │                                   bundle della dashboard è già output di Vite, non di questo script)
-│   └── readme-parity.mjs              README.md contro ogni README.<lang>.md (npm run check:readme)
+│   ├── readme-parity.mjs              README.md contro ogni README.<lang>.md (npm run check:readme)
+│   ├── build-catalog.mjs              rigenera il catalogo da tools/catalog/seed.json e dalle liste pubbliche (2.1)
+│   └── sign-catalog.mjs               firma catalog/catalog.json con $CATALOG_SIGNING_KEY (2.2)
+├── catalog/                           il catalogo pubblicato e firmato, e il report dell'ultima generazione
 ├── test/
 │   ├── core/                          diff engine, poller, scheduler, dispatcher, i18n, schemi
 │   │   └── stateStore.contract.ts     una suite che ogni implementazione di StateStore deve passare
@@ -429,6 +435,25 @@ Suite notevoli:
   `canary` con l'ultimo report; una notte pulita non chiude niente, la chiude la
   correzione. `npm run canary` lo esegue a mano, `--only github,openai` lo
   restringe, `--report file.md` scrive il report invece di stamparlo.
+- **Generazione settimanale del catalogo** (roadmap 2.1 e 2.2) —
+  `tools/build-catalog.mjs` legge il seed curato in `tools/catalog/seed.json` e
+  la sezione "Public Status Pages" di awesome-status-pages, passa ogni candidato
+  per `detectAdapter`, lo legge una volta tramite l'adapter indicato dalla
+  detection, e scrive ciò che ha risposto in `src/adapters/catalog.json` e
+  `catalog/catalog.json` — una voce per pagina, redirect seguiti, ogni URL in
+  https — più `catalog/report.md` che nomina tutto ciò che è rimasto fuori e
+  perché. Una voce già nel catalogo non viene mai rimossa per una sola lettura
+  fallita; resta e viene nominata nel report. `tools/sign-catalog.mjs` poi firma
+  la copia pubblicata con Ed25519. `.github/workflows/catalog.yml` esegue
+  entrambi il lunedì alle 04:41 UTC, committa la lista rigenerata su `dev` senza
+  revisione quando è cambiata, e spinge i tre file pubblicati su `main`, che è
+  ciò che leggono le installazioni con gli aggiornamenti del catalogo attivi. La
+  chiave privata esiste solo come secret del repository `CATALOG_SIGNING_KEY`;
+  senza, il job si ferma prima di pubblicare qualunque cosa. Ruotarla significa
+  cambiare `CATALOG_PUBLIC_KEY` in `src/adapters/catalogFeed.ts` nello stesso
+  rilascio — il passo di firma rifiuta una chiave che non corrisponde. Per
+  aggiungere un provider a mano, lo si aggiunge al seed (con `adapter` per
+  saltare la detection) e si esegue `node tools/build-catalog.mjs`.
 
 La dashboard è ora TypeScript vero, verificato dal proprio `tsconfig.web.json`
 invece che da un passaggio guidato da JSDoc su JavaScript puro; i suoi componenti e
