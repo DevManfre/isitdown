@@ -480,15 +480,44 @@ first carried in at the top and everything adapter-specific folded under
 and what is left is tuning.
 
 The catalog (roadmap 5.11) is a grid of well-known providers, searchable by
-name, and one pick fills in the adapter, the base URL and the id. Every entry in
-`src/adapters/catalog.ts` was confirmed by running the detection against the
-page, so what the grid offers is what an adapter actually reads. Providers whose
+name, and one pick fills in the adapter, the base URL and the id. Since roadmap
+2.1 it is a generated artifact rather than a hand-written list: a weekly job
+(`tools/build-catalog.mjs`, see [9.4](development.md#94-tests-and-checks)) reads a curated
+seed and the public lists of status pages, runs every candidate through the
+same detection the dashboard uses, then reads it once through its adapter, and
+keeps only what answered — about two hundred providers, in
+`src/adapters/catalog.json`. So what the grid offers is what an adapter actually
+reads. Providers whose
 status page refuses an automated read (Stripe, GitLab, Zendesk, Okta) are
 deliberately absent rather than listed and broken — for those, and for anything
 else the list does not have, paste the URL and let detection
 (`POST /config/services/detect`) name the adapter. An entry already watched stays
 in the grid, dimmed, rather than disappearing from it. Served as
 `GET /config/catalog`.
+
+**Catalog updates** (roadmap 2.2, **Settings → Data → Update the provider
+catalog**, off by default) keep that list current without a new image. Switched
+on, the UI edition downloads `catalog/catalog.json` from the project's `main`
+branch once a day — and once straight away when the switch is turned on — and
+checks its Ed25519 signature against the public key compiled into the build. A
+list whose signature does not match, that is not a catalog, or that is no newer
+than the one the image shipped is ignored; rows naming an adapter this build
+does not have are dropped. The last good copy is kept in the database, so a
+restart does not fall back. The request carries nothing about this instance
+beyond what any anonymous read of GitHub reveals (its IP address and the time).
+
+A downloaded list never changes a configured provider by itself. When a provider
+you watch has the id of a catalog entry whose adapter or URL now differs —
+"GitHub moved its status page" — the setting lists it with **Update** and
+**Keep mine**. Update is an ordinary service edit; Keep mine remembers that
+exact value, so you are asked again only if the catalog moves a second time.
+
+**Finding providers from a project** (roadmap 2.3). `isitdown discover <path>`
+([10.2](cli.md#102-isitdown-discover)) reads a project's `package.json`, compose
+files, Dockerfiles, `.env`, Terraform, `requirements.txt`, `pyproject.toml`,
+`go.mod` or a hosts file and proposes the catalog providers it depends on, each
+with the line that gave it away; `--yaml` prints a `services:` block for
+`config.yml`. The UI edition answers the same question at `POST /config/discover`.
 
 The provider's own `status.indicator` maps onto the internal severity model:
 

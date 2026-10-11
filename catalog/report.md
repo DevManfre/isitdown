@@ -1,0 +1,133 @@
+# Catalog build
+
+Generated 2026-10-10T10:39:57.419Z: 202 providers in the catalog, 127 candidates left out.
+
+## Left out
+
+- Algolia — https://status.algolia.com: no adapter recognises the page
+- Auth0 — https://status.auth0.com: no adapter recognises the page
+- Backblaze — https://status.backblaze.com: no adapter recognises the page
+- Basecamp — https://www.basecampstatus.com: no adapter recognises the page
+- Bitwarden — https://status.bitwarden.com: no adapter recognises the page
+- Braintree — https://status.braintreepayments.com: no adapter recognises the page
+- Calendly — https://status.calendly.com: no adapter recognises the page
+- ClickUp — https://clickupstatus.com: no adapter recognises the page
+- DeepL — https://www.deeplstatus.com: no adapter recognises the page
+- Deno Deploy — https://www.denostatus.com: no adapter recognises the page
+- Fastly — https://www.fastlystatus.com: no adapter recognises the page
+- Fivetran — https://status.fivetran.com: no adapter recognises the page
+- Freshworks — https://status.freshworks.com: no adapter recognises the page
+- Hetzner — https://status.hetzner.com: no adapter recognises the page
+- Intercom — https://www.intercomstatus.com: no adapter recognises the page
+- JetBrains — https://status.jetbrains.com: no adapter recognises the page
+- Mailchimp — https://status.mailchimp.com: no adapter recognises the page
+- Mistral AI — https://status.mistral.ai: no adapter recognises the page
+- Neon — https://neonstatus.com: no adapter recognises the page
+- OpenRouter — https://status.openrouter.ai: no adapter recognises the page
+- PagerDuty — https://status.pagerduty.com: no adapter recognises the page
+- PayPal — https://www.paypal-status.com: no adapter recognises the page
+- Pipedrive — https://status.pipedrive.com: no adapter recognises the page
+- PostHog — https://status.posthog.com: no adapter recognises the page
+- Postmark — https://status.postmarkapp.com: no adapter recognises the page
+- Railway — https://status.railway.com: no adapter recognises the page
+- Redis Cloud — https://status.redis.io: no adapter recognises the page
+- Replicate — https://www.replicatestatus.com: no adapter recognises the page
+- Salesforce — https://status.salesforce.com: no adapter recognises the page
+- Semaphore CI — https://semaphoreci.statuspage.io: no adapter recognises the page
+- SendBird — https://status.sendbird.com: no adapter recognises the page
+- SonarCloud — https://sonarcloud.statuspage.io: no adapter recognises the page
+- Splunk Observability — https://status.signalfx.com: no adapter recognises the page
+- Storyblok — https://status.storyblok.com: no adapter recognises the page
+- Todoist — https://status.todoist.com: no adapter recognises the page
+- Unity — https://status.unity.com: no adapter recognises the page
+- Vultr — https://status.vultr.com: no adapter recognises the page
+- WordPress.com — https://wpcomstatus.com: no adapter recognises the page
+- Xata — https://status.xata.io: no adapter recognises the page
+- Zendesk — https://status.zendesk.com: no adapter recognises the page
+- Zoho — https://status.zoho.com: no adapter recognises the page
+- AppSignal — https://www.appsignalstatus.com: no adapter recognises the page
+- BigCommerce — https://www.bigcommercestatus.com: no adapter recognises the page
+- Checkly — https://is.checkly.online: no adapter recognises the page
+- Cloudflare Workers — https://www.cloudflarestatus.com: same id or page as an entry above
+- Databricks — https://status.databricks.com: no adapter recognises the page
+- Discourse — https://status.discourse.org: no adapter recognises the page
+- Docusign — https://status.docusign.com: no adapter recognises the page
+- Dynatrace — https://status.dynatrace.com: no adapter recognises the page
+- Elastic Email — https://status.elasticemail.com: no adapter recognises the page
+- Fauna — https://status.fauna.com: no adapter recognises the page
+- Firebase — https://status.firebase.google.com: no adapter recognises the page
+- Instabug — https://status.instabug.com: no adapter recognises the page
+- Lemon Squeezy — https://status.lemonsqueezy.com: no adapter recognises the page
+- Mandrill — https://status.mandrillapp.com: no adapter recognises the page
+- Namecheap — https://status.namecheap.com: no adapter recognises the page
+- Okta — https://status.okta.com: no adapter recognises the page
+- Packagecloud — https://status.packagecloud.io: no adapter recognises the page
+- Papertrail — https://www.papertrailstatus.com: no adapter recognises the page
+- Scalingo — https://scalingostatus.com: no adapter recognises the page
+- SendGrid Marketing — https://status.sendgrid.com: same id or page as an entry above
+- Spacelift — https://status.spacelift.io: no adapter recognises the page
+- Tableau — https://trust.tableau.com: no adapter recognises the page
+- Tines — https://status.tines.com: no adapter recognises the page
+- Weaviate Cloud — https://status.weaviate.io: no adapter recognises the page
+- Wrike — https://status.wrike.com: no adapter recognises the page
+- GitHub Copilot — https://www.githubstatus.com: same id or page as an entry above
+- Microsoft 365 — https://status.cloud.microsoft: no adapter recognises the page
+- IBM Cloud — https://cloud.ibm.com/status: no adapter recognises the page
+- Bitbucket Pipelines — https://bitbucket.status.atlassian.com: same id or page as an entry above
+- Codeberg — https://status.codeberg.org: no adapter recognises the page
+- Steam — https://steamstat.us: no adapter recognises the page
+- Xbox Live — https://support.xbox.com/xbox-live-status: no adapter recognises the page
+- Spotify — https://status.spotify.dev: no adapter recognises the page
+- Fathom — https://status.usefathom.com: no adapter recognises the page
+- Matomo Cloud — https://status.matomo.cloud: no adapter recognises the page
+- Binance — https://www.binance.com/en/status: no adapter recognises the page
+- Revolut — https://status.revolut.com: no adapter recognises the page
+- Adyen — https://status.adyen.com: no adapter recognises the page
+- Checkout.com — https://status.checkout.com: no adapter recognises the page
+- Absurd Design — https://status.absurd.design/: no adapter recognises the page
+- Adobe — https://status.adobe.com/: no adapter recognises the page
+- Akamai — https://cloudharmony.com/status-for-akamai: no adapter recognises the page
+- Atlassian cloud dashboard — https://status.atlassian.com/: same id or page as an entry above
+- Apple Developer — https://developer.apple.com/system-status/: no adapter recognises the page
+- Apple Support — https://www.apple.com/support/systemstatus/: no adapter recognises the page
+- BambooHR — https://status.bamboohr.com/: no adapter recognises the page
+- BigQuery — https://status.cloud.google.com/: same id or page as an entry above
+- Datadog — https://status.datadoghq.com/: same id or page as an entry above
+- Designmodo — https://status.designmodo.com/: no adapter recognises the page
+- DigitalOcean — https://status.digitalocean.com/: same id or page as an entry above
+- Discord App — https://discordstatus.com/: same id or page as an entry above
+- Dropbox — https://status.dropbox.com/: same id or page as an entry above
+- Facebook for Business — https://status.fb.com/: no adapter recognises the page
+- Facebook Platform — https://developers.facebook.com/status/dashboard/: no adapter recognises the page
+- Fastly — https://status.fastly.com/: no adapter recognises the page
+- GitHub — https://status.github.com/api: same id or page as an entry above
+- GitLab — https://status.gitlab.com: no adapter recognises the page
+- Google Ads — https://ads.google.com/status/publisher/: no adapter recognises the page
+- Google Search — https://status.search.google.com: no adapter recognises the page
+- Google Workspace — https://www.google.com/appsstatus: no adapter recognises the page
+- Heroku — https://status.heroku.com/: same id or page as an entry above
+- HubSpot — https://status.hubspot.com/: same id or page as an entry above
+- Humanity — https://humanity.status.io/: no adapter recognises the page
+- Linear — https://linearstatus.com: same id or page as an entry above
+- Mail.ru cloud — https://status.mcs.mail.ru/: no adapter recognises the page
+- Microsoft Advertisement — https://status.ads.microsoft.com/: The operation was aborted due to timeout
+- Microsoft Office365 — https://status.office365.com/: no adapter recognises the page
+- Odoo — https://www.saashub.com/odoo-status: no adapter recognises the page
+- OpenAI — https://status.openai.com/: same id or page as an entry above
+- Rackspace — https://status.rackspace.com/: no adapter recognises the page
+- Revolut — https://www.revolut.com/system-status/: no adapter recognises the page
+- reddit — https://www.redditstatus.com/: same id or page as an entry above
+- Repetiti — https://status.repetiti.com/: no adapter recognises the page
+- Sematext — https://status.eu.sematext.com/ui/statuspages: no adapter recognises the page
+- Skype — https://support.skype.com/en/status/: no adapter recognises the page
+- Slack — https://status.slack.com/: no adapter recognises the page
+- Squdcast — https://status.squadcast.com/: no adapter recognises the page
+- Stripe — https://status.stripe.com/: no adapter recognises the page
+- Sony PlayStation — https://status.playstation.com/: no adapter recognises the page
+- Taskade — https://status.taskade.com/: no adapter recognises the page
+- Trakt — https://status.trakt.tv: no adapter recognises the page
+- Twitter API — https://api.twitterstat.us/: no adapter recognises the page
+- Vkontakte platform — https://vk.com/dev.php?method=health: no adapter recognises the page
+- Wikipedia Frontend Monitoring — https://grafana.wikimedia.org/d/000000479/frontend-traffic?orgId=1: no adapter recognises the page
+- Zoom Cloud — https://status.zoom.us/: same id or page as an entry above
+- Wordnik — https://status.wordnik.com/: no adapter recognises the page

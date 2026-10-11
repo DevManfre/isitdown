@@ -3,8 +3,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { detectAdapter } from "../../adapters/detect.ts";
 import { resetValidators } from "../../core/http.ts";
-import { CATALOG } from "../../adapters/catalog.ts";
 import { cadenceProblems, optionProblems } from "../../adapters/index.ts";
+import { discover } from "../../adapters/discover.ts";
 import { getAdapter } from "../../adapters/index.ts";
 import {
   alertCapSchema,
@@ -74,7 +74,15 @@ const settingsPatchSchema = pollingSchema
     // Roadmap 15.11a. Not part of `delivery`: it never sends a notification,
     // it just controls whether the dashboard itself reads GHCR.
     updateCheckEnabled: z.boolean().optional(),
+    // Roadmap 2.2. Beside the update check, for the same reason.
+    catalogFeedEnabled: z.boolean().optional(),
   });
+const discoverRequestSchema = z.object({
+  files: z
+    .array(z.object({ path: z.string().min(1).max(255), content: z.string() }))
+    .min(1)
+    .max(50),
+});
 const channelPatchSchema = z.object({
   enabled: z.boolean().optional(),
   fields: z.record(z.string()).optional(),
@@ -201,6 +209,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       // SQLite like every other one, so a toggle survives a restart even
       // though the last result does not.
       updateCheck: { enabled: settings.updateCheckEnabled, ...runtime.updateCheck.state() },
+      catalogFeed: { enabled: settings.catalogFeedEnabled, ...runtime.catalogFeed.state() },
       channels: describeChannels(db, runtime.env),
       routing: describeRouting(db, runtime.logger),
       // Removed but still restorable. Part of the config payload rather than a
@@ -216,17 +225,61 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
    * entry missing from that menu because it is already watched would look like
    * a catalog that forgot about it.
    *
-   * No network and no upstream: the list ships with the image, so this answers
-   * from memory. Detection stays the path for a page the list does not have.
+   * No network on the request path: the list ships with the image, or — once
+   * the operator opts into catalog updates (roadmap 2.2) — is the last signed
+   * copy downloaded in the background. Detection stays the path for a page the
+   * list does not have.
    */
   router.get("/config/catalog", (_req, res) => {
     const taken = new Set(listServices(db).map((service) => service.id));
     res.json({
-      providers: CATALOG.map((entry) => ({
+      providers: runtime.catalogFeed.entries().map((entry) => ({
         ...entry,
         configured: taken.has(entry.id),
       })),
     });
+  });
+
+  /**
+   * Configured providers whose catalog entry has moved since — roadmap 2.2.
+   * Proposed, never applied: accepting one is an ordinary
+   * `PATCH /config/services/:id` with the `to` it carries, so it goes through
+   * every check an edit by hand does.
+   */
+  router.get("/config/catalog/proposals", (_req, res) => {
+    res.json({ proposals: runtime.catalogFeed.proposals() });
+  });
+
+  /**
+   * Dependency discovery — roadmap 2.3. The files a project already has, pasted
+   * or uploaded, mapped onto the catalog in force: the same pure function the
+   * `isitdown discover` command runs over a directory. Nothing is added; each
+   * proposal carries its evidence and whether the fleet already watches it.
+   *
+   * Bounded by the app's 64 kB body limit, which a manifest, a compose file or
+   * a Terraform module fits in; a lockfile does not, and is not read anyway.
+   */
+  router.post("/config/discover", (req, res) => {
+    const parsed = discoverRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+    const taken = new Set(listServices(db).map((service) => service.id));
+    const result = discover(parsed.data.files, runtime.catalogFeed.entries());
+    res.json({
+      ...result,
+      providers: result.providers.map((provider) => ({ ...provider, configured: taken.has(provider.entry.id) })),
+    });
+  });
+
+  /** Turns one proposal down, for this exact value: a later move asks again. */
+  router.post("/config/catalog/proposals/:id/dismiss", (req, res) => {
+    if (!runtime.catalogFeed.dismiss(req.params.id)) {
+      res.status(404).json({ error: { message: `no catalog proposal for ${req.params.id}` } });
+      return;
+    }
+    res.status(204).end();
   });
 
   /**
@@ -570,12 +623,20 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       ...(parsed.data.updateCheckEnabled === undefined
         ? {}
         : { updateCheckEnabled: parsed.data.updateCheckEnabled }),
+      ...(parsed.data.catalogFeedEnabled === undefined
+        ? {}
+        : { catalogFeedEnabled: parsed.data.catalogFeedEnabled }),
       ...deliveryPatch(parsed.data.delivery),
     });
+    // Turning catalog updates on asks straight away rather than at the next
+    // daily tick: the operator who flips it wants to see it work. Not awaited —
+    // the save answers now, the check lands in the background.
+    if (parsed.data.catalogFeedEnabled === true) void runtime.catalogFeed.maybeRun(true, { force: true });
     const settings = readSettings(db, runtime.logger);
     res.json({
       delivery: deliveryOf(settings),
       updateCheck: { enabled: settings.updateCheckEnabled, ...runtime.updateCheck.state() },
+      catalogFeed: { enabled: settings.catalogFeedEnabled, ...runtime.catalogFeed.state() },
       polling: {
         intervalMinutes: settings.pollIntervalMinutes,
         requestTimeoutSeconds: settings.requestTimeoutSeconds,

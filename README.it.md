@@ -41,7 +41,7 @@ Il manuale, un file per sezione:
 - [7. Come funziona](docs/how-it-works.it.md) — flusso dei dati, componenti, quando scatta una notifica, resilienza, consenso degli outpost
 - [8. Tema e localizzazione](docs/theming.it.md) — temi, `en`/`it`, accessibilità
 - [9. Sviluppo](docs/development.it.md) — struttura, stack tecnico, sviluppo live, test, rilasci
-- [10. Client da terminale](docs/cli.it.md) — `isitdown watch`, una vista di sola lettura della flotta per il terminale
+- [10. Client da terminale](docs/cli.it.md) — `isitdown watch`, una vista di sola lettura della flotta per il terminale, e `isitdown discover`, una prima flotta letta dai file di un progetto
 
 Ogni pagina ha accanto la sua gemella inglese (`docs/<nome>.md`).
 

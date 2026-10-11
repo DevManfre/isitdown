@@ -165,6 +165,11 @@ const settingsSchema = z.object({
    * discover it happening.
    */
   updateCheckEnabled: booleanSetting.catch(false),
+  /**
+   * Reading the signed provider catalog from GitHub (roadmap 2.2). Off by
+   * default for the update check's reason: a request to a host nobody chose.
+   */
+  catalogFeedEnabled: booleanSetting.catch(false),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;

@@ -1,0 +1,1217 @@
+{
+  "generatedAt": "2026-10-10T10:39:57.419Z",
+  "entries": [
+    {
+      "id": "github",
+      "name": "GitHub",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.githubstatus.com"
+    },
+    {
+      "id": "bitbucket",
+      "name": "Bitbucket",
+      "adapter": "statuspage",
+      "baseUrl": "https://bitbucket.status.atlassian.com"
+    },
+    {
+      "id": "atlassian",
+      "name": "Atlassian",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.atlassian.com"
+    },
+    {
+      "id": "jira",
+      "name": "Jira",
+      "adapter": "statuspage",
+      "baseUrl": "https://jira-software.status.atlassian.com"
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.cloudflarestatus.com"
+    },
+    {
+      "id": "aws",
+      "name": "Amazon Web Services",
+      "adapter": "aws",
+      "baseUrl": "https://health.aws.amazon.com"
+    },
+    {
+      "id": "gcp",
+      "name": "Google Cloud",
+      "adapter": "gcp",
+      "baseUrl": "https://status.cloud.google.com"
+    },
+    {
+      "id": "azure",
+      "name": "Microsoft Azure",
+      "adapter": "azure",
+      "baseUrl": "https://azure.status.microsoft"
+    },
+    {
+      "id": "digitalocean",
+      "name": "DigitalOcean",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.digitalocean.com"
+    },
+    {
+      "id": "linode",
+      "name": "Akamai Linode",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.linode.com"
+    },
+    {
+      "id": "heroku",
+      "name": "Heroku",
+      "adapter": "rss",
+      "baseUrl": "https://status.heroku.com/feed"
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.vercel-status.com"
+    },
+    {
+      "id": "netlify",
+      "name": "Netlify",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.netlifystatus.com"
+    },
+    {
+      "id": "render",
+      "name": "Render",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.render.com"
+    },
+    {
+      "id": "fly",
+      "name": "Fly.io",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.flyio.net"
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.claude.com"
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.openai.com"
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "adapter": "slack",
+      "baseUrl": "https://slack-status.com"
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "adapter": "statuspage",
+      "baseUrl": "https://discordstatus.com"
+    },
+    {
+      "id": "zoom",
+      "name": "Zoom",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.zoom.us"
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.notion-status.com"
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "adapter": "statuspage",
+      "baseUrl": "https://linearstatus.com"
+    },
+    {
+      "id": "figma",
+      "name": "Figma",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.figma.com"
+    },
+    {
+      "id": "dropbox",
+      "name": "Dropbox",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.dropbox.com"
+    },
+    {
+      "id": "hubspot",
+      "name": "HubSpot",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.hubspot.com"
+    },
+    {
+      "id": "shopify",
+      "name": "Shopify",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.shopifystatus.com"
+    },
+    {
+      "id": "square",
+      "name": "Square",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.issquareup.com"
+    },
+    {
+      "id": "twilio",
+      "name": "Twilio",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.twilio.com"
+    },
+    {
+      "id": "sendgrid",
+      "name": "Twilio SendGrid",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.sendgrid.com"
+    },
+    {
+      "id": "datadog",
+      "name": "Datadog",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.datadoghq.com"
+    },
+    {
+      "id": "sentry",
+      "name": "Sentry",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.sentry.io"
+    },
+    {
+      "id": "circleci",
+      "name": "CircleCI",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.circleci.com"
+    },
+    {
+      "id": "docker",
+      "name": "Docker Hub",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.dockerstatus.com"
+    },
+    {
+      "id": "npm",
+      "name": "npm",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.npmjs.org"
+    },
+    {
+      "id": "mongodb",
+      "name": "MongoDB Atlas",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.mongodb.com"
+    },
+    {
+      "id": "planetscale",
+      "name": "PlanetScale",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.planetscalestatus.com"
+    },
+    {
+      "id": "supabase",
+      "name": "Supabase",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.supabase.com"
+    },
+    {
+      "id": "elastic",
+      "name": "Elastic Cloud",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.elastic.co"
+    },
+    {
+      "id": "snowflake",
+      "name": "Snowflake",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.snowflake.com"
+    },
+    {
+      "id": "cloudinary",
+      "name": "Cloudinary",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.cloudinary.com"
+    },
+    {
+      "id": "reddit",
+      "name": "Reddit",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.redditstatus.com"
+    },
+    {
+      "id": "twitch",
+      "name": "Twitch",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.twitch.com"
+    },
+    {
+      "id": "uptimecom",
+      "name": "Uptime.com",
+      "adapter": "uptimecom",
+      "baseUrl": "https://status.uptime.com/statuspage/uptime-status"
+    },
+    {
+      "id": "airtable",
+      "name": "Airtable",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.airtable.com"
+    },
+    {
+      "id": "amplitude",
+      "name": "Amplitude",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.amplitude.com"
+    },
+    {
+      "id": "asana",
+      "name": "Asana",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.asana.com"
+    },
+    {
+      "id": "box",
+      "name": "Box",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.box.com"
+    },
+    {
+      "id": "brevo",
+      "name": "Brevo",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.brevo.com"
+    },
+    {
+      "id": "browserstack",
+      "name": "Browserstack",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.browserstack.com"
+    },
+    {
+      "id": "buildkite",
+      "name": "Buildkite",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.buildkitestatus.com"
+    },
+    {
+      "id": "bunny-net",
+      "name": "Bunny.net",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.bunny.net"
+    },
+    {
+      "id": "canva",
+      "name": "Canva",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.canvastatus.com"
+    },
+    {
+      "id": "chargebee",
+      "name": "Chargebee",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.chargebee.com"
+    },
+    {
+      "id": "clerk",
+      "name": "Clerk",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.clerk.com"
+    },
+    {
+      "id": "cloudsmith",
+      "name": "Cloudsmith",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.cloudsmith.io"
+    },
+    {
+      "id": "codecov",
+      "name": "Codecov",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.codecov.com"
+    },
+    {
+      "id": "coinbase",
+      "name": "Coinbase",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.coinbase.com"
+    },
+    {
+      "id": "confluent-cloud",
+      "name": "Confluent Cloud",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.confluent.cloud"
+    },
+    {
+      "id": "contentful",
+      "name": "Contentful",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.contentfulstatus.com"
+    },
+    {
+      "id": "convex",
+      "name": "Convex",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.convex.dev"
+    },
+    {
+      "id": "crowdin",
+      "name": "Crowdin",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.crowdin.com"
+    },
+    {
+      "id": "doppler",
+      "name": "Doppler",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.doppler.com"
+    },
+    {
+      "id": "duo-security",
+      "name": "Duo Security",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.duo.com"
+    },
+    {
+      "id": "elastic-path",
+      "name": "Elastic Path",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.elasticpath.com"
+    },
+    {
+      "id": "expo",
+      "name": "Expo",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.expo.dev"
+    },
+    {
+      "id": "front",
+      "name": "Front",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.frontapp.com"
+    },
+    {
+      "id": "gitbook",
+      "name": "GitBook",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.gitbookstatus.com"
+    },
+    {
+      "id": "gitpod",
+      "name": "Gitpod",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.gitpodstatus.com"
+    },
+    {
+      "id": "grafana-cloud",
+      "name": "Grafana Cloud",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.grafana.com"
+    },
+    {
+      "id": "groq",
+      "name": "Groq",
+      "adapter": "statuspage",
+      "baseUrl": "https://groqstatus.com"
+    },
+    {
+      "id": "hashicorp",
+      "name": "Hashicorp",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.hashicorp.com"
+    },
+    {
+      "id": "honeycomb",
+      "name": "Honeycomb",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.honeycomb.io"
+    },
+    {
+      "id": "hugging-face",
+      "name": "Hugging Face",
+      "adapter": "betterstack",
+      "baseUrl": "https://status.huggingface.co"
+    },
+    {
+      "id": "jamf",
+      "name": "Jamf",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.jamf.com"
+    },
+    {
+      "id": "kinsta",
+      "name": "Kinsta",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.kinsta.com"
+    },
+    {
+      "id": "klaviyo",
+      "name": "Klaviyo",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.klaviyo.com"
+    },
+    {
+      "id": "launchdarkly",
+      "name": "LaunchDarkly",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.launchdarkly.com"
+    },
+    {
+      "id": "lastpass",
+      "name": "LastPass",
+      "adapter": "rss",
+      "baseUrl": "https://status.lastpass.com/history.rss"
+    },
+    {
+      "id": "loom",
+      "name": "Loom",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.loomstatus.com"
+    },
+    {
+      "id": "lucid",
+      "name": "Lucid",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.lucid.co"
+    },
+    {
+      "id": "mailgun",
+      "name": "Mailgun",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.mailgun.com"
+    },
+    {
+      "id": "mapbox",
+      "name": "Mapbox",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.mapbox.com"
+    },
+    {
+      "id": "miro",
+      "name": "Miro",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.miro.com"
+    },
+    {
+      "id": "mixpanel",
+      "name": "Mixpanel",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.mixpanelstatus.com"
+    },
+    {
+      "id": "monday-com",
+      "name": "Monday.com",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.monday.com"
+    },
+    {
+      "id": "mux",
+      "name": "Mux",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.mux.com"
+    },
+    {
+      "id": "netdata",
+      "name": "Netdata",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.netdata.cloud"
+    },
+    {
+      "id": "new-relic",
+      "name": "New Relic",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.newrelic.com"
+    },
+    {
+      "id": "ngrok",
+      "name": "ngrok",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.ngrok.com"
+    },
+    {
+      "id": "optimizely",
+      "name": "Optimizely",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.optimizely.com"
+    },
+    {
+      "id": "ovhcloud",
+      "name": "OVHcloud",
+      "adapter": "statuspage",
+      "baseUrl": "https://public-cloud.status-ovhcloud.com"
+    },
+    {
+      "id": "paddle",
+      "name": "Paddle",
+      "adapter": "statuspage",
+      "baseUrl": "https://paddlestatus.com"
+    },
+    {
+      "id": "perplexity",
+      "name": "Perplexity",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.perplexity.com"
+    },
+    {
+      "id": "pinecone",
+      "name": "Pinecone",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.pinecone.io"
+    },
+    {
+      "id": "plaid",
+      "name": "Plaid",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.plaid.com"
+    },
+    {
+      "id": "postman",
+      "name": "Postman",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.postman.com"
+    },
+    {
+      "id": "prisma",
+      "name": "Prisma",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.prisma-status.com"
+    },
+    {
+      "id": "pulumi",
+      "name": "Pulumi",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.pulumi.com"
+    },
+    {
+      "id": "pusher",
+      "name": "Pusher",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.pusher.com"
+    },
+    {
+      "id": "quay-io",
+      "name": "Quay.io",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.quay.io"
+    },
+    {
+      "id": "recurly",
+      "name": "Recurly",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.recurly.com"
+    },
+    {
+      "id": "resend",
+      "name": "Resend",
+      "adapter": "statuspage",
+      "baseUrl": "https://resend-status.com"
+    },
+    {
+      "id": "retool",
+      "name": "Retool",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.retool.com"
+    },
+    {
+      "id": "rubygems",
+      "name": "RubyGems",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.rubygems.org"
+    },
+    {
+      "id": "scaleway",
+      "name": "Scaleway",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.scaleway.com"
+    },
+    {
+      "id": "segment",
+      "name": "Segment",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.segment.com"
+    },
+    {
+      "id": "smartsheet",
+      "name": "Smartsheet",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.smartsheet.com"
+    },
+    {
+      "id": "snyk",
+      "name": "Snyk",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.snyk.io"
+    },
+    {
+      "id": "statsig",
+      "name": "Statsig",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.statsig.com"
+    },
+    {
+      "id": "strapi-cloud",
+      "name": "Strapi Cloud",
+      "adapter": "betterstack",
+      "baseUrl": "https://status.strapi.io"
+    },
+    {
+      "id": "stream",
+      "name": "Stream",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.getstream.io"
+    },
+    {
+      "id": "sumo-logic",
+      "name": "Sumo Logic",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.sumologic.com"
+    },
+    {
+      "id": "tailscale",
+      "name": "Tailscale",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.tailscale.com"
+    },
+    {
+      "id": "teamwork",
+      "name": "Teamwork",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.teamwork.com"
+    },
+    {
+      "id": "travis-ci",
+      "name": "Travis CI",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.traviscistatus.com"
+    },
+    {
+      "id": "trello",
+      "name": "Trello",
+      "adapter": "statuspage",
+      "baseUrl": "https://trello.status.atlassian.com"
+    },
+    {
+      "id": "turso",
+      "name": "Turso",
+      "adapter": "betterstack",
+      "baseUrl": "https://status.turso.tech"
+    },
+    {
+      "id": "typeform",
+      "name": "Typeform",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.typeform.com"
+    },
+    {
+      "id": "upstash",
+      "name": "Upstash",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.upstash.com"
+    },
+    {
+      "id": "vimeo",
+      "name": "Vimeo",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.vimeostatus.com"
+    },
+    {
+      "id": "vonage",
+      "name": "Vonage",
+      "adapter": "statuspage",
+      "baseUrl": "https://vonageapi.statuspage.io"
+    },
+    {
+      "id": "webflow",
+      "name": "Webflow",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.webflow.com"
+    },
+    {
+      "id": "wix",
+      "name": "Wix",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.wix.com"
+    },
+    {
+      "id": "zapier",
+      "name": "Zapier",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.zapier.com"
+    },
+    {
+      "id": "1password",
+      "name": "1Password",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.1password.com"
+    },
+    {
+      "id": "akamai",
+      "name": "Akamai",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.akamaistatus.com"
+    },
+    {
+      "id": "apollo-graphql",
+      "name": "Apollo GraphQL",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.apollographql.com"
+    },
+    {
+      "id": "appwrite",
+      "name": "Appwrite",
+      "adapter": "betterstack",
+      "baseUrl": "https://status.appwrite.online"
+    },
+    {
+      "id": "bitrise",
+      "name": "Bitrise",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.bitrise.io"
+    },
+    {
+      "id": "bugsnag",
+      "name": "Bugsnag",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.bugsnag.com"
+    },
+    {
+      "id": "civo",
+      "name": "Civo",
+      "adapter": "rss",
+      "baseUrl": "https://status.civo.com/index.xml"
+    },
+    {
+      "id": "coda",
+      "name": "Coda",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.coda.io"
+    },
+    {
+      "id": "cockroachdb-cloud",
+      "name": "CockroachDB Cloud",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.cockroachlabs.cloud"
+    },
+    {
+      "id": "cohere",
+      "name": "Cohere",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.cohere.com"
+    },
+    {
+      "id": "confluence",
+      "name": "Confluence",
+      "adapter": "statuspage",
+      "baseUrl": "https://confluence.status.atlassian.com"
+    },
+    {
+      "id": "cypress-cloud",
+      "name": "Cypress Cloud",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.cypressstatus.com"
+    },
+    {
+      "id": "dnsimple",
+      "name": "DNSimple",
+      "adapter": "statuspage",
+      "baseUrl": "https://dnsimplestatus.com"
+    },
+    {
+      "id": "flagsmith",
+      "name": "Flagsmith",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.flagsmith.com"
+    },
+    {
+      "id": "gandi",
+      "name": "Gandi",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.gandi.net"
+    },
+    {
+      "id": "gemfury",
+      "name": "Gemfury",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.gemfury.com"
+    },
+    {
+      "id": "gocardless",
+      "name": "GoCardless",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.gocardless-status.com"
+    },
+    {
+      "id": "gorgias",
+      "name": "Gorgias",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.gorgias.com"
+    },
+    {
+      "id": "greenhouse",
+      "name": "Greenhouse",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.greenhouse.io"
+    },
+    {
+      "id": "harness",
+      "name": "Harness",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.harness.io"
+    },
+    {
+      "id": "help-scout",
+      "name": "Help Scout",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.helpscout.com"
+    },
+    {
+      "id": "hotjar",
+      "name": "Hotjar",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.hotjar.com"
+    },
+    {
+      "id": "imgix",
+      "name": "imgix",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.imgix.com"
+    },
+    {
+      "id": "jira-service-management",
+      "name": "Jira Service Management",
+      "adapter": "statuspage",
+      "baseUrl": "https://jira-service-management.status.atlassian.com"
+    },
+    {
+      "id": "keygen",
+      "name": "Keygen",
+      "adapter": "betterstack",
+      "baseUrl": "https://status.keygen.sh"
+    },
+    {
+      "id": "kong-konnect",
+      "name": "Kong Konnect",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.konghq.com"
+    },
+    {
+      "id": "logz-io",
+      "name": "Logz.io",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.logz.io"
+    },
+    {
+      "id": "mailjet",
+      "name": "Mailjet",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.mailjet.com"
+    },
+    {
+      "id": "memberstack",
+      "name": "Memberstack",
+      "adapter": "betterstack",
+      "baseUrl": "https://status.memberstack.com"
+    },
+    {
+      "id": "messagebird",
+      "name": "MessageBird",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.messagebird.com"
+    },
+    {
+      "id": "metabase",
+      "name": "Metabase",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.metabase.com"
+    },
+    {
+      "id": "mollie",
+      "name": "Mollie",
+      "adapter": "rss",
+      "baseUrl": "https://status.mollie.com/history.rss"
+    },
+    {
+      "id": "nhost",
+      "name": "Nhost",
+      "adapter": "rss",
+      "baseUrl": "https://status.nhost.io/history.rss"
+    },
+    {
+      "id": "nylas",
+      "name": "Nylas",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.nylas.com"
+    },
+    {
+      "id": "onesignal",
+      "name": "OneSignal",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.onesignal.com"
+    },
+    {
+      "id": "pipedream",
+      "name": "Pipedream",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.pipedream.com"
+    },
+    {
+      "id": "pinata",
+      "name": "Pinata",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.pinata.cloud"
+    },
+    {
+      "id": "porkbun",
+      "name": "Porkbun",
+      "adapter": "uptimecom",
+      "baseUrl": "https://status.porkbun.com"
+    },
+    {
+      "id": "qdrant-cloud",
+      "name": "Qdrant Cloud",
+      "adapter": "betterstack",
+      "baseUrl": "https://status.qdrant.io"
+    },
+    {
+      "id": "quickbooks",
+      "name": "Quickbooks",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.quickbooks.intuit.com"
+    },
+    {
+      "id": "rollbar",
+      "name": "Rollbar",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.rollbar.com"
+    },
+    {
+      "id": "sanity",
+      "name": "Sanity",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.sanity-status.com"
+    },
+    {
+      "id": "sinch",
+      "name": "Sinch",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.sinch.com"
+    },
+    {
+      "id": "sparkpost",
+      "name": "SparkPost",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.sparkpost.com"
+    },
+    {
+      "id": "stytch",
+      "name": "Stytch",
+      "adapter": "rss",
+      "baseUrl": "https://status.stytch.com/history.rss"
+    },
+    {
+      "id": "telnyx",
+      "name": "Telnyx",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.telnyx.com"
+    },
+    {
+      "id": "temporal-cloud",
+      "name": "Temporal Cloud",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.temporal.io"
+    },
+    {
+      "id": "together-ai",
+      "name": "Together AI",
+      "adapter": "betterstack",
+      "baseUrl": "https://status.together.ai"
+    },
+    {
+      "id": "transifex",
+      "name": "Transifex",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.transifex.com"
+    },
+    {
+      "id": "twingate",
+      "name": "Twingate",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.twingate.com"
+    },
+    {
+      "id": "unbounce",
+      "name": "Unbounce",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.unbounce.com"
+    },
+    {
+      "id": "wasabi",
+      "name": "Wasabi",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.wasabi.com"
+    },
+    {
+      "id": "workos",
+      "name": "WorkOS",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.workos.com"
+    },
+    {
+      "id": "xero",
+      "name": "Xero",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.xero.com"
+    },
+    {
+      "id": "zuora",
+      "name": "Zuora",
+      "adapter": "statuspage",
+      "baseUrl": "https://trust.zuora.com"
+    },
+    {
+      "id": "oracle-cloud",
+      "name": "Oracle Cloud",
+      "adapter": "rss",
+      "baseUrl": "https://ocistatus.oraclecloud.com/history.rss"
+    },
+    {
+      "id": "sourcehut",
+      "name": "SourceHut",
+      "adapter": "rss",
+      "baseUrl": "https://status.sr.ht/index.xml"
+    },
+    {
+      "id": "matrix-org",
+      "name": "Matrix.org",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.matrix.org"
+    },
+    {
+      "id": "mastodon-social",
+      "name": "Mastodon.social",
+      "adapter": "instatus",
+      "baseUrl": "https://status.mastodon.social"
+    },
+    {
+      "id": "wikimedia",
+      "name": "Wikimedia",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.wikimediastatus.net"
+    },
+    {
+      "id": "epic-games",
+      "name": "Epic Games",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.epicgames.com"
+    },
+    {
+      "id": "dropbox-sign",
+      "name": "Dropbox Sign",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.hellosign.com"
+    },
+    {
+      "id": "plausible",
+      "name": "Plausible",
+      "adapter": "betterstack",
+      "baseUrl": "https://status.plausible.io"
+    },
+    {
+      "id": "bitly",
+      "name": "Bitly",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.bitly.com"
+    },
+    {
+      "id": "kraken",
+      "name": "Kraken",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.kraken.com"
+    },
+    {
+      "id": "wise",
+      "name": "Wise",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.wise.com"
+    },
+    {
+      "id": "klarna",
+      "name": "Klarna",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.klarna.com"
+    },
+    {
+      "id": "sumup",
+      "name": "SumUp",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.sumup.com"
+    },
+    {
+      "id": "lightspeed",
+      "name": "Lightspeed",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.lightspeedhq.com"
+    },
+    {
+      "id": "appsflyer",
+      "name": "AppsFlyer",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.appsflyer.com"
+    },
+    {
+      "id": "bluesky",
+      "name": "Bluesky",
+      "adapter": "rss",
+      "baseUrl": "https://status.bsky.app/history.rss"
+    },
+    {
+      "id": "grammarly",
+      "name": "Grammarly",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.grammarly.com"
+    },
+    {
+      "id": "hibob",
+      "name": "HiBob",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.hibob.io"
+    },
+    {
+      "id": "jitterbit",
+      "name": "Jitterbit",
+      "adapter": "statuspage",
+      "baseUrl": "https://trust.jitterbit.com"
+    },
+    {
+      "id": "pinterest",
+      "name": "Pinterest",
+      "adapter": "statuspage",
+      "baseUrl": "https://www.pintereststatus.com"
+    },
+    {
+      "id": "sumsub",
+      "name": "Sumsub",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.sumsub.com"
+    },
+    {
+      "id": "udemy",
+      "name": "Udemy",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.udemy.com"
+    },
+    {
+      "id": "webgazer",
+      "name": "WebGazer",
+      "adapter": "rss",
+      "baseUrl": "https://status.webgazer.io/feed"
+    }
+  ]
+}

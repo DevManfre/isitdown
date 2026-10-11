@@ -1,0 +1,9 @@
+services:
+  app:
+    image: ghcr.io/acme/shop:latest
+    environment:
+      STRIPE_WEBHOOK: https://hooks.example-unknown.dev/stripe
+  db:
+    image: postgres:16
+  cache:
+    image: public.ecr.aws/docker/library/redis:7
