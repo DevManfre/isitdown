@@ -409,6 +409,7 @@ list is never overwritten afterwards.
 | `PUBLIC_PAGE_PROVIDERS` | UI | — | Which providers to publish, comma-separated by id. Unset publishes every enabled provider. A visitor cannot widen this: the page takes no request input at all. |
 | `PUBLIC_PAGE_LOCALE` | UI | — | The language that page is written in. Unset follows the installation's own notification locale. |
 | `PUSH_TOKEN` | UI | — | Turns on the provider-webhook endpoint ([3.15](#315-provider-push-instead-of-poll)) and is the credential in its URL. Unset, that route answers `404`. |
+| `HEARTBEAT_TOKEN` | UI | — | Turns on the heartbeat ping endpoint ([3.19](#319-heartbeats--the-dead-mans-switch)) and is the credential in its URL. Unset, that route answers `404`. |
 | `PORT` | UI | `3000` | HTTP port. |
 
 Secrets arrive through `env_file` at runtime; nothing is baked into an image.
@@ -1831,3 +1832,53 @@ providers still appear, under the name you gave them, with no link.
 It is not authentication: anyone who can reach the port can read the page, which
 is the point of it. Set `API_TOKEN` and the page stays open while the dashboard
 does not — its readers are exactly the people who hold no token.
+
+### 3.19 Heartbeats — the dead-man's switch
+
+Every other provider is something IsItDown goes and asks. A `heartbeat` is
+asked *of* it: a cron job calls a URL when it has run, and the alert is the call
+that did not come — the backup that quietly stopped three weeks ago (roadmap
+2.5). UI edition only: the Light edition has no URL a job could call, and refuses
+a `heartbeat` provider in its `config.yml` as an unknown adapter.
+
+```json
+{
+  "id": "nightly-backup",
+  "name": "Nightly backup",
+  "adapter": "heartbeat",
+  "baseUrl": "https://heartbeat.invalid",
+  "options": { "every": "24h", "grace": "1h" }
+}
+```
+
+| Option | Meaning |
+|---|---|
+| `every` | Required. How often the job calls, ping to ping: `30m`, `24h`, `7d` — one number and a unit (`s`, `m`, `h`, `d`), between `1m` and `35d`. A bare number is refused rather than read as some unit. |
+| `grace` | How late a ping may be before it is missed. Defaults to a tenth of `every`, never less than a minute; never longer than `every`. |
+
+`baseUrl` is not read. By convention it is `https://heartbeat.invalid` — a
+domain reserved never to resolve — which is what `isitdown import` writes.
+
+Set `HEARTBEAT_TOKEN` and give the job its URL — the last line of a crontab:
+
+```bash
+0 3 * * * /usr/local/bin/backup.sh && curl -fsS "https://isitdown.example.com/heartbeat/nightly-backup?token=$HEARTBEAT_TOKEN"
+```
+
+`GET` and `POST` both count. The provider reads `operational` until `every` plus
+`grace` has run out since the last ping, and `major_outage` from then on — the
+verdict goes through the diff engine and the routing like any outage, so a
+missed run notifies through the same channels and rules. A job that has never
+called is measured from when the monitor was first read: it is late after its
+first period, not pending forever. A ping also reads the provider straight
+away, so a late job that has now called resolves in seconds; pings within ten
+seconds of one another are recorded without another read (`202`).
+
+`GET /config/heartbeats` lists every heartbeat's URL with when its job last
+called and how many times — the only proof a crontab line is right. The token
+appears in it only for a request that could also write; a read-only
+`API_TOKEN` holder sees `<HEARTBEAT_TOKEN>` in its place. Like the push URL
+([3.15](#315-provider-push-instead-of-poll)), the ping route is never gated by
+`API_TOKEN` — its caller is a script — so treat the URL as the secret it is and
+serve it over HTTPS. A ping that arrives while the instance itself is down is
+lost: the next one puts the provider right.

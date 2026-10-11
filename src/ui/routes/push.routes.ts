@@ -76,7 +76,7 @@ const bodySchema = z.object({
   component: z.object({ name: z.string().optional() }).optional(),
 });
 
-function tokenMatches(expected: string, given: string): boolean {
+export function tokenMatches(expected: string, given: string): boolean {
   const a = Buffer.from(expected);
   const b = Buffer.from(given);
   return a.length === b.length && timingSafeEqual(a, b);
