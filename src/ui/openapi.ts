@@ -605,6 +605,17 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
+  "/config/import/neighbour": {
+    post: {
+      tags: ["Configuration"],
+      summary: "Read another monitoring tool's export into proposed providers.",
+      description:
+        "Roadmap 2.4. The body is an Uptime Kuma backup, a Gatus config.yaml, a Statping export or a StatusGator board's monitor list — as a text body (up to 256 kB), as `{ content }`, or as the export's own JSON. `?from=uptimekuma|gatus|statping|statusgator` names the tool; absent, it is detected. Answers `{ tool, services: [{ source, type, kind, service, notes, configured }], skipped: [{ source, type, reason, detail }] }`, `kind` being `probe`, `page` (a status page the catalog recognises) or `heartbeat`. Every `service` passes the same checks a save does. Nothing is added and nothing is fetched.",
+      parameters: [query("from", "The tool that wrote the export; detected when absent.", { type: "string", enum: ["uptimekuma", "gatus", "statping", "statusgator"] })],
+      requestBody: { required: true, ...media("text/plain", "The export as it stands.") },
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
   "/config/services": {
     post: {
       tags: ["Configuration"],

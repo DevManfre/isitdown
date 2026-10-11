@@ -70,7 +70,48 @@ catalog entry matched — candidates to add by URL if they have a status page.
 `--yaml` prints a `services:` block a Light edition `config.yml` accepts as it
 is; `--json` the whole result.
 
-### 10.3 How `watch` stays live
+### 10.3 `isitdown import`
+
+```
+usage: isitdown import <file> [--from <tool>] [--yaml | --json]
+```
+
+The third command (roadmap 2.4), and like `discover` it needs no instance:
+it reads another monitoring tool's export and says what each monitor becomes
+here, before anything is added. Offline — the bundled catalog is the only other
+thing it reads.
+
+| Tool | The file |
+|---|---|
+| `uptimekuma` | the backup — Settings → Backup → Export, the JSON with a `monitorList` |
+| `gatus` | its `config.yaml` — the inverse of the Gatus export ([6](api.md#6-http-api), `/export/gatus.yaml`) |
+| `statping` | the output of `statping export` |
+| `statusgator` | a board's monitor list, as its API answers it: `curl -H "Authorization: Bearer $TOKEN" https://statusgator.com/api/v3/boards/<board>/monitors` |
+
+`--from` names the tool; without it, the shape of the file says which. Each
+monitor lands in one of four places:
+
+- **Probes** — HTTP, keyword, TCP and DNS checks become `http`, `tcp` and `dns`
+  providers, with their expected status, body text, cadence and group.
+- **Status pages the catalog recognises** — a URL whose host is a catalog
+  entry's status page becomes that provider, read by its own adapter rather than
+  probed as a web page. A StatusGator service monitor the catalog does not know
+  is listed, to be added by URL so detection names its adapter.
+- **Heartbeats** — Uptime Kuma push monitors, Gatus external endpoints with a
+  heartbeat interval and Statping check-ins are jobs that call in, and become
+  `heartbeat` providers ([3.19](configuration.md#319-heartbeats--the-dead-mans-switch)).
+- **Not imported** — ping, gRPC, databases, a method other than `GET` or `HEAD`,
+  a DNS record type the probe cannot ask for — each with the reason.
+
+What does not carry over is said per monitor rather than guessed at: a Gatus
+condition with no equivalent, a regular expression on the body, and headers,
+authentication or a request body — credentials never travel into a config.
+`--yaml` prints a `services:` block a Light edition `config.yml` accepts as it
+is, heartbeats left out with a comment, since the Light edition has no URL a
+job could call; `--json` the whole result. The UI edition answers the same
+question at `POST /config/import/neighbour`.
+
+### 10.4 How `watch` stays live
 
 The client opens `GET /events` — the same server-sent-events stream
 `src/ui/routes/events.routes.ts` serves the dashboard — and re-reads
@@ -86,7 +127,7 @@ back to polling `/status` on `--interval` while it keeps trying the stream in
 the background — a dropped connection becomes slower updates, never a frozen
 screen, and reconnecting is silent: nothing has to be restarted by hand.
 
-### 10.4 `watch` errors
+### 10.5 `watch` errors
 
 A server that is unreachable, a token the instance rejects (`401`/`403`), or a
 response that isn't the JSON this client expects all show up as the panel's
@@ -94,11 +135,12 @@ own connection line — never as a stack trace that breaks the layout. A
 rejected token is the one case that stops rather than retries: no amount of
 waiting fixes a wrong credential.
 
-### 10.5 What `watch` deliberately does not do
+### 10.6 What `watch` deliberately does not do
 
 Every request this client makes is a `GET`. It has no code path that writes —
 no polling trigger, no mute, no configuration change — so a token handed to it
 only ever needs read access, and pointing it at an instance can never be
 mistaken for administering one. Adding write access or another view is out
 of scope for this page; each would be its own roadmap row. `discover` (10.2)
-is a separate command that reads local files, not the instance.
+and `import` (10.3) are separate commands that read local files, not the
+instance.

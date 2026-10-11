@@ -5,6 +5,7 @@ import { detectAdapter } from "../../adapters/detect.ts";
 import { resetValidators } from "../../core/http.ts";
 import { cadenceProblems, optionProblems } from "../../adapters/index.ts";
 import { discover } from "../../adapters/discover.ts";
+import { IMPORT_TOOLS, importMonitors, type ImportTool } from "../../adapters/import/index.ts";
 import { getAdapter } from "../../adapters/index.ts";
 import {
   alertCapSchema,
@@ -270,6 +271,49 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     res.json({
       ...result,
       providers: result.providers.map((provider) => ({ ...provider, configured: taken.has(provider.entry.id) })),
+    });
+  });
+
+  /**
+   * A neighbour tool's export, read into proposals — roadmap 2.4. The same
+   * pure function `isitdown import` runs: nothing is added, and each proposal
+   * says whether the fleet already has a provider with its id.
+   *
+   * The export arrives as a text body (YAML or JSON, up to the text parser's
+   * 256 kB — an Uptime Kuma backup outgrows the JSON parser's 64 kB long
+   * before it outgrows that), as `{ content }`, or as the export's own JSON
+   * posted as it stands. `?from=` names the tool; absent, it is detected.
+   */
+  router.post("/config/import/neighbour", (req, res) => {
+    const from = typeof req.query["from"] === "string" ? req.query["from"] : undefined;
+    if (from !== undefined && !(IMPORT_TOOLS as readonly string[]).includes(from)) {
+      res.status(400).json({ error: { message: `from must be one of ${IMPORT_TOOLS.join(", ")}` } });
+      return;
+    }
+    const body: unknown = req.body;
+    const content =
+      typeof body === "string"
+        ? body
+        : typeof (body as { content?: unknown } | undefined)?.content === "string"
+          ? (body as { content: string }).content
+          : typeof body === "object" && body !== null && Object.keys(body).length > 0
+            ? JSON.stringify(body)
+            : "";
+    if (content.trim() === "") {
+      res.status(400).json({ error: { message: "send the export as the request body, or as { content }" } });
+      return;
+    }
+    let result;
+    try {
+      result = importMonitors(content, runtime.catalogFeed.entries(), from as ImportTool | undefined);
+    } catch (error) {
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      return;
+    }
+    const taken = new Set(listServices(db).map((service) => service.id));
+    res.json({
+      ...result,
+      services: result.services.map((proposal) => ({ ...proposal, configured: taken.has(proposal.service.id) })),
     });
   });
 

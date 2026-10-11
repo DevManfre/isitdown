@@ -21,7 +21,7 @@ src/light/      Light edition entrypoint, file-based config loader, file state s
 src/ui/         UI edition entrypoint, Express server, SQLite state store, dashboard routes
 src/ui/web/     React dashboard: Vite, shadcn/ui, Recharts — bundled into dist/ui/public
 src/outpost/    Outpost entrypoint (roadmap 1.7) — a stateless `POST /probe` server that runs one probe for a remote poller; core + adapters only, ships in the Light image
-src/cli/        Terminal client entrypoint (`isitdown watch`, roadmap 17.7; `isitdown discover`, roadmap 2.3) — `watch` is a read-only HTTP client for the UI edition's API, `discover` reads local files through src/adapters (catalog + discover.ts); never imports src/ui itself, only its response shapes (validated with zod like any other external input)
+src/cli/        Terminal client entrypoint (`isitdown watch`, roadmap 17.7; `isitdown discover`, roadmap 2.3; `isitdown import`, roadmap 2.4) — `watch` is a read-only HTTP client for the UI edition's API, `discover` and `import` read local files through src/adapters (catalog + discover.ts, import/); never imports src/ui itself, only its response shapes (validated with zod like any other external input)
 design/         Claude Design exports/prototypes for the UI dashboard (source of truth for visual direction before implementation) — git-ignored, so present on disk only
 ```
 

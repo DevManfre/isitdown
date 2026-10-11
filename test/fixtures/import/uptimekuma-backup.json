@@ -1,0 +1,19 @@
+{
+  "version": "1.23.16",
+  "notificationList": [],
+  "proxyList": [],
+  "monitorList": [
+    { "id": 1, "name": "Infrastructure", "type": "group", "parent": null, "active": 1, "interval": 60 },
+    { "id": 2, "name": "Homepage", "type": "http", "url": "https://example.com/", "method": "GET", "interval": 60, "active": 1, "parent": 1, "accepted_statuscodes": ["200-299"], "headers": null, "body": null, "basic_auth_user": null, "authMethod": null },
+    { "id": 3, "name": "API health", "type": "keyword", "url": "https://api.example.com/health", "method": "GET", "interval": 30, "active": 1, "parent": 1, "keyword": "\"ok\":true", "invertKeyword": false, "accepted_statuscodes": ["200-299", "304"], "headers": "{\"Authorization\": \"Bearer hunter2\"}" },
+    { "id": 4, "name": "No maintenance banner", "type": "keyword", "url": "https://example.com/status", "method": "GET", "interval": 300, "active": 0, "parent": null, "keyword": "maintenance", "invertKeyword": true, "accepted_statuscodes": ["200-299"] },
+    { "id": 5, "name": "Postgres", "type": "port", "hostname": "db.example.internal", "port": 5432, "interval": 20, "active": 1, "parent": 1 },
+    { "id": 6, "name": "Mail MX", "type": "dns", "hostname": "example.com", "dns_resolve_type": "MX", "dns_resolve_server": "1.1.1.1", "port": 53, "interval": 600, "active": 1, "parent": null },
+    { "id": 7, "name": "SRV record", "type": "dns", "hostname": "_sip._tcp.example.com", "dns_resolve_type": "SRV", "dns_resolve_server": "1.1.1.1", "port": 53, "interval": 600, "active": 1 },
+    { "id": 8, "name": "Nightly backup", "type": "push", "pushToken": "abc123", "interval": 86400, "active": 1 },
+    { "id": 9, "name": "GitHub status", "type": "http", "url": "https://www.githubstatus.com", "method": "GET", "interval": 60, "active": 1, "accepted_statuscodes": ["200-299"] },
+    { "id": 10, "name": "Router", "type": "ping", "hostname": "192.168.1.1", "interval": 60, "active": 1 },
+    { "id": 11, "name": "Webhook receiver", "type": "http", "url": "https://hooks.example.com/in", "method": "POST", "interval": 60, "active": 1 },
+    { "id": 12, "name": "Homepage", "type": "http", "url": "https://example.org", "method": "HEAD", "interval": 90, "active": 1, "accepted_statuscodes": ["200-299"] }
+  ]
+}
