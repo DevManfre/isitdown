@@ -3,6 +3,7 @@ import type {
   Annotation,
   AdapterDetection,
   AdapterProbeResult,
+  CatalogProposal,
   CatalogProvider,
   ComponentHistoryResponse,
   ComponentPreview,
@@ -341,6 +342,13 @@ export const restoreBackup = async (file: File): Promise<DbRestoreReport> => {
 /** The bundled provider menu, with the ids already watched marked (roadmap 5.11). */
 export const getCatalog = () =>
   request<{ providers: CatalogProvider[] }>("GET", "/config/catalog");
+
+/** Configured providers whose catalog entry moved (roadmap 2.2). */
+export const getCatalogProposals = () =>
+  request<{ proposals: CatalogProposal[] }>("GET", "/config/catalog/proposals");
+
+export const dismissCatalogProposal = (serviceId: string) =>
+  request<undefined>("POST", `/config/catalog/proposals/${encodeURIComponent(serviceId)}/dismiss`);
 /** Which adapter reads a pasted url, and the base url that adapter wants. */
 export const detectAdapter = (url: string) =>
   request<AdapterDetection>("POST", "/config/services/detect", { url });

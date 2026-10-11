@@ -80,7 +80,7 @@
   "public.empty": "Es wird noch kein Dienst veröffentlicht.",
   "public.generated": "Zuletzt geprüft {at}. Diese Seite erzeugt IsItDown aus der öffentlichen Statusseite jedes Anbieters.",
 
-  "cli.usage": "Verwendung: isitdown <befehl>\n\nBefehle:\n  watch   zeigt die Flotte einer laufenden UI-Edition-Instanz und aktualisiert sich bei Änderungen\n\nFühre 'isitdown watch --help' für dessen Optionen aus.\n",
+  "cli.usage": "Verwendung: isitdown <befehl>\n\nBefehle:\n  watch    zeigt die Flotte einer laufenden UI-Edition-Instanz und aktualisiert sich bei Änderungen\n  discover liest die Dateien eines Projekts und schlägt die Anbieter vor, von denen es abhängt\n\nFühre 'isitdown <befehl> --help' für dessen Optionen aus.\n",
   "cli.error.unknownCommand": "unbekannter Befehl: {command}",
   "cli.error.missingValue": "{option} benötigt einen Wert",
   "cli.error.unknownOption": "unbekannte Option: {option}",
@@ -106,5 +106,12 @@
   "cli.watch.changes.heading": "Letzte Änderungen",
   "cli.watch.changes.empty": "Noch keine Änderungen beobachtet.",
   "cli.watch.changes.line": "{at}  {provider} -> {status}",
-  "cli.watch.footer": "Drücke Strg+C zum Beenden."
+  "cli.watch.footer": "Drücke Strg+C zum Beenden.",
+  "cli.discover.usage": "Verwendung: isitdown discover [pfad...] [--yaml | --json]\n\nLiest die Dateien eines Projekts — package.json, Compose-Dateien, Dockerfiles, .env,\nTerraform, requirements.txt, pyproject.toml, go.mod, eine hosts-Datei — und\nschlägt die Katalog-Anbieter vor, von denen es abhängt, jeweils mit dem Fund.\nOffline: nichts wird abgerufen, nichts geschrieben.\n\n  pfad    Dateien oder Verzeichnisse (Standard: das aktuelle Verzeichnis)\n  --yaml  gibt einen services:-Block für die config.yml der Light-Edition aus\n  --json  gibt das vollständige Ergebnis als JSON aus\n",
+  "cli.discover.read": "{files} Dateien gelesen.",
+  "cli.discover.none": "Kein Katalog-Anbieter darin gefunden.",
+  "cli.discover.unmatched": "Hosts ohne passenden Katalogeintrag — per URL hinzufügen, falls sie eine Statusseite haben:",
+  "cli.discover.next": "Mit --yaml erneut ausführen für einen services:-Block für config.yml.",
+  "cli.discover.no-files": "Keine lesbare Datei gefunden.",
+  "cli.discover.error.read": "Projekt kann nicht gelesen werden: {reason}"
 }

@@ -3,8 +3,8 @@
 ## 10. Terminal client
 
 A third entrypoint beside Light and UI, for whoever keeps a terminal panel
-open next to their logs instead of a browser tab (roadmap 17.7). It is a
-**read-only client** of the UI edition's HTTP API — not a second dashboard and
+open next to their logs instead of a browser tab (roadmap 17.7). Its `watch`
+command is a **read-only client** of the UI edition's HTTP API — not a second dashboard and
 not a second engine — so everything it shows also appears at
 `http://localhost:3000`, and none of it can change anything on the instance
 it points at.
@@ -35,7 +35,42 @@ below it, a trailing queue of the most recent status changes as they arrive.
 There is no navigation, no chart, and no second screen; that is deliberate,
 not an interim state (see the parent issue's scope note). `Ctrl+C` quits.
 
-### 10.2 How it stays live
+### 10.2 `isitdown discover`
+
+```
+usage: isitdown discover [path...] [--yaml | --json]
+```
+
+The second command (roadmap 2.3), and the one that needs no instance: it reads
+a project's own files and proposes the catalog providers the project depends
+on. Offline — it reads the bundled catalog and nothing else, fetches nothing
+and writes nothing.
+
+| File | What it reads |
+|---|---|
+| `package.json` | dependency names — `@aws-sdk/*` is AWS, `openai` is OpenAI |
+| `docker-compose.yml`, `compose.yaml`, `Dockerfile` | image registries — a bare `postgres:16` is Docker Hub, `ghcr.io/…` is GitHub |
+| `.env`, `.env.*` | URLs and host names in values |
+| `*.tf` | provider sources and blocks — `hashicorp/aws`, `provider "azurerm"` |
+| `requirements*.txt`, `pyproject.toml`, `Pipfile` | package names — `boto3`, `anthropic` |
+| `go.mod` | module paths |
+| `hosts` | host names |
+| other `.yml`, `.json`, `.toml`, … | any URL |
+
+A host matches a provider when its registrable domain is the status page's —
+`api.sendgrid.com` and `status.sendgrid.com` are both `sendgrid.com` — so that
+half grows with the catalog. A small table of hints in
+`src/adapters/discover.ts` covers the providers whose dependencies do not share
+a domain with their status page. A directory is walked to a depth of eight,
+leaving out `node_modules`, `.git`, `vendor`, build output and virtualenvs;
+`localhost`, `.internal`, `.local` and bare IP addresses are never proposed.
+
+Each provider is printed with every line that pointed at it, then the hosts no
+catalog entry matched — candidates to add by URL if they have a status page.
+`--yaml` prints a `services:` block a Light edition `config.yml` accepts as it
+is; `--json` the whole result.
+
+### 10.3 How `watch` stays live
 
 The client opens `GET /events` — the same server-sent-events stream
 `src/ui/routes/events.routes.ts` serves the dashboard — and re-reads
@@ -51,7 +86,7 @@ back to polling `/status` on `--interval` while it keeps trying the stream in
 the background — a dropped connection becomes slower updates, never a frozen
 screen, and reconnecting is silent: nothing has to be restarted by hand.
 
-### 10.3 Errors
+### 10.4 `watch` errors
 
 A server that is unreachable, a token the instance rejects (`401`/`403`), or a
 response that isn't the JSON this client expects all show up as the panel's
@@ -59,11 +94,11 @@ own connection line — never as a stack trace that breaks the layout. A
 rejected token is the one case that stops rather than retries: no amount of
 waiting fixes a wrong credential.
 
-### 10.4 What it deliberately does not do
+### 10.5 What `watch` deliberately does not do
 
 Every request this client makes is a `GET`. It has no code path that writes —
 no polling trigger, no mute, no configuration change — so a token handed to it
 only ever needs read access, and pointing it at an instance can never be
-mistaken for administering one. Adding write access, another view, or a
-second command is out of scope for this page; each would be its own roadmap
-row.
+mistaken for administering one. Adding write access or another view is out
+of scope for this page; each would be its own roadmap row. `discover` (10.2)
+is a separate command that reads local files, not the instance.

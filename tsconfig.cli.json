@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["src/core/i18n/**/*.ts", "src/cli/**/*.ts"]
+  "include": ["src/core/i18n/**/*.ts", "src/cli/**/*.ts", "src/adapters/catalog.ts", "src/adapters/catalog.json", "src/adapters/discover.ts"]
 }

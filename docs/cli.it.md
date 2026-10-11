@@ -4,7 +4,7 @@
 
 Un terzo entrypoint accanto a Light e UI, per chi tiene un pannello del
 terminale aperto accanto ai propri log invece di una scheda del browser
-(roadmap 17.7). È un **client di sola lettura** dell'API HTTP dell'edizione
+(roadmap 17.7). Il suo comando `watch` è un **client di sola lettura** dell'API HTTP dell'edizione
 UI — non una seconda dashboard e non un secondo motore — quindi tutto ciò che
 mostra compare anche su `http://localhost:3000`, e niente di quello che fa può
 modificare l'istanza a cui si collega.
@@ -36,7 +36,43 @@ navigazione, non c'è un grafico, e non c'è un secondo schermo; è una scelta
 deliberata, non uno stato provvisorio (vedi la nota di perimetro nella issue
 di partenza). `Ctrl+C` per uscire.
 
-### 10.2 Come resta live
+### 10.2 `isitdown discover`
+
+```
+utilizzo: isitdown discover [percorso...] [--yaml | --json]
+```
+
+Il secondo comando (roadmap 2.3), e quello che non ha bisogno di un'istanza:
+legge i file di un progetto e propone i provider del catalogo da cui il progetto
+dipende. Offline — legge il catalogo incluso e nient'altro, non scarica nulla e
+non scrive nulla.
+
+| File | Cosa legge |
+|---|---|
+| `package.json` | nomi delle dipendenze — `@aws-sdk/*` è AWS, `openai` è OpenAI |
+| `docker-compose.yml`, `compose.yaml`, `Dockerfile` | registry delle immagini — un `postgres:16` nudo è Docker Hub, `ghcr.io/…` è GitHub |
+| `.env`, `.env.*` | URL e nomi host nei valori |
+| `*.tf` | sorgenti e blocchi dei provider — `hashicorp/aws`, `provider "azurerm"` |
+| `requirements*.txt`, `pyproject.toml`, `Pipfile` | nomi dei pacchetti — `boto3`, `anthropic` |
+| `go.mod` | percorsi dei moduli |
+| `hosts` | nomi host |
+| altri `.yml`, `.json`, `.toml`, … | qualunque URL |
+
+Un host corrisponde a un provider quando il suo dominio registrabile è quello
+della status page — `api.sendgrid.com` e `status.sendgrid.com` sono entrambi
+`sendgrid.com` — quindi quella metà cresce con il catalogo. Una piccola tabella
+di indizi in `src/adapters/discover.ts` copre i provider le cui dipendenze non
+condividono un dominio con la loro status page. Una cartella viene percorsa fino
+a otto livelli, escludendo `node_modules`, `.git`, `vendor`, gli output di build
+e i virtualenv; `localhost`, `.internal`, `.local` e gli indirizzi IP nudi non
+vengono mai proposti.
+
+Ogni provider viene stampato con ogni riga che l'ha indicato, poi gli host che
+nessuna voce del catalogo riconosce — candidati da aggiungere per URL se hanno
+una status page. `--yaml` stampa un blocco `services:` che il `config.yml`
+dell'edizione Light accetta così com'è; `--json` il risultato completo.
+
+### 10.3 Come `watch` resta live
 
 Il client apre `GET /events` — lo stesso stream a eventi lato server che
 `src/ui/routes/events.routes.ts` serve alla dashboard — e rilegge
@@ -53,7 +89,7 @@ stream in background — una connessione caduta diventa aggiornamenti più
 lenti, mai uno schermo bloccato, e la riconnessione è silenziosa: non c'è
 nulla da riavviare a mano.
 
-### 10.3 Errori
+### 10.4 Errori di `watch`
 
 Un server irraggiungibile, un token rifiutato dall'istanza (`401`/`403`), o
 una risposta che non è il JSON atteso da questo client compaiono tutti sulla
@@ -61,12 +97,12 @@ riga di stato della connessione del pannello — mai come uno stack trace che
 rompe il layout. Un token rifiutato è l'unico caso in cui il client si ferma
 invece di riprovare: nessuna attesa risolve una credenziale sbagliata.
 
-### 10.4 Cosa deliberatamente non fa
+### 10.5 Cosa `watch` deliberatamente non fa
 
 Ogni richiesta di questo client è una `GET`. Non ha nessun percorso di codice
 che scrive — nessun trigger di polling, nessun silenziamento, nessuna
 modifica di configurazione — quindi un token affidato a lui ha bisogno solo
 di accesso in lettura, e puntarlo su un'istanza non può mai essere scambiato
-per amministrarla. Aggiungere accesso in scrittura, un'altra vista, o un
-secondo comando è fuori dal perimetro di questa pagina; ognuno sarebbe una
-riga di roadmap a sé.
+per amministrarla. Aggiungere accesso in scrittura o un'altra vista è fuori dal
+perimetro di questa pagina; ognuno sarebbe una riga di roadmap a sé.
+`discover` (10.2) è un comando separato che legge file locali, non l'istanza.

@@ -15,6 +15,7 @@ import {
 import { Switch } from "@/components/ui/switch.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
 import { SettingRow } from "@/components/SettingRow.tsx";
+import { CatalogUpdatesRow } from "@/components/settings/CatalogUpdatesRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
 import { MessagePreviewDialog } from "@/components/settings/MessagePreviewDialog.tsx";
 import { SECTION_REELS } from "@/components/settings/reels.ts";
@@ -589,6 +590,22 @@ function SettingsView() {
           tone: "error",
         }),
     });
+  };
+
+  /** Roadmap 2.2: the same shape as the update check below it. */
+  const commitCatalogFeed = (enabled: boolean): void => {
+    toast("data", undefined);
+    settingsMutation.mutate(
+      { catalogFeedEnabled: enabled },
+      {
+        onSuccess: () => toast("data", { text: t("settings.saved"), tone: "ok" }),
+        onError: (error) =>
+          toast("data", {
+            text: error instanceof Error ? error.message : String(error),
+            tone: "error",
+          }),
+      },
+    );
   };
 
   /** Roadmap 15.11a: the switch is the whole form, so it applies on click. */
@@ -1462,6 +1479,8 @@ function SettingsView() {
                 onCheckedChange={commitUpdateCheck}
               />
             </SettingRow>
+
+            <CatalogUpdatesRow status={config.catalogFeed} onToggle={commitCatalogFeed} />
           </SettingsSection>
         )}
 
