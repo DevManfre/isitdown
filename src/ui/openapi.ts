@@ -572,8 +572,37 @@ const paths: Json = {
   "/config/catalog": {
     get: {
       tags: ["Configuration"],
-      summary: "The bundled provider catalog, answered from memory.",
+      summary: "The provider catalog in force, answered from memory.",
+      description:
+        "Roadmap 5.11 and 2.2. The list the image shipped, or — once catalog updates are on — the last signed copy downloaded in the background, when it is newer. No request leaves the server to answer this.",
       responses: { "200": ok({ type: "object" }) },
+    },
+  },
+  "/config/catalog/proposals": {
+    get: {
+      tags: ["Configuration"],
+      summary: "Configured providers whose catalog entry has moved.",
+      description:
+        "Roadmap 2.2. `{ proposals: [{ serviceId, name, from: { adapter, baseUrl }, to: { adapter, baseUrl } }] }`, empty unless a downloaded catalog is in force. Never applied by the server: accepting one is `PATCH /config/services/{id}` with `to`.",
+      responses: { "200": ok({ type: "object" }) },
+    },
+  },
+  "/config/catalog/proposals/{id}/dismiss": {
+    post: {
+      tags: ["Configuration"],
+      summary: "Turn one catalog proposal down, for the value it offers.",
+      parameters: [path("id", "Service id.")],
+      responses: { "204": { description: "Dismissed." }, "404": notFound },
+    },
+  },
+  "/config/discover": {
+    post: {
+      tags: ["Configuration"],
+      summary: "Map a project's files onto the catalog.",
+      description:
+        "Roadmap 2.3. Body `{ files: [{ path, content }] }`, 1 to 50 files within the 64 kB body limit — package.json, compose files, Dockerfiles, .env, Terraform, requirements.txt, pyproject.toml, go.mod, a hosts file. Answers `{ providers: [{ entry, evidence: [{ file, found }], configured }], unmatchedHosts, files }`. Nothing is added and nothing is fetched.",
+      requestBody: { required: true, ...json({ type: "object" }) },
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
   "/config/services": {

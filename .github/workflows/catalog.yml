@@ -1,0 +1,93 @@
+# Roadmap 2.1 and 2.2. Once a week this regenerates the provider catalog from
+# the curated seed and the public status-page lists — every candidate run
+# through detection and read through its real adapter — signs the result, and
+# lands it in two places:
+#
+#   dev   src/adapters/catalog.json, so the next release ships it in the image
+#   main  catalog/catalog.json + .sig, so an install that opted into catalog
+#         updates picks it up without waiting for that release
+#
+# Committed without review, by decision: the generator never drops a provider
+# already in the catalog because of one failed read, and catalog/report.md
+# names everything it left out. A week with nothing new commits nothing.
+name: Catalog
+
+on:
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalog
+  cancel-in-progress: false
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the catalog from the seed and the public lists
+        run: node tools/build-catalog.mjs
+
+      - name: Job summary
+        if: always()
+        run: cat catalog/report.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      # The private key exists only as this secret; without it the job stops
+      # here rather than publishing a list every install would refuse.
+      - name: Sign the published catalog
+        env:
+          CATALOG_SIGNING_KEY: ${{ secrets.CATALOG_SIGNING_KEY }}
+        run: node tools/sign-catalog.mjs
+
+      - name: The generated list still passes the catalog's own tests
+        run: node --test test/adapters/catalog.test.ts test/adapters/catalogFeed.test.ts
+
+      - name: Commit to dev
+        id: dev
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # The report changes every run (its failures are tonight's); only a
+          # changed list is worth a commit.
+          if git diff --quiet -- src/adapters/catalog.json; then
+            echo "Catalog unchanged."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add src/adapters/catalog.json catalog/
+          count=$(node -e 'console.log(require("./src/adapters/catalog.json").entries.length)')
+          git commit -m "🍱 CATALOG - regenerate the provider catalog (${count} providers)"
+          git push origin dev
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # Only the three published files: main carries the product and nothing
+      # else of dev's, and the next mergeclean finds the same bytes on both.
+      - name: Publish to main
+        if: steps.dev.outputs.changed == 'true'
+        run: |
+          git fetch origin main
+          git worktree add ../main origin/main
+          cp catalog/catalog.json catalog/catalog.json.sig catalog/report.md ../main/catalog/ 2>/dev/null || {
+            mkdir -p ../main/catalog
+            cp catalog/catalog.json catalog/catalog.json.sig catalog/report.md ../main/catalog/
+          }
+          cd ../main
+          git add catalog/
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "🍱 CATALOG - publish the signed provider catalog"
+          git push origin HEAD:main

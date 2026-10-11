@@ -649,6 +649,26 @@ export interface RuntimeConfigResponse {
    * without it, which the Settings row reads as off with nothing to show.
    */
   updateCheck?: UpdateCheckStatus;
+  /** Roadmap 2.2: opt-in signed catalog updates. Optional, like `updateCheck`. */
+  catalogFeed?: CatalogFeedStatus;
+}
+
+/** Mirrors `CatalogFeedState` in `src/ui/catalogFeed.ts`, plus whether the option is on. */
+export interface CatalogFeedStatus {
+  enabled: boolean;
+  status: "unknown" | "current" | "updated" | "failed";
+  source: "bundled" | "remote";
+  generatedAt: string;
+  entries: number;
+  checkedAt: string | null;
+}
+
+/** A configured provider whose catalog entry moved — roadmap 2.2. */
+export interface CatalogProposal {
+  serviceId: string;
+  name: string;
+  from: { adapter: string; baseUrl: string };
+  to: { adapter: string; baseUrl: string };
 }
 
 /** Mirrors `UpdateCheckState` in `src/ui/updateCheck.ts`, plus whether the option is on. */
