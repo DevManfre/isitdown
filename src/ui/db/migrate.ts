@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -690,6 +690,21 @@ export function migrate(db: DatabaseSync): void {
         after       TEXT NOT NULL,
         observed_at TEXT NOT NULL,
         UNIQUE (provider_id, incident_id, field, after)
+      );
+    `);
+  }
+
+  if (from < 30) {
+    // Passive monitors — roadmap 2.5. One row per heartbeat provider, written
+    // by the job's own call rather than by a poll. `armed_at` is when the
+    // monitor started waiting, so a job that never calls at all is late from
+    // then on instead of pending forever.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS heartbeats (
+        provider_id  TEXT PRIMARY KEY REFERENCES services(id) ON DELETE CASCADE,
+        armed_at     TEXT NOT NULL,
+        last_ping_at TEXT,
+        pings        INTEGER NOT NULL DEFAULT 0
       );
     `);
   }

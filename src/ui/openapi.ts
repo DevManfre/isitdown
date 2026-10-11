@@ -904,6 +904,41 @@ const paths: Json = {
       },
     },
   },
+  "/config/heartbeats": {
+    get: {
+      tags: ["Diagnostics"],
+      summary: "Every heartbeat provider's ping URL, and when its job last called.",
+      description:
+        "Roadmap 2.5. `{ enabled, tokenRevealed, heartbeats: [{ providerId, url, lastPingAt, pings }] }`. `enabled` is whether `HEARTBEAT_TOKEN` is set; `url` is null while it is not, or while the provider is disabled. The token is revealed only to a request that could also write — a read-only `API_TOKEN` holder gets `<HEARTBEAT_TOKEN>` in its place, and `tokenRevealed` says which.",
+      responses: { "200": ok({ type: "object" }) },
+    },
+  },
+  "/heartbeat/{providerId}": {
+    get: {
+      tags: ["Diagnostics"],
+      summary: "A job's dead-man's-switch ping: it ran.",
+      description:
+        "Roadmap 2.5. Called by the job itself — the last line of a crontab — so GET works as well as POST. Records the time and reads that one provider now, so a job that was late and has called resolves in seconds; the verdict is the `heartbeat` adapter's, through the diff engine like any outage. Requires `?token=` matching `HEARTBEAT_TOKEN`; without the variable set the route answers 404. Calls within ten seconds of a read are recorded without another one (202). Never gated by `API_TOKEN`: the caller is a script, and the URL is its credential.",
+      parameters: [path("providerId", "Heartbeat provider id."), query("token", "Must equal HEARTBEAT_TOKEN.", { type: "string" })],
+      responses: {
+        "200": ok({ type: "object" }, "Recorded, and the provider read."),
+        "202": ok({ type: "object" }, "Recorded inside the cooldown; no extra read."),
+        "401": { description: "Wrong or missing token.", ...json(ref("Error")) },
+        "404": notFound,
+      },
+    },
+    post: {
+      tags: ["Diagnostics"],
+      summary: "The same ping, for a caller that prefers POST.",
+      parameters: [path("providerId", "Heartbeat provider id."), query("token", "Must equal HEARTBEAT_TOKEN.", { type: "string" })],
+      responses: {
+        "200": ok({ type: "object" }, "Recorded, and the provider read."),
+        "202": ok({ type: "object" }, "Recorded inside the cooldown; no extra read."),
+        "401": { description: "Wrong or missing token.", ...json(ref("Error")) },
+        "404": notFound,
+      },
+    },
+  },
   "/public": {
     get: {
       tags: ["Public"],
