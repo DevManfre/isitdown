@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-10T10:39:57.419Z",
+  "generatedAt": "2026-10-12T12:28:54.381Z",
   "entries": [
     {
       "id": "github",
@@ -1188,6 +1188,12 @@
       "name": "Jitterbit",
       "adapter": "statuspage",
       "baseUrl": "https://trust.jitterbit.com"
+    },
+    {
+      "id": "microsoft-advertisement",
+      "name": "Microsoft Advertisement",
+      "adapter": "rss",
+      "baseUrl": "https://status.ads.microsoft.com/feed"
     },
     {
       "id": "pinterest",
