@@ -810,7 +810,7 @@ modo suo, quindi ognuno ha il proprio adapter:
     adapter: aws
     baseUrl: https://health.aws.amazon.com
     options:
-      region: eu-west-1        # opzionale; omesso, guarda ogni regione
+      regions: eu-west-1       # opzionale; omesso, guarda ogni regione (vedi sotto)
 
   - id: gcp
     name: Google Cloud
@@ -829,7 +829,7 @@ modo suo, quindi ognuno ha il proprio adapter:
 aperti in questo momento. Ne seguono due cose: non c'è cronologia da
 ricostruire, perché un evento risolto sparisce dal documento invece di essere
 marcato chiuso; e ogni evento riguarda una sola regione, quindi
-`options.region` restringe alla tua. Un evento globale — uno che il feed
+`options.regions` restringe alla tua (vedi sotto). Un evento globale — uno che il feed
 pubblica senza regione — è sempre riportato: restringere non deve nascondere
 proprio la classe di evento che colpisce tutto. La severità è il codice
 numerico di AWS, non un'ipotesi sulle parole:
@@ -861,6 +861,29 @@ aggiunge le due cose che l'adapter generico sbaglia su Azure: sa che
 bene, quindi un feed vuoto è operativo e non sconosciuto. La sua cronologia
 arriva solo fin dove arriva il feed, che per un provider che pubblica solo le
 comunicazioni aperte non è lontano.
+
+**Restringere alle tue regioni e ai tuoi servizi** (roadmap 2.8). I tre feed
+coprono ogni regione del pianeta, e un incidente in `ap-south-1` è rumore per
+chi sta a Francoforte. Le stesse due opzioni su `aws`, `gcp` e `azure`,
+entrambe separate da virgole:
+
+```yaml
+    options:
+      regions: eu-west-1, eu-central-1      # aws; gcp: europe-west1; azure: westeurope
+      services: EC2, S3                     # opzionale
+```
+
+| Opzione | Confrontata con |
+|---|---|
+| `regions` | AWS: la regione dell'evento (`eu-west-1`). Google Cloud: gli id delle location colpite dall'incidente (`europe-west1`) — per uno risolto, i luoghi che ha colpito. Azure: la regione in fondo al titolo della voce (`West Europe`). Il confronto ignora maiuscole, spazi e trattini, quindi `westeurope` e `West Europe` sono la stessa regione. Il vecchio `region` di AWS viene ancora letto quando manca `regions`. |
+| `services` | AWS: il nome del servizio (`Amazon Simple Storage Service`) o la sua chiave breve (`s3`). Google Cloud: i prodotti colpiti (`Cloud Storage`). Azure: i servizi nominati nel titolo (`Virtual Machines`). Confrontati allo stesso modo. |
+
+Un incidente che il feed non colloca da nessuna parte — globale, "multiple
+regions", o semplicemente senza etichetta — passa sempre il filtro per regione,
+e uno che non nomina servizi, o "multiple services", passa sempre il filtro per
+servizio: sono proprio gli incidenti che un restringimento non deve nascondere.
+Le cronologie degli incidenti di Google Cloud e Azure vengono ristrette con la
+stessa regola.
 
 #### Instatus e Better Stack
 
