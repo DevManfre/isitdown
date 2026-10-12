@@ -127,7 +127,7 @@ export interface Adapter {
    * list would be a second place to update whenever one is added, and the kind
    * of list that stays right until it silently is not.
    *
-   * Absent means `page`, which is what every adapter but three is and what an
+   * Absent means `page`, which is what every adapter but the probes is and what an
    * external plugin almost certainly is.
    */
   kind?: "page" | "probe" | undefined;

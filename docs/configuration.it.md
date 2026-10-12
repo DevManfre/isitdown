@@ -307,6 +307,82 @@ vuota, o un canale abilitato il cui segreto non è impostato. Un container parti
 una configurazione capita a metà sembrerebbe sano mentre in silenzio non allerta: è
 l'unico modo di fallire su cui vale la pena essere rumorosi.
 
+#### Gli adapter `icmp` e `docker` — le macchine dell'homelab
+
+Due sonde per ciò che non ha una pagina e spesso nemmeno una porta che valga la
+pena nominare (roadmap 2.6): un router, un NAS, i container che ci girano sopra.
+
+```yaml
+- name: Router
+  id: router
+  adapter: icmp
+  baseUrl: http://192.168.1.1
+  options:
+    count: "3"
+    slowMs: "50"
+
+- name: NAS containers
+  id: nas
+  adapter: docker
+  baseUrl: http://docker-socket-proxy:2375
+```
+
+**`icmp`** esegue il `ping` di sistema — quello di busybox nell'immagine, quello
+di iputils su un host Linux — verso l'host di `baseUrl`. Dentro un container non
+serve alcuna capability in più: Docker consente di default i socket ICMP non
+privilegiati. Un host senza alcun `ping` lo dice nella nota della lettura.
+
+| Opzione | Default | Significato |
+|---|---|---|
+| `count` | `3` | Richieste echo per lettura, fino a `10`. Più di una, così un singolo pacchetto perso è un tasso di perdita e non un disservizio. |
+| `slowMs` | — | Un tempo di andata e ritorno medio pari o superiore a questi millisecondi è `degraded`. |
+
+| Cosa è successo | Lettura |
+|---|---|
+| Tutte le richieste hanno risposto, sotto `slowMs` | `operational` |
+| Tutte hanno risposto, in media pari o sopra `slowMs` | `degraded` |
+| Alcune hanno risposto | `partial_outage` |
+| Nessuna ha risposto, o l'host non si è risolto | `major_outage` |
+
+**`docker`** legge un engine Docker — `GET /containers/json?all=1`, una richiesta
+per lettura — e i suoi container sono i componenti del provider, scelti nello
+stesso picker dei componenti di una status page, raggruppati per progetto
+compose. Come raggiungere l'engine è l'unica decisione da prendere con cura:
+l'API di Docker **non ha una modalità in sola lettura**, e montare
+`/var/run/docker.sock` con `:ro` non la crea — chi ha il socket controlla il
+demone. La strada consigliata è quindi un socket proxy che risponde solo
+all'elenco dei container:
+
+```yaml
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy
+    environment:
+      CONTAINERS: 1          # GET /containers/* e nient'altro
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+```
+
+con `baseUrl: http://docker-socket-proxy:2375`. Per leggere direttamente il
+socket, invece, montalo e imposta `baseUrl: http://localhost` con
+`options.socket: /var/run/docker.sock`.
+
+| Container | Selezionato come componente | L'engine intero |
+|---|---|---|
+| in esecuzione, sano o senza health check | `operational` | conta come operativo |
+| in esecuzione, health check ancora in avvio | `unknown` | si astiene |
+| in esecuzione, unhealthy | `major_outage` | conta come giù |
+| in riavvio (un crash loop) | `major_outage` | conta come giù |
+| in pausa | `degraded` | conta come degradato |
+| uscito, creato, morto — o sparito | `major_outage` | si astiene |
+
+Le due colonne sono diverse apposta. Un container fermo è un job una tantum
+finito tanto quanto un servizio morto, e un engine tenuto rosso per sempre da
+un container di migrazione finito insegna all'operatore a ignorarlo; un
+container che hai selezionato l'hai selezionato perché dovrebbe girare. La
+lettura dell'engine si compone come quella di una status page: alcuni container
+giù è `partial_outage`, tutti `major_outage`. Un engine irraggiungibile è una
+lettura fallita, non un disservizio di ogni container.
+
 ### 3.2 Edizione UI — impostazioni a runtime
 
 L'edizione UI **non** monta alcun `config.yml`; uno presente su disco verrebbe

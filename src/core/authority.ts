@@ -31,7 +31,7 @@ export type Authority = (typeof AUTHORITIES)[number];
  * else: a probe is a probe because of what it does, and a list would be a
  * second place to update every time one is added — the kind of list that is
  * right until it silently is not. An adapter that declares nothing is treated
- * as reading somebody's page, which is what every adapter but three does and
+ * as reading somebody's page, which is what every adapter but the probes does and
  * what an external plugin (`plugins.ts`) almost certainly is.
  */
 export function defaultAuthorityFor(adapter: Pick<Adapter, "kind">): Authority {
