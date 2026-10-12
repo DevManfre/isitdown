@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-12T12:28:54.381Z",
+  "generatedAt": "2026-10-12T13:10:47.907Z",
   "entries": [
     {
       "id": "github",
@@ -394,8 +394,8 @@
     {
       "id": "front",
       "name": "Front",
-      "adapter": "statuspage",
-      "baseUrl": "https://status.frontapp.com"
+      "adapter": "rss",
+      "baseUrl": "https://status.frontapp.com/feed"
     },
     {
       "id": "gitbook",
@@ -1036,8 +1036,8 @@
     {
       "id": "transifex",
       "name": "Transifex",
-      "adapter": "statuspage",
-      "baseUrl": "https://status.transifex.com"
+      "adapter": "rss",
+      "baseUrl": "https://status.transifex.com/history.rss"
     },
     {
       "id": "twingate",
@@ -1072,8 +1072,8 @@
     {
       "id": "zuora",
       "name": "Zuora",
-      "adapter": "statuspage",
-      "baseUrl": "https://trust.zuora.com"
+      "adapter": "rss",
+      "baseUrl": "https://trust.zuora.com/history.rss"
     },
     {
       "id": "oracle-cloud",

@@ -1,11 +1,12 @@
 # Catalog build
 
-Generated 2026-10-12T12:28:54.381Z: 203 providers in the catalog, 111 candidates left out.
+Generated 2026-10-12T13:10:47.907Z: 203 providers in the catalog, 111 candidates left out.
 
 ## Kept although they failed this run
 
 Already in the catalog, so a single failed read does not remove them.
 
+- **Convex** — https://status.convex.dev: The operation was aborted due to timeout
 - **Gemfury** — https://status.gemfury.com: no adapter recognises the page
 
 ## Left out
