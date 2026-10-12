@@ -451,7 +451,11 @@ Suite notevoli:
   chiave privata esiste solo come secret del repository `CATALOG_SIGNING_KEY`;
   senza, il job si ferma prima di pubblicare qualunque cosa. Ruotarla significa
   cambiare `CATALOG_PUBLIC_KEY` in `src/adapters/catalogFeed.ts` nello stesso
-  rilascio — il passo di firma rifiuta una chiave che non corrisponde. Per
+  rilascio — il passo di firma rifiuta una chiave che non corrisponde. Entrambi
+  i push passano per una deploy key con scrittura salvata come
+  `CATALOG_DEPLOY_KEY`, perché la ruleset di `main` richiede il check `verify` e
+  lascia scavalcarlo solo agli admin e alle deploy key; un push con
+  `GITHUB_TOKEN` lì verrebbe rifiutato. Per
   aggiungere un provider a mano, lo si aggiunge al seed (con `adapter` per
   saltare la detection) e si esegue `node tools/build-catalog.mjs`.
 
