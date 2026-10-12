@@ -273,6 +273,8 @@ lo schema, `dns` ne risolve l'host e da lì non scarica nulla.
 | `recordType` | `dns` | `A` | `A`, `AAAA`, `CNAME`, `MX`, `NS` o `TXT`. Una risposta `MX` viene confrontata come `"<preferenza> <exchange>"` e una `TXT` con i suoi pezzi uniti — il modo in cui entrambe si scrivono quando qualcuno dice come dovrebbero essere. |
 | `expectValue` | `dns` | — | Testo che uno dei record deve contenere. Un record puntato a un indirizzo dismesso si risolve comunque, ed è una brutta giornata diversa dal non risolversi affatto. |
 | `resolver` | `dns` | quello di sistema | `1.1.1.1`, oppure `127.0.0.1:5353`. Interroga un server direttamente — per esempio uno autoritativo — invece di ciò che il resolver di questo container ha in cache. Non impostato legge ciò che sperimenta il resto dei provider monitorati. |
+| `domainWarnDays` | `dns` | — | Legge la scadenza della registrazione via RDAP (roadmap 2.7): da questo numero di giorni in giù la lettura è `degraded`, una registrazione scaduta `major_outage`. Chiesto al dominio registrabile — `api.example.co.uk` → `example.co.uk` — e tenuto dodici ore. |
+| `dnssec` | `dns` | — | `true` chiede a un resolver che valida se la catena DNSSEC del nome regge (roadmap 2.7): `resolver` se impostato, altrimenti `1.1.1.1`. Un indirizzo — `9.9.9.9` — chiede a quello, per una sonda il cui `resolver` è un server autoritativo, che non valida mai. |
 
 Le letture che producono:
 
@@ -284,6 +286,10 @@ Le letture che producono:
 | `dns`: sono tornati record, che soddisfano `expectValue`, sotto `slowMs` | `operational` |
 | `dns`: sono tornati a `slowMs` o oltre | `degraded` |
 | `dns`: NXDOMAIN, SERVFAIL, nessun record, o nulla che soddisfi `expectValue` | `major_outage` |
+| `dns` con `domainWarnDays`: la registrazione scade entro quel limite | `degraded` |
+| `dns` con `domainWarnDays`: la registrazione è scaduta | `major_outage` |
+| `dns` con `dnssec`: il resolver non ha garantito il nome (zona non firmata, o resolver che non valida) | `degraded` |
+| `dns` con `dnssec`: firme presenti e non valide — il nome si risolve solo a validazione spenta | `major_outage` |
 
 Tutto ciò che la sezione `http` dice di una sonda vale anche per questi due —
 letture invece che letture fallite, una severità e nulla più, un solo punto di
@@ -300,6 +306,14 @@ che solleva un errore invece di leggere giù. Due cose sono solo loro:
   che ne lascia cadere uno non è un disservizio nostro — ma qui la risposta *è*
   la lettura, e un record tornato vuoto significa che nessuno può raggiungere
   ciò che nomina.
+
+`domainWarnDays` e `dnssec` sono le micce lente accanto alla risposta stessa:
+una registrazione che scade e una catena di firme che si rompe si risolvono
+perfettamente fino al giorno in cui non si risolve più niente. Ognuno viene
+controllato solo su un nome che si è risolto, e una verifica che non ha potuto
+rispondere — un registro senza servizio RDAP (diversi ccTLD, `.it` compreso), un
+registro che non pubblica la scadenza, un resolver andato in timeout — viene
+detta nella nota e mai contata: è un nostro punto cieco, non colpa del dominio.
 
 Qualunque cosa non valida ferma il container all'avvio indicando motivo e percorso:
 file mancante, YAML malformato, base URL sbagliato, id duplicato, lista di servizi

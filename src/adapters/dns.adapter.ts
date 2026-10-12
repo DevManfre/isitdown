@@ -1,6 +1,10 @@
 import { Resolver } from "node:dns/promises";
 import type { Adapter, FetchContext, ReadingNote, ServiceRef } from "../core/adapter.interface.ts";
 import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
+import { checkDnssec, type DnssecVerdict } from "./dnssec.ts";
+import { registrableDomain } from "./discover.ts";
+import { domainExpiry, type ExpiryLookup } from "./rdap.ts";
+import { worstStatus } from "./severity.ts";
 
 /**
  * A DNS resolution — roadmap 1.9, the other half the HTTP probe could not
@@ -26,7 +30,7 @@ import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
  */
 
 /** The option keys this adapter reads, for the settings form and the docs. */
-export const DNS_OPTION_KEYS = ["recordType", "expectValue", "resolver", "slowMs"] as const;
+export const DNS_OPTION_KEYS = ["recordType", "expectValue", "resolver", "slowMs", "domainWarnDays", "dnssec"] as const;
 
 /** What can be asked for. Each maps onto one `Resolver` method below. */
 const RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"] as const;
@@ -41,7 +45,21 @@ export interface DnsProbeConfig {
   resolver?: string | undefined;
   /** An answer at or over this long reads `degraded` rather than `operational`. */
   slowMs?: number | undefined;
+  /**
+   * The registration this close to running out reads `degraded`, and a lapsed
+   * one `major_outage` — roadmap 2.7, read over RDAP. Off unless configured.
+   */
+  domainWarnDays?: number | undefined;
+  /**
+   * The validating resolver asked whether the name's DNSSEC chain holds —
+   * roadmap 2.7. Off unless configured: `dnssec: true` asks `resolver`, or
+   * 1.1.1.1 when there is none; an address asks that one.
+   */
+  dnssec?: string | undefined;
 }
+
+/** The validating resolver `dnssec: true` falls back to when the probe names none. */
+const DEFAULT_VALIDATING_RESOLVER = "1.1.1.1";
 
 export type DnsOutcome =
   | { answered: true; values: string[]; latencyMs: number }
@@ -77,7 +95,25 @@ export function dnsConfig(service: ServiceRef): DnsProbeConfig {
     expectValue: trimmed(options["expectValue"]),
     resolver: trimmed(options["resolver"]),
     slowMs: parseCount(trimmed(options["slowMs"]), service, "slowMs"),
+    domainWarnDays: parseDays(trimmed(options["domainWarnDays"]), service),
+    dnssec: parseDnssec(trimmed(options["dnssec"]), trimmed(options["resolver"])),
   };
+}
+
+function parseDays(raw: string | undefined, service: ServiceRef): number | undefined {
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`dns probe for ${service.id}: domainWarnDays must be a positive whole number of days`);
+  }
+  return value;
+}
+
+/** `true` → the probe's resolver or 1.1.1.1; `false`/absent → off; anything else is the resolver to ask. */
+function parseDnssec(raw: string | undefined, resolver: string | undefined): string | undefined {
+  if (raw === undefined || raw.toLowerCase() === "false") return undefined;
+  if (raw.toLowerCase() === "true") return resolver ?? DEFAULT_VALIDATING_RESOLVER;
+  return raw;
 }
 
 function parseRecordType(raw: string | undefined, service: ServiceRef): DnsRecordType {
@@ -232,6 +268,59 @@ export function resolutionReason(error: unknown): string {
   return code === undefined || code === "" ? error.message : code;
 }
 
+export interface DomainChecks {
+  /** What RDAP said, when `domainWarnDays` asked. */
+  expiry?: { domain: string; lookup: ExpiryLookup } | undefined;
+  /** What the validating resolver said, when `dnssec` asked. */
+  dnssec?: DnssecVerdict | undefined;
+}
+
+/**
+ * The two slow-fuse checks of roadmap 2.7, read as a severity and the sentences
+ * that explain it. A lookup that could not answer — a registry without RDAP, a
+ * resolver that timed out — is said, never scored: it is our blind spot, not
+ * the domain's fault.
+ */
+export function judgeDomainChecks(
+  checks: DomainChecks,
+  config: DnsProbeConfig,
+  now: number,
+): { status: OverallStatus; notes: ReadingNote[] } {
+  const statuses: OverallStatus[] = [];
+  const notes: ReadingNote[] = [];
+
+  if (checks.expiry !== undefined && config.domainWarnDays !== undefined) {
+    const { domain, lookup } = checks.expiry;
+    if (!lookup.found) {
+      notes.push({ text: `the expiry of ${domain} could not be read: ${lookup.reason}` });
+    } else {
+      const daysLeft = Math.floor((Date.parse(lookup.expiresAt) - now) / 86_400_000);
+      if (daysLeft < 0) {
+        statuses.push("major_outage");
+        notes.push({ text: `the registration of ${domain} expired on ${lookup.expiresAt.slice(0, 10)}` });
+      } else if (daysLeft <= config.domainWarnDays) {
+        statuses.push("degraded");
+        notes.push({ text: `the registration of ${domain} expires in ${daysLeft} day(s), on ${lookup.expiresAt.slice(0, 10)}` });
+      }
+    }
+  }
+
+  if (checks.dnssec !== undefined && config.dnssec !== undefined) {
+    const verdict = checks.dnssec;
+    if (verdict.kind === "bogus") {
+      statuses.push("major_outage");
+      notes.push({ text: `DNSSEC validation fails for ${config.name}: validating resolvers refuse it` });
+    } else if (verdict.kind === "insecure") {
+      statuses.push("degraded");
+      notes.push({ text: `${config.dnssec} did not validate ${config.name}: the zone is unsigned, or the resolver does not validate` });
+    } else if (verdict.kind === "error") {
+      notes.push({ text: `the DNSSEC check could not run against ${config.dnssec}: ${verdict.reason}` });
+    }
+  }
+
+  return { status: worstStatus(statuses), notes };
+}
+
 export const dnsAdapter: Adapter = {
   id: "dns",
   version: 1,
@@ -247,8 +336,29 @@ export const dnsAdapter: Adapter = {
     if (outcome.answered) ctx.onRead?.({ latencyMs: outcome.latencyMs, notModified: false });
 
     const note = noteFromOutcome(outcome, config);
-    if (note !== null) ctx.onNote?.(note);
+    const reading = readingFromOutcome(service, config, outcome);
+    // A name that does not resolve is already the worst news; the slow-fuse
+    // checks only have something to add to one that does.
+    if (!outcome.answered || (config.domainWarnDays === undefined && config.dnssec === undefined)) {
+      if (note !== null) ctx.onNote?.(note);
+      return reading;
+    }
 
-    return readingFromOutcome(service, config, outcome);
+    const domain = registrableDomain(config.name);
+    const [expiry, dnssec] = await Promise.all([
+      config.domainWarnDays === undefined ? undefined : domainExpiry(domain, { timeoutMs: ctx.timeoutMs }),
+      config.dnssec === undefined ? undefined : checkDnssec(config.name, config.recordType, config.dnssec, ctx.timeoutMs),
+    ]);
+    const judged = judgeDomainChecks(
+      { ...(expiry === undefined ? {} : { expiry: { domain, lookup: expiry } }), ...(dnssec === undefined ? {} : { dnssec }) },
+      config,
+      Date.now(),
+    );
+    // A reading carries one note, so every sentence travels in it together.
+    const notes = [...(note === null ? [] : [note]), ...judged.notes];
+    if (notes.length > 0) {
+      ctx.onNote?.({ text: notes.map((entry) => entry.text).join("; "), unreachable: notes.some((entry) => entry.unreachable === true) });
+    }
+    return { ...reading, overallStatus: worstStatus([reading.overallStatus, judged.status]) };
   },
 };

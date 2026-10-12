@@ -266,6 +266,8 @@ ignores the scheme, `dns` resolves its host and fetches nothing from it.
 | `recordType` | `dns` | `A` | `A`, `AAAA`, `CNAME`, `MX`, `NS` or `TXT`. An `MX` answer is matched as `"<preference> <exchange>"` and a `TXT` one with its chunks joined — the way both are written down when someone says what they should be. |
 | `expectValue` | `dns` | — | Text one of the records must contain. A record pointed at a decommissioned address still resolves, which is a different kind of bad day from not resolving at all. |
 | `resolver` | `dns` | the system's | `1.1.1.1`, or `127.0.0.1:5353`. Asks one server directly — an authoritative one, say — instead of whatever this container's resolver has cached. Unset reads what the rest of the fleet experiences. |
+| `domainWarnDays` | `dns` | — | Reads the registration's expiry over RDAP (roadmap 2.7): this many days or fewer left reads `degraded`, a lapsed registration `major_outage`. Asked of the registrable domain — `api.example.co.uk` → `example.co.uk` — and kept twelve hours. |
+| `dnssec` | `dns` | — | `true` asks a validating resolver whether the name's DNSSEC chain holds (roadmap 2.7): `resolver` if set, else `1.1.1.1`. An address — `9.9.9.9` — asks that one instead, for a probe whose `resolver` is an authoritative server, which never validates. |
 
 The readings they produce:
 
@@ -277,6 +279,10 @@ The readings they produce:
 | `dns`: records came back, matching `expectValue`, under `slowMs` | `operational` |
 | `dns`: they came back at or over `slowMs` | `degraded` |
 | `dns`: NXDOMAIN, SERVFAIL, no records at all, or nothing matching `expectValue` | `major_outage` |
+| `dns` with `domainWarnDays`: the registration expires within it | `degraded` |
+| `dns` with `domainWarnDays`: the registration has lapsed | `major_outage` |
+| `dns` with `dnssec`: the resolver did not vouch for the name (unsigned zone, or a resolver that does not validate) | `degraded` |
+| `dns` with `dnssec`: signatures present and failing — the name resolves only with validation off | `major_outage` |
 
 Everything the `http` section says about a probe applies to these two as well —
 readings rather than failed reads, a severity and nothing more, one vantage
@@ -291,6 +297,14 @@ than reading down. Two things are theirs alone:
   Every other adapter degrades on a missing field, because a provider dropping
   one is not an outage of ours — but here the answer *is* the reading, and a
   record that came back empty means nobody can reach the thing it names.
+
+`domainWarnDays` and `dnssec` are the slow fuses beside the answer itself: a
+registration that lapses and a signature chain that breaks both resolve
+perfectly until the day nothing does. Each is checked only on a name that
+resolved, and a lookup that could not answer — a registry with no RDAP service
+(several ccTLDs, `.it` among them), a registry that publishes no expiry, a
+resolver that timed out — is said in the note and never scored: it is our blind
+spot, not the domain's fault.
 
 Anything invalid stops the container at boot with the reason and the offending
 path — a missing file, malformed YAML, a bad base URL, a duplicate service id, an
