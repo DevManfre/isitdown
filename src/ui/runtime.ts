@@ -43,6 +43,7 @@ import { loadSecretsFile, type SecretsFile } from "./secretsFile.ts";
 import { createSqliteStateStore } from "./sqliteStateStore.ts";
 import { createUpdateChecker, CHECK_INTERVAL_MS as UPDATE_CHECK_INTERVAL_MS, type UpdateChecker } from "./updateCheck.ts";
 import { ensureVapidKeys } from "./vapidKeys.ts";
+import { useHeartbeatLedger, type HeartbeatLedger } from "./heartbeats.ts";
 
 const PRUNE_INTERVAL_MS = 24 * 3600 * 1000;
 const NOTIFICATION_FEED_LIMIT = 200;
@@ -104,6 +105,8 @@ export interface UiRuntimeCore {
   /** The push channel behind `GET /events`; published to as each cycle finishes. */
   live: LiveEvents;
   pushSubscriptions: SqlitePushSubscriptionStore;
+  /** Dead-man's-switch pings (roadmap 2.5), read by the `heartbeat` adapter. */
+  heartbeats: HeartbeatLedger;
   /**
    * The last few adapter outcomes per provider, behind `GET /debug/adapters`
    * (roadmap 5.18). In memory: diagnostics for the run in front of you.
@@ -171,6 +174,9 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   const db = openDatabase(options.dbPath);
   migrate(db);
   seedDefaults(db);
+  // Before the first cycle, like the plugins: a heartbeat provider row has to
+  // resolve to its adapter on the first read (roadmap 2.5).
+  const heartbeats = useHeartbeatLedger(db);
 
   // Before anything reads the environment: an entry saved from the dashboard on
   // a previous run has to be in place for the first cycle, exactly as it would
@@ -466,6 +472,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     metrics,
     live,
     pushSubscriptions,
+    heartbeats,
     adapterDebug,
     updateCheck: updateChecker,
     catalogFeed,

@@ -27,6 +27,7 @@ test("migrate creates every table the dashboard reads", async () => {
     "annotations",
     "channels",
     "component_samples",
+    "heartbeats",
     "incident_notes",
     "incident_revisions",
     "incident_versions",
@@ -671,5 +672,17 @@ test("a schema-27 database gains the freshness column, null on every existing ro
 
   const row = db.prepare("SELECT freshness FROM provider_state WHERE provider_id = 'github'").get() as { freshness: string | null };
   assert.equal(row.freshness, null);
+  db.close();
+});
+
+test("a schema-29 database gains the heartbeats table", async () => {
+  const db = await freshDb();
+  migrate(db);
+  db.exec("DROP TABLE heartbeats");
+  db.exec("PRAGMA user_version = 29");
+
+  migrate(db);
+
+  assert.ok(names(db, "table").includes("heartbeats"), "heartbeats missing after upgrade");
   db.close();
 });

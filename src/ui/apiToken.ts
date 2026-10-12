@@ -53,6 +53,8 @@ const ALWAYS_OPEN = new Set(["/health", "/ready"]);
  */
 const OPEN_PREFIXES = [
   "/push/",
+  /** A cron job's dead-man's-switch ping (roadmap 2.5), same shape and reason as `/push/`. */
+  "/heartbeat/",
   /**
    * Also never gated: the public status page (roadmap 5.1). Its whole purpose
    * is to be read by people who are not the operator and who therefore hold no
