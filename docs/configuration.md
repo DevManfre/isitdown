@@ -786,7 +786,7 @@ own way, so each gets its own adapter:
     adapter: aws
     baseUrl: https://health.aws.amazon.com
     options:
-      region: eu-west-1        # optional; omit to watch every region
+      regions: eu-west-1       # optional; omit to watch every region (see below)
 
   - id: gcp
     name: Google Cloud
@@ -804,8 +804,8 @@ own way, so each gets its own adapter:
 **AWS** — the adapter appends `/public/currentevents`, a document of the events
 open right now. Two things follow from that. There is no history to backfill
 from, because a resolved event drops out of the document rather than being
-marked closed; and every event is scoped to one region, so `options.region`
-narrows it to yours. A global event — one the feed publishes with no region at
+marked closed; and every event is scoped to one region, so `options.regions`
+narrows it to yours (see below). A global event — one the feed publishes with no region at
 all — is always reported, since narrowing must not hide the class of event that
 hits everything. Severity is AWS's own numeric code, not a guess from wording:
 
@@ -835,6 +835,28 @@ two things the generic feed adapter gets wrong about Azure: it knows
 healthy, so an empty feed is operational rather than unknown. Its incident
 history reaches only as far as the feed does, which for a provider that
 publishes open communications only is not far.
+
+**Narrowing to your regions and services** (roadmap 2.8). All three feeds
+cover every region on earth, and an incident in `ap-south-1` is noise to a
+fleet in Frankfurt. The same two options on `aws`, `gcp` and `azure`, both
+comma-separated:
+
+```yaml
+    options:
+      regions: eu-west-1, eu-central-1      # aws; gcp: europe-west1; azure: westeurope
+      services: EC2, S3                     # optional
+```
+
+| Option | Matched against |
+|---|---|
+| `regions` | AWS: the event's region (`eu-west-1`). Google Cloud: the incident's affected location ids (`europe-west1`) — for a resolved one, the places it affected. Azure: the region at the end of the entry's title (`West Europe`). Compared with case, spaces and dashes folded away, so `westeurope` and `West Europe` are the same region. AWS's older `region` is still read when `regions` is absent. |
+| `services` | AWS: the service's name (`Amazon Simple Storage Service`) or its short key (`s3`). Google Cloud: the affected products (`Cloud Storage`). Azure: the services named in the title (`Virtual Machines`). Folded the same way. |
+
+An incident the feed places nowhere — global, "multiple regions", or simply
+unlabelled — always passes the region filter, and one that names no service, or
+"multiple services", always passes the service filter: those are exactly the
+incidents a narrowing must not hide. Google Cloud's and Azure's incident
+timelines are narrowed by the same rule.
 
 #### Instatus and Better Stack
 

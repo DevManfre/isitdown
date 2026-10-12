@@ -115,3 +115,37 @@ test("a body that is not the incident list rejects rather than reading as calm",
   assert.throws(() => parseGcpStatus(JSON.stringify({ incidents: [] }), service), /not an incident list/);
   assert.throws(() => parseGcpStatus("<html></html>", service), /not JSON/);
 });
+
+test("regions and services narrow the incidents, the timeline too (roadmap 2.8)", () => {
+  const raw = list(
+    incident({
+      id: "eu",
+      currently_affected_locations: [{ id: "europe-west1", title: "Belgium (europe-west1)" }],
+      affected_products: [{ title: "Cloud Storage" }],
+    }),
+    incident({
+      id: "us",
+      currently_affected_locations: [{ id: "us-central1", title: "Iowa (us-central1)" }],
+      affected_products: [{ title: "Compute Engine" }],
+      service_name: "Compute Engine",
+    }),
+    incident({ id: "global", currently_affected_locations: [{ id: "global", title: "Global" }], affected_products: [{ title: "Cloud Storage" }] }),
+    incident({
+      id: "past-us",
+      end: "2026-09-05T10:00:00+00:00",
+      currently_affected_locations: [],
+      previously_affected_locations: [{ id: "us-central1", title: "Iowa" }],
+    }),
+  );
+  const open = (options: Record<string, string>): string[] =>
+    parseGcpStatus(raw, { ...service, options }).activeIncidents.map((entry) => entry.id);
+
+  assert.deepEqual(open({ regions: "europe-west1" }), ["eu", "global"]);
+  assert.deepEqual(open({ services: "compute engine" }), ["us"]);
+  assert.deepEqual(open({ regions: "us-central1", services: "Cloud Storage" }), ["global"]);
+  assert.deepEqual(
+    parseGcpHistory(raw, { ...service, options: { regions: "europe-west1" } }).incidents.map((entry) => entry.id),
+    ["eu", "global"],
+    "a resolved incident is placed by where it was",
+  );
+});

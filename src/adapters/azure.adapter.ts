@@ -2,6 +2,7 @@ import type { Adapter, FetchContext, IncidentHistoryResult, ServiceRef } from ".
 import { fetchConditional } from "../core/http.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { parseFeed, type FeedEntry } from "./rss.adapter.ts";
+import { inScope, scopeOf } from "./scope.ts";
 import { severityFromWords, worstStatus } from "./severity.ts";
 
 /**
@@ -61,8 +62,32 @@ function isOpen(entry: FeedEntry, now: Date): boolean {
 }
 
 /** Pure mapping from the feed to a status reading, exported for the tests. */
+/**
+ * Where an entry is and what it is about, read off its title — the only place
+ * the feed says: "Service Issue - Virtual Machines, Storage - West Europe". A
+ * title that does not have the three parts places the entry nowhere, which the
+ * scope reads as "keep it".
+ */
+export function placeOf(entry: FeedEntry): { regions: string[]; services: string[] } {
+  const parts = entry.title.split(" - ").map((part) => part.trim());
+  if (parts.length < 3) return { regions: [], services: [] };
+  return {
+    regions: [parts[parts.length - 1]!],
+    services: parts.slice(1, -1).join(" - ").split(/,| and /).map((service) => service.trim()),
+  };
+}
+
+/** The feed's entries the provider's `regions`/`services` keep (roadmap 2.8). */
+function scoped(xml: string, service: ServiceRef): FeedEntry[] {
+  const scope = scopeOf(service.options);
+  return parseFeed(xml, service.id).filter((entry) => {
+    const { regions, services } = placeOf(entry);
+    return inScope(scope, regions, services);
+  });
+}
+
 export function parseAzureStatus(xml: string, service: ServiceRef, now: Date = new Date()): NormalizedStatus {
-  const open = parseFeed(xml, service.id).filter((entry) => entry.id !== null && isOpen(entry, now));
+  const open = scoped(xml, service).filter((entry) => entry.id !== null && isOpen(entry, now));
   const fetchedAt = new Date().toISOString();
 
   const activeIncidents: Incident[] = open.map((entry) => ({
@@ -94,7 +119,7 @@ export function parseAzureStatus(xml: string, service: ServiceRef, now: Date = n
  * rather than null.
  */
 export function parseAzureHistory(xml: string, service: ServiceRef): IncidentHistoryResult {
-  const incidents: HistoricalIncident[] = parseFeed(xml, service.id).flatMap((entry) => {
+  const incidents: HistoricalIncident[] = scoped(xml, service).flatMap((entry) => {
     if (entry.id === null || entry.publishedAt === null) return [];
     const closed = isClosed(entry);
     return [
