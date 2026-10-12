@@ -1,6 +1,13 @@
 # Catalog build
 
-Generated 2026-10-10T10:39:57.419Z: 202 providers in the catalog, 127 candidates left out.
+Generated 2026-10-12T13:10:47.907Z: 203 providers in the catalog, 111 candidates left out.
+
+## Kept although they failed this run
+
+Already in the catalog, so a single failed read does not remove them.
+
+- **Convex** — https://status.convex.dev: The operation was aborted due to timeout
+- **Gemfury** — https://status.gemfury.com: no adapter recognises the page
 
 ## Left out
 
@@ -48,7 +55,6 @@ Generated 2026-10-10T10:39:57.419Z: 202 providers in the catalog, 127 candidates
 - AppSignal — https://www.appsignalstatus.com: no adapter recognises the page
 - BigCommerce — https://www.bigcommercestatus.com: no adapter recognises the page
 - Checkly — https://is.checkly.online: no adapter recognises the page
-- Cloudflare Workers — https://www.cloudflarestatus.com: same id or page as an entry above
 - Databricks — https://status.databricks.com: no adapter recognises the page
 - Discourse — https://status.discourse.org: no adapter recognises the page
 - Docusign — https://status.docusign.com: no adapter recognises the page
@@ -64,16 +70,13 @@ Generated 2026-10-10T10:39:57.419Z: 202 providers in the catalog, 127 candidates
 - Packagecloud — https://status.packagecloud.io: no adapter recognises the page
 - Papertrail — https://www.papertrailstatus.com: no adapter recognises the page
 - Scalingo — https://scalingostatus.com: no adapter recognises the page
-- SendGrid Marketing — https://status.sendgrid.com: same id or page as an entry above
 - Spacelift — https://status.spacelift.io: no adapter recognises the page
 - Tableau — https://trust.tableau.com: no adapter recognises the page
 - Tines — https://status.tines.com: no adapter recognises the page
 - Weaviate Cloud — https://status.weaviate.io: no adapter recognises the page
 - Wrike — https://status.wrike.com: no adapter recognises the page
-- GitHub Copilot — https://www.githubstatus.com: same id or page as an entry above
 - Microsoft 365 — https://status.cloud.microsoft: no adapter recognises the page
 - IBM Cloud — https://cloud.ibm.com/status: no adapter recognises the page
-- Bitbucket Pipelines — https://bitbucket.status.atlassian.com: same id or page as an entry above
 - Codeberg — https://status.codeberg.org: no adapter recognises the page
 - Steam — https://steamstat.us: no adapter recognises the page
 - Xbox Live — https://support.xbox.com/xbox-live-status: no adapter recognises the page
@@ -87,16 +90,10 @@ Generated 2026-10-10T10:39:57.419Z: 202 providers in the catalog, 127 candidates
 - Absurd Design — https://status.absurd.design/: no adapter recognises the page
 - Adobe — https://status.adobe.com/: no adapter recognises the page
 - Akamai — https://cloudharmony.com/status-for-akamai: no adapter recognises the page
-- Atlassian cloud dashboard — https://status.atlassian.com/: same id or page as an entry above
 - Apple Developer — https://developer.apple.com/system-status/: no adapter recognises the page
 - Apple Support — https://www.apple.com/support/systemstatus/: no adapter recognises the page
 - BambooHR — https://status.bamboohr.com/: no adapter recognises the page
-- BigQuery — https://status.cloud.google.com/: same id or page as an entry above
-- Datadog — https://status.datadoghq.com/: same id or page as an entry above
 - Designmodo — https://status.designmodo.com/: no adapter recognises the page
-- DigitalOcean — https://status.digitalocean.com/: same id or page as an entry above
-- Discord App — https://discordstatus.com/: same id or page as an entry above
-- Dropbox — https://status.dropbox.com/: same id or page as an entry above
 - Facebook for Business — https://status.fb.com/: no adapter recognises the page
 - Facebook Platform — https://developers.facebook.com/status/dashboard/: no adapter recognises the page
 - Fastly — https://status.fastly.com/: no adapter recognises the page
@@ -106,17 +103,12 @@ Generated 2026-10-10T10:39:57.419Z: 202 providers in the catalog, 127 candidates
 - Google Search — https://status.search.google.com: no adapter recognises the page
 - Google Workspace — https://www.google.com/appsstatus: no adapter recognises the page
 - Heroku — https://status.heroku.com/: same id or page as an entry above
-- HubSpot — https://status.hubspot.com/: same id or page as an entry above
 - Humanity — https://humanity.status.io/: no adapter recognises the page
-- Linear — https://linearstatus.com: same id or page as an entry above
 - Mail.ru cloud — https://status.mcs.mail.ru/: no adapter recognises the page
-- Microsoft Advertisement — https://status.ads.microsoft.com/: The operation was aborted due to timeout
 - Microsoft Office365 — https://status.office365.com/: no adapter recognises the page
 - Odoo — https://www.saashub.com/odoo-status: no adapter recognises the page
-- OpenAI — https://status.openai.com/: same id or page as an entry above
 - Rackspace — https://status.rackspace.com/: no adapter recognises the page
 - Revolut — https://www.revolut.com/system-status/: no adapter recognises the page
-- reddit — https://www.redditstatus.com/: same id or page as an entry above
 - Repetiti — https://status.repetiti.com/: no adapter recognises the page
 - Sematext — https://status.eu.sematext.com/ui/statuspages: no adapter recognises the page
 - Skype — https://support.skype.com/en/status/: no adapter recognises the page
@@ -129,5 +121,4 @@ Generated 2026-10-10T10:39:57.419Z: 202 providers in the catalog, 127 candidates
 - Twitter API — https://api.twitterstat.us/: no adapter recognises the page
 - Vkontakte platform — https://vk.com/dev.php?method=health: no adapter recognises the page
 - Wikipedia Frontend Monitoring — https://grafana.wikimedia.org/d/000000479/frontend-traffic?orgId=1: no adapter recognises the page
-- Zoom Cloud — https://status.zoom.us/: same id or page as an entry above
 - Wordnik — https://status.wordnik.com/: no adapter recognises the page
