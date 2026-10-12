@@ -13,16 +13,16 @@ test("a probe answers for itself, a status page answers for its provider", () =>
   assert.equal(defaultAuthorityFor({ kind: "probe" }), "observed");
   assert.equal(defaultAuthorityFor({ kind: "page" }), "declared");
   // An adapter that says nothing reads somebody's page, which is what every
-  // adapter but three is and what an external plugin almost certainly is.
+  // adapter but the probes is and what an external plugin almost certainly is.
   assert.equal(defaultAuthorityFor({}), "declared");
 });
 
-test("the three probes this build ships are the only ones that are not pages", () => {
+test("the probes this build ships are the only ones that are not pages", () => {
   const probes = Object.values(adapters)
     .filter((adapter) => adapter.kind === "probe")
     .map((adapter) => adapter.id)
     .sort();
-  assert.deepEqual(probes, ["dns", "http", "tcp"]);
+  assert.deepEqual(probes, ["dns", "docker", "http", "icmp", "tcp"]);
 });
 
 test("an operator's own answer wins over the adapter's", () => {

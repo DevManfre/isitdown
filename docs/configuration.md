@@ -298,6 +298,81 @@ empty service list, or an enabled channel whose secret is unset. A container tha
 started with a half-understood configuration would look healthy while silently not
 alerting, which is the one failure mode worth being loud about.
 
+#### The `icmp` and `docker` adapters — the homelab's own boxes
+
+Two probes for what has no page and often no port worth naming (roadmap 2.6):
+a router, a NAS, the stack of containers on it.
+
+```yaml
+- name: Router
+  id: router
+  adapter: icmp
+  baseUrl: http://192.168.1.1
+  options:
+    count: "3"
+    slowMs: "50"
+
+- name: NAS containers
+  id: nas
+  adapter: docker
+  baseUrl: http://docker-socket-proxy:2375
+```
+
+**`icmp`** runs the system's own `ping` — busybox's in the image, iputils' on a
+Linux host — against `baseUrl`'s host. Inside a container it needs no extra
+capability: Docker allows unprivileged ICMP sockets by default. A host with no
+`ping` at all says so in the reading's note.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `count` | `3` | Echo requests per reading, up to `10`. More than one, so a single dropped packet is a loss rate rather than an outage. |
+| `slowMs` | — | An average round trip at or over this many milliseconds reads `degraded`. |
+
+| What happened | Reading |
+|---|---|
+| Every request answered, under `slowMs` | `operational` |
+| Every request answered, at or over `slowMs` on average | `degraded` |
+| Some answered | `partial_outage` |
+| None answered, or the host did not resolve | `major_outage` |
+
+**`docker`** reads one Docker engine — `GET /containers/json?all=1`, one request
+per reading — and its containers are the provider's components, picked in the
+same picker as a status page's, grouped by compose project. How the engine is
+reached is the one decision worth making carefully: the Docker API has **no
+read-only mode**, and mounting `/var/run/docker.sock` with `:ro` does not make
+it one — whoever holds the socket controls the daemon. So the recommended path
+is a socket proxy that answers only the container list:
+
+```yaml
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy
+    environment:
+      CONTAINERS: 1          # GET /containers/* and nothing else
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+```
+
+with `baseUrl: http://docker-socket-proxy:2375`. To read the socket directly
+instead, mount it and set `baseUrl: http://localhost` with
+`options.socket: /var/run/docker.sock`.
+
+| Container | Selected as a component | The whole engine |
+|---|---|---|
+| running, healthy or with no health check | `operational` | counts as operational |
+| running, health check still starting | `unknown` | abstains |
+| running, unhealthy | `major_outage` | counts as down |
+| restarting (a crash loop) | `major_outage` | counts as down |
+| paused | `degraded` | counts as degraded |
+| exited, created, dead — or gone | `major_outage` | abstains |
+
+The two columns differ on purpose. A stopped container is as likely a one-shot
+job that finished as a service that died, and an engine kept red forever by a
+finished migration container teaches the operator to ignore it; a container
+you selected was selected because it should be running. The engine's reading
+folds like a status page's: some containers down is `partial_outage`, all of
+them `major_outage`. An engine that cannot be reached is a failed read, not an
+outage of every container.
+
 ### 3.2 UI edition — runtime settings
 
 The UI edition mounts **no** `config.yml`; one on disk would be ignored.
