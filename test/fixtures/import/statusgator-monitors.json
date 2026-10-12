@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "data": [
+    { "id": "uVLl2YK1rn", "monitor_type": "ServiceMonitor", "display_name": "Cloudflare", "paused_at": null,
+      "service": { "id": "PQNMcnNFWw", "name": "Cloudflare", "slug": "cloudflare", "home_page_url": "http://www.cloudflare.com", "status_page_url": "https://www.cloudflarestatus.com", "official": true },
+      "group": { "id": "k2x9m7nPqR", "name": "Infrastructure", "position": 1 } },
+    { "id": "a1", "monitor_type": "ServiceMonitor", "display_name": "OpenAI", "paused_at": "2026-09-01T00:00:00Z",
+      "service": { "name": "OpenAI", "status_page_url": "https://status.openai.com" }, "group": null },
+    { "id": "a2", "monitor_type": "ServiceMonitor", "display_name": "Some Niche SaaS",
+      "service": { "name": "Some Niche SaaS", "status_page_url": "https://status.niche-saas.example" } },
+    { "id": "a3", "monitor_type": "WebsiteMonitor", "display_name": "Our shop", "url": "https://shop.example.com" },
+    { "id": "a4", "monitor_type": "WebsiteMonitor", "display_name": "Landing page" },
+    { "id": "a5", "monitor_type": "PingMonitor", "display_name": "Edge box" }
+  ]
+}

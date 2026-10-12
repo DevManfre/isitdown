@@ -1,0 +1,18 @@
+{
+  "core": { "name": "My Statping" },
+  "groups": [{ "id": 1, "name": "Web Sites", "public": true, "order_id": 1 }],
+  "services": [
+    { "id": 1, "name": "Google", "domain": "https://google.com", "expected": "", "expected_status": 200, "check_interval": 10, "type": "http", "method": "GET", "post_data": "", "port": 0, "timeout": 10, "group_id": 1, "headers": "" },
+    { "id": 2, "name": "Status JSON", "domain": "https://api.example.com/status", "expected": "(online|ok)", "expected_status": 200, "check_interval": 60, "type": "http", "method": "GET", "port": 0, "group_id": 0, "headers": { "String": "X-Api-Key=abc", "Valid": true } },
+    { "id": 3, "name": "Plain body", "domain": "https://example.com", "expected": "Example Domain", "expected_status": 200, "check_interval": 120, "type": "http", "method": "GET", "port": 0, "group_id": 1 },
+    { "id": 4, "name": "SSH", "domain": "ssh.example.com", "expected": "", "expected_status": 0, "check_interval": 30, "type": "tcp", "method": "", "port": 22, "group_id": 0 },
+    { "id": 5, "name": "DNS UDP", "domain": "8.8.8.8", "check_interval": 30, "type": "udp", "port": 53, "group_id": 0 },
+    { "id": 6, "name": "Submit form", "domain": "https://example.com/form", "check_interval": 60, "type": "http", "method": "POST", "post_data": "a=1", "port": 0 }
+  ],
+  "checkins": [
+    { "id": 1, "service_id": 4, "name": "Hourly sync", "interval": 3600, "api_key": "k1" },
+    { "id": 2, "service_id": 4, "name": "Broken check-in", "interval": 0, "api_key": "k2" }
+  ],
+  "messages": [],
+  "users": []
+}

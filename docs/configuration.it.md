@@ -425,6 +425,7 @@ tua lista non viene più sovrascritta in seguito.
 | `PUBLIC_PAGE_PROVIDERS` | UI | — | Quali provider pubblicare, per id e separati da virgola. Se non è impostata pubblica tutti i provider attivi. Un visitatore non può allargare l'elenco: la pagina non legge nulla dalla richiesta. |
 | `PUBLIC_PAGE_LOCALE` | UI | — | La lingua in cui è scritta quella pagina. Se non è impostata segue il locale delle notifiche dell'installazione. |
 | `PUSH_TOKEN` | UI | — | Attiva l'endpoint per i webhook dei provider ([3.15](#315-push-del-provider-invece-del-polling)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
+| `HEARTBEAT_TOKEN` | UI | — | Attiva l'endpoint dei ping heartbeat ([3.19](#319-heartbeat--il-dead-mans-switch)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
 | `PORT` | UI | `3000` | Porta HTTP. |
 
 I segreti arrivano tramite `env_file` a runtime; nulla viene incorporato in
@@ -1899,3 +1900,56 @@ Quei provider compaiono lo stesso, con il nome che hai dato loro, ma senza link.
 Non è autenticazione: chiunque raggiunga la porta può leggere la pagina, ed è
 proprio il punto. Imposta `API_TOKEN` e la pagina resta aperta mentre la
 dashboard no — chi la legge è esattamente chi non ha nessun token.
+
+### 3.19 Heartbeat — il dead-man's switch
+
+Ogni altro provider è qualcosa a cui IsItDown va a chiedere. Un `heartbeat` è
+interrogato *da* altri: un cron job chiama un URL quando ha finito, e l'allarme
+è la chiamata che non arriva — il backup che ha smesso di girare tre settimane
+fa (roadmap 2.5). Solo edizione UI: l'edizione Light non ha un URL che un job
+possa chiamare, e rifiuta un provider `heartbeat` nel suo `config.yml` come
+adapter sconosciuto.
+
+```json
+{
+  "id": "nightly-backup",
+  "name": "Nightly backup",
+  "adapter": "heartbeat",
+  "baseUrl": "https://heartbeat.invalid",
+  "options": { "every": "24h", "grace": "1h" }
+}
+```
+
+| Opzione | Significato |
+|---|---|
+| `every` | Obbligatoria. Ogni quanto chiama il job, da un ping al successivo: `30m`, `24h`, `7d` — un numero e un'unità (`s`, `m`, `h`, `d`), tra `1m` e `35d`. Un numero senza unità viene rifiutato invece che letto in un'unità qualsiasi. |
+| `grace` | Quanto può tardare un ping prima di essere considerato mancato. Di default un decimo di `every`, mai meno di un minuto; mai più lungo di `every`. |
+
+`baseUrl` non viene letto. Per convenzione è `https://heartbeat.invalid` — un
+dominio riservato per non risolversi mai — ed è quello che scrive
+`isitdown import`.
+
+Imposta `HEARTBEAT_TOKEN` e dai al job il suo URL — l'ultima riga di un crontab:
+
+```bash
+0 3 * * * /usr/local/bin/backup.sh && curl -fsS "https://isitdown.example.com/heartbeat/nightly-backup?token=$HEARTBEAT_TOKEN"
+```
+
+Valgono sia `GET` sia `POST`. Il provider resta `operational` finché dall'ultimo
+ping non sono trascorsi `every` più `grace`, e da lì in poi è `major_outage` — il
+verdetto passa dal diff engine e dal routing come qualsiasi outage, quindi
+un'esecuzione mancata notifica sugli stessi canali e con le stesse regole. Un
+job che non ha mai chiamato si misura da quando il monitor è stato letto la
+prima volta: è in ritardo dopo il primo periodo, non in attesa per sempre. Un
+ping legge anche subito il provider, così un job in ritardo che finalmente
+chiama si risolve in pochi secondi; i ping a meno di dieci secondi l'uno
+dall'altro vengono registrati senza un'altra lettura (`202`).
+
+`GET /config/heartbeats` elenca l'URL di ogni heartbeat con l'ultima chiamata
+del suo job e quante ne ha ricevute — l'unica prova che una riga di crontab sia
+giusta. Il token compare solo per una richiesta che potrebbe anche scrivere; chi
+ha un `API_TOKEN` in sola lettura vede `<HEARTBEAT_TOKEN>` al suo posto. Come
+l'URL di push ([3.15](#315-push-del-provider-invece-del-polling)), la rotta del
+ping non è mai protetta da `API_TOKEN` — chi chiama è uno script — quindi tratta
+l'URL come il segreto che è e servilo in HTTPS. Un ping che arriva mentre
+l'istanza stessa è giù va perso: il successivo rimette a posto il provider.
