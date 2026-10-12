@@ -4,6 +4,7 @@ import {
   attemptResolve,
   dnsAdapter,
   dnsConfig,
+  judgeDomainChecks,
   noteFromOutcome,
   readingFromOutcome,
   resolutionReason,
@@ -185,3 +186,51 @@ test("the adapter is registered under its own id", async () => {
   const { getAdapter } = await import("../../src/adapters/index.ts");
   assert.equal(getAdapter("dns"), dnsAdapter);
 });
+
+// Roadmap 2.7 — the slow-fuse checks: domain expiry over RDAP, DNSSEC over a
+// validating resolver.
+
+test("domainWarnDays and dnssec are read, and refused when they cannot work", () => {
+  assert.equal(dnsConfig(service({ domainWarnDays: "30" })).domainWarnDays, 30);
+  assert.throws(() => dnsConfig(service({ domainWarnDays: "soon" })), /domainWarnDays must be/);
+  assert.equal(dnsConfig(service()).dnssec, undefined);
+  assert.equal(dnsConfig(service({ dnssec: "false" })).dnssec, undefined);
+  assert.equal(dnsConfig(service({ dnssec: "true" })).dnssec, "1.1.1.1", "no resolver named: a public validating one");
+  assert.equal(dnsConfig(service({ dnssec: "true", resolver: "9.9.9.9" })).dnssec, "9.9.9.9");
+  assert.equal(dnsConfig(service({ dnssec: "8.8.8.8", resolver: "10.0.0.53" })).dnssec, "8.8.8.8");
+});
+
+test("the slow-fuse checks: a table of what each answer reads as", () => {
+  const now = Date.parse("2026-10-12T00:00:00Z");
+  const both = config({ domainWarnDays: 30, dnssec: "1.1.1.1" });
+  const expiring = (iso: string) => ({ domain: "example.com", lookup: { found: true as const, expiresAt: iso } });
+  const cases: [string, Parameters<typeof judgeDomainChecks>[0], string, RegExp | null][] = [
+    ["far from expiry, validated", { expiry: expiring("2027-08-13T00:00:00.000Z"), dnssec: { kind: "secure" } }, "operational", null],
+    ["inside the warning window", { expiry: expiring("2026-10-30T00:00:00.000Z") }, "degraded", /expires in 18 day\(s\), on 2026-10-30/],
+    ["lapsed", { expiry: expiring("2026-10-01T00:00:00.000Z") }, "major_outage", /expired on 2026-10-01/],
+    ["registry without an expiry", { expiry: { domain: "x.it", lookup: { found: false, reason: "no RDAP" } } }, "operational", /could not be read: no RDAP/],
+    ["unsigned", { dnssec: { kind: "insecure" } }, "degraded", /did not validate/],
+    ["bogus", { dnssec: { kind: "bogus" } }, "major_outage", /validation fails/],
+    ["resolver silent", { dnssec: { kind: "error", reason: "timed out" } }, "operational", /could not run/],
+  ];
+  for (const [label, checks, status, note] of cases) {
+    const judged = judgeDomainChecks(checks, both, now);
+    assert.equal(judged.status, status, label);
+    if (note === null) assert.deepEqual(judged.notes, [], label);
+    else assert.match(judged.notes.map((entry) => entry.text).join("; "), note, label);
+  }
+});
+
+test("dnssec against a resolver that does not validate reads degraded, in one note", async () => {
+  await withDnsServer({ kind: "a", addresses: ["192.0.2.10"] }, async (resolver) => {
+    const notes: ReadingNote[] = [];
+    const reading = await dnsAdapter.fetchStatus(service({ resolver, dnssec: "true" }), {
+      timeoutMs: 2000,
+      onNote: (note) => notes.push(note),
+    });
+    assert.equal(reading.overallStatus, "degraded");
+    assert.equal(notes.length, 1);
+    assert.match(notes[0]!.text, new RegExp(`${resolver} did not validate api.example.com`));
+  });
+});
+
