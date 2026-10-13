@@ -626,3 +626,22 @@ test("an unusable adaptive cadence falls back rather than stopping the cycle", a
   assert.equal(config.polling.adaptiveIntervalMinutes, 1);
   db.close();
 });
+
+test("what a provider runs on survives the database, and null clears it", async () => {
+  const db = await freshDbNoSeed();
+  insertService(db, {
+    id: "vercel",
+    name: "Vercel",
+    adapter: "statuspage",
+    baseUrl: "https://www.vercel-status.com",
+    enabled: true,
+    components: [],
+    scopeToComponents: false,
+    dependsOn: ["cloudflare", "aws"],
+  });
+
+  assert.deepEqual(listServices(db)[0]?.dependsOn, ["cloudflare", "aws"]);
+
+  updateService(db, "vercel", { dependsOn: null });
+  assert.equal(listServices(db)[0]?.dependsOn, undefined);
+});

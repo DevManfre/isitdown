@@ -255,10 +255,17 @@ function summarise(payload: NotificationPayload): string {
         current,
       });
     case "correlated_outage":
-      return t(locale, "notification.digest.correlated", {
-        count: change.correlated?.providerIds.length ?? 0,
-        providers: (change.correlated?.providerIds ?? []).join(", "),
-      });
+      return t(
+        locale,
+        change.correlated?.cause === undefined
+          ? "notification.digest.correlated"
+          : "notification.digest.correlated-cause",
+        {
+          count: change.correlated?.providerIds.length ?? 0,
+          providers: (change.correlated?.providerIds ?? []).join(", "),
+          cause: change.correlated?.cause ?? "",
+        },
+      );
     case "sla_burn":
       return t(locale, "notification.digest.sla", {
         target: (change.sla?.target ?? 0).toFixed(2),
@@ -369,7 +376,10 @@ function render(
     change.kind === "silent_outage" &&
     change.crossCheck?.authority === "observed"
       ? "notification.silent.outage-observed"
-      : TEMPLATE[change.kind];
+      : change.kind === "correlated_outage" &&
+          change.correlated?.cause !== undefined
+        ? "notification.correlated.outage-cause"
+        : TEMPLATE[change.kind];
 
   const body = t(locale, key, {
     provider: service.name,
@@ -390,6 +400,7 @@ function render(
     // name here, and a list that mixed one display name with N slugs would
     // read as two different things.
     providers: (change.correlated?.providerIds ?? []).join(", "),
+    cause: change.correlated?.cause ?? "",
     minutes: change.correlated?.windowMinutes ?? 0,
     probe: change.crossCheck?.probeId ?? "",
     note: change.crossCheck?.note ?? "",

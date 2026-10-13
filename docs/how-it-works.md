@@ -209,6 +209,16 @@ is news the shared-failure message did not carry. The window lives in memory,
 so a restart costs at most one folded alert — in the direction of saying too
 much rather than too little.
 
+**Declared dependencies** (`dependsOn`, roadmap 2.9) let that one message say
+*why*. A provider lists what it runs on — `dependsOn: [cloudflare]` on Vercel and
+on Linear — and when the providers in a shared failure name the same upstream,
+two or more of them, the message adds "Probable cause: cloudflare". The
+operator declares it and IsItDown never infers it: a dependency graph guessed
+from outages would call a coincidence a cause. It changes the wording and
+nothing else — it does not start a correlation the window did not find, and it
+does not require the upstream to be monitored here. Ties go to the id that
+sorts first, so the same window always names the same cause.
+
 Everything in the table above is the diff engine deciding what is *news*. What
 happens to a change after that is the delivery policy's business — quiet hours,
 a digest window, an hourly cap, one message per incident — and that is
