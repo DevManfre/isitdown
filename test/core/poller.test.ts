@@ -1318,6 +1318,39 @@ test("three providers going bad in one window are reported once, not three times
   }
 });
 
+test("a shared failure names the upstream its members declare they run on", async () => {
+  let indicator = "none";
+  const respond = (_req: IncomingMessage, res: ServerResponse): void => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary(indicator));
+  };
+  const a = await fakeProvider(respond);
+  const b = await fakeProvider(respond);
+  const c = await fakeProvider(respond);
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const cfg = config(
+    [
+      service("vercel", a.baseUrl, { dependsOn: ["cloudflare"] }),
+      service("linear", b.baseUrl, { dependsOn: ["cloudflare"] }),
+      service("cloudflare", c.baseUrl),
+    ],
+    { correlationThreshold: 3, correlationWindowMinutes: 10 },
+  );
+  try {
+    await poller.runCycle(cfg);
+    indicator = "critical";
+    clock.advance(ONE_INTERVAL_MS);
+    const cycle = await poller.runCycle(cfg);
+    assert.equal(cycle.changes[0]?.correlated?.cause, "cloudflare");
+  } finally {
+    await store.close();
+    await Promise.all([a.close(), b.close(), c.close()]);
+  }
+});
+
 test("the same shared failure is not re-announced on every cycle", async () => {
   let indicator = "none";
   const respond = (_req: IncomingMessage, res: ServerResponse): void => {

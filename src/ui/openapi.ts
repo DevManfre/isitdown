@@ -1145,6 +1145,13 @@ const schemas: Json = {
       baseUrl: { type: "string" },
       enabled: { type: "boolean" },
       group: { type: "string", nullable: true },
+      dependsOn: {
+        type: "array",
+        items: { type: "string" },
+        nullable: true,
+        description:
+          "Providers this one runs on, declared by the operator (roadmap 2.9). A shared failure names the one most of its members declare.",
+      },
       crossChecks: {
         type: "string",
         nullable: true,

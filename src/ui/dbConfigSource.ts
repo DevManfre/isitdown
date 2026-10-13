@@ -195,6 +195,7 @@ const serviceRowSchema = z.object({
   interval_seconds: z.number().nullable(),
   muted_until: z.string().nullable(),
   group_name: z.string().nullable(),
+  depends_on: z.string().nullable(),
   cross_checks: z.string().nullable(),
   sla_target: z.number().nullable(),
   authority: z.enum(["declared", "observed"]).nullable(),
@@ -330,7 +331,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, cross_checks, sla_target, authority
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -369,6 +370,14 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // Absent rather than null, like the interval above: "in no group" is the
       // normal state and the engine reads it from the field not being there.
       ...(row.group_name === null ? {} : { group: row.group_name }),
+      ...(row.depends_on === null
+        ? {}
+        : {
+            dependsOn: z
+              .array(z.string())
+              .catch([])
+              .parse(JSON.parse(row.depends_on)),
+          }),
       ...(row.cross_checks === null ? {} : { crossChecks: row.cross_checks }),
       // Absent rather than null, like every optional above: "nobody promised
       // anything about this provider" has to stay distinguishable from a
@@ -384,7 +393,7 @@ export function insertService(
 ): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, cross_checks, sla_target, authority, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -398,6 +407,7 @@ export function insertService(
     parsed.intervalSeconds ?? null,
     parsed.mutedUntil ?? null,
     parsed.group ?? null,
+    parsed.dependsOn === undefined ? null : JSON.stringify(parsed.dependsOn),
     parsed.crossChecks ?? null,
     parsed.slaTarget ?? null,
     parsed.authority ?? null,
@@ -431,6 +441,11 @@ export const servicePatchSchema = serviceDefinitionSchema
     mutedUntil: z.string().datetime().nullable().optional(),
     /** Null takes the provider out of its group (roadmap 2.6). */
     group: serviceDefinitionSchema.shape.group.unwrap().nullable().optional(),
+    /** Null clears what the provider runs on (roadmap 2.9). */
+    dependsOn: serviceDefinitionSchema.shape.dependsOn
+      .unwrap()
+      .nullable()
+      .optional(),
     /** Null stops a probe cross-checking anything (roadmap 1.10). */
     crossChecks: serviceDefinitionSchema.shape.crossChecks
       .unwrap()
@@ -460,6 +475,9 @@ export function updateService(
   // Null is how the dashboard takes a provider out of its group, the way it
   // clears an interval: on a patch `undefined` already means "leave it alone".
   if (parsed.group !== undefined) columns["group_name"] = parsed.group;
+  if (parsed.dependsOn !== undefined)
+    columns["depends_on"] =
+      parsed.dependsOn === null ? null : JSON.stringify(parsed.dependsOn);
   if (parsed.crossChecks !== undefined)
     columns["cross_checks"] = parsed.crossChecks;
   if (parsed.components !== undefined) {

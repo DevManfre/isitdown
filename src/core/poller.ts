@@ -637,6 +637,13 @@ export function createPoller(deps: PollerDeps): Poller {
       windowMinutes: correlationWindowMinutes,
       threshold: correlationThreshold,
       at,
+      dependsOn: new Map(
+        config.services.flatMap((service) =>
+          service.dependsOn === undefined
+            ? []
+            : [[service.id, service.dependsOn] as const],
+        ),
+      ),
     });
     if (correlated === null) {
       announced = null;
