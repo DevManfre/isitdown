@@ -155,3 +155,27 @@ test("the feed's UTF-16 body is read through to a status", async () => {
     },
   );
 });
+
+test("regions and services narrow the feed together (roadmap 2.8)", () => {
+  const raw = feed(
+    event(),
+    event({ arn: "arn:aws:health:eu-central-1::event/S3/X/X_2", service: "s3-eu-central-1", service_name: "Amazon Simple Storage Service" }),
+    event({ arn: "arn:aws:health:us-east-1::event/EC2/X/X_3", service: "ec2-us-east-1", region_name: "N. Virginia" }),
+  );
+  const ids = (options: Record<string, string>): string[] =>
+    parseAwsStatus(raw, { ...service, options }).activeIncidents.map((incident) => incident.id.split("/").pop()!);
+
+  assert.deepEqual(ids({ regions: "eu-west-1, eu-central-1" }), ["AWS_EC2_OPERATIONAL_ISSUE_1", "X_2"]);
+  assert.deepEqual(ids({ services: "ec2" }), ["AWS_EC2_OPERATIONAL_ISSUE_1", "X_3"], "the short key matches");
+  assert.deepEqual(ids({ services: "Amazon Simple Storage Service" }), ["X_2"], "the display name matches");
+  assert.deepEqual(ids({ regions: "eu-west-1,eu-central-1", services: "EC2" }), ["AWS_EC2_OPERATIONAL_ISSUE_1"]);
+  assert.deepEqual(ids({ region: "us-east-1", regions: "eu-central-1" }), ["X_2"], "regions wins over the older region");
+});
+
+test("a multiple-services event is never hidden by a service filter", () => {
+  const status = parseAwsStatus(feed(event({ service: "multipleservices-eu-west-1", service_name: "Multiple services" })), {
+    ...service,
+    options: { services: "lambda" },
+  });
+  assert.equal(status.activeIncidents.length, 1);
+});

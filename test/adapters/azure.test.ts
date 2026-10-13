@@ -102,3 +102,16 @@ test("the locale option decides which feed is read", async () => {
     },
   );
 });
+
+test("regions and services are read off the title (roadmap 2.8)", () => {
+  const raw = fixture("incident");
+  const open = (options: Record<string, string>): string[] =>
+    parseAzureStatus(raw, { ...service, options }, now).activeIncidents.map((entry) => entry.id);
+
+  assert.deepEqual(open({ regions: "westeurope" }).sort(), ["ABCD-1234-WEU", "EFGH-5678-GLOBAL"], "the API name matches the display name; Global always passes");
+  assert.deepEqual(open({ regions: "North Europe" }), ["EFGH-5678-GLOBAL"]);
+  // The AKS advisory names its service; "Multiple Services" says nothing about
+  // which, so no service filter may hide it.
+  assert.deepEqual(open({ services: "Azure Kubernetes Service" }).sort(), ["ABCD-1234-WEU", "EFGH-5678-GLOBAL"]);
+  assert.deepEqual(open({ services: "Cosmos DB" }), ["ABCD-1234-WEU"]);
+});

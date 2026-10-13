@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Adapter, FetchContext, ServiceRef } from "../core/adapter.interface.ts";
 import { fetchConditional } from "../core/http.ts";
+import { inScope, scopeOf } from "./scope.ts";
 import type { Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { worstStatus } from "./severity.ts";
 
@@ -128,11 +129,22 @@ function regionOf(event: AwsEvent): string | null {
 }
 
 /**
+ * The names an event's service goes by: the feed's display name ("Amazon
+ * Elastic Compute Cloud") and the short key it is filed under (`ec2` out of
+ * `ec2-eu-west-1`), so `services: EC2` and the full name both match.
+ */
+function servicesOf(event: AwsEvent): string[] {
+  const key = (event.service ?? "").replace(/-[a-z]{2}(?:-[a-z]+)+-\d$/, "");
+  return [event.service_name ?? "", key];
+}
+
+/**
  * Pure mapping from the feed to a status reading, exported for the tests.
  *
- * `service.options.region` narrows it to one region. A global event — one the
- * feed publishes with no region at all — is always reported: it is the case
- * where narrowing would hide exactly the outage that matters most.
+ * `regions` and `services` (`scope.ts`) narrow it to what the fleet runs on. A
+ * global event — one the feed publishes with no region at all — is always
+ * reported: it is the case where narrowing would hide exactly the outage that
+ * matters most.
  */
 export function parseAwsStatus(raw: string, service: ServiceRef): NormalizedStatus {
   let json: unknown;
@@ -146,14 +158,14 @@ export function parseAwsStatus(raw: string, service: ServiceRef): NormalizedStat
     throw new Error(`aws fetch for ${service.id} returned a body that is not an event list`);
   }
 
-  const region = service.options?.["region"];
+  // Roadmap 2.8: `regions` and `services`, with the older single `region` still
+  // read when `regions` is absent.
+  const scope = scopeOf(service.options, "region");
   const fetchedAt = new Date().toISOString();
-
   const events = parsed.data.filter((event) => {
     if (event.arn === undefined || codeOf(event) === CLOSED) return false;
-    if (region === undefined || region === "") return true;
-    const eventRegion = regionOf(event);
-    return eventRegion === null || eventRegion === region;
+    const region = regionOf(event);
+    return inScope(scope, region === null ? [] : [region], servicesOf(event));
   });
 
   const activeIncidents: Incident[] = events.map((event) => ({

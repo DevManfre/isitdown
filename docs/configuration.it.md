@@ -273,6 +273,8 @@ lo schema, `dns` ne risolve l'host e da lì non scarica nulla.
 | `recordType` | `dns` | `A` | `A`, `AAAA`, `CNAME`, `MX`, `NS` o `TXT`. Una risposta `MX` viene confrontata come `"<preferenza> <exchange>"` e una `TXT` con i suoi pezzi uniti — il modo in cui entrambe si scrivono quando qualcuno dice come dovrebbero essere. |
 | `expectValue` | `dns` | — | Testo che uno dei record deve contenere. Un record puntato a un indirizzo dismesso si risolve comunque, ed è una brutta giornata diversa dal non risolversi affatto. |
 | `resolver` | `dns` | quello di sistema | `1.1.1.1`, oppure `127.0.0.1:5353`. Interroga un server direttamente — per esempio uno autoritativo — invece di ciò che il resolver di questo container ha in cache. Non impostato legge ciò che sperimenta il resto dei provider monitorati. |
+| `domainWarnDays` | `dns` | — | Legge la scadenza della registrazione via RDAP (roadmap 2.7): da questo numero di giorni in giù la lettura è `degraded`, una registrazione scaduta `major_outage`. Chiesto al dominio registrabile — `api.example.co.uk` → `example.co.uk` — e tenuto dodici ore. |
+| `dnssec` | `dns` | — | `true` chiede a un resolver che valida se la catena DNSSEC del nome regge (roadmap 2.7): `resolver` se impostato, altrimenti `1.1.1.1`. Un indirizzo — `9.9.9.9` — chiede a quello, per una sonda il cui `resolver` è un server autoritativo, che non valida mai. |
 
 Le letture che producono:
 
@@ -284,6 +286,10 @@ Le letture che producono:
 | `dns`: sono tornati record, che soddisfano `expectValue`, sotto `slowMs` | `operational` |
 | `dns`: sono tornati a `slowMs` o oltre | `degraded` |
 | `dns`: NXDOMAIN, SERVFAIL, nessun record, o nulla che soddisfi `expectValue` | `major_outage` |
+| `dns` con `domainWarnDays`: la registrazione scade entro quel limite | `degraded` |
+| `dns` con `domainWarnDays`: la registrazione è scaduta | `major_outage` |
+| `dns` con `dnssec`: il resolver non ha garantito il nome (zona non firmata, o resolver che non valida) | `degraded` |
+| `dns` con `dnssec`: firme presenti e non valide — il nome si risolve solo a validazione spenta | `major_outage` |
 
 Tutto ciò che la sezione `http` dice di una sonda vale anche per questi due —
 letture invece che letture fallite, una severità e nulla più, un solo punto di
@@ -301,11 +307,95 @@ che solleva un errore invece di leggere giù. Due cose sono solo loro:
   la lettura, e un record tornato vuoto significa che nessuno può raggiungere
   ciò che nomina.
 
+`domainWarnDays` e `dnssec` sono le micce lente accanto alla risposta stessa:
+una registrazione che scade e una catena di firme che si rompe si risolvono
+perfettamente fino al giorno in cui non si risolve più niente. Ognuno viene
+controllato solo su un nome che si è risolto, e una verifica che non ha potuto
+rispondere — un registro senza servizio RDAP (diversi ccTLD, `.it` compreso), un
+registro che non pubblica la scadenza, un resolver andato in timeout — viene
+detta nella nota e mai contata: è un nostro punto cieco, non colpa del dominio.
+
 Qualunque cosa non valida ferma il container all'avvio indicando motivo e percorso:
 file mancante, YAML malformato, base URL sbagliato, id duplicato, lista di servizi
 vuota, o un canale abilitato il cui segreto non è impostato. Un container partito con
 una configurazione capita a metà sembrerebbe sano mentre in silenzio non allerta: è
 l'unico modo di fallire su cui vale la pena essere rumorosi.
+
+#### Gli adapter `icmp` e `docker` — le macchine dell'homelab
+
+Due sonde per ciò che non ha una pagina e spesso nemmeno una porta che valga la
+pena nominare (roadmap 2.6): un router, un NAS, i container che ci girano sopra.
+
+```yaml
+- name: Router
+  id: router
+  adapter: icmp
+  baseUrl: http://192.168.1.1
+  options:
+    count: "3"
+    slowMs: "50"
+
+- name: NAS containers
+  id: nas
+  adapter: docker
+  baseUrl: http://docker-socket-proxy:2375
+```
+
+**`icmp`** esegue il `ping` di sistema — quello di busybox nell'immagine, quello
+di iputils su un host Linux — verso l'host di `baseUrl`. Dentro un container non
+serve alcuna capability in più: Docker consente di default i socket ICMP non
+privilegiati. Un host senza alcun `ping` lo dice nella nota della lettura.
+
+| Opzione | Default | Significato |
+|---|---|---|
+| `count` | `3` | Richieste echo per lettura, fino a `10`. Più di una, così un singolo pacchetto perso è un tasso di perdita e non un disservizio. |
+| `slowMs` | — | Un tempo di andata e ritorno medio pari o superiore a questi millisecondi è `degraded`. |
+
+| Cosa è successo | Lettura |
+|---|---|
+| Tutte le richieste hanno risposto, sotto `slowMs` | `operational` |
+| Tutte hanno risposto, in media pari o sopra `slowMs` | `degraded` |
+| Alcune hanno risposto | `partial_outage` |
+| Nessuna ha risposto, o l'host non si è risolto | `major_outage` |
+
+**`docker`** legge un engine Docker — `GET /containers/json?all=1`, una richiesta
+per lettura — e i suoi container sono i componenti del provider, scelti nello
+stesso picker dei componenti di una status page, raggruppati per progetto
+compose. Come raggiungere l'engine è l'unica decisione da prendere con cura:
+l'API di Docker **non ha una modalità in sola lettura**, e montare
+`/var/run/docker.sock` con `:ro` non la crea — chi ha il socket controlla il
+demone. La strada consigliata è quindi un socket proxy che risponde solo
+all'elenco dei container:
+
+```yaml
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy
+    environment:
+      CONTAINERS: 1          # GET /containers/* e nient'altro
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+```
+
+con `baseUrl: http://docker-socket-proxy:2375`. Per leggere direttamente il
+socket, invece, montalo e imposta `baseUrl: http://localhost` con
+`options.socket: /var/run/docker.sock`.
+
+| Container | Selezionato come componente | L'engine intero |
+|---|---|---|
+| in esecuzione, sano o senza health check | `operational` | conta come operativo |
+| in esecuzione, health check ancora in avvio | `unknown` | si astiene |
+| in esecuzione, unhealthy | `major_outage` | conta come giù |
+| in riavvio (un crash loop) | `major_outage` | conta come giù |
+| in pausa | `degraded` | conta come degradato |
+| uscito, creato, morto — o sparito | `major_outage` | si astiene |
+
+Le due colonne sono diverse apposta. Un container fermo è un job una tantum
+finito tanto quanto un servizio morto, e un engine tenuto rosso per sempre da
+un container di migrazione finito insegna all'operatore a ignorarlo; un
+container che hai selezionato l'hai selezionato perché dovrebbe girare. La
+lettura dell'engine si compone come quella di una status page: alcuni container
+giù è `partial_outage`, tutti `major_outage`. Un engine irraggiungibile è una
+lettura fallita, non un disservizio di ogni container.
 
 ### 3.2 Edizione UI — impostazioni a runtime
 
@@ -720,7 +810,7 @@ modo suo, quindi ognuno ha il proprio adapter:
     adapter: aws
     baseUrl: https://health.aws.amazon.com
     options:
-      region: eu-west-1        # opzionale; omesso, guarda ogni regione
+      regions: eu-west-1       # opzionale; omesso, guarda ogni regione (vedi sotto)
 
   - id: gcp
     name: Google Cloud
@@ -739,7 +829,7 @@ modo suo, quindi ognuno ha il proprio adapter:
 aperti in questo momento. Ne seguono due cose: non c'è cronologia da
 ricostruire, perché un evento risolto sparisce dal documento invece di essere
 marcato chiuso; e ogni evento riguarda una sola regione, quindi
-`options.region` restringe alla tua. Un evento globale — uno che il feed
+`options.regions` restringe alla tua (vedi sotto). Un evento globale — uno che il feed
 pubblica senza regione — è sempre riportato: restringere non deve nascondere
 proprio la classe di evento che colpisce tutto. La severità è il codice
 numerico di AWS, non un'ipotesi sulle parole:
@@ -771,6 +861,29 @@ aggiunge le due cose che l'adapter generico sbaglia su Azure: sa che
 bene, quindi un feed vuoto è operativo e non sconosciuto. La sua cronologia
 arriva solo fin dove arriva il feed, che per un provider che pubblica solo le
 comunicazioni aperte non è lontano.
+
+**Restringere alle tue regioni e ai tuoi servizi** (roadmap 2.8). I tre feed
+coprono ogni regione del pianeta, e un incidente in `ap-south-1` è rumore per
+chi sta a Francoforte. Le stesse due opzioni su `aws`, `gcp` e `azure`,
+entrambe separate da virgole:
+
+```yaml
+    options:
+      regions: eu-west-1, eu-central-1      # aws; gcp: europe-west1; azure: westeurope
+      services: EC2, S3                     # opzionale
+```
+
+| Opzione | Confrontata con |
+|---|---|
+| `regions` | AWS: la regione dell'evento (`eu-west-1`). Google Cloud: gli id delle location colpite dall'incidente (`europe-west1`) — per uno risolto, i luoghi che ha colpito. Azure: la regione in fondo al titolo della voce (`West Europe`). Il confronto ignora maiuscole, spazi e trattini, quindi `westeurope` e `West Europe` sono la stessa regione. Il vecchio `region` di AWS viene ancora letto quando manca `regions`. |
+| `services` | AWS: il nome del servizio (`Amazon Simple Storage Service`) o la sua chiave breve (`s3`). Google Cloud: i prodotti colpiti (`Cloud Storage`). Azure: i servizi nominati nel titolo (`Virtual Machines`). Confrontati allo stesso modo. |
+
+Un incidente che il feed non colloca da nessuna parte — globale, "multiple
+regions", o semplicemente senza etichetta — passa sempre il filtro per regione,
+e uno che non nomina servizi, o "multiple services", passa sempre il filtro per
+servizio: sono proprio gli incidenti che un restringimento non deve nascondere.
+Le cronologie degli incidenti di Google Cloud e Azure vengono ristrette con la
+stessa regola.
 
 #### Instatus e Better Stack
 

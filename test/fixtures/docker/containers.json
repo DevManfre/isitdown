@@ -1,0 +1,9 @@
+[
+  { "Id": "b83cb339c07d0000", "Names": ["/web"], "Image": "nginx:1.27", "State": "running", "Status": "Up 21 hours (healthy)", "Labels": { "com.docker.compose.project": "shop", "com.docker.compose.service": "web" } },
+  { "Id": "191dc18748b00000", "Names": ["/db"], "Image": "postgres:16", "State": "running", "Status": "Up 3 days", "Labels": { "com.docker.compose.project": "shop" } },
+  { "Id": "67dba8cf5a660000", "Names": ["/migrate"], "Image": "flyway/flyway", "State": "exited", "Status": "Exited (1) 3 days ago", "Labels": { "com.docker.compose.project": "shop" } },
+  { "Id": "57037a92d6a80000", "Names": ["/worker"], "Image": "shop/worker", "State": "running", "Status": "Up 2 minutes (unhealthy)", "Labels": { "com.docker.compose.project": "shop" } },
+  { "Id": "ade266ca6c300000", "Names": ["/cache"], "Image": "redis:7", "State": "restarting", "Status": "Restarting (1) 5 seconds ago", "Labels": {} },
+  { "Id": "ea93b9113ca90000", "Names": ["/backup"], "Image": "restic", "State": "paused", "Status": "Up 1 hour (Paused)", "Labels": null },
+  { "Id": "2895c64afe1e0000", "Names": ["/proxy"], "Image": "traefik:3", "State": "running", "Status": "Up 5 seconds (health: starting)" }
+]
