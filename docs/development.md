@@ -440,7 +440,10 @@ Notable suites:
   on read. The private key exists only as the `CATALOG_SIGNING_KEY` repository
   secret; without it the job stops before publishing anything. Rotating it
   means changing `CATALOG_PUBLIC_KEY` in `src/adapters/catalogFeed.ts` in the
-  same release — the sign step refuses a key that does not match it. To add a
+  same release — the sign step refuses a key that does not match it. Both
+  pushes go out over a write deploy key stored as `CATALOG_DEPLOY_KEY`, because
+  `main`'s ruleset requires the `verify` check and lets only admins and deploy
+  keys bypass it; a push with `GITHUB_TOKEN` would be rejected there. To add a
   provider by hand, add it to the seed (with `adapter` to skip detection) and
   run `node tools/build-catalog.mjs`.
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Adapter, FetchContext, IncidentHistoryResult, ServiceRef } from "../core/adapter.interface.ts";
 import { fetchConditional } from "../core/http.ts";
+import { inScope, scopeOf } from "./scope.ts";
 import type { HistoricalIncident, Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { worstStatus } from "./severity.ts";
 import { createdAtOf } from "./createdAt.ts";
@@ -42,6 +43,9 @@ const incidentSchema = z.object({
   created: z.string().optional(),
   end: z.string().nullable().optional(),
   modified: z.string().nullable().optional(),
+  currently_affected_locations: z.array(z.object({ id: z.string().optional() }).passthrough()).nullish(),
+  previously_affected_locations: z.array(z.object({ id: z.string().optional() }).passthrough()).nullish(),
+  affected_products: z.array(z.object({ title: z.string().optional() }).passthrough()).nullish(),
 });
 
 const incidentsSchema = z.array(incidentSchema);
@@ -79,7 +83,27 @@ function parseBody(raw: string, service: ServiceRef): GcpIncident[] {
   }
   // An incident with no id cannot be tracked across cycles, and inventing one
   // would report the same trouble as new on every poll.
-  return parsed.data.filter((incident) => incident.id !== undefined);
+  const scope = scopeOf(service.options);
+  return parsed.data.filter((incident) => incident.id !== undefined && inScope(scope, regionsOf(incident), servicesOf(incident)));
+}
+
+/**
+ * Where an incident is, by location id (`us-central1`). An open incident names
+ * the locations it is affecting now; a resolved one has none left, so the
+ * places it affected stand in — the timeline filters by the same rule.
+ */
+function regionsOf(incident: GcpIncident): string[] {
+  const current = incident.currently_affected_locations ?? [];
+  const places = current.length > 0 ? current : (incident.previously_affected_locations ?? []);
+  return places.flatMap((place) => (place.id === undefined ? [] : [place.id]));
+}
+
+/** The products an incident names, and the feed's own one-line service name. */
+function servicesOf(incident: GcpIncident): string[] {
+  return [
+    ...(incident.affected_products ?? []).flatMap((product) => (product.title === undefined ? [] : [product.title])),
+    incident.service_name ?? "",
+  ];
 }
 
 /** Pure mapping from the incident list to a status reading, exported for the tests. */

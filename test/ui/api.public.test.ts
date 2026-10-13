@@ -131,6 +131,39 @@ test("a direct probe's base url is withheld, because it is the operator's own ho
   }
 });
 
+test("every adapter that reads the operator's own hosts keeps its base url off the page", async () => {
+  const app = await api(ON);
+  try {
+    const own = [
+      { adapter: "tcp", baseUrl: "http://db.internal.acme.corp" },
+      { adapter: "dns", baseUrl: "https://dns.internal.acme.corp" },
+      { adapter: "icmp", baseUrl: "http://router.internal.acme.corp" },
+      { adapter: "docker", baseUrl: "http://docker-proxy.internal.acme.corp:2375" },
+      { adapter: "heartbeat", baseUrl: "https://heartbeat.invalid" },
+    ];
+    for (const [index, { adapter, baseUrl }] of own.entries()) {
+      insertService(app.runtime.db, {
+        id: `own-${index}`,
+        name: `Own ${adapter}`,
+        adapter,
+        baseUrl,
+        enabled: true,
+        components: [],
+        scopeToComponents: false,
+      });
+    }
+    const page = await app.get("/public");
+    const json = await app.get("/public/summary.json");
+    for (const { adapter, baseUrl } of own) {
+      const host = new URL(baseUrl).hostname;
+      assert.match(page.text, new RegExp(`Own ${adapter}`), `${adapter} still appears`);
+      assert.ok(!page.text.includes(host) && !json.text.includes(host), `${adapter}'s ${host} must not be published`);
+    }
+  } finally {
+    await app.close();
+  }
+});
+
 test("a vendor's own status page is linked, because it is already public", async () => {
   const app = await api(ON);
   try {

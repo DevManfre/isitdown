@@ -28,10 +28,15 @@ jobs:
   catalog:
     runs-on: ubuntu-latest
     steps:
+      # Pushes go out over this deploy key, not GITHUB_TOKEN: main's ruleset
+      # requires the "verify" check, which a commit made here can't have, and
+      # the deploy key is the ruleset's one bypass besides admins. A push made
+      # this way also triggers CI on dev, which a GITHUB_TOKEN push never does.
       - uses: actions/checkout@v5
         with:
           ref: dev
           fetch-depth: 0
+          ssh-key: ${{ secrets.CATALOG_DEPLOY_KEY }}
 
       - uses: actions/setup-node@v5
         with:
@@ -58,7 +63,6 @@ jobs:
         run: node --test test/adapters/catalog.test.ts test/adapters/catalogFeed.test.ts
 
       - name: Commit to dev
-        id: dev
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -66,19 +70,18 @@ jobs:
           # changed list is worth a commit.
           if git diff --quiet -- src/adapters/catalog.json; then
             echo "Catalog unchanged."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git add src/adapters/catalog.json catalog/
           count=$(node -e 'console.log(require("./src/adapters/catalog.json").entries.length)')
           git commit -m "🍱 CATALOG - regenerate the provider catalog (${count} providers)"
           git push origin dev
-          echo "changed=true" >> "$GITHUB_OUTPUT"
 
       # Only the three published files: main carries the product and nothing
       # else of dev's, and the next mergeclean finds the same bytes on both.
+      # Compared against main itself rather than gated on the dev commit, so a
+      # run whose push to main failed is repaired by the next one.
       - name: Publish to main
-        if: steps.dev.outputs.changed == 'true'
         run: |
           git fetch origin main
           git worktree add ../main origin/main
@@ -88,6 +91,7 @@ jobs:
           }
           cd ../main
           git add catalog/
-          if git diff --cached --quiet; then exit 0; fi
+          # As on dev, the report alone is not worth a commit.
+          if git diff --cached --quiet -- catalog/catalog.json; then exit 0; fi
           git commit -m "🍱 CATALOG - publish the signed provider catalog"
           git push origin HEAD:main

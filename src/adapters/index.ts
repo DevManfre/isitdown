@@ -5,10 +5,12 @@ import { azureAdapter } from "./azure.adapter.ts";
 import { betterStackAdapter } from "./betterstack.adapter.ts";
 import { cachetAdapter } from "./cachet.adapter.ts";
 import { dnsAdapter } from "./dns.adapter.ts";
+import { dockerAdapter } from "./docker.adapter.ts";
 import { gcpAdapter } from "./gcp.adapter.ts";
 import { htmlAdapter } from "./html.adapter.ts";
 import { imapAdapter } from "./imap.adapter.ts";
 import { httpAdapter } from "./http.adapter.ts";
+import { icmpAdapter } from "./icmp.adapter.ts";
 import { instatusAdapter } from "./instatus.adapter.ts";
 import { jsonAdapter } from "./json.adapter.ts";
 import { rssAdapter } from "./rss.adapter.ts";
@@ -42,6 +44,8 @@ export const adapters: Record<string, Adapter> = {
   [httpAdapter.id]: httpAdapter,
   [tcpAdapter.id]: tcpAdapter,
   [dnsAdapter.id]: dnsAdapter,
+  [icmpAdapter.id]: icmpAdapter,
+  [dockerAdapter.id]: dockerAdapter,
 };
 
 /**
@@ -92,7 +96,7 @@ export function cadenceProblems(service: {
   const adapter = adapters[service.adapter];
   if (adapter !== undefined && adapter.kind !== "probe") {
     problems.push(
-      `intervalSeconds is only for a probe (http, tcp, dns); the ${service.adapter} adapter reads a status page, use intervalMinutes`,
+      `intervalSeconds is only for a probe (http, tcp, dns, icmp, docker); the ${service.adapter} adapter reads a status page, use intervalMinutes`,
     );
   }
   if (service.intervalMinutes !== undefined && service.intervalMinutes !== null) {
