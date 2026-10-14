@@ -129,7 +129,14 @@ export interface StatusChange {
    * dashboard all have a real subject to hang it on, and this is what says
    * the alert is about more than that one.
    */
-  correlated?: { providerIds: string[]; windowMinutes: number } | undefined;
+  correlated?:
+    | {
+        providerIds: string[];
+        windowMinutes: number;
+        /** The declared upstream most members run on (roadmap 2.9). */
+        cause?: string | undefined;
+      }
+    | undefined;
   /**
    * Present for silent_outage only (roadmap 1.10): the probe whose failing
    * reading disagrees with the provider's own page, and whatever it had to say

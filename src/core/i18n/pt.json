@@ -23,6 +23,7 @@
   "notification.incident.resolved": "{provider} — {severity}\n\nO incidente «{title}» foi resolvido.\nAtualizado: {updatedAt}\n\n{url}",
   "notification.monitoring.degraded": "{provider} — monitorização degradada\n\nLeituras consecutivas falhadas: {count}. Último estado conhecido: {lastStatus}.\nAtualizado: {updatedAt}",
   "notification.correlated.outage": "{provider} — {severity}\n\n{count} fornecedores pioraram em {minutes} minutos: {providers}.\nParece uma única falha partilhada e não {count} falhas separadas.\n\n{url}",
+  "notification.correlated.outage-cause": "{provider} — {severity}\n\n{count} fornecedores pioraram em {minutes} minutos: {providers}.\nParece uma única falha partilhada e não {count} falhas separadas.\nCausa provável: {cause}, em que assentam.\n\n{url}",
   "notification.silent.outage": "{provider} — {severity}\n\nA página de estado continua a indicar {previous}, mas a nossa sonda {probe} não consegue alcançar o serviço: {note}\n\n{url}",
   "notification.silent.outage-observed": "{provider} — {severity}\n\nA nossa sonda {probe} não alcança o serviço, e para este fornecedor vale o que medimos: {note}\n\nA sua página de estado ainda reporta {previous}, o que aqui é uma opinião e não a resposta.\n\n{url}",
   "notification.sla.burn": "{provider} — orçamento de erro\n\nA este ritmo, {month} fecha em {projected}% face a um objetivo de {target}%.\nJá foram gastos {spentMinutes} dos {budgetMinutes} minutos disponíveis e a disponibilidade medida até agora é de {uptime}%.\n\n{url}",
@@ -42,6 +43,7 @@
   "notification.digest.monitoring": "monitorização degradada — {count} leituras consecutivas falhadas",
   "notification.digest.silent": "a página de estado continua a dizer operacional, mas a sonda {probe} lê {current}",
   "notification.digest.correlated": "{count} fornecedores pioraram ao mesmo tempo — {providers}",
+  "notification.digest.correlated-cause": "{count} fornecedores pioraram ao mesmo tempo — {providers} — causa provável: {cause}",
   "notification.digest.sla": "orçamento de erro — a este ritmo o mês fecha em {projected}% face a {target}%",
   "notification.digest.slow-page": "página de estado lenta — {latency} face aos habituais {median}",
 

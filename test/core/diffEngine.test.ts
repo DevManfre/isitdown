@@ -718,3 +718,51 @@ test("a slow page is not a worsening for the correlation window", () => {
     [],
   );
 });
+
+const gone = [
+  worsening("vercel", "2026-09-01T10:00:00.000Z", "degraded"),
+  worsening("linear", "2026-09-01T10:02:00.000Z", "degraded"),
+  worsening("cloudflare", "2026-09-01T10:03:00.000Z", "major_outage"),
+];
+
+const correlate = (dependsOn?: Map<string, string[]>) =>
+  correlatedOutage({
+    recent: gone,
+    windowMinutes: 10,
+    threshold: 3,
+    at: "2026-09-01T10:05:00.000Z",
+    dependsOn,
+  });
+
+test("declared dependencies name the upstream most failing providers run on", () => {
+  const cause = correlate(
+    new Map([
+      ["vercel", ["cloudflare", "aws"]],
+      ["linear", ["cloudflare"]],
+    ]),
+  );
+  assert.equal(cause?.correlated?.cause, "cloudflare");
+});
+
+for (const [label, dependsOn] of [
+  ["nothing declared", undefined],
+  ["no one shared", new Map([["vercel", ["cloudflare"]], ["linear", ["aws"]]])],
+  ["an upstream only itself names", new Map([["cloudflare", ["cloudflare"]]])],
+  ["providers outside the window", new Map([["notion", ["aws"]], ["figma", ["aws"]]])],
+] as const) {
+  test(`no cause is named when ${label}`, () => {
+    const change = correlate(dependsOn as Map<string, string[]> | undefined);
+    assert.equal(change?.kind, "correlated_outage", "the correlation itself still stands");
+    assert.equal(change?.correlated?.cause, undefined);
+  });
+}
+
+test("a tie between two shared upstreams goes to the id that sorts first", () => {
+  const cause = correlate(
+    new Map([
+      ["vercel", ["gcp", "aws"]],
+      ["linear", ["aws", "gcp"]],
+    ]),
+  );
+  assert.equal(cause?.correlated?.cause, "aws");
+});

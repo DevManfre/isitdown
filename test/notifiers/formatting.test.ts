@@ -367,3 +367,21 @@ test("a silent outage says what the disagreement means, per the provider's autho
     assert.ok(message.includes("connection refused"), message);
   }
 });
+
+test("a shared failure names its probable cause only when one was declared", () => {
+  const change = (cause?: string): StatusChange => ({
+    kind: "correlated_outage",
+    providerId: "vercel",
+    currentStatus: "major_outage",
+    correlated: {
+      providerIds: ["vercel", "linear", "cloudflare"],
+      windowMinutes: 10,
+      ...(cause === undefined ? {} : { cause }),
+    },
+    at: "2026-08-19T14:32:07.000Z",
+  });
+
+  const named = renderMessage(payloadFor(change("cloudflare")));
+  assert.ok(named.includes("Probable cause: cloudflare"), named);
+  assert.ok(!renderMessage(payloadFor(change())).includes("Probable cause"));
+});

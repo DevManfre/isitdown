@@ -81,6 +81,14 @@ export const serviceDefinitionSchema = z.object({
    */
   group: slug.optional(),
   /**
+   * The providers this one runs on, declared by the operator and never
+   * inferred (roadmap 2.9). When several providers go bad together, a shared
+   * upstream named here is what the shared-failure alert calls the probable
+   * cause. Slugs, not checked against the fleet: an upstream you do not
+   * monitor (a cloud you only depend on) is still worth naming.
+   */
+  dependsOn: z.array(slug).min(1).max(20).optional(),
+  /**
    * Only on a probe (`http`, `tcp`, `dns`) or a mailbox reading (`imap`,
    * roadmap 1.4): the provider whose status page this probe is a second
    * opinion on — silent-outage cross-check (roadmap 1.10).

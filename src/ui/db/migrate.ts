@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 30;
+export const SCHEMA_VERSION = 31;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -707,6 +707,19 @@ export function migrate(db: DatabaseSync): void {
         pings        INTEGER NOT NULL DEFAULT 0
       );
     `);
+  }
+
+  if (from < 31) {
+    // Provider dependencies - roadmap 2.9. A JSON list of provider ids a
+    // provider runs on, on the row like `group_name` and `cross_checks`: the
+    // Light edition's `config.yml` writes it as a field of the provider too,
+    // and a table would make the two editions describe one thing two ways.
+    const dependencyColumns = (
+      db.prepare("PRAGMA table_info(services)").all() as { name: string }[]
+    ).map((column) => column.name);
+    if (!dependencyColumns.includes("depends_on")) {
+      db.exec("ALTER TABLE services ADD COLUMN depends_on TEXT");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

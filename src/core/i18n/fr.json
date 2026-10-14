@@ -23,6 +23,7 @@
   "notification.incident.resolved": "{provider} — {severity}\n\nL'incident « {title} » est résolu.\nMis à jour : {updatedAt}\n\n{url}",
   "notification.monitoring.degraded": "{provider} — surveillance dégradée\n\nLectures consécutives en échec : {count}. Dernier état connu : {lastStatus}.\nMis à jour : {updatedAt}",
   "notification.correlated.outage": "{provider} — {severity}\n\n{count} fournisseurs se sont dégradés en {minutes} minutes : {providers}.\nCela ressemble à une seule panne commune plutôt qu'à {count} pannes distinctes.\n\n{url}",
+  "notification.correlated.outage-cause": "{provider} — {severity}\n\n{count} fournisseurs se sont dégradés en {minutes} minutes : {providers}.\nCela ressemble à une seule panne commune plutôt qu'à {count} pannes distinctes.\nCause probable : {cause}, sur laquelle ils reposent.\n\n{url}",
   "notification.silent.outage": "{provider} — {severity}\n\nLa page d'état indique toujours {previous}, mais notre sonde {probe} n'arrive pas à joindre le service : {note}\n\n{url}",
   "notification.silent.outage-observed": "{provider} — {severity}\n\nNotre sonde {probe} n'atteint pas le service, et pour ce fournisseur c'est notre mesure qui fait foi : {note}\n\nSa page de statut annonce toujours {previous}, ce qui ici est un avis et non la réponse.\n\n{url}",
   "notification.sla.burn": "{provider} — budget d'erreur\n\nÀ ce rythme, {month} finira à {projected}% pour un objectif de {target}%.\n{spentMinutes} des {budgetMinutes} minutes autorisées sont déjà consommées et la disponibilité mesurée jusqu'ici est de {uptime}%.\n\n{url}",
@@ -42,6 +43,7 @@
   "notification.digest.monitoring": "surveillance dégradée — {count} lectures consécutives en échec",
   "notification.digest.silent": "la page d'état dit toujours opérationnel, mais la sonde {probe} lit {current}",
   "notification.digest.correlated": "{count} fournisseurs dégradés en même temps — {providers}",
+  "notification.digest.correlated-cause": "{count} fournisseurs dégradés en même temps — {providers} — cause probable : {cause}",
   "notification.digest.sla": "budget d'erreur — à ce rythme le mois finit à {projected}% pour {target}%",
   "notification.digest.slow-page": "page d'état lente — {latency} contre {median} d'habitude",
 

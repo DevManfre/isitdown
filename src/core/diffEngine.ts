@@ -298,6 +298,13 @@ export interface CorrelationInputs {
   threshold: number;
   /** ISO 8601, UTC. The end of the window — the cycle that just finished. */
   at: string;
+  /**
+   * What each provider declares it runs on (roadmap 2.9), by provider id.
+   * Declared by the operator, never inferred: it only names a cause for a
+   * correlation the window already found, and decides nothing about whether
+   * there is one.
+   */
+  dependsOn?: ReadonlyMap<string, readonly string[]> | undefined;
 }
 
 /**
@@ -351,16 +358,51 @@ export function correlatedOutage(
   const [lead] = members;
   if (lead === undefined) return null;
 
+  const providerIds = members.map((member) => member.providerId);
+  const cause = probableCause(providerIds, inputs.dependsOn);
   return {
     kind: "correlated_outage",
     providerId: lead.providerId,
     currentStatus: lead.status,
     correlated: {
-      providerIds: members.map((member) => member.providerId),
+      providerIds,
       windowMinutes: inputs.windowMinutes,
+      ...(cause === null ? {} : { cause }),
     },
     at: inputs.at,
   };
+}
+
+/**
+ * The upstream most of the failing providers say they run on (roadmap 2.9).
+ * Two members naming the same one is the least that makes it a cause rather
+ * than a coincidence; below that the alert stays silent about why, which is
+ * what it did before any dependency was declared. Ties go to the id that sorts
+ * first, so the same window always names the same cause.
+ */
+function probableCause(
+  members: readonly string[],
+  dependsOn: CorrelationInputs["dependsOn"],
+): string | null {
+  if (dependsOn === undefined) return null;
+  const votes = new Map<string, number>();
+  for (const member of members) {
+    for (const upstream of new Set(dependsOn.get(member) ?? [])) {
+      if (upstream === member) continue;
+      votes.set(upstream, (votes.get(upstream) ?? 0) + 1);
+    }
+  }
+  let cause: string | null = null;
+  let best = 1;
+  for (const [upstream, count] of [...votes].sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
+    if (count > best) {
+      cause = upstream;
+      best = count;
+    }
+  }
+  return cause;
 }
 
 /** Severity order, for picking the worst member. `unknown` never gets here. */

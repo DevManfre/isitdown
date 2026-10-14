@@ -2066,3 +2066,42 @@ l'URL di push ([3.15](#315-push-del-provider-invece-del-polling)), la rotta del
 ping non è mai protetta da `API_TOKEN` — chi chiama è uno script — quindi tratta
 l'URL come il segreto che è e servilo in HTTPS. Un ping che arriva mentre
 l'istanza stessa è giù va perso: il successivo rimette a posto il provider.
+
+### 3.20 Dipendenze — "su cosa gira"
+
+Metà di una flotta gira sull'altra metà: Vercel su AWS, mille prodotti SaaS su
+Cloudflare. Quando più provider peggiorano insieme, l'avviso di guasto condiviso
+([`correlationThreshold`](#31-edizione-light--configyml)) dice *che* è successo.
+Una lista `dependsOn` è il modo in cui l'operatore gli dice *perché* (roadmap
+2.9) — in `config.yml`:
+
+```yaml
+services:
+  - name: Vercel
+    id: vercel
+    adapter: statuspage
+    baseUrl: https://www.vercel-status.com
+    dependsOn: [cloudflare]
+  - name: Linear
+    id: linear
+    adapter: statuspage
+    baseUrl: https://linearstatus.com
+    dependsOn: [cloudflare]
+```
+
+Quando due o più provider di un guasto condiviso nominano lo stesso upstream, il
+messaggio guadagna una riga — "Causa probabile: cloudflare" — e così la voce del
+digest. Nell'edizione UI il campo è `dependsOn` su `POST /config/services` e
+`PATCH /config/services/:id` (`null` lo azzera); la dashboard non ha ancora un
+campo per questo.
+
+- **Dichiarata, mai dedotta.** IsItDown non indovina un grafo dai guasti: una
+  coincidenza verrebbe chiamata causa.
+- **Solo le parole.** Non fa partire una correlazione che la finestra non ha
+  trovato, e un provider che nomina un upstream che nessun altro nomina non
+  cambia nulla.
+- **L'upstream non deve essere monitorato qui.** Nomina un cloud da cui dipendi
+  soltanto e viene comunque indicato come causa. Lo slug non è verificato
+  contro la flotta.
+- **A parità di voti** vince l'id che viene prima in ordine alfabetico, così la
+  stessa finestra nomina sempre la stessa causa.

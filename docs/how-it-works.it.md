@@ -219,6 +219,17 @@ guasto condiviso non portava. La finestra vive in memoria, quindi un riavvio
 costa al massimo un avviso ripiegato — nella direzione di dire troppo piuttosto
 che troppo poco.
 
+Le **dipendenze dichiarate** (`dependsOn`, roadmap 2.9) permettono a quel
+messaggio di dire *perché*. Un provider elenca su cosa gira — `dependsOn:
+[cloudflare]` su Vercel e su Linear — e quando i provider di un guasto condiviso
+nominano lo stesso upstream, almeno due, il messaggio aggiunge "Causa probabile:
+cloudflare". La dichiara l'operatore e IsItDown non la deduce mai: un grafo delle
+dipendenze indovinato dai guasti chiamerebbe causa una coincidenza. Cambia le
+parole e nient'altro — non fa partire una correlazione che la finestra non ha
+trovato e non richiede che l'upstream sia monitorato qui. A parità di voti vince
+l'id che viene prima in ordine alfabetico, così la stessa finestra nomina sempre
+la stessa causa.
+
 Tutto ciò che sta nella tabella sopra è il diff engine che decide cosa è
 *notizia*. Cosa succede a un cambiamento dopo di quello è affare della politica
 di consegna — ore di silenzio, finestra di riepilogo, limite orario, un
