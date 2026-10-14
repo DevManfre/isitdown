@@ -83,6 +83,9 @@ export function exportConfigYaml(db: DatabaseSync, logger: Logger): string {
       ...(service.components.length === 0 ? {} : { components: service.components }),
       ...(service.scopeToComponents ? { scopeToComponents: true } : {}),
       ...(service.group === undefined ? {} : { group: service.group }),
+      ...(service.dependsOn === undefined
+        ? {}
+        : { dependsOn: service.dependsOn }),
       ...(service.crossChecks === undefined ? {} : { crossChecks: service.crossChecks }),
       ...(service.slaTarget === undefined ? {} : { slaTarget: service.slaTarget }),
     })),
@@ -231,6 +234,7 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
         // service that no longer carries a group or a cross-check has to lose
         // the one the database is still holding.
         group: service.group ?? null,
+        dependsOn: service.dependsOn ?? null,
         crossChecks: service.crossChecks ?? null,
         slaTarget: service.slaTarget ?? null,
         ...(service.options === undefined ? {} : { options: service.options }),

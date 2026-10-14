@@ -23,6 +23,7 @@
   "notification.incident.resolved": "{provider} — {severity}\n\nDie Störung „{title}“ ist behoben.\nAktualisiert: {updatedAt}\n\n{url}",
   "notification.monitoring.degraded": "{provider} — Überwachung beeinträchtigt\n\nAufeinanderfolgende fehlgeschlagene Abrufe: {count}. Letzter bekannter Status: {lastStatus}.\nAktualisiert: {updatedAt}",
   "notification.correlated.outage": "{provider} — {severity}\n\n{count} Anbieter haben sich innerhalb von {minutes} Minuten verschlechtert: {providers}.\nDas sieht nach einer einzigen gemeinsamen Störung aus und nicht nach {count} getrennten.\n\n{url}",
+  "notification.correlated.outage-cause": "{provider} — {severity}\n\n{count} Anbieter haben sich innerhalb von {minutes} Minuten verschlechtert: {providers}.\nDas sieht nach einer einzigen gemeinsamen Störung aus und nicht nach {count} getrennten.\nWahrscheinliche Ursache: {cause}, auf der sie laufen.\n\n{url}",
   "notification.silent.outage": "{provider} — {severity}\n\nDie Statusseite meldet weiterhin {previous}, aber unsere Sonde {probe} erreicht den Dienst nicht: {note}\n\n{url}",
   "notification.silent.outage-observed": "{provider} — {severity}\n\nUnsere Sonde {probe} erreicht den Dienst nicht, und für diesen Anbieter gilt, was wir messen: {note}\n\nSeine Statusseite meldet weiterhin {previous} — hier eine Meinung und nicht die Antwort.\n\n{url}",
   "notification.sla.burn": "{provider} — Fehlerbudget\n\nBei diesem Tempo landet {month} bei {projected}% gegenüber einem Ziel von {target}%.\n{spentMinutes} von {budgetMinutes} erlaubten Minuten sind bereits verbraucht, die bisher gemessene Verfügbarkeit liegt bei {uptime}%.\n\n{url}",
@@ -42,6 +43,7 @@
   "notification.digest.monitoring": "Überwachung beeinträchtigt — {count} aufeinanderfolgende fehlgeschlagene Abrufe",
   "notification.digest.silent": "die Statusseite meldet weiterhin betriebsbereit, aber die Sonde {probe} liest {current}",
   "notification.digest.correlated": "{count} Anbieter haben sich gleichzeitig verschlechtert — {providers}",
+  "notification.digest.correlated-cause": "{count} Anbieter haben sich gleichzeitig verschlechtert — {providers} — wahrscheinliche Ursache: {cause}",
   "notification.digest.sla": "Fehlerbudget — bei diesem Tempo landet der Monat bei {projected}% gegenüber {target}%",
   "notification.digest.slow-page": "Statusseite langsam — {latency} statt sonst {median}",
 

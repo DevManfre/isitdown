@@ -23,6 +23,7 @@
   "notification.incident.resolved": "{provider} — {severity}\n\nLa incidencia «{title}» se ha resuelto.\nActualizado: {updatedAt}\n\n{url}",
   "notification.monitoring.degraded": "{provider} — seguimiento degradado\n\nLecturas consecutivas fallidas: {count}. Último estado conocido: {lastStatus}.\nActualizado: {updatedAt}",
   "notification.correlated.outage": "{provider} — {severity}\n\n{count} proveedores han empeorado en {minutes} minutos: {providers}.\nParece un único fallo compartido y no {count} fallos distintos.\n\n{url}",
+  "notification.correlated.outage-cause": "{provider} — {severity}\n\n{count} proveedores han empeorado en {minutes} minutos: {providers}.\nParece un único fallo compartido y no {count} fallos distintos.\nCausa probable: {cause}, en la que se apoyan.\n\n{url}",
   "notification.silent.outage": "{provider} — {severity}\n\nLa página de estado sigue indicando {previous}, pero nuestra sonda {probe} no consigue alcanzar el servicio: {note}\n\n{url}",
   "notification.silent.outage-observed": "{provider} — {severity}\n\nNuestra sonda {probe} no alcanza el servicio, y para este proveedor vale lo que medimos nosotros: {note}\n\nSu página de estado sigue informando {previous}, que aquí es una opinión y no la respuesta.\n\n{url}",
   "notification.sla.burn": "{provider} — presupuesto de error\n\nA este ritmo, {month} cerrará en {projected}% frente a un objetivo del {target}%.\nYa se han consumido {spentMinutes} de los {budgetMinutes} minutos disponibles y la disponibilidad medida hasta ahora es del {uptime}%.\n\n{url}",
@@ -42,6 +43,7 @@
   "notification.digest.monitoring": "seguimiento degradado — {count} lecturas consecutivas fallidas",
   "notification.digest.silent": "la página de estado sigue diciendo operativo, pero la sonda {probe} lee {current}",
   "notification.digest.correlated": "{count} proveedores han empeorado a la vez — {providers}",
+  "notification.digest.correlated-cause": "{count} proveedores han empeorado a la vez — {providers} — causa probable: {cause}",
   "notification.digest.sla": "presupuesto de error — a este ritmo el mes cierra en {projected}% frente a {target}%",
   "notification.digest.slow-page": "página de estado lenta — {latency} frente a los {median} habituales",
 

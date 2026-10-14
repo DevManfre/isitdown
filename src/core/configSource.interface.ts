@@ -42,6 +42,8 @@ export interface ServiceDefinition {
   enabled: boolean;
   /** The group this provider belongs to, or absent while the fleet is flat (roadmap 2.6). */
   group?: string | undefined;
+  /** providers this one runs on, operator-declared (roadmap 2.9). */
+  dependsOn?: string[] | undefined;
   /**
    * On a probe: the provider whose status page it is a second opinion on
    * (roadmap 1.10). Absent on everything else, which is every service that is

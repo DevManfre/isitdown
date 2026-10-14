@@ -1993,3 +1993,40 @@ appears in it only for a request that could also write; a read-only
 `API_TOKEN` — its caller is a script — so treat the URL as the secret it is and
 serve it over HTTPS. A ping that arrives while the instance itself is down is
 lost: the next one puts the provider right.
+
+### 3.20 Dependencies — "what this runs on"
+
+Half of a fleet runs on the other half: Vercel on AWS, a thousand SaaS products
+on Cloudflare. When several providers go bad together, the shared-failure alert
+([`correlationThreshold`](#31-light-edition--configyml)) says *that* they did.
+A `dependsOn` list is how an operator tells it *why* (roadmap 2.9) — in
+`config.yml`:
+
+```yaml
+services:
+  - name: Vercel
+    id: vercel
+    adapter: statuspage
+    baseUrl: https://www.vercel-status.com
+    dependsOn: [cloudflare]
+  - name: Linear
+    id: linear
+    adapter: statuspage
+    baseUrl: https://linearstatus.com
+    dependsOn: [cloudflare]
+```
+
+When two or more of the providers in a shared failure name the same upstream,
+the message gains a line — "Probable cause: cloudflare" — and so does the
+digest entry. In the UI edition the field is `dependsOn` on
+`POST /config/services` and `PATCH /config/services/:id` (`null` clears it);
+the dashboard has no field for it yet.
+
+- **Declared, never inferred.** IsItDown does not guess a graph from outages: a
+  coincidence would be called a cause.
+- **Wording only.** It does not start a correlation the window did not find,
+  and a provider that names an upstream nobody else names changes nothing.
+- **The upstream need not be monitored here.** Name a cloud you only depend on
+  and it is still named as the cause. The slug is not checked against the fleet.
+- **Ties** go to the id that sorts first, so the same window always names the
+  same cause.
