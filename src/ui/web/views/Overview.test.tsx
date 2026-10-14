@@ -404,4 +404,49 @@ describe("Overview's status beacon", () => {
     await screen.findAllByText("GitHub");
     expect(tier()).toBe("danger");
   });
+  it("names the likely cause while two providers that declare it are down (roadmap 2.9)", async () => {
+    const service = (id: string, dependsOn?: string[]) => ({
+      id,
+      name: id,
+      adapter: "statuspage",
+      baseUrl: "https://x.example",
+      enabled: true,
+      components: [],
+      scopeToComponents: false,
+      ...(dependsOn === undefined ? {} : { dependsOn }),
+    });
+    renderWithProviders(<Overview />, {
+      status: {
+        providers: [
+          providerFixture({ id: "vercel", name: "Vercel", overallStatus: "degraded" }),
+          providerFixture({ id: "npm", name: "npm", overallStatus: "major_outage" }),
+        ],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
+      config: { services: [service("vercel", ["cloudflare"]), service("npm", ["cloudflare"])] },
+      history,
+    });
+    expect(
+      await screen.findByRole("heading", { name: i18n.t("shared-failure.title", { cause: "cloudflare" }) }),
+    ).toBeInTheDocument();
+  });
+
+  it("draws no shared-failure card when nothing is declared", async () => {
+    renderWithProviders(<Overview />, {
+      status: {
+        providers: [
+          providerFixture({ id: "vercel", overallStatus: "degraded" }),
+          providerFixture({ id: "npm", overallStatus: "major_outage" }),
+        ],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
+      history,
+    });
+    await screen.findByTestId("hero-stats");
+    expect(screen.queryByText(i18n.t("shared-failure.kicker"))).toBeNull();
+  });
 });

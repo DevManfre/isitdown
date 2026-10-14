@@ -23,6 +23,7 @@ import type {
   Preferences,
   MessagePreview,
   ProviderCalendar,
+  CoincidenceReport,
   ReliabilityReport,
   SlaResponse,
   ProviderPushConfig,
@@ -177,6 +178,8 @@ export const getMessagePreview = (kind: string) =>
   );
 
 /** Per-provider MTTR and MTBF, and incidents by weekday and hour — roadmap 12.2, 12.3. */
+export const getCoincidence = (days: number) =>
+  request<CoincidenceReport>("GET", `/coincidence?days=${days}`);
 export const getReliability = (days: number) =>
   request<ReliabilityReport>("GET", `/reliability?days=${days}`);
 

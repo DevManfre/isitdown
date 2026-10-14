@@ -22,10 +22,13 @@ import {
 import {
   useAnnotations,
   useHistory,
+  useCoincidence,
+  useConfigChrome,
   useReliability,
   useStatus,
 } from "@/hooks/queries.ts";
 import { AnnotationBar } from "@/components/AnnotationBar.tsx";
+import { BreakTogetherCard } from "@/components/BreakTogetherCard.tsx";
 import { ReliabilityTable } from "@/components/ReliabilityTable.tsx";
 import { IncidentHeatmap } from "@/components/charts/IncidentHeatmap.tsx";
 import { CoverageProvider } from "@/lib/coverage.tsx";
@@ -153,6 +156,9 @@ export function History() {
   // arithmetic is defined over the three documented spans, and asking for an
   // arbitrary range would mean a second definition of "the previous window".
   const { data: reliability } = useReliability(nearestFixed(window_.days));
+  // Roadmap 2.10. Same fixed window, for the same reason.
+  const { data: coincidence } = useCoincidence(nearestFixed(window_.days));
+  const { data: config } = useConfigChrome();
 
   // useHistory throws on an initial-load failure (routes.tsx's errorElement
   // catches it); while still in flight there is nothing to render yet.
@@ -513,6 +519,13 @@ export function History() {
                 nameOf={nameOf}
               />
               <IncidentHeatmap grid={reliability.byWeekdayHour} />
+            {coincidence !== undefined && (
+                <BreakTogetherCard
+                  pairs={coincidence.pairs}
+                  services={config?.services ?? []}
+                  nameOf={nameOf}
+                />
+              )}
             </>
           )}
 

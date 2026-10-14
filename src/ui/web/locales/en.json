@@ -927,5 +927,21 @@
   "trust.excluded": "Excluded {count} — {maintenance} declared maintenance, {blind} fleet-wide read failure",
   "trust.vantage": "Seen from one probe, one network, one location.",
   "trust.floor.title": "Not enough episodes to say anything",
-  "trust.floor.body": "{counted} disagreements in {days} days. {floor} needed."
+  "trust.floor.body": "{counted} disagreements in {days} days. {floor} needed.",
+  "field.depends-on": "Depends on",
+  "field.depends-on-add": "Add a provider…",
+  "field.depends-on-remove": "Remove {name}",
+  "field.depends-on-hint": "Name the providers this one runs on. When two or more of them fail at once, the alert says \"Likely cause: …\". It only changes the wording; nothing is inferred.",
+  "shared-failure.kicker": "Shared failure",
+  "shared-failure.count": "{count} degraded",
+  "shared-failure.title": "Likely cause: {cause}",
+  "shared-failure.hint": "Providers that declare {cause} as an upstream are degraded at once. Declared by you, not inferred.",
+  "shared-failure.graph": "{cause} and the providers that run on it, all degraded",
+  "coincidence.title": "Break together",
+  "coincidence.hint": "Pairs whose incidents overlap far more often than chance. A pattern, not a cause: they may share an upstream, or just a bad week.",
+  "coincidence.row": "{a} and {b} went down together {together} times out of {of}",
+  "coincidence.lift": "{lift}× more often than chance",
+  "coincidence.declare": "Declare dependency",
+  "coincidence.dismiss": "Dismiss",
+  "coincidence.declare-failed": "Could not save the dependency: {error}"
 }

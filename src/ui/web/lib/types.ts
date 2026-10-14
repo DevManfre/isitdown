@@ -476,6 +476,11 @@ export interface ServiceDefinition {
    * "whatever this adapter implies", which is how most providers are left.
    */
   authority?: "declared" | "observed" | null;
+  /**
+   * The providers this one runs on, declared by the operator (roadmap 2.9).
+   * Absent while none is named; `null` only ever sent, on a patch, to clear it.
+   */
+  dependsOn?: string[] | null;
 }
 
 /** One provider's month against its target — `GET /sla` (roadmap 4.13). */
@@ -893,4 +898,20 @@ export interface DbMaintenanceReport {
   bytesAfter: number;
   reclaimed: number;
   durationMs: number;
+}
+
+/** One pair of providers whose incidents overlap far more than chance — roadmap 2.10. */
+export interface CoincidentPair {
+  providerId: string;
+  otherId: string;
+  together: number;
+  incidents: number;
+  rate: number;
+  lift: number;
+  declared: boolean;
+}
+
+export interface CoincidenceReport {
+  days: number;
+  pairs: CoincidentPair[];
 }
