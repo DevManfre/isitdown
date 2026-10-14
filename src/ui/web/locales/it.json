@@ -927,5 +927,21 @@
   "trust.excluded": "Esclusi {count} — {maintenance} manutenzioni dichiarate, {blind} letture fallite sull'intera flotta",
   "trust.vantage": "Osservato da una sola sonda, una sola rete, una sola posizione.",
   "trust.floor.title": "Episodi insufficienti per dire qualcosa",
-  "trust.floor.body": "{counted} disaccordi in {days} giorni. Ne servono {floor}."
+  "trust.floor.body": "{counted} disaccordi in {days} giorni. Ne servono {floor}.",
+  "field.depends-on": "Dipende da",
+  "field.depends-on-add": "Aggiungi un provider…",
+  "field.depends-on-remove": "Rimuovi {name}",
+  "field.depends-on-hint": "Indica su quali provider gira questo. Quando due o più di loro cadono insieme, l'avviso dice \"Causa probabile: …\". Cambia solo le parole; nulla viene dedotto.",
+  "shared-failure.kicker": "Guasto condiviso",
+  "shared-failure.count": "{count} in difficoltà",
+  "shared-failure.title": "Causa probabile: {cause}",
+  "shared-failure.hint": "I provider che dichiarano {cause} come upstream sono in difficoltà insieme. Dichiarato da te, non dedotto.",
+  "shared-failure.graph": "{cause} e i provider che girano su di esso, tutti in difficoltà",
+  "coincidence.title": "Cadono insieme",
+  "coincidence.hint": "Coppie i cui incidenti si sovrappongono molto più del caso. Uno schema, non una causa: possono condividere un upstream, o solo una brutta settimana.",
+  "coincidence.row": "{a} e {b} sono andati giù insieme {together} volte su {of}",
+  "coincidence.lift": "{lift}× più spesso del caso",
+  "coincidence.declare": "Dichiara dipendenza",
+  "coincidence.dismiss": "Nascondi",
+  "coincidence.declare-failed": "Impossibile salvare la dipendenza: {error}"
 }

@@ -2092,8 +2092,14 @@ services:
 Quando due o più provider di un guasto condiviso nominano lo stesso upstream, il
 messaggio guadagna una riga — "Causa probabile: cloudflare" — e così la voce del
 digest. Nell'edizione UI il campo è `dependsOn` su `POST /config/services` e
-`PATCH /config/services/:id` (`null` lo azzera); la dashboard non ha ancora un
-campo per questo.
+`PATCH /config/services/:id` (`null` lo azzera); la dashboard lo modifica nella riga
+**Dipende da** del form del provider. Finché due provider abilitati che nominano
+lo stesso upstream sono in difficoltà o giù, la Overview disegna una scheda
+*Guasto condiviso* — l'upstream al centro, i dipendenti intorno — che sparisce
+appena uno dei due si riprende. La scheda *Cadono insieme* della vista Storico
+(roadmap 2.10, `GET /coincidence`) propone le coppie che continuano a cadere
+insieme; **Dichiara dipendenza** scrive lo stesso `dependsOn`, **Nascondi**
+nasconde la coppia solo su quel browser.
 
 - **Dichiarata, mai dedotta.** IsItDown non indovina un grafo dai guasti: una
   coincidenza verrebbe chiamata causa.

@@ -51,6 +51,7 @@ import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx
 import { useCatalog, useConfig, useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { detectAdapter, previewComponents } from "@/lib/api.ts";
+import { DependsOnField } from "@/components/DependsOnField.tsx";
 import { slugify } from "@/lib/slugify.ts";
 import type { CatalogProvider, ServiceDefinition } from "@/lib/types.ts";
 
@@ -175,6 +176,8 @@ export function ServiceDialog({
   // provider is left on: it keeps the rule a rule instead of freezing today's
   // answer onto this row.
   const [authority, setAuthority] = useState<string>(service?.authority ?? "");
+  // Roadmap 2.9. Declared by the operator, never inferred.
+  const [dependsOn, setDependsOn] = useState<string[]>(service?.dependsOn ?? []);
   // Adapter-specific extras, of which the scrape adapter is so far the only
   // user. Kept as the raw record the service definition carries, rather than as
   // named fields, so an adapter that grows an option later needs no new state.
@@ -305,6 +308,7 @@ export function ServiceDialog({
     setGroup(service?.group ?? "");
     setSlaTarget(service?.slaTarget == null ? "" : String(service.slaTarget));
     setAuthority(service?.authority ?? "");
+    setDependsOn(service?.dependsOn ?? []);
     setOptions(service?.options ?? {});
     setHeader(storedHeader(service?.options));
     setPreview(undefined);
@@ -505,6 +509,7 @@ export function ServiceDialog({
           ...(authority === ""
             ? {}
             : { authority: authority as "declared" | "observed" }),
+          ...(dependsOn.length === 0 ? {} : { dependsOn }),
         });
         const result = await test.mutateAsync(id);
         if (!result.ok) {
@@ -545,6 +550,8 @@ export function ServiceDialog({
             slaTarget: slaTarget.trim() === "" ? null : Number(slaTarget),
             authority:
               authority === "" ? null : (authority as "declared" | "observed"),
+          // Null, not omitted, like the rest: an emptied list must travel.
+          dependsOn: dependsOn.length === 0 ? null : dependsOn,
             ...savedOptions(),
           },
         });
@@ -736,6 +743,15 @@ export function ServiceDialog({
             {t("field.authority-hint")}
           </span>
         </div>
+
+          {/* Roadmap 2.9. After the record-truth choice it sits beside: both say
+              how this provider relates to the others. */}
+          <DependsOnField
+            value={dependsOn}
+            onChange={setDependsOn}
+            options={(config?.services ?? []).map((entry) => ({ id: entry.id, name: entry.name }))}
+            selfId={id}
+          />
       </Section>
 
       <Section

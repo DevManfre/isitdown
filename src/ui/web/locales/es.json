@@ -927,5 +927,21 @@
   "trust.excluded": "Excluidos {count} — {maintenance} mantenimientos declarados, {blind} fallos de lectura de toda la flota",
   "trust.vantage": "Visto desde una sola sonda, una sola red, una sola ubicación.",
   "trust.floor.title": "No hay episodios suficientes para afirmar nada",
-  "trust.floor.body": "{counted} desacuerdos en {days} días. Hacen falta {floor}."
+  "trust.floor.body": "{counted} desacuerdos en {days} días. Hacen falta {floor}.",
+  "field.depends-on": "Depende de",
+  "field.depends-on-add": "Añadir un proveedor…",
+  "field.depends-on-remove": "Quitar {name}",
+  "field.depends-on-hint": "Indica los proveedores sobre los que corre este. Cuando dos o más fallan a la vez, la alerta dice \"Causa probable: …\". Solo cambia la redacción; no se deduce nada.",
+  "shared-failure.kicker": "Fallo compartido",
+  "shared-failure.count": "{count} degradados",
+  "shared-failure.title": "Causa probable: {cause}",
+  "shared-failure.hint": "Los proveedores que declaran {cause} como upstream están degradados a la vez. Declarado por ti, no deducido.",
+  "shared-failure.graph": "{cause} y los proveedores que corren sobre él, todos degradados",
+  "coincidence.title": "Caen juntos",
+  "coincidence.hint": "Pares cuyos incidentes se solapan mucho más que el azar. Un patrón, no una causa: pueden compartir un upstream, o solo una mala semana.",
+  "coincidence.row": "{a} y {b} cayeron juntos {together} veces de {of}",
+  "coincidence.lift": "{lift}× más a menudo que el azar",
+  "coincidence.declare": "Declarar dependencia",
+  "coincidence.dismiss": "Descartar",
+  "coincidence.declare-failed": "No se pudo guardar la dependencia: {error}"
 }
