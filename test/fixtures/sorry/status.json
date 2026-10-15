@@ -1,0 +1,1 @@
+{"page":{"id":36,"name":"Sorry™ Service Status","state":"operational","state_text":"All systems are go!","url":"https://status.sorryapp.com","created_at":"2013-07-15T13:43:40.568Z","updated_at":"2026-10-15T07:17:44.047Z","links":{"components":{"href":"/api/v1/components","count":25},"notices":{"href":"/api/v1/notices","count":129},"self":"/api/v1"}}}

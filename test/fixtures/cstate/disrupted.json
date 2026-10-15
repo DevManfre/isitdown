@@ -1,0 +1,116 @@
+{
+  "is": "index",
+  "cStateVersion": "6.0.1",
+  "apiVersion": "2.0",
+  "title": "Eggsample Status",
+  "languageCodeHTML": "en",
+  "languageCode": "en",
+  "baseURL": "https://example.com/",
+  "description": "We continuously monitor the status of our services and if there are any interruptions, a note will be posted here.",
+  "summaryStatus": "disrupted",
+  "categories": [
+    {
+      "name": "North Coast",
+      "description": "The main servers are located here.",
+      "hideTitle": false,
+      "closedByDefault": true
+    },
+    {
+      "name": "Empty Category",
+      "hideTitle": false,
+      "closedByDefault": false
+    },
+    {
+      "name": "Uncategorized",
+      "hideTitle": true,
+      "closedByDefault": false
+    }
+  ],
+  "pinnedIssues": [
+    {
+      "is": "issue",
+      "title": "Maintenance Announcement",
+      "createdAt": "2024-02-24 10:35:00 +0000 UTC",
+      "lastMod": "2025-07-30 17:54:30 +0300 +0300",
+      "permalink": "https://example.com/issues/2024-02-24-maintenance-window/",
+      "affected": [],
+      "filename": "2024-02-24-maintenance-window.md"
+    }
+  ],
+  "systems": [
+    {
+      "name": "Gateway",
+      "category": "North Coast",
+      "status": "disrupted",
+      "unresolvedIssues": [
+        {
+          "is": "issue",
+          "title": "Elevated API errors",
+          "createdAt": "2026-10-01 09:30:00 +0000 UTC",
+          "lastMod": "2026-10-01 09:45:00 +0000 UTC",
+          "permalink": "https://example.com/issues/2026-10-01-api-errors/",
+          "severity": "disrupted",
+          "resolved": false,
+          "informational": false,
+          "affected": [
+            "API",
+            "Gateway"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Backup Gateway",
+      "category": "North Coast",
+      "status": "ok",
+      "unresolvedIssues": []
+    },
+    {
+      "name": "Website",
+      "description": "The web frontend for the application.",
+      "category": "Uncategorized",
+      "status": "ok",
+      "unresolvedIssues": []
+    },
+    {
+      "name": "API",
+      "description": "The guts of the application.",
+      "category": "Uncategorized",
+      "status": "disrupted",
+      "unresolvedIssues": [
+        {
+          "is": "issue",
+          "title": "Elevated API errors",
+          "createdAt": "2026-10-01 09:30:00 +0000 UTC",
+          "lastMod": "2026-10-01 09:45:00 +0000 UTC",
+          "permalink": "https://example.com/issues/2026-10-01-api-errors/",
+          "severity": "disrupted",
+          "resolved": false,
+          "informational": false,
+          "affected": [
+            "API",
+            "Gateway"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Media Proxy",
+      "description": "This is the service responsible for serving images, audio, and video. It is reliant on our CDN.",
+      "category": "Uncategorized",
+      "status": "ok",
+      "unresolvedIssues": []
+    }
+  ],
+  "buildDate": "2025-07-30",
+  "buildTime": "14:54",
+  "buildTimezone": "UTC",
+  "colorBrand": "#0a0c0f",
+  "colorOk": "#008000",
+  "colorDisrupted": "#cc4400",
+  "colorDown": "#e60000",
+  "colorNotice": "#24478f",
+  "alwaysKeepBrandColor": "true",
+  "logo": "https://example.com/logo.png",
+  "googleAnalytics": "UA-00000000-1"
+}
