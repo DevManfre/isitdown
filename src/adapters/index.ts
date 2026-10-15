@@ -7,16 +7,21 @@ import { cachetAdapter } from "./cachet.adapter.ts";
 import { dnsAdapter } from "./dns.adapter.ts";
 import { dockerAdapter } from "./docker.adapter.ts";
 import { gcpAdapter } from "./gcp.adapter.ts";
+import { githubActionsAdapter } from "./githubactions.adapter.ts";
 import { htmlAdapter } from "./html.adapter.ts";
 import { imapAdapter } from "./imap.adapter.ts";
 import { httpAdapter } from "./http.adapter.ts";
 import { icmpAdapter } from "./icmp.adapter.ts";
 import { instatusAdapter } from "./instatus.adapter.ts";
+import { isItDownAdapter } from "./isitdown.adapter.ts";
 import { jsonAdapter } from "./json.adapter.ts";
+import { registryAdapter } from "./registry.adapter.ts";
 import { rssAdapter } from "./rss.adapter.ts";
 import { slackAdapter } from "./slack.adapter.ts";
+import { statusIoAdapter } from "./statusio.adapter.ts";
 import { statuspageAdapter } from "./statuspage.adapter.ts";
 import { tcpAdapter } from "./tcp.adapter.ts";
+import { upptimeAdapter } from "./upptime.adapter.ts";
 import { uptimeComAdapter } from "./uptimecom.adapter.ts";
 import { uptimeKumaAdapter } from "./uptimekuma.adapter.ts";
 import { watchdogAdapter } from "./watchdog.adapter.ts";
@@ -46,6 +51,11 @@ export const adapters: Record<string, Adapter> = {
   [dnsAdapter.id]: dnsAdapter,
   [icmpAdapter.id]: icmpAdapter,
   [dockerAdapter.id]: dockerAdapter,
+  [isItDownAdapter.id]: isItDownAdapter,
+  [upptimeAdapter.id]: upptimeAdapter,
+  [statusIoAdapter.id]: statusIoAdapter,
+  [githubActionsAdapter.id]: githubActionsAdapter,
+  [registryAdapter.id]: registryAdapter,
 };
 
 /**
@@ -96,7 +106,7 @@ export function cadenceProblems(service: {
   const adapter = adapters[service.adapter];
   if (adapter !== undefined && adapter.kind !== "probe") {
     problems.push(
-      `intervalSeconds is only for a probe (http, tcp, dns, icmp, docker); the ${service.adapter} adapter reads a status page, use intervalMinutes`,
+      `intervalSeconds is only for a probe (http, tcp, dns, icmp, docker, registry); the ${service.adapter} adapter reads a status page, use intervalMinutes`,
     );
   }
   if (service.intervalMinutes !== undefined && service.intervalMinutes !== null) {
@@ -124,6 +134,10 @@ const AUTHENTICATED_READERS = new Set([
   betterStackAdapter.id,
   cachetAdapter.id,
   uptimeKumaAdapter.id,
+  isItDownAdapter.id,
+  upptimeAdapter.id,
+  statusIoAdapter.id,
+  githubActionsAdapter.id,
   uptimeComAdapter.id,
 ]);
 

@@ -1088,6 +1088,78 @@ sta ancora guardando il campo in cui lo si è scritto.
 Per un provider che non sta su nessuno di questi, aggiungi un adapter sotto
 `src/adapters/`.
 
+#### Altre piattaforme di stato, altre istanze e segnali da sviluppatore
+
+Roadmap 2.11, 2.12 e 2.13. Ognuno è un adapter; tutti tranne `registry` leggono
+con lo stesso percorso a richieste condizionali di una pagina di stato, quindi
+`header.<Name>` e `tokenEnv` funzionano (vedi *Fonti private e autenticate*).
+
+| `adapter` | URL di base | Opzioni | Legge |
+|---|---|---|---|
+| `isitdown` | L'origine dell'altra istanza, `https://status.amico.example` | `provider` — uno dei suoi id | Il suo `GET /status`: i provider diventano i componenti, lo stato è il peggiore tra loro |
+| `upptime` | Il repository, `https://github.com/owner/repo` | `branch` (default `HEAD`) | `history/summary.json`, un sito per componente |
+| `statusio` | L'endpoint, `https://api.status.io/1.0/status/<id pagina>` — o l'host più `pageId` | `pageId` | L'API pubblica di stato: codice complessivo, componenti, incidenti, manutenzioni |
+| `githubactions` | Il repository, `https://github.com/owner/repo` | `workflow` (un nome di file), `branch`, `apiBase` (Enterprise) | L'ultima esecuzione *completata* |
+| `registry` | L'origine API del registry, `https://registry.npmjs.org` | `registry` (`npm`, `pypi`, `dockerhub`) e `package`, entrambi obbligatori | I metadati di un pacchetto reale |
+
+**`isitdown` — federazione.** Nessun protocollo nuovo: un'istanza pubblica già
+`/status` nel vocabolario che questo adapter legge. Il composito è il peggiore tra
+i provider *abilitati* dell'altra istanza (`unknown` si astiene, la regola dei
+gruppi della dashboard); incidenti e manutenzioni aperti arrivano con il nome del
+provider come prefisso, e `scopeToComponents` considera solo i provider spuntati.
+Un provider dell'altra istanza che sparisce legge `unknown`, mai operativo. Il
+`/status` dell'altra istanza deve essere raggiungibile: dietro un reverse proxy,
+passa la credenziale come `header.Authorization` o `tokenEnv`. Nella pagina
+pubblica l'URL di base è trattato come privato, perché di solito è tuo.
+
+**`upptime`** legge il riepilogo committato nel repository da
+`raw.githubusercontent.com`. `up` è operativo, `degraded` degradato, `down` un
+disservizio grave; la pagina si riduce come quella di Uptime Kuma (qualche sito
+giù è un disservizio *parziale*, tutti giù uno grave). Upptime tiene i disservizi
+come issue di GitHub e non nel riepilogo, quindi non si riporta alcun incidente.
+Cstate e OpenStatus non ci sono ancora: nessuno dei due pubblica un riepilogo
+leggibile da macchina e stabile, verificato.
+
+**`statusio`** traduce i codici di Status.io: 100 operativo, 200 manutenzione
+pianificata (si astiene), 300 degradato, 400 disservizio parziale, 500
+disservizio, 600 evento di sicurezza (parziale). Un codice sconosciuto legge come
+disservizio grave. L'id della pagina non sta nell'URL pubblico: si copia dalla
+scheda *API* della pagina.
+
+**`githubactions`** trasforma "main è rosso" in uno stato. `success` è operativo;
+`failure` e `timed_out` disservizio grave; `action_required` e `startup_failure`
+degradato; `cancelled`, `skipped` e `neutral` si astengono. Un'esecuzione fallita
+è riportata come un incidente che nomina l'esecuzione. L'API senza autenticazione
+concede 60 richieste l'ora per indirizzo: con più di un paio di repository serve
+`tokenEnv`. La release di un pacchetto da cui dipendi non è un segnale qui, di
+proposito: è una notizia, non un disservizio.
+
+**`registry`** è una sonda (`intervalSeconds` funziona): chiede al registry i
+metadati di un pacchetto da cui dipendi, così una home che si carica mentre l'API
+risponde 502 legge comunque giù. Un 2xx con corpo JSON è operativo; un 404 o un
+2xx che non sono metadati sono degradati (il registry ha risposto, il pacchetto va
+guardato da te); un 429 si astiene; tutto il resto, nessuna risposta compresa, è
+un disservizio grave. Il selettore della dashboard non ha ancora campi per
+`registry` e `package`: impostali in `config.yml` o con `POST /config/services`.
+
+```yaml
+services:
+  - id: friend-lab
+    name: Homelab dell'amico
+    adapter: isitdown
+    baseUrl: https://status.amico.example
+  - id: npm
+    name: Registry npm
+    adapter: registry
+    baseUrl: https://registry.npmjs.org
+    options: { registry: npm, package: left-pad }
+  - id: ci
+    name: CI su main
+    adapter: githubactions
+    baseUrl: https://github.com/owner/repo
+    options: { workflow: ci.yml, branch: main, tokenEnv: GITHUB_TOKEN }
+```
+
 #### Fonti private e autenticate
 
 Ogni adapter che legge una pagina via HTTP — tutti tranne le sonde e `imap` — può
