@@ -1,0 +1,7 @@
+{
+  "page": { "id": "p1", "name": "Lean Co", "url": "https://status.example.com", "updated_at": "2026-01-01T00:00:00Z" },
+  "status": { "indicator": "none", "description": "All Systems Operational" },
+  "components": [
+    { "id": "c1", "name": "API", "status": "operational", "position": 1 }
+  ]
+}

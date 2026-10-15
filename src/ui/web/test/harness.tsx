@@ -24,6 +24,7 @@ type FixtureKey =
   | "componentHistory"
   | "providerCalendar"
   | "reliability"
+  | "coincidence"
   | "messagePreview"
   | "annotations"
   | "map"
@@ -47,6 +48,8 @@ export interface Fixtures {
   providerCalendar?: unknown;
   /** `/reliability` — MTTR, MTBF and the weekday-hour grid (roadmap 12.2, 12.3). */
   reliability?: unknown;
+  /** `/coincidence` — providers that break together (roadmap 2.10). */
+  coincidence?: unknown;
   /** `/notifications/preview` — what each channel would say (roadmap 14.1). */
   messagePreview?: unknown;
   /** `/annotations` — the operator's own timeline markers (roadmap 12.1). */
@@ -89,6 +92,8 @@ export function stubApi(fixtures: Fixtures): void {
       const path = String(input);
       const key: FixtureKey = path.startsWith("/notifications/preview")
         ? "messagePreview"
+        : path.startsWith("/coincidence")
+        ? "coincidence"
         : path.startsWith("/reliability")
         ? "reliability"
         : path.startsWith("/annotations")
@@ -155,6 +160,7 @@ export function stubApi(fixtures: Fixtures): void {
             Array.from({ length: 24 }, () => 0),
           ),
         },
+        coincidence: { days: 90, pairs: [] },
         annotations: { annotations: [] },
         providerPush: { enabled: false, tokenRevealed: false, providers: [] },
         messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },

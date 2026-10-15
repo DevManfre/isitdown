@@ -927,5 +927,21 @@
   "trust.excluded": "Exclus {count} — {maintenance} maintenances déclarées, {blind} échecs de lecture sur toute la flotte",
   "trust.vantage": "Vu depuis une seule sonde, un seul réseau, un seul endroit.",
   "trust.floor.title": "Pas assez d'épisodes pour affirmer quoi que ce soit",
-  "trust.floor.body": "{counted} désaccords en {days} jours. Il en faut {floor}."
+  "trust.floor.body": "{counted} désaccords en {days} jours. Il en faut {floor}.",
+  "field.depends-on": "Dépend de",
+  "field.depends-on-add": "Ajouter un fournisseur…",
+  "field.depends-on-remove": "Retirer {name}",
+  "field.depends-on-hint": "Nommez les fournisseurs sur lesquels celui-ci repose. Quand deux ou plus tombent en même temps, l'alerte dit « Cause probable : … ». Cela ne change que la formulation ; rien n'est déduit.",
+  "shared-failure.kicker": "Panne partagée",
+  "shared-failure.count": "{count} dégradés",
+  "shared-failure.title": "Cause probable : {cause}",
+  "shared-failure.hint": "Les fournisseurs qui déclarent {cause} comme amont sont dégradés en même temps. Déclaré par vous, pas déduit.",
+  "shared-failure.graph": "{cause} et les fournisseurs qui reposent dessus, tous dégradés",
+  "coincidence.title": "Tombent ensemble",
+  "coincidence.hint": "Paires dont les incidents se chevauchent bien plus que le hasard. Un motif, pas une cause : ils peuvent partager un amont, ou juste une mauvaise semaine.",
+  "coincidence.row": "{a} et {b} sont tombés ensemble {together} fois sur {of}",
+  "coincidence.lift": "{lift}× plus souvent que le hasard",
+  "coincidence.declare": "Déclarer la dépendance",
+  "coincidence.dismiss": "Ignorer",
+  "coincidence.declare-failed": "Impossible d'enregistrer la dépendance : {error}"
 }

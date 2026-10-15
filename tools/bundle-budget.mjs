@@ -76,8 +76,14 @@ const ASSETS = "dist/ui/public/assets";
  * updates row. Measured: 524.1 kB before it, 526.1 kB after — 2.0 kB gzipped,
  * nearly all of it the eight new strings in six catalogs, the disclosure among
  * them long on purpose. The same remedy again.
+ *
+ * It moved 539,450 -> 543,500 (526.8 -> 530.7 kB) for roadmap 2.9 and 2.10's
+ * dashboard: the depends-on field, the shared-failure card and the
+ * break-together card. Measured: 526.1 kB before them, 530.1 kB after — 4.0 kB
+ * gzipped, from three small components and eighteen new strings in six
+ * catalogs. The same remedy again.
  */
-export const BUDGET = { js: 539_450, css: 20_000 };
+export const BUDGET = { js: 543_500, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

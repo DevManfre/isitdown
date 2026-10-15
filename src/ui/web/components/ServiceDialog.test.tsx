@@ -801,6 +801,7 @@ describe("the service dialog's write path", () => {
       name: "GitHub Renamed",
       baseUrl: "https://www.githubstatus.com",
       components: [],
+      dependsOn: null,
       scopeToComponents: false,
       // An empty interval field is the provider following the global cadence,
       // and only a null says so on a patch.
@@ -818,6 +819,20 @@ describe("the service dialog's write path", () => {
       // of an answer, not an answer of its own, so clearing it needs a null.
       authority: null,
     });
+  });
+
+  it("saves the providers this one depends on, and sends a null once they are all removed (roadmap 2.9)", async () => {
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
+    await openEdit();
+    const dialog = await screen.findByRole("dialog");
+    const calls = interceptWrites({ "PATCH /config/services/github": {} });
+
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.depends-on")), "Azure{Enter}");
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.save") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const patchCall = calls.find((call) => call.method === "PATCH" && call.path === "/config/services/github");
+    expect((patchCall?.body as { dependsOn?: unknown }).dependsOn).toEqual(["azure"]);
   });
 
   it("submits the poll interval the operator typed for this provider alone", async () => {

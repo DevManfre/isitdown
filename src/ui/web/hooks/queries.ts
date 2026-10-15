@@ -317,6 +317,13 @@ export const useMessagePreview = (kind: string, enabled: boolean) =>
  * One query for both, because the server answers both from one walk of the
  * incident table and the two are drawn on the same screen.
  */
+/** Which providers break together — roadmap 2.10. */
+export const useCoincidence = (days: number) =>
+  useQuery({
+    queryKey: ["coincidence", days],
+    queryFn: () => api.getCoincidence(days),
+  });
+
 export const useReliability = (days: number) =>
   useQuery({
     queryKey: ["reliability", days],
@@ -487,6 +494,8 @@ const WRITE_KEYS = [
   ["status"],
   ["config"],
   ["history"],
+  // A declared dependency turns a proposed pair into a declared one.
+  ["coincidence"],
   ["incidents"],
   ["incident"],
   ["notifications"],

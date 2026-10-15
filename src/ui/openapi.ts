@@ -203,6 +203,16 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
+  "/coincidence": {
+    get: {
+      tags: ["History"],
+      summary: "Pairs of providers whose incidents overlap far more often than chance.",
+      description:
+        "Roadmap 2.10, over rows the poller already wrote. Not a causal claim: a shortlist of pairs worth declaring as a `dependsOn`. `providerId` is the one with fewer incidents, `together` of its `incidents` overlapped `otherId`'s, `lift` is that rate over the share of the window `otherId` was open, and `declared` is true when either side already names the other. At least 3 overlaps and a lift of 3 to be listed; best first.",
+      parameters: [query("days", "Window in days.", { type: "integer" })],
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
   "/reliability": {
     get: {
       tags: ["History"],

@@ -1,0 +1,15 @@
+{
+  "data": {
+    "id": "1",
+    "type": "status_page",
+    "attributes": { "aggregate_state": "operational" }
+  },
+  "included": [
+    { "id": "10", "type": "status_page_section", "attributes": { "name": "Core", "position": 0 } },
+    {
+      "id": "20",
+      "type": "status_page_resource",
+      "attributes": { "public_name": "API", "status": "operational", "status_page_section_id": 10 }
+    }
+  ]
+}

@@ -10,16 +10,18 @@ import { FleetRings } from "@/components/FleetRings.tsx";
 import { FLEET_ROW_STAGGER, FleetRows } from "@/components/FleetRows.tsx";
 import { FleetSummary } from "@/components/FleetSummary.tsx";
 import { HeroStats } from "@/components/HeroStats.tsx";
+import { SharedFailureCard } from "@/components/SharedFailureCard.tsx";
 import { StackBand } from "@/components/StackBand.tsx";
 import { GeoCard } from "@/components/GeoCard.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
-import { useHistory, useStatus } from "@/hooks/queries.ts";
+import { useConfigChrome, useHistory, useStatus } from "@/hooks/queries.ts";
 import { CoverageProvider } from "@/lib/coverage.tsx";
 import { statusLabelKey, worstTier } from "@/lib/chartConfig.ts";
 import { formatList, formatRelative } from "@/lib/format.ts";
 import { summaryProviders } from "@/lib/history.ts";
 import { isOffLine, shownStatus, suspectedOf } from "@/lib/suspicion.ts";
 import { suspectedHatchCss } from "@/lib/chartConfig.ts";
+import { sharedFailure } from "@/lib/sharedFailure.ts";
 import { overviewShape } from "@/lib/overviewShape.ts";
 import { stagger } from "@/lib/stagger.ts";
 import { cn } from "@/lib/utils.ts";
@@ -44,6 +46,8 @@ export function Overview() {
   const navigate = useNavigate();
   const { data: status } = useStatus();
   const { data: summary } = useHistory({ days: WINDOW_DAYS });
+  // Roadmap 2.9. Declared dependencies live on the config, not on the status.
+  const { data: config } = useConfigChrome();
 
   // A disabled provider is one the poller has been told to skip
   // (poller.ts:164), so nothing about it is being measured any more. It is left
@@ -57,6 +61,14 @@ export function Overview() {
     summaryProviders(summary).map((p) => [p.providerId, p.buckets]),
   );
   const shape = overviewShape(providers.length);
+  const shared = sharedFailure(
+    providers,
+    new Map(
+      (config?.services ?? []).flatMap((service) =>
+        service.dependsOn == null ? [] : [[service.id, service.dependsOn] as const],
+      ),
+    ),
+  );
 
   // The headline is chosen by plural rule, never assembled from fragments —
   // "one provider is off the line" and "3 providers are off the line" are
@@ -332,6 +344,15 @@ export function Overview() {
             when `mapView` is `off`, which is the default, so the Overview's
             existing shape is unchanged for anyone who has not asked for it. */}
         <GeoCard />
+
+        {/* Roadmap 2.9: only while two providers that name the same upstream are
+            bad at once — a quiet fleet draws nothing. */}
+        {shared !== null && (
+          <SharedFailureCard
+            failure={shared}
+            nameOf={(id) => configured.find((p) => p.id === id)?.name ?? id}
+          />
+        )}
 
         {/* Roadmap 2.6: the groups, above the flat fleet they summarise. */}
         <StackBand groups={status?.groups ?? []} providers={providers} />
