@@ -1,0 +1,7 @@
+{
+ "info": {
+  "name": "requests",
+  "version": "2.34.2",
+  "summary": "Python HTTP for Humans."
+ }
+}
