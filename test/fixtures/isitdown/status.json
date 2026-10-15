@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "id": "github", "name": "GitHub", "adapter": "statuspage", "baseUrl": "https://www.githubstatus.com",
+      "enabled": true, "overallStatus": "degraded",
+      "activeIncidents": [
+        { "id": "inc1", "name": "Delayed webhooks", "impact": "minor", "status": "investigating", "updatedAt": "2026-10-01T10:05:00.000Z", "createdAt": "2026-10-01T10:00:00.000Z" }
+      ],
+      "components": [], "fetchedAt": "2026-10-01T10:06:00.000Z", "failureCount": 0,
+      "maintenance": { "active": [], "upcoming": [] }
+    },
+    {
+      "id": "cloudflare", "name": "Cloudflare", "adapter": "statuspage", "baseUrl": "https://www.cloudflarestatus.com",
+      "enabled": true, "overallStatus": "operational", "activeIncidents": [], "components": [],
+      "fetchedAt": "2026-10-01T10:06:00.000Z", "failureCount": 0,
+      "maintenance": { "active": [{ "id": "m1", "name": "Edge upgrade", "status": "in_progress", "startsAt": "2026-10-01T09:00:00.000Z", "endsAt": "2026-10-01T12:00:00.000Z", "componentIds": [] }], "upcoming": [] }
+    },
+    {
+      "id": "old", "name": "Retired", "adapter": "statuspage", "baseUrl": "https://old.example.com",
+      "enabled": false, "overallStatus": "unknown", "activeIncidents": [], "components": [],
+      "fetchedAt": null, "failureCount": 0, "maintenance": { "active": [], "upcoming": [] }
+    }
+  ],
+  "groups": [], "pollIntervalMinutes": 5, "lastPollAt": "2026-10-01T10:06:00.000Z", "nextPollAt": null, "serverNow": "2026-10-01T10:07:00.000Z"
+}
