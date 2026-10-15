@@ -90,6 +90,10 @@ export const AUTH_ADAPTERS = new Set([
   "cachet",
   "uptimekuma",
   "uptimecom",
+  "upptime",
+  "statusio",
+  "isitdown",
+  "githubactions",
 ]);
 
 /** Whether an adapter has any of the blocks below at all. */

@@ -1055,6 +1055,76 @@ field it was typed into.
 
 For a provider none of these fit, add an adapter under `src/adapters/`.
 
+#### Other status platforms, other instances, and developer signals
+
+Roadmap 2.11, 2.12 and 2.13. Each is one adapter; all but `registry` read through
+the same conditional-request path as a status page, so `header.<Name>` and
+`tokenEnv` work on them (see *Private and authenticated sources*).
+
+| `adapter` | Base URL | Options | Reads |
+|---|---|---|---|
+| `isitdown` | The other instance's origin, `https://status.friend.example` | `provider` — one of its provider ids | Its `GET /status`: the providers become the components, the status is the worst of them |
+| `upptime` | The repository, `https://github.com/owner/repo` | `branch` (default `HEAD`) | `history/summary.json`, one site per component |
+| `statusio` | The endpoint, `https://api.status.io/1.0/status/<page id>` — or the host plus `pageId` | `pageId` | The public status API: overall code, components, incidents, maintenance |
+| `githubactions` | The repository, `https://github.com/owner/repo` | `workflow` (a file name), `branch`, `apiBase` (Enterprise) | The newest *completed* run |
+| `registry` | The registry's API origin, `https://registry.npmjs.org` | `registry` (`npm`, `pypi`, `dockerhub`) and `package`, both required | The metadata of a real package |
+
+**`isitdown` — federation.** No new protocol: a peer already publishes `/status`
+in the vocabulary this reads. The composite is the worst of the peer's *enabled*
+providers (`unknown` abstains, the rule the dashboard's groups use), its open
+incidents and maintenance windows come through prefixed with the provider's name,
+and `scopeToComponents` folds only the providers you ticked. A peer provider that
+disappears reads `unknown`, never operational. The peer's `/status` has to be
+reachable from here: behind a reverse proxy, pass the credential as
+`header.Authorization` or `tokenEnv`. The base URL is treated as private on the
+public page, since it is usually yours.
+
+**`upptime`** reads the repository's committed summary from
+`raw.githubusercontent.com`. `up` is operational, `degraded` degraded, `down` a
+major outage; the page is folded like Uptime Kuma's (some down is a *partial*
+outage, all down a major one). Upptime keeps outages as GitHub issues, not in the
+summary, so no incident is reported. Cstate and OpenStatus are not here yet:
+neither publishes a stable machine-readable summary this has been checked against.
+
+**`statusio`** maps Status.io's own codes: 100 operational, 200 planned
+maintenance (abstains), 300 degraded, 400 partial disruption, 500 disruption, 600
+security event (partial). An unknown code reads as a major outage. The page id is
+not in the page's public URL — copy it from the page's *API* tab.
+
+**`githubactions`** turns "main is red" into a status. `success` is operational;
+`failure` and `timed_out` a major outage; `action_required` and `startup_failure`
+degraded; `cancelled`, `skipped` and `neutral` abstain. A failed run is reported as
+one incident naming the run. The unauthenticated API allows 60 requests an hour
+per address — give it `tokenEnv` when more than a couple of repositories are
+watched. A release of a package you depend on is deliberately not a signal here:
+it is news, not downtime.
+
+**`registry`** is a probe (`intervalSeconds` works): it asks the registry for the
+metadata of a package you depend on, so a front page that loads while the API
+returns 502 still reads down. A 2xx with a JSON body is operational; a 404 or a
+2xx that is not metadata is degraded (the registry answered, the package is yours
+to look at); a 429 abstains; anything else, including no answer, is a major outage.
+The dashboard's picker has no fields for `registry` and `package` yet — set them
+in `config.yml` or through `POST /config/services`.
+
+```yaml
+services:
+  - id: friend-lab
+    name: Friend's homelab
+    adapter: isitdown
+    baseUrl: https://status.friend.example
+  - id: npm
+    name: npm registry
+    adapter: registry
+    baseUrl: https://registry.npmjs.org
+    options: { registry: npm, package: left-pad }
+  - id: ci
+    name: CI on main
+    adapter: githubactions
+    baseUrl: https://github.com/owner/repo
+    options: { workflow: ci.yml, branch: main, tokenEnv: GITHUB_TOKEN }
+```
+
 #### Private and authenticated sources
 
 Every adapter that reads a page over HTTP — all of them but the probes and
