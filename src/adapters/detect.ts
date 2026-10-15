@@ -152,6 +152,26 @@ const CANDIDATES: Candidate[] = [
       return typeof page["global_is_operational"] === "boolean" && Array.isArray(page["components"]);
     }),
   },
+  {
+    adapter: "sorry",
+    path: "/api/v1/status",
+    accept: JSON_ACCEPT,
+    baseUrl: (origin) => origin,
+    // `links.components` is what separates Sorry's page document from any other
+    // `{ page: { state } }`.
+    matches: jsonShaped((body) => {
+      const page = body["page"];
+      return isObject(page) && typeof (page as Record<string, unknown>)["state"] === "string" && isObject((page as Record<string, unknown>)["links"]);
+    }),
+  },
+  {
+    adapter: "cstate",
+    path: "/index.json",
+    accept: JSON_ACCEPT,
+    baseUrl: (origin) => origin,
+    // cState announces itself: `is: "index"` and a `systems` list.
+    matches: jsonShaped((body) => body["is"] === "index" && Array.isArray(body["systems"])),
+  },
   // The feed adapter reads whatever url it is given, so a matching feed hands
   // back its own url rather than the origin.
   ...["/history.rss", "/feed", "/index.xml"].map((path) => ({
