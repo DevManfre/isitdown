@@ -634,4 +634,21 @@ describe("a provider's detail drawer", () => {
 
     expect(screen.queryByText(i18n.t("history.next-maintenance.kicker"))).toBeNull();
   });
+  it("offers the pairs that break together as dependencies, and hides the card when there are none (roadmap 2.10)", async () => {
+    renderWithProviders(<History />, {
+      ...fixtures,
+      coincidence: {
+        days: 90,
+        pairs: [{ providerId: "github", otherId: "cloudflare", together: 7, incidents: 9, rate: 0.78, lift: 11.4, declared: false }],
+      },
+    });
+    expect(await screen.findByText(i18n.t("coincidence.title"))).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: i18n.t("coincidence.declare") })).toBeInTheDocument();
+  });
+
+  it("shows no break-together card without pairs", async () => {
+    renderWithProviders(<History />, fixtures);
+    await screen.findByText(/99[.,]42/);
+    expect(screen.queryByText(i18n.t("coincidence.title"))).toBeNull();
+  });
 });

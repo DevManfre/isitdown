@@ -2020,7 +2020,13 @@ When two or more of the providers in a shared failure name the same upstream,
 the message gains a line — "Probable cause: cloudflare" — and so does the
 digest entry. In the UI edition the field is `dependsOn` on
 `POST /config/services` and `PATCH /config/services/:id` (`null` clears it);
-the dashboard has no field for it yet.
+the dashboard edits it as the **Depends on** row of the provider form.
+While two enabled providers that name the same upstream are degraded or down,
+the Overview draws a *Shared failure* card — the upstream in the middle, its
+dependents around it — and it disappears the moment either recovers. The History
+view's *Break together* card (roadmap 2.10, `GET /coincidence`) proposes pairs
+that keep going down together; **Declare dependency** writes the same
+`dependsOn`, **Dismiss** hides the pair on that browser only.
 
 - **Declared, never inferred.** IsItDown does not guess a graph from outages: a
   coincidence would be called a cause.

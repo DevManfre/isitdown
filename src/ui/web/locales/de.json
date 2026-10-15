@@ -927,5 +927,21 @@
   "trust.excluded": "Ausgeschlossen {count} — {maintenance} angekündigte Wartungen, {blind} flottenweite Lesefehler",
   "trust.vantage": "Gesehen von einer Sonde, einem Netz, einem Ort.",
   "trust.floor.title": "Zu wenige Vorfälle für eine Aussage",
-  "trust.floor.body": "{counted} Abweichungen in {days} Tagen. {floor} werden gebraucht."
+  "trust.floor.body": "{counted} Abweichungen in {days} Tagen. {floor} werden gebraucht.",
+  "field.depends-on": "Hängt ab von",
+  "field.depends-on-add": "Anbieter hinzufügen…",
+  "field.depends-on-remove": "{name} entfernen",
+  "field.depends-on-hint": "Nenne die Anbieter, auf denen dieser läuft. Fallen zwei oder mehr gleichzeitig aus, lautet die Meldung \"Wahrscheinliche Ursache: …\". Das ändert nur den Wortlaut; nichts wird abgeleitet.",
+  "shared-failure.kicker": "Gemeinsame Störung",
+  "shared-failure.count": "{count} beeinträchtigt",
+  "shared-failure.title": "Wahrscheinliche Ursache: {cause}",
+  "shared-failure.hint": "Anbieter, die {cause} als Upstream angeben, sind gleichzeitig beeinträchtigt. Von dir angegeben, nicht abgeleitet.",
+  "shared-failure.graph": "{cause} und die Anbieter, die darauf laufen, alle beeinträchtigt",
+  "coincidence.title": "Fallen gemeinsam aus",
+  "coincidence.hint": "Paare, deren Vorfälle sich weit häufiger überschneiden als der Zufall. Ein Muster, keine Ursache: Sie teilen vielleicht einen Upstream oder nur eine schlechte Woche.",
+  "coincidence.row": "{a} und {b} fielen {together} von {of} Malen gemeinsam aus",
+  "coincidence.lift": "{lift}× häufiger als der Zufall",
+  "coincidence.declare": "Abhängigkeit angeben",
+  "coincidence.dismiss": "Ausblenden",
+  "coincidence.declare-failed": "Abhängigkeit konnte nicht gespeichert werden: {error}"
 }
