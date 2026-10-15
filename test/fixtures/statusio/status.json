@@ -1,0 +1,16 @@
+{
+  "result": {
+    "status_overall": { "updated": "2026-10-01T10:00:00.000Z", "status": "Service Disruption", "status_code": 500 },
+    "status": [
+      { "id": "c1", "name": "Web", "status": "Operational", "status_code": 100, "containers": [{ "id": "k1", "name": "EU", "status_code": 100 }] },
+      { "id": "c2", "name": "API", "status": "Service Disruption", "status_code": 500, "containers": [{ "id": "k2", "name": "EU", "status_code": 500 }] }
+    ],
+    "incidents": [
+      { "_id": "i1", "name": "API errors", "datetime_open": "2026-10-01T09:30:00.000Z", "messages": [{ "datetime": "2026-10-01T09:45:00.000Z", "status": 500 }] }
+    ],
+    "maintenance": {
+      "active": [],
+      "upcoming": [{ "_id": "m1", "name": "DB upgrade", "datetime_planned_start": "2026-10-05T01:00:00.000Z", "datetime_planned_end": "2026-10-05T02:00:00.000Z" }]
+    }
+  }
+}
