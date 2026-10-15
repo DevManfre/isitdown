@@ -4,6 +4,7 @@ import { awsAdapter } from "./aws.adapter.ts";
 import { azureAdapter } from "./azure.adapter.ts";
 import { betterStackAdapter } from "./betterstack.adapter.ts";
 import { cachetAdapter } from "./cachet.adapter.ts";
+import { cStateAdapter } from "./cstate.adapter.ts";
 import { dnsAdapter } from "./dns.adapter.ts";
 import { dockerAdapter } from "./docker.adapter.ts";
 import { gcpAdapter } from "./gcp.adapter.ts";
@@ -15,9 +16,11 @@ import { icmpAdapter } from "./icmp.adapter.ts";
 import { instatusAdapter } from "./instatus.adapter.ts";
 import { isItDownAdapter } from "./isitdown.adapter.ts";
 import { jsonAdapter } from "./json.adapter.ts";
+import { openStatusAdapter } from "./openstatus.adapter.ts";
 import { registryAdapter } from "./registry.adapter.ts";
 import { rssAdapter } from "./rss.adapter.ts";
 import { slackAdapter } from "./slack.adapter.ts";
+import { sorryAdapter } from "./sorry.adapter.ts";
 import { statusIoAdapter } from "./statusio.adapter.ts";
 import { statuspageAdapter } from "./statuspage.adapter.ts";
 import { tcpAdapter } from "./tcp.adapter.ts";
@@ -56,6 +59,9 @@ export const adapters: Record<string, Adapter> = {
   [statusIoAdapter.id]: statusIoAdapter,
   [githubActionsAdapter.id]: githubActionsAdapter,
   [registryAdapter.id]: registryAdapter,
+  [openStatusAdapter.id]: openStatusAdapter,
+  [sorryAdapter.id]: sorryAdapter,
+  [cStateAdapter.id]: cStateAdapter,
 };
 
 /**
@@ -138,6 +144,9 @@ const AUTHENTICATED_READERS = new Set([
   upptimeAdapter.id,
   statusIoAdapter.id,
   githubActionsAdapter.id,
+  openStatusAdapter.id,
+  sorryAdapter.id,
+  cStateAdapter.id,
   uptimeComAdapter.id,
 ]);
 
