@@ -1088,6 +1088,107 @@ sta ancora guardando il campo in cui lo si è scritto.
 Per un provider che non sta su nessuno di questi, aggiungi un adapter sotto
 `src/adapters/`.
 
+#### Altre piattaforme di stato, altre istanze e segnali da sviluppatore
+
+Roadmap 2.11, 2.12 e 2.13. Ognuno è un adapter; tutti tranne `registry` leggono
+con lo stesso percorso a richieste condizionali di una pagina di stato, quindi
+`header.<Name>` e `tokenEnv` funzionano (vedi *Fonti private e autenticate*).
+
+| `adapter` | URL di base | Opzioni | Legge |
+|---|---|---|---|
+| `isitdown` | L'origine dell'altra istanza, `https://status.amico.example` | `provider` — uno dei suoi id | Il suo `GET /status`: i provider diventano i componenti, lo stato è il peggiore tra loro |
+| `upptime` | Il repository, `https://github.com/owner/repo` | `branch` (default `HEAD`) | `history/summary.json`, un sito per componente |
+| `statusio` | L'endpoint, `https://api.status.io/1.0/status/<id pagina>` — o l'host più `pageId` | `pageId` | L'API pubblica di stato: codice complessivo, componenti, incidenti, manutenzioni |
+| `githubactions` | Il repository, `https://github.com/owner/repo` | `workflow` (un nome di file), `branch`, `apiBase` (Enterprise) | L'ultima esecuzione *completata* |
+| `openstatus` | La pagina, `https://acme.openstatus.dev` | `slug` (default: la prima etichetta dell'host), `apiBase` | `GET /public/status/<slug>`: solo la parola complessiva |
+| `sorry` | La pagina, `https://status.example.com` | — | `/api/v1/status`, `/components`, `/notices` |
+| `cstate` | La pagina, `https://status.example.com` | — | `index.json` (API v2.0 di cState) |
+| `registry` | L'origine API: `https://registry.npmjs.org`, `https://pypi.org`, `https://hub.docker.com`, `https://crates.io`, `https://data.jsdelivr.com`, `https://api.cdnjs.com`, `https://unpkg.com` | `registry` (`npm`, `pypi`, `dockerhub`, `crates`, `jsdelivr`, `cdnjs`, `unpkg`) e `package`, entrambi obbligatori; `pinned` | I metadati di un pacchetto reale |
+
+**`isitdown` — federazione.** Nessun protocollo nuovo: un'istanza pubblica già
+`/status` nel vocabolario che questo adapter legge. Il composito è il peggiore tra
+i provider *abilitati* dell'altra istanza (`unknown` si astiene, la regola dei
+gruppi della dashboard); incidenti e manutenzioni aperti arrivano con il nome del
+provider come prefisso, e `scopeToComponents` considera solo i provider spuntati.
+Un provider dell'altra istanza che sparisce legge `unknown`, mai operativo. Il
+`/status` dell'altra istanza deve essere raggiungibile: dietro un reverse proxy,
+passa la credenziale come `header.Authorization` o `tokenEnv`. Nella pagina
+pubblica l'URL di base è trattato come privato, perché di solito è tuo.
+
+**`upptime`** legge il riepilogo committato nel repository da
+`raw.githubusercontent.com`. `up` è operativo, `degraded` degradato, `down` un
+disservizio grave; la pagina si riduce come quella di Uptime Kuma (qualche sito
+giù è un disservizio *parziale*, tutti giù uno grave). Upptime tiene i disservizi
+come issue di GitHub e non nel riepilogo, quindi non si riporta alcun incidente.
+
+**`openstatus`** legge l'unica parola che OpenStatus pubblica su
+`api.openstatus.dev/public/status/<slug>` (`operational`, `degraded_performance`,
+`partial_outage`, `major_outage`, `incident`, `under_maintenance`); l'endpoint
+pubblico non ha componenti né incidenti, quindi non se ne riportano.
+
+**`sorry`** legge l'API pubblica di una pagina Sorry™. Le tre parole diventano
+`operational` operativo, `partially-degraded` degradato e `degraded` un
+disservizio parziale. Un avviso `unplanned` aperto è un incidente, uno `planned`
+non completato né annullato una finestra di manutenzione; gli avvisi `general`
+sono annunci e si ignorano.
+
+**`cstate`** legge l'`index.json` della pagina costruita con Hugo: `ok`,
+`disrupted`, `down` per sistema e per pagina. I sistemi sono i componenti, indicati
+con il nome, e le issue che elencano come non risolte sono gli incidenti.
+
+**incident.io** non ha bisogno di un adapter: le sue pagine servono
+`/api/v2/summary.json` nel formato di Statuspage, quindi le legge `statuspage`
+(e il rilevamento automatico). Lo stesso vale per una pagina Atlassian Statuspage
+*per un pubblico specifico*: passa la credenziale come `header.<Name>` o
+`tokenEnv`, `statuspage` la invia.
+
+**Non coperti, e perché.** Hund.io ha solo un'API di gestione autenticata i cui
+campi di stato non si sono potuti verificare su una pagina reale; StatusCast e
+Statusfy non pubblicano un endpoint di stato pubblico documentato. Una pagina di
+una qualsiasi di queste si legge comunque con la mappatura `json` generica, `rss`
+o `html`.
+**`statusio`** traduce i codici di Status.io: 100 operativo, 200 manutenzione
+pianificata (si astiene), 300 degradato, 400 disservizio parziale, 500
+disservizio, 600 evento di sicurezza (parziale). Un codice sconosciuto legge come
+disservizio grave. L'id della pagina non sta nell'URL pubblico: si copia dalla
+scheda *API* della pagina.
+
+**`githubactions`** trasforma "main è rosso" in uno stato. `success` è operativo;
+`failure` e `timed_out` disservizio grave; `action_required` e `startup_failure`
+degradato; `cancelled`, `skipped` e `neutral` si astengono. Un'esecuzione fallita
+è riportata come un incidente che nomina l'esecuzione. L'API senza autenticazione
+concede 60 richieste l'ora per indirizzo: con più di un paio di repository serve
+`tokenEnv`. 
+
+**`registry`** è una sonda (`intervalSeconds` funziona): chiede al registry o alla CDN i
+metadati di un pacchetto da cui dipendi, così una home che si carica mentre l'API
+risponde 502 legge comunque giù. Un 2xx con corpo JSON è operativo; un 404 o un
+2xx che non sono metadati sono degradati (il registry ha risposto, il pacchetto va
+guardato da te); un 429 si astiene; tutto il resto, nessuna risposta compresa, è
+un disservizio grave. Con `pinned` (`1` o `1.4.2`) una *major più recente* della versione fissata
+legge degradato e apre un incidente — "left-pad 2.0.0 è uscita, tu fissi 1.4.2" —
+che è il segnale di release: non un disservizio, ma un breaking change da sapere.
+Sparisce quando alzi il pin. Docker Hub non ha una versione da confrontare e
+rifiuta `pinned`.
+
+```yaml
+services:
+  - id: friend-lab
+    name: Homelab dell'amico
+    adapter: isitdown
+    baseUrl: https://status.amico.example
+  - id: npm
+    name: Registry npm
+    adapter: registry
+    baseUrl: https://registry.npmjs.org
+    options: { registry: npm, package: left-pad }
+  - id: ci
+    name: CI su main
+    adapter: githubactions
+    baseUrl: https://github.com/owner/repo
+    options: { workflow: ci.yml, branch: main, tokenEnv: GITHUB_TOKEN }
+```
+
 #### Fonti private e autenticate
 
 Ogni adapter che legge una pagina via HTTP — tutti tranne le sonde e `imap` — può
