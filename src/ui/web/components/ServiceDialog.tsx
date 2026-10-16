@@ -39,6 +39,7 @@ import {
   IMAP_ADAPTER,
   hasAdapterOptions,
   PROBE_ADAPTER,
+  REGISTRY_ADAPTER,
   TCP_ADAPTER,
 } from "@/components/service-dialog/AdapterOptions.tsx";
 import {
@@ -222,11 +223,12 @@ export function ServiceDialog({
   const probing = activeAdapter === PROBE_ADAPTER;
   const tcpProbing = activeAdapter === TCP_ADAPTER;
   const dnsProbing = activeAdapter === DNS_ADAPTER;
+  const registryProbing = activeAdapter === REGISTRY_ADAPTER;
   const mailReading = activeAdapter === IMAP_ADAPTER;
   // A status page is never read faster than once a minute (roadmap 1.6), so
   // the unit picker only exists for a probe, and a seconds value left over from
   // switching away from one is read as minutes rather than sent and refused.
-  const anyProbe = probing || tcpProbing || dnsProbing;
+  const anyProbe = probing || tcpProbing || dnsProbing || registryProbing;
   const unit: IntervalUnit = anyProbe ? intervalUnit : "minutes";
   const interval =
     intervalMinutes.trim() === "" ? null : Number(intervalMinutes);
@@ -266,7 +268,7 @@ export function ServiceDialog({
         ? { options: next }
         : {};
     }
-    return tcpProbing || dnsProbing || mailReading
+    return tcpProbing || dnsProbing || registryProbing || mailReading
       ? { options: usedOptions(options) }
       : {};
   };

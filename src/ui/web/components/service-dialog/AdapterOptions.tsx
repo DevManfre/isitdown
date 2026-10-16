@@ -60,6 +60,29 @@ const PROBE_METHODS = ["GET", "HEAD"] as const;
  */
 export const TCP_ADAPTER = "tcp";
 export const DNS_ADAPTER = "dns";
+/** The package registry / CDN probe (roadmap 2.13). */
+export const REGISTRY_ADAPTER = "registry";
+
+/** What the registry probe can speak to; the adapter refuses anything else. */
+const REGISTRIES = ["npm", "pypi", "dockerhub", "crates", "jsdelivr", "cdnjs", "unpkg"] as const;
+
+/**
+ * The one or two plain text options a page adapter takes beyond credentials,
+ * keyed by adapter. The catalog keys are written out rather than built from the
+ * option name, so the catalog tests can see each one is rendered.
+ */
+const SIMPLE_OPTIONS: Record<string, { key: string; label: string; hint: string; placeholder: string }[]> = {
+  isitdown: [{ key: "provider", label: "option.provider", hint: "option.provider-hint", placeholder: "github" }],
+  upptime: [{ key: "branch", label: "option.branch", hint: "option.branch-hint", placeholder: "master" }],
+  statusio: [{ key: "pageId", label: "option.pageId", hint: "option.pageId-hint", placeholder: "5a1b2c3d4e5f" }],
+  githubactions: [
+    { key: "workflow", label: "option.workflow", hint: "option.workflow-hint", placeholder: "ci.yml" },
+    { key: "branch", label: "option.branch", hint: "option.branch-hint", placeholder: "main" },
+    { key: "apiBase", label: "option.apiBase", hint: "option.apiBase-hint", placeholder: "https://github.example.com/api/v3" },
+  ],
+  openstatus: [{ key: "slug", label: "option.slug", hint: "option.slug-hint", placeholder: "acme" }],
+  uptimekuma: [{ key: "slug", label: "option.slug", hint: "option.slug-hint", placeholder: "default" }],
+};
 
 /**
  * The vendor's own mail, read from a mailbox (roadmap 1.4). Nothing about it
@@ -90,6 +113,13 @@ export const AUTH_ADAPTERS = new Set([
   "cachet",
   "uptimekuma",
   "uptimecom",
+  "upptime",
+  "statusio",
+  "isitdown",
+  "githubactions",
+  "openstatus",
+  "sorry",
+  "cstate",
 ]);
 
 /** Whether an adapter has any of the blocks below at all. */
@@ -101,7 +131,8 @@ export const hasAdapterOptions = (adapter: string): boolean =>
   adapter === PROBE_ADAPTER ||
   adapter === TCP_ADAPTER ||
   adapter === DNS_ADAPTER ||
-  adapter === IMAP_ADAPTER;
+  adapter === IMAP_ADAPTER ||
+  adapter === REGISTRY_ADAPTER;
 
 /**
  * The fields that only one adapter each can use, lifted out of the dialog body
@@ -700,7 +731,81 @@ export function AdapterOptions({
     );
   }
 
-  if (AUTH_ADAPTERS.has(adapter)) return credentials;
+  if (adapter === REGISTRY_ADAPTER) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-muted-foreground">{t("registry.warning")}</p>
+        <div className="flex flex-col gap-1.5">
+          <Label>{t("registry.kind")}</Label>
+          <ToggleGroup
+            type="single"
+            spacing={1}
+            className="w-full flex-wrap"
+            value={options["registry"] ?? "npm"}
+            onValueChange={(next) => {
+              if (next !== "") setOption("registry", next);
+            }}
+          >
+            {REGISTRIES.map((option) => (
+              <ToggleGroupItem key={option} value={option}>
+                {option}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="service-registry-package">{t("registry.package")}</Label>
+            <Input
+              id="service-registry-package"
+              className="font-mono"
+              value={options["package"] ?? ""}
+              onChange={(event) => setOption("package", event.target.value)}
+              {...fieldProps}
+            />
+            <span className="text-xs text-muted-foreground">{t("registry.package-hint")}</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="service-registry-pinned">{t("registry.pinned")}</Label>
+            <Input
+              id="service-registry-pinned"
+              className="font-mono"
+              placeholder={t("registry.pinned-placeholder")}
+              value={options["pinned"] ?? ""}
+              onChange={(event) => setOption("pinned", event.target.value)}
+              {...fieldProps}
+            />
+            <span className="text-xs text-muted-foreground">{t("registry.pinned-hint")}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (AUTH_ADAPTERS.has(adapter)) {
+    const fields = SIMPLE_OPTIONS[adapter] ?? [];
+    return fields.length === 0 ? (
+      credentials
+    ) : (
+      <div className="flex flex-col gap-3">
+        {fields.map((field) => (
+          <div key={field.key} className="flex flex-col gap-1.5">
+            <Label htmlFor={`service-option-${field.key}`}>{t(field.label)}</Label>
+            <Input
+              id={`service-option-${field.key}`}
+              className="font-mono"
+              placeholder={field.placeholder}
+              value={options[field.key] ?? ""}
+              onChange={(event) => setOption(field.key, event.target.value)}
+              {...fieldProps}
+            />
+            <span className="text-xs text-muted-foreground">{t(field.hint)}</span>
+          </div>
+        ))}
+        {credentials}
+      </div>
+    );
+  }
 
   return null;
 }
