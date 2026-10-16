@@ -82,8 +82,14 @@ const ASSETS = "dist/ui/public/assets";
  * break-together card. Measured: 526.1 kB before them, 530.1 kB after — 4.0 kB
  * gzipped, from three small components and eighteen new strings in six
  * catalogs. The same remedy again.
+ *
+ * It moved 543,500 -> 553,500 (530.7 -> 540.5 kB) for the adapters added since
+ * v2.16.0 (GitHub Actions, package registries, OpenStatus, Sorry, cState,
+ * Upptime, Status.io, federation) and their dashboard fields. Measured: 530.1 kB
+ * before them, 535.8 kB after, mostly the new strings in six catalogs. The same
+ * remedy again.
  */
-export const BUDGET = { js: 543_500, css: 20_000 };
+export const BUDGET = { js: 553_500, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
