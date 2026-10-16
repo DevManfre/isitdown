@@ -100,7 +100,7 @@ const trimmed = (value: string | undefined): string | undefined => {
  * `${VAR}` as a bearer token — the endpoint would answer 401 and the probe
  * would report the service down, which is the wrong thing to wake up to.
  */
-function resolveEnv(value: string, service: ServiceRef, key: string): string {
+export function resolveEnv(value: string, service: ServiceRef, key: string): string {
   return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name: string) => {
     const found = process.env[name];
     if (found === undefined || found === "") {

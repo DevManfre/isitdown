@@ -19,6 +19,7 @@ import { jsonAdapter } from "./json.adapter.ts";
 import { openStatusAdapter } from "./openstatus.adapter.ts";
 import { registryAdapter } from "./registry.adapter.ts";
 import { rssAdapter } from "./rss.adapter.ts";
+import { sequenceAdapter } from "./sequence.adapter.ts";
 import { slackAdapter } from "./slack.adapter.ts";
 import { sorryAdapter } from "./sorry.adapter.ts";
 import { statusIoAdapter } from "./statusio.adapter.ts";
@@ -51,6 +52,7 @@ export const adapters: Record<string, Adapter> = {
   [imapAdapter.id]: imapAdapter,
   [httpAdapter.id]: httpAdapter,
   [tcpAdapter.id]: tcpAdapter,
+  [sequenceAdapter.id]: sequenceAdapter,
   [dnsAdapter.id]: dnsAdapter,
   [icmpAdapter.id]: icmpAdapter,
   [dockerAdapter.id]: dockerAdapter,
@@ -112,7 +114,7 @@ export function cadenceProblems(service: {
   const adapter = adapters[service.adapter];
   if (adapter !== undefined && adapter.kind !== "probe") {
     problems.push(
-      `intervalSeconds is only for a probe (http, tcp, dns, icmp, docker, registry); the ${service.adapter} adapter reads a status page, use intervalMinutes`,
+      `intervalSeconds is only for a probe (http, sequence, tcp, dns, icmp, docker, registry); the ${service.adapter} adapter reads a status page, use intervalMinutes`,
     );
   }
   if (service.intervalMinutes !== undefined && service.intervalMinutes !== null) {
