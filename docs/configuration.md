@@ -66,12 +66,12 @@ notifications:
 | `correlationWindowMinutes` | `10` | 1–1440. How wide that window is. Wider catches a shared failure that rolls across status pages slowly, and risks folding two unrelated bad days into one. |
 | `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `imap` reads a vendor's notices out of a mailbox (see below); `html` scrapes a page that publishes neither and `watchdog` reports any change to a page's text (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `imap` reads a vendor's notices out of a mailbox (see below); `html` scrapes a page that publishes neither and `watchdog` reports any change to a page's text (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, `sequence` chains two or three requests for an API behind a login, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
-| `services[].intervalSeconds` | — | 10–3600, probes only (`http`, `tcp`, `dns`). The same cadence in seconds, for an endpoint that can be down for less than a minute; a status page stays on the minute floor and is refused at load. Never together with `intervalMinutes`. |
-| `services[].crossChecks` | — | Only on a probe (`http`, `tcp`, `dns`) or a mailbox reading (`imap`): the id of the provider whose status page this probe is a second opinion on — silent-outage cross-check (roadmap 1.10). When the probe cannot reach the service and that provider's page still reports operational with no open incident, the disagreement is itself an alert. Optionally narrowed to one component with the same `provider#component` form a routing rule targets (roadmap 2.9); the component half only refines what the trust card (roadmap 8.1) compares the probe against, since the silent-outage check itself is about a page claiming nothing at all is wrong. |
-| `services[].authority` | from the adapter | Which source is the record for this provider — `declared` (its own status page) or `observed` (our own reading), roadmap 9.1. Omitted is the normal case and is not a missing value: a probe (`http`, `tcp`, `dns`) reads `observed` because it *is* the reading, and everything that parses somebody's page reads `declared`. Set it only to disagree with that — a status page you have learned to distrust, or a probe you do not want treated as the record. It decides what the dashboard prints beside the adapter and how a silent-outage alert is worded, not which samples back a percentage. See [7.7](how-it-works.md#77-which-source-is-the-record). |
+| `services[].intervalSeconds` | — | 10–3600, probes only (`http`, `sequence`, `tcp`, `dns`). The same cadence in seconds, for an endpoint that can be down for less than a minute; a status page stays on the minute floor and is refused at load. Never together with `intervalMinutes`. |
+| `services[].crossChecks` | — | Only on a probe (`http`, `sequence`, `tcp`, `dns`) or a mailbox reading (`imap`): the id of the provider whose status page this probe is a second opinion on — silent-outage cross-check (roadmap 1.10). When the probe cannot reach the service and that provider's page still reports operational with no open incident, the disagreement is itself an alert. Optionally narrowed to one component with the same `provider#component` form a routing rule targets (roadmap 2.9); the component half only refines what the trust card (roadmap 8.1) compares the probe against, since the silent-outage check itself is about a page claiming nothing at all is wrong. |
+| `services[].authority` | from the adapter | Which source is the record for this provider — `declared` (its own status page) or `observed` (our own reading), roadmap 9.1. Omitted is the normal case and is not a missing value: a probe (`http`, `sequence`, `tcp`, `dns`) reads `observed` because it *is* the reading, and everything that parses somebody's page reads `declared`. Set it only to disagree with that — a status page you have learned to distrust, or a probe you do not want treated as the record. It decides what the dashboard prints beside the adapter and how a silent-outage alert is worded, not which samples back a percentage. See [7.7](how-it-works.md#77-which-source-is-the-record). |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
 | `services[].options` | — | Adapter-specific extras. Six adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), `watchdog` (`baseline`, plus an optional `selector`), `http`, `tcp` and `dns`, and `imap` (see their own sections below). |
 
@@ -256,12 +256,17 @@ far — so those two get an adapter each (roadmap 1.9).
 ```
 
 Both take their target from `baseUrl`, because that is the field the schema
-validates and an `http`/`https` URL is what it accepts: `tcp` uses its host and
-ignores the scheme, `dns` resolves its host and fetches nothing from it.
+validates and an `http`/`https` URL is what it accepts: `tcp` uses its host, and its scheme only to decide whether to speak TLS (see `check`), `dns` resolves its host and fetches nothing from it.
 
 | Option | Adapter | Default | Meaning |
 |---|---|---|---|
 | `port` | `tcp` | the URL's, else the scheme's | The port to connect to. A value that is not a port throws rather than falling back, since a probe silently aimed at 443 would read healthy about the wrong thing. |
+| `check` | `tcp` | `connect` | What to ask the port: `connect` (just open it), `tls` (a handshake, reading the certificate), `smtp` (a `220` greeting, then a `250` to `EHLO`, then `QUIT`), `websocket` (an `Upgrade` that must come back `101` with the accept token that matches the key sent) or `grpc` (the standard `grpc.health.v1.Health/Check`, which must say `SERVING`). Roadmap 2.15. |
+| `tls` | `tcp` | from the URL's scheme | `yes` speaks TLS first, which a secure SMTP, WebSocket or gRPC port needs. Taken from an `https` scheme when unset; always on for `check: tls`. |
+| `verify` | `tcp` | `yes` | `no` accepts a certificate this machine's trust store does not know — a private authority. Otherwise an untrusted or expired certificate reads `major_outage` with the reason in the note. |
+| `tlsWarnDays` | `tcp` | — | Fewer days than this left on the certificate reads `degraded`. Needs a TLS handshake: `check: tls`, or `tls: "yes"`. The same slow fuse `tlsWarnDays` is on `http`, for a port that speaks no HTTP — IMAPS, LDAPS, a database. |
+| `path` | `tcp` | `/` | The path of the WebSocket upgrade, for `check: websocket`. |
+| `service` | `tcp` | empty | The service the gRPC health check asks about, for `check: grpc`. Empty asks about the server as a whole. |
 | `slowMs` | both | — | A handshake or an answer at or over this many milliseconds reads `degraded` instead of `operational`. |
 | `recordType` | `dns` | `A` | `A`, `AAAA`, `CNAME`, `MX`, `NS` or `TXT`. An `MX` answer is matched as `"<preference> <exchange>"` and a `TXT` one with its chunks joined — the way both are written down when someone says what they should be. |
 | `expectValue` | `dns` | — | Text one of the records must contain. A record pointed at a decommissioned address still resolves, which is a different kind of bad day from not resolving at all. |
@@ -276,6 +281,9 @@ The readings they produce:
 | `tcp`: the port accepted the connection, under `slowMs` | `operational` |
 | `tcp`: it accepted, at or over `slowMs` | `degraded` |
 | `tcp`: refused, reset, unresolvable, or past the timeout | `major_outage` |
+| `tcp` with `tlsWarnDays`: the certificate expires within it | `degraded` |
+| `tcp` with a `check`: the handshake completes (greeting and `EHLO` answered, upgrade accepted, health `SERVING`) | `operational` |
+| `tcp` with a `check`: the handshake is refused, answered wrongly or never completes (`421` greeting, `200` instead of `101`, `NOT_SERVING`, an untrusted certificate) | `major_outage` |
 | `dns`: records came back, matching `expectValue`, under `slowMs` | `operational` |
 | `dns`: they came back at or over `slowMs` | `degraded` |
 | `dns`: NXDOMAIN, SERVFAIL, no records at all, or nothing matching `expectValue` | `major_outage` |
@@ -289,10 +297,12 @@ readings rather than failed reads, a severity and nothing more, one vantage
 point, a note in **Diagnose** saying why, and a wrong option throwing rather
 than reading down. Two things are theirs alone:
 
-- `tcp` connects and hangs up **without sending a byte**. A protocol handshake
-  would mean knowing the protocol, and every service worth probing speaks a
-  different one. "The port is open" is a smaller claim than "the service is
-  healthy", and saying only the smaller one is what keeps the reading honest.
+- `tcp` by default connects and hangs up **without sending a byte**. "The port
+  is open" is a smaller claim than "the service is healthy", and saying only the
+  smaller one is what keeps the reading honest. `check` asks a slightly larger
+  question of the services that have one standard way of answering it, and no
+  more: it speaks just enough of the protocol to see the service answer in it,
+  and never sends anything to a mailbox, a queue or a table.
 - `dns` treats an empty answer as an outage rather than as a missing field.
   Every other adapter degrades on a missing field, because a provider dropping
   one is not an outage of ours — but here the answer *is* the reading, and a
@@ -305,6 +315,65 @@ resolved, and a lookup that could not answer — a registry with no RDAP service
 (several ccTLDs, `.it` among them), a registry that publishes no expiry, a
 resolver that timed out — is said in the note and never scored: it is our blind
 spot, not the domain's fault.
+
+#### The `sequence` adapter — a login, then the call that needs it
+
+The `http` probe reads one answer. An API behind authentication needs two: a
+login that hands back a token, then the call that spends it (roadmap 2.14).
+`sequence` runs two or three requests in a row and carries a value from one
+answer into the next. It is **not a browser** — no scripts, no rendering — which
+is what keeps it inside the project's rule of no extra dependencies.
+
+```yaml
+- name: Orders API, authenticated
+  id: orders-api
+  adapter: sequence
+  baseUrl: https://api.example.com
+  options:
+    step1.method: "POST"
+    step1.path: "/login"
+    step1.body: '{"user":"probe","password":"${PROBE_PASSWORD}"}'
+    step1.extract: "token=json:data.token"
+    step2.path: "/orders?limit=1"
+    step2.header.Authorization: "Bearer {{token}}"
+    expectBody: '"orders"'
+    slowMs: "1500"
+```
+
+A step is a group of keys, numbered from 1 with no gap, two or three of them:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `stepN.method` | `GET` | `GET`, `HEAD` or `POST`. Nothing else: a probe that `PUT`s or `DELETE`s on a timer is a footgun. |
+| `stepN.path` | empty | Appended to `baseUrl`. May use `{{name}}`. |
+| `stepN.body` | — | The request body, `POST` only. Sent as JSON when it starts with `{` or `[`, otherwise form-encoded, unless you set `stepN.header.Content-Type`. |
+| `stepN.header.<Name>` | — | A request header, like `header.<Name>` on `http`. |
+| `stepN.extract` | — | One `name=rule` per line; every step but the last. The rule is `json:data.token` (dotted path, numbers index an array), `header:X-Csrf-Token`, or `regex:name="csrf" value="([^"]+)"` (the first group is the value, the whole match when there is none). |
+| `stepN.expectStatus` | `200-299` | Same syntax as on `http`. |
+| `expectBody`, `absentBody`, `slowMs`, `followRedirects` | | As on `http`; `expectBody` and `absentBody` are checked on the **last** step, `slowMs` on the whole sequence. |
+
+`{{name}}` in a later step's path, body or header is replaced by what an earlier
+step extracted, and `${VAR}` by an environment variable, the way every
+credential travels here. Cookies a step sets ride the next one, nothing more: no
+expiry, no domain matching.
+
+The last step is the verdict. A sequence reads `operational` when every step
+answered an accepted status, every `extract` found its value and the last
+answer satisfied `expectBody` / `absentBody`; `degraded` when it ran to the end
+but took `slowMs` or longer; `major_outage` when any step is refused, answers
+the wrong status or never answers, or a rule finds nothing — the note names the
+step ("step 2 of 2: answered HTTP 401…"). A typo — `{{toekn}}` that no step
+extracts, a gap in the numbering, a `${VAR}` with nothing behind it — throws
+instead of reading down, like on `http`.
+
+Two things to know before you point it at something:
+
+- a `POST` step changes something on the service every time the sequence runs,
+  and the cadence can be as short as ten seconds. Use it for a login, never for
+  an order. The poller never retries a probe on its own.
+- an extracted value is never written anywhere: not in the note, not in the log,
+  not on the dashboard. It is a credential as often as not, and a reading's
+  explanation is stored.
 
 Anything invalid stops the container at boot with the reason and the offending
 path — a missing file, malformed YAML, a bad base URL, a duplicate service id, an
