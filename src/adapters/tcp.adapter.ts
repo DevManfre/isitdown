@@ -1,6 +1,16 @@
 import { connect } from "node:net";
 import type { Adapter, FetchContext, ReadingNote, ServiceRef } from "../core/adapter.interface.ts";
 import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
+import {
+  TCP_CHECKS,
+  checkGrpc,
+  checkSmtp,
+  checkTls,
+  checkWebSocket,
+  type HandshakeOutcome,
+  type HandshakeTarget,
+  type TcpCheck,
+} from "./tcpChecks.ts";
 
 /**
  * A bare TCP connect — roadmap 1.9, the half of it the HTTP probe could not
@@ -14,11 +24,17 @@ import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
  * failed read, so the target's behaviour resolves into a severity and only our
  * own configuration throws.
  *
- * Deliberately narrow. It connects, measures how long that took, and hangs up
- * without sending a byte: a protocol handshake would mean knowing the protocol,
- * and every service worth probing speaks a different one. "The port is open" is
- * a smaller claim than "the service is healthy", and saying only the smaller one
- * is what keeps the reading honest.
+ * Deliberately narrow. By default it connects, measures how long that took, and
+ * hangs up without sending a byte: "the port is open" is a smaller claim than
+ * "the service is healthy", and saying only the smaller one is what keeps the
+ * reading honest.
+ *
+ * Roadmap 2.15 adds the `check` option, which asks a slightly larger question
+ * of the services that have a standard way of answering it — a TLS handshake
+ * with the certificate's days left, an SMTP `EHLO`, a WebSocket upgrade, a gRPC
+ * health check (see `tcpChecks.ts`). They are options of this adapter rather
+ * than adapters of their own because the subject is the same: a service that
+ * speaks no HTTP the status-page way, reached by host and port.
  *
  * The target is the `baseUrl` the schema already validates — the host is taken
  * from it and the scheme ignored — with `port` naming the port when the URL
@@ -27,18 +43,28 @@ import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
  */
 
 /** The option keys this adapter reads, for the settings form and the docs. */
-export const TCP_OPTION_KEYS = ["port", "slowMs"] as const;
+export const TCP_OPTION_KEYS = ["port", "slowMs", "check", "tls", "verify", "tlsWarnDays", "path", "service"] as const;
 
 export interface TcpProbeConfig {
   host: string;
   port: number;
   /** A connection that took at or over this long reads `degraded`. */
   slowMs?: number | undefined;
+  /** Which handshake to make; a bare connect when the operator states nothing. */
+  check?: TcpCheck | undefined;
+  /** Speak TLS first. Always true for the `tls` check, from the URL scheme otherwise. */
+  secure?: boolean | undefined;
+  /** Refuse a certificate the runtime does not trust. On unless the operator turns it off. */
+  verify?: boolean | undefined;
+  /** A certificate this close to expiry reads `degraded`. Only for a check that handshakes TLS. */
+  tlsWarnDays?: number | undefined;
+  /** WebSocket upgrade path. */
+  path?: string | undefined;
+  /** gRPC health service name. */
+  service?: string | undefined;
 }
 
-export type TcpOutcome =
-  | { connected: true; latencyMs: number }
-  | { connected: false; reason: string };
+export type TcpOutcome = HandshakeOutcome;
 
 const trimmed = (value: string | undefined): string | undefined => {
   const text = value?.trim();
@@ -62,12 +88,44 @@ export function tcpConfig(service: ServiceRef): TcpProbeConfig {
   }
   if (url.hostname === "") throw new Error(`tcp probe for ${service.id}: baseUrl names no host`);
 
-  const port = parsePort(trimmed(options["port"]), url, service);
+  const check = parseCheck(trimmed(options["check"]), service);
+  const secure =
+    check === "tls" ||
+    parseFlag(trimmed(options["tls"]), url.protocol === "https:", service, "tls");
+  const tlsWarnDays = parseCount(trimmed(options["tlsWarnDays"]), service, "tlsWarnDays");
+  if (tlsWarnDays !== undefined && !secure) {
+    throw new Error(`tcp probe for ${service.id}: tlsWarnDays needs a TLS handshake — use check "tls" or tls "yes"`);
+  }
+
+  const port = parsePort(trimmed(options["port"]), url, service, check);
   return {
     host: url.hostname,
     port,
     slowMs: parseCount(trimmed(options["slowMs"]), service, "slowMs"),
+    check,
+    secure,
+    verify: parseFlag(trimmed(options["verify"]), true, service, "verify"),
+    tlsWarnDays,
+    path: trimmed(options["path"]) ?? "/",
+    service: trimmed(options["service"]) ?? "",
   };
+}
+
+function parseCheck(raw: string | undefined, service: ServiceRef): TcpCheck {
+  if (raw === undefined) return "connect";
+  const check = raw.toLowerCase();
+  if (!(TCP_CHECKS as readonly string[]).includes(check)) {
+    throw new Error(`tcp probe for ${service.id}: check "${raw}" is not one of ${TCP_CHECKS.join(", ")}`);
+  }
+  return check as TcpCheck;
+}
+
+function parseFlag(raw: string | undefined, fallback: boolean, service: ServiceRef, key: string): boolean {
+  if (raw === undefined) return fallback;
+  const value = raw.toLowerCase();
+  if (["yes", "true", "1", "on"].includes(value)) return true;
+  if (["no", "false", "0", "off"].includes(value)) return false;
+  throw new Error(`tcp probe for ${service.id}: ${key} must be yes or no, not "${raw}"`);
 }
 
 /**
@@ -75,9 +133,9 @@ export function tcpConfig(service: ServiceRef): TcpProbeConfig {
  * unusable value throws rather than falling back: a probe silently aimed at 443
  * because "5432" was mistyped would read healthy about the wrong thing.
  */
-function parsePort(raw: string | undefined, url: URL, service: ServiceRef): number {
+function parsePort(raw: string | undefined, url: URL, service: ServiceRef, check: TcpCheck): number {
   const stated = raw ?? (url.port === "" ? undefined : url.port);
-  if (stated === undefined) return url.protocol === "https:" ? 443 : 80;
+  if (stated === undefined) return check === "smtp" ? 25 : check === "grpc" ? 50_051 : url.protocol === "https:" || check === "tls" ? 443 : 80;
   if (!/^\d+$/.test(stated)) {
     throw new Error(`tcp probe for ${service.id}: port "${stated}" is not a number`);
   }
@@ -109,8 +167,14 @@ function parseCount(raw: string | undefined, service: ServiceRef, key: string): 
 export function severityFromOutcome(outcome: TcpOutcome, config: TcpProbeConfig): OverallStatus {
   if (!outcome.connected) return "major_outage";
   if (config.slowMs !== undefined && outcome.latencyMs >= config.slowMs) return "degraded";
+  // A certificate about to expire is a service that works today and stops on a
+  // known date; `degraded` is the only reading that says both.
+  if (expiresSoon(outcome, config)) return "degraded";
   return "operational";
 }
+
+const expiresSoon = (outcome: TcpOutcome & { connected: true }, config: TcpProbeConfig): boolean =>
+  config.tlsWarnDays !== undefined && outcome.tlsDaysLeft !== undefined && outcome.tlsDaysLeft <= config.tlsWarnDays;
 
 /**
  * The sentence the reading cannot carry: why the probe is not operational.
@@ -126,6 +190,9 @@ export function noteFromOutcome(outcome: TcpOutcome, config: TcpProbeConfig): Re
     return {
       text: `connected to ${target} in ${outcome.latencyMs} ms, at or over the ${config.slowMs} ms threshold`,
     };
+  }
+  if (expiresSoon(outcome, config)) {
+    return { text: `the TLS certificate of ${target} expires in ${outcome.tlsDaysLeft} day(s)` };
   }
   return null;
 }
@@ -153,6 +220,30 @@ export function readingFromOutcome(
  * does not resolve" are two different afternoons.
  */
 export function attemptConnect(config: TcpProbeConfig, timeoutMs: number): Promise<TcpOutcome> {
+  const target: HandshakeTarget = {
+    host: config.host,
+    port: config.port,
+    secure: config.secure ?? false,
+    verify: config.verify ?? true,
+    path: config.path ?? "/",
+    service: config.service ?? "",
+  };
+  switch (config.check ?? "connect") {
+    case "tls":
+      return checkTls(target, timeoutMs);
+    case "smtp":
+      return checkSmtp(target, timeoutMs);
+    case "websocket":
+      return checkWebSocket(target, timeoutMs);
+    case "grpc":
+      return checkGrpc(target, timeoutMs);
+    default:
+      return attemptBareConnect(config, timeoutMs);
+  }
+}
+
+/** The original reading: connect, time it, hang up without a byte. */
+function attemptBareConnect(config: TcpProbeConfig, timeoutMs: number): Promise<TcpOutcome> {
   return new Promise((resolve) => {
     const askedAt = Date.now();
     const socket = connect({ host: config.host, port: config.port });
@@ -174,6 +265,15 @@ export const tcpAdapter: Adapter = {
   id: "tcp",
   version: 1,
   kind: "probe",
+
+  validateOptions(options) {
+    try {
+      tcpConfig({ id: "tcp", name: "tcp", baseUrl: "http://localhost", options });
+      return [];
+    } catch (error) {
+      return [error instanceof Error ? error.message.replace(/^tcp probe for tcp: /, "") : String(error)];
+    }
+  },
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const config = tcpConfig(service);

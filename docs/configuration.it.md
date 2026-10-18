@@ -66,12 +66,12 @@ notifications:
 | `correlationWindowMinutes` | `10` | 1–1440. Quanto è larga quella finestra. Più larga intercetta un guasto condiviso che attraversa lentamente le status page, e rischia di unire due giornate storte non collegate. |
 | `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro e `watchdog` segnala qualunque cambiamento nel testo di una pagina (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto (vedi sotto). |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro e `watchdog` segnala qualunque cambiamento nel testo di una pagina (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `sequence` concatena due o tre richieste per un'API dietro un login, `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto (vedi sotto). |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
-| `services[].intervalSeconds` | — | 10–3600, solo sonde (`http`, `tcp`, `dns`). La stessa cadenza in secondi, per un endpoint che può restare giù meno di un minuto; una pagina di stato resta sul pavimento del minuto e viene rifiutata al caricamento. Mai insieme a `intervalMinutes`. |
-| `services[].crossChecks` | — | Solo su una sonda (`http`, `tcp`, `dns`) o su una lettura di posta (`imap`): l'id del provider di cui questa sonda è un secondo parere — controllo incrociato dei guasti silenziosi (roadmap 1.10). Quando la sonda non raggiunge il servizio e la status page di quel provider dichiara ancora operativo senza incidenti aperti, il disaccordo è esso stesso un avviso. Si può restringere a un singolo componente con la stessa forma `provider#componente` con cui una regola di routing indica il bersaglio (roadmap 2.9); la metà componente serve solo a precisare contro cosa la scheda di fiducia (roadmap 8.1) confronta la sonda, dato che il controllo dei guasti silenziosi riguarda una pagina che dichiara che non c'è proprio nulla che non va. |
-| `services[].authority` | dall'adapter | Quale fonte fa fede per questo provider — `declared` (la sua status page) oppure `observed` (la nostra misura), roadmap 9.1. Ometterlo è il caso normale e non è un valore mancante: una sonda (`http`, `tcp`, `dns`) legge `observed` perché *è* la misura, e tutto ciò che legge la pagina di qualcun altro legge `declared`. Va impostato solo per non essere d'accordo con quel default — una status page di cui hai imparato a diffidare, o una sonda che non vuoi sia trattata come il riferimento. Decide cosa la dashboard stampa accanto all'adapter e come è formulato un avviso di disservizio silenzioso, non quali campioni sostengono una percentuale. Vedi [7.7](how-it-works.it.md#77-quale-fonte-fa-fede). |
+| `services[].intervalSeconds` | — | 10–3600, solo sonde (`http`, `sequence`, `tcp`, `dns`). La stessa cadenza in secondi, per un endpoint che può restare giù meno di un minuto; una pagina di stato resta sul pavimento del minuto e viene rifiutata al caricamento. Mai insieme a `intervalMinutes`. |
+| `services[].crossChecks` | — | Solo su una sonda (`http`, `sequence`, `tcp`, `dns`) o su una lettura di posta (`imap`): l'id del provider di cui questa sonda è un secondo parere — controllo incrociato dei guasti silenziosi (roadmap 1.10). Quando la sonda non raggiunge il servizio e la status page di quel provider dichiara ancora operativo senza incidenti aperti, il disaccordo è esso stesso un avviso. Si può restringere a un singolo componente con la stessa forma `provider#componente` con cui una regola di routing indica il bersaglio (roadmap 2.9); la metà componente serve solo a precisare contro cosa la scheda di fiducia (roadmap 8.1) confronta la sonda, dato che il controllo dei guasti silenziosi riguarda una pagina che dichiara che non c'è proprio nulla che non va. |
+| `services[].authority` | dall'adapter | Quale fonte fa fede per questo provider — `declared` (la sua status page) oppure `observed` (la nostra misura), roadmap 9.1. Ometterlo è il caso normale e non è un valore mancante: una sonda (`http`, `sequence`, `tcp`, `dns`) legge `observed` perché *è* la misura, e tutto ciò che legge la pagina di qualcun altro legge `declared`. Va impostato solo per non essere d'accordo con quel default — una status page di cui hai imparato a diffidare, o una sonda che non vuoi sia trattata come il riferimento. Decide cosa la dashboard stampa accanto all'adapter e come è formulato un avviso di disservizio silenzioso, non quali campioni sostengono una percentuale. Vedi [7.7](how-it-works.it.md#77-quale-fonte-fa-fede). |
 | `services[].mutedUntil` | — | ISO 8601. Finché è nel futuro il provider viene interrogato e registrato come sempre ma non notifica nulla — "lo so, smetti di dirmelo, fino ad allora". Nell'edizione UI è ciò che scrive il comando **Silenzia** della dashboard. |
 | `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano sei: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`), `watchdog` (`baseline`, più un `selector` facoltativo), `http`, `tcp` e `dns`, e `imap` (vedi le loro sezioni qui sotto). |
 
@@ -263,12 +263,17 @@ testa (roadmap 1.9).
 ```
 
 Entrambi prendono il bersaglio da `baseUrl`, perché è il campo che lo schema
-valida e un URL `http`/`https` è ciò che accetta: `tcp` ne usa l'host e ignora
-lo schema, `dns` ne risolve l'host e da lì non scarica nulla.
+valida e un URL `http`/`https` è ciò che accetta: `tcp` ne usa l'host, e lo schema solo per decidere se parlare TLS (vedi `check`), `dns` ne risolve l'host e da lì non scarica nulla.
 
 | Opzione | Adapter | Default | Significato |
 |---|---|---|---|
 | `port` | `tcp` | quella dell'URL, altrimenti quella dello schema | La porta a cui connettersi. Un valore che non è una porta solleva un errore invece di ripiegare: una sonda puntata in silenzio alla 443 leggerebbe sana la cosa sbagliata. |
+| `check` | `tcp` | `connect` | Cosa chiedere alla porta: `connect` (basta aprirla), `tls` (un handshake, leggendo il certificato), `smtp` (un saluto `220`, poi un `250` a `EHLO`, poi `QUIT`), `websocket` (un `Upgrade` che deve tornare `101` con il token di accettazione che corrisponde alla chiave inviata) o `grpc` (lo standard `grpc.health.v1.Health/Check`, che deve dire `SERVING`). Roadmap 2.15. |
+| `tls` | `tcp` | dallo schema dell'URL | `yes` parla TLS fin dall'inizio, cosa che una porta sicura SMTP, WebSocket o gRPC richiede. Preso da uno schema `https` se non impostato; sempre attivo con `check: tls`. |
+| `verify` | `tcp` | `yes` | `no` accetta un certificato che il trust store di questa macchina non conosce — un'autorità privata. Altrimenti un certificato non fidato o scaduto legge `major_outage` con il motivo nella nota. |
+| `tlsWarnDays` | `tcp` | — | Meno giorni di questi alla scadenza del certificato legge `degraded`. Richiede un handshake TLS: `check: tls`, oppure `tls: "yes"`. La stessa miccia lenta di `tlsWarnDays` su `http`, per una porta che non parla HTTP — IMAPS, LDAPS, un database. |
+| `path` | `tcp` | `/` | Il percorso dell'upgrade WebSocket, per `check: websocket`. |
+| `service` | `tcp` | vuoto | Il servizio su cui chiede l'health check gRPC, per `check: grpc`. Vuoto chiede del server nel suo insieme. |
 | `slowMs` | entrambi | — | Un handshake o una risposta a questi millisecondi o oltre legge `degraded` invece di `operational`. |
 | `recordType` | `dns` | `A` | `A`, `AAAA`, `CNAME`, `MX`, `NS` o `TXT`. Una risposta `MX` viene confrontata come `"<preferenza> <exchange>"` e una `TXT` con i suoi pezzi uniti — il modo in cui entrambe si scrivono quando qualcuno dice come dovrebbero essere. |
 | `expectValue` | `dns` | — | Testo che uno dei record deve contenere. Un record puntato a un indirizzo dismesso si risolve comunque, ed è una brutta giornata diversa dal non risolversi affatto. |
@@ -283,6 +288,9 @@ Le letture che producono:
 | `tcp`: la porta ha accettato la connessione, sotto `slowMs` | `operational` |
 | `tcp`: ha accettato, a `slowMs` o oltre | `degraded` |
 | `tcp`: rifiutata, resettata, host irrisolvibile, o oltre il timeout | `major_outage` |
+| `tcp` con `tlsWarnDays`: il certificato scade entro quel termine | `degraded` |
+| `tcp` con un `check`: l'handshake si completa (saluto ed `EHLO` risposti, upgrade accettato, health `SERVING`) | `operational` |
+| `tcp` con un `check`: l'handshake è rifiutato, risposto male o non si completa mai (saluto `421`, `200` invece di `101`, `NOT_SERVING`, un certificato non fidato) | `major_outage` |
 | `dns`: sono tornati record, che soddisfano `expectValue`, sotto `slowMs` | `operational` |
 | `dns`: sono tornati a `slowMs` o oltre | `degraded` |
 | `dns`: NXDOMAIN, SERVFAIL, nessun record, o nulla che soddisfi `expectValue` | `major_outage` |
@@ -296,11 +304,12 @@ letture invece che letture fallite, una severità e nulla più, un solo punto di
 osservazione, una nota in **Diagnose** che dice perché, e un'opzione sbagliata
 che solleva un errore invece di leggere giù. Due cose sono solo loro:
 
-- `tcp` si connette e chiude **senza inviare un byte**. Un handshake di
-  protocollo vorrebbe dire conoscere il protocollo, e ogni servizio che vale la
-  pena sondare ne parla uno diverso. "La porta è aperta" è un'affermazione più
-  piccola di "il servizio è sano", e dire solo la più piccola è ciò che tiene
-  onesta la lettura.
+- `tcp` di default si connette e chiude **senza inviare un byte**. "La porta è
+  aperta" è un'affermazione più piccola di "il servizio è sano", e dire solo la
+  più piccola è ciò che tiene onesta la lettura. `check` fa una domanda un po'
+  più grande ai servizi che hanno un solo modo standard di rispondere, e non
+  di più: parla del protocollo quanto basta per vedere il servizio rispondere, e
+  non invia mai nulla a una casella, una coda o una tabella.
 - `dns` tratta una risposta vuota come un disservizio e non come un campo
   mancante. Ogni altro adapter degrada su un campo mancante, perché un provider
   che ne lascia cadere uno non è un disservizio nostro — ma qui la risposta *è*
@@ -314,6 +323,67 @@ controllato solo su un nome che si è risolto, e una verifica che non ha potuto
 rispondere — un registro senza servizio RDAP (diversi ccTLD, `.it` compreso), un
 registro che non pubblica la scadenza, un resolver andato in timeout — viene
 detta nella nota e mai contata: è un nostro punto cieco, non colpa del dominio.
+
+#### L'adapter `sequence` — un login, poi la chiamata che ne ha bisogno
+
+La sonda `http` legge una risposta. Un'API dietro autenticazione ne vuole due: un
+login che restituisce un token, poi la chiamata che lo spende (roadmap 2.14).
+`sequence` esegue due o tre richieste di fila e porta un valore dalla risposta di
+una alla successiva. **Non è un browser** — niente script, niente rendering — ed è
+ciò che la tiene dentro la regola del progetto di non aggiungere dipendenze.
+
+```yaml
+- name: Orders API, autenticata
+  id: orders-api
+  adapter: sequence
+  baseUrl: https://api.example.com
+  options:
+    step1.method: "POST"
+    step1.path: "/login"
+    step1.body: '{"user":"probe","password":"${PROBE_PASSWORD}"}'
+    step1.extract: "token=json:data.token"
+    step2.path: "/orders?limit=1"
+    step2.header.Authorization: "Bearer {{token}}"
+    expectBody: '"orders"'
+    slowMs: "1500"
+```
+
+Un passaggio è un gruppo di chiavi, numerate da 1 senza buchi, due o tre in tutto:
+
+| Opzione | Default | Significato |
+|---|---|---|
+| `stepN.method` | `GET` | `GET`, `HEAD` o `POST`. Nient'altro: una sonda che fa `PUT` o `DELETE` a intervalli è una trappola, non una funzione. |
+| `stepN.path` | vuoto | Accodato a `baseUrl`. Può usare `{{nome}}`. |
+| `stepN.body` | — | Il corpo della richiesta, solo `POST`. Inviato come JSON se inizia con `{` o `[`, altrimenti form-encoded, a meno di impostare `stepN.header.Content-Type`. |
+| `stepN.header.<Nome>` | — | Un header di richiesta, come `header.<Nome>` su `http`. |
+| `stepN.extract` | — | Un `nome=regola` per riga; ogni passaggio tranne l'ultimo. La regola è `json:data.token` (percorso con punti, i numeri indicizzano un array), `header:X-Csrf-Token`, o `regex:name="csrf" value="([^"]+)"` (il primo gruppo è il valore, l'intera corrispondenza se non ce n'è). |
+| `stepN.expectStatus` | `200-299` | Stessa sintassi di `http`. |
+| `expectBody`, `absentBody`, `slowMs`, `followRedirects` | | Come su `http`; `expectBody` e `absentBody` si controllano sull'**ultimo** passaggio, `slowMs` sull'intera sequenza. |
+
+`{{nome}}` nel percorso, nel corpo o in un header di un passaggio successivo viene
+sostituito da ciò che un passaggio precedente ha estratto, e `${VAR}` da una
+variabile d'ambiente, come viaggia ogni credenziale qui. I cookie impostati da un
+passaggio viaggiano con il successivo, nient'altro: niente scadenza, niente
+confronto di dominio.
+
+L'ultimo passaggio è il verdetto. Una sequenza legge `operational` quando ogni
+passaggio ha risposto con uno stato accettato, ogni `extract` ha trovato il suo
+valore e l'ultima risposta soddisfa `expectBody` / `absentBody`; `degraded` quando
+arriva in fondo ma impiega `slowMs` o più; `major_outage` quando un passaggio è
+rifiutato, risponde con lo stato sbagliato o non risponde, o una regola non trova
+nulla — la nota nomina il passaggio ("step 2 of 2: answered HTTP 401…"). Un errore
+di battitura — un `{{toekn}}` che nessun passaggio estrae, un buco nella
+numerazione, un `${VAR}` senza nulla dietro — solleva un errore invece di leggere
+giù, come su `http`.
+
+Due cose da sapere prima di puntarla su qualcosa:
+
+- un passaggio `POST` cambia qualcosa sul servizio a ogni esecuzione della
+  sequenza, e la cadenza può scendere a dieci secondi. Usalo per un login, mai per
+  un ordine. Il poller non ripete mai una sonda da solo.
+- un valore estratto non viene scritto da nessuna parte: né nella nota, né nel log,
+  né sulla dashboard. È una credenziale più spesso che no, e la spiegazione di una
+  lettura viene conservata.
 
 Qualunque cosa non valida ferma il container all'avvio indicando motivo e percorso:
 file mancante, YAML malformato, base URL sbagliato, id duplicato, lista di servizi

@@ -98,7 +98,7 @@ export interface PublicSummary {
  * lose its link. A plugin that probes the operator's own infrastructure should
  * be named here, and the docs say so.
  */
-const PRIVATE_BASE_URL_ADAPTERS = new Set(["http", "tcp", "dns", "icmp", "docker", "heartbeat", "uptimekuma", "isitdown", "imap"]);
+const PRIVATE_BASE_URL_ADAPTERS = new Set(["http", "sequence", "tcp", "dns", "icmp", "docker", "heartbeat", "uptimekuma", "isitdown", "imap"]);
 
 const SEVERITY: OverallStatus[] = [
   "operational",
