@@ -1024,5 +1024,20 @@
   "tcp.path": "Upgrade-Pfad",
   "tcp.path-hint": "Der Pfad des WebSocket-Endpunkts. Standard ist /.",
   "tcp.service": "gRPC-Dienst",
-  "tcp.service-hint": "Der Dienst, nach dem der Health-Check fragt. Leer lassen, um nach dem Server als Ganzem zu fragen."
+  "tcp.service-hint": "Der Dienst, nach dem der Health-Check fragt. Leer lassen, um nach dem Server als Ganzem zu fragen.",
+  "view.loading": "Wird geladen…",
+  "overview.title.empty": "Noch nichts zu beobachten",
+  "providers.empty-title": "Noch keine Anbieter",
+  "providers.empty-body": "Füge die erste Statusseite hinzu, die beobachtet werden soll. IsItDown fragt sie ab und meldet sich, wenn sich ihr Status ändert.",
+  "fleet.dot-label": "{name}: {status}",
+  "heatmap.summary_one": "{count} Störung in diesem Zeitraum, am {weekday} um {hour}.",
+  "heatmap.summary_other": "{count} Störungen in diesem Zeitraum. Häufigster Zeitpunkt: {weekday} {hour}, mit {peak} davon.",
+  "dialog.discard.title": "Änderungen verwerfen?",
+  "dialog.discard.body": "Was du in diesem Dialog eingegeben hast, geht verloren.",
+  "action.discard": "Verwerfen",
+  "action.keep-editing": "Weiter bearbeiten",
+  "routing.remove.title": "Diese Regel entfernen?",
+  "routing.remove.body": "Regel {position} leitet nicht mehr weiter, sobald sie entfernt ist, und die Regeln darunter rücken nach oben.",
+  "palette.shortcut-mac": "⌘K",
+  "palette.shortcut-other": "Strg K"
 }

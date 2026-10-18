@@ -155,6 +155,39 @@ describe("RoutingRules", () => {
     ]);
   });
 
+  it("asks before removing a rule, and saves nothing when the operator backs out", async () => {
+    const save = vi.fn();
+    mount(
+      <RoutingRules
+        routing={{
+          rules: [
+            { provider: "github", classes: ["status"], minSeverity: "any", channels: ["telegram"] },
+            { provider: "*", classes: ["status"], minSeverity: "any", channels: ["slack"] },
+          ],
+          invalidRules: 0,
+        }}
+        channels={channels}
+        services={services}
+        onSave={save}
+      />,
+    );
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Remove" })[0]!);
+    const confirm = await screen.findByRole("dialog", { name: i18n.t("routing.remove.title") });
+    await userEvent.click(within(confirm).getByRole("button", { name: i18n.t("action.cancel") }));
+    expect(save).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Remove" })[0]!);
+    await userEvent.click(
+      within(await screen.findByRole("dialog", { name: i18n.t("routing.remove.title") })).getByRole("button", {
+        name: i18n.t("action.remove"),
+      }),
+    );
+    expect(save).toHaveBeenCalledWith([
+      { provider: "*", classes: ["status"], minSeverity: "any", channels: ["slack"] },
+    ]);
+  });
+
   it("disables the row's controls while a save is in flight, so a second click cannot compute from stale state", () => {
     // Fully controlled from server state with no optimistic update: between
     // a click and the refetch, `rules` is stale and a second click's patch

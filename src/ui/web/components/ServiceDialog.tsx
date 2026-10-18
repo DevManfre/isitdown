@@ -54,6 +54,7 @@ import { useCatalog, useConfig, useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
 import { detectAdapter, previewComponents } from "@/lib/api.ts";
 import { DependsOnField } from "@/components/DependsOnField.tsx";
+import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { slugify } from "@/lib/slugify.ts";
 import type { CatalogProvider, ServiceDefinition } from "@/lib/types.ts";
 
@@ -199,6 +200,24 @@ export function ServiceDialog({
     { text: string; tone: "error" | "info" } | undefined
   >(undefined);
   const [saving, setSaving] = useState(false);
+  // Everything the operator can type or pick, as one comparable value. The
+  // dialog holds a two-step form, and an Escape or a stray outside click used
+  // to throw it away without a word; `pristine` is this value as the dialog
+  // opened, so a close with anything changed asks first.
+  const formState = JSON.stringify([
+    picked, name, adapter, baseUrl, selection, scopeToComponents, intervalMinutes,
+    intervalUnit, group, slaTarget, authority, dependsOn, options, header,
+  ]);
+  const [pristine, setPristine] = useState(formState);
+  const [capturePristine, setCapturePristine] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  useEffect(() => {
+    // One render after `resetForm`, so the snapshot is of the reset values.
+    if (capturePristine) {
+      setPristine(formState);
+      setCapturePristine(false);
+    }
+  }, [capturePristine, formState]);
   // Only while adding, and only while the dialog is open: an edit already has
   // every answer the catalog would offer.
   const { data: catalog } = useCatalog(open && mode === "add");
@@ -340,6 +359,14 @@ export function ServiceDialog({
     setOpen(true);
     setDialogOpen(true);
     resetForm();
+    setCapturePristine(true);
+  };
+
+  // Every close the operator asks for (Escape, outside click, ✕, Cancel) goes
+  // through here; a save's own close still calls `close()` straight away.
+  const requestClose = (): void => {
+    if (formState !== pristine && !saving) setConfirmDiscard(true);
+    else close();
   };
 
   const loadPreview = async (): Promise<void> => {
@@ -525,6 +552,8 @@ export function ServiceDialog({
             text: t("add.test-failed", { error: result.error }),
             tone: "error",
           });
+          // Saved already: closing now loses nothing, so it must not ask.
+          setPristine(formState);
           setSaving(false);
           return;
         }
@@ -805,7 +834,7 @@ export function ServiceDialog({
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => (next ? openDialog() : close())}
+      onOpenChange={(next) => (next ? openDialog() : requestClose())}
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className={adding ? "sm:max-w-2xl" : undefined}>
@@ -950,6 +979,9 @@ export function ServiceDialog({
               the button that asks for it sits in the footer. */}
           {message !== undefined && (
             <p
+              // Announced when it appears: it is the answer to the button the
+              // operator just pressed, and it lands outside their focus.
+              role={message.tone === "error" ? "alert" : "status"}
               className={
                 message.tone === "error"
                   ? "px-1 pt-3 text-sm text-destructive"
@@ -959,6 +991,18 @@ export function ServiceDialog({
               {message.text}
             </p>
           )}
+
+          {/* Inside the content rather than beside it, so Radix stacks it as a
+              nested layer and the outer dialog's focus trap lets it through. */}
+          <ConfirmDialog
+            open={confirmDiscard}
+            onOpenChange={setConfirmDiscard}
+            title={t("dialog.discard.title")}
+            description={t("dialog.discard.body")}
+            confirmLabel={t("action.discard")}
+            cancelLabel={t("action.keep-editing")}
+            onConfirm={close}
+          />
 
           <DialogFooter className="sm:justify-between">
             <div className="flex items-center gap-2">
@@ -996,7 +1040,7 @@ export function ServiceDialog({
                   {t("action.previous-step")}
                 </Button>
               )}
-              <Button type="button" variant="ghost" onClick={close}>
+              <Button type="button" variant="ghost" onClick={requestClose}>
                 {t("action.cancel")}
               </Button>
               {onSource ? (

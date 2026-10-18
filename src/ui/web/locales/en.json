@@ -1024,5 +1024,20 @@
   "tcp.path": "Upgrade path",
   "tcp.path-hint": "The path of the WebSocket endpoint. Defaults to /.",
   "tcp.service": "gRPC service",
-  "tcp.service-hint": "The service the health check asks about. Leave empty to ask about the server as a whole."
+  "tcp.service-hint": "The service the health check asks about. Leave empty to ask about the server as a whole.",
+  "view.loading": "Loading…",
+  "overview.title.empty": "Nothing to watch yet",
+  "providers.empty-title": "No providers yet",
+  "providers.empty-body": "Add the first status page to watch. IsItDown polls it and tells you when its status changes.",
+  "fleet.dot-label": "{name}: {status}",
+  "heatmap.summary_one": "{count} incident in this window, on {weekday} at {hour}.",
+  "heatmap.summary_other": "{count} incidents in this window. Busiest slot: {weekday} {hour}, with {peak} of them.",
+  "dialog.discard.title": "Discard changes?",
+  "dialog.discard.body": "What you entered in this dialog will be lost.",
+  "action.discard": "Discard",
+  "action.keep-editing": "Keep editing",
+  "routing.remove.title": "Remove this rule?",
+  "routing.remove.body": "Rule {position} stops routing as soon as it is removed, and the rules below it move up.",
+  "palette.shortcut-mac": "⌘K",
+  "palette.shortcut-other": "Ctrl K"
 }
