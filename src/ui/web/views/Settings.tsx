@@ -131,17 +131,17 @@ const DELIVERY_OFF: DeliveryPolicy = {
   digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" },
   cap: { enabled: false, maxPerHour: 10 },
   updateInPlace: false,
-};
   maintenanceNotice: { enabled: false, leadMinutes: 120 },
   escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
+};
 
 /** The two typed numbers in the delivery section, bounded like the engine's. */
 const DELIVERY_BOUNDS = {
   windowMinutes: { min: 1, max: 1440, labelKey: "field.digest.window" },
   maxPerHour: { min: 1, max: 1000, labelKey: "field.cap.max" },
-};
   leadMinutes: { min: 1, max: 10_080, labelKey: "field.maintenance-notice.lead" },
   afterMinutes: { min: 1, max: 1440, labelKey: "field.escalation.after" },
+};
 
 /**
  * A severity floor, in the same words in all three places one is chosen. Its
@@ -180,7 +180,6 @@ function FloorSelect({
   );
 }
 
-/** Which providers the services card lists — the state, not the search. */
 /**
  * The channel an escalation goes to, picked from the ones that can send. A
  * channel the escalation still names but that has since been switched off stays
@@ -221,6 +220,7 @@ function ChannelSelect({
   );
 }
 
+/** Which providers the services card lists — the state, not the search. */
 type ServiceFilter = "all" | "enabled" | "disabled" | "muted";
 
 const SERVICE_FILTERS: {
@@ -326,11 +326,11 @@ function SettingsView() {
     undefined,
   );
   const [capPerHour_, setCapPerHour] = useState<number | undefined>(undefined);
+  const [noticeLead_, setNoticeLead] = useState<number | undefined>(undefined);
+  const [escalationAfter_, setEscalationAfter] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     return () => {
-  const [noticeLead_, setNoticeLead] = useState<number | undefined>(undefined);
-  const [escalationAfter_, setEscalationAfter] = useState<number | undefined>(undefined);
       if (debounce.current !== undefined) clearTimeout(debounce.current);
     };
   }, []);
@@ -381,13 +381,13 @@ function SettingsView() {
   const delivery = config.delivery ?? DELIVERY_OFF;
   const digestWindow = digestWindow_ ?? delivery.digest.windowMinutes;
   const capPerHour = capPerHour_ ?? delivery.cap.maxPerHour;
-
-  /**
-   * One field of the delivery policy at a time. The patch is partial at every
   const maintenanceNotice = delivery.maintenanceNotice ?? DELIVERY_OFF.maintenanceNotice!;
   const noticeLead = noticeLead_ ?? maintenanceNotice.leadMinutes;
   const escalation = delivery.escalation ?? DELIVERY_OFF.escalation!;
   const escalationAfter = escalationAfter_ ?? escalation.afterMinutes;
+
+  /**
+   * One field of the delivery policy at a time. The patch is partial at every
    * level, so a floor changed here cannot write back a window the operator is
    * still typing into.
    */
@@ -396,11 +396,11 @@ function SettingsView() {
     digest?: Partial<DeliveryPolicy["digest"]>;
     cap?: Partial<DeliveryPolicy["cap"]>;
     updateInPlace?: boolean;
+    maintenanceNotice?: Partial<NonNullable<DeliveryPolicy["maintenanceNotice"]>>;
+    escalation?: Partial<NonNullable<DeliveryPolicy["escalation"]>>;
   }): void => {
     toast("delivery", undefined);
     settingsMutation.mutate(
-    maintenanceNotice?: Partial<NonNullable<DeliveryPolicy["maintenanceNotice"]>>;
-    escalation?: Partial<NonNullable<DeliveryPolicy["escalation"]>>;
       { delivery: patch },
       {
         onSuccess: () =>
