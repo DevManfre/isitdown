@@ -13,6 +13,7 @@ import type { RuntimeConfig, ServiceDefinition } from "../../src/core/configSour
 import type { StateStore } from "../../src/core/stateStore.interface.ts";
 import type { ServiceRef } from "../../src/core/adapter.interface.ts";
 import { CATCH_ALL_RULE } from "../../src/core/routing.ts";
+import { DELIVERY_DEFAULTS } from "../../src/core/delivery.ts";
 
 const silent = createLogger("error", () => {});
 
@@ -1878,6 +1879,169 @@ test("a muted provider's slow page stays quiet", async () => {
     await cycles(poller, runtime, 25);
     latency.set("github", 4200);
     assert.deepEqual(await cycles(poller, runtime, 3), []);
+  } finally {
+    await store.close();
+  }
+});
+
+/**
+ * A page that declares one maintenance window the test can move — roadmap 3.3.
+ * The window is stated relative to the moment of each read, so "in 90 minutes"
+ * stays 90 minutes however long the suite has been running.
+ */
+function pagesWithWindow(window: { current: { id: string; startsInMinutes: number } | null }) {
+  return () => ({
+    id: "stub",
+    fetchStatus: async (ref: ServiceRef) => {
+      const now = Date.now();
+      const declared = window.current;
+      return {
+        provider: ref.id,
+        overallStatus: "operational" as const,
+        activeIncidents: [],
+        components: [],
+        maintenances:
+          declared === null
+            ? []
+            : [
+                {
+                  id: declared.id,
+                  name: "Database upgrade",
+                  status: "scheduled",
+                  startsAt: new Date(now + declared.startsInMinutes * 60_000).toISOString(),
+                  endsAt: new Date(now + (declared.startsInMinutes + 30) * 60_000).toISOString(),
+                  componentIds: [],
+                },
+              ],
+        fetchedAt: new Date(now).toISOString(),
+      };
+    },
+  });
+}
+
+const withNotice = (runtime: RuntimeConfig, over: { enabled?: boolean; leadMinutes?: number } = {}): RuntimeConfig => ({
+  ...runtime,
+  delivery: {
+    ...DELIVERY_DEFAULTS,
+    maintenanceNotice: { enabled: true, leadMinutes: 120, ...over },
+  },
+});
+
+test("a maintenance window inside the lead is announced once, however many cycles see it", async () => {
+  const store = await freshStore();
+  const window = { current: { id: "mw1", startsInMinutes: 90 } };
+  const poller = createPoller({ getAdapter: pagesWithWindow(window), store, logger: silent, sleep: fakeSleep().sleep });
+  const runtime = withNotice(config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]));
+  try {
+    assert.deepEqual(await cycles(poller, runtime, 1), ["maintenance_upcoming:github"]);
+    assert.deepEqual(await cycles(poller, runtime, 3), [], "the same window is not news again");
+    window.current = { id: "mw2", startsInMinutes: 60 };
+    assert.deepEqual(await cycles(poller, runtime, 1), ["maintenance_upcoming:github"], "another window is");
+  } finally {
+    await store.close();
+  }
+});
+
+test("a window further away than the lead waits, and is announced when it comes inside", async () => {
+  const store = await freshStore();
+  const window = { current: { id: "mw1", startsInMinutes: 600 } };
+  const poller = createPoller({ getAdapter: pagesWithWindow(window), store, logger: silent, sleep: fakeSleep().sleep });
+  const runtime = withNotice(config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]));
+  try {
+    assert.deepEqual(await cycles(poller, runtime, 2), []);
+    window.current = { id: "mw1", startsInMinutes: 100 };
+    assert.deepEqual(await cycles(poller, runtime, 1), ["maintenance_upcoming:github"]);
+  } finally {
+    await store.close();
+  }
+});
+
+test("the heads-up is off unless the operator asked for it, and a mute covers it", async () => {
+  const store = await freshStore();
+  const window = { current: { id: "mw1", startsInMinutes: 30 } };
+  const poller = createPoller({ getAdapter: pagesWithWindow(window), store, logger: silent, sleep: fakeSleep().sleep });
+  const plain = config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]);
+  try {
+    assert.deepEqual(await cycles(poller, plain, 2), [], "no delivery block at all means off");
+    assert.deepEqual(await cycles(poller, withNotice(plain, { enabled: false }), 1), []);
+    const muted = withNotice(
+      config([service("github", "http://127.0.0.1:1", { adapter: "stub", mutedUntil: "2999-01-01T00:00:00.000Z" })]),
+    );
+    assert.deepEqual(await cycles(poller, muted, 2), [], "I know, stop telling me");
+    // Not spent by the muted cycles: lifting the mute still gets the heads-up.
+    assert.deepEqual(await cycles(poller, withNotice(plain), 1), ["maintenance_upcoming:github"]);
+  } finally {
+    await store.close();
+  }
+});
+
+/** A page whose overall status and open incidents the test sets before each cycle — roadmap 3.1's ack lifetime. */
+function pagesInState(state: { status: "operational" | "major_outage"; incidents: number }) {
+  return () => ({
+    id: "stub",
+    fetchStatus: async (ref: ServiceRef) => ({
+      provider: ref.id,
+      overallStatus: state.status,
+      activeIncidents: Array.from({ length: state.incidents }, (_, index) => ({
+        id: `i${index}`,
+        name: "Outage",
+        impact: "major",
+        status: "investigating",
+        updatedAt: new Date().toISOString(),
+      })),
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    }),
+  });
+}
+
+test("an acknowledgement lasts exactly as long as the trouble it was given for", async () => {
+  const store = await freshStore();
+  const acks = new Map<string, { ackedAt: string; ackedBy: string }>();
+  const ackStore = {
+    acknowledge: async (id: string, by: string, at: string) => !acks.has(id) && (acks.set(id, { ackedAt: at, ackedBy: by }), true),
+    getAck: async (id: string) => acks.get(id) ?? null,
+    clearAck: async (id: string) => void acks.delete(id),
+  };
+  const state = { status: "major_outage" as "operational" | "major_outage", incidents: 1 };
+  const poller = createPoller({ getAdapter: pagesInState(state), store, logger: silent, sleep: fakeSleep().sleep, acks: ackStore });
+  const runtime = config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]);
+  try {
+    await cycles(poller, runtime, 1);
+    await ackStore.acknowledge("github", "web", new Date().toISOString());
+
+    await cycles(poller, runtime, 2);
+    assert.ok(acks.has("github"), "still down: still on it");
+
+    state.status = "operational";
+    await cycles(poller, runtime, 1);
+    assert.ok(acks.has("github"), "an open incident is still trouble, whatever the headline says");
+
+    state.incidents = 0;
+    await cycles(poller, runtime, 1);
+    assert.equal(acks.has("github"), false, "calm again: the next outage starts from nobody being on it");
+  } finally {
+    await store.close();
+  }
+});
+
+test("an acknowledgement is also let go while the provider is muted, where no alert would say it ended", async () => {
+  const store = await freshStore();
+  const acks = new Map([["github", { ackedAt: "2026-09-01T10:00:00.000Z", ackedBy: "web" }]]);
+  const ackStore = {
+    acknowledge: async () => false,
+    getAck: async (id: string) => acks.get(id) ?? null,
+    clearAck: async (id: string) => void acks.delete(id),
+  };
+  const state = { status: "operational" as "operational" | "major_outage", incidents: 0 };
+  const poller = createPoller({ getAdapter: pagesInState(state), store, logger: silent, sleep: fakeSleep().sleep, acks: ackStore });
+  const runtime = config([
+    service("github", "http://127.0.0.1:1", { adapter: "stub", mutedUntil: "2999-01-01T00:00:00.000Z" }),
+  ]);
+  try {
+    await cycles(poller, runtime, 1);
+    assert.equal(acks.size, 0);
   } finally {
     await store.close();
   }

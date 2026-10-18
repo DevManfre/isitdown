@@ -30,6 +30,7 @@
   "notification.slow.page": "{provider} — page d'état lente\n\nLa page d'état a mis {latency} à répondre, contre {median} d'habitude (au-delà de {threshold}, c'est inhabituel). Une page qui ralentit ainsi est souvent le premier signe d'un problème que le fournisseur n'a pas encore reconnu.\n\n{url}",
   "notification.maintenance.started": "{provider} — maintenance\n\nUne maintenance planifiée a commencé : {title}\nFin prévue : {endsAt}\nLes alertes pour ce fournisseur sont suspendues jusqu'à la fin.\n\n{url}",
   "notification.maintenance.ended": "{provider} — maintenance terminée\n\n{title} est terminée.\nÉtat actuel : {current} — incidents ouverts : {count}.\nMis à jour : {updatedAt}\n\n{url}",
+  "notification.maintenance.upcoming": "{provider} — maintenance à venir\n\nUne maintenance programmée commence dans {startsIn} : {title}\nDébut : {startsAt} — durée prévue : {duration}\n\n{url}",
 
   "notification.digest.heading": "IsItDown — {count} changements sur les {minutes} dernières minutes",
   "notification.digest.line": "{provider} : {what}",
@@ -40,6 +41,7 @@
   "notification.digest.incident-resolved": "incident résolu — {title}",
   "notification.digest.maintenance-started": "maintenance commencée — {title}",
   "notification.digest.maintenance-ended": "maintenance terminée — {title}",
+  "notification.digest.maintenance-upcoming": "maintenance dans {startsIn} — {title}",
   "notification.digest.monitoring": "surveillance dégradée — {count} lectures consécutives en échec",
   "notification.digest.silent": "la page d'état dit toujours opérationnel, mais la sonde {probe} lit {current}",
   "notification.digest.correlated": "{count} fournisseurs dégradés en même temps — {providers}",
@@ -48,8 +50,9 @@
   "notification.digest.slow-page": "page d'état lente — {latency} contre {median} d'habitude",
 
   "notification.suppressed": "{count} autres alertes pour ce fournisseur ont été supprimées par la limite horaire.",
+  "notification.escalated": "⏫ Personne ne l'a pris en charge après {minutes} min — je le renvoie ici.",
 
-  "chatops.help": "Commandes IsItDown\n\n/status — tous les fournisseurs, les pires d'abord\n/status <fournisseur> — un seul fournisseur\n/history <fournisseur> [7|30|90] — disponibilité sur une période\n/mute <fournisseur> <30m|2h|1d> — suspendre les alertes un moment\n/unmute <fournisseur> — les réactiver\n/help — ce message",
+  "chatops.help": "Commandes IsItDown\n\n/status — tous les fournisseurs, les pires d'abord\n/status <fournisseur> — un seul fournisseur\n/history <fournisseur> [7|30|90] — disponibilité sur une période\n/mute <fournisseur> <30m|2h|1d> — suspendre les alertes un moment\n/unmute <fournisseur> — les réactiver\n/ack <fournisseur> — prendre en charge\n/help — ce message",
   "chatops.status.heading": "{count} fournisseurs sur {total} ne sont pas opérationnels.",
   "chatops.status.all-operational": "Les {count} fournisseurs sont opérationnels.",
   "chatops.status.empty": "Aucun fournisseur n'est encore surveillé.",
@@ -64,6 +67,10 @@
   "chatops.history.unmeasured": "Rien n'a été mesuré pour {provider} sur les {days} derniers jours.",
   "chatops.mute.done": "{provider} est en sourdine jusqu'à {until}. Les alertes reprennent d'elles-mêmes ensuite.",
   "chatops.unmute.done": "{provider} n'est plus en sourdine.",
+  "chatops.ack.done": "{provider} : pris en charge par {by}.",
+  "chatops.ack.already": "{provider} était déjà pris en charge par {by} à {at}.",
+  "notify.action.ack": "✅ Je m'en occupe",
+  "notify.action.mute": "🔕 Sourdine 2 h",
   "chatops.error.provider-required": "Indiquez un fournisseur, par exemple /status github",
   "chatops.error.duration-required": "Indiquez une durée, par exemple /mute github 2h",
   "chatops.error.bad-duration": "{duration} n'est pas une durée que je sais lire. Essayez 30m, 2h ou 1d, jusqu'à 30d.",

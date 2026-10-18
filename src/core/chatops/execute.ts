@@ -1,6 +1,7 @@
 import { formatUtc, t } from "../i18n/index.ts";
 import type { OverallStatus } from "../types.ts";
 import type { ChatopsBackend, ChatProvider } from "./backend.interface.ts";
+import { parseAction } from "./actions.ts";
 import { parseCommand, type ChatCommand } from "./commands.ts";
 
 /**
@@ -97,6 +98,7 @@ async function run(
   locale: string,
   command: ChatCommand,
   now: Date,
+  by: string,
 ): Promise<string> {
   switch (command.kind) {
     case "help":
@@ -155,6 +157,20 @@ async function run(
       return t(locale, "chatops.mute.done", { provider: provider.name, until: formatUtc(until) });
     }
 
+    case "ack": {
+      const providers = await backend.listProviders();
+      const provider = findProvider(providers, command.providerId);
+      if (provider === undefined) {
+        return t(locale, "chatops.error.unknown-provider", { provider: command.providerId });
+      }
+      const ack = await backend.ack(provider.id, by);
+      return t(locale, ack.newly ? "chatops.ack.done" : "chatops.ack.already", {
+        provider: provider.name,
+        by: ack.by,
+        at: formatUtc(ack.at),
+      });
+    }
+
     case "unmute": {
       const providers = await backend.listProviders();
       const provider = findProvider(providers, command.providerId);
@@ -180,12 +196,41 @@ export async function handleMessage(options: {
   locale: string;
   text: string;
   now?: Date;
+  /** Who sent it, for the commands that record somebody — `/ack`. */
+  by?: string;
 }): Promise<string | null> {
   const parsed = parseCommand(options.text);
   if (parsed === null) return null;
   if (!parsed.ok) return t(options.locale, parsed.key, parsed.params ?? {});
   try {
-    return await run(options.backend, options.locale, parsed.command, options.now ?? new Date());
+    return await run(options.backend, options.locale, parsed.command, options.now ?? new Date(), options.by ?? "chat");
+  } catch (error) {
+    return t(options.locale, "chatops.error.failed", {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * One button press in, one reply out — roadmap 3.1. `null` for anything the
+ * notifier did not write, which the transport answers with silence.
+ *
+ * The press becomes the command it stands for and goes through the same `run`
+ * the typed one does, so "Ack" on a notification and `/ack github` in the chat
+ * cannot disagree about what they did. The reply is the same kind of sentence,
+ * for the same reason: somebody just pressed a button and is waiting to be told.
+ */
+export async function handleCallback(options: {
+  backend: ChatopsBackend;
+  locale: string;
+  data: string;
+  by: string;
+  now?: Date;
+}): Promise<string | null> {
+  const action = parseAction(options.data);
+  if (action === null) return null;
+  try {
+    return await run(options.backend, options.locale, action, options.now ?? new Date(), options.by);
   } catch (error) {
     return t(options.locale, "chatops.error.failed", {
       reason: error instanceof Error ? error.message : String(error),

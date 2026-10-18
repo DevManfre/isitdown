@@ -354,6 +354,8 @@ export type StatusChangeKind =
   | "incident_resolved"
   | "maintenance_started"
   | "maintenance_ended"
+  // A declared window that has not opened yet (roadmap 3.3).
+  | "maintenance_upcoming"
   | "monitoring_degraded"
   // Several providers going bad inside one window, reported once (roadmap 2.7).
   | "correlated_outage"
@@ -714,6 +716,22 @@ export interface DeliveryPolicy {
   cap: { enabled: boolean; maxPerHour: number };
   /** Roadmap 3.19: an incident's updates edit its first message. */
   updateInPlace: boolean;
+  /**
+   * Roadmap 3.3: a heads-up before a declared maintenance window opens.
+   * Optional because a server from before it existed answers without it, which
+   * reads as off.
+   */
+  maintenanceNotice?: { enabled: boolean; leadMinutes: number };
+  /**
+   * Roadmap 3.2: a change nobody took in charge is said again on another
+   * channel. Optional for the same reason as above.
+   */
+  escalation?: {
+    enabled: boolean;
+    afterMinutes: number;
+    channel: string;
+    minSeverity: SeverityFloorName;
+  };
 }
 
 /**

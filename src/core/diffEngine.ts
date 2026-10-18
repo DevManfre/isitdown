@@ -447,7 +447,8 @@ export function worseningsIn(changes: StatusChange[]): WorseningReading[] {
       continue;
     if (
       change.kind === "maintenance_started" ||
-      change.kind === "maintenance_ended"
+      change.kind === "maintenance_ended" ||
+      change.kind === "maintenance_upcoming"
     )
       continue;
     const current = change.currentStatus;
@@ -522,6 +523,50 @@ export function silentOutage(inputs: CrossCheckInputs): StatusChange | null {
     },
     at: inputs.at,
   };
+}
+
+export interface UpcomingMaintenanceInputs {
+  status: NormalizedStatus;
+  /** How far ahead a window is announced. Zero, negative or NaN turns this off. */
+  leadMinutes: number;
+  /** ISO 8601, UTC. */
+  at: string;
+}
+
+/**
+ * Declared windows that open within `leadMinutes` — roadmap 3.3.
+ *
+ * Every other maintenance alert is about a window that is already running, which
+ * is too late to move a deploy. The window is already read and stored from the
+ * provider's page; this only asks whether it is close enough to be worth saying.
+ *
+ * Pure like the checks beside it: "is this window inside the lead" is decided
+ * here, "have I said so already" is the poller's business, the way a slow page
+ * is said once per episode. A window that is already running is `isActive`'s,
+ * and one whose start cannot be parsed is not announced at all — a heads-up
+ * with an invented time would be worse than none.
+ */
+export function upcomingMaintenance(inputs: UpcomingMaintenanceInputs): StatusChange[] {
+  const { status, leadMinutes } = inputs;
+  if (!Number.isFinite(leadMinutes) || leadMinutes <= 0) return [];
+  const now = Date.parse(inputs.at);
+  if (Number.isNaN(now)) return [];
+  const horizon = now + leadMinutes * 60_000;
+
+  const changes: StatusChange[] = [];
+  for (const window of status.maintenances) {
+    const starts = Date.parse(window.startsAt);
+    if (Number.isNaN(starts) || starts <= now || starts > horizon) continue;
+    changes.push({
+      kind: "maintenance_upcoming",
+      providerId: status.provider,
+      currentStatus: status.overallStatus,
+      maintenance: window,
+      startsInMinutes: Math.ceil((starts - now) / 60_000),
+      at: inputs.at,
+    });
+  }
+  return changes;
 }
 
 export interface SlowPageInputs {

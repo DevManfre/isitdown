@@ -3,7 +3,8 @@ import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { PushSubscription, PushSubscriptionStore } from "../core/pushSubscriptionStore.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { renderMessage } from "./formatting.ts";
+import { t } from "../core/i18n/index.ts";
+import { offersActions, renderMessage } from "./formatting.ts";
 
 const keysSchema = z.object({
   publicKey: z.string().min(1, "the webpush channel needs a VAPID public key"),
@@ -135,6 +136,17 @@ export function createWebPushNotifier(deps: {
         body: rest.join(" "),
         url: "/",
         providerId: payload.change.providerId,
+        // Ack and Mute on the toast itself (roadmap 3.1). The service worker
+        // turns a press into a call to this process's own routes, so what is
+        // sent is only the labels and which action each button is.
+        ...(offersActions(payload)
+          ? {
+              actions: [
+                { action: "ack", title: t(payload.locale, "notify.action.ack") },
+                { action: "mute", title: t(payload.locale, "notify.action.mute") },
+              ],
+            }
+          : {}),
         // The provider being reported, not IsItDown: a toast stack shows which
         // service is down before a word of it is read.
         ...(icon === "" ? {} : { icon }),

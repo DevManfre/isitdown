@@ -69,6 +69,9 @@ const chatops = await createChatops(started).catch((error: unknown) => {
   return null;
 });
 chatops?.start();
+// Only now is anything answering a press, so only now do Telegram messages grow
+// Ack and Mute buttons (roadmap 3.1).
+if (chatops !== null) started.interactiveChannels.add("telegram");
 // One immediate pass so a fresh container has markers on the map before the
 // first quarter-hour interval elapses, rather than an empty card until then.
 void started.mapLane.refresh().catch((error: unknown) => {

@@ -9,6 +9,8 @@ import { IMPORT_TOOLS, importMonitors, type ImportTool } from "../../adapters/im
 import { getAdapter } from "../../adapters/index.ts";
 import {
   alertCapSchema,
+  maintenanceNoticeSchema,
+  escalationSchema,
   digestSchema,
   localeSchema,
   pollingSchema,
@@ -63,6 +65,8 @@ const deliveryPatchSchema = z.object({
   digest: digestSchema.partial().optional(),
   cap: alertCapSchema.partial().optional(),
   updateInPlace: z.boolean().optional(),
+  maintenanceNotice: maintenanceNoticeSchema.partial().optional(),
+  escalation: escalationSchema.partial().optional(),
 });
 
 const settingsPatchSchema = pollingSchema
@@ -133,7 +137,7 @@ function deliveryPatch(
   patch: z.infer<typeof deliveryPatchSchema> | undefined,
 ): Record<string, unknown> {
   if (patch === undefined) return {};
-  const { quietHours, digest, cap, updateInPlace } = patch;
+  const { quietHours, digest, cap, updateInPlace, maintenanceNotice, escalation } = patch;
   return {
     ...(quietHours?.enabled === undefined
       ? {}
@@ -160,6 +164,14 @@ function deliveryPatch(
       ? {}
       : { alertCapPerHour: cap.maxPerHour }),
     ...(updateInPlace === undefined ? {} : { updateInPlace }),
+    ...(maintenanceNotice?.enabled === undefined ? {} : { maintenanceNoticeEnabled: maintenanceNotice.enabled }),
+    ...(maintenanceNotice?.leadMinutes === undefined
+      ? {}
+      : { maintenanceNoticeLeadMinutes: maintenanceNotice.leadMinutes }),
+    ...(escalation?.enabled === undefined ? {} : { escalationEnabled: escalation.enabled }),
+    ...(escalation?.afterMinutes === undefined ? {} : { escalationAfterMinutes: escalation.afterMinutes }),
+    ...(escalation?.channel === undefined ? {} : { escalationChannel: escalation.channel }),
+    ...(escalation?.minSeverity === undefined ? {} : { escalationMinSeverity: escalation.minSeverity }),
   };
 }
 
