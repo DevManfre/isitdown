@@ -30,6 +30,9 @@ const CLASS_OF: Record<StatusChangeKind, EventClass> = {
   incident_resolved: "incident",
   maintenance_started: "maintenance",
   maintenance_ended: "maintenance",
+  // The same class as the window itself (roadmap 3.3): a rule that carries
+  // maintenance already carries the heads-up before it.
+  maintenance_upcoming: "maintenance",
   monitoring_degraded: "monitoring",
   // A shared failure is still a fleet of statuses going bad (roadmap 2.7): it
   // replaces the status alerts it folds, so it has to reach the same rules

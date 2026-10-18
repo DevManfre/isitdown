@@ -52,4 +52,11 @@ export interface ChatopsBackend {
    */
   mute(providerId: string, until: string): Promise<void>;
   unmute(providerId: string): Promise<void>;
+  /**
+   * Records that somebody has taken this provider's trouble in charge (roadmap
+   * 3.1). `by` names who, as the transport knows them. Resolves with whether
+   * this press was the first — a second one changes nothing and learns who got
+   * there before it, so the answer can say so instead of pretending.
+   */
+  ack(providerId: string, by: string): Promise<{ newly: boolean; by: string; at: string }>;
 }

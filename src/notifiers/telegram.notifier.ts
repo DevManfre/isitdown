@@ -1,7 +1,10 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { renderMessage } from "./formatting.ts";
+import { ACTION_MUTE_MINUTES, encodeAction } from "../core/chatops/actions.ts";
+import { t } from "../core/i18n/index.ts";
+import { isResolution } from "./incidentKey.ts";
+import { offersActions, renderMessage } from "./formatting.ts";
 
 const API_TIMEOUT_MS = 10_000;
 
@@ -55,6 +58,40 @@ export function createTelegramNotifier(settings: Record<string, string>): Notifi
     return parsed;
   }
 
+  /**
+   * The buttons under a message (roadmap 3.1), or nothing.
+   *
+   * `inline_keyboard: []` on a message that no longer wants buttons is not the
+   * same as leaving the field out: an edit that omits it keeps the old keyboard,
+   * so the message that closes an incident has to ask for an empty one to take
+   * the buttons away from a message that says the trouble is over. A first send
+   * has nothing to remove, so there it is simply omitted.
+   */
+  function keyboardFor(payload: NotificationPayload, editing: boolean): { reply_markup?: unknown } {
+    if (offersActions(payload)) {
+      const providerId = payload.change.providerId;
+      const ack = encodeAction({ kind: "ack", providerId });
+      const mute = encodeAction({ kind: "mute", providerId, minutes: ACTION_MUTE_MINUTES });
+      // Both or neither: an id that fits one and not the other is not worth a
+      // half-keyboard, and the notification is complete without it.
+      if (ack !== null && mute !== null) {
+        return {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: t(payload.locale, "notify.action.ack"), callback_data: ack },
+                { text: t(payload.locale, "notify.action.mute"), callback_data: mute },
+              ],
+            ],
+          },
+        };
+      }
+    }
+    return editing && payload.interactive === true && isResolution(payload.change)
+      ? { reply_markup: { inline_keyboard: [] } }
+      : {};
+  }
+
   return {
     id: "telegram",
 
@@ -68,6 +105,7 @@ export function createTelegramNotifier(settings: Record<string, string>): Notifi
         chat_id: chatId,
         text: renderMessage(payload),
         disable_web_page_preview: true,
+        ...keyboardFor(payload, false),
       });
       const id = parsed.result?.message_id;
       return typeof id === "number" ? String(id) : undefined;
@@ -85,6 +123,7 @@ export function createTelegramNotifier(settings: Record<string, string>): Notifi
         message_id: Number(ref),
         text: renderMessage(payload),
         disable_web_page_preview: true,
+        ...keyboardFor(payload, true),
       });
     },
   };

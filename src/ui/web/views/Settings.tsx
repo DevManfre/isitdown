@@ -132,12 +132,16 @@ const DELIVERY_OFF: DeliveryPolicy = {
   cap: { enabled: false, maxPerHour: 10 },
   updateInPlace: false,
 };
+  maintenanceNotice: { enabled: false, leadMinutes: 120 },
+  escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
 
 /** The two typed numbers in the delivery section, bounded like the engine's. */
 const DELIVERY_BOUNDS = {
   windowMinutes: { min: 1, max: 1440, labelKey: "field.digest.window" },
   maxPerHour: { min: 1, max: 1000, labelKey: "field.cap.max" },
 };
+  leadMinutes: { min: 1, max: 10_080, labelKey: "field.maintenance-notice.lead" },
+  afterMinutes: { min: 1, max: 1440, labelKey: "field.escalation.after" },
 
 /**
  * A severity floor, in the same words in all three places one is chosen. Its
@@ -177,6 +181,46 @@ function FloorSelect({
 }
 
 /** Which providers the services card lists — the state, not the search. */
+/**
+ * The channel an escalation goes to, picked from the ones that can send. A
+ * channel the escalation still names but that has since been switched off stays
+ * in the list: hiding it would show an empty choice for something that is set,
+ * and the log already says the escalation cannot be sent.
+ */
+function ChannelSelect({
+  id,
+  label,
+  value,
+  channels,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  channels: { id: string; enabled: boolean }[];
+  onChange: (value: string) => void;
+}) {
+  const { t } = useTranslation();
+  const options = channels.filter((channel) => channel.enabled || channel.id === value);
+  return (
+    // `{...(value === "" ? {} : { value })}` rather than `value={undefined}`:
+    // an empty string is not a valid item value, and no value at all is what
+    // lets the placeholder show for an escalation that has no channel yet.
+    <Select {...(value === "" ? {} : { value })} onValueChange={onChange}>
+      <SelectTrigger id={id} className="w-56" aria-label={label}>
+        <SelectValue placeholder={t("field.escalation.channel.placeholder")} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((channel) => (
+          <SelectItem key={channel.id} value={channel.id}>
+            {t(`channel.name.${channel.id}`)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 type ServiceFilter = "all" | "enabled" | "disabled" | "muted";
 
 const SERVICE_FILTERS: {
@@ -285,6 +329,8 @@ function SettingsView() {
 
   useEffect(() => {
     return () => {
+  const [noticeLead_, setNoticeLead] = useState<number | undefined>(undefined);
+  const [escalationAfter_, setEscalationAfter] = useState<number | undefined>(undefined);
       if (debounce.current !== undefined) clearTimeout(debounce.current);
     };
   }, []);
@@ -338,6 +384,10 @@ function SettingsView() {
 
   /**
    * One field of the delivery policy at a time. The patch is partial at every
+  const maintenanceNotice = delivery.maintenanceNotice ?? DELIVERY_OFF.maintenanceNotice!;
+  const noticeLead = noticeLead_ ?? maintenanceNotice.leadMinutes;
+  const escalation = delivery.escalation ?? DELIVERY_OFF.escalation!;
+  const escalationAfter = escalationAfter_ ?? escalation.afterMinutes;
    * level, so a floor changed here cannot write back a window the operator is
    * still typing into.
    */
@@ -349,6 +399,8 @@ function SettingsView() {
   }): void => {
     toast("delivery", undefined);
     settingsMutation.mutate(
+    maintenanceNotice?: Partial<NonNullable<DeliveryPolicy["maintenanceNotice"]>>;
+    escalation?: Partial<NonNullable<DeliveryPolicy["escalation"]>>;
       { delivery: patch },
       {
         onSuccess: () =>
@@ -382,7 +434,11 @@ function SettingsView() {
     commitDelivery(
       field === "windowMinutes"
         ? { digest: { windowMinutes: value } }
-        : { cap: { maxPerHour: value } },
+        : field === "leadMinutes"
+          ? { maintenanceNotice: { leadMinutes: value } }
+          : field === "afterMinutes"
+            ? { escalation: { afterMinutes: value } }
+            : { cap: { maxPerHour: value } },
     );
   };
 
@@ -1288,6 +1344,95 @@ function SettingsView() {
                 }
               />
             </SettingRow>
+
+            <SettingRow
+              label={t("field.maintenance-notice")}
+              description={t("field.maintenance-notice.hint")}
+              align="top"
+            >
+              <Switch
+                id="maintenance-notice"
+                aria-label={t("field.maintenance-notice")}
+                checked={maintenanceNotice.enabled}
+                onCheckedChange={(next) =>
+                  commitDelivery({ maintenanceNotice: { enabled: next } })
+                }
+              />
+            </SettingRow>
+
+            <Reveal open={maintenanceNotice.enabled}>
+              <SettingRow label={t("field.maintenance-notice.lead")} align="top">
+                <NumberSetting
+                  id="maintenance-notice-lead"
+                  label={t("field.maintenance-notice.lead")}
+                  unit={t("unit.minutes")}
+                  min={DELIVERY_BOUNDS.leadMinutes.min}
+                  max={DELIVERY_BOUNDS.leadMinutes.max}
+                  value={noticeLead}
+                  onChange={setNoticeLead}
+                  onCommit={(value) =>
+                    commitDeliveryNumber("leadMinutes", value)
+                  }
+                  onFocus={fieldProps.onFocus}
+                  onBlur={fieldProps.onBlur}
+                />
+              </SettingRow>
+            </Reveal>
+
+            <SettingRow
+              label={t("field.escalation")}
+              description={t("field.escalation.hint")}
+              align="top"
+            >
+              <Switch
+                id="escalation"
+                aria-label={t("field.escalation")}
+                checked={escalation.enabled}
+                onCheckedChange={(next) =>
+                  commitDelivery({ escalation: { enabled: next } })
+                }
+              />
+            </SettingRow>
+
+            <Reveal open={escalation.enabled}>
+              <SettingRow label={t("field.escalation.after")} align="top">
+                <NumberSetting
+                  id="escalation-after"
+                  label={t("field.escalation.after")}
+                  unit={t("unit.minutes")}
+                  min={DELIVERY_BOUNDS.afterMinutes.min}
+                  max={DELIVERY_BOUNDS.afterMinutes.max}
+                  value={escalationAfter}
+                  onChange={setEscalationAfter}
+                  onCommit={(value) =>
+                    commitDeliveryNumber("afterMinutes", value)
+                  }
+                  onFocus={fieldProps.onFocus}
+                  onBlur={fieldProps.onBlur}
+                />
+              </SettingRow>
+              <SettingRow label={t("field.escalation.channel")} align="top">
+                <ChannelSelect
+                  id="escalation-channel"
+                  label={t("field.escalation.channel")}
+                  value={escalation.channel}
+                  channels={config.channels}
+                  onChange={(value) =>
+                    commitDelivery({ escalation: { channel: value } })
+                  }
+                />
+              </SettingRow>
+              <SettingRow label={t("field.escalation.floor")} align="top">
+                <FloorSelect
+                  id="escalation-floor"
+                  label={t("field.escalation.floor")}
+                  value={escalation.minSeverity}
+                  onChange={(value) =>
+                    commitDelivery({ escalation: { minSeverity: value } })
+                  }
+                />
+              </SettingRow>
+            </Reveal>
           </SettingsSection>
         )}
 

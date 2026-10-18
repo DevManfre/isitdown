@@ -59,6 +59,7 @@ const TEMPLATE: Record<StatusChangeKind, string> = {
   incident_resolved: "notification.incident.resolved",
   maintenance_started: "notification.maintenance.started",
   maintenance_ended: "notification.maintenance.ended",
+  maintenance_upcoming: "notification.maintenance.upcoming",
   monitoring_degraded: "notification.monitoring.degraded",
   correlated_outage: "notification.correlated.outage",
   silent_outage: "notification.silent.outage",
@@ -85,7 +86,8 @@ function accentFor(change: StatusChange): { emoji: string; color: number } {
   }
   if (
     change.kind === "maintenance_started" ||
-    change.kind === "maintenance_ended"
+    change.kind === "maintenance_ended" ||
+    change.kind === "maintenance_upcoming"
   ) {
     return { emoji: MAINTENANCE_EMOJI, color: MAINTENANCE_COLOR };
   }
@@ -93,6 +95,30 @@ function accentFor(change: StatusChange): { emoji: string; color: number } {
     emoji: emojiFor(change.currentStatus),
     color: COLOR[change.currentStatus],
   };
+}
+
+/**
+ * Whether this message should carry Ack and Mute (roadmap 3.1).
+ *
+ * Trouble that is still going, on a channel that can take the press — and
+ * nothing else. A recovery has nothing left to take in charge, a heads-up about
+ * maintenance or a slow page is not something to mute a provider over, and a
+ * digest is a batch whose buttons would have to say which of its members they
+ * mean. Decided here, once, so every channel that draws buttons draws them on
+ * the same messages.
+ */
+export function offersActions(payload: NotificationPayload): boolean {
+  if (payload.interactive !== true || payload.digest !== undefined) return false;
+  const { change } = payload;
+  switch (change.kind) {
+    case "status_change":
+    case "component_status_change":
+    case "incident_opened":
+    case "incident_updated":
+      return change.currentStatus !== "operational" && change.currentStatus !== "unknown";
+    default:
+      return false;
+  }
 }
 
 export function colorFor(change: StatusChange): number {
@@ -114,6 +140,24 @@ export function severityLabel(status: OverallStatus, locale: string): string {
  */
 function durationLabel(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+/**
+ * A span of minutes as a person would say it: "45 min" up to an hour and a half,
+ * "3 h" past it. Built here for the same reason `durationLabel` is — the unit
+ * switches with the value and the catalog cannot say that.
+ */
+function minutesLabel(minutes: number): string {
+  return minutes < 90 ? `${Math.max(1, Math.round(minutes))} min` : `${Math.round(minutes / 60)} h`;
+}
+
+/** How long a declared window is expected to last, or the catalog's "not stated". */
+function plannedDuration(change: StatusChange, locale: string): string {
+  const window = change.maintenance;
+  const starts = window === undefined ? Number.NaN : Date.parse(window.startsAt);
+  const ends = window?.endsAt == null ? Number.NaN : Date.parse(window.endsAt);
+  if (Number.isNaN(starts) || Number.isNaN(ends) || ends <= starts) return t(locale, "maintenance.no-end");
+  return minutesLabel((ends - starts) / 60_000);
 }
 
 /** Translates a provider's own lifecycle word, leaving an unknown one visible. */
@@ -235,6 +279,11 @@ function summarise(payload: NotificationPayload): string {
     case "maintenance_ended":
       return t(locale, "notification.digest.maintenance-ended", {
         title: change.maintenance?.name ?? "",
+      });
+    case "maintenance_upcoming":
+      return t(locale, "notification.digest.maintenance-upcoming", {
+        title: change.maintenance?.name ?? "",
+        startsIn: minutesLabel(change.startsInMinutes ?? 0),
       });
     case "monitoring_degraded":
       return t(locale, "notification.digest.monitoring", {
@@ -402,6 +451,9 @@ function render(
     providers: (change.correlated?.providerIds ?? []).join(", "),
     cause: change.correlated?.cause ?? "",
     minutes: change.correlated?.windowMinutes ?? 0,
+    startsIn: minutesLabel(change.startsInMinutes ?? 0),
+    startsAt: formatUtc(change.maintenance?.startsAt ?? change.at),
+    duration: plannedDuration(change, locale),
     probe: change.crossCheck?.probeId ?? "",
     note: change.crossCheck?.note ?? "",
     latency: durationLabel(change.latency?.latencyMs ?? 0),
@@ -434,6 +486,10 @@ function render(
  */
 function withSuppressed(message: string, payload: NotificationPayload): string {
   const count = payload.suppressedCount ?? 0;
-  if (count <= 0) return message;
-  return `${message}\n\n${suppressedLine(count, payload.locale)}`;
+  const withCount = count <= 0 ? message : `${message}\n\n${suppressedLine(count, payload.locale)}`;
+  // The escalation's own line (roadmap 3.2), after the cap's: also not about the
+  // change but about how it came to be said a second time, and appended for the
+  // same reason — a template has no token for it, so it cannot be templated away.
+  if (payload.escalated === undefined) return withCount;
+  return `${withCount}\n\n${t(payload.locale, "notification.escalated", { minutes: payload.escalated.afterMinutes })}`;
 }

@@ -287,9 +287,35 @@ export const alertCapSchema = z.object({
  * block and the UI edition's settings rows, so the two editions cannot disagree
  * about what a valid policy is.
  */
+/**
+ * Heads-up before a declared maintenance window (roadmap 3.3). Capped at a week:
+ * providers publish windows days ahead, but a notice a fortnight early is one
+ * nobody still remembers when the day comes.
+ */
+export const maintenanceNoticeSchema = z.object({
+  enabled: z.boolean().default(false),
+  leadMinutes: z.number().int().positive().max(10_080).default(120),
+});
+
+/**
+ * Escalation (roadmap 3.2). Capped at a day: a change nobody has answered in
+ * twenty-four hours is not an escalation, it is a different problem. `channel`
+ * is a free string rather than a channel enum — which channels exist is the
+ * configuration's business, and a stale name is caught where the escalation
+ * runs, with the channel in the message, not here with a bare enum error.
+ */
+export const escalationSchema = z.object({
+  enabled: z.boolean().default(false),
+  afterMinutes: z.number().int().positive().max(1440).default(15),
+  channel: z.string().trim().max(64).default(""),
+  minSeverity: z.enum(SEVERITY_FLOORS).default("major_outage"),
+});
+
 export const deliverySchema = z.object({
   quietHours: quietHoursSchema.default({}),
   digest: digestSchema.default({}),
   cap: alertCapSchema.default({}),
   updateInPlace: z.boolean().default(false),
+  maintenanceNotice: maintenanceNoticeSchema.default({}),
+  escalation: escalationSchema.default({}),
 });

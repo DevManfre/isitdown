@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { I18nextProvider } from "react-i18next";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -1445,6 +1445,110 @@ describe("Settings retention", () => {
       );
     });
 
+    it("turns the maintenance heads-up on, then saves its lead on blur", async () => {
+      renderSettings("delivery", fixtures);
+      const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+      expect(screen.queryByLabelText(i18n.t("field.maintenance-notice.lead"))).toBeNull();
+      await userEvent.click(await screen.findByLabelText(i18n.t("field.maintenance-notice")));
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          { path: "/config/settings", method: "PATCH", body: { delivery: { maintenanceNotice: { enabled: true } } } },
+        ]),
+      );
+
+      const on = {
+        ...fixtures,
+        config: {
+          ...config,
+          delivery: {
+            quietHours: { enabled: false, start: "23:00", end: "07:00", timeZone: "auto", minSeverity: "major_outage" as const },
+            digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" as const },
+            cap: { enabled: false, maxPerHour: 10 },
+            updateInPlace: false,
+            maintenanceNotice: { enabled: true, leadMinutes: 120 },
+          },
+        },
+      };
+      cleanup();
+      renderSettings("delivery", on);
+      const more = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+      const field = await screen.findByLabelText(i18n.t("field.maintenance-notice.lead"));
+      expect(field).toHaveValue(120);
+      await userEvent.clear(field);
+      await userEvent.type(field, "60");
+      await userEvent.tab();
+      await waitFor(() =>
+        expect(writesIn(more)).toEqual([
+          { path: "/config/settings", method: "PATCH", body: { delivery: { maintenanceNotice: { leadMinutes: 60 } } } },
+        ]),
+      );
+    });
+
+    it("turns escalation on, and only then asks for how long, where to, and how bad", async () => {
+      renderSettings("delivery", fixtures);
+      const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+      expect(screen.queryByLabelText(i18n.t("field.escalation.after"))).toBeNull();
+      await userEvent.click(await screen.findByLabelText(i18n.t("field.escalation")));
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          { path: "/config/settings", method: "PATCH", body: { delivery: { escalation: { enabled: true } } } },
+        ]),
+      );
+    });
+
+    it("saves the escalation wait on blur, and nothing else with it", async () => {
+      const on = {
+        ...fixtures,
+        config: {
+          ...config,
+          delivery: {
+            quietHours: { enabled: false, start: "23:00", end: "07:00", timeZone: "auto", minSeverity: "major_outage" as const },
+            digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" as const },
+            cap: { enabled: false, maxPerHour: 10 },
+            updateInPlace: false,
+            escalation: { enabled: true, afterMinutes: 15, channel: "", minSeverity: "major_outage" as const },
+          },
+        },
+      };
+      renderSettings("delivery", on);
+      const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+      const field = await screen.findByLabelText(i18n.t("field.escalation.after"));
+      expect(field).toHaveValue(15);
+      await userEvent.clear(field);
+      await userEvent.type(field, "30");
+      await userEvent.tab();
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          { path: "/config/settings", method: "PATCH", body: { delivery: { escalation: { afterMinutes: 30 } } } },
+        ]),
+      );
+      // No channel chosen yet: the trigger shows the prompt, not an empty box.
+      expect(await screen.findByText(i18n.t("field.escalation.channel.placeholder"))).toBeTruthy();
+    });
+
+    it("refuses an escalation wait outside its bounds without calling the server", async () => {
+      const on = {
+        ...fixtures,
+        config: {
+          ...config,
+          delivery: {
+            quietHours: { enabled: false, start: "23:00", end: "07:00", timeZone: "auto", minSeverity: "major_outage" as const },
+            digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" as const },
+            cap: { enabled: false, maxPerHour: 10 },
+            updateInPlace: false,
+            escalation: { enabled: true, afterMinutes: 15, channel: "", minSeverity: "major_outage" as const },
+          },
+        },
+      };
+      renderSettings("delivery", on);
+      const calls = interceptWrites({});
+      const field = await screen.findByLabelText(i18n.t("field.escalation.after"));
+      await userEvent.clear(field);
+      await userEvent.type(field, "5000");
+      await userEvent.tab();
+      expect(writesIn(calls)).toEqual([]);
+    });
+
     it("reads a server that answers without a delivery policy as everything off", async () => {
       // A payload from before the policy existed. The section still renders,
       // and renders as off rather than as a page of undefined controls.
@@ -1454,6 +1558,8 @@ describe("Settings retention", () => {
       expect(await screen.findByLabelText(i18n.t("field.digest"))).not.toBeChecked();
       expect(await screen.findByLabelText(i18n.t("field.cap"))).not.toBeChecked();
       expect(await screen.findByLabelText(i18n.t("field.update-in-place"))).not.toBeChecked();
+      expect(await screen.findByLabelText(i18n.t("field.maintenance-notice"))).not.toBeChecked();
+      expect(await screen.findByLabelText(i18n.t("field.escalation"))).not.toBeChecked();
     });
   });
 

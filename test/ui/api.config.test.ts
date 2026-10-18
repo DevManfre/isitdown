@@ -1014,6 +1014,8 @@ test("GET /config reports the delivery policy, and an unconfigured one reads as 
       digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" },
       cap: { enabled: false, maxPerHour: 10 },
       updateInPlace: false,
+      maintenanceNotice: { enabled: false, leadMinutes: 120 },
+      escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
     });
   } finally {
     await it.close();
@@ -1066,6 +1068,8 @@ test("a digest and a cap survive the round trip through the setting rows", async
         digest: { enabled: true, windowMinutes: 45, immediateFloor: "partial_outage" },
         cap: { enabled: true, maxPerHour: 6 },
         updateInPlace: true,
+        maintenanceNotice: { enabled: true, leadMinutes: 45 },
+        escalation: { enabled: true, afterMinutes: 20, channel: "pushover", minSeverity: "partial_outage" },
       },
     });
 
@@ -1077,6 +1081,13 @@ test("a digest and a cap survive the round trip through the setting rows", async
     });
     assert.deepEqual(config.delivery.cap, { enabled: true, maxPerHour: 6 });
     assert.equal(config.delivery.updateInPlace, true);
+    assert.deepEqual(config.delivery.maintenanceNotice, { enabled: true, leadMinutes: 45 });
+    assert.deepEqual(config.delivery.escalation, {
+      enabled: true,
+      afterMinutes: 20,
+      channel: "pushover",
+      minSeverity: "partial_outage",
+    });
   } finally {
     await it.close();
   }

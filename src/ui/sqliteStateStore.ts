@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { DaySegment } from "./calendarDays.ts";
 import type { PollCycle } from "./coverage.ts";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
+import type { AckRecord } from "../core/ackStore.interface.ts";
 import type { ProviderRuntimeState, SaveStatusMeta } from "../core/stateStore.interface.ts";
 import {
   componentStatusSchema,
@@ -437,6 +438,13 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
   const deleteMessageRef = db.prepare(
     "DELETE FROM message_refs WHERE channel = ? AND provider_id = ? AND incident_id = ?",
   );
+  // Acknowledgements (roadmap 3.1). `OR IGNORE` is the "first hand wins" rule:
+  // the insert changing no row is how `acknowledge` knows it was a second press.
+  const insertAck = db.prepare(
+    "INSERT OR IGNORE INTO acks (provider_id, acked_at, acked_by) VALUES (?, ?, ?)",
+  );
+  const selectAck = db.prepare("SELECT acked_at, acked_by FROM acks WHERE provider_id = ?");
+  const deleteAck = db.prepare("DELETE FROM acks WHERE provider_id = ?");
   const selectEarliestSampleTime = db.prepare(
     "SELECT MIN(observed_at) AS earliest FROM status_samples WHERE provider_id = ?",
   );
@@ -617,6 +625,21 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
 
     async forgetRef(channel: string, providerId: string, incidentId: string): Promise<void> {
       deleteMessageRef.run(channel, providerId, incidentId);
+    },
+
+    async acknowledge(providerId: string, by: string, at: string): Promise<boolean> {
+      return insertAck.run(providerId, at, by).changes > 0;
+    },
+
+    async getAck(providerId: string): Promise<AckRecord | null> {
+      const row = selectAck.get(providerId);
+      if (row === undefined) return null;
+      const parsed = z.object({ acked_at: z.string(), acked_by: z.string() }).parse(row);
+      return { ackedAt: parsed.acked_at, ackedBy: parsed.acked_by };
+    },
+
+    async clearAck(providerId: string): Promise<void> {
+      deleteAck.run(providerId);
     },
 
     async recordNotification(record: SentRecord): Promise<void> {

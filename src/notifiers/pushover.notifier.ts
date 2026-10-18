@@ -47,7 +47,14 @@ export function createPushoverNotifier(settings: Record<string, string>): Notifi
         message: detail === "" ? heading : detail,
         url,
         url_title: payload.service.name,
-        priority: String(PRIORITY[payload.change.currentStatus]),
+        // An escalated message is the one already sent once and left unanswered
+        // (roadmap 3.2), so it is never quieter than "high" whatever the status
+        // underneath says.
+        priority: String(
+          payload.escalated === undefined
+            ? PRIORITY[payload.change.currentStatus]
+            : Math.max(1, PRIORITY[payload.change.currentStatus]),
+        ),
       });
       if (device !== "") form.set("device", device);
 

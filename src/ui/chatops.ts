@@ -1,5 +1,5 @@
 import type { ChatHistory, ChatopsBackend, ChatProvider } from "../core/chatops/backend.interface.ts";
-import { handleMessage } from "../core/chatops/execute.ts";
+import { handleCallback, handleMessage } from "../core/chatops/execute.ts";
 import { isActive } from "../core/maintenance.ts";
 import { offsetSegments, resolveZone, shiftDay, zonedDayKey } from "./calendarDays.ts";
 import type { MaintenanceWindow } from "../core/types.ts";
@@ -118,6 +118,14 @@ export function createChatopsBackend(runtime: UiRuntimeCore): ChatopsBackend {
         throw new Error(`no provider called ${providerId}`);
       }
     },
+
+    async ack(providerId: string, by: string): Promise<{ newly: boolean; by: string; at: string }> {
+      const at = new Date().toISOString();
+      if (await runtime.store.acknowledge(providerId, by, at)) return { newly: true, by, at };
+      // Somebody got there first: report them, not the press that lost the race.
+      const first = await runtime.store.getAck(providerId);
+      return { newly: false, by: first?.ackedBy ?? by, at: first?.ackedAt ?? at };
+    },
   };
 }
 
@@ -172,6 +180,7 @@ export async function createChatops(runtime: UiRuntimeCore): Promise<TelegramBot
     botToken: settings.botToken,
     allowedChatIds: settings.allowedChatIds,
     logger: runtime.logger,
-    onCommand: (text) => handleMessage({ backend, locale, text }),
+    onCommand: (text, by) => handleMessage({ backend, locale, text, by }),
+    onCallback: (data, by) => handleCallback({ backend, locale, data, by }),
   });
 }

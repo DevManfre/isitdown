@@ -1,3 +1,4 @@
+import type { AckStore } from "./ackStore.interface.ts";
 import type { Adapter, ReadingNote } from "./adapter.interface.ts";
 import {
   configuredIntervalMinutes,
@@ -10,9 +11,11 @@ import {
   isMuted,
   silentOutage,
   slowStatusPage,
+  upcomingMaintenance,
   worseningsIn,
   type WorseningReading,
 } from "./diffEngine.ts";
+import { DELIVERY_DEFAULTS } from "./delivery.ts";
 import { pushLatency } from "./latency.ts";
 import { activeWindows } from "./maintenance.ts";
 import { RetryAfterError, type StatusPageRead } from "./http.ts";
@@ -198,6 +201,12 @@ export interface PollerDeps {
    * probe's reading is this container's alone, which is how it always was.
    */
   outposts?: Outpost[] | undefined;
+  /**
+   * Where "I'm on it" is kept (roadmap 3.1). The poller's one job with it is to
+   * let go: an acknowledgement belongs to a stretch of trouble, and the poller is
+   * what sees that stretch end. Absent in the Light edition, which has none.
+   */
+  acks?: AckStore | undefined;
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -218,6 +227,7 @@ export function createPoller(deps: PollerDeps): Poller {
   const sleep = deps.sleep ?? realSleep;
   const now = deps.now ?? Date.now;
   const outposts = deps.outposts ?? [];
+  const acks = deps.acks;
 
   /**
    * When each provider was last reached for, attempt or not. Kept here rather
@@ -266,6 +276,13 @@ export function createPoller(deps: PollerDeps): Poller {
   const slowStreak = new Map<string, number>();
   /** Pages whose slowness has been announced, so a slow hour is one alert. */
   const slowAnnounced = new Set<string>();
+  /**
+   * Maintenance windows already announced ahead of time, per provider (roadmap
+   * 3.3). In memory like the slow-page set above: a restart inside the lead
+   * costs one repeated heads-up, which is the side of the trade an operator
+   * would pick over a heads-up that was lost.
+   */
+  const announcedWindows = new Map<string, Set<string>>();
 
   async function attemptFetch(
     service: ServiceDefinition,
@@ -512,6 +529,18 @@ export function createPoller(deps: PollerDeps): Poller {
       adapterVersion: getAdapter(service.adapter).version ?? 1,
     });
     await store.saveNotifyState(service.id, gate.baseline, gate.pending);
+    // The trouble an acknowledgement was given for is over once the provider is
+    // calm *and* has nothing open — the same two things `inTrouble` reads. Judged
+    // on the reading rather than on a resolving change, because a mute or a
+    // maintenance window swallows that change, and an acknowledgement left
+    // behind would silence the escalation of the next, unrelated outage.
+    if (
+      acks !== undefined &&
+      outcome.status.overallStatus === "operational" &&
+      outcome.status.activeIncidents.length === 0
+    ) {
+      await acks.clearAck(service.id);
+    }
     await trackFreshness(service, before, outcome.status);
     if (before.failureCount > 0) await store.clearFailures(service.id);
     if (before.degradedNotified)
@@ -856,6 +885,61 @@ export function createPoller(deps: PollerDeps): Poller {
     return changes;
   }
 
+  /**
+   * Declared windows about to open — roadmap 3.3.
+   *
+   * Said once per window, when the first reading finds it inside the lead. The
+   * mute and a window already running both mean "I know" and are answered here
+   * as they are everywhere else — and answered *before* the window is marked as
+   * said, so lifting a mute still gets the operator the heads-up they asked
+   * not to hear while it was on.
+   */
+  function judgeUpcoming(results: ProviderResult[], config: RuntimeConfig): StatusChange[] {
+    const notice = (config.delivery ?? DELIVERY_DEFAULTS).maintenanceNotice;
+    if (!notice.enabled) {
+      announcedWindows.clear();
+      return [];
+    }
+
+    const changes: StatusChange[] = [];
+    for (const result of results) {
+      if (!result.ok || result.status === undefined) continue;
+      const service = config.services.find((candidate) => candidate.id === result.providerId);
+      if (service === undefined) continue;
+      const { status } = result;
+
+      // Forgotten once the provider stops listing it, so a window id reused a
+      // month later is announced again rather than treated as already said.
+      const listed = new Set(status.maintenances.map((window) => window.id));
+      const said = new Set([...(announcedWindows.get(service.id) ?? [])].filter((id) => listed.has(id)));
+      announcedWindows.set(service.id, said);
+
+      if (isMuted(service.mutedUntil, status.fetchedAt)) continue;
+      if (activeWindows(status).length > 0) continue;
+      for (const change of upcomingMaintenance({
+        status,
+        leadMinutes: notice.leadMinutes,
+        at: status.fetchedAt,
+      })) {
+        const id = change.maintenance?.id;
+        if (id === undefined || said.has(id)) continue;
+        said.add(id);
+        logger.info("a maintenance window is about to open", {
+          providerId: service.id,
+          windowId: id,
+          startsInMinutes: change.startsInMinutes,
+        });
+        changes.push(change);
+      }
+    }
+    // A provider removed from configuration must not keep its memory.
+    const known = new Set(config.services.map((service) => service.id));
+    for (const id of announcedWindows.keys()) {
+      if (!known.has(id)) announcedWindows.delete(id);
+    }
+    return changes;
+  }
+
   return {
     async nextIntervalMinutes(config: RuntimeConfig): Promise<number> {
       let shortest = config.polling.intervalMinutes;
@@ -985,6 +1069,7 @@ export function createPoller(deps: PollerDeps): Poller {
       }
 
       changes.push(...judgeLatency(results, config));
+      changes.push(...judgeUpcoming(results, config));
 
       const correlated = foldCorrelated(changes, config, finishedAt);
       if (correlated !== null) {

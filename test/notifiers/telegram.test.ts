@@ -143,3 +143,99 @@ test("an edit Telegram refuses is reported rather than swallowed", async () => {
     stub.restore();
   }
 });
+
+// Roadmap 3.1: Ack and Mute on the message itself.
+const interactiveDegraded: NotificationPayload = { ...degraded, interactive: true };
+
+test("an interactive message carries Ack and Mute 2h, addressed to its provider", async () => {
+  const stub = stubFetch(() => jsonResponse({ ok: true, result: { message_id: 1 } }));
+  try {
+    await createTelegramNotifier(settings).send(interactiveDegraded);
+  } finally {
+    stub.restore();
+  }
+  const body = stub.requests[0]?.body as { reply_markup?: { inline_keyboard: { text: string; callback_data: string }[][] } };
+  assert.deepEqual(
+    body.reply_markup?.inline_keyboard.flat().map((button) => button.callback_data),
+    ["ack:github", "mute:github:120"],
+  );
+  assert.deepEqual(
+    body.reply_markup?.inline_keyboard.flat().map((button) => button.text),
+    ["✅ I'm on it", "🔕 Mute 2h"],
+  );
+});
+
+test("the buttons speak the message's own language", async () => {
+  const stub = stubFetch(() => jsonResponse({ ok: true, result: { message_id: 1 } }));
+  try {
+    await createTelegramNotifier(settings).send({ ...interactiveDegraded, locale: "it" });
+  } finally {
+    stub.restore();
+  }
+  const body = stub.requests[0]?.body as { reply_markup: { inline_keyboard: { text: string }[][] } };
+  assert.deepEqual(
+    body.reply_markup.inline_keyboard.flat().map((button) => button.text),
+    ["✅ Preso in carico", "🔕 Silenzia 2h"],
+  );
+});
+
+test("a message that is not interactive, or is a recovery, has no keyboard at all", async () => {
+  const stub = stubFetch(() => jsonResponse({ ok: true, result: { message_id: 1 } }));
+  try {
+    await createTelegramNotifier(settings).send(degraded);
+    await createTelegramNotifier(settings).send({ ...resolved, interactive: true });
+  } finally {
+    stub.restore();
+  }
+  for (const request of stub.requests) {
+    assert.equal("reply_markup" in (request.body as object), false);
+  }
+});
+
+test("a provider id too long for a button gets the message without one, not a broken button", async () => {
+  const stub = stubFetch(() => jsonResponse({ ok: true, result: { message_id: 1 } }));
+  const long = "p".repeat(80);
+  try {
+    await createTelegramNotifier(settings).send({
+      ...interactiveDegraded,
+      change: { ...interactiveDegraded.change, providerId: long },
+    });
+  } finally {
+    stub.restore();
+  }
+  assert.equal("reply_markup" in (stub.requests[0]?.body as object), false);
+});
+
+test("editing an incident's message keeps its buttons", async () => {
+  const stub = stubFetch(() => jsonResponse({ ok: true, result: { message_id: 1 } }));
+  const updated: NotificationPayload = {
+    ...interactiveDegraded,
+    change: {
+      kind: "incident_updated",
+      providerId: "github",
+      currentStatus: "major_outage",
+      incident: { id: "i1", name: "API", impact: "major", status: "identified", updatedAt: "2026-08-19T14:40:00.000Z" },
+      at: "2026-08-19T14:40:00.000Z",
+    },
+  };
+  try {
+    await createTelegramNotifier(settings).update!(updated, "55");
+  } finally {
+    stub.restore();
+  }
+  const body = stub.requests[0]?.body as { reply_markup?: { inline_keyboard: unknown[][] } };
+  assert.equal(body.reply_markup?.inline_keyboard.flat().length, 2);
+});
+
+test("the message that resolves an incident edits the buttons away", async () => {
+  const stub = stubFetch(() => jsonResponse({ ok: true, result: { message_id: 1 } }));
+  try {
+    await createTelegramNotifier(settings).update!({ ...resolved, interactive: true }, "55");
+  } finally {
+    stub.restore();
+  }
+  // An empty keyboard is how Telegram is told to remove one; omitting the field
+  // would leave the old buttons under a message that says the trouble is over.
+  const body = stub.requests[0]?.body as { reply_markup?: { inline_keyboard: unknown[][] } };
+  assert.deepEqual(body.reply_markup, { inline_keyboard: [] });
+});

@@ -92,6 +92,8 @@ export const STATUS_CHANGE_KINDS = [
   "incident_resolved",
   "maintenance_started",
   "maintenance_ended",
+  // A declared window that has not opened yet (roadmap 3.3).
+  "maintenance_upcoming",
   "monitoring_degraded",
   "correlated_outage",
   "silent_outage",
@@ -117,10 +119,16 @@ export interface StatusChange {
   component?: { id: string; name: string } | undefined;
   /** Present for monitoring_degraded only. */
   failureCount?: number | undefined;
-  /** Present on both maintenance_* kinds. */
+  /** Present on every maintenance_* kind. */
   maintenance?: MaintenanceWindow | undefined;
   /** Present on maintenance_ended only: incidents still open as it closed. */
   openIncidents?: number | undefined;
+  /**
+   * Present on maintenance_upcoming only: whole minutes until the window opens,
+   * rounded up so "starts in 0 minutes" is never said about a window that has
+   * not started.
+   */
+  startsInMinutes?: number | undefined;
   /**
    * Present for correlated_outage only (roadmap 2.7): every provider that
    * went bad inside the window, the change's own provider included, and how
@@ -295,6 +303,22 @@ export interface NotificationPayload {
    * has stopped working.
    */
   suppressedCount?: number | undefined;
+  /**
+   * Whether the channel this message is going to can take a press on a button
+   * (roadmap 3.1). Set by the dispatcher from what the edition says it is
+   * listening for, never by a notifier: whether a button would *work* is a fact
+   * about the edition, and a notifier that guessed would draw buttons that do
+   * nothing. Absent is the normal case and means no buttons, byte for byte.
+   */
+  interactive?: boolean | undefined;
+  /**
+   * Set when this message is the *second* telling of a change nobody took in
+   * charge (roadmap 3.2): how long the first one went unanswered. Rendered as a
+   * trailing line like the suppressed count — the change underneath is the one
+   * already sent, unedited, so the escalation reads as "this, again" rather than
+   * as news of its own.
+   */
+  escalated?: { afterMinutes: number } | undefined;
   /**
    * Set when this message is a digest (roadmap 3.12): `change` is then its most
    * severe member, kept so a channel that colours or badges a message by

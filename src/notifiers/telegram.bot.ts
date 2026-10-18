@@ -26,8 +26,22 @@ const LONG_POLL_SECONDS = 50;
 /** After a failed poll, before trying again — a provider outage must not become a hot loop. */
 const RETRY_DELAY_MS = 5_000;
 
+/** Telegram refuses a button's confirmation toast longer than this. */
+const TOAST_MAX_CHARS = 200;
+
 const updateSchema = z.object({
   update_id: z.number(),
+  // A press on one of the buttons a notification carries (roadmap 3.1). `message`
+  // is absent when the press came from an inline-mode message, which this bot
+  // never sends — such a press has no chat to authorise and is ignored.
+  callback_query: z
+    .object({
+      id: z.string(),
+      data: z.string().optional(),
+      from: z.object({ id: z.union([z.number(), z.string()]), username: z.string().optional() }),
+      message: z.object({ chat: z.object({ id: z.union([z.number(), z.string()]) }) }).optional(),
+    })
+    .optional(),
   message: z
     .object({
       text: z.string().optional(),
@@ -57,8 +71,22 @@ export interface TelegramBotOptions {
    * whoever is probing it.
    */
   allowedChatIds: readonly string[];
-  /** Returns the reply text, or `null` to stay silent. */
-  onCommand: (text: string) => Promise<string | null>;
+  /**
+   * Returns the reply text, or `null` to stay silent. `by` names who sent it, the
+   * way a button press names its presser, for the commands that record somebody.
+   */
+  onCommand: (text: string, by: string) => Promise<string | null>;
+  /**
+   * Handles a press on a notification's button (roadmap 3.1): the button's data
+   * and who pressed it. Returns the reply, or `null` for data that is not an
+   * action. Absent means the bot ignores presses entirely, which is what a bot
+   * built before buttons existed did.
+   *
+   * Authorised exactly like a command — by the chat the button sits in — and for
+   * the same reason: a button is only as trustworthy as the chat it was posted
+   * to, and anybody who could press it could type `/ack` there anyway.
+   */
+  onCallback?: ((data: string, by: string) => Promise<string | null>) | undefined;
   logger: Logger;
 }
 
@@ -101,18 +129,34 @@ export function createTelegramBot(options: TelegramBotOptions): TelegramBot {
     return parsed;
   }
 
+  /** How a person is named in what gets recorded: their handle, else their id. */
+  const nameOf = (from: { id: number | string; username?: string | undefined } | undefined): string =>
+    from === undefined ? "telegram" : `telegram:${from.username ?? String(from.id)}`;
+
   async function reply(chatId: string, text: string): Promise<void> {
     await call("sendMessage", { chat_id: chatId, text, disable_web_page_preview: true });
+  }
+
+  /**
+   * Stops the spinner on the pressed button, with a short toast when there is
+   * something to say. Always sent for an authorised press, answered or not: a
+   * button that spins for half a minute reads as a bot that has crashed.
+   */
+  async function answerPress(callbackQueryId: string, text: string | null): Promise<void> {
+    await call("answerCallbackQuery", {
+      callback_query_id: callbackQueryId,
+      ...(text === null ? {} : { text: text.slice(0, TOAST_MAX_CHARS) }),
+    });
   }
 
   async function pollOnce(): Promise<number> {
     const raw = await call("getUpdates", {
       offset,
       timeout: LONG_POLL_SECONDS,
-      // Only messages: this bot has no buttons and no inline mode, and asking
-      // for the rest would mean receiving edits and reactions it would have to
-      // decide to ignore.
-      allowed_updates: ["message"],
+      // Messages, and the presses on the buttons a notification carries. Not the
+      // rest: asking for edits and reactions would mean receiving things this
+      // bot would have to decide to ignore.
+      allowed_updates: ["message", "callback_query"],
     });
     const parsed = updatesSchema.parse(raw);
     if (!parsed.ok) throw new Error(`telegram getUpdates rejected: ${parsed.description ?? "unknown reason"}`);
@@ -124,6 +168,28 @@ export function createTelegramBot(options: TelegramBotOptions): TelegramBot {
       // cost of the other choice is one lost reply; the cost of this one is an
       // infinite loop that never polls anything again.
       offset = Math.max(offset, update.update_id + 1);
+
+      const press = update.callback_query;
+      if (press !== undefined) {
+        if (options.onCallback === undefined || press.message === undefined) continue;
+        const pressChat = String(press.message.chat.id);
+        if (!allowed.has(pressChat)) {
+          options.logger.warn("ignored a telegram button press from a chat that is not allowed to send one", {
+            chatId: pressChat,
+            username: press.from.username,
+          });
+          continue;
+        }
+        const outcome = await options.onCallback(press.data ?? "", nameOf(press.from));
+        await answerPress(press.id, outcome);
+        if (outcome === null) continue;
+        // Said to the chat as well as to the button: taking something in charge
+        // is for the rest of the team to see, and a toast is seen by one person.
+        await reply(pressChat, outcome);
+        handled += 1;
+        continue;
+      }
+
       const message = update.message;
       const text = message?.text;
       if (message === undefined || text === undefined) continue;
@@ -137,7 +203,7 @@ export function createTelegramBot(options: TelegramBotOptions): TelegramBot {
         continue;
       }
 
-      const answer = await options.onCommand(text);
+      const answer = await options.onCommand(text, nameOf(message.from));
       if (answer === null) continue;
       await reply(chatId, answer);
       handled += 1;
