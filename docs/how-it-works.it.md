@@ -127,6 +127,7 @@ casi limite si aggiungono come righe invece che come test isolati.
 | qualunque | `unknown` | **nessun** `status_change` — una transizione *verso* "non lo sappiamo" non è una novità |
 | N cicli falliti consecutivi | | sì, **una volta** — `monitoring_degraded`, e non di nuovo finché un successo non lo azzera |
 | nessuna finestra in corso | inizia una finestra dichiarata | sì — `maintenance_started` |
+| una finestra dichiarata dista meno di `maintenanceNotice.leadMinutes` dall'inizio | la prima lettura che la vede (disattivato per default) | sì, **una volta** per finestra — `maintenance_upcoming`, prima che la finestra si apra e non quando lo fa |
 | una finestra in corso | la stessa finestra termina | sì — `maintenance_ended`, con lo stato in cui il provider è uscito |
 | una finestra in corso | qualunque altra cosa cambia a monte (stato, componenti, incidenti) | **no** — soppressa finché la finestra non termina |
 | un silenziamento in corso (`mutedUntil` nel futuro) | qualunque cosa | **no** — l'operatore ha detto che già lo sa; polling e registrazione continuano |
