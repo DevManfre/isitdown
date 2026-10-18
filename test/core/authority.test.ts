@@ -22,7 +22,7 @@ test("the probes this build ships are the only ones that are not pages", () => {
     .filter((adapter) => adapter.kind === "probe")
     .map((adapter) => adapter.id)
     .sort();
-  assert.deepEqual(probes, ["dns", "docker", "http", "icmp", "registry", "tcp"]);
+  assert.deepEqual(probes, ["dns", "docker", "http", "icmp", "registry", "sequence", "tcp"]);
 });
 
 test("an operator's own answer wins over the adapter's", () => {

@@ -66,6 +66,10 @@ const ASSETS = "dist/ui/public/assets";
  * four new strings in six catalogs and the badge that shows them. The same
  * remedy again.
  *
+ * It moved 553,500 -> 563,500 (540.5 -> 550.3 kB) for the sequence probe and the
+ * tcp `check` option (roadmap 2.14, 2.15): their form fields and about forty
+ * strings in six catalogs. Measured: 535.8 kB before, 542.5 kB after.
+ *
  * It moved 533,875 -> 537,400 (521.4 -> 524.8 kB) for roadmap 1.10, 1.11 and
  * 1.12. Measured: 520.7 kB before them, 524.1 kB after — 3.4 kB gzipped, most of
  * it the twenty-odd new strings in six catalogs (the watchdog's form explains
@@ -89,7 +93,7 @@ const ASSETS = "dist/ui/public/assets";
  * before them, 535.8 kB after, mostly the new strings in six catalogs. The same
  * remedy again.
  */
-export const BUDGET = { js: 553_500, css: 20_000 };
+export const BUDGET = { js: 563_500, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

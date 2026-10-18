@@ -64,6 +64,7 @@ const ADAPTER_FAMILIES: { title: string; adapters: { id: string; hint: string; n
     title: "adapter.family.probe",
     adapters: [
       { id: "http", hint: "adapter.hint.http", note: "add.note.http" },
+      { id: "sequence", hint: "adapter.hint.sequence", note: "add.note.sequence" },
       { id: "tcp", hint: "adapter.hint.tcp", note: "add.note.tcp" },
       { id: "dns", hint: "adapter.hint.dns", note: "add.note.dns" },
       { id: "registry", hint: "adapter.hint.registry", note: "add.note.registry" },

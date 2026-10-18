@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { SEQUENCE_ADAPTER, SequenceOptions } from "./SequenceOptions.tsx";
 
 /**
  * The adapter that reads a page's markup instead of a machine-readable
@@ -58,7 +59,20 @@ const PROBE_METHODS = ["GET", "HEAD"] as const;
  * a base url — only the operator knows which port, or which record, is the one
  * that matters — so each grows its own small block of fields.
  */
+export { SEQUENCE_ADAPTER };
 export const TCP_ADAPTER = "tcp";
+
+/** The handshakes the tcp probe can make beyond a bare connect (roadmap 2.15). */
+const TCP_CHECKS = ["connect", "tls", "smtp", "websocket", "grpc"] as const;
+
+/** Their labels, written out as literal keys so the catalog tests can see each one rendered. */
+const TCP_CHECK_LABELS: Record<(typeof TCP_CHECKS)[number], string> = {
+  connect: "tcp.check-connect",
+  tls: "tcp.check-tls",
+  smtp: "tcp.check-smtp",
+  websocket: "tcp.check-websocket",
+  grpc: "tcp.check-grpc",
+};
 export const DNS_ADAPTER = "dns";
 /** The package registry / CDN probe (roadmap 2.13). */
 export const REGISTRY_ADAPTER = "registry";
@@ -130,6 +144,7 @@ export const hasAdapterOptions = (adapter: string): boolean =>
   adapter === JSON_ADAPTER ||
   adapter === PROBE_ADAPTER ||
   adapter === TCP_ADAPTER ||
+  adapter === SEQUENCE_ADAPTER ||
   adapter === DNS_ADAPTER ||
   adapter === IMAP_ADAPTER ||
   adapter === REGISTRY_ADAPTER;
@@ -504,10 +519,36 @@ export function AdapterOptions({
     );
   }
 
+  if (adapter === SEQUENCE_ADAPTER) {
+    return <SequenceOptions options={options} setOption={setOption} fieldProps={fieldProps} />;
+  }
+
   if (adapter === TCP_ADAPTER) {
+    const check = options["check"] ?? "connect";
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-xs text-muted-foreground">{t("tcp.warning")}</p>
+        <p className="text-xs text-muted-foreground">
+          {check === "connect" ? t("tcp.warning") : t("tcp.warning-check")}
+        </p>
+        <div className="flex flex-col gap-1.5">
+          <Label>{t("tcp.check")}</Label>
+          <ToggleGroup
+            type="single"
+            spacing={1}
+            className="w-full flex-wrap"
+            value={check}
+            onValueChange={(next) => {
+              if (next !== "") setOption("check", next);
+            }}
+          >
+            {TCP_CHECKS.map((option) => (
+              <ToggleGroupItem key={option} value={option}>
+                {t(TCP_CHECK_LABELS[option])}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <span className="text-xs text-muted-foreground">{t("tcp.check-hint")}</span>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="service-tcp-port">{t("tcp.port")}</Label>
@@ -540,6 +581,64 @@ export function AdapterOptions({
             </span>
           </div>
         </div>
+        {check === "tls" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="service-tcp-tls-warn">{t("tcp.tls-warn-days")}</Label>
+              <Input
+                id="service-tcp-tls-warn"
+                type="number"
+                min={1}
+                value={options["tlsWarnDays"] ?? ""}
+                onChange={(event) => setOption("tlsWarnDays", event.target.value)}
+                {...fieldProps}
+              />
+              <span className="text-xs text-muted-foreground">{t("tcp.tls-warn-days-hint")}</span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>{t("tcp.verify")}</Label>
+              <ToggleGroup
+                type="single"
+                spacing={1}
+                value={options["verify"] ?? "yes"}
+                onValueChange={(next) => {
+                  if (next !== "") setOption("verify", next);
+                }}
+              >
+                <ToggleGroupItem value="yes">{t("tcp.verify-yes")}</ToggleGroupItem>
+                <ToggleGroupItem value="no">{t("tcp.verify-no")}</ToggleGroupItem>
+              </ToggleGroup>
+              <span className="text-xs text-muted-foreground">{t("tcp.verify-hint")}</span>
+            </div>
+          </div>
+        )}
+        {check === "websocket" && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="service-tcp-path">{t("tcp.path")}</Label>
+            <Input
+              id="service-tcp-path"
+              className="font-mono"
+              placeholder="/"
+              value={options["path"] ?? ""}
+              onChange={(event) => setOption("path", event.target.value)}
+              {...fieldProps}
+            />
+            <span className="text-xs text-muted-foreground">{t("tcp.path-hint")}</span>
+          </div>
+        )}
+        {check === "grpc" && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="service-tcp-service">{t("tcp.service")}</Label>
+            <Input
+              id="service-tcp-service"
+              className="font-mono"
+              value={options["service"] ?? ""}
+              onChange={(event) => setOption("service", event.target.value)}
+              {...fieldProps}
+            />
+            <span className="text-xs text-muted-foreground">{t("tcp.service-hint")}</span>
+          </div>
+        )}
       </div>
     );
   }
