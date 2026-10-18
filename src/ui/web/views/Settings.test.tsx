@@ -1683,7 +1683,6 @@ describe("database backup and restore", () => {
   it("sends the picked file's bytes and reports what came back", async () => {
     renderSettings("data", fixtures);
     const input = await screen.findByLabelText(i18n.t("settings.restore.upload"));
-    vi.stubGlobal("confirm", vi.fn(() => true));
 
     const base = globalThis.fetch as typeof fetch;
     const sent: { contentType: string; bytes: number }[] = [];
@@ -1722,6 +1721,9 @@ describe("database backup and restore", () => {
       new File([new Uint8Array([1, 2, 3, 4])], "isitdown.db", { type: "application/octet-stream" }),
     );
 
+    // Asked in the page's own dialog now, not window.confirm.
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: i18n.t("action.restore") }));
+
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]?.contentType).toBe("application/octet-stream");
     expect(sent[0]?.bytes).toBe(4);
@@ -1733,7 +1735,6 @@ describe("database backup and restore", () => {
   it("sends nothing when the confirmation is declined", async () => {
     renderSettings("data", fixtures);
     const input = await screen.findByLabelText(i18n.t("settings.restore.upload"));
-    vi.stubGlobal("confirm", vi.fn(() => false));
 
     const base = globalThis.fetch as typeof fetch;
     const calls: string[] = [];
@@ -1746,6 +1747,7 @@ describe("database backup and restore", () => {
     );
 
     await userEvent.upload(input, new File([new Uint8Array([1])], "isitdown.db"));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: i18n.t("action.cancel") }));
 
     expect(calls).not.toContain("/config/restore");
   });
@@ -1753,7 +1755,6 @@ describe("database backup and restore", () => {
   it("shows the server's own refusal rather than a generic failure", async () => {
     renderSettings("data", fixtures);
     const input = await screen.findByLabelText(i18n.t("settings.restore.upload"));
-    vi.stubGlobal("confirm", vi.fn(() => true));
 
     const base = globalThis.fetch as typeof fetch;
     vi.stubGlobal(
@@ -1772,6 +1773,9 @@ describe("database backup and restore", () => {
     );
 
     await userEvent.upload(input, new File([new Uint8Array([1])], "other.db"));
+
+    // Asked in the page's own dialog now, not window.confirm.
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: i18n.t("action.restore") }));
 
     expect(await screen.findByText(/not an IsItDown backup/)).toBeInTheDocument();
   });

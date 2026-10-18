@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { Menu, Monitor, Moon, Search, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { isApplePlatform } from "@/lib/shortcut.ts";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler.tsx";
 import { PollIndicator } from "./PollIndicator.tsx";
 import { openCommandPalette } from "./CommandPalette.tsx";
@@ -112,7 +113,9 @@ export function Header({ view }: { view: string }) {
       >
         <Search className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
         {t("palette.open")}
-        <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">⌘K</kbd>
+        <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+          {t(isApplePlatform() ? "palette.shortcut-mac" : "palette.shortcut-other")}
+        </kbd>
       </button>
 
       <div className="header-actions col-start-2 row-start-2 flex items-center justify-end gap-2 md:row-span-2 md:row-start-1 lg:col-start-3">

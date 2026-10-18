@@ -130,7 +130,10 @@ describe("Providers", () => {
       history: { aggregateUptime: 0, months: [], providers: [] },
     });
     expect(
-      await screen.findByText(i18n.t("providers.empty")),
+      await screen.findByText(i18n.t("providers.empty-title")),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: i18n.t("action.add-service") }),
     ).toBeInTheDocument();
   });
 

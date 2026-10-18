@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import {
   Select,
   SelectContent,
@@ -280,6 +281,10 @@ function SettingsView() {
   const { data: storage } = useStorage();
   const storageMaintenance = useStorageMaintenance();
   const restoreBackup = useRestoreBackup();
+  // The file picked for a restore, while the operator is asked to confirm it.
+  const [pendingRestore, setPendingRestore] = useState<File | undefined>(undefined);
+  // Apart from the file, so the dialog keeps its text while it animates out.
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const configImport = useConfigImport();
   const { restore: serviceRestore, purge: servicePurge } =
     useServiceMutations();
@@ -580,14 +585,11 @@ function SettingsView() {
 
   /**
    * Roadmap 4.4. The one destructive control on this page: it replaces every row
-   * this edition stores. Confirmed in the browser's own dialog, for the same
-   * reason removing a provider is — the alternative is a second dialog
-   * component for a button nobody presses twice a year.
+   * this edition stores. Asked first in a `ConfirmDialog` (`pendingRestore`):
+   * `window.confirm` could not be themed, and read as a different product.
    */
   const runRestore = async (file: File): Promise<void> => {
     toast("data", undefined);
-    if (!window.confirm(t("settings.restore.confirm", { file: file.name })))
-      return;
     try {
       const report = await restoreBackup.mutateAsync(file);
       const rows = Object.values(report.tables).reduce(
@@ -1572,8 +1574,21 @@ function SettingsView() {
                 className="h-8 w-56 cursor-pointer py-1 text-xs"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
-                  if (file !== undefined) void runRestore(file);
+                  if (file !== undefined) {
+                    setPendingRestore(file);
+                    setRestoreOpen(true);
+                  }
                   event.target.value = "";
+                }}
+              />
+              <ConfirmDialog
+                open={restoreOpen}
+                onOpenChange={setRestoreOpen}
+                title={t("settings.restore.upload")}
+                description={t("settings.restore.confirm", { file: pendingRestore?.name ?? "" })}
+                confirmLabel={t("action.restore")}
+                onConfirm={() => {
+                  if (pendingRestore !== undefined) void runRestore(pendingRestore);
                 }}
               />
             </SettingRow>

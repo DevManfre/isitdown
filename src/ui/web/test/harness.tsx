@@ -166,10 +166,11 @@ export function stubApi(fixtures: Fixtures): void {
         messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },
       };
       const fixture = fixtures[key] ?? EMPTY[key];
-      const body =
-        typeof fixture === "function"
-          ? (fixture as (path: string) => unknown)(path)
-          : fixture;
+      // Awaited, so a fixture can also be a promise that never settles — the
+      // way a test holds an endpoint on the wire to see the loading state.
+      const body = await (typeof fixture === "function"
+        ? (fixture as (path: string) => unknown)(path)
+        : fixture);
       return {
         ok: true,
         status: 200,

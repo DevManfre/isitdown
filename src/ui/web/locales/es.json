@@ -1024,5 +1024,20 @@
   "tcp.path": "Ruta del upgrade",
   "tcp.path-hint": "La ruta del endpoint WebSocket. Por defecto /.",
   "tcp.service": "Servicio gRPC",
-  "tcp.service-hint": "El servicio por el que pregunta el health check. Déjalo vacío para preguntar por el servidor en conjunto."
+  "tcp.service-hint": "El servicio por el que pregunta el health check. Déjalo vacío para preguntar por el servidor en conjunto.",
+  "view.loading": "Cargando…",
+  "overview.title.empty": "Todavía no hay nada que vigilar",
+  "providers.empty-title": "Todavía no hay proveedores",
+  "providers.empty-body": "Añade la primera página de estado que vigilar. IsItDown la consulta y te avisa cuando cambia su estado.",
+  "fleet.dot-label": "{name}: {status}",
+  "heatmap.summary_one": "{count} incidente en esta ventana, el {weekday} a las {hour}.",
+  "heatmap.summary_other": "{count} incidentes en esta ventana. Franja con más: {weekday} {hour}, con {peak} de ellos.",
+  "dialog.discard.title": "¿Descartar los cambios?",
+  "dialog.discard.body": "Lo que has introducido en este diálogo se perderá.",
+  "action.discard": "Descartar",
+  "action.keep-editing": "Seguir editando",
+  "routing.remove.title": "¿Quitar esta regla?",
+  "routing.remove.body": "La regla {position} deja de enrutar en cuanto se quita, y las reglas de debajo suben.",
+  "palette.shortcut-mac": "⌘K",
+  "palette.shortcut-other": "Ctrl K"
 }

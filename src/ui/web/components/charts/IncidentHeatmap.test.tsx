@@ -29,4 +29,13 @@ describe("IncidentHeatmap", () => {
     // Thursday at 20:00, the fourth row's twenty-first cell.
     expect(cells[3 * 24 + 20]?.dataset.count).toBe("5");
   });
+  it("states its conclusion in words for a screen reader", () => {
+    const grid = empty();
+    grid[3]![20] = 5;
+    grid[0]![9] = 1;
+    show(grid);
+    const summary = screen.getByRole("img");
+    expect(summary.getAttribute("aria-label")).toContain("6");
+    expect(summary.getAttribute("aria-label")).toContain("20:00");
+  });
 });
