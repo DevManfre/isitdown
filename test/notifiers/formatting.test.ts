@@ -1,14 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { colorFor, emojiFor, renderMessage, renderParts, severityLabel } from "../../src/notifiers/formatting.ts";
+import { colorFor, emojiFor, offersActions, renderMessage, renderParts, severityLabel } from "../../src/notifiers/formatting.ts";
 import type { NotificationPayload, StatusChange } from "../../src/core/types.ts";
 
 const service = { id: "github", name: "GitHub", statusUrl: "https://www.githubstatus.com" };
 
-const payloadFor = (change: StatusChange, locale = "en"): NotificationPayload => ({
+const payloadFor = (
+  change: StatusChange,
+  locale = "en",
+  extra: Partial<NotificationPayload> = {},
+): NotificationPayload => ({
   change,
   service,
   locale,
+  ...extra,
 });
 
 const incident = {
@@ -148,6 +153,8 @@ test("no rendered message leaves an unfilled placeholder", () => {
     { kind: "maintenance_started", providerId: "github", currentStatus: "operational", maintenance: window, at: window.startsAt },
     { kind: "maintenance_started", providerId: "github", currentStatus: "operational", maintenance: openEndedWindow, at: openEndedWindow.startsAt },
     { kind: "maintenance_ended", providerId: "github", currentStatus: "major_outage", maintenance: window, openIncidents: 2, at: window.endsAt as string },
+    { kind: "maintenance_upcoming", providerId: "github", currentStatus: "operational", maintenance: window, startsInMinutes: 90, at: window.startsAt },
+    { kind: "maintenance_upcoming", providerId: "github", currentStatus: "operational", maintenance: openEndedWindow, startsInMinutes: 30, at: openEndedWindow.startsAt },
   ];
   for (const locale of ["en", "it"]) {
     for (const change of changes) {
@@ -300,6 +307,7 @@ test("every change kind splits into a non-empty heading and detail", () => {
     { kind: "incident_resolved", providerId: "github", currentStatus: "operational", incident, at: incident.updatedAt },
     { kind: "maintenance_started", providerId: "github", currentStatus: "operational", maintenance: window, at: window.startsAt },
     { kind: "maintenance_ended", providerId: "github", currentStatus: "operational", maintenance: window, openIncidents: 0, at: window.endsAt },
+    { kind: "maintenance_upcoming", providerId: "github", currentStatus: "operational", maintenance: window, startsInMinutes: 120, at: window.startsAt },
     { kind: "monitoring_degraded", providerId: "github", currentStatus: "unknown", failureCount: 5, at: incident.updatedAt },
   ];
   for (const change of kinds) {
@@ -384,4 +392,69 @@ test("a shared failure names its probable cause only when one was declared", () 
   const named = renderMessage(payloadFor(change("cloudflare")));
   assert.ok(named.includes("Probable cause: cloudflare"), named);
   assert.ok(!renderMessage(payloadFor(change())).includes("Probable cause"));
+});
+
+test("an upcoming window says how soon and for how long, and is not a start", () => {
+  const upcoming: StatusChange = {
+    kind: "maintenance_upcoming",
+    providerId: "github",
+    currentStatus: "operational",
+    maintenance: { ...window, startsAt: "2026-08-19T14:00:00.000Z", endsAt: "2026-08-19T14:30:00.000Z" },
+    startsInMinutes: 120,
+    at: "2026-08-19T12:00:00.000Z",
+  };
+  const message = renderMessage(payloadFor(upcoming, "en"));
+  assert.ok(message.includes("2 h"), message);
+  assert.ok(message.includes("30 min"), message);
+  assert.ok(message.includes(window.name), message);
+  assert.ok(!message.includes("has started"), message);
+  const openEnded = renderMessage(payloadFor({ ...upcoming, maintenance: { ...window, endsAt: null } }, "en"));
+  assert.ok(openEnded.includes("not stated"), openEnded);
+});
+
+// Roadmap 3.1: when a notification is worth Ack and Mute buttons.
+test("buttons are offered on trouble that is still going, and on nothing else", () => {
+  const trouble = (over: Partial<StatusChange>): StatusChange => ({
+    kind: "status_change",
+    providerId: "github",
+    previousStatus: "operational",
+    currentStatus: "major_outage",
+    at: incident.updatedAt,
+    ...over,
+  });
+  const offered: [string, StatusChange][] = [
+    ["a status getting worse", trouble({})],
+    ["a component getting worse", trouble({ kind: "component_status_change", component: { id: "c1", name: "Actions" } })],
+    ["an incident opening", trouble({ kind: "incident_opened", incident })],
+    ["an incident moving on", trouble({ kind: "incident_updated", incident })],
+  ];
+  for (const [label, change] of offered) {
+    assert.equal(offersActions(payloadFor(change, "en", { interactive: true })), true, label);
+  }
+
+  const withheld: [string, StatusChange][] = [
+    ["a recovery", trouble({ previousStatus: "major_outage", currentStatus: "operational" })],
+    ["a resolved incident", trouble({ kind: "incident_resolved", currentStatus: "operational", incident })],
+    ["a status we cannot read", trouble({ currentStatus: "unknown" })],
+    ["our own fetching failing", trouble({ kind: "monitoring_degraded", currentStatus: "unknown", failureCount: 5 })],
+    ["a maintenance window", trouble({ kind: "maintenance_started", currentStatus: "operational", maintenance: window })],
+    ["a heads-up", trouble({ kind: "maintenance_upcoming", currentStatus: "operational", maintenance: window, startsInMinutes: 30 })],
+    ["a slow page", trouble({ kind: "slow_status_page", currentStatus: "operational", latency: { latencyMs: 4000, medianMs: 200, thresholdMs: 1000 } })],
+  ];
+  for (const [label, change] of withheld) {
+    assert.equal(offersActions(payloadFor(change, "en", { interactive: true })), false, label);
+  }
+});
+
+test("no buttons unless the channel was marked interactive, nor on a digest", () => {
+  const change: StatusChange = {
+    kind: "status_change",
+    providerId: "github",
+    previousStatus: "operational",
+    currentStatus: "major_outage",
+    at: incident.updatedAt,
+  };
+  assert.equal(offersActions(payloadFor(change, "en")), false);
+  const member = payloadFor(change, "en", { interactive: true });
+  assert.equal(offersActions({ ...member, digest: { items: [member], windowMinutes: 15 } }), false);
 });

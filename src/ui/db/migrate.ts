@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 31;
+export const SCHEMA_VERSION = 32;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -720,6 +720,22 @@ export function migrate(db: DatabaseSync): void {
     if (!dependencyColumns.includes("depends_on")) {
       db.exec("ALTER TABLE services ADD COLUMN depends_on TEXT");
     }
+  }
+
+  if (from < 32) {
+    // "I'm on it" — roadmap 3.1. One row per provider whose current trouble has
+    // been taken in charge, read back by the escalation in 3.2. Cascaded with
+    // the provider: an acknowledgement of a provider that is gone is about
+    // nothing. Not part of a backup — see `dbBackup.ts` — because a restored
+    // acknowledgement would silence an escalation for trouble nobody is
+    // looking at any more.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS acks (
+        provider_id TEXT PRIMARY KEY REFERENCES services(id) ON DELETE CASCADE,
+        acked_at TEXT NOT NULL,
+        acked_by TEXT NOT NULL
+      );
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

@@ -3,6 +3,7 @@ import { DELIVERY_DEFAULTS, type DeliveryConfig } from "./delivery.ts";
 import type { Logger } from "./logger.ts";
 import type { MessageRefStore } from "./messageRefStore.interface.ts";
 import type { Notifier } from "./notifier.interface.ts";
+import { isMuted } from "./diffEngine.ts";
 import { clearsFloor, explain, severityOf, type RoutingRule } from "./routing.ts";
 import type { NotificationPayload, StatusChange, StatusChangeKind } from "./types.ts";
 import { tracer } from "./tracing.ts";
@@ -66,6 +67,12 @@ export interface DispatchContext {
    * exactly as it did.
    */
   channelMessages?: Record<string, ChannelMessageOptions> | undefined;
+  /**
+   * The channels whose messages can carry Ack and Mute because the edition is
+   * listening for the press (roadmap 3.1). Empty or absent — the Light edition,
+   * and a UI edition with chatops off — means no message grows a button.
+   */
+  interactiveChannels?: readonly string[] | undefined;
 }
 
 /** One channel's answer to "in what words?" — see `DispatchContext.channelMessages`. */
@@ -111,6 +118,20 @@ export interface DispatcherDeps {
    * with nowhere to keep a reference must not silently send duplicates.
    */
   messageRefs?: MessageRefStore | undefined;
+  /**
+   * What escalation (roadmap 3.2) needs to know that only the edition can say:
+   * whether somebody has taken this provider's trouble in charge, and whether
+   * the provider is still in trouble at all. Absent in the Light edition, which
+   * has neither an acknowledgement nor a button to give one — and an escalation
+   * that was asked for there is refused out loud rather than run blind, because
+   * "nobody answered" is not a thing it can know.
+   */
+  escalation?:
+    | {
+        isAcked(providerId: string): Promise<boolean>;
+        inTrouble(providerId: string): Promise<boolean>;
+      }
+    | undefined;
 }
 
 /**
@@ -161,6 +182,20 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
   const sleep = deps.sleep ?? realSleep;
   const now = deps.now ?? Date.now;
   const messageRefs = deps.messageRefs;
+  const escalationDeps = deps.escalation;
+
+  /**
+   * Changes waiting to see whether anybody answers (roadmap 3.2), one per
+   * provider: what was said, when, and whether this stretch of trouble is done
+   * with. In memory like the cap and the digest — a restart clears the clocks, so
+   * the first alerts after one are never escalated by a timer nobody can see.
+   *
+   * An entry stays after it has escalated, and goes only when the provider is out
+   * of trouble: that is what makes this one escalation per stretch rather than
+   * one per later update, which would be the same nag every quarter hour.
+   */
+  const pendingEscalations = new Map<string, { payload: NotificationPayload; since: number; settled: boolean }>();
+  let escalationRefused = false;
 
   /**
    * When this provider's recent messages went out, newest last. The cap's whole
@@ -472,6 +507,130 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     return sends;
   }
 
+  /**
+   * Whether this change starts the escalation clock: trouble that is still going
+   * and clears the operator's floor. A recovery has nothing to answer, and the
+   * kinds that are not about the provider's own state — a maintenance notice, a
+   * slow page, our own fetching failing — are not what anyone is being paged for.
+   */
+  function startsEscalation(change: StatusChange, floor: DeliveryConfig["escalation"]["minSeverity"]): boolean {
+    switch (change.kind) {
+      case "status_change":
+      case "component_status_change":
+      case "incident_opened":
+      case "incident_updated":
+        return (
+          change.currentStatus !== "operational" &&
+          change.currentStatus !== "unknown" &&
+          clearsFloor(severityOf(change), floor)
+        );
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Starts, or refreshes, the clock for a change that was just sent. Refreshing
+   * keeps the original start: the clock measures how long this trouble has gone
+   * unanswered, and a worse update ten minutes in does not make anybody's
+   * silence shorter.
+   */
+  function trackEscalation(change: StatusChange, payload: NotificationPayload, delivery: DeliveryConfig, at: number): void {
+    const policy = delivery.escalation;
+    if (!policy.enabled || !startsEscalation(change, policy.minSeverity)) return;
+    if (escalationDeps === undefined || policy.channel === "") {
+      // Said once, not per change: the operator asked for something this edition
+      // or this configuration cannot do, and a line per alert would bury it.
+      if (!escalationRefused) {
+        escalationRefused = true;
+        logger.warn(
+          escalationDeps === undefined
+            ? "escalation is on but this edition cannot tell whether anybody took a change in charge, so nothing will be escalated"
+            : "escalation is on but no channel is chosen to escalate to, so nothing will be escalated",
+        );
+      }
+      return;
+    }
+    const existing = pendingEscalations.get(change.providerId);
+    pendingEscalations.set(change.providerId, {
+      payload,
+      since: existing?.since ?? at,
+      settled: existing?.settled ?? false,
+    });
+  }
+
+  /**
+   * Says again whatever has gone unanswered for long enough. Asked on every
+   * dispatch, including the ones with nothing to dispatch: like a digest window,
+   * the wait runs out on the clock, not when the next change happens to arrive.
+   * Its resolution is therefore one poll cycle — the dispatcher is only ever
+   * asked then — which is why a wait shorter than the cadence is no shorter.
+   */
+  async function dueEscalations(
+    ctx: DispatchContext,
+    delivery: DeliveryConfig,
+    at: number,
+  ): Promise<Promise<SentRecord>[]> {
+    const policy = delivery.escalation;
+    if (!policy.enabled || escalationDeps === undefined) {
+      pendingEscalations.clear();
+      return [];
+    }
+    const byChannelId = new Map(ctx.notifiers.map((notifier) => [notifier.id, notifier]));
+    const sends: Promise<SentRecord>[] = [];
+
+    for (const [providerId, entry] of [...pendingEscalations]) {
+      // Out of trouble, however it ended: forgotten, so the next stretch starts
+      // a fresh clock. Judged on the provider's own state rather than on a
+      // resolving change, because a mute or a maintenance window swallows that.
+      if (!(await escalationDeps.inTrouble(providerId))) {
+        pendingEscalations.delete(providerId);
+        continue;
+      }
+      if (entry.settled || at - entry.since < policy.afterMinutes * 60_000) continue;
+
+      // From here this stretch of trouble is done with, whatever the answer: it
+      // is either escalated, or somebody has it, or the operator said they know.
+      entry.settled = true;
+      if (await escalationDeps.isAcked(providerId)) continue;
+      const service = ctx.services.find((candidate) => candidate.id === providerId);
+      if (service === undefined) {
+        pendingEscalations.delete(providerId);
+        continue;
+      }
+      if (isMuted(service.mutedUntil, new Date(at).toISOString())) continue;
+
+      const notifier = byChannelId.get(policy.channel);
+      if (notifier === undefined) {
+        // The escalation target was switched off, or never existed: an alert
+        // nobody answered that then goes nowhere is the one outcome this feature
+        // exists to prevent, so it is a warning and not a shrug.
+        logger.warn("escalation could not be sent because its channel is not enabled", {
+          channel: policy.channel,
+          providerId,
+        });
+        continue;
+      }
+
+      const message = ctx.channelMessages?.[policy.channel];
+      const payload: NotificationPayload = {
+        ...entry.payload,
+        locale: message?.locale ?? ctx.locale,
+        template: message?.template,
+        interactive: ctx.interactiveChannels?.includes(policy.channel) === true ? true : undefined,
+        escalated: { afterMinutes: policy.afterMinutes },
+        suppressedCount: 0,
+      };
+      logger.warn("a change nobody took in charge is being escalated", {
+        providerId,
+        channel: policy.channel,
+        afterMinutes: policy.afterMinutes,
+      });
+      sends.push(deliver(notifier, payload, renderMessage(payload)));
+    }
+    return sends;
+  }
+
   return {
     async sendTest(notifier, service, locale, message): Promise<SentRecord> {
       const payload: NotificationPayload = {
@@ -499,6 +658,9 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       // happened on a busy cycle would hold a batch until the next change —
       // which is the flood it exists to replace, delayed.
       const attempts: Promise<SentRecord>[] = flushDue(ctx, delivery, at, false);
+      // Before this cycle's own changes are tracked, so a change cannot be
+      // escalated in the dispatch that first sent it.
+      attempts.push(...(await dueEscalations(ctx, delivery, at)));
       if (changes.length === 0) {
         const settled = await Promise.allSettled(attempts);
         return settled.flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value] : []));
@@ -577,6 +739,10 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         // disagrees with itself across channels.
         let counted = false;
         let suppressed: number | undefined;
+        // Whether any channel was handed this change right now (not batched, not
+        // skipped): the escalation clock starts from a message that went out.
+        let sentNow = false;
+        let lastPayload: NotificationPayload | undefined;
         for (const channelId of routed.targets) {
           const notifier = byChannelId.get(channelId);
           if (notifier === undefined) {
@@ -615,10 +781,14 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
             ...base,
             locale: message?.locale ?? base.locale,
             ...(message?.template === undefined ? {} : { template: message.template }),
+            ...(ctx.interactiveChannels?.includes(channelId) === true ? { interactive: true } : {}),
             suppressedCount: suppressed ?? 0,
           };
           attempts.push(deliver(notifier, payload, renderMessage(payload), MAX_ATTEMPTS, linkOf(change, delivery)));
+          sentNow = true;
+          lastPayload = payload;
         }
+        if (sentNow && lastPayload !== undefined) trackEscalation(change, base, delivery, at);
       }
 
       const settled = await Promise.allSettled(attempts);

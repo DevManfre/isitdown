@@ -161,7 +161,22 @@ describe("Overview", () => {
       status: { providers: [], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
       history: { aggregateUptime: 0, months: [], providers: [] },
     });
-    expect(await screen.findByText(i18n.t("providers.empty"))).toBeInTheDocument();
+    // First run: the page says why it is empty and offers the fix, rather
+    // than pointing elsewhere in muted text.
+    expect(await screen.findByText(i18n.t("providers.empty-title"))).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: i18n.t("action.add-service") })).toBeInTheDocument();
+  });
+
+  it("draws a loading skeleton, not the empty state, before /status answers", async () => {
+    // A request that never settles: the view is released after its hold cap
+    // with no data, which is exactly when it used to claim an empty fleet.
+    renderWithProviders(<Overview />, {
+      status: () => new Promise(() => {}),
+      history: { aggregateUptime: 0, months: [], providers: [] },
+    });
+    expect(await screen.findByRole("status", { name: i18n.t("view.loading") }, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("providers.empty-title"))).not.toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("overview.title.all-operational"))).not.toBeInTheDocument();
   });
 
   // No test in this suite otherwise asserts rendered copy against anything

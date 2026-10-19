@@ -63,6 +63,15 @@ test("only a genuine recovery closes an alert", () => {
     }),
     true,
   );
+  // A heads-up about a window is the opposite of its end: nothing has closed.
+  assert.equal(
+    isResolution({
+      ...base,
+      kind: "maintenance_upcoming",
+      maintenance: { id: "m1", name: "", status: "scheduled", startsAt: at, endsAt: null, componentIds: [] },
+    }),
+    false,
+  );
   assert.equal(isResolution({ ...base, kind: "status_change", currentStatus: "operational" }), true);
   assert.equal(isResolution({ ...base, kind: "status_change" }), false);
   assert.equal(isResolution({ ...base, kind: "incident_opened", incident }), false);

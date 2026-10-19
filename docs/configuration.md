@@ -1508,8 +1508,8 @@ hypothetical set.
 
 ### 3.8 Delivery policy — quiet hours, digests, caps
 
-The routing rules decide *who* hears about a change. Four further controls
-decide *how much* of it actually goes out, and in how many messages. All four
+The routing rules decide *who* hears about a change. Six further controls
+decide *how much* of it actually goes out, and in how many messages. All six
 are off by default, so an installation that configures none of them behaves
 exactly as it did before they existed.
 
@@ -1529,6 +1529,14 @@ delivery:
     enabled: true
     maxPerHour: 6
   updateInPlace: true
+  maintenanceNotice:
+    enabled: true
+    leadMinutes: 120
+  escalation:
+    enabled: true
+    afterMinutes: 15
+    channel: pushover
+    minSeverity: major_outage
 ```
 
 **Quiet hours** are a routing *input*, not a filter bolted on after the rules:
@@ -1563,7 +1571,39 @@ edit the channel refuses (too old, deleted by hand) falls back to a fresh
 message rather than losing the update. Slack's incoming webhook cannot edit at
 all, so it keeps receiving a message per update.
 
-The Light edition configures all four as the `delivery` block above; the UI
+**`maintenanceNotice`** says so *before* a maintenance window the provider has
+declared opens, instead of only when it does — the one alert that lets somebody
+act first ("GitHub maintenance in 2 h, expected 30 min"). A window is announced
+once, on the first reading that finds it within `leadMinutes` of its start
+(1–10080, default 120), and it routes as the `maintenance` event class, so a
+rule that already carries maintenance carries the heads-up too. A mute on the
+provider, or a window of its own already running, holds it back — and does not
+spend it, so lifting the mute still gets you the notice. A window with no
+declared end is announced without a duration. Like the digest and the cap, what
+has been announced lives in memory: a restart inside the lead repeats one
+heads-up rather than losing it.
+
+**`escalation`** says a change again, on a different channel, when nobody has
+taken it in charge. A status getting worse, a component getting worse, or an
+incident opening or moving on — at or above `minSeverity` (default
+`major_outage`) — starts a clock when it is sent. After `afterMinutes`
+(1–1440, default 15), if nobody has pressed **I'm on it** (or typed `/ack`; see
+[3.17](#317-chatops--commanding-the-bot-from-telegram)), the provider is still in
+trouble and not muted, the same change is sent once to `channel` — and only to
+it — ending in "Nobody took this in charge after 15 min". On Pushover that is
+never below high priority. It is once per stretch of trouble, not once per later
+update, and a stretch ends when the provider is operational with nothing open; a
+recovery, a mute, or an acknowledgement before the wait is up cancels it. The
+wait is measured in poll cycles, because that is when the dispatcher is asked:
+an `afterMinutes` shorter than your cadence is no shorter than your cadence. If
+the escalation channel is switched off the log says so, rather than the change
+quietly going nowhere. The clocks live in memory like the cap and the digest, so
+a restart clears them. **UI edition only**: the Light edition has no
+acknowledgement to read, so with `escalation` enabled there it logs one line
+saying nothing will be escalated and carries on.
+
+The Light edition configures all six as the `delivery` block above (with the
+caveat just given for `escalation`); the UI
 edition edits them under **Settings → Delivery**, where each row applies on its
 own without a restart.
 
@@ -2047,7 +2087,30 @@ The bot then answers, in the chat it already alerts:
 | `/history <provider> [7\|30\|90]` | Uptime over a window, the days actually measured, incidents, and the worst day. Defaults to 30. |
 | `/mute <provider> <30m\|2h\|1d>` | Stops alerts for a while, up to `30d`. |
 | `/unmute <provider>` | Starts them again. |
+| `/ack <provider>` | Says you are on it: records who took the provider's current trouble in charge. |
 | `/help` | The list above. |
+
+**Buttons on the alert itself.** While chatops is on, a Telegram alert about
+trouble that is still going — a status getting worse, an incident opening or
+moving on — carries two buttons under it: **I'm on it** and **Mute 2h**. They are
+the `/ack` and `/mute … 2h` commands without the typing, answered by the same
+code, authorised by the same allowlist, and worded in the channel's own locale.
+Pressing **I'm on it** posts who took it to the chat, so the rest of the team can
+see; the first press wins, and a second one says who got there before. A
+recovery, a maintenance notice, a slow page or a digest carries no buttons —
+there is nothing to take in charge — and the message that closes an incident
+loses the ones it had. A provider id too long to fit Telegram's 64-byte button
+data gets the alert without buttons rather than a button for the wrong provider.
+
+**Web push** toasts get the same two actions when the browser shows them. They
+call `POST /providers/:id/ack` and `POST /providers/:id/mute` on this server,
+the same routes the Telegram buttons end in. If that call fails — the dashboard
+is unreachable, or an API token refuses the write — the click opens the
+dashboard instead of failing silently, because a button that does nothing and
+says nothing would leave you believing you had taken it in charge.
+
+An acknowledgement is per provider, not per incident, and lets go by itself once
+the provider is operational with nothing open. It is not part of a backup.
 
 A provider can be named by its configured id or by the name on the dashboard,
 whichever comes to mind. A mute set here is the *same* mute the dashboard sets —

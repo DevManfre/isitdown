@@ -210,6 +210,31 @@ describe("the service dialog's keyboard contract", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  it("asks before Escape throws away what was typed, and keeps it on 'keep editing'", async () => {
+    const { dialog } = await openAdd();
+    await chooseSource(dialog, "source.url");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://status.example.com");
+
+    await userEvent.keyboard("{Escape}");
+    const confirm = await screen.findByRole("dialog", { name: i18n.t("dialog.discard.title") });
+    await userEvent.click(within(confirm).getByRole("button", { name: i18n.t("action.keep-editing") }));
+
+    expect(screen.queryByRole("dialog", { name: i18n.t("dialog.discard.title") })).toBeNull();
+    expect(within(dialog).getByLabelText(i18n.t("field.base-url"))).toHaveValue("https://status.example.com");
+  });
+
+  it("closes on 'discard' once the operator has confirmed", async () => {
+    const { dialog } = await openAdd();
+    await chooseSource(dialog, "source.url");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.base-url")), "https://status.example.com");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.cancel") }));
+    const confirm = await screen.findByRole("dialog", { name: i18n.t("dialog.discard.title") });
+    await userEvent.click(within(confirm).getByRole("button", { name: i18n.t("action.discard") }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
   it("returns focus to whatever opened it", async () => {
     const { trigger } = await openAdd();
     await userEvent.keyboard("{Escape}");
@@ -228,6 +253,14 @@ describe("the service dialog's keyboard contract", () => {
     );
 
     expect(idField).toHaveValue("citta-cloud-co");
+  });
+
+  it("closes an untouched edit on Escape without asking to discard anything", async () => {
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
+    await openEdit();
+    await screen.findByRole("dialog");
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("refuses to edit the id of an existing service", async () => {

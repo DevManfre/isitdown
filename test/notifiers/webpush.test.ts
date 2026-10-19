@@ -223,3 +223,31 @@ test("a status URL that does not parse leaves the toast without an icon", async 
   // the browser's own default.
   assert.ok(!Object.hasOwn(JSON.parse(sent[0]!) as Record<string, unknown>, "icon"));
 });
+
+// Roadmap 3.1: the toast's own buttons.
+test("an interactive toast carries Ack and Mute actions, and the provider they act on", async () => {
+  const sent: string[] = [];
+  const notifier = createWebPushNotifier({
+    keys,
+    store: fakeStore([device(1)]),
+    push: async (_subscription, payload) => void sent.push(payload),
+  });
+  await notifier.send({ ...degraded, interactive: true });
+  const body = JSON.parse(sent[0]!) as { actions?: { action: string; title: string }[]; providerId: string };
+  assert.deepEqual(body.actions, [
+    { action: "ack", title: "✅ I'm on it" },
+    { action: "mute", title: "🔕 Mute 2h" },
+  ]);
+  assert.equal(body.providerId, "github");
+});
+
+test("a toast that is not interactive is exactly what it was before buttons existed", async () => {
+  const sent: string[] = [];
+  const notifier = createWebPushNotifier({
+    keys,
+    store: fakeStore([device(1)]),
+    push: async (_subscription, payload) => void sent.push(payload),
+  });
+  await notifier.send(degraded);
+  assert.equal("actions" in (JSON.parse(sent[0]!) as object), false);
+});

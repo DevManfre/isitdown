@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { Trans, useTranslation } from "react-i18next";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -12,6 +13,7 @@ import { stagger } from "@/lib/stagger.ts";
 import { shownStatus } from "@/lib/suspicion.ts";
 import type { HistoryBucket, ProviderStatus } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
+import { ROUTE_PATHS } from "../../routePaths.ts";
 
 function GroupHeader({
   label, count, tone, open,
@@ -52,9 +54,9 @@ function GroupHeader({
  * The operational fleet while its group is shut: one dot per provider, with the
  * detail on hover.
  *
- * A hover card is pointer-only by nature, so this is deliberately a redundant
- * affordance — the group's own trigger expands to the full rows, and that is
- * the keyboard and screen-reader path to the same facts.
+ * Each dot is a link to its provider, named "{name}: {status}", so the strip is
+ * reachable by keyboard and readable by a screen reader on its own — the hover
+ * card adds the uptime figure for a pointer, and Radix opens it on focus too.
  */
 function DotStrip({ providers }: { providers: ProviderStatus[] }) {
   const { t, i18n } = useTranslation();
@@ -64,13 +66,22 @@ function DotStrip({ providers }: { providers: ProviderStatus[] }) {
       {providers.map((provider) => (
         <HoverCard key={provider.id} openDelay={120} closeDelay={60}>
           <HoverCardTrigger asChild>
-            <span className="cursor-default">
+            <Link
+              to={ROUTE_PATHS.providerDetail.replace(":providerId", provider.id)}
+              aria-label={t("fleet.dot-label", {
+                name: provider.name,
+                status: t(statusLabelKey(shownStatus(provider).status)),
+              })}
+              // 10px of dot, 22px of target: padding grows the hit area
+              // (WCAG 2.5.8) and the negative margin keeps the strip's rhythm.
+              className="-m-1.5 inline-flex rounded-full p-1.5"
+            >
               <StatusDot
                 status={shownStatus(provider).status}
                 hatched={shownStatus(provider).hatched}
                 size={10}
               />
-            </span>
+            </Link>
           </HoverCardTrigger>
           <HoverCardContent className="flex w-auto flex-col gap-1 p-3">
             <span className="text-sm">{provider.name}</span>

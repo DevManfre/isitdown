@@ -125,3 +125,22 @@ test("the notifier refuses a missing token or user key", () => {
 test("the notifier reports its channel id", () => {
   assert.equal(createPushoverNotifier(settings).id, "pushover");
 });
+
+// Roadmap 3.2: the second telling is never the quiet one.
+test("an escalated message is never below high priority, and says why it is here", async () => {
+  const degraded: NotificationPayload = {
+    ...opened,
+    change: { kind: "status_change", providerId: "github", previousStatus: "operational", currentStatus: "degraded", at: opened.change.at },
+  };
+  const stub = stubFetch(okResponse);
+  try {
+    await createPushoverNotifier(settings).send(degraded);
+    await createPushoverNotifier(settings).send({ ...degraded, escalated: { afterMinutes: 15 } });
+  } finally {
+    stub.restore();
+  }
+  const [plain, escalated] = stub.requests.map((request) => form(request.rawBody));
+  assert.equal(plain?.get("priority"), "0");
+  assert.equal(escalated?.get("priority"), "1");
+  assert.ok(escalated?.get("message")?.includes("15 min"), escalated?.get("message") ?? "");
+});

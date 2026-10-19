@@ -20,7 +20,9 @@ export type ChatCommand =
   | { kind: "status"; providerId?: string | undefined }
   | { kind: "history"; providerId: string; days: 7 | 30 | 90 }
   | { kind: "mute"; providerId: string; minutes: number }
-  | { kind: "unmute"; providerId: string };
+  | { kind: "unmute"; providerId: string }
+  // "I'm on it" (roadmap 3.1): the same command the notification's button sends.
+  | { kind: "ack"; providerId: string };
 
 export type ParseResult =
   | { ok: true; command: ChatCommand }
@@ -116,6 +118,12 @@ export function parseCommand(text: string): ParseResult | null {
       const providerId = rest[0];
       if (providerId === undefined) return { ok: false, key: "chatops.error.provider-required" };
       return { ok: true, command: { kind: "unmute", providerId: providerId.toLowerCase() } };
+    }
+
+    case "ack": {
+      const providerId = rest[0];
+      if (providerId === undefined) return { ok: false, key: "chatops.error.provider-required" };
+      return { ok: true, command: { kind: "ack", providerId: providerId.toLowerCase() } };
     }
 
     default:

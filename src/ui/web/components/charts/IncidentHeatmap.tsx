@@ -18,6 +18,9 @@ export function IncidentHeatmap({ grid }: { grid: number[][] }) {
   const { t, i18n } = useTranslation();
   const total = grid.flat().reduce((sum, value) => sum + value, 0);
   const busiest = Math.max(1, ...grid.flat());
+  // The busiest slot in words: 168 coloured cells are a picture, and a screen
+  // reader needs the conclusion the picture is drawn to show.
+  const peak = grid.flat().indexOf(Math.max(...grid.flat()));
 
   // Monday first, in the operator's own language: the server counts on the same
   // convention, so index 0 is Monday here too.
@@ -44,7 +47,16 @@ export function IncidentHeatmap({ grid }: { grid: number[][] }) {
           {t("heatmap.empty")}
         </span>
       ) : (
-        <div className="flex flex-col gap-1">
+        <div
+          role="img"
+          aria-label={t("heatmap.summary", {
+            count: total,
+            weekday: weekdays[Math.floor(peak / 24)],
+            hour: `${String(peak % 24).padStart(2, "0")}:00`,
+            peak: grid.flat()[peak],
+          })}
+          className="flex flex-col gap-1"
+        >
           {grid.map((row, weekday) => (
             <div key={weekdays[weekday]} className="flex items-center gap-2">
               <span className="w-10 shrink-0 font-mono text-[10px] uppercase text-muted-foreground">
@@ -58,6 +70,7 @@ export function IncidentHeatmap({ grid }: { grid: number[][] }) {
                     // its status: it is what a test reads and what the cell
                     // means, rather than an opacity a restyle could change.
                     data-count={count}
+                    aria-hidden="true"
                     title={t("heatmap.cell", {
                       weekday: weekdays[weekday],
                       hour: `${String(hour).padStart(2, "0")}:00`,

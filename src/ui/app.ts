@@ -19,6 +19,7 @@ import { publicRoutes } from "./routes/public.routes.ts";
 import { reliabilityRoutes } from "./routes/reliability.routes.ts";
 import { coincidenceRoutes } from "./routes/coincidence.routes.ts";
 import { pushRoutes } from "./routes/push.routes.ts";
+import { actionsRoutes } from "./routes/actions.routes.ts";
 import { heartbeatRoutes } from "./routes/heartbeat.routes.ts";
 import { slaRoutes } from "./routes/sla.routes.ts";
 import { trustRoutes } from "./routes/trust.routes.ts";
@@ -57,6 +58,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(coincidenceRoutes(runtime));
   app.use(trustRoutes(runtime));
   app.use(pushRoutes(runtime));
+  app.use(actionsRoutes(runtime));
   app.use(heartbeatRoutes(runtime));
   app.use(incidentsRoutes(runtime));
   app.use(notificationsRoutes(runtime));

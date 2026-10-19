@@ -925,6 +925,34 @@ const paths: Json = {
       },
     },
   },
+  "/providers/{id}/ack": {
+    post: {
+      tags: ["Providers"],
+      summary: "Say you are on a provider's trouble.",
+      description:
+        "Roadmap 3.1. What a web push toast's *I'm on it* button calls. Records that somebody has taken this provider's current trouble in charge — `{ newly, by, at }`. The first press wins: a second one changes nothing and answers `newly: false` with who got there first. Cleared by itself once the provider is operational with no open incident. The acknowledgement is what a later escalation reads before nagging a second channel. Read-only `API_TOKEN` holders cannot call it.",
+      parameters: [path("id", "Provider id.")],
+      responses: {
+        "200": ok({ type: "object" }, "Recorded, or already recorded by somebody else."),
+        "404": notFound,
+      },
+    },
+  },
+  "/providers/{id}/mute": {
+    post: {
+      tags: ["Providers"],
+      summary: "Mute a provider for a while.",
+      description:
+        "Roadmap 3.1. What a web push toast's *Mute 2h* button calls. Writes the same `mutedUntil` the dashboard's own mute button does — `{ mutedUntil }`, an ISO 8601 UTC instant — so the diff engine reads it back like any other mute. The optional body `{ minutes }` (1 to 43200, default 120) sets how long; no body is two hours. Read-only `API_TOKEN` holders cannot call it.",
+      parameters: [path("id", "Provider id.")],
+      requestBody: { required: false, ...json({ type: "object", properties: { minutes: { type: "integer", minimum: 1, maximum: 43200 } } }) },
+      responses: {
+        "200": ok({ type: "object" }, "The provider is muted until `mutedUntil`."),
+        "400": badRequest,
+        "404": notFound,
+      },
+    },
+  },
   "/config/heartbeats": {
     get: {
       tags: ["Diagnostics"],
@@ -1217,6 +1245,7 @@ export function openapiDocument(): Json {
         name: "Incidents",
         description: "Incident search, detail and operator notes.",
       },
+      { name: "Providers", description: "Acting on one provider from a notification." },
       { name: "Notifications", description: "What was sent, and what failed." },
       { name: "Export", description: "Downloads and feeds." },
       {
