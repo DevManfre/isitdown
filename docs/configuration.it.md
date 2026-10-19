@@ -1562,8 +1562,8 @@ un insieme ipotetico.
 ### 3.8 Politica di consegna — ore di silenzio, riepiloghi, limiti
 
 Le regole di instradamento decidono *chi* viene informato di un cambiamento.
-Altri sei controlli decidono *quanto* di quel cambiamento esce davvero, e in
-quanti messaggi. Tutti e sei sono disattivati per default, così
+Altri sette controlli decidono *quanto* di quel cambiamento esce davvero, e in
+quanti messaggi. Tutti e sette sono disattivati per default, così
 un'installazione che non ne configura nessuno si comporta esattamente come prima
 che esistessero.
 
@@ -1591,6 +1591,9 @@ delivery:
     afterMinutes: 15
     channel: pushover
     minSeverity: major_outage
+  channelHealth:
+    enabled: true
+    afterFailures: 3
 ```
 
 **Le ore di silenzio** sono un *ingresso* dell'instradamento, non un filtro
@@ -1662,7 +1665,23 @@ l'edizione Light non ha nessuna presa in carico da leggere, quindi con
 `escalation` attiva lì scrive una riga di log dicendo che nulla verrà escalato e
 prosegue.
 
-L'edizione Light configura tutti e sei con il blocco `delivery` sopra (con la
+**`channelHealth`** avvisa gli altri canali quando uno smette di consegnare. Un
+webhook che risponde 500 da una settimana altrimenti compare solo come badge
+rosso nel registro consegne, e l'operatore deve accorgersi di un'assenza. Quando
+un canale ha rifiutato `afterFailures` messaggi di fila (2–100, default 3) —
+ognuno già oltre i propri tentativi, quindi una dead letter — gli altri canali
+ricevono un messaggio: "IsItDown — il canale discord non funziona: 3 messaggi di
+fila non sono arrivati, dal …, ultimo errore: HTTP 401". Viene instradato come
+classe `monitoring` con le stesse regole di tutto il resto, togliendo il canale
+rotto e ogni altro canale con una serie di fallimenti propria; se non resta
+nessuno a cui dirlo, lo dice il log. Una volta per serie: l'avviso non si ripete
+finché il canale resta rotto, e il primo messaggio che torna a consegnare chiude
+la serie, così una rottura successiva viene segnalata di nuovo. Le ore di
+silenzio lo trattengono come ogni altro cambiamento di monitoraggio, ed esce
+dopo invece che mai. Il **Invia test** dell'operatore non conta. Le serie vivono
+in memoria come il limite, quindi un riavvio le fa ripartire.
+
+L'edizione Light configura tutti e sette con il blocco `delivery` sopra (con la
 riserva appena detta per `escalation`);
 l'edizione UI li modifica da **Impostazioni → Consegna**, dove ogni riga si
 applica da sé e senza riavvio.
@@ -1826,6 +1845,8 @@ I segnaposti, che la dashboard elenca anche sotto il campo:
 | `{{component}}` | Il componente che è cambiato; vuoto se non è un cambio di componente. |
 | `{{title}}` | Il titolo dell'incidente o della finestra di manutenzione; vuoto se non c'è nessuno dei due. |
 | `{{incidentStatus}}` | La parola di ciclo di vita del provider per l'incidente, tradotta dove è nota. |
+| `{{impact}}` | Cosa si rompe quando questo provider va giù, come scritto sul provider ([3.23](#323-perché-un-provider-conta--impatto-e-responsabile)); vuoto se non impostato. |
+| `{{owner}}` | Chi risponde di questo provider; vuoto se non impostato. |
 | `{{url}}` | La pagina di stato pubblica del provider. Vuota su un canale che rende il link da sé (un embed Discord), così non viene mai stampato due volte. |
 | `{{at}}` | Quando è successo, UTC. |
 
@@ -2348,3 +2369,86 @@ nasconde la coppia solo su quel browser.
   contro la flotta.
 - **A parità di voti** vince l'id che viene prima in ordine alfabetico, così la
   stessa finestra nomina sempre la stessa causa.
+
+### 3.21 Destinatari — una persona, più canali
+
+Chi è sia su Telegram sia su Discord riceve ogni avviso due volte, quindi ne
+silenzia uno — e perde la ridondanza per cui il secondo canale c'era. Un
+*destinatario* raggruppa i canali che raggiungono la stessa persona (o lo stesso
+team), in ordine di preferenza: un cambiamento va al primo, e al successivo solo
+quando quello è fallito del tutto, tentativi esauriti.
+
+```yaml
+recipients:
+  - id: alice
+    name: Alice
+    channels: [telegram, discord]   # prima il preferito, poi le riserve in ordine
+```
+
+- **Le regole decidono ancora chi può saperlo.** Un destinatario decide solo
+  quante volte. Un cambiamento raggiunge i canali del destinatario *che la sua
+  regola ha raggiunto*, nell'ordine del destinatario — così una regola che tiene
+  un provider fuori da Discord lo tiene fuori anche dalla riserva Discord.
+- **Si registrano entrambi i lati.** Un ripiego scrive nel registro consegne il
+  fallimento del canale preferito e la consegna della riserva, così il registro
+  mostra ancora il canale che ne ha avuto bisogno, e
+  [`channelHealth`](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti)
+  conta comunque quel fallimento.
+- **Un riepilogo** va al canale preferito del destinatario, ripiegando allo
+  stesso modo quando la sua finestra si chiude.
+- **Le regole della lista**: almeno due canali ciascuno, un canale in al massimo
+  un destinatario, e ogni canale uno che la configurazione definisce —
+  l'edizione Light rifiuta di partire con un destinatario che nomina un canale
+  assente da `notifications`, come fa per una regola di instradamento.
+
+L'edizione Light li configura con la lista `recipients` sopra; l'edizione UI li
+modifica da **Impostazioni → Notifiche → Destinatari**, salvati tutti insieme
+(`PUT /config/recipients`). Export e import li trasportano; il web push non ha
+posto in un `config.yml`, quindi resta fuori da un destinatario esportato.
+
+### 3.22 Seguire un singolo incidente
+
+Il provider che di solito tieni lontano dal telefono può avere proprio
+l'incidente di cui vuoi sentire ogni parola. **Segui** sulla pagina di un
+incidente aperto manda ogni aggiornamento successivo di quell'incidente a ogni
+canale attivo finché non si risolve, senza toccare una regola di
+instradamento; la risoluzione è l'ultimo messaggio, e il seguito finisce con
+lei. Riguarda solo quell'incidente — gli altri cambiamenti del provider vanno
+ancora dove li mandano le regole. Le ore di silenzio valgono comunque: seguire
+dice "dimmi ogni aggiornamento", non "svegliami per ogni aggiornamento". I
+destinatari ([3.21](#321-destinatari--una-persona-più-canali)) si raggruppano
+comunque, così una persona con due canali sente ogni aggiornamento una volta.
+
+**Solo edizione UI** — l'edizione Light non ha una pagina su cui premerlo. Le
+route sono `PUT` e `DELETE /incidents/:providerId/:incidentId/follow`; un
+incidente risolto non si può seguire (409). Un seguito non fa parte del backup,
+per lo stesso motivo di una presa in carico: ripristinato, manderebbe a ogni
+canale aggiornamenti su un incidente che nessuno guarda più.
+
+### 3.23 Perché un provider conta — impatto e responsabile
+
+Alle 3 di notte "GitHub — MAJOR OUTAGE" è una parola di stato; "deploy bloccati,
+CI ferma — chiedi a @alice" è una nota di passaggio di consegne. Due campi
+facoltativi sul provider dicono questo:
+
+```yaml
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    impact: deploy bloccati, CI ferma   # fino a 200 caratteri
+    owner: "@alice"                     # fino a 80 caratteri
+```
+
+Entrambi vengono aggiunti sotto ogni messaggio su quel provider — "Impatto: …" e
+"Responsabile: …", nella lingua del canale — e mostrati sulla sua pagina nella
+dashboard. Un canale con un modello ([3.11](#311-lingua-e-modello-per-canale))
+li colloca da sé con `{{impact}}` e `{{owner}}`, così non vengono aggiunti due
+volte. Un riepilogo, che parla di più provider, e un avviso di canale rotto, che
+nomina un provider solo perché il messaggio perso parlava di lui, non portano
+nessuno dei due. Nell'edizione UI sono i campi **Perché conta** e
+**Responsabile** del modulo del provider, e `impact` / `owner` su
+`POST /config/services` e `PATCH /config/services/:id` (`null` cancella l'uno o
+l'altro).
+
