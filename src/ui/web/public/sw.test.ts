@@ -38,6 +38,7 @@ interface FakeSelf {
   };
   skipWaiting: ReturnType<typeof vi.fn>;
   location: { origin: string };
+  fetch: ReturnType<typeof vi.fn>;
 }
 
 /**
@@ -70,6 +71,7 @@ function loadServiceWorker(): { self: FakeSelf; dispatch: (type: string, event: 
     },
     skipWaiting: vi.fn(),
     location: { origin: "https://localhost" },
+    fetch: vi.fn().mockResolvedValue({ ok: true }),
   };
 
   new Function("self", swSource)(fakeSelf);
@@ -192,6 +194,91 @@ describe("service worker (sw.js)", () => {
       await settle();
 
       expect(self.clients.openWindow).toHaveBeenCalledWith("/settings");
+    });
+
+    // Roadmap 3.1: the two buttons on a toast.
+    it("shows the notifier's actions on the toast, and remembers which provider they act on", async () => {
+      const { self, dispatch } = loadServiceWorker();
+      const { waitUntil, settle } = capture();
+      const actions = [
+        { action: "ack", title: "✅ I'm on it" },
+        { action: "mute", title: "🔕 Mute 2h" },
+      ];
+
+      dispatch("push", {
+        data: { json: () => ({ title: "🔴 GitHub", body: "down", url: "/", providerId: "github", actions }) },
+        waitUntil,
+      });
+      await settle();
+
+      expect(self.registration.showNotification).toHaveBeenCalledWith("🔴 GitHub", {
+        body: "down",
+        tag: "github",
+        renotify: true,
+        actions,
+        data: { url: "/", providerId: "github" },
+      });
+    });
+
+    it.each([
+      ["ack", "/providers/github/ack"],
+      ["mute", "/providers/github/mute"],
+    ])("a press on %s calls the dashboard's own route and opens nothing", async (action, path) => {
+      const { self, dispatch } = loadServiceWorker();
+      const { waitUntil, settle } = capture();
+      const notification = { close: vi.fn(), data: { url: "/", providerId: "github" } };
+
+      dispatch("notificationclick", { notification, action, waitUntil });
+      await settle();
+
+      expect(notification.close).toHaveBeenCalledOnce();
+      expect(self.fetch).toHaveBeenCalledWith(path, { method: "POST" });
+      expect(self.clients.openWindow).not.toHaveBeenCalled();
+    });
+
+    it("a press whose call fails takes the operator to the dashboard, where they can do it by hand", async () => {
+      const { self, dispatch } = loadServiceWorker();
+      self.fetch.mockResolvedValue({ ok: false, status: 403 });
+      const { waitUntil, settle } = capture();
+      const notification = { close: vi.fn(), data: { url: "/", providerId: "github" } };
+
+      dispatch("notificationclick", { notification, action: "ack", waitUntil });
+      await settle();
+
+      expect(self.clients.openWindow).toHaveBeenCalledWith("/");
+    });
+
+    it("a press that cannot reach the server at all does the same, rather than failing silently", async () => {
+      const { self, dispatch } = loadServiceWorker();
+      self.fetch.mockRejectedValue(new TypeError("Failed to fetch"));
+      const { waitUntil, settle } = capture();
+      const notification = { close: vi.fn(), data: { url: "/", providerId: "github" } };
+
+      dispatch("notificationclick", { notification, action: "mute", waitUntil });
+      await settle();
+
+      expect(self.clients.openWindow).toHaveBeenCalledWith("/");
+    });
+
+    it("an unknown action, or one with no provider to act on, is an ordinary click", async () => {
+      const { self, dispatch } = loadServiceWorker();
+      const { waitUntil, settle } = capture();
+
+      dispatch("notificationclick", {
+        notification: { close: vi.fn(), data: { url: "/", providerId: "github" } },
+        action: "launch-missiles",
+        waitUntil,
+      });
+      await settle();
+      dispatch("notificationclick", {
+        notification: { close: vi.fn(), data: { url: "/" } },
+        action: "ack",
+        waitUntil,
+      });
+      await settle();
+
+      expect(self.fetch).not.toHaveBeenCalled();
+      expect(self.clients.openWindow).toHaveBeenCalledTimes(2);
     });
   });
 });

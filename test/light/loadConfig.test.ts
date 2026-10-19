@@ -352,6 +352,8 @@ test("a file with no delivery block reads as every control off", async () => {
     digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" },
     cap: { enabled: false, maxPerHour: 10 },
     updateInPlace: false,
+    maintenanceNotice: { enabled: false, leadMinutes: 120 },
+    escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
   });
 });
 
@@ -372,6 +374,13 @@ delivery:
     enabled: true
     maxPerHour: 6
   updateInPlace: true
+  maintenanceNotice:
+    enabled: true
+    leadMinutes: 90
+  escalation:
+    enabled: true
+    afterMinutes: 30
+    channel: pushover
 ${MINIMAL}
 `);
 
@@ -387,6 +396,14 @@ ${MINIMAL}
   assert.equal(config.delivery.digest.windowMinutes, 30);
   assert.equal(config.delivery.cap.maxPerHour, 6);
   assert.equal(config.delivery.updateInPlace, true);
+  assert.deepEqual(config.delivery.maintenanceNotice, { enabled: true, leadMinutes: 90 });
+  // The floor was not written, so it is the default rather than anything stricter.
+  assert.deepEqual(config.delivery.escalation, {
+    enabled: true,
+    afterMinutes: 30,
+    channel: "pushover",
+    minSeverity: "major_outage",
+  });
 });
 
 test("a half-configured delivery block keeps the defaults for the rest", async () => {

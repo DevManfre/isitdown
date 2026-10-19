@@ -23,6 +23,7 @@ export function incidentKey(change: StatusChange): string {
       return `isitdown/${change.providerId}/component/${change.component?.id ?? "unknown"}`;
     case "maintenance_started":
     case "maintenance_ended":
+    case "maintenance_upcoming":
       return `isitdown/${change.providerId}/maintenance/${change.maintenance?.id ?? "unknown"}`;
     case "monitoring_degraded":
       return `isitdown/${change.providerId}/monitoring`;

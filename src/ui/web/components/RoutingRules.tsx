@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangleIcon, ArrowDownIcon, ArrowUpIcon, Trash2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { cn } from "@/lib/utils.ts";
+import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import type { DescribedChannel, QuietHoursPolicy, RoutingResponse, RoutingRule } from "@/lib/types.ts";
 // `explain` is core's own evaluator, imported rather than copied: a dry run
 // computed from a second copy of the matching logic could disagree with what
@@ -101,6 +102,8 @@ const DRYRUN_EVENTS: { id: string; change: Omit<StatusChange, "providerId" | "at
     change: {
       kind: "incident_opened" as StatusChangeKind,
       currentStatus: "partial_outage",
+      // Never shown: `explain` routes on kind, status and group, not on the
+      // incident's name, so this is fixture data rather than a UI string.
       incident: { id: "dryrun", name: "Dry run incident", impact: "minor", status: "investigating", updatedAt: new Date().toISOString() },
     },
   },
@@ -361,6 +364,19 @@ export function RoutingRules({
 
   /** Every edit, add, delete and reorder saves the whole ordered list: per-row position writes can interleave. */
   const save = (next: RoutingRule[]) => void onSave?.(next);
+  // The rule awaiting a "remove?" answer. A rule is a precedence-ordered piece
+  // of logic the operator wrote by hand, and the trash icon used to delete it
+  // on one click with nothing to bring it back.
+  // Held as the rule itself, not its index: the list can reorder or refetch
+  // while the question is open, and an index would then name another rule.
+  // `removeOpen` is separate so the text survives the dialog's exit animation.
+  const [pendingRemove, setPendingRemove] = useState<RoutingRule | undefined>(undefined);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  // A confirmed delete unmounts the trash button that opened the question, so
+  // focus lands on the one control every list still has.
+  const addRef = useRef<HTMLButtonElement>(null);
+  const removedRef = useRef(false);
+  const sameRule = (a: RoutingRule, b: RoutingRule) => JSON.stringify(a) === JSON.stringify(b);
 
   const patch = (index: number, changes: Partial<RoutingRule>) =>
     save(rules.map((rule, at) => (at === index ? { ...rule, ...changes } : rule)));
@@ -498,7 +514,11 @@ export function RoutingRules({
                       className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                       aria-label={t("action.remove")}
                       disabled={saving}
-                      onClick={() => save(rules.filter((_, at) => at !== index))}
+                      onClick={() => {
+                    removedRef.current = false;
+                    setPendingRemove(rule);
+                    setRemoveOpen(true);
+                  }}
                     >
                       <Trash2Icon />
                     </Button>
@@ -582,6 +602,7 @@ export function RoutingRules({
 
       <div>
         <Button
+          ref={addRef}
           type="button"
           variant="secondary"
           size="sm"
@@ -597,6 +618,25 @@ export function RoutingRules({
       {rules.length > 0 && (
         <DryRun rules={rules} channels={channels} services={services} quietHours={quietHours} />
       )}
+
+      <ConfirmDialog
+        open={removeOpen}
+        onOpenChange={setRemoveOpen}
+        title={t("routing.remove.title")}
+        description={t("routing.remove.body", {
+          position: pendingRemove === undefined ? 1 : rules.findIndex((r) => sameRule(r, pendingRemove)) + 1,
+        })}
+        confirmLabel={t("action.remove")}
+        // Only after a removal: on Cancel the trash button is still there and
+        // Radix's own return is the right one.
+        focusAfter={() => (removedRef.current ? addRef.current : null)}
+        onConfirm={() => {
+          if (pendingRemove === undefined) return;
+          removedRef.current = true;
+          const at = rules.findIndex((r) => sameRule(r, pendingRemove));
+          if (at !== -1) save(rules.filter((_, index) => index !== at));
+        }}
+      />
     </div>
   );
 }

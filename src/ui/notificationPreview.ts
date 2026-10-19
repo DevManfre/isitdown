@@ -77,6 +77,7 @@ export const PREVIEW_KINDS = [
   "incident_opened",
   "incident_resolved",
   "maintenance_started",
+  "maintenance_upcoming",
   "monitoring_degraded",
   "silent_outage",
   "slow_status_page",
@@ -138,6 +139,21 @@ function fakeChange(
           endsAt: null,
           componentIds: [],
         },
+      };
+    case "maintenance_upcoming":
+      return {
+        ...base,
+        kind,
+        currentStatus: "operational",
+        maintenance: {
+          id: "preview",
+          name: "Scheduled database maintenance",
+          status: "scheduled",
+          startsAt: new Date(Date.parse(at) + 2 * 3600_000).toISOString(),
+          endsAt: new Date(Date.parse(at) + 2.5 * 3600_000).toISOString(),
+          componentIds: [],
+        },
+        startsInMinutes: 120,
       };
     case "monitoring_degraded":
       return { ...base, kind, currentStatus: "unknown", failureCount: 5 };

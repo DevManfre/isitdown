@@ -25,6 +25,7 @@ const KINDS = [
   "incident_opened",
   "incident_resolved",
   "maintenance_started",
+  "maintenance_upcoming",
   "monitoring_degraded",
   "silent_outage",
   "slow_status_page",

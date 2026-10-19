@@ -280,3 +280,18 @@ notifications:
 #   # on channels that can edit one (telegram, discord). The others still get a
 #   # message per update.
 #   updateInPlace: true
+#
+#   # A heads-up before a maintenance window the provider has declared opens
+#   # (not while it runs): "GitHub maintenance in 2 h, expected 30 min".
+#   maintenanceNotice:
+#     enabled: true
+#     leadMinutes: 120
+#
+#   # A major change nobody took in charge is said again on another channel
+#   # after this long. UI edition only: it needs the "I'm on it" button to know
+#   # whether anybody answered.
+#   escalation:
+#     enabled: true
+#     afterMinutes: 15
+#     channel: pushover
+#     minSeverity: major_outage

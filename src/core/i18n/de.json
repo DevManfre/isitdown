@@ -30,6 +30,7 @@
   "notification.slow.page": "{provider} — Statusseite langsam\n\nDie Statusseite brauchte {latency} für ihre Antwort, sonst sind es {median} (alles über {threshold} fällt auf). Eine Statusseite, die so langsam wird, ist oft das erste Anzeichen eines Problems, das der Anbieter noch nicht eingeräumt hat.\n\n{url}",
   "notification.maintenance.started": "{provider} — Wartung\n\nEine geplante Wartung hat begonnen: {title}\nVoraussichtliches Ende: {endsAt}\nMeldungen zu diesem Anbieter pausieren bis dahin.\n\n{url}",
   "notification.maintenance.ended": "{provider} — Wartung beendet\n\n{title} ist abgeschlossen.\nAktueller Status: {current} — offene Störungen: {count}.\nAktualisiert: {updatedAt}\n\n{url}",
+  "notification.maintenance.upcoming": "{provider} — Wartung steht bevor\n\nGeplante Wartung beginnt in {startsIn}: {title}\nBeginn: {startsAt} — erwartete Dauer: {duration}\n\n{url}",
 
   "notification.digest.heading": "IsItDown — {count} Änderungen in den letzten {minutes} Minuten",
   "notification.digest.line": "{provider}: {what}",
@@ -40,6 +41,7 @@
   "notification.digest.incident-resolved": "Störung behoben — {title}",
   "notification.digest.maintenance-started": "Wartung begonnen — {title}",
   "notification.digest.maintenance-ended": "Wartung beendet — {title}",
+  "notification.digest.maintenance-upcoming": "Wartung in {startsIn} — {title}",
   "notification.digest.monitoring": "Überwachung beeinträchtigt — {count} aufeinanderfolgende fehlgeschlagene Abrufe",
   "notification.digest.silent": "die Statusseite meldet weiterhin betriebsbereit, aber die Sonde {probe} liest {current}",
   "notification.digest.correlated": "{count} Anbieter haben sich gleichzeitig verschlechtert — {providers}",
@@ -48,8 +50,9 @@
   "notification.digest.slow-page": "Statusseite langsam — {latency} statt sonst {median}",
 
   "notification.suppressed": "{count} weitere Meldungen zu diesem Anbieter wurden durch das Stundenlimit unterdrückt.",
+  "notification.escalated": "⏫ Niemand hat das nach {minutes} Min. übernommen — deshalb hier noch einmal.",
 
-  "chatops.help": "IsItDown-Befehle\n\n/status — alle Anbieter, die schlimmsten zuerst\n/status <Anbieter> — ein einzelner Anbieter\n/history <Anbieter> [7|30|90] — Verfügbarkeit über einen Zeitraum\n/mute <Anbieter> <30m|2h|1d> — Meldungen eine Weile stummschalten\n/unmute <Anbieter> — wieder einschalten\n/help — diese Nachricht",
+  "chatops.help": "IsItDown-Befehle\n\n/status — alle Anbieter, die schlimmsten zuerst\n/status <Anbieter> — ein einzelner Anbieter\n/history <Anbieter> [7|30|90] — Verfügbarkeit über einen Zeitraum\n/mute <Anbieter> <30m|2h|1d> — Meldungen eine Weile stummschalten\n/unmute <Anbieter> — wieder einschalten\n/ack <Anbieter> — übernehmen\n/help — diese Nachricht",
   "chatops.status.heading": "{count} von {total} Anbietern sind nicht betriebsbereit.",
   "chatops.status.all-operational": "Alle {count} Anbieter sind betriebsbereit.",
   "chatops.status.empty": "Es wird noch kein Anbieter überwacht.",
@@ -64,6 +67,10 @@
   "chatops.history.unmeasured": "Für {provider} wurde in den letzten {days} Tagen nichts gemessen.",
   "chatops.mute.done": "{provider} ist bis {until} stummgeschaltet. Danach laufen die Meldungen von selbst wieder an.",
   "chatops.unmute.done": "{provider} ist nicht mehr stummgeschaltet.",
+  "chatops.ack.done": "{provider}: von {by} übernommen.",
+  "chatops.ack.already": "{provider} wurde bereits um {at} von {by} übernommen.",
+  "notify.action.ack": "✅ Übernommen",
+  "notify.action.mute": "🔕 2 Std. stumm",
   "chatops.error.provider-required": "Nenne einen Anbieter, zum Beispiel /status github",
   "chatops.error.duration-required": "Sag, wie lange, zum Beispiel /mute github 2h",
   "chatops.error.bad-duration": "{duration} ist keine Dauer, die ich lesen kann. Versuch 30m, 2h oder 1d, bis zu 30d.",

@@ -995,3 +995,235 @@ test("a digest reads in the batching channel's language, line by line", async ()
   // A template describes one change; a batch of them is not templated.
   assert.equal(payload?.template, undefined);
 });
+
+// Roadmap 3.1: only the channels that can take a press are told to draw buttons.
+test("only channels the context names as interactive are handed an interactive payload", async () => {
+  const withButtons = recorder("telegram");
+  const without = recorder("webhook");
+  const dispatcher = createDispatcher({ logger: silent });
+
+  await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [withButtons.notifier, without.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    interactiveChannels: ["telegram"],
+  });
+
+  assert.equal(withButtons.seen[0]?.interactive, true);
+  assert.equal(without.seen[0]?.interactive, undefined);
+});
+
+test("a context that names no interactive channel leaves every payload as it always was", async () => {
+  const channel = recorder("telegram");
+  await createDispatcher({ logger: silent }).dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
+  assert.equal("interactive" in (channel.seen[0] ?? {}), false);
+});
+
+// Roadmap 3.2: a major change nobody has taken in charge is said again, elsewhere.
+const KNOWN_ESCALATION = ["telegram", "pushover", "webhook"];
+
+const escalationPolicy = (over: Partial<DeliveryConfig["escalation"]> = {}): DeliveryConfig => ({
+  ...DELIVERY_DEFAULTS,
+  escalation: { enabled: true, afterMinutes: 15, channel: "pushover", minSeverity: "major_outage", ...over },
+});
+
+function escalationHarness(over: { acked?: boolean; inTrouble?: boolean; delivery?: DeliveryConfig } = {}) {
+  let at = Date.parse("2026-08-19T14:00:00.000Z");
+  const state = { acked: over.acked ?? false, inTrouble: over.inTrouble ?? true };
+  const primary = recorder("telegram");
+  const escalation = recorder("pushover");
+  // Copied so a test can mute the provider after the outage was announced.
+  const fleet = services.map((service) => ({ ...service }));
+  const dispatcher = createDispatcher({
+    logger: silent,
+    now: () => at,
+    sleep: async () => {},
+    escalation: {
+      isAcked: async () => state.acked,
+      inTrouble: async () => state.inTrouble,
+    },
+  });
+  const run = (changes: StatusChange[]) =>
+    dispatcher.dispatch(changes, {
+      services: fleet,
+      locale: "en",
+      notifiers: [primary.notifier, escalation.notifier],
+      rules: [{ provider: "*", classes: ["status", "incident"], minSeverity: "any", channels: ["telegram"] }],
+      knownChannelIds: KNOWN_ESCALATION,
+      delivery: over.delivery ?? escalationPolicy(),
+    });
+  return {
+    state,
+    primary,
+    escalation,
+    run,
+    advance: (minutes: number) => void (at += minutes * 60_000),
+    mute: () => void (fleet[0]!.mutedUntil = "2999-01-01T00:00:00.000Z"),
+  };
+}
+
+const outage = (): StatusChange => change({ currentStatus: "major_outage" });
+
+test("a major change nobody takes in charge is sent again, once, on the escalation channel", async () => {
+  const h = escalationHarness();
+  await h.run([outage()]);
+  assert.equal(h.primary.seen.length, 1);
+  assert.equal(h.escalation.seen.length, 0, "not yet: nobody has had the time to answer");
+
+  h.advance(14);
+  await h.run([]);
+  assert.equal(h.escalation.seen.length, 0, "still inside the wait");
+
+  h.advance(1);
+  await h.run([]);
+  assert.equal(h.escalation.seen.length, 1);
+  assert.deepEqual(h.escalation.seen[0]?.escalated, { afterMinutes: 15 });
+  assert.equal(h.escalation.seen[0]?.change.kind, "status_change");
+  assert.equal(h.primary.seen.length, 1, "the primary channel is not told twice");
+
+  h.advance(60);
+  await h.run([]);
+  assert.equal(h.escalation.seen.length, 1, "once per stretch of trouble, not every cycle");
+});
+
+test("somebody taking it in charge before the wait is up cancels the escalation", async () => {
+  const h = escalationHarness();
+  await h.run([outage()]);
+  h.advance(10);
+  h.state.acked = true;
+  h.advance(10);
+  await h.run([]);
+  assert.equal(h.escalation.seen.length, 0);
+});
+
+test("trouble that ended on its own before the wait is up is not escalated", async () => {
+  const h = escalationHarness();
+  await h.run([outage()]);
+  h.advance(20);
+  h.state.inTrouble = false;
+  await h.run([]);
+  assert.equal(h.escalation.seen.length, 0);
+});
+
+test("trouble that ends and comes back is a new stretch, and escalates again", async () => {
+  const h = escalationHarness();
+  await h.run([outage()]);
+  h.advance(20);
+  await h.run([]);
+  assert.equal(h.escalation.seen.length, 1);
+
+  h.state.inTrouble = false;
+  await h.run([]);
+  h.state.inTrouble = true;
+  await h.run([outage()]);
+  h.advance(20);
+  await h.run([]);
+  assert.equal(h.escalation.seen.length, 2);
+});
+
+test("only a change that clears the escalation floor starts the clock", async () => {
+  const h = escalationHarness();
+  await h.run([change({ currentStatus: "degraded" })]);
+  h.advance(60);
+  await h.run([]);
+  assert.equal(h.escalation.seen.length, 0);
+
+  const wide = escalationHarness({ delivery: escalationPolicy({ minSeverity: "degraded" }) });
+  await wide.run([change({ currentStatus: "degraded" })]);
+  wide.advance(20);
+  await wide.run([]);
+  assert.equal(wide.escalation.seen.length, 1);
+});
+
+test("a recovery never starts the clock, and a change that was held back by quiet hours never did", async () => {
+  const h = escalationHarness();
+  await h.run([change({ previousStatus: "major_outage", currentStatus: "operational" })]);
+  h.advance(60);
+  await h.run([]);
+  assert.equal(h.escalation.seen.length, 0);
+});
+
+test("a muted provider is not escalated, and the escalation is off unless it was asked for", async () => {
+  const muted = escalationHarness();
+  await muted.run([outage()]);
+  muted.mute();
+  muted.advance(20);
+  await muted.run([]);
+  assert.equal(muted.escalation.seen.length, 0, "I know, stop telling me");
+  const off = escalationHarness({ delivery: escalationPolicy({ enabled: false }) });
+  await off.run([outage()]);
+  off.advance(60);
+  await off.run([]);
+  assert.equal(off.escalation.seen.length, 0);
+  const none = escalationHarness({ delivery: DELIVERY_DEFAULTS });
+  await none.run([outage()]);
+  none.advance(60);
+  await none.run([]);
+  assert.equal(none.escalation.seen.length, 0);
+});
+
+test("an escalation channel that is not enabled says so in the log instead of vanishing", async () => {
+  const lines: string[] = [];
+  const logger = createLogger("warn", (line: string) => void lines.push(line));
+  let at = Date.parse("2026-08-19T14:00:00.000Z");
+  const primary = recorder("telegram");
+  const dispatcher = createDispatcher({
+    logger,
+    now: () => at,
+    escalation: { isAcked: async () => false, inTrouble: async () => true },
+  });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [primary.notifier],
+    rules: [{ provider: "*", classes: ["status" as const], minSeverity: "any" as const, channels: ["telegram"] }],
+    knownChannelIds: KNOWN_ESCALATION,
+    delivery: escalationPolicy({ channel: "pushover" }),
+  };
+  await dispatcher.dispatch([outage()], ctx);
+  at += 20 * 60_000;
+  await dispatcher.dispatch([], ctx);
+  assert.ok(lines.some((line) => /escalat/i.test(line) && /pushover/.test(line)), lines.join("\n"));
+});
+
+test("the escalated message says it was not taken in charge, in the channel's own language", async () => {
+  const h = escalationHarness();
+  await h.run([outage()]);
+  h.advance(20);
+  await h.run([]);
+  const payload = h.escalation.seen[0]!;
+  const { renderMessage } = await import("../../src/notifiers/formatting.ts");
+  assert.match(renderMessage(payload), /15 min/);
+  assert.match(renderMessage({ ...payload, locale: "it" }), /15 min/);
+  assert.notEqual(renderMessage(payload), renderMessage({ ...payload, escalated: undefined }));
+});
+
+test("without a way to ask who has taken it in charge, an escalation that was asked for is refused, not guessed", async () => {
+  const lines: string[] = [];
+  const logger = createLogger("warn", (line: string) => void lines.push(line));
+  let at = Date.parse("2026-08-19T14:00:00.000Z");
+  const primary = recorder("telegram");
+  const escalation = recorder("pushover");
+  const dispatcher = createDispatcher({ logger, now: () => at });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [primary.notifier, escalation.notifier],
+    rules: [{ provider: "*", classes: ["status" as const], minSeverity: "any" as const, channels: ["telegram"] }],
+    knownChannelIds: KNOWN_ESCALATION,
+    delivery: escalationPolicy(),
+  };
+  await dispatcher.dispatch([outage()], ctx);
+  at += 60 * 60_000;
+  await dispatcher.dispatch([], ctx);
+  assert.equal(escalation.seen.length, 0);
+  assert.ok(lines.some((line) => /escalat/i.test(line)), "the refusal is said out loud");
+});

@@ -53,6 +53,12 @@ export interface SchedulerDeps {
    * so enabling a channel takes effect without a restart.
    */
   buildNotifiers: (channels: ChannelConfig[]) => Notifier[];
+  /**
+   * The channels that can take a press on a button right now (roadmap 3.1). A
+   * function rather than a list because the edition's answer changes after the
+   * scheduler exists — the bot starts a moment after the runtime is built.
+   */
+  interactiveChannels?: (() => readonly string[]) | undefined;
   logger: Logger;
   onCycle?: ((result: CycleResult) => void | Promise<void>) | undefined;
   /** Injected so tests get an exact arming delay. */
@@ -68,8 +74,14 @@ export interface SchedulerDeps {
  * the cycle's own readings (roadmap 4.13) — and two hand-built contexts is two
  * places for a channel's locale or the quiet-hours window to be forgotten.
  */
-export function dispatchContextOf(config: RuntimeConfig, notifiers: Notifier[]): DispatchContext {
+export function dispatchContextOf(
+  config: RuntimeConfig,
+  notifiers: Notifier[],
+  /** Channels that can take a press on a button (roadmap 3.1); the edition knows, the config does not. */
+  interactiveChannels: readonly string[] = [],
+): DispatchContext {
   return {
+    interactiveChannels,
     services: config.services,
     locale: config.locale,
     notifiers,
@@ -165,7 +177,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       lastIntervalMinutes = Math.min(lastIntervalMinutes, await poller.nextIntervalMinutes(config));
     }
     await tracer().span("notifications.dispatch", { "isitdown.changes": result.changes.length }, () =>
-      dispatcher.dispatch(result.changes, dispatchContextOf(config, buildNotifiers(config.channels))),
+      dispatcher.dispatch(result.changes, dispatchContextOf(config, buildNotifiers(config.channels), deps.interactiveChannels?.() ?? [])),
     );
     if (onCycle !== undefined) await onCycle(result);
     return result;

@@ -8,6 +8,8 @@ import {
 } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
+import { EmptyFleet } from "@/components/EmptyFleet.tsx";
+import { ViewSkeleton } from "@/components/ViewSkeleton.tsx";
 import {
   createColumnHelper,
   createSortedRowModel,
@@ -604,6 +606,11 @@ export function Providers() {
   return (
     // Roadmap 10.1: the strips in the table hatch the days the poller missed.
     <CoverageProvider coverage={summary?.dailyCoverage}>
+      {/* Before the first `/status` the filter chips and the cards would sit
+          over a fleet that is not there yet — the whole body waits. */}
+      {status === undefined ? (
+        <ViewSkeleton rows={6} />
+      ) : (
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <p className="anim-fade text-sm text-muted-foreground">
@@ -665,7 +672,11 @@ export function Providers() {
           <ProviderCards providers={data} />
         )}
 
-        {data.length === 0 ? (
+        {/* First run and "nothing matches" are different answers, and only
+            the second is a line of muted text. */}
+        {all.length === 0 ? (
+          <EmptyFleet />
+        ) : data.length === 0 ? (
           <p className="text-muted-foreground">{t("providers.empty")}</p>
         ) : (
           <Table>
@@ -760,6 +771,7 @@ export function Providers() {
           </Table>
         )}
       </div>
+      )}
     </CoverageProvider>
   );
 }

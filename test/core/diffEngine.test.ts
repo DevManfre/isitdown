@@ -7,6 +7,7 @@ import {
   silentOutage,
   slowStatusPage,
   signatureOf,
+  upcomingMaintenance,
   worseningsIn,
   type WorseningReading,
 } from "../../src/core/diffEngine.ts";
@@ -765,4 +766,53 @@ test("a tie between two shared upstreams goes to the id that sorts first", () =>
     ]),
   );
   assert.equal(cause?.correlated?.cause, "aws");
+});
+
+// Roadmap 3.3: a heads-up before a declared window opens, not while it runs.
+const upcomingAt = "2026-08-19T12:00:00.000Z";
+const soon = (over: Partial<MaintenanceWindow> = {}): MaintenanceWindow =>
+  window({
+    id: "mw-soon",
+    status: "scheduled",
+    startsAt: "2026-08-19T13:30:00.000Z",
+    endsAt: "2026-08-19T14:00:00.000Z",
+    ...over,
+  });
+
+const upcoming = (windows: MaintenanceWindow[], leadMinutes = 120) =>
+  upcomingMaintenance({
+    status: { ...snap("operational", [], [], windows), fetchedAt: upcomingAt },
+    leadMinutes,
+    at: upcomingAt,
+  });
+
+test("upcomingMaintenance announces a window that opens inside the lead, with how soon", () => {
+  const [change, ...rest] = upcoming([soon()]);
+  assert.equal(rest.length, 0);
+  assert.equal(change?.kind, "maintenance_upcoming");
+  assert.equal(change?.providerId, "github");
+  assert.equal(change?.maintenance?.id, "mw-soon");
+  assert.equal(change?.startsInMinutes, 90);
+  assert.equal(change?.at, upcomingAt);
+});
+
+test("upcomingMaintenance stays quiet outside the lead, once running, or when nothing can be judged", () => {
+  const cases: [string, MaintenanceWindow][] = [
+    ["further away than the lead", soon({ startsAt: "2026-08-19T15:00:01.000Z" })],
+    ["a second past the lead edge", soon({ startsAt: "2026-08-19T14:00:01.000Z" })],
+    ["already running", soon({ startsAt: "2026-08-19T11:00:00.000Z" })],
+    ["starting this very instant", soon({ startsAt: upcomingAt })],
+    ["unparseable start", soon({ startsAt: "soon-ish" })],
+  ];
+  for (const [label, candidate] of cases) {
+    assert.deepEqual(upcoming([candidate]), [], label);
+  }
+  assert.equal(upcoming([soon({ startsAt: "2026-08-19T14:00:00.000Z" })]).length, 1, "the lead edge is inclusive");
+  assert.deepEqual(upcoming([soon()], 0), [], "a lead of zero is off");
+  assert.deepEqual(upcoming([soon()], Number.NaN), [], "a nonsensical lead is off");
+});
+
+test("upcomingMaintenance leaves a window with no declared end announceable, and reports each window", () => {
+  const changes = upcoming([soon({ endsAt: null }), soon({ id: "mw-2", startsAt: "2026-08-19T12:30:00.000Z" })]);
+  assert.deepEqual(changes.map((change) => change.maintenance?.id), ["mw-soon", "mw-2"]);
 });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { matchPath, NavLink, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
+import { isApplePlatform } from "@/lib/shortcut.ts";
 import {
   Activity,
   History,
@@ -181,7 +182,11 @@ export function MobileNav() {
             >
               <Search className="size-5 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
               <span className="flex-1">{t("palette.open")}</span>
-              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">⌘K</kbd>
+              {/* Only where a keyboard is likely: the drawer is a phone's
+                  surface, and a shortcut hint there names keys nobody has. */}
+              <kbd className="hidden rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground md:inline">
+                {t(isApplePlatform() ? "palette.shortcut-mac" : "palette.shortcut-other")}
+              </kbd>
             </button>
           </div>
 

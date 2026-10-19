@@ -2,6 +2,7 @@ import type { DaySegment } from "./calendarDays.ts";
 import type { PollCycle } from "./coverage.ts";
 import type { SentRecord } from "../core/notificationDispatcher.ts";
 import type { MessageRefStore } from "../core/messageRefStore.interface.ts";
+import type { AckStore } from "../core/ackStore.interface.ts";
 import type { StateStore } from "../core/stateStore.interface.ts";
 import type { HistoricalIncident, MaintenanceWindow, OverallStatus } from "../core/types.ts";
 
@@ -158,7 +159,7 @@ export interface IncidentNote {
   createdAt: string;
 }
 
-export interface HistoryStore extends StateStore, MessageRefStore {
+export interface HistoryStore extends StateStore, MessageRefStore, AckStore {
   /**
    * One row per day that has samples, oldest first. Days with none are absent.
    *

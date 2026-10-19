@@ -812,3 +812,46 @@ test("a day cut in half by a DST transition is counted once, from both sides", a
   );
   await store.close();
 });
+
+// Roadmap 3.1: "I'm on it", kept where the escalation in 3.2 can read it back.
+test("an acknowledgement is remembered once, with who and when, and can be cleared", async () => {
+  const { db, store } = await harness();
+  const provider = CONTRACT_PROVIDER_IDS[0]!;
+  try {
+    assert.equal(await store.getAck(provider), null);
+
+    assert.equal(await store.acknowledge(provider, "telegram:42", "2026-08-20T18:00:00.000Z"), true);
+    assert.deepEqual(await store.getAck(provider), {
+      ackedAt: "2026-08-20T18:00:00.000Z",
+      ackedBy: "telegram:42",
+    });
+
+    // A second person pressing the same button changes nothing: the first
+    // hand to be raised is the one the team should know about.
+    assert.equal(await store.acknowledge(provider, "web", "2026-08-20T18:05:00.000Z"), false);
+    assert.deepEqual(await store.getAck(provider), {
+      ackedAt: "2026-08-20T18:00:00.000Z",
+      ackedBy: "telegram:42",
+    });
+
+    await store.clearAck(provider);
+    assert.equal(await store.getAck(provider), null);
+    await store.clearAck(provider);
+    assert.equal(await store.acknowledge(provider, "web", "2026-08-20T19:00:00.000Z"), true);
+  } finally {
+    db.close();
+  }
+});
+
+test("an acknowledgement goes with its provider", async () => {
+  const { db, store } = await harness();
+  const provider = CONTRACT_PROVIDER_IDS[0]!;
+  try {
+    await store.acknowledge(provider, "web", "2026-08-20T18:00:00.000Z");
+    db.exec("PRAGMA foreign_keys = ON");
+    db.prepare("DELETE FROM services WHERE id = ?").run(provider);
+    assert.equal(await store.getAck(provider), null);
+  } finally {
+    db.close();
+  }
+});

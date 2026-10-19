@@ -38,6 +38,36 @@ export interface AlertCapConfig {
   maxPerHour: number;
 }
 
+/**
+ * Roadmap 3.3: a heads-up before a declared maintenance window opens, which is
+ * the one alert that lets somebody act *before* rather than after.
+ */
+export interface MaintenanceNoticeConfig {
+  enabled: boolean;
+  /** How far ahead of its start a window is announced. */
+  leadMinutes: number;
+}
+
+/**
+ * Roadmap 3.2: a change nobody has taken in charge is said again, on a louder
+ * channel. Reads the acknowledgement from 3.1, so it can only exist where there
+ * is one to read — the UI edition.
+ */
+export interface EscalationConfig {
+  enabled: boolean;
+  /** How long a change may go unanswered before it is said again. */
+  afterMinutes: number;
+  /**
+   * The channel it is said on — and only that one, the point being a *different*
+   * way of reaching somebody. Empty means none chosen, which is not an
+   * escalation: an operator who switched it on without picking a target is told
+   * so in the log rather than sent a guess.
+   */
+  channel: string;
+  /** The floor a change must clear to start the clock; a degraded blip does not page anybody twice. */
+  minSeverity: SeverityFloor;
+}
+
 export interface DeliveryConfig {
   quietHours: QuietHours;
   digest: DigestConfig;
@@ -49,6 +79,8 @@ export interface DeliveryConfig {
    * find its history silently collapsing into a single line.
    */
   updateInPlace: boolean;
+  maintenanceNotice: MaintenanceNoticeConfig;
+  escalation: EscalationConfig;
 }
 
 /**
@@ -67,4 +99,6 @@ export const DELIVERY_DEFAULTS: DeliveryConfig = {
   digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" },
   cap: { enabled: false, maxPerHour: 10 },
   updateInPlace: false,
+  maintenanceNotice: { enabled: false, leadMinutes: 120 },
+  escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
 };

@@ -17,21 +17,53 @@ self.addEventListener("push", (event) => {
       // than empty, so the browser falls back to its default instead of trying
       // to load "".
       ...(data.icon ? { icon: data.icon } : {}),
-      data: { url: data.url || "/" },
+      // Ack and Mute (roadmap 3.1), when the notifier offered them. Only then
+      // does the toast remember which provider they act on: a plain toast keeps
+      // exactly the payload it always had.
+      ...(Array.isArray(data.actions) && data.actions.length > 0 ? { actions: data.actions } : {}),
+      data: {
+        url: data.url || "/",
+        ...(Array.isArray(data.actions) && data.actions.length > 0 && data.providerId
+          ? { providerId: data.providerId }
+          : {}),
+      },
     }),
   );
 });
 
+// The two buttons a toast can carry, and no others: the name goes into a URL, so
+// it is matched against this list rather than passed through.
+const TOAST_ACTIONS = ["ack", "mute"];
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = (event.notification.data && event.notification.data.url) || "/";
-  event.waitUntil(
+  const providerId = event.notification.data && event.notification.data.providerId;
+
+  const focusOrOpen = () =>
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       const open = clients.find((client) => client.url.includes(self.registration.scope));
       if (open) return open.focus();
       return self.clients.openWindow(url);
-    }),
-  );
+    });
+
+  // A press on a button rather than on the toast itself (roadmap 3.1): call this
+  // process's own route, the same one the Telegram buttons end in. Nothing is
+  // opened when it works — the toast closing is the answer. When it does not
+  // (the dashboard is unreachable, a token refused the write) the operator is
+  // taken to the dashboard instead, because a button that fails without a word
+  // is worse than no button: they would believe they had taken it in charge.
+  if (TOAST_ACTIONS.includes(event.action) && providerId) {
+    event.waitUntil(
+      self
+        .fetch("/providers/" + encodeURIComponent(providerId) + "/" + event.action, { method: "POST" })
+        .then((response) => (response && response.ok ? undefined : focusOrOpen()))
+        .catch(focusOrOpen),
+    );
+    return;
+  }
+
+  event.waitUntil(focusOrOpen());
 });
 
 /* -------------------------------------------------------------------------

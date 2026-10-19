@@ -13,6 +13,8 @@ import { HeroStats } from "@/components/HeroStats.tsx";
 import { SharedFailureCard } from "@/components/SharedFailureCard.tsx";
 import { StackBand } from "@/components/StackBand.tsx";
 import { GeoCard } from "@/components/GeoCard.tsx";
+import { EmptyFleet } from "@/components/EmptyFleet.tsx";
+import { ViewSkeleton } from "@/components/ViewSkeleton.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useConfigChrome, useHistory, useStatus } from "@/hooks/queries.ts";
 import { CoverageProvider } from "@/lib/coverage.tsx";
@@ -49,6 +51,11 @@ export function Overview() {
   // Roadmap 2.9. Declared dependencies live on the config, not on the status.
   const { data: config } = useConfigChrome();
 
+  // No `/status` yet: draw the page's shape, not its empty state. Read as
+  // `data ?? []`, a slow first response told an operator with a full fleet
+  // that none was configured — and "all 0 operational" in the hero above it.
+  if (status === undefined) return <ViewSkeleton hero rows={6} />;
+
   // A disabled provider is one the poller has been told to skip
   // (poller.ts:164), so nothing about it is being measured any more. It is left
   // out of the fleet, the counts, the headline and the average rather than
@@ -57,6 +64,7 @@ export function Overview() {
   const configured = status?.providers ?? [];
   const providers = configured.filter((provider) => provider.enabled);
   const allDisabled = configured.length > 0 && providers.length === 0;
+  const noneConfigured = configured.length === 0;
   const buckets = new Map(
     summaryProviders(summary).map((p) => [p.providerId, p.buckets]),
   );
@@ -124,6 +132,8 @@ export function Overview() {
         <h2 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance md:text-3xl lg:text-4xl lg:leading-[1.1]">
           {allDisabled ? (
             t("overview.title.all-disabled")
+          ) : noneConfigured ? (
+            t("overview.title.empty")
           ) : down.length === 0 ? (
             unreadable.length === 0 ? (
               t("overview.title.all-operational")
@@ -155,7 +165,7 @@ export function Overview() {
           dropped rather than rendered as "All 0 providers responded" — the
           sentence that explains the state is the one in the fleet region, said
           once. The paragraph goes with it, so the gap does not stay behind. */}
-      {!allDisabled && (
+      {!allDisabled && !noneConfigured && (
         <p
           className="anim-rise anim-rise-hero max-w-[68ch] text-muted-foreground"
           style={{ animationDelay: "100ms" }}
@@ -357,10 +367,10 @@ export function Overview() {
         {/* Roadmap 2.6: the groups, above the flat fleet they summarise. */}
         <StackBand groups={status?.groups ?? []} providers={providers} />
 
-        {providers.length === 0 ? (
-          <p className="text-muted-foreground">
-            {t(allDisabled ? "overview.all-disabled" : "providers.empty")}
-          </p>
+        {noneConfigured ? (
+          <EmptyFleet />
+        ) : providers.length === 0 ? (
+          <p className="text-muted-foreground">{t("overview.all-disabled")}</p>
         ) : (
           <>
             {shape === "dense" ? (

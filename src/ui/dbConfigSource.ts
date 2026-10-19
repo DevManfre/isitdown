@@ -157,6 +157,14 @@ const settingsSchema = z.object({
    * otherwise watch its channel history collapse without having asked.
    */
   updateInPlace: booleanSetting.catch(false),
+  /** Heads-up before a declared maintenance window (roadmap 3.3). */
+  maintenanceNoticeEnabled: booleanSetting.catch(false),
+  maintenanceNoticeLeadMinutes: z.coerce.number().int().positive().max(10_080).catch(120),
+  /** Say a change again, elsewhere, when nobody took it in charge (roadmap 3.2). */
+  escalationEnabled: booleanSetting.catch(false),
+  escalationAfterMinutes: z.coerce.number().int().positive().max(1440).catch(15),
+  escalationChannel: z.string().max(64).catch(""),
+  escalationMinSeverity: z.enum(SEVERITY_FLOORS).catch("major_outage"),
 
   /**
    * "Is a newer version out" (roadmap 15.11a). Off by default: it is the only
@@ -290,6 +298,13 @@ export function deliveryOf(settings: Settings): {
   };
   cap: { enabled: boolean; maxPerHour: number };
   updateInPlace: boolean;
+  maintenanceNotice: { enabled: boolean; leadMinutes: number };
+  escalation: {
+    enabled: boolean;
+    afterMinutes: number;
+    channel: string;
+    minSeverity: Settings["escalationMinSeverity"];
+  };
 } {
   return {
     quietHours: {
@@ -309,6 +324,16 @@ export function deliveryOf(settings: Settings): {
       maxPerHour: settings.alertCapPerHour,
     },
     updateInPlace: settings.updateInPlace,
+    maintenanceNotice: {
+      enabled: settings.maintenanceNoticeEnabled,
+      leadMinutes: settings.maintenanceNoticeLeadMinutes,
+    },
+    escalation: {
+      enabled: settings.escalationEnabled,
+      afterMinutes: settings.escalationAfterMinutes,
+      channel: settings.escalationChannel,
+      minSeverity: settings.escalationMinSeverity,
+    },
   };
 }
 

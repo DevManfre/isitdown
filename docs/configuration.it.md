@@ -1562,8 +1562,8 @@ un insieme ipotetico.
 ### 3.8 Politica di consegna — ore di silenzio, riepiloghi, limiti
 
 Le regole di instradamento decidono *chi* viene informato di un cambiamento.
-Altri quattro controlli decidono *quanto* di quel cambiamento esce davvero, e in
-quanti messaggi. Tutti e quattro sono disattivati per default, così
+Altri sei controlli decidono *quanto* di quel cambiamento esce davvero, e in
+quanti messaggi. Tutti e sei sono disattivati per default, così
 un'installazione che non ne configura nessuno si comporta esattamente come prima
 che esistessero.
 
@@ -1583,6 +1583,14 @@ delivery:
     enabled: true
     maxPerHour: 6
   updateInPlace: true
+  maintenanceNotice:
+    enabled: true
+    leadMinutes: 120
+  escalation:
+    enabled: true
+    afterMinutes: 15
+    channel: pushover
+    minSeverity: major_outage
 ```
 
 **Le ore di silenzio** sono un *ingresso* dell'instradamento, non un filtro
@@ -1621,7 +1629,41 @@ mano) ripiega su un messaggio nuovo invece di perdere l'aggiornamento. Il
 webhook entrante di Slack non sa modificare, quindi continua a ricevere un
 messaggio per aggiornamento.
 
-L'edizione Light configura tutti e quattro con il blocco `delivery` sopra;
+**`maintenanceNotice`** avvisa *prima* che si apra una finestra di manutenzione
+dichiarata dal provider, invece che solo quando parte — l'unico avviso che
+permette di agire per primi ("manutenzione GitHub tra 2 h, durata prevista 30
+min"). Una finestra viene annunciata una sola volta, alla prima lettura che la
+trova entro `leadMinutes` dal suo inizio (1–10080, default 120), e viaggia come
+classe di evento `maintenance`, quindi una regola che già porta la manutenzione
+porta anche il preavviso. Un mute sul provider, o una finestra propria già in
+corso, lo trattengono — senza consumarlo, così togliendo il mute l'avviso
+arriva comunque. Una finestra senza fine dichiarata viene annunciata senza
+durata. Come il riepilogo e il limite, ciò che è già stato annunciato vive in
+memoria: un riavvio dentro l'anticipo ripete un preavviso invece di perderlo.
+
+**`escalation`** ripete un cambiamento, su un canale diverso, quando nessuno l'ha
+preso in carico. Uno stato che peggiora, un componente che peggiora, o un
+incidente che si apre o evolve — pari o superiori a `minSeverity` (default
+`major_outage`) — fa partire un conto alla rovescia nel momento in cui viene
+inviato. Dopo `afterMinutes` (1–1440, default 15), se nessuno ha premuto **Preso
+in carico** (o scritto `/ack`; vedi [3.17](configuration.it.md#317-chatops--comandare-il-bot-da-telegram)),
+il provider è ancora in difficoltà e non è silenziato, lo stesso cambiamento viene
+inviato una volta a `channel` — e solo a quello — con in coda "Nessuno l'ha preso
+in carico dopo 15 min". Su Pushover non scende mai sotto la priorità alta. Vale
+una volta per periodo di guai, non una per ogni aggiornamento successivo, e un
+periodo finisce quando il provider è operativo senza nulla di aperto; un
+ripristino, un mute o una presa in carico prima della scadenza lo annullano.
+L'attesa si misura in cicli di polling, perché è quando il dispatcher viene
+interpellato: un `afterMinutes` più corto della cadenza non è più corto della
+cadenza. Se il canale di escalation è spento il log lo dice, invece di far
+sparire il cambiamento nel nulla. I conti alla rovescia vivono in memoria come il
+limite e il riepilogo, quindi un riavvio li azzera. **Solo edizione UI**:
+l'edizione Light non ha nessuna presa in carico da leggere, quindi con
+`escalation` attiva lì scrive una riga di log dicendo che nulla verrà escalato e
+prosegue.
+
+L'edizione Light configura tutti e sei con il blocco `delivery` sopra (con la
+riserva appena detta per `escalation`);
 l'edizione UI li modifica da **Impostazioni → Consegna**, dove ogni riga si
 applica da sé e senza riavvio.
 
@@ -2120,7 +2162,31 @@ Il bot risponde allora nella chat in cui già avvisa:
 | `/history <provider> [7\|30\|90]` | Uptime su un periodo, i giorni davvero misurati, gli incidenti e la giornata peggiore. Default 30. |
 | `/mute <provider> <30m\|2h\|1d>` | Sospende gli avvisi per un po', fino a `30d`. |
 | `/unmute <provider>` | Li riattiva. |
+| `/ack <provider>` | Dice che ci stai lavorando: registra chi ha preso in carico il guaio in corso del provider. |
 | `/help` | L'elenco qui sopra. |
+
+**Bottoni sull'avviso stesso.** Finché il chatops è attivo, un avviso Telegram
+su un guaio ancora in corso — uno stato che peggiora, un incidente che si apre o
+evolve — porta due bottoni sotto di sé: **Preso in carico** e **Silenzia 2h**.
+Sono i comandi `/ack` e `/mute … 2h` senza doverli digitare, serviti dallo stesso
+codice, autorizzati dalla stessa lista di chat e scritti nella lingua del canale.
+Premere **Preso in carico** scrive in chat chi se n'è occupato, così il resto del
+gruppo lo vede; vince la prima pressione, e una seconda dice chi è arrivato
+prima. Un ripristino, un avviso di manutenzione, una pagina lenta o un riepilogo
+non hanno bottoni — non c'è nulla da prendere in carico — e il messaggio che
+chiude un incidente perde quelli che aveva. Un id di provider troppo lungo per i
+64 byte che Telegram concede ai dati di un bottone fa partire l'avviso senza
+bottoni, invece di un bottone per il provider sbagliato.
+
+Le notifiche **web push** ricevono le stesse due azioni quando il browser le
+mostra. Chiamano `POST /providers/:id/ack` e `POST /providers/:id/mute` su questo
+server, le stesse route in cui finiscono i bottoni Telegram. Se la chiamata fallisce
+— la dashboard non è raggiungibile, o un token API rifiuta la scrittura — il clic
+apre la dashboard invece di fallire in silenzio, perché un bottone che non fa
+nulla e non dice nulla ti lascerebbe credere di aver preso in carico.
+
+Una presa in carico è per provider, non per incidente, e si scioglie da sola
+quando il provider è operativo senza nulla di aperto. Non fa parte di un backup.
 
 Un provider si può indicare con l'id configurato o con il nome che compare sulla
 dashboard, quello che viene in mente per primo. Un mute impostato qui è lo

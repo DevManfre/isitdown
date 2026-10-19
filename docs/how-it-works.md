@@ -125,6 +125,7 @@ cases get added as rows rather than as one-off tests.
 | N consecutive failed cycles | | yes, **once** — `monitoring_degraded`, and not again until a success clears it |
 | no window running | a declared window starts | yes — `maintenance_started` |
 | a window running | the same window ends | yes — `maintenance_ended`, naming the status the provider came out in |
+| a declared window is within `maintenanceNotice.leadMinutes` of starting | the first reading that sees it (off by default) | yes, **once** per window — `maintenance_upcoming`, before the window opens rather than when it does |
 | a window running | anything else changes upstream (status, components, incidents) | **no** — suppressed until the window ends |
 | a mute is running (`mutedUntil` in the future) | anything | **no** — the operator said they already know; polling and recording carry on |
 | `confirmSamples: N` | a change seen fewer than N polls in a row | **no**, *yet* — the baseline is held, so the same change is announced once N polls agree |

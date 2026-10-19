@@ -76,6 +76,14 @@ export interface UiRuntimeCore {
    */
   secrets: SecretsFile;
   dispatcher: Dispatcher;
+  /**
+   * Channels whose messages may carry Ack and Mute because something is
+   * listening for the press (roadmap 3.1). Web push is in from the start — its
+   * buttons call this process's own routes — and `server.ts` adds `telegram`
+   * once the bot is actually polling: a button drawn before anything can answer
+   * it is a button that does nothing, which is worse than none.
+   */
+  interactiveChannels: Set<string>;
   store: HistoryStore;
   history: ReturnType<typeof createHistoryService>;
   reliability: ReturnType<typeof createReliabilityService>;
@@ -230,7 +238,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     timeoutMs: 8000,
   });
 
-  const poller = createPoller({ getAdapter, store, logger, outposts: readOutposts(options.env) });
+  const poller = createPoller({ getAdapter, store, logger, outposts: readOutposts(options.env), acks: store });
   const live = createLiveEvents();
 
   const metrics = createMetricsRegistry({
@@ -245,6 +253,20 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     // next update can edit it rather than add another (roadmap 3.19). The same
     // store as everything else: the references cascade with the provider.
     messageRefs: store,
+    // Escalation (roadmap 3.2) asks the same store 3.1's buttons write to, and
+    // reads whether the provider is still in trouble off its last stored
+    // reading — the same two things the poller lets go of an acknowledgement on.
+    escalation: {
+      isAcked: async (providerId) => (await store.getAck(providerId)) !== null,
+      inTrouble: async (providerId) => {
+        const last = (await store.getState(providerId)).last;
+        if (last === null) return false;
+        // `unknown` is not trouble: it is a page we could not read, which the
+        // poller's own `inTrouble` leaves out for the same reason.
+        const bad = last.overallStatus !== "operational" && last.overallStatus !== "unknown";
+        return bad || last.activeIncidents.length > 0;
+      },
+    },
     // What the dashboard's notification feed is built from, and — since every
     // outbound message passes here — what the delivery counters count.
     onSent: (record) => {
@@ -253,12 +275,15 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     },
   });
 
+  const interactiveChannels = new Set<string>(["webpush"]);
+
   let lastCycle: CycleResult | undefined;
   const scheduler = createScheduler({
     configSource,
     poller,
     dispatcher,
     buildNotifiers: buildAllNotifiers,
+    interactiveChannels: () => [...interactiveChannels],
     logger,
     onCycle: async (result) => {
       lastCycle = result;
@@ -334,7 +359,8 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
         (providerId, month) => slaAlreadyTold(db, providerId, month),
       );
       if (changes.length === 0) return;
-      await dispatcher.dispatch(changes, dispatchContextOf(config, buildAllNotifiers(config.channels)));
+      await dispatcher.dispatch(changes, dispatchContextOf(config, buildAllNotifiers(config.channels), [...interactiveChannels]),
+      );
       for (const change of changes) {
         if (change.sla === undefined) continue;
         rememberSlaNotice(db, change.providerId, change.sla.month);
@@ -461,6 +487,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     env: options.env,
     secrets,
     dispatcher,
+    interactiveChannels,
     store,
     history,
     reliability,
