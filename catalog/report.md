@@ -1,12 +1,11 @@
 # Catalog build
 
-Generated 2026-10-12T13:10:47.907Z: 203 providers in the catalog, 111 candidates left out.
+Generated 2026-10-19T10:17:35.494Z: 205 providers in the catalog, 109 candidates left out.
 
 ## Kept although they failed this run
 
 Already in the catalog, so a single failed read does not remove them.
 
-- **Convex** — https://status.convex.dev: The operation was aborted due to timeout
 - **Gemfury** — https://status.gemfury.com: no adapter recognises the page
 
 ## Left out
@@ -33,9 +32,7 @@ Already in the catalog, so a single failed read does not remove them.
 - OpenRouter — https://status.openrouter.ai: no adapter recognises the page
 - PagerDuty — https://status.pagerduty.com: no adapter recognises the page
 - PayPal — https://www.paypal-status.com: no adapter recognises the page
-- Pipedrive — https://status.pipedrive.com: no adapter recognises the page
 - PostHog — https://status.posthog.com: no adapter recognises the page
-- Postmark — https://status.postmarkapp.com: no adapter recognises the page
 - Railway — https://status.railway.com: no adapter recognises the page
 - Redis Cloud — https://status.redis.io: no adapter recognises the page
 - Replicate — https://www.replicatestatus.com: no adapter recognises the page
