@@ -245,6 +245,14 @@ export interface HistoryStore extends StateStore, MessageRefStore, AckStore {
   addIncidentNote(providerId: string, incidentId: string, body: string): Promise<IncidentNote>;
   /** False when the note is not this incident's, or is already gone. */
   deleteIncidentNote(providerId: string, incidentId: string, id: number): Promise<boolean>;
+  /**
+   * Incidents followed from the dashboard — roadmap 3.6. Every update of a
+   * followed incident reaches every enabled channel until it resolves, which is
+   * when the dispatcher lets go of it. Following twice is following once.
+   */
+  followIncident(providerId: string, incidentId: string): Promise<void>;
+  unfollowIncident(providerId: string, incidentId: string): Promise<void>;
+  isIncidentFollowed(providerId: string, incidentId: string): Promise<boolean>;
   /** Newest first by `startsAt`. */
   listMaintenances(filter: MaintenanceFilter): Promise<MaintenanceRow[]>;
   /** Newest first, for the incident view's poll strip. */

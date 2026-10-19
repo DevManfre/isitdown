@@ -81,11 +81,12 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       return;
     }
 
-    const [polls, notifications, active, notes] = await Promise.all([
+    const [polls, notifications, active, notes, followed] = await Promise.all([
       runtime.store.getRecentSamples(providerId, POLL_STRIP_SIZE),
       runtime.store.listNotifications(ACTION_LOG_LIMIT),
       runtime.store.listIncidents({ providerId, state: "active" }),
       runtime.store.listIncidentNotes(providerId, incidentId),
+      runtime.store.isIncidentFollowed(providerId, incidentId),
     ]);
 
     res.json({
@@ -100,7 +101,37 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       // Roadmap 1.11: what the provider changed about this incident after it
       // had already resolved it. Empty for nearly every incident there is.
       revisions: runtime.revisions.revisions(providerId, incidentId),
+      // Roadmap 3.6: whether every update of this incident reaches every channel.
+      followed,
     });
+  });
+
+  /**
+   * Follow one incident — roadmap 3.6: every update reaches every enabled
+   * channel until it resolves, without touching a routing rule. Only an open
+   * incident can be followed: a resolved one has no update left to send, and a
+   * follow on it would sit in the table forever, since the resolution that
+   * clears a follow has already happened.
+   */
+  router.put("/incidents/:providerId/:incidentId/follow", async (req, res) => {
+    const { providerId, incidentId } = req.params;
+    const incident = await runtime.store.getIncident(providerId, incidentId);
+    if (incident === null) {
+      res.status(404).json({ error: { message: `unknown incident: ${providerId}/${incidentId}` } });
+      return;
+    }
+    if (incident.resolvedAt !== null) {
+      res.status(409).json({ error: { message: "a resolved incident has no updates left to follow" } });
+      return;
+    }
+    await runtime.store.followIncident(providerId, incidentId);
+    res.json({ followed: true });
+  });
+
+  /** Idempotent: unfollowing something not followed is already done. */
+  router.delete("/incidents/:providerId/:incidentId/follow", async (req, res) => {
+    await runtime.store.unfollowIncident(req.params.providerId, req.params.incidentId);
+    res.json({ followed: false });
   });
 
   /**

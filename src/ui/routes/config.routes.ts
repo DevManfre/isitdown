@@ -11,10 +11,12 @@ import {
   alertCapSchema,
   maintenanceNoticeSchema,
   escalationSchema,
+  channelHealthSchema,
   digestSchema,
   localeSchema,
   pollingSchema,
   quietHoursSchema,
+  recipientsSchema,
   routingRulesSchema,
   serviceDefinitionSchema,
 } from "../../core/config.schema.ts";
@@ -25,12 +27,14 @@ import {
   describeServiceImpact,
   insertService,
   listChannels,
+  listRecipients,
   listRemovedServices,
   listServices,
   purgeService,
   readSettings,
   restoreDeadline,
   restoreService,
+  replaceRecipients,
   replaceRoutingRules,
   servicePatchSchema,
   softDeleteService,
@@ -67,6 +71,7 @@ const deliveryPatchSchema = z.object({
   updateInPlace: z.boolean().optional(),
   maintenanceNotice: maintenanceNoticeSchema.partial().optional(),
   escalation: escalationSchema.partial().optional(),
+  channelHealth: channelHealthSchema.partial().optional(),
 });
 
 const settingsPatchSchema = pollingSchema
@@ -137,7 +142,7 @@ function deliveryPatch(
   patch: z.infer<typeof deliveryPatchSchema> | undefined,
 ): Record<string, unknown> {
   if (patch === undefined) return {};
-  const { quietHours, digest, cap, updateInPlace, maintenanceNotice, escalation } = patch;
+  const { quietHours, digest, cap, updateInPlace, maintenanceNotice, escalation, channelHealth } = patch;
   return {
     ...(quietHours?.enabled === undefined
       ? {}
@@ -172,6 +177,10 @@ function deliveryPatch(
     ...(escalation?.afterMinutes === undefined ? {} : { escalationAfterMinutes: escalation.afterMinutes }),
     ...(escalation?.channel === undefined ? {} : { escalationChannel: escalation.channel }),
     ...(escalation?.minSeverity === undefined ? {} : { escalationMinSeverity: escalation.minSeverity }),
+    ...(channelHealth?.enabled === undefined ? {} : { channelHealthEnabled: channelHealth.enabled }),
+    ...(channelHealth?.afterFailures === undefined
+      ? {}
+      : { channelHealthAfterFailures: channelHealth.afterFailures }),
   };
 }
 
@@ -225,6 +234,8 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       catalogFeed: { enabled: settings.catalogFeedEnabled, ...runtime.catalogFeed.state() },
       channels: describeChannels(db, runtime.env),
       routing: describeRouting(db, runtime.logger),
+      // Who each channel reaches, preferred first (roadmap 3.5).
+      recipients: listRecipients(db, runtime.logger),
       // Removed but still restorable. Part of the config payload rather than a
       // route of its own: the undo has to be visible on a page an operator
       // reloads tomorrow, not only in the seconds a toast lives for.
@@ -1028,6 +1039,26 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
       return;
     }
     res.json(describeRouting(db, runtime.logger));
+  });
+
+  /**
+   * Every recipient at once (roadmap 3.5), like the routing rules: the dashboard
+   * holds the whole list, and a whole-list write cannot interleave with itself.
+   * Applies from the next dispatch, because the config source re-reads it.
+   */
+  router.put("/config/recipients", (req, res) => {
+    const parsed = z.object({ recipients: recipientsSchema }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+    try {
+      replaceRecipients(db, parsed.data.recipients);
+    } catch (error) {
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      return;
+    }
+    res.json({ recipients: listRecipients(db, runtime.logger) });
   });
 
   /**

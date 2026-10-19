@@ -354,6 +354,7 @@ test("a file with no delivery block reads as every control off", async () => {
     updateInPlace: false,
     maintenanceNotice: { enabled: false, leadMinutes: 120 },
     escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
+    channelHealth: { enabled: false, afterFailures: 3 },
   });
 });
 
@@ -526,4 +527,56 @@ services:
     intervalSeconds: 15
 `);
   assert.equal((await loadConfig(probe, {})).services[0]?.intervalSeconds, 15);
+});
+
+// Roadmap 3.5 and 3.7.
+const WITH_RECIPIENTS = (channels: string) => `
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    impact: deploys blocked, CI stopped
+    owner: "@alice"
+notifications:
+  telegram:
+    enabled: true
+    botToken: t
+    chatId: c
+  webhook:
+    enabled: true
+    url: https://example.com/hook
+recipients:
+  - id: alice
+    name: Alice
+    channels: ${channels}
+`;
+
+test("recipients and a provider's impact and owner are read from the file", async () => {
+  const config = await loadConfig(await configFile(WITH_RECIPIENTS("[telegram, webhook]")), {});
+  assert.deepEqual(config.recipients, [{ id: "alice", name: "Alice", channels: ["telegram", "webhook"] }]);
+  assert.equal(config.services[0]?.impact, "deploys blocked, CI stopped");
+  assert.equal(config.services[0]?.owner, "@alice");
+});
+
+test("a file with no recipients block has none", async () => {
+  const config = await loadConfig(await configFile(FULL), {
+    TELEGRAM_BOT_TOKEN: "123:ABC",
+    TELEGRAM_CHAT_ID: "-100",
+  });
+  assert.deepEqual(config.recipients, []);
+});
+
+test("a recipient naming a channel the file does not define is fatal", async () => {
+  const path = await configFile(WITH_RECIPIENTS("[telegram, pushover]"));
+  await assert.rejects(() => loadConfig(path, {}), /pushover/);
+});
+
+test("a recipient with one channel, or a channel in two recipients, is refused", async () => {
+  await assert.rejects(async () => loadConfig(await configFile(WITH_RECIPIENTS("[telegram]")), {}), /at least two channels/);
+  const shared = `${WITH_RECIPIENTS("[telegram, webhook]")}  - id: bob
+    name: Bob
+    channels: [webhook, telegram]
+`;
+  await assert.rejects(async () => loadConfig(await configFile(shared), {}), /already belongs to recipient/);
 });

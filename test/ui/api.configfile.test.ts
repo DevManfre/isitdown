@@ -201,3 +201,65 @@ test("routing survives a round trip, and an absent routing block leaves the rule
     await app.close();
   }
 });
+
+// Roadmap 3.5 and 3.7: recipients and a provider's handover note travel both ways.
+test("recipients and a provider's impact and owner survive a round trip", async () => {
+  const app = await api();
+  try {
+    await app.putJson("/config/recipients", {
+      recipients: [
+        { id: "alice", name: "Alice", channels: ["telegram", "discord"] },
+        // Web push has no place in a config.yml, so this one is left out.
+        { id: "browser", name: "Browser", channels: ["webpush", "slack"] },
+      ],
+    });
+    const yaml = `services:
+  - id: solo
+    name: Solo
+    adapter: statuspage
+    baseUrl: https://status.solo.test
+    impact: deploys blocked
+    owner: "@alice"
+`;
+    assert.equal((await app.postYaml("/config/import", yaml)).status, 200);
+
+    const exported = parse((await app.get("/config/export")).text) as {
+      services: { id: string; impact?: string; owner?: string }[];
+      recipients: { id: string }[];
+    };
+    const solo = exported.services.find((service) => service.id === "solo");
+    assert.equal(solo?.impact, "deploys blocked");
+    assert.equal(solo?.owner, "@alice");
+    assert.deepEqual(
+      exported.recipients.map((recipient) => recipient.id),
+      ["alice"],
+      "no recipients block on import leaves them alone; web push stays out of the file",
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+test("an imported recipient naming a channel this edition does not have is refused before anything is written", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.postYaml(
+      "/config/import",
+      `services:
+  - id: solo
+    name: Solo
+    adapter: statuspage
+    baseUrl: https://status.solo.test
+recipients:
+  - id: alice
+    name: Alice
+    channels: [telegram, carrier-pigeon]
+`,
+    );
+    assert.equal(status, 400);
+    const exported = parse((await app.get("/config/export")).text) as { services: { id: string }[] };
+    assert.equal(exported.services.some((service) => service.id === "solo"), false);
+  } finally {
+    await app.close();
+  }
+});

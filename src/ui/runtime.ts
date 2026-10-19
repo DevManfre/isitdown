@@ -267,6 +267,12 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
         return bad || last.activeIncidents.length > 0;
       },
     },
+    // Incidents followed from the dashboard (roadmap 3.6), in the same store
+    // so a follow cascades with its provider.
+    follows: {
+      isFollowed: (providerId, incidentId) => store.isIncidentFollowed(providerId, incidentId),
+      unfollow: (providerId, incidentId) => store.unfollowIncident(providerId, incidentId),
+    },
     // What the dashboard's notification feed is built from, and — since every
     // outbound message passes here — what the delivery counters count.
     onSent: (record) => {

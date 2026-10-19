@@ -99,6 +99,8 @@ export const STATUS_CHANGE_KINDS = [
   "silent_outage",
   "sla_burn",
   "slow_status_page",
+  // A channel that keeps failing, said on another one (roadmap 3.4).
+  "channel_failing",
 ] as const;
 
 export type StatusChangeKind = (typeof STATUS_CHANGE_KINDS)[number];
@@ -199,6 +201,23 @@ export interface StatusChange {
    * than only that something was slow.
    */
   latency?: { latencyMs: number; medianMs: number; thresholdMs: number } | undefined;
+  /**
+   * Present for channel_failing only (roadmap 3.4): the channel that has stopped
+   * taking messages, how many in a row it refused, since when, and the last
+   * thing it said. The change still names a provider in `providerId` — the one
+   * the latest lost message was about — for the same reason correlated_outage
+   * does: routing, the delivery log and the dashboard all need a real subject,
+   * and this is what says the alert is about a channel rather than about it.
+   */
+  channel?:
+    | {
+        id: string;
+        failures: number;
+        /** ISO 8601, UTC. When the first failure of this run happened. */
+        since: string;
+        error?: string | undefined;
+      }
+    | undefined;
   /** ISO 8601, UTC. */
   at: string;
 }
@@ -278,6 +297,13 @@ export interface NotificationPayload {
     name: string;
     /** The provider's public status page, linked from the message. */
     statusUrl: string;
+    /**
+     * What breaks when this provider does, and who to call — roadmap 3.7. The
+     * operator's own words, carried on every message so an alert at 3 a.m.
+     * reads as a handover note rather than as a bare status word.
+     */
+    impact?: string | undefined;
+    owner?: string | undefined;
   };
   /**
    * The language this message is written in. The configured notification

@@ -292,12 +292,32 @@ const paths: Json = {
     get: {
       tags: ["Incidents"],
       summary:
-        "One incident: the timeline, what was sent, the last polls, the operator's notes, and any edit the provider made to it after resolving it.",
+        "One incident: the timeline, what was sent, the last polls, the operator's notes, any edit the provider made to it after resolving it, and whether it is followed.",
       parameters: [
         path("providerId", "Provider id."),
         path("incidentId", "The provider's own incident id."),
       ],
       responses: { "200": ok({ type: "object" }), "404": notFound },
+    },
+  },
+  "/incidents/{providerId}/{incidentId}/follow": {
+    put: {
+      tags: ["Incidents"],
+      summary: "Follow an open incident: every update reaches every enabled channel until it resolves.",
+      description:
+        "Roadmap 3.6. Bypasses the routing rules for this one incident, not quiet hours. Ends by itself when the incident resolves. A resolved incident is a 409. Answers `{ followed: true }`.",
+      parameters: [path("providerId", "Provider id."), path("incidentId", "The provider's own incident id.")],
+      responses: {
+        "200": ok({ type: "object" }),
+        "404": notFound,
+        "409": { description: "The incident has already resolved." },
+      },
+    },
+    delete: {
+      tags: ["Incidents"],
+      summary: "Stop following an incident. Idempotent.",
+      parameters: [path("providerId", "Provider id."), path("incidentId", "The provider's own incident id.")],
+      responses: { "200": ok({ type: "object" }) },
     },
   },
   "/incidents/{providerId}/{incidentId}/notes": {
@@ -765,6 +785,16 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
+  "/config/recipients": {
+    put: {
+      tags: ["Configuration"],
+      summary: "Replace the recipients: channels grouped by who they reach, preferred first.",
+      description:
+        "Roadmap 3.5. Body `{ recipients: [{ id, name, channels }] }`. A change a rule sends to several channels of one recipient goes to the first of them only, and to the next only if that one fails. At least two channels each, each channel in at most one recipient, every channel one that exists.",
+      requestBody: { required: true, ...json({ type: "object" }) },
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
   "/config/channels/{id}": {
     patch: {
       tags: ["Configuration"],
@@ -1213,6 +1243,18 @@ const schemas: Json = {
         nullable: true,
         description:
           "Which source is the record for this provider (roadmap 9.1). Null — the normal case — means the adapter decides: a probe is `observed`, a status page is `declared`.",
+      },
+      impact: {
+        type: "string",
+        maxLength: 200,
+        nullable: true,
+        description: "What breaks when this provider does, in the operator's words (roadmap 3.7). Carried into every message.",
+      },
+      owner: {
+        type: "string",
+        maxLength: 80,
+        nullable: true,
+        description: "Who answers for this provider (roadmap 3.7). Carried into every message.",
       },
     },
   },

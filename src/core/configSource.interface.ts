@@ -86,6 +86,13 @@ export interface ServiceDefinition {
    * the provider was added.
    */
   authority?: "declared" | "observed" | undefined;
+  /**
+   * What breaks here when this provider does — "deploys blocked, CI stopped" —
+   * and who answers for it (roadmap 3.7). Free text, carried into every message
+   * and onto the provider's page. Absent is the normal case.
+   */
+  impact?: string | undefined;
+  owner?: string | undefined;
 }
 
 /**
@@ -145,6 +152,25 @@ export interface RuntimeConfig {
    * configures none of this behaves exactly as it did before.
    */
   delivery: DeliveryConfig;
+  /**
+   * People reached through more than one channel, each with a preferred one and
+   * the rest as fallbacks (roadmap 3.5). Empty is the normal case and means every
+   * channel a rule names is sent to, exactly as before recipients existed.
+   */
+  recipients: Recipient[];
+}
+
+/**
+ * One person (or one team) reached through several channels — roadmap 3.5.
+ * `channels` is in order of preference: a change is sent to the first one a rule
+ * reaches, and to the next only if that one fails. What it replaces is the
+ * operator muting their own second channel to stop hearing everything twice,
+ * and losing the redundancy that second channel was there for.
+ */
+export interface Recipient {
+  id: string;
+  name: string;
+  channels: string[];
 }
 
 /**
