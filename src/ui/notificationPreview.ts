@@ -81,6 +81,7 @@ export const PREVIEW_KINDS = [
   "monitoring_degraded",
   "silent_outage",
   "slow_status_page",
+  "channel_failing",
 ] as const satisfies readonly StatusChangeKind[];
 
 export type PreviewKind = (typeof PREVIEW_KINDS)[number];
@@ -176,6 +177,18 @@ function fakeChange(
         currentStatus: "operational",
         latency: { latencyMs: 4200, medianMs: 210, thresholdMs: 1210 },
       };
+    case "channel_failing":
+      return {
+        ...base,
+        kind,
+        currentStatus: "unknown",
+        channel: {
+          id: "webhook",
+          failures: 3,
+          since: new Date(Date.parse(at) - 3 * 86_400_000).toISOString(),
+          error: "HTTP 500",
+        },
+      };
     default:
       return {
         ...base,
@@ -200,6 +213,10 @@ export function previewChannels(
     id: provider?.id ?? "example",
     name: provider?.name ?? "Example Provider",
     statusUrl: provider?.baseUrl ?? "https://status.example.com",
+    // Why it matters and who answers for it (roadmap 3.7), when the operator
+    // wrote them: the preview is the message this installation would send.
+    ...(provider?.impact === undefined ? {} : { impact: provider.impact }),
+    ...(provider?.owner === undefined ? {} : { owner: provider.owner }),
   };
   const at = now.toISOString();
   const change = fakeChange(kind, service.id, at);

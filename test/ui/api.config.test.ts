@@ -1016,6 +1016,7 @@ test("GET /config reports the delivery policy, and an unconfigured one reads as 
       updateInPlace: false,
       maintenanceNotice: { enabled: false, leadMinutes: 120 },
       escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
+      channelHealth: { enabled: false, afterFailures: 3 },
     });
   } finally {
     await it.close();
@@ -1359,5 +1360,97 @@ test("catalog updates are off by default and propose nothing until a signed list
     assert.equal((await request("POST", "/config/catalog/proposals/github/dismiss")).status, 404);
   } finally {
     await close();
+  }
+});
+
+// Roadmap 3.5: recipients.
+test("PUT /config/recipients stores the list, and GET /config reads it back in order", async () => {
+  const app = await api();
+  try {
+    const recipients = [
+      { id: "alice", name: "Alice", channels: ["telegram", "discord"] },
+      { id: "oncall", name: "On-call", channels: ["pagerduty", "slack"] },
+    ];
+    const { status, body } = await app.request("PUT", "/config/recipients", { recipients });
+    assert.equal(status, 200);
+    assert.deepEqual(body, { recipients });
+    assert.deepEqual(((await app.request("GET", "/config")).body as { recipients: unknown }).recipients, recipients);
+    assert.deepEqual((await app.runtime.configSource.load()).recipients, recipients);
+  } finally {
+    await app.close();
+  }
+});
+
+test("PUT /config/recipients refuses an unknown channel, a lone channel and a shared one, and writes nothing", async () => {
+  const app = await api();
+  try {
+    await app.request("PUT", "/config/recipients", {
+      recipients: [{ id: "alice", name: "Alice", channels: ["telegram", "discord"] }],
+    });
+    const attempts = [
+      [{ id: "bob", name: "Bob", channels: ["telegram", "carrier-pigeon"] }],
+      [{ id: "bob", name: "Bob", channels: ["telegram"] }],
+      [
+        { id: "alice", name: "Alice", channels: ["telegram", "discord"] },
+        { id: "bob", name: "Bob", channels: ["slack", "telegram"] },
+      ],
+    ];
+    for (const recipients of attempts) {
+      const { status } = await app.request("PUT", "/config/recipients", { recipients });
+      assert.equal(status, 400, JSON.stringify(recipients));
+    }
+    const kept = ((await app.request("GET", "/config")).body as { recipients: { id: string }[] }).recipients;
+    assert.deepEqual(kept.map((recipient) => recipient.id), ["alice"]);
+  } finally {
+    await app.close();
+  }
+});
+
+// Roadmap 3.4.
+test("a delivery patch switches channel health on and sets its threshold", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.request("PATCH", "/config/settings", {
+      delivery: { channelHealth: { enabled: true, afterFailures: 5 } },
+    });
+    assert.equal(status, 200);
+    const delivery = ((await app.request("GET", "/config")).body as { delivery: { channelHealth: unknown } }).delivery;
+    assert.deepEqual(delivery.channelHealth, { enabled: true, afterFailures: 5 });
+    assert.equal(
+      (await app.request("PATCH", "/config/settings", { delivery: { channelHealth: { afterFailures: 1 } } })).status,
+      400,
+      "one failure is a blip, not a broken channel",
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+// Roadmap 3.7.
+test("a provider's impact and owner are stored, served, and cleared with null", async () => {
+  const app = await api();
+  try {
+    const [first] = ((await app.request("GET", "/config")).body as { services: { id: string }[] }).services;
+    const id = first?.id as string;
+    const patched = await app.request("PATCH", `/config/services/${id}`, {
+      impact: "deploys blocked, CI stopped",
+      owner: "@alice",
+    });
+    assert.equal(patched.status, 200);
+    const read = async () =>
+      ((await app.request("GET", "/config")).body as { services: { id: string; impact?: string; owner?: string }[] }).services.find(
+        (service) => service.id === id,
+      );
+    assert.equal((await read())?.impact, "deploys blocked, CI stopped");
+    assert.equal((await read())?.owner, "@alice");
+    const status = (await app.request("GET", "/status")).body as { providers: { id: string; owner: string | null }[] };
+    assert.equal(status.providers.find((provider) => provider.id === id)?.owner, "@alice");
+
+    await app.request("PATCH", `/config/services/${id}`, { impact: null, owner: null });
+    assert.equal((await read())?.impact, undefined);
+    assert.equal((await read())?.owner, undefined);
+    assert.equal((await app.request("PATCH", `/config/services/${id}`, { impact: "x".repeat(201) })).status, 400);
+  } finally {
+    await app.close();
   }
 });

@@ -51,6 +51,9 @@ const CLASS_OF: Record<StatusChangeKind, EventClass> = {
   // A page answering slowly is a hint about the provider, not a status it has
   // declared (roadmap 1.10). Monitoring, so a rule can keep it off the phone.
   slow_status_page: "monitoring",
+  // About our own delivery, not about any provider (roadmap 3.4): monitoring,
+  // the class a rule already uses for "our side is having trouble".
+  channel_failing: "monitoring",
 };
 
 export function classOf(kind: StatusChangeKind): EventClass {

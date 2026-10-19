@@ -31,6 +31,7 @@
   "notification.maintenance.started": "{provider} — Wartung\n\nEine geplante Wartung hat begonnen: {title}\nVoraussichtliches Ende: {endsAt}\nMeldungen zu diesem Anbieter pausieren bis dahin.\n\n{url}",
   "notification.maintenance.ended": "{provider} — Wartung beendet\n\n{title} ist abgeschlossen.\nAktueller Status: {current} — offene Störungen: {count}.\nAktualisiert: {updatedAt}\n\n{url}",
   "notification.maintenance.upcoming": "{provider} — Wartung steht bevor\n\nGeplante Wartung beginnt in {startsIn}: {title}\nBeginn: {startsAt} — erwartete Dauer: {duration}\n\n{url}",
+  "notification.channel.failing": "IsItDown — Kanal {channel} gestört\n\n{count} Nachricht(en) in Folge konnten nicht an {channel} zugestellt werden, seit {since}.\nLetzter Fehler: {error}\nMeldungen, die nur {channel} erreichen, gehen verloren, bis er repariert ist.",
 
   "notification.digest.heading": "IsItDown — {count} Änderungen in den letzten {minutes} Minuten",
   "notification.digest.line": "{provider}: {what}",
@@ -48,9 +49,12 @@
   "notification.digest.correlated-cause": "{count} Anbieter haben sich gleichzeitig verschlechtert — {providers} — wahrscheinliche Ursache: {cause}",
   "notification.digest.sla": "Fehlerbudget — bei diesem Tempo landet der Monat bei {projected}% gegenüber {target}%",
   "notification.digest.slow-page": "Statusseite langsam — {latency} statt sonst {median}",
+  "notification.digest.channel-failing": "Kanal {channel} gestört — {count} Nachricht(en) in Folge verloren",
 
   "notification.suppressed": "{count} weitere Meldungen zu diesem Anbieter wurden durch das Stundenlimit unterdrückt.",
   "notification.escalated": "⏫ Niemand hat das nach {minutes} Min. übernommen — deshalb hier noch einmal.",
+  "notification.impact": "Auswirkung: {impact}",
+  "notification.owner": "Verantwortlich: {owner}",
 
   "chatops.help": "IsItDown-Befehle\n\n/status — alle Anbieter, die schlimmsten zuerst\n/status <Anbieter> — ein einzelner Anbieter\n/history <Anbieter> [7|30|90] — Verfügbarkeit über einen Zeitraum\n/mute <Anbieter> <30m|2h|1d> — Meldungen eine Weile stummschalten\n/unmute <Anbieter> — wieder einschalten\n/ack <Anbieter> — übernehmen\n/help — diese Nachricht",
   "chatops.status.heading": "{count} von {total} Anbietern sind nicht betriebsbereit.",

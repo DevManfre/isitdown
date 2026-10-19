@@ -11,7 +11,7 @@ import { IncidentMap } from "@/components/IncidentMap.tsx";
 import { PollStrip } from "@/components/charts/PollStrip.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
-import { useIncident, useIncidentNotes, useStatus } from "@/hooks/queries.ts";
+import { useIncident, useIncidentFollow, useIncidentNotes, useStatus } from "@/hooks/queries.ts";
 import { formatDateTime, formatDuration, formatTime } from "@/lib/format.ts";
 import {
   impactColor, impactKey, impactStatus, incidentStatusKey, INCIDENT_STEPS,
@@ -84,6 +84,7 @@ export function IncidentDetail() {
   // the detail query, and a draft must survive the refetch an added note causes.
   const [draft, setDraft] = useState("");
   const notesMutations = useIncidentNotes(providerId, incidentId);
+  const follow = useIncidentFollow(providerId, incidentId);
   const [actionLogExpanded, setActionLogExpanded] = useState(false);
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => {
@@ -251,6 +252,31 @@ export function IncidentDetail() {
               </div>
             ))}
           </div>
+
+          {/* Roadmap 3.6. Only on an open incident: a resolved one has no update
+              left to send, and the server refuses to follow it. */}
+          {incident.resolvedAt === null && (
+            <div className="flex max-w-[30ch] flex-col items-end gap-1 text-right">
+              <Button
+                type="button"
+                variant={detail.followed === true ? "secondary" : "outline"}
+                size="sm"
+                aria-pressed={detail.followed === true}
+                disabled={follow.isPending}
+                onClick={() => follow.mutate(detail.followed !== true)}
+              >
+                {t(detail.followed === true ? "incident.following" : "incident.follow")}
+              </Button>
+              <span className="text-[11px] text-muted-foreground">{t("incident.follow.hint")}</span>
+              {follow.isError && (
+                <span role="alert" className="text-[11px] text-destructive">
+                  {t("incident.follow.failed", {
+                    reason: follow.error instanceof Error ? follow.error.message : String(follow.error),
+                  })}
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col items-end gap-1">
             <Button type="button" variant="ghost" className="mono" onClick={() => void copyPayload()}>

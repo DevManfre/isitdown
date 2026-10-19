@@ -254,7 +254,7 @@ const CHANNEL_ICONS: Record<string, typeof Bell> = {
   webpush: MonitorSmartphone,
 };
 
-const CHANNEL_NAME_KEYS: Record<string, string> = {
+export const CHANNEL_NAME_KEYS: Record<string, string> = {
   apprise: "channel.name.apprise",
   discord: "channel.name.discord",
   email: "channel.name.email",

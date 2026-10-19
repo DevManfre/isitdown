@@ -387,6 +387,15 @@ export function useIncidentNotes(providerId: string, incidentId: string) {
   };
 }
 
+/** Following one incident (roadmap 3.6); refreshes that incident's own query. */
+export function useIncidentFollow(providerId: string, incidentId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (followed: boolean) => api.setIncidentFollowed(providerId, incidentId, followed),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["incident", providerId, incidentId] }),
+  });
+}
+
 /** Newest first by `startsAt`, scoped to enabled providers server-side. */
 export const useMaintenances = (query: api.MaintenanceListQuery = {}) => {
   const busy = useBusy();
@@ -646,6 +655,13 @@ export function useRoutingMutations() {
   const invalidate = useInvalidateAll();
   return {
     save: useMutation({ mutationFn: api.putRouting, onSuccess: invalidate }),
+  };
+}
+
+export function useRecipientMutations() {
+  const invalidate = useInvalidateAll();
+  return {
+    save: useMutation({ mutationFn: api.putRecipients, onSuccess: invalidate }),
   };
 }
 

@@ -43,6 +43,10 @@ export function incidentKey(change: StatusChange): string {
       return `isitdown/${change.providerId}/sla/${change.sla?.month ?? "unknown"}`;
     case "slow_status_page":
       return `isitdown/${change.providerId}/slow-page`;
+    // Keyed on the channel rather than on the provider it happens to name: the
+    // alert is about the channel, and the next lost message may be about another.
+    case "channel_failing":
+      return `isitdown/channel/${change.channel?.id ?? "unknown"}`;
   }
 }
 

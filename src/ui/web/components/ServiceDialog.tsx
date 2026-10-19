@@ -181,6 +181,9 @@ export function ServiceDialog({
   const [authority, setAuthority] = useState<string>(service?.authority ?? "");
   // Roadmap 2.9. Declared by the operator, never inferred.
   const [dependsOn, setDependsOn] = useState<string[]>(service?.dependsOn ?? []);
+  // Roadmap 3.7. Free text the operator writes for the 3 a.m. reader.
+  const [impact, setImpact] = useState(service?.impact ?? "");
+  const [owner, setOwner] = useState(service?.owner ?? "");
   // Adapter-specific extras, of which the scrape adapter is so far the only
   // user. Kept as the raw record the service definition carries, rather than as
   // named fields, so an adapter that grows an option later needs no new state.
@@ -206,7 +209,7 @@ export function ServiceDialog({
   // opened, so a close with anything changed asks first.
   const formState = JSON.stringify([
     picked, name, adapter, baseUrl, selection, scopeToComponents, intervalMinutes,
-    intervalUnit, group, slaTarget, authority, dependsOn, options, header,
+    intervalUnit, group, slaTarget, authority, dependsOn, impact, owner, options, header,
   ]);
   const [pristine, setPristine] = useState(formState);
   const [capturePristine, setCapturePristine] = useState(false);
@@ -332,6 +335,8 @@ export function ServiceDialog({
     setSlaTarget(service?.slaTarget == null ? "" : String(service.slaTarget));
     setAuthority(service?.authority ?? "");
     setDependsOn(service?.dependsOn ?? []);
+    setImpact(service?.impact ?? "");
+    setOwner(service?.owner ?? "");
     setOptions(service?.options ?? {});
     setHeader(storedHeader(service?.options));
     setPreview(undefined);
@@ -541,6 +546,8 @@ export function ServiceDialog({
             ? {}
             : { authority: authority as "declared" | "observed" }),
           ...(dependsOn.length === 0 ? {} : { dependsOn }),
+          ...(impact.trim() === "" ? {} : { impact: impact.trim() }),
+          ...(owner.trim() === "" ? {} : { owner: owner.trim() }),
         });
         const result = await test.mutateAsync(id);
         if (!result.ok) {
@@ -585,6 +592,8 @@ export function ServiceDialog({
               authority === "" ? null : (authority as "declared" | "observed"),
           // Null, not omitted, like the rest: an emptied list must travel.
           dependsOn: dependsOn.length === 0 ? null : dependsOn,
+            impact: impact.trim() === "" ? null : impact.trim(),
+            owner: owner.trim() === "" ? null : owner.trim(),
             ...savedOptions(),
           },
         });
@@ -785,6 +794,32 @@ export function ServiceDialog({
             options={(config?.services ?? []).map((entry) => ({ id: entry.id, name: entry.name }))}
             selfId={id}
           />
+
+        {/* Roadmap 3.7. Both end up in every message about this provider and on
+            its page: what an alert at 3 a.m. needs to be a handover note. */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-impact">{t("field.impact")}</Label>
+          <Input
+            id="service-impact"
+            maxLength={200}
+            placeholder={t("field.impact-placeholder")}
+            value={impact}
+            onChange={(event) => setImpact(event.target.value)}
+            {...fieldProps}
+          />
+          <span className="text-xs text-muted-foreground">{t("field.impact-hint")}</span>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-owner">{t("field.owner")}</Label>
+          <Input
+            id="service-owner"
+            maxLength={80}
+            placeholder={t("field.owner-placeholder")}
+            value={owner}
+            onChange={(event) => setOwner(event.target.value)}
+            {...fieldProps}
+          />
+        </div>
       </Section>
 
       <Section

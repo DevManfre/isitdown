@@ -24,6 +24,7 @@ import type {
   MessagePreview,
   ProviderCalendar,
   CoincidenceReport,
+  Recipient,
   ReliabilityReport,
   SlaResponse,
   ProviderPushConfig,
@@ -247,6 +248,12 @@ export const addIncidentNote = (
     { body },
   );
 
+/** Follow an open incident, or stop — roadmap 3.6. */
+export const setIncidentFollowed = (providerId: string, incidentId: string, followed: boolean) =>
+  request<{ followed: boolean }>(
+    followed ? "PUT" : "DELETE",
+    `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/follow`,
+  );
 export const deleteIncidentNote = (
   providerId: string,
   incidentId: string,
@@ -409,6 +416,8 @@ export const probeAdapter = (id: string) =>
 /** Every edit, add, delete and reorder saves the whole ordered list — see RoutingRules.tsx. */
 export const putRouting = (rules: RoutingRule[]) =>
   request<RoutingResponse>("PUT", "/config/routing", { rules });
+export const putRecipients = (recipients: Recipient[]) =>
+  request<{ recipients: Recipient[] }>("PUT", "/config/recipients", { recipients });
 export const patchChannel = (id: string, patch: unknown) =>
   request<unknown>(
     "PATCH",

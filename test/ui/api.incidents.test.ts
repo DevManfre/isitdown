@@ -412,3 +412,46 @@ test("an incident's detail carries what the provider edited after resolving it",
     await close();
   }
 });
+
+// Roadmap 3.6: following one incident.
+test("an open incident can be followed and unfollowed, and its detail says which", async () => {
+  const app = await api();
+  try {
+    const [providerId] = await openIncidents(app.runtime);
+    const path = `/incidents/${providerId}/${providerId}-1`;
+    assert.equal(((await app.get(path)).body as { followed: boolean }).followed, false);
+
+    assert.deepEqual((await app.send("PUT", `${path}/follow`)).body, { followed: true });
+    assert.equal(((await app.get(path)).body as { followed: boolean }).followed, true);
+    assert.equal(await app.runtime.store.isIncidentFollowed(providerId as string, `${providerId}-1`), true);
+
+    assert.deepEqual((await app.send("DELETE", `${path}/follow`)).body, { followed: false });
+    assert.equal(((await app.get(path)).body as { followed: boolean }).followed, false);
+    // Idempotent: unfollowing twice is unfollowing once.
+    assert.equal((await app.send("DELETE", `${path}/follow`)).status, 200);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a resolved incident, or one that does not exist, cannot be followed", async () => {
+  const app = await api();
+  try {
+    const [providerId] = await openIncidents(app.runtime);
+    assert.equal((await app.send("PUT", `/incidents/${providerId}/nope/follow`)).status, 404);
+
+    // The incident leaving the page is what resolves it.
+    await app.runtime.store.saveStatus({
+      provider: providerId as string,
+      overallStatus: "operational",
+      activeIncidents: [],
+      components: [],
+      maintenances: [],
+      fetchedAt: new Date().toISOString(),
+    });
+    const refused = await app.send("PUT", `/incidents/${providerId}/${providerId}-1/follow`);
+    assert.equal(refused.status, 409);
+  } finally {
+    await app.close();
+  }
+});

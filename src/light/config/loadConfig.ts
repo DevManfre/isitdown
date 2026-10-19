@@ -6,6 +6,7 @@ import {
   CHANNEL_MESSAGE_KEYS,
   type ChannelConfig,
   type ConfigSource,
+  type Recipient,
   type RuntimeConfig,
 } from "../../core/configSource.interface.ts";
 import { CATCH_ALL_RULE, type RoutingRule } from "../../core/routing.ts";
@@ -132,6 +133,7 @@ export async function inspectConfig(path: string, env: NodeJS.ProcessEnv): Promi
     // "everything off" defaults come from one place rather than being restated
     // as a literal here.
     delivery: deliverySchema.parse(file.delivery ?? {}),
+    recipients: buildRecipients(file, channels, path, problems),
   };
 
   return { problems, config };
@@ -168,6 +170,30 @@ function buildRules(
     }
     return rule;
   });
+}
+
+/**
+ * A recipient naming a channel the file does not configure is the same typo a
+ * routing rule's would be, refused for the same reason: its fallback would
+ * silently be one channel shorter than the operator thinks.
+ */
+function buildRecipients(
+  file: FileConfig,
+  channels: ChannelConfig[],
+  path: string,
+  problems: string[],
+): Recipient[] {
+  const knownChannels = new Set(channels.map((channel) => channel.id));
+  const recipients = file.recipients ?? [];
+  for (const recipient of recipients) {
+    for (const channel of recipient.channels) {
+      if (knownChannels.has(channel)) continue;
+      problems.push(
+        `config file ${path}: recipient "${recipient.id}" names channel "${channel}", which is not in notifications`,
+      );
+    }
+  }
+  return recipients;
 }
 
 /** Re-reads the file on every load, so editing it applies on the next cycle. */

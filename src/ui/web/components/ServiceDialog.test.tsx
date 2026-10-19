@@ -851,7 +851,25 @@ describe("the service dialog's write path", () => {
       // And for the authority (roadmap 9.1): "from the adapter" is the absence
       // of an answer, not an answer of its own, so clearing it needs a null.
       authority: null,
+      // And for why it matters and who owns it (roadmap 3.7).
+      impact: null,
+      owner: null,
     });
+  });
+
+  it("saves why a provider matters and who owns it, trimmed (roadmap 3.7)", async () => {
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
+    await openEdit();
+    const dialog = await screen.findByRole("dialog");
+    const calls = interceptWrites({ "PATCH /config/services/github": {} });
+
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.impact")), "  deploys blocked, CI stopped ");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.owner")), "@alice");
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.save") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const patchCall = calls.find((call) => call.method === "PATCH" && call.path === "/config/services/github");
+    expect(patchCall?.body).toMatchObject({ impact: "deploys blocked, CI stopped", owner: "@alice" });
   });
 
   it("saves the providers this one depends on, and sends a null once they are all removed (roadmap 2.9)", async () => {
