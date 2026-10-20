@@ -111,7 +111,7 @@ isitdown/
 │   ├── core/                          diff engine, poller, scheduler, dispatcher, i18n, schemi
 │   │   └── stateStore.contract.ts     una suite che ogni implementazione di StateStore deve passare
 │   ├── adapters/
-│   ├── notifiers/
+│   ├── notifiers/                     test per canale, più contract.test.ts e golden/ (3.8)
 │   ├── light/
 │   ├── ui/                            contratto dello store, aggregazione, ogni route API, guardie tema e lingue
 │   ├── cli/                           args, riduttori e renderer di watch, e il ciclo contro un server finto
@@ -352,8 +352,15 @@ Suite notevoli:
 - **Scheduler** — timer simulati e jitter iniettato: cadenza, rilettura della
   configurazione per ciclo, un poll manuale che si aggancia a un ciclo in corso, un
   ciclo fallito che non uccide il loop.
-- **Notifier** — forma della richiesta in uscita per transizione, e la verifica che un
-  invio Telegram fallito non metta mai il token nel proprio errore.
+- **Contratto dei notifier** — un'unica suite che ogni canale deve superare
+  (roadmap 3.8): ogni tipo di cambiamento consegnato, un rifiuto tipizzato come
+  `ChannelError` senza credenziali dentro, ogni campo limitato tagliato per
+  entrarci, una chiave di deduplicazione stabile, le versioni in testo semplice e
+  formattate che nominano entrambe l'incidente, e i byte esatti in rete
+  confrontati con `test/notifiers/golden/` — `UPDATE_GOLDEN=1 node --test
+  test/notifiers/contract.test.ts` li riscrive, da rivedere come qualunque diff.
+  Un canale aggiunto al registro senza un caso o un'esenzione dichiarata la fa
+  fallire.
 - **API** — ogni route contro un server reale su un database temporaneo, inclusa la
   verifica che nessun body di risposta contenga un valore dell'ambiente.
 - **Guardie su tema e lingue** — nessun esadecimale fuori dal file dei token (la

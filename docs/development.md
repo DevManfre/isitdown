@@ -117,7 +117,7 @@ isitdown/
 │   ├── core/                          diff engine, poller, scheduler, dispatcher, i18n, schemas
 │   │   └── stateStore.contract.ts     one suite every StateStore implementation must pass
 │   ├── adapters/
-│   ├── notifiers/
+│   ├── notifiers/                     per-channel tests, plus contract.test.ts and golden/ (3.8)
 │   ├── light/
 │   ├── ui/                            store contract, aggregation, every API route, theme and locale guards
 │   ├── cli/                           watch's args, reducers, renderer, and the loop against a fake server
@@ -349,8 +349,13 @@ Notable suites:
   provider not blocking a healthy one, and the monitoring warning firing once.
 - **Scheduler** — mocked timers and injected jitter: cadence, config re-read per
   cycle, a manual poll joining an in-flight cycle, a failed cycle not killing the loop.
-- **Notifiers** — outbound request shape per transition, and the assertion that a
-  failed Telegram send never puts the token in its error.
+- **Notifier contract** — one suite every channel must pass (roadmap 3.8): every
+  kind delivered, a refusal typed as `ChannelError` with no credential in it,
+  every capped field cut to fit, a stable de-duplication key, both plain and rich
+  renderings naming the incident, and the exact bytes on the wire against
+  `test/notifiers/golden/` — `UPDATE_GOLDEN=1 node --test
+  test/notifiers/contract.test.ts` rewrites them, to be reviewed like any diff. A
+  channel added to the registry without a case or a stated exemption fails it.
 - **API** — every route against a real server on a temp database, including the
   assertion that no response body contains a value from the environment.
 - **Theme and locale guards** — no hex outside the token file (the scan also
