@@ -1,3 +1,4 @@
+import { MAX_BODY_BYTES, guardedFetch, readCapped, readOutboundPolicy } from "./outboundPolicy.ts";
 import { authHeaders, forgetToken } from "./requestAuth.ts";
 
 /**
@@ -200,7 +201,12 @@ export async function fetchConditional(url: string, opts: ConditionalFetchOption
   let response: Response;
   const askedAt = Date.now();
   try {
-    response = await fetch(url, { headers, signal: AbortSignal.timeout(opts.timeoutMs) });
+    response = await guardedFetch(
+      url,
+      { headers, signal: AbortSignal.timeout(opts.timeoutMs) },
+      readOutboundPolicy(process.env),
+      true,
+    );
   } catch (error) {
     // A validator kept across a failure would be offered again next cycle; if
     // the failure was the provider objecting to it, that is a permanent stall.
@@ -242,7 +248,7 @@ export async function fetchConditional(url: string, opts: ConditionalFetchOption
     throw new Error(`${opts.label} for ${opts.providerId} failed: HTTP ${response.status}`);
   }
 
-  const body = decode(await response.arrayBuffer(), response.headers.get("content-type"));
+  const body = decode(await readCapped(response, MAX_BODY_BYTES), response.headers.get("content-type"));
   const etag = response.headers.get("etag");
   const lastModified = response.headers.get("last-modified");
   if (etag !== null || lastModified !== null) {

@@ -1,5 +1,6 @@
 import type { Adapter, FetchContext, ReadingNote, ServiceRef } from "../core/adapter.interface.ts";
 import { USER_AGENT } from "../core/http.ts";
+import { BodyTooLargeError, MAX_BODY_BYTES, guardedFetch, readCapped, readOutboundPolicy } from "../core/outboundPolicy.ts";
 import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { failureReason, parseStatusSpec, resolveEnv } from "./http.adapter.ts";
 
@@ -339,14 +340,18 @@ export async function runSequence(service: ServiceRef, config: SequenceConfig, t
 
     let response: Response;
     try {
-      response = await fetch(`${service.baseUrl}${path}`, {
-        method: step.method,
-        headers,
-        ...(body === undefined ? {} : { body }),
-        cache: "no-store",
-        redirect: config.followRedirects ? "follow" : "manual",
-        signal: AbortSignal.timeout(remaining),
-      });
+      response = await guardedFetch(
+        `${service.baseUrl}${path}`,
+        {
+          method: step.method,
+          headers,
+          ...(body === undefined ? {} : { body }),
+          cache: "no-store",
+          signal: AbortSignal.timeout(remaining),
+        },
+        readOutboundPolicy(process.env),
+        config.followRedirects,
+      );
     } catch (error) {
       return { ok: false, step: step.index, reason: `no answer from ${service.baseUrl}${step.path}: ${failureReason(error)}`, unreachable: true };
     }
@@ -357,8 +362,11 @@ export async function runSequence(service: ServiceRef, config: SequenceConfig, t
     let text = "";
     if (needsBody) {
       try {
-        text = await response.text();
-      } catch {
+        text = new TextDecoder().decode(await readCapped(response, MAX_BODY_BYTES));
+      } catch (error) {
+        if (error instanceof BodyTooLargeError) {
+          return { ok: false, step: step.index, reason: error.message, unreachable: false };
+        }
         text = "";
       }
     } else {
