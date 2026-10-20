@@ -605,6 +605,7 @@ list is never overwritten afterwards.
 | `DB_PATH` | UI | `/app/data/isitdown.db` | SQLite database. |
 | `API_TOKEN` | UI | — | A read-only bearer token ([3.12](#312-reaching-the-api-from-another-host)). Unset — the default — leaves every route open, which is right for an instance bound to `127.0.0.1`. Set it and a request carrying it may `GET` from any host; writes stay local-only. |
 | `API_LOCAL_BYPASS` | UI | `true` | Whether a request from this machine may skip `API_TOKEN`. Set it to `false` behind a reverse proxy, where every forwarded request looks local. |
+| `ALLOWED_HOSTS` | UI | — | Comma-separated extra hostnames the dashboard may be served under (for example a reverse proxy's name). A write whose `Origin` or `Host` is neither the dashboard's own, `localhost` nor an IP literal is refused with `403`. No wildcard. |
 | `TELEGRAM_CHATOPS` | UI | `false` | Set it to `true` to let the Telegram bot take commands as well as send alerts ([3.17](#317-chatops--commanding-the-bot-from-telegram)). Off by default: an inbound command channel is something you opt into. |
 | `TELEGRAM_COMMAND_CHAT_IDS` | UI | — | Extra chat ids allowed to command the bot, comma-separated. The chat the Telegram channel already sends to is always allowed; this is for an installation alerted in one chat and commanded from another. |
 | `PUBLIC_PAGE` | UI | `false` | Set it to `true` to publish a read-only status page at `/public` ([3.18](#318-the-public-status-page)). Off by default — it is the one surface strangers can read. |

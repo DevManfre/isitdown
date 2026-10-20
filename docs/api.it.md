@@ -12,6 +12,13 @@ unico token bearer di sola lettura — `GET` e `HEAD` da qualunque host, tutto i
 resto rifiutato, `/health` e `/ready` mai protette. Vedi
 [3.12](configuration.it.md#312-raggiungere-lapi-da-un-altro-host).
 
+Una scrittura il cui `Origin` del browser non è l'host della dashboard viene
+rifiutata con `403`, così come una il cui `Host` non è `localhost`, un indirizzo IP
+o un nome elencato in `ALLOWED_HOSTS` (hostname extra, separati da virgola, con cui
+la dashboard può essere servita, ad es. il nome di un reverse proxy). Le richieste
+senza `Origin` (curl, script) e le rotte `/push/`, `/heartbeat/` e `/public` non
+sono toccate.
+
 | Metodo | Percorso | Scopo |
 |---|---|---|
 | `GET` | `/health` | Liveness, e nient'altro: il processo risponde. `{ status, providers, lastCycleAt }`. Non fallisce mai perché un provider è irraggiungibile. |
