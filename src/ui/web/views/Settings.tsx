@@ -20,6 +20,8 @@ import { CatalogUpdatesRow } from "@/components/settings/CatalogUpdatesRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
 import { MessagePreviewDialog } from "@/components/settings/MessagePreviewDialog.tsx";
 import { SECTION_REELS } from "@/components/settings/reels.ts";
+import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
+import { AppearanceSection } from "@/components/settings/AppearanceSection.tsx";
 import { SettingsLauncher } from "@/components/settings/SettingsLauncher.tsx";
 import {
   openCategory,
@@ -31,7 +33,6 @@ import {
   ChannelSummary,
   channelRank,
 } from "@/components/settings/ChannelRow.tsx";
-import { InstallAppRow } from "@/components/settings/InstallAppRow.tsx";
 import { NumberSetting } from "@/components/settings/NumberSetting.tsx";
 import { RoutingRulesDialog } from "@/components/settings/RoutingRulesDialog.tsx";
 import { RecipientsDialog } from "@/components/settings/RecipientsDialog.tsx";
@@ -51,7 +52,6 @@ import {
   useConfig,
   useConfigImport,
   usePreferences,
-  usePreferencesMutation,
   useServiceMutations,
   useSettingsMutation,
   useStorage,
@@ -61,22 +61,17 @@ import {
 import { useFieldProps } from "@/hooks/useBusy.tsx";
 import { formatBytes, formatRelative, hostOf } from "@/lib/format.ts";
 import { isMuted } from "@/lib/mute.ts";
-import { localeName, supportedLocales, switchLocale } from "@/lib/i18n.ts";
-import { effectiveTimeZone, setTimeZone, TIME_ZONES } from "@/lib/timeZone.ts";
+import { TIME_ZONES } from "@/lib/timeZone.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type {
   DeliveryPolicy,
   DescribedChannel,
-  MapView,
   ServiceDefinition,
   SeverityFloorName,
 } from "@/lib/types.ts";
 // The floors come from core's own list rather than a copy: a floor added there
 // has to appear here, and a literal array would silently not.
 import { SEVERITY_FLOORS } from "../../../core/routing.ts";
-
-/** Sections enter in reading order, after the view's own frame has landed. */
-const SECTION_CASCADE = { base: 60, step: 60 };
 
 /**
  * The bounds `pollingSchema` already enforces server-side. Checked here too,
@@ -279,7 +274,6 @@ function SettingsView() {
   const { query, counts } = useSettingsChrome();
   const { data: config } = useConfig();
   const { data: preferences } = usePreferences();
-  const patchPreferences = usePreferencesMutation();
   const settingsMutation = useSettingsMutation();
   const { data: storage } = useStorage();
   const storageMaintenance = useStorageMaintenance();
@@ -1698,132 +1692,7 @@ function SettingsView() {
           </SettingsSection>
         )}
 
-        {open === "appearance" && (
-          <SettingsSection
-            id="appearance"
-            title={t("settings.section.appearance")}
-            reel={SECTION_REELS.appearance}
-            className="lg:col-span-3"
-            delay={stagger(5, SECTION_CASCADE)}
-          >
-            {/* Language leads the section: it decides the words every other row on
-            this page is read in, so it belongs above them rather than after.
-            It used to sit in the header as six code pills; six is where that
-            stopped being a glance and started being a row of chrome. */}
-            <SettingRow
-              label={t("settings.language.label")}
-              description={t("settings.language.hint")}
-              align="top"
-            >
-              <Select
-                value={i18n.language}
-                onValueChange={(value) => {
-                  // Applied here as well as stored, like the time zone beside it:
-                  // `switchLocale` is what actually changes the language, and the
-                  // mutation only remembers the choice for the next browser.
-                  void switchLocale(value).then((applied) =>
-                    patchPreferences.mutate(
-                      { uiLocale: applied },
-                      receipt("appearance"),
-                    ),
-                  );
-                }}
-              >
-                <SelectTrigger
-                  id="ui-locale"
-                  className="w-56"
-                  aria-label={t("settings.language.label")}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {supportedLocales.map((locale) => (
-                    <SelectItem key={locale} value={locale}>
-                      {localeName(locale)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </SettingRow>
-            <SettingRow
-              label={t("settings.timezone.label")}
-              description={t("settings.timezone.hint", {
-                zone: effectiveTimeZone(),
-              })}
-              align="top"
-            >
-              <Select
-                value={preferences?.timeZone ?? "auto"}
-                onValueChange={(value) => {
-                  // Applied here as well as stored: the mutation only writes the
-                  // preference back, and the formatters read the module value.
-                  setTimeZone(value);
-                  patchPreferences.mutate(
-                    { timeZone: value },
-                    receipt("appearance"),
-                  );
-                }}
-              >
-                <SelectTrigger
-                  id="time-zone"
-                  className="w-56"
-                  aria-label={t("settings.timezone.label")}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">
-                    {t("settings.timezone.auto")}
-                  </SelectItem>
-                  {TIME_ZONES.map((zone) => (
-                    <SelectItem key={zone} value={zone}>
-                      {zone === "UTC"
-                        ? t("settings.timezone.utc")
-                        : zone.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </SettingRow>
-            <SettingRow
-              label={t("settings.map-view.label")}
-              description={t("settings.map-view.hint")}
-              align="top"
-            >
-              <Select
-                value={preferences?.mapView ?? "off"}
-                onValueChange={(value) =>
-                  patchPreferences.mutate(
-                    { mapView: value as MapView },
-                    receipt("appearance"),
-                  )
-                }
-              >
-                <SelectTrigger
-                  id="map-view"
-                  className="w-42"
-                  aria-label={t("settings.map-view.label")}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="off">
-                    {t("settings.map-view.off")}
-                  </SelectItem>
-                  <SelectItem value="map">
-                    {t("settings.map-view.map")}
-                  </SelectItem>
-                  <SelectItem value="globe">
-                    {t("settings.map-view.globe")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </SettingRow>
-            {/* Roadmap 5.21. Last in Appearance: it is about the window the
-            dashboard lives in rather than about what is drawn inside it. */}
-            <InstallAppRow />
-          </SettingsSection>
-        )}
+        {open === "appearance" && <AppearanceSection preferences={preferences} />}
 
         {/* The filter can empty the category being read, and the launcher says so
           itself — this is the same sentence for the one open category. */}
