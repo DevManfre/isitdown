@@ -35,6 +35,10 @@ jobs:
       - name: Typecheck (server + dashboard)
         run: npm run typecheck
 
+      # Correctness and suspicious rule groups only; no formatter.
+      - name: Lint (check only)
+        run: npm run lint
+
       # Roadmap 7.2. The same two suites `npm test` runs, under a coverage
       # floor: a new subsystem that lands without tests of its own drags the
       # total under the floor and fails here rather than going unnoticed.

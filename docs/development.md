@@ -252,6 +252,7 @@ npm run canary           # every catalog page, live, against its adapter's fixtu
 npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
+npm run lint             # Biome, check only: correctness + suspicious rules, no formatter
 npm run build:light      # tsc + copy assets, excluding src/ui
 npm run build:ui         # tsc + vite build + copy assets
 npm run build:cli        # tsc + copy assets, src/core/i18n and src/cli only (10.1)

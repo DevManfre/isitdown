@@ -249,6 +249,7 @@ npm run canary           # ogni pagina del catalogo, dal vivo, contro i fixture 
 npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
+npm run lint             # Biome, solo controllo: regole correctness + suspicious, nessun formatter
 npm run build:light      # tsc + copia asset, escludendo src/ui
 npm run build:ui         # tsc + vite build + copia asset
 npm run build:cli        # tsc + copia asset, solo src/core/i18n e src/cli (10.1)
