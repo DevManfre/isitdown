@@ -211,15 +211,13 @@
    not re-enter when the operator changes view, only the view does. */
 .console:not([data-ready]) .header-meta,
 .console:not([data-ready]) .poll-next,
-.console:not([data-ready]) .rail-badge,
-.console:not([data-ready]) .rail-channels {
+.console:not([data-ready]) .rail-badge {
   visibility: hidden;
 }
 /* And they enter on the view's own curve, in the same frame it does. */
 .console[data-ready] .header-meta,
 .console[data-ready] .poll-next,
-.console[data-ready] .rail-badge,
-.console[data-ready] .rail-channels {
+.console[data-ready] .rail-badge {
   animation: fade 0.36s var(--ease-entry) both;
 }
 /* The incident detail enters a touch slower; it is a page, not a panel. */

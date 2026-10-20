@@ -7,7 +7,6 @@ import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
@@ -15,7 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar.tsx";
-import { useConfigChrome, useStatusChrome } from "@/hooks/queries.ts";
+import { useStatusChrome } from "@/hooks/queries.ts";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -42,12 +41,15 @@ const NAV_ICONS: Record<NavRouteName, LucideIcon> = {
  * The rail is the shadcn `Sidebar` primitive, pinned open: App holds the
  * provider's `open` at true, so no collapsed state — and none of the
  * primitive's collapsed-width rules — is ever reachable here.
+ *
+ * Views only. It used to end in a chip per notification channel, which at
+ * thirty channels was most of the rail spent on names nothing is clicked in;
+ * the channels are Settings → Notifications' business.
  */
 export function Rail() {
   const { t, i18n } = useTranslation();
   const { pathname } = useLocation();
   const { data: status } = useStatusChrome();
-  const { data: config } = useConfigChrome();
 
   const badgeFor = (name: RouteName): number | undefined => {
     if (status === undefined) return undefined;
@@ -65,9 +67,6 @@ export function Rail() {
     }
     return undefined;
   };
-
-  const channels = config?.channels ?? [];
-  const active = channels.filter((channel) => channel.enabled).length;
 
   return (
     <Sidebar role="navigation" aria-label={t("nav.views")} className="rail">
@@ -118,39 +117,6 @@ export function Rail() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* The channel list used to be a column of ten rows, which is most of the
-          rail's height spent on a list nothing is ever clicked in. The same ten
-          names wrap as chips, and the line under them is the figure the column
-          never said out loud: how many of them would actually send. */}
-      <SidebarFooter className="rail-foot mt-auto gap-2 px-6">
-        <span className="text-xs text-muted-foreground">{t("nav.channels")}</span>
-        <div className="rail-channels flex flex-wrap gap-1">
-          {channels.map((channel) => (
-            <span
-              key={channel.id}
-              className={cn(
-                "rail-channel inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[10px]",
-                channel.enabled
-                  ? "bg-status-operational/10 text-muted-foreground"
-                  : "bg-muted text-muted-foreground/70",
-              )}
-            >
-              <span
-                className={cn(
-                  "size-1 rounded-full",
-                  channel.enabled ? "bg-status-operational" : "bg-muted-foreground",
-                )}
-              />
-              {channel.id}
-            </span>
-          ))}
-        </div>
-        {channels.length > 0 && (
-          <span className="rail-channels text-xs text-muted-foreground">
-            {t("channel.summary.count", { count: active, total: channels.length })}
-          </span>
-        )}
-      </SidebarFooter>
     </Sidebar>
   );
 }
