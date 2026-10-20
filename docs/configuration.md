@@ -209,10 +209,18 @@ Four things worth knowing before relying on it:
   because the name no longer resolves" are the same severity and different
   problems.
 - it will probe **anything this container can reach**, private addresses
-  included, and it does so with no allowlist. That is deliberate for a
+  included, and it has no allowlist. That is deliberate for a
   single-operator dashboard bound to `127.0.0.1` (`BIND_HOST`, and the compose port mapping); it is also the reason a
   read-only API token or a public read-only page (roadmap 4.15 and 5.1) would
-  have to decide who may write a service definition before either ships.
+  have to decide who may write a service definition before either ships. Two
+  limits apply regardless: a response body is read up to **8 MiB** and a probe
+  that streams more fails with `response exceeded 8388608 bytes`, and
+  **link-local addresses** (`169.254.0.0/16`, `fe80::/10`, the `fd00:ec2::254`
+  metadata address) are always refused, as is any redirect that lands on one.
+  Set `OUTBOUND_BLOCK_PRIVATE=true` to refuse loopback and private ranges as
+  well (`127/8`, `10/8`, `172.16/12`, `192.168/16`, `100.64/10`, `::1`,
+  `fc00::/7`) — recommended whenever the dashboard is reachable beyond this
+  host.
 - **a bot challenge is not an outage.** Cloudflare and friends answer a client
   that cannot run their JavaScript with `403` and a `cf-mitigated` header — the
   "Just a moment…" page. The edge never asked your service anything, so the
@@ -614,6 +622,7 @@ list is never overwritten afterwards.
 | `PUBLIC_PAGE_LOCALE` | UI | — | The language that page is written in. Unset follows the installation's own notification locale. |
 | `PUSH_TOKEN` | UI | — | Turns on the provider-webhook endpoint ([3.15](#315-provider-push-instead-of-poll)) and is the credential in its URL. Unset, that route answers `404`. |
 | `HEARTBEAT_TOKEN` | UI | — | Turns on the heartbeat ping endpoint ([3.19](#319-heartbeats--the-dead-mans-switch)) and is the credential in its URL. Unset, that route answers `404`. |
+| `OUTBOUND_BLOCK_PRIVATE` | both | unset | `true` makes probes and status-page reads refuse loopback and private-range targets (and redirects to them), on top of the link-local addresses that are always refused. Anything else leaves private targets allowed. |
 | `BIND_HOST` | UI | `127.0.0.1` | The address the dashboard listens on. Loopback by default, which is what keeps an instance with no `API_TOKEN` reachable only from this machine; the container images set `0.0.0.0` (the compose `ports` mapping then decides who can reach it, and publishes on `127.0.0.1` only). To reach the dashboard from another machine, publish on `0.0.0.0` (or set `BIND_HOST` on bare metal) **and** set `API_TOKEN` — see [3.12](#312-reaching-the-api-from-another-host) for what a request off this machine may then do. |
 | `PORT` | UI | `3000` | HTTP port. |
 

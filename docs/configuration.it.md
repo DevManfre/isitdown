@@ -213,11 +213,19 @@ Quattro cose da sapere prima di affidarcisi:
   `the TLS certificate expires in 9 day(s)`. "Giù" e "giù perché il nome non si
   risolve più" sono la stessa severità e due problemi diversi.
 - sonda **qualunque cosa questo container riesca a raggiungere**, indirizzi
-  privati compresi, senza alcuna allowlist. È voluto per una dashboard a
+  privati compresi, e non ha alcuna allowlist. È voluto per una dashboard a
   operatore singolo in ascolto su `127.0.0.1` (`BIND_HOST` e la mappatura delle porte di compose); è anche il motivo per cui un
   token API in sola lettura o una pagina pubblica in sola lettura (roadmap 4.15
   e 5.1) dovranno decidere chi può scrivere una definizione di servizio prima di
-  esistere.
+  esistere. Due limiti valgono comunque: il corpo di una risposta viene letto
+  fino a **8 MiB** e una sonda che ne trasmette di più fallisce con
+  `response exceeded 8388608 bytes`, e gli **indirizzi link-local**
+  (`169.254.0.0/16`, `fe80::/10`, l'indirizzo di metadata `fd00:ec2::254`)
+  vengono sempre rifiutati, come ogni redirect che arriva su uno di essi.
+  Imposta `OUTBOUND_BLOCK_PRIVATE=true` per rifiutare anche loopback e range
+  privati (`127/8`, `10/8`, `172.16/12`, `192.168/16`, `100.64/10`, `::1`,
+  `fc00::/7`) — consigliato ogni volta che la dashboard è raggiungibile oltre
+  questo host.
 - **una sfida anti-bot non è un disservizio.** Cloudflare e simili rispondono a
   un client che non sa eseguire il loro JavaScript con `403` e un header
   `cf-mitigated` — la pagina "Just a moment…". Il bordo non ha mai chiesto nulla
@@ -632,6 +640,7 @@ tua lista non viene più sovrascritta in seguito.
 | `PUBLIC_PAGE_LOCALE` | UI | — | La lingua in cui è scritta quella pagina. Se non è impostata segue il locale delle notifiche dell'installazione. |
 | `PUSH_TOKEN` | UI | — | Attiva l'endpoint per i webhook dei provider ([3.15](#315-push-del-provider-invece-del-polling)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
 | `HEARTBEAT_TOKEN` | UI | — | Attiva l'endpoint dei ping heartbeat ([3.19](#319-heartbeat--il-dead-mans-switch)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
+| `OUTBOUND_BLOCK_PRIVATE` | entrambe | non impostata | `true` fa rifiutare a sonde e letture delle pagine di stato i target loopback e dei range privati (e i redirect verso di essi), oltre agli indirizzi link-local che sono sempre rifiutati. Qualsiasi altro valore lascia consentiti i target privati. |
 | `BIND_HOST` | UI | `127.0.0.1` | L'indirizzo su cui la dashboard è in ascolto. Per impostazione predefinita è il loopback, ciò che mantiene un'istanza senza `API_TOKEN` raggiungibile solo da questa macchina; le immagini container impostano `0.0.0.0` (la mappatura `ports` di compose decide poi chi può raggiungerla, e pubblica solo su `127.0.0.1`). Per raggiungere la dashboard da un'altra macchina, pubblica su `0.0.0.0` (o imposta `BIND_HOST` su bare metal) **e** imposta `API_TOKEN` — vedi [3.12](#312-raggiungere-lapi-da-un-altro-host) per ciò che una richiesta da fuori questa macchina può fare. |
 | `PORT` | UI | `3000` | Porta HTTP. |
 
