@@ -26,7 +26,7 @@ export class ChannelError extends Error {
 /**
  * The failure every HTTP channel reports, in the wording the delivery log has
  * always shown: `discord notification failed: HTTP 404 (Unknown Webhook)`.
- * Stated once so seventeen channels cannot phrase the same thing seventeen ways.
+ * Stated once so no two channels phrase the same thing differently.
  */
 export function httpFailure(
   channel: string,
@@ -36,4 +36,14 @@ export function httpFailure(
 ): ChannelError {
   const said = reason === undefined || reason === "" ? "" : ` (${reason})`;
   return new ChannelError(channel, `${channel} notification ${verb}: HTTP ${status}${said}`, status);
+}
+
+/** The request budget every HTTP channel gives its endpoint. */
+export const REQUEST_TIMEOUT_MS = 10_000;
+
+/** The tail every plain HTTP channel shares: nothing on success, the shared failure on anything else. */
+export async function failUnlessOk(channel: string, response: Response, verb = "failed"): Promise<void> {
+  if (response.ok) return;
+  const reason = (await response.text().catch(() => "")).trim();
+  throw httpFailure(channel, verb, response.status, reason);
 }
