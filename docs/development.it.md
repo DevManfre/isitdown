@@ -162,8 +162,8 @@ esclusive di un'edizione.
 | Server state | TanStack Query | `refetchInterval` di 30 secondi, refetch al focus, sospeso mentre un dialogo o un campo è in uso. |
 | Container | un `Dockerfile` multi-stage | `--target light` / `--target ui`, `node:24-alpine`. |
 
-Dipendenze a runtime, in modo esaustivo: `zod`, `yaml` (entrambe le edizioni) ed
-`express` (UI). Tutto ciò che la dashboard usa — React, Vite, Tailwind, le
+Dipendenze a runtime, in modo esaustivo: `zod` e `yaml` (entrambe le edizioni), `express`
+e `web-push` (UI, dove viene costruito il canale Web Push). Tutto ciò che la dashboard usa — React, Vite, Tailwind, le
 primitive Radix di shadcn/ui, TanStack Query, react-i18next, Recharts e il resto —
 è una devDependency compilata in asset statici al momento della build, così
 l'immagine `ui` guadagna un bundle, non un albero di dipendenze. Dipendenze di
