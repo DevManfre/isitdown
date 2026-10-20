@@ -32,7 +32,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {
-    "cobe": "^2.0.1",
     "express": "^5.2.1",
     "web-push": "^3.6.7",
     "yaml": "^2.5.0",
@@ -55,6 +54,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "cobe": "^2.0.1",
     "concurrently": "^10.0.5",
     "dotted-map": "^3.1.0",
     "happy-dom": "^20.11.6",

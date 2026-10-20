@@ -167,8 +167,8 @@ interfaces instead. A test enforces this, including the edition-only dependencie
 | Server state | TanStack Query | 30-second `refetchInterval`, refetch on focus, held while a dialog or a field is in use. |
 | Container | one multi-stage `Dockerfile` | `--target light` / `--target ui`, `node:24-alpine`. |
 
-Runtime dependencies, exhaustively: `zod`, `yaml` (both editions) and `express`
-(UI). Everything the dashboard uses — React, Vite, Tailwind, shadcn/ui's Radix
+Runtime dependencies, exhaustively: `zod` and `yaml` (both editions), `express`
+and `web-push` (UI, where the Web Push channel is built). Everything the dashboard uses — React, Vite, Tailwind, shadcn/ui's Radix
 primitives, TanStack Query, react-i18next, Recharts and the rest — is a
 devDependency compiled into static assets at build time, so the `ui` image gains
 a bundle, not a dependency tree. Dev dependencies otherwise: `typescript`,

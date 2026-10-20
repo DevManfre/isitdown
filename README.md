@@ -9,7 +9,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](tsconfig.json)
 [![Dashboard](https://img.shields.io/badge/dashboard-react-61DAFB?style=flat-square&logo=react&logoColor=black)](docs/development.md#92-tech-stack)
 
-[![Runtime dependencies](https://img.shields.io/badge/runtime%20deps-3-lightgrey?style=flat-square)](docs/development.md#92-tech-stack)
+[![Runtime dependencies](https://img.shields.io/badge/runtime%20deps-4-lightgrey?style=flat-square)](docs/development.md#92-tech-stack)
 [![Docker](https://img.shields.io/badge/docker-light%20%7C%20ui-2496ED?style=flat-square&logo=docker&logoColor=white)](docs/docker.md#4-docker)
 [![i18n](https://img.shields.io/badge/i18n-en%20%7C%20it-orange?style=flat-square)](docs/theming.md#82-localisation)
 
