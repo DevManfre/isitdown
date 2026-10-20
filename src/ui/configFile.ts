@@ -7,9 +7,11 @@ import {
   deliveryOf,
   insertService,
   listChannels,
+  listRecipients,
   listRoutingRules,
   listServices,
   readSettings,
+  replaceRecipients,
   replaceRoutingRules,
   softDeleteService,
   updateChannel,
@@ -88,10 +90,20 @@ export function exportConfigYaml(db: DatabaseSync, logger: Logger): string {
         : { dependsOn: service.dependsOn }),
       ...(service.crossChecks === undefined ? {} : { crossChecks: service.crossChecks }),
       ...(service.slaTarget === undefined ? {} : { slaTarget: service.slaTarget }),
+      ...(service.impact === undefined ? {} : { impact: service.impact }),
+      ...(service.owner === undefined ? {} : { owner: service.owner }),
     })),
     notifications,
     routing: listRoutingRules(db, logger).rules,
     delivery,
+    // Only the channels the file format has, for the reason `notifications`
+    // skips the rest; a recipient left with fewer than two is no recipient.
+    recipients: listRecipients(db, logger)
+      .map((recipient) => ({
+        ...recipient,
+        channels: recipient.channels.filter((channel) => FILE_CHANNEL_IDS.includes(channel)),
+      }))
+      .filter((recipient) => recipient.channels.length >= 2),
   };
 
   return `${HEADER}${stringify(document, { lineWidth: 0 })}`;
@@ -180,6 +192,13 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
     channelWrites.push({ id, enabled: raw.enabled, fields });
   }
 
+  // A recipient naming a channel this edition does not have is refused here,
+  // before the first write, like a literal credential above.
+  for (const recipient of file.recipients ?? []) {
+    const unknown = recipient.channels.find((channel) => !known.has(channel));
+    if (unknown !== undefined) throw new Error(`recipient ${recipient.id}: unknown notification channel: ${unknown}`);
+  }
+
   const settings = {
     pollIntervalMinutes: file.pollIntervalMinutes,
     requestTimeoutSeconds: file.requestTimeoutSeconds,
@@ -211,6 +230,8 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
           escalationAfterMinutes: file.delivery.escalation?.afterMinutes,
           escalationChannel: file.delivery.escalation?.channel,
           escalationMinSeverity: file.delivery.escalation?.minSeverity,
+          channelHealthEnabled: file.delivery.channelHealth?.enabled,
+          channelHealthAfterFailures: file.delivery.channelHealth?.afterFailures,
         }),
   };
   const carried = Object.entries(settings).filter(([, value]) => value !== undefined);
@@ -243,6 +264,8 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
         dependsOn: service.dependsOn ?? null,
         crossChecks: service.crossChecks ?? null,
         slaTarget: service.slaTarget ?? null,
+        impact: service.impact ?? null,
+        owner: service.owner ?? null,
         ...(service.options === undefined ? {} : { options: service.options }),
       });
       report.updated.push(service.id);
@@ -273,6 +296,8 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
     replaceRoutingRules(db, file.routing);
     report.routingRules = file.routing.length;
   }
+  // Absent leaves the recipients alone, for the same reason.
+  if (file.recipients !== undefined) replaceRecipients(db, file.recipients);
 
   logger.info("configuration imported", {
     added: report.added.length,

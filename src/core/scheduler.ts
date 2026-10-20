@@ -93,6 +93,8 @@ export function dispatchContextOf(
     // window or a digest length changed from the dashboard applies without a
     // restart.
     delivery: config.delivery,
+    // Who each channel reaches (roadmap 3.5), read fresh like the rules.
+    recipients: config.recipients,
     // What each channel asked for about the wording of its own messages: the
     // locale (roadmap 3.20) and the template (roadmap 3.15). Built from the
     // same channels the notifiers are, so the two can never describe different

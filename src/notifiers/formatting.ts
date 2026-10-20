@@ -65,6 +65,7 @@ const TEMPLATE: Record<StatusChangeKind, string> = {
   silent_outage: "notification.silent.outage",
   sla_burn: "notification.sla.burn",
   slow_status_page: "notification.slow.page",
+  channel_failing: "notification.channel.failing",
 };
 
 export function emojiFor(status: OverallStatus): string {
@@ -81,7 +82,12 @@ export function emojiFor(status: OverallStatus): string {
 function accentFor(change: StatusChange): { emoji: string; color: number } {
   // A slow page is a hint read off our own measurement, not a severity the
   // provider declared, so it wears the same neutral pair (roadmap 1.10).
-  if (change.kind === "monitoring_degraded" || change.kind === "slow_status_page") {
+  // A failing channel is about our own delivery (roadmap 3.4): neutral too.
+  if (
+    change.kind === "monitoring_degraded" ||
+    change.kind === "slow_status_page" ||
+    change.kind === "channel_failing"
+  ) {
     return { emoji: EMOJI.unknown, color: COLOR.unknown };
   }
   if (
@@ -325,6 +331,11 @@ function summarise(payload: NotificationPayload): string {
         latency: durationLabel(change.latency?.latencyMs ?? 0),
         median: durationLabel(change.latency?.medianMs ?? 0),
       });
+    case "channel_failing":
+      return t(locale, "notification.digest.channel-failing", {
+        channel: change.channel?.id ?? "",
+        count: change.channel?.failures ?? 0,
+      });
   }
 }
 
@@ -369,6 +380,8 @@ export function templateValues(
     component: change.component?.name ?? "",
     title: change.incident?.name ?? change.maintenance?.name ?? "",
     incidentStatus: incidentStatusLabel(change.incident?.status ?? "", locale),
+    impact: service.impact ?? "",
+    owner: service.owner ?? "",
     // Dropped for a channel that links the status page itself, on the same rule
     // the default rendering follows: a Discord embed already carries the link
     // as a button, and a template that printed it again would print it twice.
@@ -444,7 +457,12 @@ function render(
       change.failureCount ??
       change.openIncidents ??
       change.correlated?.providerIds.length ??
+      change.channel?.failures ??
       0,
+    // The channel that keeps failing (roadmap 3.4), since when, and what it said.
+    channel: change.channel?.id ?? "",
+    since: formatUtc(change.channel?.since ?? change.at),
+    error: change.channel?.error ?? "",
     // Provider ids rather than names: only the change's own provider has a
     // name here, and a list that mixed one display name with N slugs would
     // read as two different things.
@@ -473,9 +491,26 @@ function render(
   });
 
   return withSuppressed(
-    `${accentFor(change).emoji} ${body}`.trimEnd(),
+    withContext(`${accentFor(change).emoji} ${body}`.trimEnd(), payload),
     payload,
   );
+}
+
+/**
+ * Why this provider matters and who answers for it (roadmap 3.7), under the
+ * message. Only on the default rendering: a template has `{{impact}}` and
+ * `{{owner}}` tokens and decides for itself where they go, and a digest is about
+ * several providers at once. Not on a failing channel either — that alert names
+ * a provider only because the lost message happened to be about it.
+ */
+function withContext(message: string, payload: NotificationPayload): string {
+  if (payload.change.kind === "channel_failing") return message;
+  const { impact, owner } = payload.service;
+  const lines = [
+    ...(impact === undefined || impact === "" ? [] : [t(payload.locale, "notification.impact", { impact })]),
+    ...(owner === undefined || owner === "" ? [] : [t(payload.locale, "notification.owner", { owner })]),
+  ];
+  return lines.length === 0 ? message : `${message}\n\n${lines.join("\n")}`;
 }
 
 /**

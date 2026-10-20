@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   deliverySchema,
+  recipientsSchema,
   localeSchema,
   routingRuleSchema,
   serviceDefinitionSchema,
@@ -242,6 +243,11 @@ export const fileConfigSchema = z.object({
    * here.
    */
   delivery: deliverySchema.optional(),
+  /**
+   * People reached through several channels, preferred first (roadmap 3.5).
+   * Absent means none: every channel a rule names is sent to on its own.
+   */
+  recipients: recipientsSchema.optional(),
 });
 
 export type FileConfig = z.infer<typeof fileConfigSchema>;

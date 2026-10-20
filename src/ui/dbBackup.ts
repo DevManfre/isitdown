@@ -34,6 +34,7 @@ const TABLES = [
   "settings",
   "channels",
   "routing_rules",
+  "recipients",
   "provider_state",
   "status_samples",
   "component_samples",

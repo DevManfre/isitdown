@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -734,6 +734,37 @@ export function migrate(db: DatabaseSync): void {
         provider_id TEXT PRIMARY KEY REFERENCES services(id) ON DELETE CASCADE,
         acked_at TEXT NOT NULL,
         acked_by TEXT NOT NULL
+      );
+    `);
+  }
+
+  if (from < 33) {
+    // Why a provider matters and who answers for it — roadmap 3.7. On the row
+    // like `sla_target`: the Light edition writes both as fields of the
+    // provider, and a side table would describe one thing two ways.
+    const contextColumns = (
+      db.prepare("PRAGMA table_info(services)").all() as { name: string }[]
+    ).map((column) => column.name);
+    if (!contextColumns.includes("impact")) db.exec("ALTER TABLE services ADD COLUMN impact TEXT");
+    if (!contextColumns.includes("owner")) db.exec("ALTER TABLE services ADD COLUMN owner TEXT");
+    // Recipients — roadmap 3.5. Channels as a JSON list in order of
+    // preference, like a routing rule's; `position` keeps the list in the
+    // order the operator wrote it, which the dashboard shows it back in.
+    // Incident follows — roadmap 3.6. Cascaded with the provider, and not part
+    // of a backup for the reason acks are not: a restored follow would page
+    // every channel about an incident nobody is watching any more.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS recipients (
+        id TEXT PRIMARY KEY,
+        position INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        channels TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS incident_follows (
+        provider_id TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        incident_id TEXT NOT NULL,
+        followed_at TEXT NOT NULL,
+        PRIMARY KEY (provider_id, incident_id)
       );
     `);
   }

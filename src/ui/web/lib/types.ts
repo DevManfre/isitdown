@@ -84,6 +84,12 @@ export interface ProviderStatus {
    */
   authority: "declared" | "observed";
   /**
+   * Roadmap 3.7: what breaks when this provider does, and who answers for it.
+   * Null when unset; optional so an older server's answer still renders.
+   */
+  impact?: string | null;
+  owner?: string | null;
+  /**
    * Roadmap 1.3. A reading a probe measured and the page has not declared;
    * null when there is none. Optional so a dashboard served by an older server
    * still renders — absent reads as none.
@@ -363,7 +369,9 @@ export type StatusChangeKind =
   // service it describes (roadmap 1.10).
   | "silent_outage"
   // A status page answering far slower than it usually does (roadmap 1.10).
-  | "slow_status_page";
+  | "slow_status_page"
+  // A channel that keeps refusing messages, said on another (roadmap 3.4).
+  | "channel_failing";
 
 /**
  * One dispatch attempt, delivered or failed. Field list follows
@@ -418,6 +426,11 @@ export interface IncidentDetail {
    * first (roadmap 1.11). Empty for nearly every incident.
    */
   revisions?: IncidentRevision[];
+  /**
+   * Whether every update reaches every channel until it resolves (roadmap 3.6).
+   * Optional because a server from before it existed answers without it.
+   */
+  followed?: boolean;
 }
 
 /** One field a provider edited on an incident it had already resolved (roadmap 1.11). */
@@ -483,6 +496,12 @@ export interface ServiceDefinition {
    * Absent while none is named; `null` only ever sent, on a patch, to clear it.
    */
   dependsOn?: string[] | null;
+  /**
+   * What breaks when this provider does, and who answers for it (roadmap 3.7).
+   * Absent while unset; `null` only ever sent, on a patch, to clear one.
+   */
+  impact?: string | null;
+  owner?: string | null;
 }
 
 /** One provider's month against its target — `GET /sla` (roadmap 4.13). */
@@ -624,6 +643,13 @@ export interface RoutingResponse {
   invalidRules: number;
 }
 
+/** One person reached through several channels, preferred first — roadmap 3.5. */
+export interface Recipient {
+  id: string;
+  name: string;
+  channels: string[];
+}
+
 export interface RuntimeConfigResponse {
   polling: {
     intervalMinutes: number;
@@ -648,6 +674,8 @@ export interface RuntimeConfigResponse {
   services: ServiceDefinition[];
   channels: DescribedChannel[];
   routing: RoutingResponse;
+  /** Roadmap 3.5. Optional: a server from before recipients answers without them. */
+  recipients?: Recipient[];
   /** Removed but still restorable, newest removal first. */
   removed: RemovedService[];
   /**
@@ -732,6 +760,8 @@ export interface DeliveryPolicy {
     channel: string;
     minSeverity: SeverityFloorName;
   };
+  /** Roadmap 3.4: tell the other channels when one keeps failing. Optional, as above. */
+  channelHealth?: { enabled: boolean; afterFailures: number };
 }
 
 /**

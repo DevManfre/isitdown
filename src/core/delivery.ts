@@ -68,6 +68,16 @@ export interface EscalationConfig {
   minSeverity: SeverityFloor;
 }
 
+/**
+ * Roadmap 3.4: a channel that refuses this many messages in a row is reported
+ * on the others. A broken webhook otherwise shows up only as a badge in the
+ * delivery log, and the operator has to notice an absence.
+ */
+export interface ChannelHealthConfig {
+  enabled: boolean;
+  afterFailures: number;
+}
+
 export interface DeliveryConfig {
   quietHours: QuietHours;
   digest: DigestConfig;
@@ -81,6 +91,7 @@ export interface DeliveryConfig {
   updateInPlace: boolean;
   maintenanceNotice: MaintenanceNoticeConfig;
   escalation: EscalationConfig;
+  channelHealth: ChannelHealthConfig;
 }
 
 /**
@@ -101,4 +112,5 @@ export const DELIVERY_DEFAULTS: DeliveryConfig = {
   updateInPlace: false,
   maintenanceNotice: { enabled: false, leadMinutes: 120 },
   escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
+  channelHealth: { enabled: false, afterFailures: 3 },
 };

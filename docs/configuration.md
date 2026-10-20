@@ -1508,8 +1508,8 @@ hypothetical set.
 
 ### 3.8 Delivery policy — quiet hours, digests, caps
 
-The routing rules decide *who* hears about a change. Six further controls
-decide *how much* of it actually goes out, and in how many messages. All six
+The routing rules decide *who* hears about a change. Seven further controls
+decide *how much* of it actually goes out, and in how many messages. All seven
 are off by default, so an installation that configures none of them behaves
 exactly as it did before they existed.
 
@@ -1537,6 +1537,9 @@ delivery:
     afterMinutes: 15
     channel: pushover
     minSeverity: major_outage
+  channelHealth:
+    enabled: true
+    afterFailures: 3
 ```
 
 **Quiet hours** are a routing *input*, not a filter bolted on after the rules:
@@ -1602,7 +1605,22 @@ a restart clears them. **UI edition only**: the Light edition has no
 acknowledgement to read, so with `escalation` enabled there it logs one line
 saying nothing will be escalated and carries on.
 
-The Light edition configures all six as the `delivery` block above (with the
+**`channelHealth`** tells the other channels when one stops delivering. A
+webhook answering 500 for a week otherwise shows up only as a red badge in the
+delivery log, and the operator has to notice an absence. Once a channel has
+refused `afterFailures` messages in a row (2–100, default 3) — each one already
+past its own retries, so a dead letter — the other channels get one message:
+"IsItDown — channel discord failing: 3 message(s) in a row could not be
+delivered, since …, last error: HTTP 401". It routes as the `monitoring` class
+through the same rules as everything else, minus the broken channel and any
+other channel in a failing run of its own; with nowhere left to say it, the log
+says it instead. Once per run: the alert is not repeated while the channel stays
+broken, and the next message it does deliver ends the run, so a later breakage
+is reported again. Quiet hours hold it back like any other monitoring change,
+and it goes out after them rather than never. An operator's **Send test** does
+not count. The runs live in memory like the cap, so a restart starts them over.
+
+The Light edition configures all seven as the `delivery` block above (with the
 caveat just given for `escalation`); the UI
 edition edits them under **Settings → Delivery**, where each row applies on its
 own without a restart.
@@ -1764,6 +1782,8 @@ The tokens, which the dashboard also lists under the field:
 | `{{component}}` | The component that changed; empty unless this is a component change. |
 | `{{title}}` | The incident's or maintenance window's own title; empty when there is neither. |
 | `{{incidentStatus}}` | The provider's own lifecycle word for the incident, translated where known. |
+| `{{impact}}` | What breaks when this provider does, as written on it ([3.23](#323-why-a-provider-matters--impact-and-owner)); empty when not set. |
+| `{{owner}}` | Who answers for this provider; empty when not set. |
 | `{{url}}` | The provider's public status page. Empty on a channel that renders the link itself (a Discord embed), so it is never printed twice. |
 | `{{at}}` | When it happened, UTC. |
 
@@ -2264,3 +2284,83 @@ that keep going down together; **Declare dependency** writes the same
   and it is still named as the cause. The slug is not checked against the fleet.
 - **Ties** go to the id that sorts first, so the same window always names the
   same cause.
+
+### 3.21 Recipients — one person, several channels
+
+Somebody on both Telegram and Discord hears every alert twice, so they mute one
+of the two — and lose the redundancy the second channel was there for. A
+*recipient* groups channels that reach the same person (or the same team), in
+order of preference: a change goes to the first one, and to the next only when
+that one has failed for good, retries spent.
+
+```yaml
+recipients:
+  - id: alice
+    name: Alice
+    channels: [telegram, discord]   # preferred first, then fallbacks in order
+```
+
+- **The rules still decide who may hear.** A recipient only decides how many
+  times. A change reaches the recipient's channels *that its rule reached*, in
+  the recipient's order — so a rule that keeps a provider off Discord keeps it
+  off Discord's fallback too.
+- **Both sides are logged.** A fallback writes the preferred channel's failure
+  and the fallback's delivery into the delivery log, so the log still shows the
+  channel that needed it, and [`channelHealth`](#38-delivery-policy--quiet-hours-digests-caps)
+  still counts that failure.
+- **A digest** goes to the recipient's preferred channel, falling back the same
+  way when its window closes.
+- **The rules for a list**: at least two channels each, a channel in at most one
+  recipient, and every channel one the configuration defines — the Light
+  edition refuses to start on a recipient naming a channel `notifications` does
+  not have, as it does for a routing rule.
+
+The Light edition configures them as the `recipients` list above; the UI edition
+edits them from **Settings → Notifications → Recipients**, saved as a whole
+(`PUT /config/recipients`). Export and import carry them; web push has no place
+in a `config.yml`, so it is left out of an exported recipient.
+
+### 3.22 Following one incident
+
+The provider you normally keep off your phone can have the incident you need to
+hear every word of. **Follow** on an open incident's page sends every later
+update of that incident to every enabled channel until it resolves, without
+touching a routing rule; the resolution is the last message, and the follow ends
+with it. It is about that incident only — the provider's other changes still go
+where the rules send them. Quiet hours still apply: following says "tell me
+every update", not "wake me for every update". Recipients
+([3.21](#321-recipients--one-person-several-channels)) still collapse, so a
+person with two channels hears each update once.
+
+**UI edition only** — the Light edition has no page to press it on. The routes
+are `PUT` and `DELETE /incidents/:providerId/:incidentId/follow`; a resolved
+incident cannot be followed (409). A follow is not part of a backup, for the
+reason an acknowledgement is not: restored, it would send every channel updates
+about an incident nobody is watching any more.
+
+### 3.23 Why a provider matters — impact and owner
+
+At 3 a.m. "GitHub — MAJOR OUTAGE" is a status word; "deploys blocked, CI
+stopped — ask @alice" is a handover note. Two optional fields on a provider say
+that much:
+
+```yaml
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    impact: deploys blocked, CI stopped   # up to 200 characters
+    owner: "@alice"                       # up to 80 characters
+```
+
+Both are added under every message about that provider — "Impact: …" and
+"Owner: …", in the channel's language — and shown on its page in the dashboard.
+A channel with a template ([3.11](#311-per-channel-locale-and-template)) places
+them itself with `{{impact}}` and `{{owner}}`, so they are not appended twice. A
+digest, which is about several providers, and a failing-channel alert, which
+only names a provider because the lost message was about it, carry neither. In
+the UI edition they are the **Why it matters** and **Owner** fields of the
+provider form, and `impact` / `owner` on `POST /config/services` and
+`PATCH /config/services/:id` (`null` clears either).
+

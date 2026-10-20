@@ -1227,3 +1227,275 @@ test("without a way to ask who has taken it in charge, an escalation that was as
   assert.equal(escalation.seen.length, 0);
   assert.ok(lines.some((line) => /escalat/i.test(line)), "the refusal is said out loud");
 });
+
+// Roadmap 3.4: a channel that keeps failing is reported on the others.
+const channelHealthPolicy = (afterFailures = 3): DeliveryConfig => ({
+  ...DELIVERY_DEFAULTS,
+  channelHealth: { enabled: true, afterFailures },
+});
+
+function channelHealthHarness(delivery: DeliveryConfig = channelHealthPolicy()) {
+  let behaviour: "ok" | "throw" = "throw";
+  const brokenSeen: NotificationPayload[] = [];
+  const broken: Notifier = {
+    id: "webhook",
+    async send(payload) {
+      brokenSeen.push(payload);
+      if (behaviour === "throw") throw new Error("HTTP 500");
+    },
+  };
+  const healthy = recorder("telegram");
+  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [broken, healthy.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery,
+  };
+  return {
+    healthy,
+    brokenSeen,
+    run: (changes: StatusChange[]) => dispatcher.dispatch(changes, ctx),
+    dispatcher,
+    recover: () => void (behaviour = "ok"),
+    breakAgain: () => void (behaviour = "throw"),
+  };
+}
+
+const told = (seen: NotificationPayload[]) => seen.filter((payload) => payload.change.kind === "channel_failing");
+
+test("a channel that refuses enough messages in a row is reported once on the others", async () => {
+  const h = channelHealthHarness();
+  await h.run([change()]);
+  await h.run([change()]);
+  assert.equal(told(h.healthy.seen).length, 0, "two failures are not yet a broken channel");
+
+  const records = await h.run([change()]);
+  const alerts = told(h.healthy.seen);
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0]?.change.channel?.id, "webhook");
+  assert.equal(alerts[0]?.change.channel?.failures, 3);
+  assert.equal(alerts[0]?.change.channel?.error, "HTTP 500");
+  assert.equal(told(h.brokenSeen).length, 0, "the broken channel is not asked to report itself");
+  assert.ok(records.some((record) => record.kind === "channel_failing" && record.channel === "telegram"));
+
+  await h.run([change()]);
+  assert.equal(told(h.healthy.seen).length, 1, "once per run of failures, not every cycle after");
+});
+
+test("a channel that works again ends its run, so the next run is reported again", async () => {
+  const h = channelHealthHarness();
+  for (let n = 0; n < 3; n += 1) await h.run([change()]);
+  assert.equal(told(h.healthy.seen).length, 1);
+
+  h.recover();
+  await h.run([change()]);
+  h.breakAgain();
+  for (let n = 0; n < 3; n += 1) await h.run([change()]);
+  assert.equal(told(h.healthy.seen).length, 2);
+});
+
+test("a failing channel is not reported while the feature is off", async () => {
+  const h = channelHealthHarness(DELIVERY_DEFAULTS);
+  for (let n = 0; n < 5; n += 1) await h.run([change()]);
+  assert.equal(told(h.healthy.seen).length, 0);
+});
+
+test("quiet hours hold the report back, and it goes out once they are over", async () => {
+  let at = Date.parse("2026-08-19T02:00:00.000Z");
+  const delivery: DeliveryConfig = {
+    ...channelHealthPolicy(2),
+    quietHours: { enabled: true, start: "23:00", end: "07:00", timeZone: "UTC", minSeverity: "major_outage" },
+  };
+  const broken: Notifier = { id: "webhook", send: async () => Promise.reject(new Error("HTTP 500")) };
+  const healthy = recorder("telegram");
+  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {}, now: () => at });
+  const run = (changes: StatusChange[]) =>
+    dispatcher.dispatch(changes, {
+      services,
+      locale: "en",
+      notifiers: [broken, healthy.notifier],
+      rules: [{ provider: "*", classes: ["status"], minSeverity: "any", channels: ["webhook"] }, CATCH_ALL_RULE],
+      knownChannelIds: KNOWN,
+      delivery,
+    });
+  // A major outage clears the quiet-hours floor, so it is still sent — and fails.
+  await run([change({ currentStatus: "major_outage" })]);
+  await run([change({ currentStatus: "major_outage" })]);
+  assert.equal(told(healthy.seen).length, 0, "held: a broken webhook is not worth waking anybody");
+
+  at = Date.parse("2026-08-19T08:00:00.000Z");
+  await run([]);
+  assert.equal(told(healthy.seen).length, 1);
+});
+
+test("an operator's test send does not count towards a channel's run", async () => {
+  const h = channelHealthHarness(channelHealthPolicy(2));
+  const broken = { id: "webhook", send: async () => Promise.reject(new Error("HTTP 500")) };
+  await h.dispatcher.sendTest(broken, services[0]!, "en");
+  await h.dispatcher.sendTest(broken, services[0]!, "en");
+  await h.run([]);
+  assert.equal(told(h.healthy.seen).length, 0);
+});
+
+// Roadmap 3.5: a recipient hears a change once, on its preferred channel.
+const recipients = [{ id: "alice", name: "Alice", channels: ["telegram", "discord"] }];
+
+test("a recipient's channels collapse into its preferred one", async () => {
+  const telegram = recorder("telegram");
+  const discord = recorder("discord");
+  const webhook = recorder("webhook");
+  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [discord.notifier, telegram.notifier, webhook.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    recipients,
+  });
+
+  assert.equal(telegram.seen.length, 1);
+  assert.equal(discord.seen.length, 0, "the fallback stays quiet while the preferred channel works");
+  assert.equal(webhook.seen.length, 1, "a channel in no recipient is sent to as before");
+  assert.equal(records.length, 2);
+});
+
+test("a preferred channel that fails for good hands the message to the next", async () => {
+  const telegram = recorder("telegram", "throw");
+  const discord = recorder("discord");
+  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier, discord.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    recipients,
+  });
+
+  assert.equal(discord.seen.length, 1);
+  assert.deepEqual(
+    records.map((record) => [record.channel, record.ok]),
+    [
+      ["telegram", false],
+      ["discord", true],
+    ],
+    "the delivery log shows why the fallback was needed",
+  );
+});
+
+test("a recipient only falls back onto channels the rule reached", async () => {
+  const telegram = recorder("telegram", "throw");
+  const discord = recorder("discord");
+  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+
+  await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier, discord.notifier],
+    rules: [{ provider: "*", classes: ["status"], minSeverity: "any", channels: ["telegram"] }],
+    knownChannelIds: KNOWN,
+    recipients,
+  });
+
+  assert.equal(discord.seen.length, 0, "the rule kept this provider off Discord, fallback included");
+});
+
+test("a recipient's digest goes to its preferred channel only", async () => {
+  let at = Date.parse("2026-08-19T14:00:00.000Z");
+  const telegram = recorder("telegram");
+  const discord = recorder("discord");
+  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {}, now: () => at });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier, discord.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    recipients,
+    delivery: { ...DELIVERY_DEFAULTS, digest: { enabled: true, windowMinutes: 15, immediateFloor: "major_outage" as const } },
+  };
+  await dispatcher.dispatch([change()], ctx);
+  at += 16 * 60_000;
+  await dispatcher.dispatch([], ctx);
+  assert.equal(telegram.seen.length, 1);
+  assert.notEqual(telegram.seen[0]?.digest, undefined);
+  assert.equal(discord.seen.length, 0);
+});
+
+// Roadmap 3.6: a followed incident reaches every channel until it resolves.
+test("a followed incident reaches every enabled channel whatever the rules say, until it resolves", async () => {
+  const followed = new Set(["github/i1"]);
+  const telegram = recorder("telegram");
+  const slack = recorder("slack");
+  const dispatcher = createDispatcher({
+    logger: silent,
+    follows: {
+      isFollowed: async (providerId, incidentId) => followed.has(`${providerId}/${incidentId}`),
+      unfollow: async (providerId, incidentId) => void followed.delete(`${providerId}/${incidentId}`),
+    },
+  });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier, slack.notifier],
+    // A rule that mutes this provider outright.
+    rules: [{ provider: "github", classes: ["status" as const, "incident" as const], minSeverity: "any" as const, channels: [] }],
+    knownChannelIds: KNOWN,
+  };
+
+  await dispatcher.dispatch([change({ kind: "incident_updated", incident })], ctx);
+  assert.equal(telegram.seen.length, 1);
+  assert.equal(slack.seen.length, 1);
+
+  await dispatcher.dispatch([change({ kind: "status_change" })], ctx);
+  assert.equal(telegram.seen.length, 1, "only the incident is followed, not the provider");
+
+  await dispatcher.dispatch([change({ kind: "incident_resolved", incident, currentStatus: "operational" })], ctx);
+  assert.equal(telegram.seen.length, 2, "the resolution is the last update it carries");
+  assert.equal(followed.size, 0, "and the follow ends with it");
+
+  await dispatcher.dispatch([change({ kind: "incident_updated", incident })], ctx);
+  assert.equal(telegram.seen.length, 2);
+});
+
+test("quiet hours still hold a followed incident's update", async () => {
+  const telegram = recorder("telegram");
+  const dispatcher = createDispatcher({
+    logger: silent,
+    now: () => Date.parse("2026-08-19T02:00:00.000Z"),
+    follows: { isFollowed: async () => true, unfollow: async () => {} },
+  });
+  await dispatcher.dispatch([change({ kind: "incident_updated", incident, currentStatus: "degraded" })], {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: {
+      ...DELIVERY_DEFAULTS,
+      quietHours: { enabled: true, start: "23:00", end: "07:00", timeZone: "UTC", minSeverity: "major_outage" },
+    },
+  });
+  assert.equal(telegram.seen.length, 0);
+});
+
+// Roadmap 3.7: why a provider matters travels with every message about it.
+test("a provider's impact and owner reach the payload", async () => {
+  const channel = recorder("telegram");
+  const dispatcher = createDispatcher({ logger: silent });
+  await dispatcher.dispatch([change()], {
+    services: [{ ...services[0]!, impact: "deploys blocked", owner: "@alice" }],
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
+  assert.equal(channel.seen[0]?.service.impact, "deploys blocked");
+  assert.equal(channel.seen[0]?.service.owner, "@alice");
+});

@@ -146,6 +146,13 @@ export const serviceDefinitionSchema = z.object({
    * where the rule lives; this is only where an operator overrides it.
    */
   authority: z.enum(["declared", "observed"]).optional(),
+  /**
+   * What breaks when this provider does, and who answers for it — roadmap 3.7.
+   * One sentence and one name, carried into every message: bounded so a
+   * paragraph pasted here cannot turn every alert into a page of text.
+   */
+  impact: z.string().trim().min(1).max(200).optional(),
+  owner: z.string().trim().min(1).max(80).optional(),
 });
 
 export const pollingSchema = z.object({
@@ -311,6 +318,16 @@ export const escalationSchema = z.object({
   minSeverity: z.enum(SEVERITY_FLOORS).default("major_outage"),
 });
 
+/**
+ * Say so on another channel when one keeps failing (roadmap 3.4). Floored at
+ * two: one failed message is a blip the retries already absorbed, and an alert
+ * on every one would be noise about noise.
+ */
+export const channelHealthSchema = z.object({
+  enabled: z.boolean().default(false),
+  afterFailures: z.number().int().min(2).max(100).default(3),
+});
+
 export const deliverySchema = z.object({
   quietHours: quietHoursSchema.default({}),
   digest: digestSchema.default({}),
@@ -318,4 +335,55 @@ export const deliverySchema = z.object({
   updateInPlace: z.boolean().default(false),
   maintenanceNotice: maintenanceNoticeSchema.default({}),
   escalation: escalationSchema.default({}),
+  channelHealth: channelHealthSchema.default({}),
 });
+
+/**
+ * One recipient (roadmap 3.5): channels in order of preference. At least two —
+ * a recipient with one channel is that channel — and each named once, because
+ * falling back to the channel that just failed is a retry, not a fallback.
+ * Whether the channels exist is checked where both editions know their channel
+ * list, like a routing rule's.
+ */
+export const recipientSchema = z.object({
+  id: slug,
+  name: z.string().trim().min(1).max(80),
+  channels: z
+    .array(slug)
+    .min(2, "a recipient needs at least two channels")
+    .max(10)
+    .refine((channels) => new Set(channels).size === channels.length, {
+      message: "a channel can appear only once in a recipient",
+    }),
+});
+
+/**
+ * Every recipient, with the one rule a single recipient cannot check: a channel
+ * belongs to at most one of them. Two recipients sharing a channel would each
+ * collapse it differently, and which fallback a failure took would depend on
+ * the order they happened to be read in.
+ */
+export const recipientsSchema = z
+  .array(recipientSchema)
+  .max(50)
+  .superRefine((recipients, ctx) => {
+    const ids = new Set<string>();
+    const owner = new Map<string, string>();
+    recipients.forEach((recipient, index) => {
+      if (ids.has(recipient.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [index, "id"], message: `recipient id "${recipient.id}" is used twice` });
+      }
+      ids.add(recipient.id);
+      for (const channel of recipient.channels) {
+        const other = owner.get(channel);
+        if (other !== undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [index, "channels"],
+            message: `channel "${channel}" already belongs to recipient "${other}"`,
+          });
+        }
+        owner.set(channel, recipient.id);
+      }
+    });
+  });

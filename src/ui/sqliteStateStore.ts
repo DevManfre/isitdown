@@ -849,6 +849,24 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       return { id: Number(lastInsertRowid), body, createdAt };
     },
 
+    async followIncident(providerId: string, incidentId: string): Promise<void> {
+      db.prepare(
+        "INSERT OR IGNORE INTO incident_follows (provider_id, incident_id, followed_at) VALUES (?, ?, ?)",
+      ).run(providerId, incidentId, now().toISOString());
+    },
+
+    async unfollowIncident(providerId: string, incidentId: string): Promise<void> {
+      db.prepare("DELETE FROM incident_follows WHERE provider_id = ? AND incident_id = ?").run(providerId, incidentId);
+    },
+
+    async isIncidentFollowed(providerId: string, incidentId: string): Promise<boolean> {
+      return (
+        db
+          .prepare("SELECT 1 AS one FROM incident_follows WHERE provider_id = ? AND incident_id = ?")
+          .get(providerId, incidentId) !== undefined
+      );
+    },
+
     async deleteIncidentNote(providerId: string, incidentId: string, id: number): Promise<boolean> {
       // Scoped to the incident it was written on, not just to its own id: a
       // delete addressed through the wrong incident is a mistake, not a match.
