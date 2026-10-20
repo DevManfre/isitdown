@@ -46,7 +46,9 @@ services:
       - path: .env
         required: false
     ports:
-      - "3000:3000"
+      # Loopback only: the dashboard has no login by default. For LAN exposure,
+      # change the left side to "0.0.0.0:3000" AND set API_TOKEN (docs/configuration.md).
+      - "127.0.0.1:3000:3000"
     # No config.yml: the UI edition keeps its configuration in SQLite.
     volumes:
       - isitdown-ui-data:/app/data

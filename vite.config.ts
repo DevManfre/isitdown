@@ -24,7 +24,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: Object.fromEntries(API_PATHS.map((path) => [path, "http://localhost:3000"])),
+    proxy: Object.fromEntries(API_PATHS.map((path) => [path, "http://127.0.0.1:3000"])),
   },
   test: {
     environment: "happy-dom",
