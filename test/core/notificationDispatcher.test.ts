@@ -1499,3 +1499,70 @@ test("a provider's impact and owner reach the payload", async () => {
   assert.equal(channel.seen[0]?.service.impact, "deploys blocked");
   assert.equal(channel.seen[0]?.service.owner, "@alice");
 });
+
+test("a message reference that cannot be saved does not resend a delivered message", async () => {
+  const channel = editable("telegram");
+  const refs: MessageRefStore = {
+    ...refStore(),
+    async saveRef() {
+      throw new Error("database is locked");
+    },
+  };
+  const sent: SentRecord[] = [];
+  const dispatcher = createDispatcher({
+    logger: silent,
+    messageRefs: refs,
+    sleep: async () => {},
+    onSent: (record) => {
+      sent.push(record);
+    },
+  });
+
+  await dispatcher.dispatch([incidentChange("incident_opened")], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ updateInPlace: true }),
+  });
+
+  assert.equal(channel.sent.length, 1, "delivered once, not once per retry");
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0]?.ok, true);
+});
+
+test("a delivery that throws before it can try is logged and recorded, not dropped", async () => {
+  const channel = editable("telegram");
+  const refs: MessageRefStore = {
+    ...refStore(),
+    async getRef() {
+      throw new Error("database is locked");
+    },
+  };
+  const lines: string[] = [];
+  const sent: SentRecord[] = [];
+  const dispatcher = createDispatcher({
+    logger: createLogger("error", (line) => lines.push(line)),
+    messageRefs: refs,
+    sleep: async () => {},
+    onSent: (record) => {
+      sent.push(record);
+    },
+  });
+
+  const records = await dispatcher.dispatch([incidentChange("incident_updated", "identified")], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ updateInPlace: true }),
+  });
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.ok, false);
+  assert.equal(records[0]?.channel, "telegram");
+  assert.equal(sent.filter((record) => !record.ok && record.channel === "telegram").length, 1);
+  assert.ok(lines.some((line) => line.includes('"level":"error"')), "an error line was logged");
+});
