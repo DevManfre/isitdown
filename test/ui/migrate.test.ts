@@ -706,3 +706,20 @@ test("a schema-29 database gains the heartbeats table", async () => {
   assert.ok(names(db, "table").includes("heartbeats"), "heartbeats missing after upgrade");
   db.close();
 });
+
+test("a database left with only one pending-damping column is repaired on the next boot", async () => {
+  const db = await freshDb();
+  migrate(db);
+  // A boot that died between the two ALTER TABLE statements of the damping step.
+  db.exec("ALTER TABLE provider_state DROP COLUMN pending_count");
+  db.exec("PRAGMA user_version = 13");
+
+  migrate(db);
+
+  const columns = (db.prepare("PRAGMA table_info(provider_state)").all() as { name: string }[]).map(
+    (column) => column.name,
+  );
+  assert.ok(columns.includes("pending_signature"));
+  assert.ok(columns.includes("pending_count"));
+  db.close();
+});
