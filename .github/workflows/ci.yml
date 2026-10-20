@@ -63,9 +63,17 @@ jobs:
       # After the build, because it screenshots the bundle in dist/. The
       # browser is Playwright's cached Chromium, installed here rather than
       # carried as a dependency — the harness drives it over the DevTools
-      # protocol and imports nothing from the package.
+      # protocol and imports nothing from the package. The release is pinned
+      # on purpose: a different Chromium can move pixels, so bump it together
+      # with a reviewed baseline commit.
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-1.64.1-${{ runner.os }}
+
       - name: Install Chromium for the visual check
-        run: npx --yes playwright@latest install --with-deps chromium
+        run: npx --yes playwright@1.64.1 install --with-deps chromium
 
       - name: Visual regression (every view, both themes, both locales)
         run: npm run test:visual

@@ -387,7 +387,8 @@ Notable suites:
 
   That 1.5%-of-edge-pixels noise assumes the machine running Chromium has the
   system fonts Playwright's own Chromium build expects — CI gets them because
-  it installs the browser with `npx playwright install --with-deps`, which
+  it installs the browser with `npx playwright@1.64.1 install --with-deps`
+  (the release is pinned; bumping it needs a reviewed baseline refresh), which
   pulls in `fontconfig` and `fonts-liberation` as root alongside Chromium
   itself (see `deb.deps` next to the cached binary for the full list). A
   sandbox that cannot run that installer as root and instead unpacks the same
