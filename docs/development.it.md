@@ -395,7 +395,8 @@ Suite notevoli:
   Quel rumore dell'1,5% lungo i bordi del testo presuppone che la macchina su
   cui gira Chromium abbia i font di sistema che la build di Chromium di
   Playwright si aspetta — la CI li ha perché installa il browser con `npx
-  playwright install --with-deps`, che tira dentro `fontconfig` e
+  playwright@1.64.1 install --with-deps` (la release è fissata: cambiarla richiede
+  una revisione delle baseline), che tira dentro `fontconfig` e
   `fonts-liberation` come root insieme a Chromium stesso (vedi `deb.deps`
   accanto al binario in cache per l'elenco completo). Un sandbox che non può
   eseguire quell'installer come root e invece spacchetta a mano gli stessi
