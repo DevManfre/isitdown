@@ -1,11 +1,9 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload, OverallStatus } from "../core/types.ts";
-import { httpFailure } from "./errors.ts";
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { fitText, renderParts } from "./formatting.ts";
 import { incidentKey, isResolution } from "./incidentKey.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 const EVENTS_ENDPOINT = "https://www.zenduty.com/api/events";
 

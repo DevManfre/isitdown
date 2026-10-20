@@ -1,11 +1,9 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { ChannelError, httpFailure } from "./errors.ts";
+import { ChannelError, httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { fitText, renderParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 /** Rocket.Chat's default `Message_MaxAllowedSize`. */
 const MESSAGE_MAX_CHARS = 5000;

@@ -1,7 +1,5 @@
 import { z } from "zod";
-import { httpFailure } from "./errors.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
 
 const API_ROOT = "https://api.twilio.com/2010-04-01/Accounts";
 
