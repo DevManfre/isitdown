@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router";
 import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { SettingRow } from "@/components/SettingRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
@@ -20,6 +19,7 @@ import { DeliverySection } from "@/components/settings/DeliverySection.tsx";
 import { DELIVERY_OFF } from "@/components/settings/deliveryDefaults.ts";
 import { NotificationsSection } from "@/components/settings/NotificationsSection.tsx";
 import { ServicesSection } from "@/components/settings/ServicesSection.tsx";
+import { RemovedSection } from "@/components/settings/RemovedSection.tsx";
 import { DataSection } from "@/components/settings/DataSection.tsx";
 import {
   SettingsChromeProvider,
@@ -34,15 +34,11 @@ import {
 import {
   useConfig,
   usePreferences,
-  useServiceMutations,
   useSettingsMutation,
   useStorage,
 } from "@/hooks/queries.ts";
 import { useFieldProps } from "@/hooks/useBusy.tsx";
-import { formatRelative, hostOf } from "@/lib/format.ts";
 import { stagger } from "@/lib/stagger.ts";
-import type {
-} from "@/lib/types.ts";
 // The floors come from core's own list rather than a copy: a floor added there
 // has to appear here, and a literal array would silently not.
 
@@ -84,15 +80,13 @@ const POLLING_DEBOUNCE_MS = 600;
  * whether that variable currently resolves.
  */
 function SettingsView() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { pathname } = useLocation();
   const { query, counts } = useSettingsChrome();
   const { data: config } = useConfig();
   const { data: preferences } = usePreferences();
   const settingsMutation = useSettingsMutation();
   const { data: storage } = useStorage();
-  const { restore: serviceRestore, purge: servicePurge } =
-    useServiceMutations();
   // Above the early return below: a hook cannot be called conditionally.
   const fieldProps = useFieldProps();
 
@@ -102,18 +96,6 @@ function SettingsView() {
   // Every instant-apply answer on this page — receipt or refusal — leaves as a
   // card in the bottom-right stack rather than a line in the card that saved.
   const toast = useSettingsToastReport();
-  /** The receipt every plain write leaves, and the refusal when one fails. */
-  const receipt = (kind: Parameters<typeof toast>[0], text?: string) => ({
-    onSuccess: () =>
-      toast(kind, { text: text ?? t("settings.saved"), tone: "ok" as const }),
-    onError: (error: unknown) =>
-      toast(kind, {
-        text: t("toast.failed", {
-          error: error instanceof Error ? error.message : String(error),
-        }),
-        tone: "error" as const,
-      }),
-  });
   const [adaptiveInterval_, setAdaptiveInterval] = useState<number | undefined>(
     undefined,
   );
@@ -486,63 +468,7 @@ function SettingsView() {
           would be permanent chrome for a state that is normally absent — and
           the launcher drops its tile for the same reason. */}
         {open === "removed" && removed.length > 0 && (
-          <SettingsSection
-            id="removed"
-            reel={SECTION_REELS.removed}
-            className="lg:col-span-2"
-            title={t("settings.section.removed")}
-            note={t("settings.removed-note")}
-            delay={stagger(2, SECTION_CASCADE)}
-          >
-            {removed.map((service) => (
-              <SettingRow
-                key={service.id}
-                className="service-row"
-                label={service.name}
-                description={`${service.adapter} · ${hostOf(service.baseUrl)}`}
-                meta={t("providers.restore-until", {
-                  when: formatRelative(i18n.language, service.restoreUntil),
-                })}
-              >
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={serviceRestore.isPending}
-                  onClick={() =>
-                    serviceRestore.mutate(
-                      service.id,
-                      receipt(
-                        "services",
-                        t("toast.service.restored", { name: service.name }),
-                      ),
-                    )
-                  }
-                >
-                  {t("action.restore")}
-                </Button>
-                {/* The destructive half: everything the removal's confirmation
-                  named goes now instead of when the window closes. */}
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  disabled={servicePurge.isPending}
-                  onClick={() =>
-                    servicePurge.mutate(
-                      service.id,
-                      receipt(
-                        "services",
-                        t("toast.service.purged", { name: service.name }),
-                      ),
-                    )
-                  }
-                >
-                  {t("action.remove-now")}
-                </Button>
-              </SettingRow>
-            ))}
-          </SettingsSection>
+          <RemovedSection removed={removed} />
         )}
 
         {open === "notifications" && (
