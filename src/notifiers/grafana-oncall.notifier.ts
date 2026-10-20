@@ -1,12 +1,10 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { httpFailure } from "./errors.ts";
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { fitText, renderParts } from "./formatting.ts";
 import { incidentKey, isResolution } from "./incidentKey.ts";
 import { httpUrlSetting } from "./settings.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 const settingsSchema = z.object({
   /** The Formatted Webhook integration's URL, which is its credential. */

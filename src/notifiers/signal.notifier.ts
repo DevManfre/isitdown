@@ -1,11 +1,9 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { httpFailure } from "./errors.ts";
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { fitText, renderMessage } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 /** Past this Signal turns the text into a long-message attachment. */
 const MESSAGE_MAX_CHARS = 2000;

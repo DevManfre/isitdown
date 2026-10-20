@@ -5,11 +5,9 @@ import { connect as connectTls } from "node:tls";
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload, OverallStatus } from "../core/types.ts";
-import { ChannelError } from "./errors.ts";
+import { ChannelError, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { fitText, renderParts } from "./formatting.ts";
 import { incidentKey } from "./incidentKey.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 /**
  * How large one message may be. RFC 5426 has every receiver take 2048 bytes

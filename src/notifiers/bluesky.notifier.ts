@@ -1,11 +1,9 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { httpFailure } from "./errors.ts";
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { fitText, publicParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 /** Bluesky counts a post in graphemes — what a reader sees as one character. */
 const POST_MAX_GRAPHEMES = 300;

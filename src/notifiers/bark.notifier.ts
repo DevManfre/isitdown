@@ -1,11 +1,9 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload, OverallStatus } from "../core/types.ts";
-import { httpFailure } from "./errors.ts";
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { fitText, renderParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 /** The public Bark server, for an operator who does not run their own. */
 const DEFAULT_SERVER = "https://api.day.app";

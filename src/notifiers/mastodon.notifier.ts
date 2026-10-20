@@ -2,11 +2,9 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { httpFailure } from "./errors.ts";
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { fitText, publicParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 /** Mastodon's default post length; an instance can raise it, never below this. */
 const STATUS_MAX_CHARS = 500;

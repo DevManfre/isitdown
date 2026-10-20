@@ -4,10 +4,8 @@ import { connect as connectTls } from "node:tls";
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { ChannelError } from "./errors.ts";
+import { ChannelError, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { renderParts } from "./formatting.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 const DEFAULT_PORT = { mqtt: 1883, mqtts: 8883 } as const;
 
