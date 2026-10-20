@@ -214,12 +214,26 @@ export function chainsOf(targets: readonly string[], recipients: readonly Recipi
   return chains;
 }
 
-/** A batch of delivery results, some of which came back as a chain's several records. */
-type Attempt = Promise<SentRecord | SentRecord[]>;
+/**
+ * A batch of delivery results, some of which came back as a chain's several
+ * records. The context says whose message it was, so a rejection nobody
+ * expected can still be logged and recorded against a provider and a channel.
+ */
+interface Attempt {
+  run: Promise<SentRecord | SentRecord[]>;
+  providerId: string;
+  /** For a chain, its preferred channel: the one the message was meant for. */
+  channel: string;
+  kind: StatusChangeKind;
+}
 
-async function settleAll(attempts: Attempt[]): Promise<SentRecord[]> {
-  const settled = await Promise.allSettled(attempts);
-  return settled.flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value].flat() : []));
+function attempt(
+  run: Promise<SentRecord | SentRecord[]>,
+  providerId: string,
+  channel: string | undefined,
+  kind: StatusChangeKind,
+): Attempt {
+  return { run, providerId, channel: channel ?? "unknown", kind };
 }
 
 const RETRY_BASE_MS = 1000;
@@ -370,6 +384,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     );
 
     async function attemptDelivery(): Promise<SentRecord> {
+      let sentRef: string | void | undefined;
       while (attempts < maxAttempts) {
         if (attempts > 0) {
           // Jittered, like the poller's own backoff: a provider-wide incident
@@ -379,21 +394,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         }
         attempts += 1;
         try {
-          const ref = await notifier.send(payload);
-          // A channel that names its messages, an incident to attach it to, and
-          // somewhere to keep it: remember it so the next update edits this one.
-          // Not for the message that closes an incident — there is nothing left
-          // to edit — which is also what keeps the table from growing a row per
-          // incident forever.
-          if (
-            typeof ref === "string" &&
-            ref !== "" &&
-            link !== undefined &&
-            !link.final &&
-            messageRefs !== undefined
-          ) {
-            await messageRefs.saveRef(notifier.id, providerId, link.incidentId, ref);
-          }
+          sentRef = await notifier.send(payload);
           failure = undefined;
           break;
         } catch (error) {
@@ -406,6 +407,32 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
             kind,
             attempt: attempts,
             error: failure,
+          });
+        }
+      }
+
+      // A channel that names its messages, an incident to attach it to, and
+      // somewhere to keep it: remember it so the next update edits this one.
+      // Not for the message that closes an incident — there is nothing left
+      // to edit — which is also what keeps the table from growing a row per
+      // incident forever. Outside the send's try: the message has already
+      // gone, so a store that cannot keep its reference must not make the
+      // loop send it again.
+      if (
+        failure === undefined &&
+        typeof sentRef === "string" &&
+        sentRef !== "" &&
+        link !== undefined &&
+        !link.final &&
+        messageRefs !== undefined
+      ) {
+        try {
+          await messageRefs.saveRef(notifier.id, providerId, link.incidentId, sentRef);
+        } catch (error) {
+          logger.warn("could not remember the message for later edits", {
+            providerId,
+            channel: notifier.id,
+            error: error instanceof Error ? error.message : String(error),
           });
         }
       }
@@ -441,6 +468,43 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       await audit(record);
       return record;
     }
+  }
+
+  /**
+   * Waits for every attempt. One that rejected — a throw outside `deliver`'s
+   * own retry loop — is logged and recorded as a failed delivery rather than
+   * dropped: a failed delivery is always visible.
+   */
+  async function settleAll(attempts: Attempt[]): Promise<SentRecord[]> {
+    const settled = await Promise.allSettled(attempts.map((item) => item.run));
+    const records: SentRecord[] = [];
+    for (const [index, outcome] of settled.entries()) {
+      if (outcome.status === "fulfilled") {
+        records.push(...[outcome.value].flat());
+        continue;
+      }
+      const context = attempts[index];
+      if (context === undefined) continue;
+      const error = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      logger.error("a delivery failed before it could be tried", {
+        providerId: context.providerId,
+        channel: context.channel,
+        error,
+      });
+      const record: SentRecord = {
+        providerId: context.providerId,
+        channel: context.channel,
+        kind: context.kind,
+        text: "",
+        sentAt: new Date().toISOString(),
+        ok: false,
+        attempts: 0,
+        error,
+      };
+      await audit(record);
+      records.push(record);
+    }
+    return records;
   }
 
   /**
@@ -586,10 +650,15 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       };
       countSend(worst.change.providerId, at);
       sends.push(
-        deliverChain(chain, (target) => {
-          const payload = digestFor(target);
-          return deliver(target, payload, renderMessage(payload));
-        }),
+        attempt(
+          deliverChain(chain, (target) => {
+            const payload = digestFor(target);
+            return deliver(target, payload, renderMessage(payload));
+          }),
+          worst.change.providerId,
+          notifier.id,
+          worst.change.kind,
+        ),
       );
     }
 
@@ -705,15 +774,20 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       for (const chain of chainsOf(healthy, ctx.recipients)) {
         const notifiers = chain.flatMap((id) => byChannelId.get(id) ?? []);
         attempts.push(
-          deliverChain(notifiers, (notifier) => {
-            const message = ctx.channelMessages?.[notifier.id];
-            const payload: NotificationPayload = {
-              ...base,
-              locale: message?.locale ?? ctx.locale,
-              ...(message?.template === undefined ? {} : { template: message.template }),
-            };
-            return deliver(notifier, payload, renderMessage(payload));
-          }),
+          attempt(
+            deliverChain(notifiers, (notifier) => {
+              const message = ctx.channelMessages?.[notifier.id];
+              const payload: NotificationPayload = {
+                ...base,
+                locale: message?.locale ?? ctx.locale,
+                ...(message?.template === undefined ? {} : { template: message.template }),
+              };
+              return deliver(notifier, payload, renderMessage(payload));
+            }),
+            change.providerId,
+            notifiers[0]?.id,
+            change.kind,
+          ),
         );
       }
     }
@@ -839,7 +913,14 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         channel: policy.channel,
         afterMinutes: policy.afterMinutes,
       });
-      sends.push(deliver(notifier, payload, renderMessage(payload)));
+      sends.push(
+        attempt(
+          deliver(notifier, payload, renderMessage(payload)),
+          payload.change.providerId,
+          notifier.id,
+          payload.change.kind,
+        ),
+      );
     }
     return sends;
   }
@@ -1034,10 +1115,15 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
             };
           };
           attempts.push(
-            deliverChain(chain, (notifier) => {
-              const payload = payloadFor(notifier);
-              return deliver(notifier, payload, renderMessage(payload), MAX_ATTEMPTS, linkOf(change, delivery));
-            }),
+            attempt(
+              deliverChain(chain, (notifier) => {
+                const payload = payloadFor(notifier);
+                return deliver(notifier, payload, renderMessage(payload), MAX_ATTEMPTS, linkOf(change, delivery));
+              }),
+              change.providerId,
+              chain[0]?.id,
+              change.kind,
+            ),
           );
           sentNow = true;
         }
