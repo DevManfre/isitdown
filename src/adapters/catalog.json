@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-12T13:10:47.907Z",
+  "generatedAt": "2026-10-19T10:17:35.494Z",
   "entries": [
     {
       "id": "github",
@@ -394,8 +394,8 @@
     {
       "id": "front",
       "name": "Front",
-      "adapter": "rss",
-      "baseUrl": "https://status.frontapp.com/feed"
+      "adapter": "statuspage",
+      "baseUrl": "https://status.frontapp.com"
     },
     {
       "id": "gitbook",
@@ -566,6 +566,12 @@
       "baseUrl": "https://status.pinecone.io"
     },
     {
+      "id": "pipedrive",
+      "name": "Pipedrive",
+      "adapter": "sorry",
+      "baseUrl": "https://status.pipedrive.com"
+    },
+    {
       "id": "plaid",
       "name": "Plaid",
       "adapter": "statuspage",
@@ -576,6 +582,12 @@
       "name": "Postman",
       "adapter": "statuspage",
       "baseUrl": "https://status.postman.com"
+    },
+    {
+      "id": "postmark",
+      "name": "Postmark",
+      "adapter": "sorry",
+      "baseUrl": "https://status.postmarkapp.com"
     },
     {
       "id": "prisma",
@@ -784,8 +796,8 @@
     {
       "id": "civo",
       "name": "Civo",
-      "adapter": "rss",
-      "baseUrl": "https://status.civo.com/index.xml"
+      "adapter": "cstate",
+      "baseUrl": "https://status.civo.com"
     },
     {
       "id": "coda",
@@ -1036,8 +1048,8 @@
     {
       "id": "transifex",
       "name": "Transifex",
-      "adapter": "rss",
-      "baseUrl": "https://status.transifex.com/history.rss"
+      "adapter": "statuspage",
+      "baseUrl": "https://status.transifex.com"
     },
     {
       "id": "twingate",
@@ -1072,8 +1084,8 @@
     {
       "id": "zuora",
       "name": "Zuora",
-      "adapter": "rss",
-      "baseUrl": "https://trust.zuora.com/history.rss"
+      "adapter": "statuspage",
+      "baseUrl": "https://trust.zuora.com"
     },
     {
       "id": "oracle-cloud",

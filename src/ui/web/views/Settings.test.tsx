@@ -1560,6 +1560,117 @@ describe("Settings retention", () => {
       expect(await screen.findByLabelText(i18n.t("field.update-in-place"))).not.toBeChecked();
       expect(await screen.findByLabelText(i18n.t("field.maintenance-notice"))).not.toBeChecked();
       expect(await screen.findByLabelText(i18n.t("field.escalation"))).not.toBeChecked();
+      expect(await screen.findByLabelText(i18n.t("field.channel-health"))).not.toBeChecked();
+    });
+
+    // Roadmap 3.4.
+    it("turns channel health on, and only then asks after how many failures", async () => {
+      renderSettings("delivery", fixtures);
+      const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+      expect(screen.queryByLabelText(i18n.t("field.channel-health.after"))).toBeNull();
+      await userEvent.click(await screen.findByLabelText(i18n.t("field.channel-health")));
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          { path: "/config/settings", method: "PATCH", body: { delivery: { channelHealth: { enabled: true } } } },
+        ]),
+      );
+    });
+
+    it("saves the failure threshold on blur, and refuses one below two", async () => {
+      const on = {
+        ...fixtures,
+        config: {
+          ...config,
+          delivery: {
+            quietHours: { enabled: false, start: "23:00", end: "07:00", timeZone: "auto", minSeverity: "major_outage" as const },
+            digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" as const },
+            cap: { enabled: false, maxPerHour: 10 },
+            updateInPlace: false,
+            channelHealth: { enabled: true, afterFailures: 3 },
+          },
+        },
+      };
+      renderSettings("delivery", on);
+      const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+      const field = await screen.findByLabelText(i18n.t("field.channel-health.after"));
+      expect(field).toHaveValue(3);
+      await userEvent.clear(field);
+      await userEvent.type(field, "1");
+      await userEvent.tab();
+      expect(writesIn(calls)).toEqual([]);
+      await userEvent.clear(field);
+      await userEvent.type(field, "5");
+      await userEvent.tab();
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          { path: "/config/settings", method: "PATCH", body: { delivery: { channelHealth: { afterFailures: 5 } } } },
+        ]),
+      );
+    });
+  });
+
+  // Roadmap 3.5.
+  describe("recipients", () => {
+    const withChannels = {
+      ...fixtures,
+      config: {
+        ...config,
+        channels: [
+          ...config.channels,
+          { id: "discord", enabled: true, fields: [], locale: "", template: "" },
+          { id: "slack", enabled: true, fields: [], locale: "", template: "" },
+        ],
+      },
+    };
+
+    it("says how many recipients there are without opening the editor", async () => {
+      renderSettings("notifications", {
+        ...withChannels,
+        config: { ...withChannels.config, recipients: [{ id: "alice", name: "Alice", channels: ["telegram", "discord"] }] },
+      });
+      expect(await screen.findByText(i18n.t("settings.recipients.count", { count: 1 }))).toBeInTheDocument();
+    });
+
+    it("builds a recipient from a name and two channels, then saves the whole list", async () => {
+      renderSettings("notifications", withChannels);
+      await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.edit-recipients") }));
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText(i18n.t("recipients.empty"))).toBeInTheDocument();
+      const save = within(dialog).getByRole("button", { name: i18n.t("action.save") });
+
+      await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("recipients.add") }));
+      await userEvent.type(within(dialog).getByLabelText(i18n.t("recipients.name")), "Alice");
+      expect(within(dialog).getByText(i18n.t("recipients.problem.channels"))).toBeInTheDocument();
+      expect(save).toBeDisabled();
+
+      for (const name of ["Telegram", "Discord"]) {
+        await userEvent.click(within(dialog).getByRole("combobox", { name: i18n.t("recipients.add-channel") }));
+        await userEvent.click(await screen.findByRole("option", { name }));
+      }
+      expect(within(dialog).getByText(i18n.t("recipients.preferred"))).toBeInTheDocument();
+
+      const calls = interceptWrites({
+        "PUT /config/recipients": { recipients: [{ id: "alice", name: "Alice", channels: ["telegram", "discord"] }] },
+      });
+      await userEvent.click(save);
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          {
+            path: "/config/recipients",
+            method: "PUT",
+            body: { recipients: [{ id: "alice", name: "Alice", channels: ["telegram", "discord"] }] },
+          },
+        ]),
+      );
+    });
+
+    it("asks before closing with unsaved changes", async () => {
+      renderSettings("notifications", withChannels);
+      await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.edit-recipients") }));
+      const dialog = await screen.findByRole("dialog");
+      await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("recipients.add") }));
+      await userEvent.keyboard("{Escape}");
+      expect(await screen.findByText(i18n.t("dialog.discard.title"))).toBeInTheDocument();
     });
   });
 

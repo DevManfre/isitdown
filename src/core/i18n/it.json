@@ -31,6 +31,7 @@
   "notification.maintenance.started": "{provider} — manutenzione\n\nÈ iniziata una manutenzione programmata: {title}\nFine prevista: {endsAt}\nGli avvisi per questo provider restano sospesi fino al termine.\n\n{url}",
   "notification.maintenance.ended": "{provider} — manutenzione conclusa\n\n{title} è terminata.\nStato attuale: {current} — incidenti aperti: {count}.\nAggiornato: {updatedAt}\n\n{url}",
   "notification.maintenance.upcoming": "{provider} — manutenzione in arrivo\n\nUna manutenzione programmata inizia tra {startsIn}: {title}\nInizio: {startsAt} — durata prevista: {duration}\n\n{url}",
+  "notification.channel.failing": "IsItDown — il canale {channel} non funziona\n\n{count} messaggi di fila non sono arrivati a {channel}, dal {since}.\nUltimo errore: {error}\nGli avvisi che raggiungono solo {channel} vanno persi finché non viene sistemato.",
 
   "notification.digest.heading": "IsItDown — {count} novità negli ultimi {minutes} minuti",
   "notification.digest.line": "{provider}: {what}",
@@ -48,9 +49,12 @@
   "notification.digest.correlated-cause": "{count} provider peggiorati insieme — {providers} — causa probabile: {cause}",
   "notification.digest.sla": "budget di errore — di questo passo il mese chiude al {projected}% contro {target}%",
   "notification.digest.slow-page": "pagina di stato lenta — {latency} contro i soliti {median}",
+  "notification.digest.channel-failing": "il canale {channel} non funziona — {count} messaggi di fila persi",
 
   "notification.suppressed": "Altri {count} avvisi per questo provider sono stati soppressi dal limite orario.",
   "notification.escalated": "⏫ Nessuno l'ha preso in carico dopo {minutes} min — lo rimando qui.",
+  "notification.impact": "Impatto: {impact}",
+  "notification.owner": "Responsabile: {owner}",
 
   "chatops.help": "Comandi di IsItDown\n\n/status — tutti i provider, i peggiori per primi\n/status <provider> — un solo provider\n/history <provider> [7|30|90] — uptime su un periodo\n/mute <provider> <30m|2h|1d> — sospendi gli avvisi per un po'\n/unmute <provider> — riattivali\n/ack <provider> — prendi in carico\n/help — questo messaggio",
   "chatops.status.heading": "{count} provider su {total} non sono operativi.",

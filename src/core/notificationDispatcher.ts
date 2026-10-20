@@ -1,10 +1,10 @@
-import type { ServiceDefinition } from "./configSource.interface.ts";
+import type { Recipient, ServiceDefinition } from "./configSource.interface.ts";
 import { DELIVERY_DEFAULTS, type DeliveryConfig } from "./delivery.ts";
 import type { Logger } from "./logger.ts";
 import type { MessageRefStore } from "./messageRefStore.interface.ts";
 import type { Notifier } from "./notifier.interface.ts";
 import { isMuted } from "./diffEngine.ts";
-import { clearsFloor, explain, severityOf, type RoutingRule } from "./routing.ts";
+import { clearsFloor, explain, inQuietHours, severityOf, type RoutingRule } from "./routing.ts";
 import type { NotificationPayload, StatusChange, StatusChangeKind } from "./types.ts";
 import { tracer } from "./tracing.ts";
 import { renderMessage } from "../notifiers/formatting.ts";
@@ -73,6 +73,12 @@ export interface DispatchContext {
    * and a UI edition with chatops off — means no message grows a button.
    */
   interactiveChannels?: readonly string[] | undefined;
+  /**
+   * Channels grouped by the person they reach, preferred first (roadmap 3.5).
+   * Absent or empty means every channel a rule names is sent to on its own,
+   * which is what every caller from before recipients existed asks for.
+   */
+  recipients?: readonly Recipient[] | undefined;
 }
 
 /** One channel's answer to "in what words?" — see `DispatchContext.channelMessages`. */
@@ -132,6 +138,18 @@ export interface DispatcherDeps {
         inTrouble(providerId: string): Promise<boolean>;
       }
     | undefined;
+  /**
+   * Incidents somebody asked to follow from the dashboard (roadmap 3.6): every
+   * update of one reaches every enabled channel until it resolves, whatever the
+   * routing rules say about its provider. Absent in the Light edition, which has
+   * no button to follow anything with.
+   */
+  follows?:
+    | {
+        isFollowed(providerId: string, incidentId: string): Promise<boolean>;
+        unfollow(providerId: string, incidentId: string): Promise<void>;
+      }
+    | undefined;
 }
 
 /**
@@ -164,6 +182,46 @@ const RANK: Record<string, number> = {
 
 const rankOf = (status: string): number => RANK[status] ?? -1;
 
+/** What a message says about the provider it is about — its page, and why it matters (roadmap 3.7). */
+function payloadServiceOf(service: ServiceDefinition): NotificationPayload["service"] {
+  return {
+    id: service.id,
+    name: service.name,
+    statusUrl: service.baseUrl,
+    ...(service.impact === undefined ? {} : { impact: service.impact }),
+    ...(service.owner === undefined ? {} : { owner: service.owner }),
+  };
+}
+
+/**
+ * The targets a rule reached, grouped into delivery chains (roadmap 3.5). A
+ * channel in no recipient is a chain of one, sent to as it always was. A
+ * recipient becomes one chain of its channels *that the rule reached*, in the
+ * recipient's order: the rule still decides who may hear about a change, and the
+ * recipient only decides how many times — so a rule that keeps a provider off
+ * Discord keeps it off Discord's fallback too.
+ */
+export function chainsOf(targets: readonly string[], recipients: readonly Recipient[] | undefined): string[][] {
+  const chains: string[][] = [];
+  const placed = new Set<string>();
+  for (const channelId of targets) {
+    if (placed.has(channelId)) continue;
+    const recipient = recipients?.find((candidate) => candidate.channels.includes(channelId));
+    const chain = recipient === undefined ? [channelId] : recipient.channels.filter((id) => targets.includes(id));
+    for (const id of chain) placed.add(id);
+    chains.push(chain);
+  }
+  return chains;
+}
+
+/** A batch of delivery results, some of which came back as a chain's several records. */
+type Attempt = Promise<SentRecord | SentRecord[]>;
+
+async function settleAll(attempts: Attempt[]): Promise<SentRecord[]> {
+  const settled = await Promise.allSettled(attempts);
+  return settled.flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value].flat() : []));
+}
+
 const RETRY_BASE_MS = 1000;
 const RETRY_JITTER_MS = 250;
 
@@ -183,6 +241,20 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
   const now = deps.now ?? Date.now;
   const messageRefs = deps.messageRefs;
   const escalationDeps = deps.escalation;
+  const follows = deps.follows;
+
+  /**
+   * The current run of failures per channel (roadmap 3.4): how many messages in
+   * a row it refused, since when, about which provider the last one was, and
+   * whether the other channels have been told. A success ends the run, so the
+   * next broken stretch is told about again. In memory like the cap, for the
+   * same reason: a restart is when an operator is watching, and a run carried
+   * across one would alert about a channel nobody has seen fail since.
+   */
+  const channelRuns = new Map<
+    string,
+    { failures: number; since: string; providerId: string; error?: string | undefined; told: boolean }
+  >();
 
   /**
    * Changes waiting to see whether anybody answers (roadmap 3.2), one per
@@ -219,7 +291,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
    * two channels covering different providers must not receive each other's
    * batch.
    */
-  const digests = new Map<string, { since: number; items: NotificationPayload[] }>();
+  const digests = new Map<string, { since: number; items: NotificationPayload[]; fallbacks: string[] }>();
 
   /**
    * One message to one channel, retried with exponential backoff until it lands
@@ -458,10 +530,10 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     delivery: DeliveryConfig,
     at: number,
     force: boolean,
-  ): Promise<SentRecord>[] {
+  ): Attempt[] {
     const byChannelId = new Map(ctx.notifiers.map((notifier) => [notifier.id, notifier]));
     const windowMs = delivery.digest.windowMinutes * 60_000;
-    const sends: Promise<SentRecord>[] = [];
+    const sends: Attempt[] = [];
 
     for (const [channelId, batch] of [...digests]) {
       if (!force && at - batch.since < windowMs) continue;
@@ -479,32 +551,173 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         });
         continue;
       }
+      // The recipient's later channels (roadmap 3.5), as they were when the
+      // batch started, minus any switched off since.
+      const chain = [
+        notifier,
+        ...batch.fallbacks.flatMap((id) => {
+          const fallback = byChannelId.get(id);
+          return fallback === undefined ? [] : [fallback];
+        }),
+      ];
 
+      const suppressedCount = takeSuppressed(worst.change.providerId);
       // The batch is per channel, so its language is that channel's (roadmap
       // 3.20) — stamped on every member as well as on the payload, because the
       // digest renders one line per item out of each item's own locale. The
       // items were collected before anyone knew which channel would take them.
-      const locale = ctx.channelMessages?.[channelId]?.locale ?? ctx.locale;
-      const payload: NotificationPayload = {
-        ...worst,
-        locale,
-        // Deliberately not templated: a template describes one change and this
-        // is a batch of them. See `src/notifiers/template.ts`.
-        template: undefined,
-        // The most severe member stands in as "the change" so a channel that
-        // colours or badges by severity still has one to read; `items` is what
-        // the message is actually made of.
-        digest: {
-          items: batch.items.map((item) => ({ ...item, locale })),
-          windowMinutes: delivery.digest.windowMinutes,
-        },
-        suppressedCount: takeSuppressed(worst.change.providerId),
+      const digestFor = (target: Notifier): NotificationPayload => {
+        const locale = ctx.channelMessages?.[target.id]?.locale ?? ctx.locale;
+        return {
+          ...worst,
+          locale,
+          // Deliberately not templated: a template describes one change and this
+          // is a batch of them. See `src/notifiers/template.ts`.
+          template: undefined,
+          // The most severe member stands in as "the change" so a channel that
+          // colours or badges by severity still has one to read; `items` is what
+          // the message is actually made of.
+          digest: {
+            items: batch.items.map((item) => ({ ...item, locale })),
+            windowMinutes: delivery.digest.windowMinutes,
+          },
+          suppressedCount,
+        };
       };
       countSend(worst.change.providerId, at);
-      sends.push(deliver(notifier, payload, renderMessage(payload)));
+      sends.push(
+        deliverChain(chain, (target) => {
+          const payload = digestFor(target);
+          return deliver(target, payload, renderMessage(payload));
+        }),
+      );
     }
 
     return sends;
+  }
+
+  /**
+   * Hands one message to the first channel of a chain, and to the next only when
+   * that one failed for good (roadmap 3.5). One record per channel tried, so the
+   * delivery log shows the preferred channel's failure as well as the fallback
+   * that carried the message — a fallback that hid why it was needed would hide
+   * a broken channel exactly as well as no fallback at all.
+   */
+  async function deliverChain(
+    chain: readonly Notifier[],
+    send: (notifier: Notifier) => Promise<SentRecord>,
+  ): Promise<SentRecord[]> {
+    const records: SentRecord[] = [];
+    for (const [index, notifier] of chain.entries()) {
+      const record = await send(notifier);
+      records.push(record);
+      if (record.ok) break;
+      const next = chain[index + 1];
+      if (next !== undefined) {
+        logger.warn("falling back to the recipient's next channel", {
+          failed: notifier.id,
+          next: next.id,
+          providerId: record.providerId,
+        });
+      }
+    }
+    return records;
+  }
+
+  /** Each channel's run of failures, extended or ended by what just happened to it. */
+  function noteOutcomes(records: readonly SentRecord[]): void {
+    for (const record of records) {
+      if (record.ok) {
+        channelRuns.delete(record.channel);
+        continue;
+      }
+      const run = channelRuns.get(record.channel);
+      channelRuns.set(record.channel, {
+        failures: (run?.failures ?? 0) + 1,
+        since: run?.since ?? record.sentAt,
+        providerId: record.providerId,
+        error: record.error,
+        told: run?.told ?? false,
+      });
+    }
+  }
+
+  /**
+   * Says so on the other channels when one has refused `afterFailures` messages
+   * in a row (roadmap 3.4) — once per run, so a webhook down for a week is one
+   * alert and not one per poll.
+   *
+   * Routed like any monitoring change, through the same rules, so an operator
+   * who keeps monitoring off the phone keeps this off it too; then the broken
+   * channel is taken out, along with every other channel currently in a run of
+   * its own, because telling a channel that is not delivering is telling nobody.
+   * Held by quiet hours like anything else, and left untold while held, so it
+   * goes out the morning after rather than never.
+   */
+  async function channelAlerts(ctx: DispatchContext, delivery: DeliveryConfig, at: number): Promise<SentRecord[]> {
+    const policy = delivery.channelHealth;
+    if (!policy.enabled || channelRuns.size === 0) return [];
+    const byChannelId = new Map(ctx.notifiers.map((notifier) => [notifier.id, notifier]));
+    const broken = (id: string): boolean => (channelRuns.get(id)?.failures ?? 0) >= policy.afterFailures;
+    const attempts: Attempt[] = [];
+
+    for (const [channelId, run] of [...channelRuns]) {
+      // A channel switched off is no longer expected to deliver anything.
+      if (!byChannelId.has(channelId)) {
+        channelRuns.delete(channelId);
+        continue;
+      }
+      if (run.told || run.failures < policy.afterFailures) continue;
+      // The provider the last lost message was about, or — if it has since been
+      // removed — any provider, so the alert still has a subject to hang on.
+      const service = ctx.services.find((candidate) => candidate.id === run.providerId) ?? ctx.services[0];
+      if (service === undefined) continue;
+
+      const change: StatusChange = {
+        kind: "channel_failing",
+        providerId: service.id,
+        currentStatus: "unknown",
+        channel: { id: channelId, failures: run.failures, since: run.since, error: run.error },
+        at: new Date(at).toISOString(),
+      };
+      const routed = explain(change, ctx.rules, [...byChannelId.keys()], {
+        quietHours: delivery.quietHours,
+        at: new Date(at),
+        ...(service.group === undefined ? {} : { providerGroup: service.group }),
+      });
+      if (routed.quieted) continue;
+      const healthy = routed.targets.filter((id) => id !== channelId && !broken(id) && byChannelId.has(id));
+      run.told = true;
+      if (healthy.length === 0) {
+        logger.error("a channel keeps failing and no other channel is routed to say so", {
+          channel: channelId,
+          failures: run.failures,
+          since: run.since,
+        });
+        continue;
+      }
+      logger.warn("a channel keeps failing, telling the others", {
+        channel: channelId,
+        failures: run.failures,
+        to: healthy,
+      });
+      const base: NotificationPayload = { change, service: payloadServiceOf(service), locale: ctx.locale };
+      for (const chain of chainsOf(healthy, ctx.recipients)) {
+        const notifiers = chain.flatMap((id) => byChannelId.get(id) ?? []);
+        attempts.push(
+          deliverChain(notifiers, (notifier) => {
+            const message = ctx.channelMessages?.[notifier.id];
+            const payload: NotificationPayload = {
+              ...base,
+              locale: message?.locale ?? ctx.locale,
+              ...(message?.template === undefined ? {} : { template: message.template }),
+            };
+            return deliver(notifier, payload, renderMessage(payload));
+          }),
+        );
+      }
+    }
+    return settleAll(attempts);
   }
 
   /**
@@ -570,14 +783,14 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     ctx: DispatchContext,
     delivery: DeliveryConfig,
     at: number,
-  ): Promise<Promise<SentRecord>[]> {
+  ): Promise<Attempt[]> {
     const policy = delivery.escalation;
     if (!policy.enabled || escalationDeps === undefined) {
       pendingEscalations.clear();
       return [];
     }
     const byChannelId = new Map(ctx.notifiers.map((notifier) => [notifier.id, notifier]));
-    const sends: Promise<SentRecord>[] = [];
+    const sends: Attempt[] = [];
 
     for (const [providerId, entry] of [...pendingEscalations]) {
       // Out of trouble, however it ended: forgotten, so the next stretch starts
@@ -631,6 +844,20 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     return sends;
   }
 
+  /**
+   * Waits for every send of a dispatch, then reads what they say about each
+   * channel's health and, where one has now failed often enough, tells the
+   * others (roadmap 3.4). Those alerts are counted too, so a second channel
+   * failing while it says the first one is broken is told about next time.
+   */
+  async function finish(attempts: Attempt[], ctx: DispatchContext, delivery: DeliveryConfig, at: number): Promise<SentRecord[]> {
+    const records = await settleAll(attempts);
+    noteOutcomes(records);
+    const alerts = await channelAlerts(ctx, delivery, at);
+    noteOutcomes(alerts);
+    return [...records, ...alerts];
+  }
+
   return {
     async sendTest(notifier, service, locale, message): Promise<SentRecord> {
       const payload: NotificationPayload = {
@@ -641,7 +868,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           failureCount: 0,
           at: new Date().toISOString(),
         },
-        service: { id: service.id, name: service.name, statusUrl: service.baseUrl },
+        service: payloadServiceOf(service),
         locale: message?.locale ?? locale,
         ...(message?.template === undefined ? {} : { template: message.template }),
       };
@@ -657,14 +884,11 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       // is exactly when a digest window quietly runs out, and a flush that only
       // happened on a busy cycle would hold a batch until the next change —
       // which is the flood it exists to replace, delayed.
-      const attempts: Promise<SentRecord>[] = flushDue(ctx, delivery, at, false);
+      const attempts: Attempt[] = flushDue(ctx, delivery, at, false);
       // Before this cycle's own changes are tracked, so a change cannot be
       // escalated in the dispatch that first sent it.
       attempts.push(...(await dueEscalations(ctx, delivery, at)));
-      if (changes.length === 0) {
-        const settled = await Promise.allSettled(attempts);
-        return settled.flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value] : []));
-      }
+      if (changes.length === 0) return finish(attempts, ctx, delivery, at);
 
       const byId = new Map(ctx.services.map((service) => [service.id, service]));
 
@@ -688,7 +912,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
 
         const base: NotificationPayload = {
           change,
-          service: { id: service.id, name: service.name, statusUrl: service.baseUrl },
+          service: payloadServiceOf(service),
           locale: ctx.locale,
         };
 
@@ -703,7 +927,22 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           // to, so the evaluator stays pure and knows nothing about the fleet.
           ...(service.group === undefined ? {} : { providerGroup: service.group }),
         });
-        if (routed.quieted) {
+        // Followed from the dashboard (roadmap 3.6): every enabled channel
+        // hears this incident whatever the rules say about its provider. Its
+        // resolution is the last thing followed, so the follow ends with it.
+        const incidentId = change.incident?.id;
+        const followed =
+          follows !== undefined &&
+          incidentId !== undefined &&
+          (change.kind === "incident_opened" || change.kind === "incident_updated" || change.kind === "incident_resolved") &&
+          (await follows.isFollowed(change.providerId, incidentId));
+        if (followed && change.kind === "incident_resolved") await follows.unfollow(change.providerId, incidentId);
+        // Quiet hours still hold a followed incident: following one says "tell
+        // me every update", not "wake me for every update".
+        const held = followed
+          ? inQuietHours(delivery.quietHours, new Date(at)) && !clearsFloor(severityOf(change), delivery.quietHours.minSeverity)
+          : routed.quieted;
+        if (held) {
           logger.info("quiet hours held a change back", {
             providerId: change.providerId,
             kind: change.kind,
@@ -711,7 +950,8 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           });
           continue;
         }
-        if (routed.targets.length === 0) continue;
+        const targets = followed ? [...new Set([...routed.targets, ...enabledChannelIds])] : routed.targets;
+        if (targets.length === 0) continue;
 
         // The cap is per provider and per change, so it is asked once here
         // rather than inside the channel loop below (roadmap 3.13).
@@ -742,10 +982,16 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         // Whether any channel was handed this change right now (not batched, not
         // skipped): the escalation clock starts from a message that went out.
         let sentNow = false;
-        let lastPayload: NotificationPayload | undefined;
-        for (const channelId of routed.targets) {
-          const notifier = byChannelId.get(channelId);
-          if (notifier === undefined) {
+        // One chain per recipient the rule reached, one per lone channel
+        // (roadmap 3.5): a recipient on Telegram and Discord hears this once.
+        for (const chainIds of chainsOf(targets, ctx.recipients)) {
+          const chain: Notifier[] = [];
+          for (const channelId of chainIds) {
+            const notifier = byChannelId.get(channelId);
+            if (notifier !== undefined) {
+              chain.push(notifier);
+              continue;
+            }
             // A configured-but-disabled channel is the normal case and says
             // nothing. A channel no registry knows is a broken rule, and a
             // broken routing rule means missing alerts.
@@ -756,13 +1002,14 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
                 kind: change.kind,
               });
             }
-            continue;
           }
+          const [head, ...fallbacks] = chain;
+          if (head === undefined) continue;
 
           if (batched) {
-            const batch = digests.get(channelId) ?? { since: at, items: [] };
+            const batch = digests.get(head.id) ?? { since: at, items: [], fallbacks: fallbacks.map((notifier) => notifier.id) };
             batch.items.push(base);
-            digests.set(channelId, batch);
+            digests.set(head.id, batch);
             continue;
           }
 
@@ -773,26 +1020,31 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           }
           // The two things the channel itself decides about the message: what
           // language it is written in (roadmap 3.20) and how it is laid out
-          // (roadmap 3.15). Applied here rather than when `base` was built,
-          // because one change routed to three channels can legitimately be
-          // three different messages.
-          const message = ctx.channelMessages?.[channelId];
-          const payload: NotificationPayload = {
-            ...base,
-            locale: message?.locale ?? base.locale,
-            ...(message?.template === undefined ? {} : { template: message.template }),
-            ...(ctx.interactiveChannels?.includes(channelId) === true ? { interactive: true } : {}),
-            suppressedCount: suppressed ?? 0,
+          // (roadmap 3.15). Applied per channel rather than when `base` was
+          // built, because one change routed to three channels can legitimately
+          // be three different messages — and a fallback is a fourth.
+          const payloadFor = (notifier: Notifier): NotificationPayload => {
+            const message = ctx.channelMessages?.[notifier.id];
+            return {
+              ...base,
+              locale: message?.locale ?? base.locale,
+              ...(message?.template === undefined ? {} : { template: message.template }),
+              ...(ctx.interactiveChannels?.includes(notifier.id) === true ? { interactive: true } : {}),
+              suppressedCount: suppressed ?? 0,
+            };
           };
-          attempts.push(deliver(notifier, payload, renderMessage(payload), MAX_ATTEMPTS, linkOf(change, delivery)));
+          attempts.push(
+            deliverChain(chain, (notifier) => {
+              const payload = payloadFor(notifier);
+              return deliver(notifier, payload, renderMessage(payload), MAX_ATTEMPTS, linkOf(change, delivery));
+            }),
+          );
           sentNow = true;
-          lastPayload = payload;
         }
-        if (sentNow && lastPayload !== undefined) trackEscalation(change, base, delivery, at);
+        if (sentNow) trackEscalation(change, base, delivery, at);
       }
 
-      const settled = await Promise.allSettled(attempts);
-      return settled.flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value] : []));
+      return finish(attempts, ctx, delivery, at);
     },
   };
 }

@@ -67,6 +67,21 @@ describe("ProviderDetail", () => {
     expect(link).toHaveAttribute("href", "https://www.githubstatus.com");
   });
 
+  // Roadmap 3.7.
+  it("shows why the provider matters and who owns it, when the operator wrote them", async () => {
+    mount({ impact: "deploys blocked, CI stopped", owner: "@alice" });
+    const context = await screen.findByTestId("provider-context");
+    expect(context).toHaveTextContent(i18n.t("field.impact"));
+    expect(context).toHaveTextContent("deploys blocked, CI stopped");
+    expect(context).toHaveTextContent("@alice");
+  });
+
+  it("shows nothing of the kind for a provider with neither", async () => {
+    mount();
+    await screen.findByRole("heading", { name: "GitHub" });
+    expect(screen.queryByTestId("provider-context")).toBeNull();
+  });
+
   // Roadmap 1.3.
   it("marks a suspected provider in its header and says what each side claims", async () => {
     mount({

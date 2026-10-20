@@ -31,6 +31,7 @@
   "notification.maintenance.started": "{provider} — mantenimiento\n\nHa comenzado un mantenimiento programado: {title}\nFin previsto: {endsAt}\nLos avisos de este proveedor quedan en pausa hasta que termine.\n\n{url}",
   "notification.maintenance.ended": "{provider} — mantenimiento finalizado\n\n{title} ha terminado.\nEstado actual: {current} — incidencias abiertas: {count}.\nActualizado: {updatedAt}\n\n{url}",
   "notification.maintenance.upcoming": "{provider} — mantenimiento próximo\n\nUn mantenimiento programado empieza en {startsIn}: {title}\nInicio: {startsAt} — duración prevista: {duration}\n\n{url}",
+  "notification.channel.failing": "IsItDown — el canal {channel} falla\n\n{count} mensaje(s) seguidos no se pudieron entregar a {channel}, desde {since}.\nÚltimo error: {error}\nLas alertas que solo llegan a {channel} se pierden hasta que se arregle.",
 
   "notification.digest.heading": "IsItDown — {count} novedades en los últimos {minutes} minutos",
   "notification.digest.line": "{provider}: {what}",
@@ -48,9 +49,12 @@
   "notification.digest.correlated-cause": "{count} proveedores han empeorado a la vez — {providers} — causa probable: {cause}",
   "notification.digest.sla": "presupuesto de error — a este ritmo el mes cierra en {projected}% frente a {target}%",
   "notification.digest.slow-page": "página de estado lenta — {latency} frente a los {median} habituales",
+  "notification.digest.channel-failing": "el canal {channel} falla — {count} mensaje(s) seguidos perdidos",
 
   "notification.suppressed": "Se han suprimido otros {count} avisos de este proveedor por el límite horario.",
   "notification.escalated": "⏫ Nadie se hizo cargo tras {minutes} min — lo reenvío aquí.",
+  "notification.impact": "Impacto: {impact}",
+  "notification.owner": "Responsable: {owner}",
 
   "chatops.help": "Comandos de IsItDown\n\n/status — todos los proveedores, los peores primero\n/status <proveedor> — un solo proveedor\n/history <proveedor> [7|30|90] — disponibilidad en un periodo\n/mute <proveedor> <30m|2h|1d> — silenciar los avisos un rato\n/unmute <proveedor> — volver a activarlos\n/ack <proveedor> — hacerse cargo\n/help — este mensaje",
   "chatops.status.heading": "{count} de {total} proveedores no están operativos.",

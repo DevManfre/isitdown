@@ -31,6 +31,7 @@
   "notification.maintenance.started": "{provider} — maintenance\n\nUne maintenance planifiée a commencé : {title}\nFin prévue : {endsAt}\nLes alertes pour ce fournisseur sont suspendues jusqu'à la fin.\n\n{url}",
   "notification.maintenance.ended": "{provider} — maintenance terminée\n\n{title} est terminée.\nÉtat actuel : {current} — incidents ouverts : {count}.\nMis à jour : {updatedAt}\n\n{url}",
   "notification.maintenance.upcoming": "{provider} — maintenance à venir\n\nUne maintenance programmée commence dans {startsIn} : {title}\nDébut : {startsAt} — durée prévue : {duration}\n\n{url}",
+  "notification.channel.failing": "IsItDown — le canal {channel} est en panne\n\n{count} message(s) d’affilée n’ont pas pu être remis à {channel}, depuis {since}.\nDernière erreur : {error}\nLes alertes qui ne passent que par {channel} sont perdues tant qu’il n’est pas réparé.",
 
   "notification.digest.heading": "IsItDown — {count} changements sur les {minutes} dernières minutes",
   "notification.digest.line": "{provider} : {what}",
@@ -48,9 +49,12 @@
   "notification.digest.correlated-cause": "{count} fournisseurs dégradés en même temps — {providers} — cause probable : {cause}",
   "notification.digest.sla": "budget d'erreur — à ce rythme le mois finit à {projected}% pour {target}%",
   "notification.digest.slow-page": "page d'état lente — {latency} contre {median} d'habitude",
+  "notification.digest.channel-failing": "canal {channel} en panne — {count} message(s) d’affilée perdus",
 
   "notification.suppressed": "{count} autres alertes pour ce fournisseur ont été supprimées par la limite horaire.",
   "notification.escalated": "⏫ Personne ne l'a pris en charge après {minutes} min — je le renvoie ici.",
+  "notification.impact": "Impact : {impact}",
+  "notification.owner": "Responsable : {owner}",
 
   "chatops.help": "Commandes IsItDown\n\n/status — tous les fournisseurs, les pires d'abord\n/status <fournisseur> — un seul fournisseur\n/history <fournisseur> [7|30|90] — disponibilité sur une période\n/mute <fournisseur> <30m|2h|1d> — suspendre les alertes un moment\n/unmute <fournisseur> — les réactiver\n/ack <fournisseur> — prendre en charge\n/help — ce message",
   "chatops.status.heading": "{count} fournisseurs sur {total} ne sont pas opérationnels.",

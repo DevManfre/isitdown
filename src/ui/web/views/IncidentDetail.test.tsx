@@ -343,3 +343,66 @@ describe("edits made after resolution", () => {
     expect(await screen.findByText(i18n.t("incident.revisions.impact", { before: "sev1", after: "sev3" }))).toBeInTheDocument();
   });
 });
+
+// Roadmap 3.6: following one incident from its own page.
+describe("following an incident", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("offers to follow an open incident, and says what following does", async () => {
+    mount();
+    const button = await screen.findByRole("button", { name: i18n.t("incident.follow") });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText(i18n.t("incident.follow.hint"))).toBeInTheDocument();
+  });
+
+  it("follows with a PUT and unfollows with a DELETE on the incident's own follow route", async () => {
+    renderWithProviders(<IncidentDetail />, {
+      incident: { ...detail, followed: true },
+      status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+    }, "/incidents/:providerId/:incidentId");
+    const button = await screen.findByRole("button", { name: i18n.t("incident.following") });
+    expect(button).toHaveAttribute("aria-pressed", "true");
+
+    const base = globalThis.fetch as typeof fetch;
+    const calls: { method: string; target: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (target: string, init?: RequestInit) => {
+        if (String(target).endsWith("/follow")) {
+          calls.push({ method: String(init?.method), target: String(target) });
+          return { ok: true, status: 200, text: async () => JSON.stringify({ followed: false }) };
+        }
+        return base(target, init);
+      }),
+    );
+
+    await userEvent.click(button);
+    expect(calls).toEqual([{ method: "DELETE", target: expect.stringMatching(/\/follow$/) }]);
+  });
+
+  it("says so when following fails, rather than looking followed", async () => {
+    mount();
+    const button = await screen.findByRole("button", { name: i18n.t("incident.follow") });
+    const base = globalThis.fetch as typeof fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (target: string, init?: RequestInit) => {
+        if (String(target).endsWith("/follow")) {
+          return { ok: false, status: 409, text: async () => JSON.stringify({ error: { message: "already resolved" } }) };
+        }
+        return base(target, init);
+      }),
+    );
+    await userEvent.click(button);
+    expect(await screen.findByRole("alert")).toHaveTextContent("already resolved");
+  });
+
+  it("offers nothing to follow on a resolved incident", async () => {
+    renderWithProviders(<IncidentDetail />, {
+      incident: { ...detail, incident: { ...detail.incident, resolvedAt: "2026-08-21T11:00:00Z" } },
+      status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
+    }, "/incidents/:providerId/:incidentId");
+    await screen.findByText("API errors");
+    expect(screen.queryByRole("button", { name: i18n.t("incident.follow") })).toBeNull();
+  });
+});

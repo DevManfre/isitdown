@@ -140,6 +140,25 @@ export function ProviderDetail() {
         </p>
       )}
 
+      {/* Roadmap 3.7. The operator's own handover note, the same words every
+          alert about this provider carries. Nothing at all when neither is set. */}
+      {((provider.impact ?? "") !== "" || (provider.owner ?? "") !== "") && (
+        <dl data-testid="provider-context" className="grid max-w-3xl grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          {(provider.impact ?? "") !== "" && (
+            <>
+              <dt className="text-muted-foreground">{t("field.impact")}</dt>
+              <dd>{provider.impact}</dd>
+            </>
+          )}
+          {(provider.owner ?? "") !== "" && (
+            <>
+              <dt className="text-muted-foreground">{t("field.owner")}</dt>
+              <dd>{provider.owner}</dd>
+            </>
+          )}
+        </dl>
+      )}
+
       <section aria-label={t("history.list")} className="flex flex-col gap-2">
         <ProviderDetailPanel
           providerId={providerId}

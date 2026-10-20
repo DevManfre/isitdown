@@ -34,6 +34,7 @@ import {
 import { InstallAppRow } from "@/components/settings/InstallAppRow.tsx";
 import { NumberSetting } from "@/components/settings/NumberSetting.tsx";
 import { RoutingRulesDialog } from "@/components/settings/RoutingRulesDialog.tsx";
+import { RecipientsDialog } from "@/components/settings/RecipientsDialog.tsx";
 import { ServiceRow } from "@/components/settings/ServiceRow.tsx";
 import {
   SettingsChromeProvider,
@@ -134,6 +135,7 @@ const DELIVERY_OFF: DeliveryPolicy = {
   updateInPlace: false,
   maintenanceNotice: { enabled: false, leadMinutes: 120 },
   escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
+  channelHealth: { enabled: false, afterFailures: 3 },
 };
 
 /** The two typed numbers in the delivery section, bounded like the engine's. */
@@ -142,6 +144,7 @@ const DELIVERY_BOUNDS = {
   maxPerHour: { min: 1, max: 1000, labelKey: "field.cap.max" },
   leadMinutes: { min: 1, max: 10_080, labelKey: "field.maintenance-notice.lead" },
   afterMinutes: { min: 1, max: 1440, labelKey: "field.escalation.after" },
+  afterFailures: { min: 2, max: 100, labelKey: "field.channel-health.after" },
 };
 
 /**
@@ -333,6 +336,7 @@ function SettingsView() {
   const [capPerHour_, setCapPerHour] = useState<number | undefined>(undefined);
   const [noticeLead_, setNoticeLead] = useState<number | undefined>(undefined);
   const [escalationAfter_, setEscalationAfter] = useState<number | undefined>(undefined);
+  const [channelFailures_, setChannelFailures] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     return () => {
@@ -390,6 +394,8 @@ function SettingsView() {
   const noticeLead = noticeLead_ ?? maintenanceNotice.leadMinutes;
   const escalation = delivery.escalation ?? DELIVERY_OFF.escalation!;
   const escalationAfter = escalationAfter_ ?? escalation.afterMinutes;
+  const channelHealth = delivery.channelHealth ?? DELIVERY_OFF.channelHealth!;
+  const channelFailures = channelFailures_ ?? channelHealth.afterFailures;
 
   /**
    * One field of the delivery policy at a time. The patch is partial at every
@@ -403,6 +409,7 @@ function SettingsView() {
     updateInPlace?: boolean;
     maintenanceNotice?: Partial<NonNullable<DeliveryPolicy["maintenanceNotice"]>>;
     escalation?: Partial<NonNullable<DeliveryPolicy["escalation"]>>;
+    channelHealth?: Partial<NonNullable<DeliveryPolicy["channelHealth"]>>;
   }): void => {
     toast("delivery", undefined);
     settingsMutation.mutate(
@@ -443,7 +450,9 @@ function SettingsView() {
           ? { maintenanceNotice: { leadMinutes: value } }
           : field === "afterMinutes"
             ? { escalation: { afterMinutes: value } }
-            : { cap: { maxPerHour: value } },
+            : field === "afterFailures"
+              ? { channelHealth: { afterFailures: value } }
+              : { cap: { maxPerHour: value } },
     );
   };
 
@@ -1145,6 +1154,17 @@ function SettingsView() {
                 quietHours={delivery.quietHours}
               />
             </SettingRow>
+
+            {/* Roadmap 3.5, under the rules it refines: the rules decide who may
+                hear about a change, recipients decide how many times. */}
+            <SettingRow
+              label={t("settings.recipients")}
+              description={t("settings.recipients.hint")}
+              meta={t("settings.recipients.count", { count: (config.recipients ?? []).length })}
+              align="top"
+            >
+              <RecipientsDialog recipients={config.recipients ?? []} channels={config.channels} />
+            </SettingRow>
           </SettingsSection>
         )}
 
@@ -1432,6 +1452,40 @@ function SettingsView() {
                   onChange={(value) =>
                     commitDelivery({ escalation: { minSeverity: value } })
                   }
+                />
+              </SettingRow>
+            </Reveal>
+
+            <SettingRow
+              label={t("field.channel-health")}
+              description={t("field.channel-health.hint")}
+              align="top"
+            >
+              <Switch
+                id="channel-health"
+                aria-label={t("field.channel-health")}
+                checked={channelHealth.enabled}
+                onCheckedChange={(next) =>
+                  commitDelivery({ channelHealth: { enabled: next } })
+                }
+              />
+            </SettingRow>
+
+            <Reveal open={channelHealth.enabled}>
+              <SettingRow label={t("field.channel-health.after")} align="top">
+                <NumberSetting
+                  id="channel-health-after"
+                  label={t("field.channel-health.after")}
+                  unit={t("unit.failures")}
+                  min={DELIVERY_BOUNDS.afterFailures.min}
+                  max={DELIVERY_BOUNDS.afterFailures.max}
+                  value={channelFailures}
+                  onChange={setChannelFailures}
+                  onCommit={(value) =>
+                    commitDeliveryNumber("afterFailures", value)
+                  }
+                  onFocus={fieldProps.onFocus}
+                  onBlur={fieldProps.onBlur}
                 />
               </SettingRow>
             </Reveal>

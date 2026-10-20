@@ -309,9 +309,16 @@ test("every change kind splits into a non-empty heading and detail", () => {
     { kind: "maintenance_ended", providerId: "github", currentStatus: "operational", maintenance: window, openIncidents: 0, at: window.endsAt },
     { kind: "maintenance_upcoming", providerId: "github", currentStatus: "operational", maintenance: window, startsInMinutes: 120, at: window.startsAt },
     { kind: "monitoring_degraded", providerId: "github", currentStatus: "unknown", failureCount: 5, at: incident.updatedAt },
+    {
+      kind: "channel_failing",
+      providerId: "github",
+      currentStatus: "unknown",
+      channel: { id: "webhook", failures: 3, since: incident.updatedAt, error: "HTTP 500" },
+      at: incident.updatedAt,
+    },
   ];
   for (const change of kinds) {
-    for (const locale of ["en", "it"]) {
+    for (const locale of ["en", "it", "de", "fr", "es", "pt"]) {
       const parts = renderParts(payloadFor(change, locale));
       assert.ok(parts.heading.length > 0, `${change.kind}/${locale}: empty heading`);
       assert.ok(parts.detail.length > 0, `${change.kind}/${locale}: empty detail`);
@@ -457,4 +464,50 @@ test("no buttons unless the channel was marked interactive, nor on a digest", ()
   assert.equal(offersActions(payloadFor(change, "en")), false);
   const member = payloadFor(change, "en", { interactive: true });
   assert.equal(offersActions({ ...member, digest: { items: [member], windowMinutes: 15 } }), false);
+});
+
+// Roadmap 3.4.
+test("a failing channel names the channel, the run and the last error, not the provider", () => {
+  const message = renderMessage(
+    payloadFor({
+      kind: "channel_failing",
+      providerId: "github",
+      currentStatus: "unknown",
+      channel: { id: "discord", failures: 4, since: "2026-08-16T09:00:00.000Z", error: "HTTP 401" },
+      at: incident.updatedAt,
+    }),
+  );
+  assert.match(message, /^⚪ IsItDown — channel discord failing/);
+  assert.match(message, /4 message\(s\) in a row/);
+  assert.match(message, /HTTP 401/);
+  assert.doesNotMatch(message, /GitHub/);
+});
+
+// Roadmap 3.7.
+test("a provider's impact and owner close the default message, and only when set", () => {
+  const change: StatusChange = {
+    kind: "status_change",
+    providerId: "github",
+    previousStatus: "operational",
+    currentStatus: "major_outage",
+    at: incident.updatedAt,
+  };
+  const plain = renderMessage(payloadFor(change));
+  const withContext = renderMessage({
+    ...payloadFor(change),
+    service: { ...service, impact: "deploys blocked, CI stopped", owner: "@alice" },
+  });
+  assert.equal(withContext, `${plain}\n\nImpact: deploys blocked, CI stopped\nOwner: @alice`);
+  const ownerOnly = renderMessage({ ...payloadFor(change, "it"), service: { ...service, owner: "@alice" } });
+  assert.match(ownerOnly, /\n\nResponsabile: @alice$/);
+  assert.doesNotMatch(ownerOnly, /Impatto/);
+});
+
+test("a template places impact and owner itself, so they are not appended twice", () => {
+  const message = renderMessage({
+    ...payloadFor({ kind: "status_change", providerId: "github", previousStatus: "operational", currentStatus: "degraded", at: incident.updatedAt }),
+    service: { ...service, impact: "deploys blocked", owner: "@alice" },
+    template: "{{provider}}: {{status}} ({{impact}}, ask {{owner}})",
+  });
+  assert.equal(message, "GitHub: Degraded (deploys blocked, ask @alice)");
 });

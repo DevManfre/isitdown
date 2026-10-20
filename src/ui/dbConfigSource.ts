@@ -5,6 +5,8 @@ import {
   deliverySchema,
   localeSchema,
   pollingSchema,
+  recipientSchema,
+  recipientsSchema,
   routingRuleSchema,
   routingRulesSchema,
   serviceDefinitionSchema,
@@ -13,6 +15,7 @@ import {
   CHANNEL_MESSAGE_KEYS,
   type ChannelConfig,
   type ConfigSource,
+  type Recipient,
   type RuntimeConfig,
   type ServiceDefinition,
 } from "../core/configSource.interface.ts";
@@ -165,6 +168,9 @@ const settingsSchema = z.object({
   escalationAfterMinutes: z.coerce.number().int().positive().max(1440).catch(15),
   escalationChannel: z.string().max(64).catch(""),
   escalationMinSeverity: z.enum(SEVERITY_FLOORS).catch("major_outage"),
+  /** Tell the other channels when one keeps failing (roadmap 3.4). */
+  channelHealthEnabled: booleanSetting.catch(false),
+  channelHealthAfterFailures: z.coerce.number().int().min(2).max(100).catch(3),
 
   /**
    * "Is a newer version out" (roadmap 15.11a). Off by default: it is the only
@@ -207,6 +213,8 @@ const serviceRowSchema = z.object({
   cross_checks: z.string().nullable(),
   sla_target: z.number().nullable(),
   authority: z.enum(["declared", "observed"]).nullable(),
+  impact: z.string().nullable(),
+  owner: z.string().nullable(),
 });
 
 const removedRowSchema = z.object({
@@ -305,6 +313,7 @@ export function deliveryOf(settings: Settings): {
     channel: string;
     minSeverity: Settings["escalationMinSeverity"];
   };
+  channelHealth: { enabled: boolean; afterFailures: number };
 } {
   return {
     quietHours: {
@@ -334,6 +343,10 @@ export function deliveryOf(settings: Settings): {
       channel: settings.escalationChannel,
       minSeverity: settings.escalationMinSeverity,
     },
+    channelHealth: {
+      enabled: settings.channelHealthEnabled,
+      afterFailures: settings.channelHealthAfterFailures,
+    },
   };
 }
 
@@ -356,7 +369,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -409,6 +422,9 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // target that happens to be 100 (roadmap 4.13).
       ...(row.sla_target === null ? {} : { slaTarget: row.sla_target }),
       ...(row.authority === null ? {} : { authority: row.authority }),
+      // Absent rather than null, like every optional above (roadmap 3.7).
+      ...(row.impact === null ? {} : { impact: row.impact }),
+      ...(row.owner === null ? {} : { owner: row.owner }),
     }));
 }
 
@@ -418,7 +434,7 @@ export function insertService(
 ): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -436,6 +452,8 @@ export function insertService(
     parsed.crossChecks ?? null,
     parsed.slaTarget ?? null,
     parsed.authority ?? null,
+    parsed.impact ?? null,
+    parsed.owner ?? null,
     new Date().toISOString(),
   );
 }
@@ -481,6 +499,9 @@ export const servicePatchSchema = serviceDefinitionSchema
       .unwrap()
       .nullable()
       .optional(),
+    /** Null clears why the provider matters, or who answers for it (roadmap 3.7). */
+    impact: serviceDefinitionSchema.shape.impact.unwrap().nullable().optional(),
+    owner: serviceDefinitionSchema.shape.owner.unwrap().nullable().optional(),
   });
 
 /** Returns false when there was no such service, so a route can answer 404. */
@@ -527,6 +548,8 @@ export function updateService(
     columns["muted_until"] = parsed.mutedUntil;
   if (parsed.slaTarget !== undefined) columns["sla_target"] = parsed.slaTarget;
   if (parsed.authority !== undefined) columns["authority"] = parsed.authority;
+  if (parsed.impact !== undefined) columns["impact"] = parsed.impact;
+  if (parsed.owner !== undefined) columns["owner"] = parsed.owner;
   if (Object.keys(columns).length === 0) return exists(db, id);
 
   const assignments = Object.keys(columns)
@@ -832,6 +855,64 @@ export function replaceRoutingRules(
   }
 }
 
+const recipientRowSchema = z.object({ id: z.string(), name: z.string(), channels: z.string() });
+
+/**
+ * Recipients in the order the operator wrote them (roadmap 3.5). A row that
+ * cannot be read is dropped with an error in the log, like a routing rule's:
+ * losing a recipient only means its channels are each sent to on their own
+ * again, which is the duplicate the operator already lived with.
+ */
+export function listRecipients(db: DatabaseSync, logger: Logger): Recipient[] {
+  const recipients: Recipient[] = [];
+  for (const raw of db.prepare("SELECT id, name, channels FROM recipients ORDER BY position, id").all()) {
+    const row = recipientRowSchema.safeParse(raw);
+    let channels: unknown;
+    try {
+      channels = row.success ? JSON.parse(row.data.channels) : undefined;
+    } catch {
+      channels = undefined;
+    }
+    const parsed = row.success ? recipientSchema.safeParse({ ...row.data, channels }) : undefined;
+    if (parsed === undefined || !parsed.success) {
+      logger.error("skipping an unreadable recipient row", { id: row.success ? row.data.id : undefined });
+      continue;
+    }
+    recipients.push(parsed.data);
+  }
+  return recipients;
+}
+
+/**
+ * Rewrites every recipient in one transaction, for the reason routing rules
+ * are: the dashboard holds the whole list, and per-row writes could interleave.
+ * Validated before anything is deleted, channels included — a recipient that
+ * names a channel this edition does not have would fall back onto nothing.
+ */
+export function replaceRecipients(db: DatabaseSync, recipients: Recipient[]): void {
+  const validated = recipientsSchema.parse(recipients);
+  const known = new Set(listChannels(db).map((channel) => channel.id));
+  for (const recipient of validated) {
+    const unknown = recipient.channels.find((channel) => !known.has(channel));
+    if (unknown !== undefined) {
+      throw new Error(`recipient ${recipient.id}: there is no channel called "${unknown}"`);
+    }
+  }
+
+  db.exec("BEGIN");
+  try {
+    db.exec("DELETE FROM recipients");
+    const insert = db.prepare("INSERT INTO recipients (id, position, name, channels) VALUES (?, ?, ?, ?)");
+    validated.forEach((recipient, index) => {
+      insert.run(recipient.id, index, recipient.name, JSON.stringify(recipient.channels));
+    });
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 /** The API shape, mirroring `describeChannels`. */
 export function describeRouting(
   db: DatabaseSync,
@@ -1088,6 +1169,7 @@ export function createDbConfigSource(
         // rows are this edition's storage, and the policy's shape and defaults
         // stay the Light edition's too.
         delivery: deliverySchema.parse(deliveryOf(settings)),
+        recipients: listRecipients(db, logger),
       };
     },
   };

@@ -41,6 +41,11 @@ services:
     # month has spent of it, and sends one alert when the rate says the month
     # will miss. Omit it when nobody promised anything — most providers.
     slaTarget: 99.9
+    # Optional: what breaks here when this provider does, and who answers for
+    # it. Both are added under every message about it, so an alert at 3 a.m.
+    # reads as a handover note.
+    impact: deploys blocked, CI stopped
+    owner: "@alice"
 
   - name: Cloudflare
     id: cloudflare
@@ -295,3 +300,19 @@ notifications:
 #     afterMinutes: 15
 #     channel: pushover
 #     minSeverity: major_outage
+#
+#   # When a channel refuses this many messages in a row, say so on the
+#   # others instead of leaving it to a badge in the delivery log.
+#   channelHealth:
+#     enabled: true
+#     afterFailures: 3
+
+# People reached through more than one channel, preferred first. A change a
+# rule sends to several of one person's channels goes to the first only, and to
+# the next only if that one fails — so nobody hears it twice, and nobody has to
+# mute their second channel to stop it.
+#
+# recipients:
+#   - id: alice
+#     name: Alice
+#     channels: [telegram, discord]
