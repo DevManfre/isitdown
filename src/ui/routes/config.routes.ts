@@ -759,7 +759,9 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
    *
    * The header says in words what the download does not carry: `secrets.env`
    * holds the channel credentials and stays here. A backup that silently
-   * omitted them would be discovered on the one day it matters.
+   * omitted them would be discovered on the one day it matters. The web-push
+   * VAPID key pair (two `settings` rows) is left out for the same reason: its
+   * private half signs push messages as this server.
    */
   router.get("/config/backup", (_req, res) => {
     const snapshot = createBackup(db);
