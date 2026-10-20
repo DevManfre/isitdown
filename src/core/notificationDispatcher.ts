@@ -251,6 +251,21 @@ const realSleep = (ms: number): Promise<void> =>
  */
 export function createDispatcher(deps: DispatcherDeps): Dispatcher {
   const { logger, onSent } = deps;
+
+  // The poller has already moved the notify baseline by the time a dispatch
+  // runs, so a throwing lookup would lose the alert for good. Each one falls
+  // back to the answer that still delivers.
+  async function orElse<T>(what: string, fallback: T, read: () => Promise<T>, context: Record<string, unknown>): Promise<T> {
+    try {
+      return await read();
+    } catch (error) {
+      logger.error(`${what} failed; carrying on without it`, {
+        ...context,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return fallback;
+    }
+  }
   const sleep = deps.sleep ?? realSleep;
   const now = deps.now ?? Date.now;
   const messageRefs = deps.messageRefs;
@@ -870,7 +885,13 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       // Out of trouble, however it ended: forgotten, so the next stretch starts
       // a fresh clock. Judged on the provider's own state rather than on a
       // resolving change, because a mute or a maintenance window swallows that.
-      if (!(await escalationDeps.inTrouble(providerId))) {
+      const stillInTrouble = await orElse(
+        "checking whether a provider is still in trouble",
+        true,
+        () => escalationDeps.inTrouble(providerId),
+        { providerId },
+      );
+      if (!stillInTrouble) {
         pendingEscalations.delete(providerId);
         continue;
       }
@@ -1016,8 +1037,16 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           follows !== undefined &&
           incidentId !== undefined &&
           (change.kind === "incident_opened" || change.kind === "incident_updated" || change.kind === "incident_resolved") &&
-          (await follows.isFollowed(change.providerId, incidentId));
-        if (followed && change.kind === "incident_resolved") await follows.unfollow(change.providerId, incidentId);
+          (await orElse("checking whether an incident is followed", false, () => follows.isFollowed(change.providerId, incidentId), {
+            providerId: change.providerId,
+            incidentId,
+          }));
+        if (followed && change.kind === "incident_resolved") {
+          await orElse("ending a follow", undefined, () => follows.unfollow(change.providerId, incidentId), {
+            providerId: change.providerId,
+            incidentId,
+          });
+        }
         // Quiet hours still hold a followed incident: following one says "tell
         // me every update", not "wake me for every update".
         const held = followed
