@@ -11,6 +11,12 @@ machine it runs on. Setting `API_TOKEN` turns on one read-only bearer token —
 `GET` and `HEAD` from any host, everything else refused, `/health` and `/ready`
 never gated. See [3.12](configuration.md#312-reaching-the-api-from-another-host).
 
+A write whose browser `Origin` is not the dashboard's own host is refused with
+`403`, as is one whose `Host` is not `localhost`, an IP address or a name listed in
+`ALLOWED_HOSTS` (comma-separated extra hostnames the dashboard may be served under,
+e.g. a reverse proxy's name). Requests without an `Origin` (curl, scripts) and the
+`/push/`, `/heartbeat/` and `/public` routes are unaffected.
+
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/health` | Liveness, and only that: the process answers. `{ status, providers, lastCycleAt }`. Never fails because a provider is unreachable. |
