@@ -26,6 +26,8 @@ import type {
   RuntimeConfigResponse,
   SeverityFloorName,
 } from "@/lib/types.ts";
+// The floors come from core's own list rather than a copy: a floor added there
+// has to appear here, and a literal array would silently not.
 import { SEVERITY_FLOORS } from "../../../../core/routing.ts";
 
 /** The two typed numbers in the delivery section, bounded like the engine's. */
