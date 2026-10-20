@@ -1041,6 +1041,9 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       db.prepare("DELETE FROM poll_cycles WHERE started_at < ?").run(cutoff);
       db.prepare("DELETE FROM incidents WHERE resolved_at IS NOT NULL AND resolved_at < ?").run(cutoff);
       db.prepare("DELETE FROM maintenances WHERE ends_at IS NOT NULL AND ends_at < ?").run(cutoff);
+      // A chat message reference nobody has touched since the cutoff will not
+      // be edited again: its resolution was swallowed (quiet hours, cap, mute).
+      db.prepare("DELETE FROM message_refs WHERE updated_at < ?").run(cutoff);
       // Roadmap 1.11: an edit to an incident nobody keeps any more is a claim
       // about nothing. Read back from a feed that still carries it, the
       // incident simply starts a new first version.
