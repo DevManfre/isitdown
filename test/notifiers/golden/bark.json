@@ -1,0 +1,70 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://api.day.app/push",
+      "headers": {
+        "content-type": "application/json; charset=utf-8"
+      },
+      "body": {
+        "device_key": "SECRET-DEVICE",
+        "title": "🔴 GitHub — MAJOR OUTAGE",
+        "body": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC",
+        "level": "critical",
+        "url": "https://www.githubstatus.com",
+        "group": "IsItDown"
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://api.day.app/push",
+      "headers": {
+        "content-type": "application/json; charset=utf-8"
+      },
+      "body": {
+        "device_key": "SECRET-DEVICE",
+        "title": "🟢 GitHub — RESOLVED",
+        "body": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC",
+        "level": "active",
+        "url": "https://www.githubstatus.com",
+        "group": "IsItDown"
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://api.day.app/push",
+      "headers": {
+        "content-type": "application/json; charset=utf-8"
+      },
+      "body": {
+        "device_key": "SECRET-DEVICE",
+        "title": "🟡 GitHub — DEGRADED",
+        "body": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC",
+        "level": "active",
+        "url": "https://www.githubstatus.com",
+        "group": "IsItDown"
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://api.day.app/push",
+      "headers": {
+        "content-type": "application/json; charset=utf-8"
+      },
+      "body": {
+        "device_key": "SECRET-DEVICE",
+        "title": "⚙️ GitHub — maintenance ahead",
+        "body": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min",
+        "level": "active",
+        "url": "https://www.githubstatus.com",
+        "group": "IsItDown"
+      }
+    }
+  ]
+}

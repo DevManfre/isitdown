@@ -2,10 +2,14 @@ import { z } from "zod";
 import { t } from "../core/i18n/index.ts";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { renderParts } from "./formatting.ts";
+import { httpFailure } from "./errors.ts";
+import { fitText, renderParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
 
 const REQUEST_TIMEOUT_MS = 10_000;
+
+/** Block Kit refuses a section whose text runs past this. */
+const SECTION_MAX_CHARS = 3000;
 
 const settingsSchema = z.object({
   webhookUrl: httpUrlSetting("webhookUrl", "slack"),
@@ -36,9 +40,9 @@ export function createSlackNotifier(settings: Record<string, string>): Notifier 
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          text: heading,
+          text: fitText(heading, SECTION_MAX_CHARS),
           blocks: [
-            { type: "section", text: { type: "mrkdwn", text: `*${heading}*\n${detail}` } },
+            { type: "section", text: { type: "mrkdwn", text: fitText(`*${heading}*\n${detail}`, SECTION_MAX_CHARS) } },
             {
               type: "actions",
               elements: [
@@ -57,9 +61,7 @@ export function createSlackNotifier(settings: Record<string, string>): Notifier 
       if (response.ok) return;
 
       const reason = (await response.text().catch(() => "")).trim();
-      throw new Error(
-        `slack notification failed: HTTP ${response.status}${reason === "" ? "" : ` (${reason})`}`,
-      );
+      throw httpFailure("slack", "failed", response.status, reason);
     },
   };
 }

@@ -1,0 +1,82 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://api.squadcast.com/v2/incidents/api/SECRET-KEY",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "message": "🔴 GitHub — MAJOR OUTAGE",
+        "description": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "status": "trigger",
+        "event_id": "isitdown/github/incident/inc-1",
+        "tags": {
+          "provider": "github",
+          "kind": "incident_opened",
+          "status": "major_outage"
+        }
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://api.squadcast.com/v2/incidents/api/SECRET-KEY",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "message": "🟢 GitHub — RESOLVED",
+        "description": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "status": "resolve",
+        "event_id": "isitdown/github/incident/inc-1",
+        "tags": {
+          "provider": "github",
+          "kind": "incident_resolved",
+          "status": "operational"
+        }
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://api.squadcast.com/v2/incidents/api/SECRET-KEY",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "message": "🟡 GitHub — DEGRADED",
+        "description": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "status": "trigger",
+        "event_id": "isitdown/github/status",
+        "tags": {
+          "provider": "github",
+          "kind": "status_change",
+          "status": "degraded"
+        }
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://api.squadcast.com/v2/incidents/api/SECRET-KEY",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "message": "⚙️ GitHub — maintenance ahead",
+        "description": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\nhttps://www.githubstatus.com",
+        "status": "trigger",
+        "event_id": "isitdown/github/maintenance/mnt-1",
+        "tags": {
+          "provider": "github",
+          "kind": "maintenance_upcoming",
+          "status": "operational"
+        }
+      }
+    }
+  ]
+}

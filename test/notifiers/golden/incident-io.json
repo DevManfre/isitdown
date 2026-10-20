@@ -1,0 +1,98 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://api.incident.io/v2/alert_events/http/01SOURCE",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "title": "🔴 GitHub — MAJOR OUTAGE",
+        "description": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC",
+        "deduplication_key": "isitdown/github/incident/inc-1",
+        "status": "firing",
+        "source_url": "https://www.githubstatus.com",
+        "metadata": {
+          "provider": "github",
+          "provider_name": "GitHub",
+          "kind": "incident_opened",
+          "status": "major_outage",
+          "previous_status": "operational"
+        }
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://api.incident.io/v2/alert_events/http/01SOURCE",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "title": "🟢 GitHub — RESOLVED",
+        "description": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC",
+        "deduplication_key": "isitdown/github/incident/inc-1",
+        "status": "resolved",
+        "source_url": "https://www.githubstatus.com",
+        "metadata": {
+          "provider": "github",
+          "provider_name": "GitHub",
+          "kind": "incident_resolved",
+          "status": "operational",
+          "previous_status": "major_outage"
+        }
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://api.incident.io/v2/alert_events/http/01SOURCE",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "title": "🟡 GitHub — DEGRADED",
+        "description": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC",
+        "deduplication_key": "isitdown/github/status",
+        "status": "firing",
+        "source_url": "https://www.githubstatus.com",
+        "metadata": {
+          "provider": "github",
+          "provider_name": "GitHub",
+          "kind": "status_change",
+          "status": "degraded",
+          "previous_status": "operational"
+        }
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://api.incident.io/v2/alert_events/http/01SOURCE",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "title": "⚙️ GitHub — maintenance ahead",
+        "description": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min",
+        "deduplication_key": "isitdown/github/maintenance/mnt-1",
+        "status": "firing",
+        "source_url": "https://www.githubstatus.com",
+        "metadata": {
+          "provider": "github",
+          "provider_name": "GitHub",
+          "kind": "maintenance_upcoming",
+          "status": "operational",
+          "previous_status": ""
+        }
+      }
+    }
+  ]
+}

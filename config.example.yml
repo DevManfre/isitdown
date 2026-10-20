@@ -217,6 +217,119 @@ notifications:
     from: "${SMTP_FROM}"
     # One address, or several separated by commas
     to: "${SMTP_TO}"
+  # On-call chains (roadmap 3.9). Like PagerDuty and Opsgenie, each keys its
+  # alert on the change, so a provider's own "resolved" closes what it opened.
+  splunk-oncall:
+    enabled: false
+    # The REST endpoint integration's API key, and the routing key that picks
+    # the escalation policy
+    apiKey: "${SPLUNK_ONCALL_API_KEY}"
+    routingKey: "${SPLUNK_ONCALL_ROUTING_KEY}"
+  squadcast:
+    enabled: false
+    # An Incident Webhook integration's URL
+    webhookUrl: "${SQUADCAST_WEBHOOK_URL}"
+  zenduty:
+    enabled: false
+    # An API integration's key
+    integrationKey: "${ZENDUTY_INTEGRATION_KEY}"
+  incident-io:
+    enabled: false
+    # An HTTP alert source: its config id and its bearer token
+    alertSourceId: "${INCIDENT_IO_ALERT_SOURCE_ID}"
+    token: "${INCIDENT_IO_TOKEN}"
+  grafana-oncall:
+    enabled: false
+    # A Formatted Webhook integration's URL
+    webhookUrl: "${GRAFANA_ONCALL_WEBHOOK_URL}"
+  # Team chat through each server's API, so an incident's updates edit the
+  # message they belong to instead of adding one each.
+  mattermost:
+    enabled: false
+    serverUrl: "${MATTERMOST_URL}"
+    # A bot account's access token, and the channel's id (not its name)
+    token: "${MATTERMOST_TOKEN}"
+    channelId: "${MATTERMOST_CHANNEL_ID}"
+  rocketchat:
+    enabled: false
+    serverUrl: "${ROCKETCHAT_URL}"
+    # The bot user's id and a personal access token of it, and the room's id
+    userId: "${ROCKETCHAT_USER_ID}"
+    token: "${ROCKETCHAT_TOKEN}"
+    roomId: "${ROCKETCHAT_ROOM_ID}"
+  zulip:
+    enabled: false
+    siteUrl: "${ZULIP_SITE_URL}"
+    botEmail: "${ZULIP_BOT_EMAIL}"
+    apiKey: "${ZULIP_API_KEY}"
+    # The channel ("stream") to post in
+    stream: "${ZULIP_STREAM}"
+    # Optional: one fixed topic. Unset, each provider gets a topic of its own.
+    topic: "${ZULIP_TOPIC}"
+  google-chat:
+    enabled: false
+    # A space's incoming webhook. An incident's messages share one thread.
+    webhookUrl: "${GOOGLE_CHAT_WEBHOOK_URL}"
+  # Phones. Numbers are E.164 (+39...). Route only what is worth waking up
+  # for to the call — a rule with minSeverity: major_outage.
+  twilio-sms:
+    enabled: false
+    accountSid: "${TWILIO_SMS_ACCOUNT_SID}"
+    authToken: "${TWILIO_SMS_AUTH_TOKEN}"
+    from: "${TWILIO_SMS_FROM}"
+    to: "${TWILIO_SMS_TO}"
+  twilio-call:
+    enabled: false
+    accountSid: "${TWILIO_CALL_ACCOUNT_SID}"
+    authToken: "${TWILIO_CALL_AUTH_TOKEN}"
+    from: "${TWILIO_CALL_FROM}"
+    to: "${TWILIO_CALL_TO}"
+  bark:
+    enabled: false
+    # The device key the Bark iOS app shows
+    deviceKey: "${BARK_DEVICE_KEY}"
+    # Optional: a self-hosted bark-server. Unset means https://api.day.app
+    serverUrl: "${BARK_SERVER_URL}"
+  signal:
+    enabled: false
+    # A signal-cli-rest-api server, which holds the account's keys
+    serverUrl: "${SIGNAL_API_URL}"
+    # The registered number to send from, and who receives: numbers or
+    # group.… ids, comma-separated
+    number: "${SIGNAL_NUMBER}"
+    recipients: "${SIGNAL_RECIPIENTS}"
+  # Machines.
+  syslog:
+    enabled: false
+    # udp://host:514, tcp://host:601 or tls://host:6514 — RFC 5424 messages
+    url: "${SYSLOG_URL}"
+    # Optional: local0 (the default) to local7
+    facility: "${SYSLOG_FACILITY}"
+  mqtt:
+    enabled: false
+    # mqtt://broker:1883, or mqtts:// for TLS
+    brokerUrl: "${MQTT_BROKER_URL}"
+    # Optional: the topic prefix, "isitdown" by default. Messages go to
+    # <prefix>/<provider>; a provider's state is published retained.
+    topic: "${MQTT_TOPIC}"
+    # Optional: only for a broker that wants credentials
+    username: "${MQTT_USERNAME}"
+    password: "${MQTT_PASSWORD}"
+  # Public posts. The operator's impact and owner notes are never posted.
+  mastodon:
+    enabled: false
+    instanceUrl: "${MASTODON_INSTANCE_URL}"
+    # An application's access token with write:statuses
+    accessToken: "${MASTODON_ACCESS_TOKEN}"
+    # Optional: public (the default), unlisted or private
+    visibility: "${MASTODON_VISIBILITY}"
+  bluesky:
+    enabled: false
+    handle: "${BLUESKY_HANDLE}"
+    # An app password (Settings → App passwords), never the account's own
+    appPassword: "${BLUESKY_APP_PASSWORD}"
+    # Optional: the account's PDS, when it is not bsky.social
+    serviceUrl: "${BLUESKY_SERVICE_URL}"
 
 # Which channels hear about what. The first rule that matches a change decides,
 # rules below it are not consulted — put specific ones on top. Leave this

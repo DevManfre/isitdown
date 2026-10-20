@@ -4,9 +4,13 @@ import type { NotificationPayload } from "../core/types.ts";
 import { ACTION_MUTE_MINUTES, encodeAction } from "../core/chatops/actions.ts";
 import { t } from "../core/i18n/index.ts";
 import { isResolution } from "./incidentKey.ts";
-import { offersActions, renderMessage } from "./formatting.ts";
+import { ChannelError, httpFailure } from "./errors.ts";
+import { fitText, offersActions, renderMessage } from "./formatting.ts";
 
 const API_TIMEOUT_MS = 10_000;
+
+/** What `sendMessage` and `editMessageText` accept, after entity parsing. */
+const TEXT_MAX_CHARS = 4096;
 
 const settingsSchema = z.object({
   botToken: z.string().min(1, "botToken is required for the telegram channel"),
@@ -45,15 +49,14 @@ export function createTelegramNotifier(settings: Record<string, string>): Notifi
     };
 
     if (!response.ok) {
-      throw new Error(
-        `telegram notification failed: HTTP ${response.status}${
-          parsed.description === undefined ? "" : ` (${parsed.description})`
-        }`,
-      );
+      throw httpFailure("telegram", "failed", response.status, parsed.description);
     }
     // Telegram also reports application-level failures inside a 200.
     if (parsed.ok === false) {
-      throw new Error(`telegram notification rejected: ${parsed.description ?? "unknown reason"}`);
+      throw new ChannelError(
+        "telegram",
+        `telegram notification rejected: ${parsed.description ?? "unknown reason"}`,
+      );
     }
     return parsed;
   }
@@ -103,7 +106,7 @@ export function createTelegramNotifier(settings: Record<string, string>): Notifi
     async send(payload: NotificationPayload): Promise<string | void> {
       const parsed = await call(endpoint, {
         chat_id: chatId,
-        text: renderMessage(payload),
+        text: fitText(renderMessage(payload), TEXT_MAX_CHARS),
         disable_web_page_preview: true,
         ...keyboardFor(payload, false),
       });
@@ -121,7 +124,7 @@ export function createTelegramNotifier(settings: Record<string, string>): Notifi
       await call(editEndpoint, {
         chat_id: chatId,
         message_id: Number(ref),
-        text: renderMessage(payload),
+        text: fitText(renderMessage(payload), TEXT_MAX_CHARS),
         disable_web_page_preview: true,
         ...keyboardFor(payload, true),
       });

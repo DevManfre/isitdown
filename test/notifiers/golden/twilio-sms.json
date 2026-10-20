@@ -1,0 +1,46 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://api.twilio.com/2010-04-01/Accounts/AC123/Messages.json",
+      "headers": {
+        "authorization": "Basic QUMxMjM6U0VDUkVULVRPS0VO",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "To=%2B393331234567&From=%2B15005550006&Body=%F0%9F%94%B4+GitHub+%E2%80%94+MAJOR+OUTAGE%0A%0AIncident%3A+API+requests+failing%0AStatus%3A+Investigating%0AUpdated%3A+2026-08-19+14%3A32+UTC%0A%0Ahttps%3A%2F%2Fwww.githubstatus.com"
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://api.twilio.com/2010-04-01/Accounts/AC123/Messages.json",
+      "headers": {
+        "authorization": "Basic QUMxMjM6U0VDUkVULVRPS0VO",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "To=%2B393331234567&From=%2B15005550006&Body=%F0%9F%9F%A2+GitHub+%E2%80%94+RESOLVED%0A%0AIncident+%22API+requests+failing%22+has+been+resolved.%0AUpdated%3A+2026-08-19+14%3A32+UTC%0A%0Ahttps%3A%2F%2Fwww.githubstatus.com"
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://api.twilio.com/2010-04-01/Accounts/AC123/Messages.json",
+      "headers": {
+        "authorization": "Basic QUMxMjM6U0VDUkVULVRPS0VO",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "To=%2B393331234567&From=%2B15005550006&Body=%F0%9F%9F%A1+GitHub+%E2%80%94+DEGRADED%0A%0AStatus+changed+from+Operational+to+Degraded.%0AUpdated%3A+2026-08-19+14%3A32+UTC%0A%0Ahttps%3A%2F%2Fwww.githubstatus.com"
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://api.twilio.com/2010-04-01/Accounts/AC123/Messages.json",
+      "headers": {
+        "authorization": "Basic QUMxMjM6U0VDUkVULVRPS0VO",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "To=%2B393331234567&From=%2B15005550006&Body=%E2%9A%99%EF%B8%8F+GitHub+%E2%80%94+maintenance+ahead%0A%0AScheduled+maintenance+starts+in+2+h%3A+Database+upgrade%0AStarts%3A+2026-08-19+16%3A00+UTC+%E2%80%94+expected+duration%3A+30+min%0A%0Ahttps%3A%2F%2Fwww.githubstatus.com"
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://alert.victorops.com/integrations/generic/20131114/alert/SECRET-KEY/ops",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "message_type": "CRITICAL",
+        "entity_id": "isitdown/github/incident/inc-1",
+        "entity_display_name": "🔴 GitHub — MAJOR OUTAGE",
+        "state_message": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "state_start_time": 1787149927,
+        "monitoring_tool": "IsItDown",
+        "provider": "GitHub",
+        "status_url": "https://www.githubstatus.com"
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://alert.victorops.com/integrations/generic/20131114/alert/SECRET-KEY/ops",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "message_type": "RECOVERY",
+        "entity_id": "isitdown/github/incident/inc-1",
+        "entity_display_name": "🟢 GitHub — RESOLVED",
+        "state_message": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "state_start_time": 1787149927,
+        "monitoring_tool": "IsItDown",
+        "provider": "GitHub",
+        "status_url": "https://www.githubstatus.com"
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://alert.victorops.com/integrations/generic/20131114/alert/SECRET-KEY/ops",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "message_type": "WARNING",
+        "entity_id": "isitdown/github/status",
+        "entity_display_name": "🟡 GitHub — DEGRADED",
+        "state_message": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "state_start_time": 1787149927,
+        "monitoring_tool": "IsItDown",
+        "provider": "GitHub",
+        "status_url": "https://www.githubstatus.com"
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://alert.victorops.com/integrations/generic/20131114/alert/SECRET-KEY/ops",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "message_type": "INFO",
+        "entity_id": "isitdown/github/maintenance/mnt-1",
+        "entity_display_name": "⚙️ GitHub — maintenance ahead",
+        "state_message": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\nhttps://www.githubstatus.com",
+        "state_start_time": 1787149927,
+        "monitoring_tool": "IsItDown",
+        "provider": "GitHub",
+        "status_url": "https://www.githubstatus.com"
+      }
+    }
+  ]
+}

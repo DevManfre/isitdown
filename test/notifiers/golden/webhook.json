@@ -1,0 +1,128 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://hooks.example/SECRET-PATH",
+      "headers": {
+        "content-type": "application/json",
+        "x-isitdown-signature": "sha256=eedf1e7fce0849e099be4e39f9e8b60f3bdca5e8b23845b9227ed6f317bcc380",
+        "x-isitdown-timestamp": "2026-10-20T08:00:00.000Z"
+      },
+      "body": {
+        "change": {
+          "kind": "incident_opened",
+          "providerId": "github",
+          "at": "2026-08-19T14:32:07.000Z",
+          "previousStatus": "operational",
+          "currentStatus": "major_outage",
+          "incident": {
+            "id": "inc-1",
+            "name": "API requests failing",
+            "impact": "major",
+            "status": "investigating",
+            "updatedAt": "2026-08-19T14:32:07.000Z"
+          }
+        },
+        "service": {
+          "id": "github",
+          "name": "GitHub",
+          "statusUrl": "https://www.githubstatus.com"
+        },
+        "message": "🔴 GitHub — MAJOR OUTAGE\n\nIncident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com"
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://hooks.example/SECRET-PATH",
+      "headers": {
+        "content-type": "application/json",
+        "x-isitdown-signature": "sha256=1771709406e34b11248a8cc61ba1702ac2fd874c193d527ab34a06e1cf56840c",
+        "x-isitdown-timestamp": "2026-10-20T08:00:00.000Z"
+      },
+      "body": {
+        "change": {
+          "kind": "incident_resolved",
+          "providerId": "github",
+          "at": "2026-08-19T14:32:07.000Z",
+          "previousStatus": "major_outage",
+          "currentStatus": "operational",
+          "incident": {
+            "id": "inc-1",
+            "name": "API requests failing",
+            "impact": "major",
+            "status": "resolved",
+            "updatedAt": "2026-08-19T14:32:07.000Z"
+          }
+        },
+        "service": {
+          "id": "github",
+          "name": "GitHub",
+          "statusUrl": "https://www.githubstatus.com"
+        },
+        "message": "🟢 GitHub — RESOLVED\n\nIncident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com"
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://hooks.example/SECRET-PATH",
+      "headers": {
+        "content-type": "application/json",
+        "x-isitdown-signature": "sha256=4478e82901e7ccbbbd32f23aae6915d4390e446e04a6c8dd0ee1be4389cbf4da",
+        "x-isitdown-timestamp": "2026-10-20T08:00:00.000Z"
+      },
+      "body": {
+        "change": {
+          "kind": "status_change",
+          "providerId": "github",
+          "at": "2026-08-19T14:32:07.000Z",
+          "previousStatus": "operational",
+          "currentStatus": "degraded"
+        },
+        "service": {
+          "id": "github",
+          "name": "GitHub",
+          "statusUrl": "https://www.githubstatus.com"
+        },
+        "message": "🟡 GitHub — DEGRADED\n\nStatus changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com"
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://hooks.example/SECRET-PATH",
+      "headers": {
+        "content-type": "application/json",
+        "x-isitdown-signature": "sha256=31f726fb6f1c842d2ba93304cf5326afd089827354b9697d7b08d2e22abc348d",
+        "x-isitdown-timestamp": "2026-10-20T08:00:00.000Z"
+      },
+      "body": {
+        "change": {
+          "kind": "maintenance_upcoming",
+          "providerId": "github",
+          "at": "2026-08-19T14:32:07.000Z",
+          "currentStatus": "operational",
+          "maintenance": {
+            "id": "mnt-1",
+            "name": "Database upgrade",
+            "status": "scheduled",
+            "startsAt": "2026-08-19T16:00:00.000Z",
+            "endsAt": "2026-08-19T16:30:00.000Z",
+            "componentIds": []
+          },
+          "startsInMinutes": 90
+        },
+        "service": {
+          "id": "github",
+          "name": "GitHub",
+          "statusUrl": "https://www.githubstatus.com"
+        },
+        "message": "⚙️ GitHub — maintenance ahead\n\nScheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\nhttps://www.githubstatus.com"
+      }
+    }
+  ]
+}

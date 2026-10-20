@@ -107,6 +107,134 @@ const DEFAULT_CHANNELS = [
       toEnv: "SMTP_TO",
     },
   },
+  // Splunk On-Call (VictorOps) REST endpoint (roadmap 3.9): the integration's
+  // API key and the routing key that picks the escalation policy.
+  {
+    id: "splunk-oncall",
+    config: {
+      apiKeyEnv: "SPLUNK_ONCALL_API_KEY",
+      routingKeyEnv: "SPLUNK_ONCALL_ROUTING_KEY",
+    },
+  },
+  // Squadcast Incident Webhook (roadmap 3.9); the URL carries the integration
+  // key.
+  { id: "squadcast", config: { webhookUrlEnv: "SQUADCAST_WEBHOOK_URL" } },
+  // Zenduty Events API (roadmap 3.9): one integration key.
+  { id: "zenduty", config: { integrationKeyEnv: "ZENDUTY_INTEGRATION_KEY" } },
+  // incident.io HTTP alert source (roadmap 3.9): its config id and bearer token.
+  {
+    id: "incident-io",
+    config: {
+      alertSourceIdEnv: "INCIDENT_IO_ALERT_SOURCE_ID",
+      tokenEnv: "INCIDENT_IO_TOKEN",
+    },
+  },
+  // Grafana OnCall formatted webhook (roadmap 3.9); the URL is the credential.
+  { id: "grafana-oncall", config: { webhookUrlEnv: "GRAFANA_ONCALL_WEBHOOK_URL" } },
+  // Mattermost through the API with a bot token (roadmap 3.9), so a post can be
+  // edited in place.
+  {
+    id: "mattermost",
+    config: {
+      serverUrlEnv: "MATTERMOST_URL",
+      tokenEnv: "MATTERMOST_TOKEN",
+      channelIdEnv: "MATTERMOST_CHANNEL_ID",
+    },
+  },
+  // Rocket.Chat through the REST API (roadmap 3.9): the bot user's id and token,
+  // and the room's id.
+  {
+    id: "rocketchat",
+    config: {
+      serverUrlEnv: "ROCKETCHAT_URL",
+      userIdEnv: "ROCKETCHAT_USER_ID",
+      tokenEnv: "ROCKETCHAT_TOKEN",
+      roomIdEnv: "ROCKETCHAT_ROOM_ID",
+    },
+  },
+  // Zulip (roadmap 3.9): a bot's email and API key, the channel, and an optional
+  // fixed topic — empty means one topic per provider.
+  {
+    id: "zulip",
+    config: {
+      siteUrlEnv: "ZULIP_SITE_URL",
+      botEmailEnv: "ZULIP_BOT_EMAIL",
+      apiKeyEnv: "ZULIP_API_KEY",
+      streamEnv: "ZULIP_STREAM",
+      topicEnv: "ZULIP_TOPIC",
+    },
+  },
+  // Google Chat incoming webhook (roadmap 3.9); the URL carries the key and
+  // token.
+  { id: "google-chat", config: { webhookUrlEnv: "GOOGLE_CHAT_WEBHOOK_URL" } },
+  // SMS through Twilio (roadmap 3.9). Numbers are E.164 (`+39…`).
+  {
+    id: "twilio-sms",
+    config: {
+      accountSidEnv: "TWILIO_SMS_ACCOUNT_SID",
+      authTokenEnv: "TWILIO_SMS_AUTH_TOKEN",
+      fromEnv: "TWILIO_SMS_FROM",
+      toEnv: "TWILIO_SMS_TO",
+    },
+  },
+  // A voice call through Twilio (roadmap 3.9) — route only what is worth waking
+  // up for to it.
+  {
+    id: "twilio-call",
+    config: {
+      accountSidEnv: "TWILIO_CALL_ACCOUNT_SID",
+      authTokenEnv: "TWILIO_CALL_AUTH_TOKEN",
+      fromEnv: "TWILIO_CALL_FROM",
+      toEnv: "TWILIO_CALL_TO",
+    },
+  },
+  // Bark iOS push (roadmap 3.9): the app's device key, and a self-hosted server
+  // when there is one.
+  { id: "bark", config: { deviceKeyEnv: "BARK_DEVICE_KEY", serverUrlEnv: "BARK_SERVER_URL" } },
+  // Signal through a signal-cli-rest-api server (roadmap 3.9): the registered
+  // number, and recipients comma-separated.
+  {
+    id: "signal",
+    config: {
+      serverUrlEnv: "SIGNAL_API_URL",
+      numberEnv: "SIGNAL_NUMBER",
+      recipientsEnv: "SIGNAL_RECIPIENTS",
+    },
+  },
+  // Syslog, RFC 5424 (roadmap 3.9): `udp://`, `tcp://` or `tls://host:port`, and
+  // a facility from local0 (the default) to local7.
+  { id: "syslog", config: { urlEnv: "SYSLOG_URL", facilityEnv: "SYSLOG_FACILITY" } },
+  // MQTT (roadmap 3.9): `mqtt://` or `mqtts://` broker, a topic prefix (default
+  // `isitdown`), and credentials only for a broker that wants them.
+  {
+    id: "mqtt",
+    config: {
+      brokerUrlEnv: "MQTT_BROKER_URL",
+      topicEnv: "MQTT_TOPIC",
+      usernameEnv: "MQTT_USERNAME",
+      passwordEnv: "MQTT_PASSWORD",
+    },
+  },
+  // Mastodon public post (roadmap 3.9): instance, an access token with
+  // write:statuses, and a visibility (default public).
+  {
+    id: "mastodon",
+    config: {
+      instanceUrlEnv: "MASTODON_INSTANCE_URL",
+      accessTokenEnv: "MASTODON_ACCESS_TOKEN",
+      visibilityEnv: "MASTODON_VISIBILITY",
+    },
+  },
+  // Bluesky public post (roadmap 3.9): handle and an app password, and a PDS
+  // when it is not bsky.social.
+  {
+    id: "bluesky",
+    config: {
+      handleEnv: "BLUESKY_HANDLE",
+      appPasswordEnv: "BLUESKY_APP_PASSWORD",
+      serviceUrlEnv: "BLUESKY_SERVICE_URL",
+    },
+  },
   // No `*Env` fields: the VAPID pair is generated on first use (src/ui/vapidKeys.ts).
   { id: "webpush", config: {} },
 ];

@@ -1,0 +1,62 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://mastodon.example/api/v1/statuses",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json",
+        "idempotency-key": "<uuid>"
+      },
+      "body": {
+        "status": "🔴 GitHub — MAJOR OUTAGE\n\nIncident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "visibility": "public"
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://mastodon.example/api/v1/statuses",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json",
+        "idempotency-key": "<uuid>"
+      },
+      "body": {
+        "status": "🟢 GitHub — RESOLVED\n\nIncident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "visibility": "public"
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://mastodon.example/api/v1/statuses",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json",
+        "idempotency-key": "<uuid>"
+      },
+      "body": {
+        "status": "🟡 GitHub — DEGRADED\n\nStatus changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "visibility": "public"
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://mastodon.example/api/v1/statuses",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json",
+        "idempotency-key": "<uuid>"
+      },
+      "body": {
+        "status": "⚙️ GitHub — maintenance ahead\n\nScheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\nhttps://www.githubstatus.com",
+        "visibility": "public"
+      }
+    }
+  ]
+}

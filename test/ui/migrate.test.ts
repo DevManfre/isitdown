@@ -213,19 +213,36 @@ test("seedDefaults registers every channel, disabled, referencing environment va
     rows.map((row) => row.id),
     [
       "apprise",
+      "bark",
+      "bluesky",
       "discord",
       "email",
+      "google-chat",
       "gotify",
+      "grafana-oncall",
+      "incident-io",
+      "mastodon",
       "matrix",
+      "mattermost",
+      "mqtt",
       "ntfy",
       "opsgenie",
       "pagerduty",
       "pushover",
+      "rocketchat",
+      "signal",
       "slack",
+      "splunk-oncall",
+      "squadcast",
+      "syslog",
       "teams",
       "telegram",
+      "twilio-call",
+      "twilio-sms",
       "webhook",
       "webpush",
+      "zenduty",
+      "zulip",
     ],
   );
   assert.ok(rows.every((row) => row.enabled === 0), "a seeded channel must start disabled");
@@ -321,7 +338,7 @@ test("seedDefaults run twice does not duplicate anything", async () => {
   const [services] = db.prepare("SELECT COUNT(*) AS n FROM services").all() as { n: number }[];
   const [channels] = db.prepare("SELECT COUNT(*) AS n FROM channels").all() as { n: number }[];
   assert.equal(services?.n, 3);
-  assert.equal(channels?.n, 14);
+  assert.equal(channels?.n, 31);
   db.close();
 });
 

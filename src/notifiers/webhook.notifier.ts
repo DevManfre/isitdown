@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
+import { httpFailure } from "./errors.ts";
 import { renderMessage } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
 
@@ -101,7 +102,7 @@ export function createWebhookNotifier(settings: Record<string, string>): Notifie
       });
 
       if (!response.ok) {
-        throw new Error(`webhook notification failed: HTTP ${response.status}`);
+        throw httpFailure("webhook", "failed", response.status);
       }
     },
   };

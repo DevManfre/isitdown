@@ -1,0 +1,182 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://example.webhook.office.com/SECRET-WEBHOOK",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "type": "message",
+        "attachments": [
+          {
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "contentUrl": null,
+            "content": {
+              "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+              "type": "AdaptiveCard",
+              "version": "1.4",
+              "body": [
+                {
+                  "type": "TextBlock",
+                  "text": "🔴 GitHub — MAJOR OUTAGE",
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "wrap": true,
+                  "color": "attention"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC",
+                  "wrap": true
+                }
+              ],
+              "actions": [
+                {
+                  "type": "Action.OpenUrl",
+                  "title": "GitHub",
+                  "url": "https://www.githubstatus.com"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://example.webhook.office.com/SECRET-WEBHOOK",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "type": "message",
+        "attachments": [
+          {
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "contentUrl": null,
+            "content": {
+              "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+              "type": "AdaptiveCard",
+              "version": "1.4",
+              "body": [
+                {
+                  "type": "TextBlock",
+                  "text": "🟢 GitHub — RESOLVED",
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "wrap": true,
+                  "color": "good"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC",
+                  "wrap": true
+                }
+              ],
+              "actions": [
+                {
+                  "type": "Action.OpenUrl",
+                  "title": "GitHub",
+                  "url": "https://www.githubstatus.com"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://example.webhook.office.com/SECRET-WEBHOOK",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "type": "message",
+        "attachments": [
+          {
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "contentUrl": null,
+            "content": {
+              "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+              "type": "AdaptiveCard",
+              "version": "1.4",
+              "body": [
+                {
+                  "type": "TextBlock",
+                  "text": "🟡 GitHub — DEGRADED",
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "wrap": true,
+                  "color": "warning"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC",
+                  "wrap": true
+                }
+              ],
+              "actions": [
+                {
+                  "type": "Action.OpenUrl",
+                  "title": "GitHub",
+                  "url": "https://www.githubstatus.com"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://example.webhook.office.com/SECRET-WEBHOOK",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "type": "message",
+        "attachments": [
+          {
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "contentUrl": null,
+            "content": {
+              "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+              "type": "AdaptiveCard",
+              "version": "1.4",
+              "body": [
+                {
+                  "type": "TextBlock",
+                  "text": "⚙️ GitHub — maintenance ahead",
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "wrap": true,
+                  "color": "good"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min",
+                  "wrap": true
+                }
+              ],
+              "actions": [
+                {
+                  "type": "Action.OpenUrl",
+                  "title": "GitHub",
+                  "url": "https://www.githubstatus.com"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
