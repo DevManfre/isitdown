@@ -1,0 +1,46 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://api.twilio.com/2010-04-01/Accounts/AC123/Calls.json",
+      "headers": {
+        "authorization": "Basic QUMxMjM6U0VDUkVULVRPS0VO",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "To=%2B393331234567&From=%2B15005550006&Twiml=%3CResponse%3E%3CSay+language%3D%22en-US%22%3EGitHub+%E2%80%94+MAJOR+OUTAGE.+Incident%3A+API+requests+failing.+Status%3A+Investigating.+Updated%3A+2026-08-19+14%3A32+UTC.%3C%2FSay%3E%3CPause+length%3D%221%22%2F%3E%3CSay+language%3D%22en-US%22%3EGitHub+%E2%80%94+MAJOR+OUTAGE.+Incident%3A+API+requests+failing.+Status%3A+Investigating.+Updated%3A+2026-08-19+14%3A32+UTC.%3C%2FSay%3E%3C%2FResponse%3E"
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://api.twilio.com/2010-04-01/Accounts/AC123/Calls.json",
+      "headers": {
+        "authorization": "Basic QUMxMjM6U0VDUkVULVRPS0VO",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "To=%2B393331234567&From=%2B15005550006&Twiml=%3CResponse%3E%3CSay+language%3D%22en-US%22%3EGitHub+%E2%80%94+RESOLVED.+Incident+%26quot%3BAPI+requests+failing%26quot%3B+has+been+resolved.+Updated%3A+2026-08-19+14%3A32+UTC.%3C%2FSay%3E%3CPause+length%3D%221%22%2F%3E%3CSay+language%3D%22en-US%22%3EGitHub+%E2%80%94+RESOLVED.+Incident+%26quot%3BAPI+requests+failing%26quot%3B+has+been+resolved.+Updated%3A+2026-08-19+14%3A32+UTC.%3C%2FSay%3E%3C%2FResponse%3E"
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://api.twilio.com/2010-04-01/Accounts/AC123/Calls.json",
+      "headers": {
+        "authorization": "Basic QUMxMjM6U0VDUkVULVRPS0VO",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "To=%2B393331234567&From=%2B15005550006&Twiml=%3CResponse%3E%3CSay+language%3D%22en-US%22%3EGitHub+%E2%80%94+DEGRADED.+Status+changed+from+Operational+to+Degraded.+Updated%3A+2026-08-19+14%3A32+UTC.%3C%2FSay%3E%3CPause+length%3D%221%22%2F%3E%3CSay+language%3D%22en-US%22%3EGitHub+%E2%80%94+DEGRADED.+Status+changed+from+Operational+to+Degraded.+Updated%3A+2026-08-19+14%3A32+UTC.%3C%2FSay%3E%3C%2FResponse%3E"
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://api.twilio.com/2010-04-01/Accounts/AC123/Calls.json",
+      "headers": {
+        "authorization": "Basic QUMxMjM6U0VDUkVULVRPS0VO",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "To=%2B393331234567&From=%2B15005550006&Twiml=%3CResponse%3E%3CSay+language%3D%22en-US%22%3EGitHub+%E2%80%94+maintenance+ahead.+Scheduled+maintenance+starts+in+2+h%3A+Database+upgrade.+Starts%3A+2026-08-19+16%3A00+UTC+%E2%80%94+expected+duration%3A+30+min.%3C%2FSay%3E%3CPause+length%3D%221%22%2F%3E%3CSay+language%3D%22en-US%22%3EGitHub+%E2%80%94+maintenance+ahead.+Scheduled+maintenance+starts+in+2+h%3A+Database+upgrade.+Starts%3A+2026-08-19+16%3A00+UTC+%E2%80%94+expected+duration%3A+30+min.%3C%2FSay%3E%3C%2FResponse%3E"
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "http://apprise:8000/notify",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "title": "🔴 GitHub — MAJOR OUTAGE",
+        "body": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "type": "failure",
+        "format": "text",
+        "urls": "tgram://SECRET-BOT/123"
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "http://apprise:8000/notify",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "title": "🟢 GitHub — RESOLVED",
+        "body": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "type": "success",
+        "format": "text",
+        "urls": "tgram://SECRET-BOT/123"
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "http://apprise:8000/notify",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "title": "🟡 GitHub — DEGRADED",
+        "body": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "type": "warning",
+        "format": "text",
+        "urls": "tgram://SECRET-BOT/123"
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "http://apprise:8000/notify",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "title": "⚙️ GitHub — maintenance ahead",
+        "body": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\nhttps://www.githubstatus.com",
+        "type": "success",
+        "format": "text",
+        "urls": "tgram://SECRET-BOT/123"
+      }
+    }
+  ]
+}

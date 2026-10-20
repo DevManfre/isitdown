@@ -1,0 +1,58 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://api.telegram.org/bot123:SECRET-BOT-TOKEN/sendMessage",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "chat_id": "-100",
+        "text": "🔴 GitHub — MAJOR OUTAGE\n\nIncident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "disable_web_page_preview": true
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://api.telegram.org/bot123:SECRET-BOT-TOKEN/sendMessage",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "chat_id": "-100",
+        "text": "🟢 GitHub — RESOLVED\n\nIncident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "disable_web_page_preview": true
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://api.telegram.org/bot123:SECRET-BOT-TOKEN/sendMessage",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "chat_id": "-100",
+        "text": "🟡 GitHub — DEGRADED\n\nStatus changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "disable_web_page_preview": true
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://api.telegram.org/bot123:SECRET-BOT-TOKEN/sendMessage",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "chat_id": "-100",
+        "text": "⚙️ GitHub — maintenance ahead\n\nScheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\nhttps://www.githubstatus.com",
+        "disable_web_page_preview": true
+      }
+    }
+  ]
+}

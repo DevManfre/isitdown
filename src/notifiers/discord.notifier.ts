@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { renderParts } from "./formatting.ts";
+import { httpFailure } from "./errors.ts";
+import { fitText, renderParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
 
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -38,17 +39,16 @@ export function createDiscordNotifier(settings: Record<string, string>): Notifie
   /** Whatever went wrong, in Discord's own words and never with the URL. */
   async function fail(response: Response, verb: string): Promise<never> {
     const body = (await response.json().catch(() => ({}))) as { message?: string };
-    throw new Error(
-      `discord notification ${verb}: HTTP ${response.status}${
-        body.message === undefined ? "" : ` (${body.message})`
-      }`,
-    );
+    throw httpFailure("discord", verb, response.status, body.message);
   }
 
   /** The one embed both a send and an edit post, so the two cannot drift apart. */
   function embed(payload: NotificationPayload): unknown {
     const { heading, detail, url, color } = renderParts(payload);
-    return { embeds: [{ title: heading, url, description: detail, color }] };
+    // Discord's own ceilings for an embed's title and description.
+    return {
+      embeds: [{ title: fitText(heading, 256), url, description: fitText(detail, 4096), color }],
+    };
   }
 
   return {

@@ -1,0 +1,137 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://events.pagerduty.com/v2/enqueue",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "routing_key": "SECRET-ROUTING",
+        "event_action": "trigger",
+        "dedup_key": "isitdown/github/incident/inc-1",
+        "payload": {
+          "summary": "🔴 GitHub — MAJOR OUTAGE",
+          "severity": "critical",
+          "source": "github",
+          "timestamp": "2026-08-19T14:32:07.000Z",
+          "group": "incident_opened",
+          "class": "incident_opened",
+          "custom_details": {
+            "provider": "GitHub",
+            "detail": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC",
+            "previous_status": "operational",
+            "current_status": "major_outage"
+          }
+        },
+        "links": [
+          {
+            "href": "https://www.githubstatus.com",
+            "text": "GitHub"
+          }
+        ]
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://events.pagerduty.com/v2/enqueue",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "routing_key": "SECRET-ROUTING",
+        "event_action": "resolve",
+        "dedup_key": "isitdown/github/incident/inc-1",
+        "payload": {
+          "summary": "🟢 GitHub — RESOLVED",
+          "severity": "info",
+          "source": "github",
+          "timestamp": "2026-08-19T14:32:07.000Z",
+          "group": "incident_resolved",
+          "class": "incident_resolved",
+          "custom_details": {
+            "provider": "GitHub",
+            "detail": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC",
+            "previous_status": "major_outage",
+            "current_status": "operational"
+          }
+        },
+        "links": [
+          {
+            "href": "https://www.githubstatus.com",
+            "text": "GitHub"
+          }
+        ]
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://events.pagerduty.com/v2/enqueue",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "routing_key": "SECRET-ROUTING",
+        "event_action": "trigger",
+        "dedup_key": "isitdown/github/status",
+        "payload": {
+          "summary": "🟡 GitHub — DEGRADED",
+          "severity": "warning",
+          "source": "github",
+          "timestamp": "2026-08-19T14:32:07.000Z",
+          "group": "status_change",
+          "class": "status_change",
+          "custom_details": {
+            "provider": "GitHub",
+            "detail": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC",
+            "previous_status": "operational",
+            "current_status": "degraded"
+          }
+        },
+        "links": [
+          {
+            "href": "https://www.githubstatus.com",
+            "text": "GitHub"
+          }
+        ]
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://events.pagerduty.com/v2/enqueue",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "routing_key": "SECRET-ROUTING",
+        "event_action": "trigger",
+        "dedup_key": "isitdown/github/maintenance/mnt-1",
+        "payload": {
+          "summary": "⚙️ GitHub — maintenance ahead",
+          "severity": "info",
+          "source": "github",
+          "timestamp": "2026-08-19T14:32:07.000Z",
+          "group": "maintenance_upcoming",
+          "class": "maintenance_upcoming",
+          "custom_details": {
+            "provider": "GitHub",
+            "detail": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min",
+            "current_status": "operational"
+          }
+        },
+        "links": [
+          {
+            "href": "https://www.githubstatus.com",
+            "text": "GitHub"
+          }
+        ]
+      }
+    }
+  ]
+}

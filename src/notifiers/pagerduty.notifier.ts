@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload, OverallStatus } from "../core/types.ts";
-import { renderParts } from "./formatting.ts";
+import { httpFailure } from "./errors.ts";
+import { fitText, renderParts } from "./formatting.ts";
 import { incidentKey, isResolution } from "./incidentKey.ts";
 
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -57,7 +58,8 @@ export function createPagerdutyNotifier(settings: Record<string, string>): Notif
         event_action: resolving ? "resolve" : "trigger",
         dedup_key: incidentKey(change),
         payload: {
-          summary: heading,
+          // PagerDuty refuses a summary past 1024 characters.
+          summary: fitText(heading, 1024),
           severity: SEVERITY[change.currentStatus],
           // The subject of the alert, in PagerDuty's own vocabulary: the thing
           // that is unhealthy, not the machine that noticed.
@@ -90,9 +92,7 @@ export function createPagerdutyNotifier(settings: Record<string, string>): Notif
         errors?: string[];
       };
       const reason = [body.message, ...(body.errors ?? [])].filter(Boolean).join("; ");
-      throw new Error(
-        `pagerduty notification failed: HTTP ${response.status}${reason === "" ? "" : ` (${reason})`}`,
-      );
+      throw httpFailure("pagerduty", "failed", response.status, reason);
     },
   };
 }

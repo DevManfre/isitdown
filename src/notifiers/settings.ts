@@ -59,6 +59,16 @@ export const OPTIONAL_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   // notifier's schema refuses the pair when both are empty, which is a claim
   // about the pair that a per-field list cannot make.
   apprise: ["configKey", "urls"],
+  // Roadmap 3.9's channels: a fixed Zulip topic (empty is one per provider), a
+  // self-hosted Bark server or Bluesky PDS (empty is the public one), a syslog
+  // facility (empty is local0), an MQTT prefix and broker credentials (a broker
+  // on the LAN often takes none), a Mastodon visibility (empty is public).
+  zulip: ["topic"],
+  bark: ["serverUrl"],
+  syslog: ["facility"],
+  mqtt: ["topic", "username", "password"],
+  mastodon: ["visibility"],
+  bluesky: ["serviceUrl"],
 };
 
 /** Whether a channel still works with this credential unset. */

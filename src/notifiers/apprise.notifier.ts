@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload, OverallStatus } from "../core/types.ts";
+import { httpFailure } from "./errors.ts";
 import { renderParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
 
@@ -68,11 +69,7 @@ export function createAppriseNotifier(settings: Record<string, string>): Notifie
       if (response.ok) return;
 
       const body = (await response.json().catch(() => ({}))) as { error?: string };
-      throw new Error(
-        `apprise notification failed: HTTP ${response.status}${
-          body.error === undefined ? "" : ` (${body.error})`
-        }`,
-      );
+      throw httpFailure("apprise", "failed", response.status, body.error);
     },
   };
 }

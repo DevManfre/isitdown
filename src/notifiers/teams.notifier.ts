@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload, OverallStatus } from "../core/types.ts";
-import { renderParts } from "./formatting.ts";
+import { httpFailure } from "./errors.ts";
+import { fitText, renderParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
 
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -51,7 +52,8 @@ export function createTeamsNotifier(settings: Record<string, string>): Notifier 
         },
         // A change whose whole report is its heading repeats it rather than
         // sending an empty block, which Teams renders as a gap.
-        { type: "TextBlock", text: detail === "" ? heading : detail, wrap: true },
+        // Teams refuses a card past ~28 KB; the detail is the only part that grows.
+        { type: "TextBlock", text: fitText(detail === "" ? heading : detail, 20_000), wrap: true },
       ];
 
       const response = await fetch(webhookUrl, {
@@ -82,9 +84,7 @@ export function createTeamsNotifier(settings: Record<string, string>): Notifier 
 
       // The webhook URL is the credential, so it never appears in the error.
       const reason = (await response.text().catch(() => "")).trim().slice(0, 200);
-      throw new Error(
-        `teams notification failed: HTTP ${response.status}${reason === "" ? "" : ` (${reason})`}`,
-      );
+      throw httpFailure("teams", "failed", response.status, reason);
     },
   };
 }

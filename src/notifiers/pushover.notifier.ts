@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload, OverallStatus } from "../core/types.ts";
-import { renderParts } from "./formatting.ts";
+import { httpFailure } from "./errors.ts";
+import { fitText, renderParts } from "./formatting.ts";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -41,10 +42,11 @@ export function createPushoverNotifier(settings: Record<string, string>): Notifi
       const form = new URLSearchParams({
         token,
         user: userKey,
-        title: heading,
+        // Pushover's own ceilings: past them the message is refused outright.
+        title: fitText(heading, 250),
         // Pushover refuses an empty message, so a change whose whole report is
         // its heading sends the heading as the body too.
-        message: detail === "" ? heading : detail,
+        message: fitText(detail === "" ? heading : detail, 1024),
         url,
         url_title: payload.service.name,
         // An escalated message is the one already sent once and left unanswered
@@ -74,11 +76,7 @@ export function createPushoverNotifier(settings: Record<string, string>): Notifi
       // sentence an operator can act on. Neither credential is ever echoed.
       const body = (await response.json().catch(() => ({}))) as { errors?: string[] };
       const reason = body.errors?.join(", ");
-      throw new Error(
-        `pushover notification failed: HTTP ${response.status}${
-          reason === undefined || reason === "" ? "" : ` (${reason})`
-        }`,
-      );
+      throw httpFailure("pushover", "failed", response.status, reason);
     },
   };
 }
