@@ -561,6 +561,51 @@ tua lista non viene più sovrascritta in seguito.
 | `APPRISE_SERVER_URL` | entrambe | — | Server API Apprise (`http://apprise:8000`). Obbligatoria se il canale Apprise è attivo. |
 | `APPRISE_CONFIG_KEY` | entrambe | — | Chiave di una configurazione salvata sul server Apprise. Serve questa oppure `APPRISE_URLS`. |
 | `APPRISE_URLS` | entrambe | — | URL dei servizi Apprise, separati da virgola, per un server stateless. Serve questa oppure `APPRISE_CONFIG_KEY`. |
+| `SPLUNK_ONCALL_API_KEY` | entrambe | — | Chiave API dell'endpoint REST di Splunk On-Call. Obbligatoria se quel canale è attivo. |
+| `SPLUNK_ONCALL_ROUTING_KEY` | entrambe | — | La routing key che sceglie la policy di escalation. Obbligatoria con la precedente. |
+| `SQUADCAST_WEBHOOK_URL` | entrambe | — | URL dell'Incident Webhook di Squadcast. Obbligatorio se quel canale è attivo. |
+| `ZENDUTY_INTEGRATION_KEY` | entrambe | — | Chiave di un'integrazione API di Zenduty. Obbligatoria se quel canale è attivo. |
+| `INCIDENT_IO_ALERT_SOURCE_ID` | entrambe | — | Config id della alert source HTTP di incident.io. Obbligatorio se quel canale è attivo. |
+| `INCIDENT_IO_TOKEN` | entrambe | — | Il bearer token di quella alert source. Obbligatorio con il precedente. |
+| `GRAFANA_ONCALL_WEBHOOK_URL` | entrambe | — | URL del Formatted Webhook di Grafana OnCall. Obbligatorio se quel canale è attivo. |
+| `MATTERMOST_URL` | entrambe | — | Server Mattermost (`https://chat.example.com`). Obbligatorio se quel canale è attivo. |
+| `MATTERMOST_TOKEN` | entrambe | — | Il token di un account bot. Obbligatorio con il precedente. |
+| `MATTERMOST_CHANNEL_ID` | entrambe | — | L'id del canale, non il nome. Obbligatorio con il precedente. |
+| `ROCKETCHAT_URL` | entrambe | — | Server Rocket.Chat. Obbligatorio se quel canale è attivo. |
+| `ROCKETCHAT_USER_ID` | entrambe | — | L'id dell'utente bot. Obbligatorio con il precedente. |
+| `ROCKETCHAT_TOKEN` | entrambe | — | Un personal access token di quell'utente. Obbligatorio con il precedente. |
+| `ROCKETCHAT_ROOM_ID` | entrambe | — | L'id della stanza, non il suo `#nome`. Obbligatorio con il precedente. |
+| `ZULIP_SITE_URL` | entrambe | — | Organizzazione Zulip (`https://example.zulipchat.com`). Obbligatoria se quel canale è attivo. |
+| `ZULIP_BOT_EMAIL` | entrambe | — | L'indirizzo email del bot. Obbligatorio con il precedente. |
+| `ZULIP_API_KEY` | entrambe | — | La chiave API del bot. Obbligatoria con il precedente. |
+| `ZULIP_STREAM` | entrambe | — | Il canale (stream) in cui scrivere. Obbligatorio con il precedente. |
+| `ZULIP_TOPIC` | entrambe | — | Opzionale. Un topic fisso; se non impostato ogni provider ha il suo. |
+| `GOOGLE_CHAT_WEBHOOK_URL` | entrambe | — | Il webhook in entrata di uno spazio Google Chat. Obbligatorio se quel canale è attivo. |
+| `TWILIO_SMS_ACCOUNT_SID` | entrambe | — | Account SID Twilio (`AC…`) per gli SMS. Obbligatorio se il canale SMS è attivo. |
+| `TWILIO_SMS_AUTH_TOKEN` | entrambe | — | L'auth token di quell'account. Obbligatorio con il precedente. |
+| `TWILIO_SMS_FROM` | entrambe | — | Il numero Twilio da cui scrivere, E.164. Obbligatorio con il precedente. |
+| `TWILIO_SMS_TO` | entrambe | — | Il numero a cui scrivere, E.164. Obbligatorio con il precedente. |
+| `TWILIO_CALL_ACCOUNT_SID` | entrambe | — | Account SID Twilio per le chiamate. Obbligatorio se il canale chiamata è attivo. Variabile propria anche per lo stesso account: due canali non ne condividono mai una. |
+| `TWILIO_CALL_AUTH_TOKEN` | entrambe | — | L'auth token di quell'account. Obbligatorio con il precedente. |
+| `TWILIO_CALL_FROM` | entrambe | — | Il numero Twilio da cui chiamare, E.164. Obbligatorio con il precedente. |
+| `TWILIO_CALL_TO` | entrambe | — | Il numero da chiamare, E.164. Obbligatorio con il precedente. |
+| `BARK_DEVICE_KEY` | entrambe | — | La device key mostrata dall'app Bark per iOS. Obbligatoria se quel canale è attivo. |
+| `BARK_SERVER_URL` | entrambe | — | Opzionale. Un bark-server self-hosted; se non impostato si usa `https://api.day.app`. |
+| `SIGNAL_API_URL` | entrambe | — | Un server signal-cli-rest-api (`http://signal-api:8080`). Obbligatorio se quel canale è attivo. |
+| `SIGNAL_NUMBER` | entrambe | — | Il numero registrato da cui partono i messaggi, E.164. Obbligatorio con il precedente. |
+| `SIGNAL_RECIPIENTS` | entrambe | — | Numeri o id `group.…`, separati da virgola. Obbligatorio con il precedente. |
+| `SYSLOG_URL` | entrambe | — | `udp://host:514`, `tcp://host:601` o `tls://host:6514`. Obbligatorio se quel canale è attivo. |
+| `SYSLOG_FACILITY` | entrambe | `local0` | Opzionale. Da `local0` a `local7`. |
+| `MQTT_BROKER_URL` | entrambe | — | `mqtt://broker:1883`, o `mqtts://` per TLS. Obbligatorio se quel canale è attivo. |
+| `MQTT_TOPIC` | entrambe | `isitdown` | Opzionale. Prefisso dei topic; i messaggi vanno su `<prefisso>/<provider>`. |
+| `MQTT_USERNAME` | entrambe | — | Opzionale. Solo per un broker che chiede credenziali. |
+| `MQTT_PASSWORD` | entrambe | — | Opzionale. Inviata solo insieme a un nome utente. |
+| `MASTODON_INSTANCE_URL` | entrambe | — | Istanza Mastodon (`https://mastodon.social`). Obbligatoria se quel canale è attivo. |
+| `MASTODON_ACCESS_TOKEN` | entrambe | — | Il token di un'applicazione con `write:statuses`. Obbligatorio con il precedente. |
+| `MASTODON_VISIBILITY` | entrambe | `public` | Opzionale. `public`, `unlisted` o `private`. |
+| `BLUESKY_HANDLE` | entrambe | — | L'handle dell'account. Obbligatorio se quel canale è attivo. |
+| `BLUESKY_APP_PASSWORD` | entrambe | — | Una app password, mai la password dell'account. Obbligatoria con il precedente. |
+| `BLUESKY_SERVICE_URL` | entrambe | `https://bsky.social` | Opzionale. Il PDS dell'account. |
 | `WEBHOOK_SECRET` | entrambe | — | Segreto condiviso opzionale per il webhook generico. Impostandolo ogni richiesta viene firmata (vedi [3.6](#36-canali-di-notifica)); lasciandolo vuoto le richieste partono non firmate, esattamente come prima. |
 | `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
 | `PLUGINS_DIR` | entrambe | — | Una cartella di plugin adapter da caricare all'avvio ([3.14](#314-plugin-adapter)). Non impostata — il valore predefinito, anche nelle immagini — non carica nulla. **Un plugin gira con i privilegi di questo processo.** |
@@ -1329,6 +1374,23 @@ lettura vecchia.
 | Opsgenie | `opsgenie` | `OPSGENIE_API_KEY` (`OPSGENIE_REGION` opzionale) |
 | Apprise | `apprise` | `APPRISE_SERVER_URL`, e una fra `APPRISE_CONFIG_KEY` / `APPRISE_URLS` |
 | Email (SMTP) | `email` | `SMTP_HOST`, `SMTP_FROM`, `SMTP_TO` (`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ALLOW_INSECURE_AUTH`, `SMTP_ALLOW_SELF_SIGNED` opzionali) |
+| Splunk On-Call | `splunk-oncall` | `SPLUNK_ONCALL_API_KEY`, `SPLUNK_ONCALL_ROUTING_KEY` |
+| Squadcast | `squadcast` | `SQUADCAST_WEBHOOK_URL` |
+| Zenduty | `zenduty` | `ZENDUTY_INTEGRATION_KEY` |
+| incident.io | `incident-io` | `INCIDENT_IO_ALERT_SOURCE_ID`, `INCIDENT_IO_TOKEN` |
+| Grafana OnCall | `grafana-oncall` | `GRAFANA_ONCALL_WEBHOOK_URL` |
+| Mattermost | `mattermost` | `MATTERMOST_URL`, `MATTERMOST_TOKEN`, `MATTERMOST_CHANNEL_ID` |
+| Rocket.Chat | `rocketchat` | `ROCKETCHAT_URL`, `ROCKETCHAT_USER_ID`, `ROCKETCHAT_TOKEN`, `ROCKETCHAT_ROOM_ID` |
+| Zulip | `zulip` | `ZULIP_SITE_URL`, `ZULIP_BOT_EMAIL`, `ZULIP_API_KEY`, `ZULIP_STREAM` (`ZULIP_TOPIC` opzionale) |
+| Google Chat | `google-chat` | `GOOGLE_CHAT_WEBHOOK_URL` |
+| SMS (Twilio) | `twilio-sms` | `TWILIO_SMS_ACCOUNT_SID`, `TWILIO_SMS_AUTH_TOKEN`, `TWILIO_SMS_FROM`, `TWILIO_SMS_TO` |
+| Chiamata vocale (Twilio) | `twilio-call` | `TWILIO_CALL_ACCOUNT_SID`, `TWILIO_CALL_AUTH_TOKEN`, `TWILIO_CALL_FROM`, `TWILIO_CALL_TO` |
+| Bark (iOS) | `bark` | `BARK_DEVICE_KEY` (`BARK_SERVER_URL` opzionale) |
+| Signal | `signal` | `SIGNAL_API_URL`, `SIGNAL_NUMBER`, `SIGNAL_RECIPIENTS` |
+| Syslog | `syslog` | `SYSLOG_URL` (`SYSLOG_FACILITY` opzionale) |
+| MQTT | `mqtt` | `MQTT_BROKER_URL` (`MQTT_TOPIC`, `MQTT_USERNAME`, `MQTT_PASSWORD` opzionali) |
+| Mastodon | `mastodon` | `MASTODON_INSTANCE_URL`, `MASTODON_ACCESS_TOKEN` (`MASTODON_VISIBILITY` opzionale) |
+| Bluesky | `bluesky` | `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD` (`BLUESKY_SERVICE_URL` opzionale) |
 | Desktop (Web Push) | `webpush` | nessuna |
 
 Il push desktop non richiede alcuna configurazione: il server genera la propria
@@ -1507,6 +1569,108 @@ nessuna CA pubblica ha firmato. Un relay che si fida di questa rete non vuole
 credenziali affatto, ed è per questo che entrambe sono opzionali. Un messaggio
 rifiutato riporta la risposta del server (`550 5.7.1 relay denied`) nel registro
 delle consegne.
+
+**Altre catene on-call** (roadmap 3.9). **Splunk On-Call** (VictorOps),
+**Squadcast**, **Zenduty**, **incident.io** e **Grafana OnCall** funzionano
+esattamente come PagerDuty e Opsgenie qui sopra: ognuno invia la stessa chiave
+di deduplicazione — `entity_id` per Splunk, `event_id` per Squadcast,
+`entity_id` per Zenduty, `deduplication_key` per incident.io, `alert_uid` per
+Grafana — così il recupero prodotto dall'aggiornamento "resolved" del provider
+chiude l'alert aperto dal suo "investigating", e un digest non chiude mai nulla.
+La gravità diventa il vocabolario di ciascuno dove ne ha uno (`CRITICAL` /
+`WARNING` / `INFO` per Splunk, `critical` / `error` / `warning` / `info` per
+Zenduty); Squadcast, incident.io e Grafana portano lo stato come tag o campo di
+metadati, che è ciò che leggono le loro regole di routing. La chiave o l'URL che
+ognuno riceve è la credenziale, e nessuna compare mai in un errore.
+
+**Mattermost, Rocket.Chat e Zulip** (roadmap 3.9) passano dall'API di ciascun
+server con il token di un bot invece che da un webhook in entrata, per l'unica
+cosa che un webhook non sa fare: modificare il messaggio che ha pubblicato. Gli
+aggiornamenti di un incidente riscrivono il messaggio che lo ha annunciato, come
+già fanno Telegram, Discord e Matrix. Il webhook compatibile Slack di Mattermost
+funziona comunque attraverso il canale Slack, per chi non vuole un bot. Zulip
+raggruppa ogni messaggio sotto un topic e, se `ZULIP_TOPIC` non ne indica uno,
+ogni provider ha il suo: tutta la storia di GitHub si legge come un'unica
+discussione. **Google Chat** è un webhook in entrata e non può modificare, quindi
+usa i thread: ogni messaggio su un incidente porta la stessa chiave di thread e
+arriva come risposta sotto quello che lo ha aperto.
+
+**SMS e chiamate vocali con Twilio** (roadmap 3.9) sono due canali invece di uno
+con una modalità, perché il routing è per canale: un SMS per ogni degrado e una
+chiamata solo per un major outage sono due regole di routing. L'SMS è il
+messaggio che manda ogni canale di solo testo, tagliato ai 1600 caratteri di
+Twilio. La chiamata legge ad alta voce titolo e dettaglio nella lingua del
+canale, due volte con una pausa in mezzo, come si leggono sempre le chiamate
+automatiche; le emoji vengono tolte e le parole del provider sono sottoposte a
+escape prima di finire nel TwiML. Il canale chiamata squilla per tutto ciò che
+gli viene instradato, quindi va messo dietro una regola con `minSeverity:
+major_outage`. Ogni canale ha le sue variabili, anche per lo stesso account: due
+canali non condividono mai una variabile d'ambiente nella dashboard.
+
+**Bark** (roadmap 3.9) è il push verso un iPhone attraverso il server Bark
+pubblico o uno self-hosted. Ciò che lo rende un canale invece di un URL Apprise è
+il livello di interruzione: un major outage parte come `critical`, che suona
+anche in modalità silenziosa e con una modalità Full immersion attiva; un partial outage
+come `timeSensitive`; una lettura che non siamo riusciti a fare come `passive`.
+**Signal** passa da un server
+[signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api), il
+sidecar che usano tutti gli strumenti self-hosted visto che Signal non ha
+un'API per bot. Le chiavi dell'account stanno sul server, quindi da questa parte
+non c'è nessuna credenziale — e quel server non dovrebbe essere raggiungibile da
+nessun altro punto.
+
+**Syslog** (roadmap 3.9) invia un messaggio RFC 5424 per ogni cambiamento al
+collector dove va già tutto il resto, via UDP, TCP o TLS (verificando il
+certificato del collector). Il messaggio è una riga sola — titolo e dettaglio,
+con gli a capo ripiegati — e la parte leggibile da una macchina viaggia come
+structured data:
+
+```
+<130>1 2026-08-19T14:32:07.000Z host isitdown 1 incident_opened [isitdown@32473 provider="github" status="major_outage" key="isitdown/github/incident/inc-1" url="https://www.githubstatus.com"] 🔴 GitHub — MAJOR OUTAGE — Incident: API requests failing | Status: Investigating | …
+```
+
+`key` è la stessa chiave di deduplicazione dei canali on-call, così una regola
+del SIEM può raggruppare i messaggi di un incidente. La gravità segue lo stato,
+da `crit` per un major outage fino a `notice`. Un messaggio viene tagliato a 2048
+byte su UDP e a 8192 su uno stream, cioè quanto ogni collector accetta di
+default.
+
+**MQTT** (roadmap 3.9) serve alla domotica che non è Home Assistant — Node-RED,
+openHAB, un microcontrollore con una spia di stato. Ogni cambiamento è un
+messaggio JSON su `<prefisso>/<provider>` (`provider`, `kind`, `status`,
+`previous`, `heading`, `detail`, `url`, `at`), i digest su `<prefisso>/digest`.
+Un cambiamento sullo stato del provider stesso — il suo stato, un incidente — è
+pubblicato *retained*, così un subscriber che si collega più tardi sa comunque
+dove si trova ogni provider; un componente, un avviso di manutenzione o il
+nostro monitoraggio sono eventi e non sono retained, altrimenti
+sovrascriverebbero quello stato. MQTT 3.1.1 è parlato direttamente su un
+socket — connessione, una publish QoS 1, attesa della conferma del broker,
+disconnessione — quindi il canale non aggiunge dipendenze all'immagine Light né
+al binario singolo.
+
+**Mastodon e Bluesky** (roadmap 3.9) pubblicano in pubblico: insieme alla pagina
+di stato pubblica, sono l'account di stato che un piccolo team non ha mai
+trovato il tempo di gestire a mano. Pubblico significa che le note di impatto e
+responsabile dell'operatore ([3.23](#323-perché-un-provider-conta--impatto-e-responsabile))
+non vengono mai pubblicate — sono note di passaggio di consegne, non roba per i
+follower; un modello viene comunque pubblicato com'è scritto, perché ciò che
+stampa è una scelta esplicita dell'operatore. Mastodon modifica il post quando
+l'incidente che ha annunciato va avanti; Bluesky non permette modifiche, quindi
+ogni cambiamento è un post. Bluesky vuole una app password, mai quella
+dell'account.
+
+**Cosa promette ogni canale** (roadmap 3.8). Un'unica contract suite,
+`test/notifiers/contract.test.ts`, tiene ogni canale alle stesse proprietà: un
+cambiamento di ogni tipo viene consegnato senza eccezioni; una consegna
+rifiutata è un errore tipizzato che nomina il canale e lo stato HTTP e non
+contiene mai una credenziale; ogni campo che il servizio remoto limita viene
+tagliato per entrarci — i 1024 caratteri di Pushover, i 4096 di Telegram, i byte
+di un datagramma syslog — con dei puntini di sospensione invece di essere
+rifiutato con un 400, cosa che prima faceva perdere per intero un digest lungo;
+la chiave di un canale on-call è stabile e condivisa dall'alert e dal suo
+recupero; e i byte esatti che ogni canale mette in rete per un insieme fisso di
+cambiamenti sono registrati in `test/notifiers/golden/`, così una modifica a ciò
+che un canale invia è un diff che qualcuno ha rivisto.
 
 ### 3.7 Instradamento delle notifiche
 

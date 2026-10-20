@@ -543,6 +543,51 @@ list is never overwritten afterwards.
 | `APPRISE_SERVER_URL` | both | — | Apprise API server (`http://apprise:8000`). Required if the Apprise channel is enabled. |
 | `APPRISE_CONFIG_KEY` | both | — | Key of a configuration the Apprise server stores. Either this or `APPRISE_URLS` is required. |
 | `APPRISE_URLS` | both | — | Apprise service URLs, comma-separated, for a stateless server. Either this or `APPRISE_CONFIG_KEY` is required. |
+| `SPLUNK_ONCALL_API_KEY` | both | — | Splunk On-Call REST endpoint API key. Required if that channel is enabled. |
+| `SPLUNK_ONCALL_ROUTING_KEY` | both | — | The routing key that picks the escalation policy. Required with the above. |
+| `SQUADCAST_WEBHOOK_URL` | both | — | Squadcast Incident Webhook URL. Required if that channel is enabled. |
+| `ZENDUTY_INTEGRATION_KEY` | both | — | Zenduty API integration key. Required if that channel is enabled. |
+| `INCIDENT_IO_ALERT_SOURCE_ID` | both | — | incident.io HTTP alert source config id. Required if that channel is enabled. |
+| `INCIDENT_IO_TOKEN` | both | — | That alert source's bearer token. Required with the above. |
+| `GRAFANA_ONCALL_WEBHOOK_URL` | both | — | Grafana OnCall Formatted Webhook URL. Required if that channel is enabled. |
+| `MATTERMOST_URL` | both | — | Mattermost server (`https://chat.example.com`). Required if that channel is enabled. |
+| `MATTERMOST_TOKEN` | both | — | A bot account's access token. Required with the above. |
+| `MATTERMOST_CHANNEL_ID` | both | — | The channel's id, not its name. Required with the above. |
+| `ROCKETCHAT_URL` | both | — | Rocket.Chat server. Required if that channel is enabled. |
+| `ROCKETCHAT_USER_ID` | both | — | The bot user's id. Required with the above. |
+| `ROCKETCHAT_TOKEN` | both | — | A personal access token of that user. Required with the above. |
+| `ROCKETCHAT_ROOM_ID` | both | — | The room's id, not its `#name`. Required with the above. |
+| `ZULIP_SITE_URL` | both | — | Zulip organisation (`https://example.zulipchat.com`). Required if that channel is enabled. |
+| `ZULIP_BOT_EMAIL` | both | — | The bot's email address. Required with the above. |
+| `ZULIP_API_KEY` | both | — | The bot's API key. Required with the above. |
+| `ZULIP_STREAM` | both | — | The channel (stream) to post in. Required with the above. |
+| `ZULIP_TOPIC` | both | — | Optional. One fixed topic; unset gives each provider a topic of its own. |
+| `GOOGLE_CHAT_WEBHOOK_URL` | both | — | A Google Chat space's incoming webhook. Required if that channel is enabled. |
+| `TWILIO_SMS_ACCOUNT_SID` | both | — | Twilio account SID (`AC…`) for SMS. Required if the SMS channel is enabled. |
+| `TWILIO_SMS_AUTH_TOKEN` | both | — | That account's auth token. Required with the above. |
+| `TWILIO_SMS_FROM` | both | — | The Twilio number to text from, E.164. Required with the above. |
+| `TWILIO_SMS_TO` | both | — | The number to text, E.164. Required with the above. |
+| `TWILIO_CALL_ACCOUNT_SID` | both | — | Twilio account SID for voice calls. Required if the call channel is enabled. Its own variable, even for the same account: two channels never share one. |
+| `TWILIO_CALL_AUTH_TOKEN` | both | — | That account's auth token. Required with the above. |
+| `TWILIO_CALL_FROM` | both | — | The Twilio number to call from, E.164. Required with the above. |
+| `TWILIO_CALL_TO` | both | — | The number to call, E.164. Required with the above. |
+| `BARK_DEVICE_KEY` | both | — | The device key the Bark iOS app shows. Required if that channel is enabled. |
+| `BARK_SERVER_URL` | both | — | Optional. A self-hosted bark-server; unset uses `https://api.day.app`. |
+| `SIGNAL_API_URL` | both | — | A signal-cli-rest-api server (`http://signal-api:8080`). Required if that channel is enabled. |
+| `SIGNAL_NUMBER` | both | — | The registered number messages are sent from, E.164. Required with the above. |
+| `SIGNAL_RECIPIENTS` | both | — | Numbers or `group.…` ids, comma-separated. Required with the above. |
+| `SYSLOG_URL` | both | — | `udp://host:514`, `tcp://host:601` or `tls://host:6514`. Required if that channel is enabled. |
+| `SYSLOG_FACILITY` | both | `local0` | Optional. `local0` to `local7`. |
+| `MQTT_BROKER_URL` | both | — | `mqtt://broker:1883`, or `mqtts://` for TLS. Required if that channel is enabled. |
+| `MQTT_TOPIC` | both | `isitdown` | Optional. Topic prefix; messages go to `<prefix>/<provider>`. |
+| `MQTT_USERNAME` | both | — | Optional. Only for a broker that wants credentials. |
+| `MQTT_PASSWORD` | both | — | Optional. Sent only with a user name. |
+| `MASTODON_INSTANCE_URL` | both | — | Mastodon instance (`https://mastodon.social`). Required if that channel is enabled. |
+| `MASTODON_ACCESS_TOKEN` | both | — | An application token with `write:statuses`. Required with the above. |
+| `MASTODON_VISIBILITY` | both | `public` | Optional. `public`, `unlisted` or `private`. |
+| `BLUESKY_HANDLE` | both | — | The account's handle. Required if that channel is enabled. |
+| `BLUESKY_APP_PASSWORD` | both | — | An app password, never the account's own. Required with the above. |
+| `BLUESKY_SERVICE_URL` | both | `https://bsky.social` | Optional. The account's PDS. |
 | `WEBHOOK_SECRET` | both | — | Optional shared secret for the generic webhook. Set it and every request is signed (see [3.6](#36-notification-channels)); leave it unset and requests go out unsigned, exactly as before. |
 | `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
 | `PLUGINS_DIR` | both | — | A directory of adapter plugins to load at boot ([3.14](#314-adapter-plugins)). Unset — the default, in the images too — loads nothing. **A plugin runs with this process's own privileges.** |
@@ -1288,6 +1333,23 @@ validators all drop the cache entry rather than pin a stale reading.
 | Opsgenie | `opsgenie` | `OPSGENIE_API_KEY` (`OPSGENIE_REGION` optional) |
 | Apprise | `apprise` | `APPRISE_SERVER_URL`, and one of `APPRISE_CONFIG_KEY` / `APPRISE_URLS` |
 | Email (SMTP) | `email` | `SMTP_HOST`, `SMTP_FROM`, `SMTP_TO` (`SMTP_PORT`, `SMTP_SECURE`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_ALLOW_INSECURE_AUTH`, `SMTP_ALLOW_SELF_SIGNED` optional) |
+| Splunk On-Call | `splunk-oncall` | `SPLUNK_ONCALL_API_KEY`, `SPLUNK_ONCALL_ROUTING_KEY` |
+| Squadcast | `squadcast` | `SQUADCAST_WEBHOOK_URL` |
+| Zenduty | `zenduty` | `ZENDUTY_INTEGRATION_KEY` |
+| incident.io | `incident-io` | `INCIDENT_IO_ALERT_SOURCE_ID`, `INCIDENT_IO_TOKEN` |
+| Grafana OnCall | `grafana-oncall` | `GRAFANA_ONCALL_WEBHOOK_URL` |
+| Mattermost | `mattermost` | `MATTERMOST_URL`, `MATTERMOST_TOKEN`, `MATTERMOST_CHANNEL_ID` |
+| Rocket.Chat | `rocketchat` | `ROCKETCHAT_URL`, `ROCKETCHAT_USER_ID`, `ROCKETCHAT_TOKEN`, `ROCKETCHAT_ROOM_ID` |
+| Zulip | `zulip` | `ZULIP_SITE_URL`, `ZULIP_BOT_EMAIL`, `ZULIP_API_KEY`, `ZULIP_STREAM` (`ZULIP_TOPIC` optional) |
+| Google Chat | `google-chat` | `GOOGLE_CHAT_WEBHOOK_URL` |
+| SMS (Twilio) | `twilio-sms` | `TWILIO_SMS_ACCOUNT_SID`, `TWILIO_SMS_AUTH_TOKEN`, `TWILIO_SMS_FROM`, `TWILIO_SMS_TO` |
+| Voice call (Twilio) | `twilio-call` | `TWILIO_CALL_ACCOUNT_SID`, `TWILIO_CALL_AUTH_TOKEN`, `TWILIO_CALL_FROM`, `TWILIO_CALL_TO` |
+| Bark (iOS) | `bark` | `BARK_DEVICE_KEY` (`BARK_SERVER_URL` optional) |
+| Signal | `signal` | `SIGNAL_API_URL`, `SIGNAL_NUMBER`, `SIGNAL_RECIPIENTS` |
+| Syslog | `syslog` | `SYSLOG_URL` (`SYSLOG_FACILITY` optional) |
+| MQTT | `mqtt` | `MQTT_BROKER_URL` (`MQTT_TOPIC`, `MQTT_USERNAME`, `MQTT_PASSWORD` optional) |
+| Mastodon | `mastodon` | `MASTODON_INSTANCE_URL`, `MASTODON_ACCESS_TOKEN` (`MASTODON_VISIBILITY` optional) |
+| Bluesky | `bluesky` | `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD` (`BLUESKY_SERVICE_URL` optional) |
 | Desktop (Web Push) | `webpush` | none |
 
 Desktop push needs nothing configured: the server generates its own VAPID key
@@ -1460,6 +1522,99 @@ it the send fails rather than putting a password on a cleartext socket — and
 trusts this network needs no credentials at all, which is why both are optional.
 A refused message reports the server's own reply (`550 5.7.1 relay denied`) into
 the delivery log.
+
+**On-call chains, again** (roadmap 3.9). **Splunk On-Call** (VictorOps),
+**Squadcast**, **Zenduty**, **incident.io** and **Grafana OnCall** work exactly
+like PagerDuty and Opsgenie above: each sends the same de-duplication key —
+Splunk's `entity_id`, Squadcast's `event_id`, Zenduty's `entity_id`,
+incident.io's `deduplication_key`, Grafana's `alert_uid` — so the recovery a
+provider's own "resolved" update produces closes the alert its "investigating"
+update opened, and a digest never closes anything. Severity becomes each one's
+own vocabulary where it has one (Splunk's `CRITICAL` / `WARNING` / `INFO`,
+Zenduty's `critical` / `error` / `warning` / `info`); Squadcast, incident.io and
+Grafana carry the status as a tag or metadata field, which is what their own
+routing rules read. The key or URL each takes is the credential, and none ever
+appears in an error.
+
+**Mattermost, Rocket.Chat and Zulip** (roadmap 3.9) go through each server's own
+API with a bot's token rather than through an incoming webhook, for the one
+thing a webhook cannot do: edit the message it posted. An incident's updates
+rewrite the message that announced it, the way Telegram, Discord and Matrix
+already do. Mattermost's own Slack-compatible webhook still works through the
+Slack channel for anyone who does not want a bot. Zulip threads every message
+under a topic, and unless `ZULIP_TOPIC` names one, each provider gets its own —
+GitHub's whole history reads as one thread. **Google Chat** is an incoming
+webhook and cannot edit, so it threads instead: every message about one incident
+carries the same thread key and lands as a reply under the one that opened it.
+
+**SMS and voice calls through Twilio** (roadmap 3.9) are two channels rather
+than one with a mode, because routing is per channel: a text for every
+degradation and a call only for a major outage is two routing rules. The SMS
+is the message every plain-text channel sends, cut at Twilio's 1600 characters.
+The call reads the heading and the detail aloud in the channel's language, twice
+with a pause between, as automated calls are always read; emoji are dropped and
+a provider's own words are escaped before they reach the TwiML. The call channel
+rings for everything routed to it, so give it a rule with `minSeverity:
+major_outage`. Each channel has its own variables, even for the same account:
+two channels never share an environment variable in the dashboard.
+
+**Bark** (roadmap 3.9) is push to an iPhone through the public Bark server or a
+self-hosted one. What makes it a channel rather than an Apprise URL is the
+interruption level: a major outage goes out `critical`, which rings through
+silent mode and Focus; a partial outage `timeSensitive`; a reading we could not
+take `passive`. **Signal** goes through a
+[signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) server,
+the sidecar every self-hosted tool uses since Signal has no bot API. The server
+holds the account's keys, so this side holds no credential — and that server
+should not be reachable from anywhere but here.
+
+**Syslog** (roadmap 3.9) sends one RFC 5424 message per change to the collector
+everything else already goes to, over UDP, TCP or TLS (with the collector's
+certificate verified). The message is one line — heading and detail, line
+breaks folded — and the machine-readable part travels as structured data:
+
+```
+<130>1 2026-08-19T14:32:07.000Z host isitdown 1 incident_opened [isitdown@32473 provider="github" status="major_outage" key="isitdown/github/incident/inc-1" url="https://www.githubstatus.com"] 🔴 GitHub — MAJOR OUTAGE — Incident: API requests failing | Status: Investigating | …
+```
+
+`key` is the same de-duplication key the on-call channels use, so a SIEM rule
+can group an incident's messages. Severity follows the status, from `crit` for a
+major outage down to `notice`. A message is cut to 2048 bytes over UDP and 8192
+over a stream, which is what every collector accepts by default.
+
+**MQTT** (roadmap 3.9) is for home automation that is not Home Assistant —
+Node-RED, openHAB, a microcontroller with a status light. Each change is one
+JSON message on `<prefix>/<provider>` (`provider`, `kind`, `status`,
+`previous`, `heading`, `detail`, `url`, `at`), digests on `<prefix>/digest`. A
+change about the provider's own state — its status, an incident — is published
+*retained*, so a subscriber that connects later still learns where each provider
+stands; a component, a maintenance notice or our own monitoring is an event and
+is not retained, or it would overwrite that state. MQTT 3.1.1 is spoken directly
+over a socket — connect, one QoS 1 publish, wait for the broker's acknowledgement,
+disconnect — so the channel adds no dependency to the Light image or the single
+binary.
+
+**Mastodon and Bluesky** (roadmap 3.9) post in public: paired with the public
+status page, they are the status account a small team never got round to
+running by hand. Public means the operator's impact and owner notes
+([3.23](#323-why-a-provider-matters--impact-and-owner)) are never posted — they
+are handover notes, not something for followers; a template is still posted as
+written, since what it prints is the operator's explicit choice. Mastodon edits
+a post in place when the incident it announced moves on; Bluesky has no editing,
+so each change is a post. Bluesky wants an app password, never the account's
+own.
+
+**What every channel promises** (roadmap 3.8). One contract suite,
+`test/notifiers/contract.test.ts`, holds every channel to the same properties:
+a change of every kind is delivered without throwing; a refused delivery is a
+typed error that names the channel and the HTTP status and never contains a
+credential; every field the remote side caps is cut to fit — Pushover's 1024
+characters, Telegram's 4096, a syslog datagram's bytes — with an ellipsis rather
+than refused with a 400, which used to lose a long digest outright; an on-call
+channel's key is stable and shared by the alert and its recovery; and the exact
+bytes each channel puts on the wire for a fixed set of changes are recorded in
+`test/notifiers/golden/`, so a change to what a channel sends is a diff someone
+reviewed.
 
 ### 3.7 Notification routing
 
