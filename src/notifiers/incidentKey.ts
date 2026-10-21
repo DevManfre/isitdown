@@ -35,6 +35,9 @@ export function incidentKey(change: StatusChange): string {
     case "silent_outage":
       return `isitdown/${change.providerId}/silent/${change.crossCheck?.probeId ?? "unknown"}`;
     case "correlated_outage":
+    // The ending shares the opening's key, so a channel that edits in place
+    // turns "went bad together" into "all back" rather than posting a second message.
+    case "correlated_resolved":
       return `isitdown/correlated/${[...(change.correlated?.providerIds ?? [])].sort().join("+")}`;
     // Keyed on the month as well as the provider (roadmap 4.13): the budget is
     // a monthly quantity, so September's burn is a new alert rather than an
@@ -47,6 +50,11 @@ export function incidentKey(change: StatusChange): string {
     // alert is about the channel, and the next lost message may be about another.
     case "channel_failing":
       return `isitdown/channel/${change.channel?.id ?? "unknown"}`;
+    // One standing key per frequency: a report is never an alert, so nothing
+    // ever resolves it, but a channel that edits in place must still not
+    // overwrite the weekly one with the monthly one.
+    case "periodic_report":
+      return `isitdown/report/${change.report?.frequency ?? "unknown"}`;
   }
 }
 
@@ -61,7 +69,14 @@ export function incidentKey(change: StatusChange): string {
  * be a recovery would silence the four that were not.
  */
 export function isResolution(change: StatusChange): boolean {
-  if (change.kind === "incident_resolved" || change.kind === "maintenance_ended") return true;
+  // The shared failure's own ending, which closes the alert its opening raised.
+  if (
+    change.kind === "incident_resolved" ||
+    change.kind === "maintenance_ended" ||
+    change.kind === "correlated_resolved"
+  ) {
+    return true;
+  }
   if (change.kind === "status_change" || change.kind === "component_status_change") {
     return change.currentStatus === "operational";
   }

@@ -228,3 +228,41 @@ test("a body line can never start the dot that would end the message early", () 
   // And no line is long enough to be folded by a server on the way.
   assert.ok(lines.every((line) => line.length <= 998));
 });
+
+test("a chart goes as an SVG attachment in a multipart message, and its absence changes nothing", async () => {
+  const withChart = await withSmtpServer({ capabilities: [] }, async ({ host, port }) => {
+    await createEmailNotifier(settings({ host, port: String(port) })).send({
+      ...opened,
+      chart: { svg: "<svg xmlns='http://www.w3.org/2000/svg'/>", filename: "github-uptime-24h.svg" },
+    });
+  });
+  assert.match(withChart.data, /^Content-Type: multipart\/mixed; boundary="/m);
+  assert.match(withChart.data, /Content-Disposition: attachment; filename="github-uptime-24h\.svg"/);
+  assert.match(withChart.data, /Content-Type: image\/svg\+xml; name="github-uptime-24h\.svg"/);
+
+  const without = await withSmtpServer({ capabilities: [] }, async ({ host, port }) => {
+    await createEmailNotifier(settings({ host, port: String(port) })).send(opened);
+  });
+  assert.match(without.data, /^Content-Type: text\/plain; charset="utf-8"/m);
+  assert.doesNotMatch(without.data, /multipart/);
+});
+
+test("a multipart body closes its boundary and keeps every line short and undotted", () => {
+  const message = bodyOf(
+    {
+      from: "a@b.co",
+      to: ["c@d.co"],
+      subject: "s",
+      text: "hello",
+      attachments: [{ filename: "x.svg", contentType: "image/svg+xml", content: ".\n".repeat(400) }],
+    },
+    new Date("2026-09-01T00:00:00.000Z"),
+    "<abc123@isitdown>",
+  );
+  const lines = message.split("\r\n");
+  const boundary = /boundary="([^"]+)"/.exec(message)?.[1];
+  assert.ok(boundary !== undefined);
+  assert.equal(lines.filter((line) => line === `--${boundary}`).length, 2);
+  assert.ok(lines.includes(`--${boundary}--`));
+  assert.ok(lines.every((line) => line.length <= 998 && !line.startsWith(".")));
+});

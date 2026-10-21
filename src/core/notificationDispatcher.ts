@@ -150,6 +150,12 @@ export interface DispatcherDeps {
         unfollow(providerId: string, incidentId: string): Promise<void>;
       }
     | undefined;
+  /**
+   * Draws a provider's last 24 hours (roadmap 3.12), or answers null when there
+   * is nothing to draw. Absent in Light edition, which keeps no readings to draw
+   * it from — `delivery.attachChart` there changes nothing.
+   */
+  charts?: { uptimeBar(providerId: string, name: string): Promise<string | null> } | undefined;
 }
 
 /**
@@ -179,6 +185,15 @@ const RANK: Record<string, number> = {
   partial_outage: 2,
   major_outage: 3,
 };
+
+/** The changes a day-of-uptime picture belongs under: a provider's own state, moving. */
+const CHART_KINDS: ReadonlySet<StatusChangeKind> = new Set([
+  "status_change",
+  "component_status_change",
+  "incident_opened",
+  "incident_updated",
+  "incident_resolved",
+]);
 
 const rankOf = (status: string): number => RANK[status] ?? -1;
 
@@ -271,6 +286,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
   const messageRefs = deps.messageRefs;
   const escalationDeps = deps.escalation;
   const follows = deps.follows;
+  const charts = deps.charts;
 
   /**
    * The current run of failures per channel (roadmap 3.4): how many messages in
@@ -321,6 +337,18 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
    * batch.
    */
   const digests = new Map<string, { since: number; items: NotificationPayload[]; fallbacks: string[] }>();
+
+  /**
+   * Incident updates waiting to see whether a newer one follows (roadmap 3.11),
+   * keyed by provider and incident. Holds the latest change only — the whole
+   * point is that the earlier ones are never sent — and when the first of the
+   * run arrived, so a provider that updates every minute still gets a message
+   * out once the window has passed instead of waiting forever. In memory like
+   * the digest, for the same reason: a restart drops at most one window of
+   * updates, and the next update says where the incident stands anyway.
+   */
+  const pendingUpdates = new Map<string, { change: StatusChange; since: number }>();
+  const updateKey = (change: StatusChange): string => `${change.providerId}\u0000${change.incident?.id ?? ""}`;
 
   /**
    * One message to one channel, retried with exponential backoff until it lands
@@ -987,10 +1015,24 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       // happened on a busy cycle would hold a batch until the next change —
       // which is the flood it exists to replace, delayed.
       const attempts: Attempt[] = flushDue(ctx, delivery, at, false);
+
+      // Updates whose window ran out, ahead of this cycle's own changes and
+      // through the same loop, so quiet hours, the cap and the digest judge them
+      // exactly as they would have judged them on arrival. Everything still
+      // waiting is released when the policy has been switched off, rather than
+      // stranded in a map nothing reads.
+      const windowMs = delivery.coalesce.windowMinutes * 60_000;
+      const queue: { change: StatusChange; released: boolean }[] = [];
+      for (const [key, entry] of [...pendingUpdates]) {
+        if (delivery.coalesce.enabled && at - entry.since < windowMs) continue;
+        pendingUpdates.delete(key);
+        queue.push({ change: entry.change, released: true });
+      }
+      for (const change of changes) queue.push({ change, released: false });
       // Before this cycle's own changes are tracked, so a change cannot be
       // escalated in the dispatch that first sent it.
       attempts.push(...(await dueEscalations(ctx, delivery, at)));
-      if (changes.length === 0) return finish(attempts, ctx, delivery, at);
+      if (queue.length === 0) return finish(attempts, ctx, delivery, at);
 
       const byId = new Map(ctx.services.map((service) => [service.id, service]));
 
@@ -1000,7 +1042,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       const known = new Set(ctx.knownChannelIds);
       const enabledChannelIds = [...byChannelId.keys()];
 
-      for (const change of changes) {
+      for (const { change, released } of queue) {
         const service = byId.get(change.providerId);
         if (service === undefined) {
           // A provider removed between the poll and the dispatch, which the UI
@@ -1017,6 +1059,46 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           service: payloadServiceOf(service),
           locale: ctx.locale,
         };
+
+        // The incident is over, so an update still waiting would be sent after
+        // the message that says it no longer matters.
+        if (change.kind === "incident_resolved" && change.incident !== undefined) {
+          pendingUpdates.delete(updateKey(change));
+        }
+        // An update waits for a newer one (roadmap 3.11). Held before routing
+        // rather than after: nothing is decided about a message that may never
+        // be sent, and what is decided at release time uses the hour it is sent.
+        if (
+          delivery.coalesce.enabled &&
+          !released &&
+          change.kind === "incident_updated" &&
+          change.incident !== undefined
+        ) {
+          const key = updateKey(change);
+          pendingUpdates.set(key, { change, since: pendingUpdates.get(key)?.since ?? at });
+          continue;
+        }
+
+        // A scheduled report goes to the channel chosen for it and nowhere else
+        // (roadmap 3.13): it is not an alert, so the rules, quiet hours, the cap
+        // and the digest — all of which exist to decide who to interrupt — have
+        // nothing to say about it. Waiting for the morning is the sender's call,
+        // made before the change was built.
+        if (change.kind === "periodic_report") {
+          const target = byChannelId.get(delivery.report.channel);
+          if (target === undefined) {
+            logger.warn("the report could not be sent because its channel is not enabled", {
+              channel: delivery.report.channel,
+            });
+            continue;
+          }
+          const message = ctx.channelMessages?.[target.id];
+          const payload: NotificationPayload = { ...base, locale: message?.locale ?? base.locale };
+          attempts.push(
+            attempt(deliver(target, payload, renderMessage(payload)), change.providerId, target.id, change.kind),
+          );
+          continue;
+        }
 
         // Who covers this change, and whether the hour of the day takes it
         // away from them again (roadmap 3.11). Evaluated together in core's own
@@ -1079,9 +1161,18 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         // deliberately not counted against the cap: a digest is one message
         // however many changes went into it, and charging each of them would
         // make the two controls fight.
+        //
+        // Also here, whether or not the digest is switched on, when the provider
+        // is already in the outage this update is about (roadmap 3.14): the
+        // alert that mattered went out when it began. Not for a followed
+        // incident — following is the operator asking for every update.
         const batched =
-          delivery.digest.enabled &&
-          !clearsFloor(severityOf(change), delivery.digest.immediateFloor);
+          (delivery.knownOutage.enabled &&
+            !followed &&
+            change.kind === "incident_updated" &&
+            change.currentStatus === "major_outage") ||
+          (delivery.digest.enabled &&
+            !clearsFloor(severityOf(change), delivery.digest.immediateFloor));
 
         // Taken once for the change, not once per channel: the tally is what
         // the operator was not told about this provider, and reporting it on
@@ -1092,6 +1183,25 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         // Whether any channel was handed this change right now (not batched, not
         // skipped): the escalation clock starts from a message that went out.
         let sentNow = false;
+        // The picture is drawn once for the change, not per channel: it is the
+        // same twenty-four hours whoever reads it, and drawing it is a read of
+        // the history. Only for changes about a provider's state — a report or a
+        // channel alert has no provider whose day is worth a picture — and never
+        // for a batch, which is about several. A failure to draw it costs the
+        // picture, not the alert.
+        const chart =
+          delivery.attachChart && charts !== undefined && !batched && CHART_KINDS.has(change.kind)
+            ? await orElse<NotificationPayload["chart"]>(
+                "drawing the uptime chart",
+                undefined,
+                async () => {
+                  const svg = await charts.uptimeBar(change.providerId, service.name);
+                  return svg === null ? undefined : { svg, filename: `${change.providerId}-uptime-24h.svg` };
+                },
+                { providerId: change.providerId },
+              )
+            : undefined;
+
         // One chain per recipient the rule reached, one per lone channel
         // (roadmap 3.5): a recipient on Telegram and Discord hears this once.
         for (const chainIds of chainsOf(targets, ctx.recipients)) {
@@ -1141,6 +1251,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
               ...(message?.template === undefined ? {} : { template: message.template }),
               ...(ctx.interactiveChannels?.includes(notifier.id) === true ? { interactive: true } : {}),
               suppressedCount: suppressed ?? 0,
+              ...(chart === undefined ? {} : { chart }),
             };
           };
           attempts.push(

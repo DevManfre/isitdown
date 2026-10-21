@@ -355,6 +355,11 @@ test("a file with no delivery block reads as every control off", async () => {
     maintenanceNotice: { enabled: false, leadMinutes: 120 },
     escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
     channelHealth: { enabled: false, afterFailures: 3 },
+    incidentSummary: { enabled: false },
+    coalesce: { enabled: false, windowMinutes: 2 },
+    knownOutage: { enabled: false },
+    report: { enabled: false, frequency: "weekly", channel: "" },
+    attachChart: false,
   });
 });
 
@@ -579,4 +584,37 @@ test("a recipient with one channel, or a channel in two recipients, is refused",
     channels: [webhook, telegram]
 `;
   await assert.rejects(async () => loadConfig(await configFile(shared), {}), /already belongs to recipient/);
+});
+
+test("the file's incidentSummary, coalesce and knownOutage blocks reach the runtime config", async () => {
+  const path = await configFile(`
+delivery:
+  incidentSummary:
+    enabled: true
+  coalesce:
+    enabled: true
+    windowMinutes: 4
+  knownOutage:
+    enabled: true
+${MINIMAL}
+`);
+  const config = await loadConfig(path, {});
+
+  assert.deepEqual(config.delivery.incidentSummary, { enabled: true });
+  assert.deepEqual(config.delivery.coalesce, { enabled: true, windowMinutes: 4 });
+  assert.deepEqual(config.delivery.knownOutage, { enabled: true });
+});
+
+test("the file's report block reaches the runtime config", async () => {
+  const path = await configFile(`
+delivery:
+  report:
+    enabled: true
+    frequency: monthly
+    channel: slack
+${MINIMAL}
+`);
+  const config = await loadConfig(path, {});
+
+  assert.deepEqual(config.delivery.report, { enabled: true, frequency: "monthly", channel: "slack" });
 });

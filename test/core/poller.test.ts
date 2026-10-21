@@ -1415,6 +1415,121 @@ test("below the threshold every provider still gets its own alert", async () => 
   }
 });
 
+/** Three providers, each with its own indicator, so they can recover one at a time. */
+async function threeProviders(): Promise<{
+  indicators: Record<"github" | "cloudflare" | "anthropic", string>;
+  cfg: (summary: boolean) => RuntimeConfig;
+  poller: ReturnType<typeof createPoller>;
+  clock: ReturnType<typeof fakeClock>;
+  close: () => Promise<void>;
+}> {
+  const indicators = { github: "none", cloudflare: "none", anthropic: "none" };
+  const serve = (id: keyof typeof indicators) =>
+    fakeProvider((_req: IncomingMessage, res: ServerResponse): void => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(summary(indicators[id]));
+    });
+  const [a, b, c] = await Promise.all([serve("github"), serve("cloudflare"), serve("anthropic")]);
+  const store = await freshStore();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: fakeSleep().sleep, now: clock.now });
+  return {
+    indicators,
+    poller,
+    clock,
+    cfg: (summaryOn) => ({
+      ...config(
+        [service("github", a.baseUrl), service("cloudflare", b.baseUrl), service("anthropic", c.baseUrl)],
+        { correlationThreshold: 3, correlationWindowMinutes: 10 },
+      ),
+      delivery: { ...DELIVERY_DEFAULTS, incidentSummary: { enabled: summaryOn } },
+    }),
+    close: async () => {
+      await store.close();
+      await Promise.all([a.close(), b.close(), c.close()]);
+    },
+  };
+}
+
+test("a shared failure that ends is reported once, when its last member is back", async () => {
+  const fleet = await threeProviders();
+  const cfg = fleet.cfg(true);
+  try {
+    await fleet.poller.runCycle(cfg);
+    for (const id of ["github", "cloudflare", "anthropic"] as const) fleet.indicators[id] = "critical";
+    fleet.clock.advance(ONE_INTERVAL_MS);
+    const down = await fleet.poller.runCycle(cfg);
+    assert.deepEqual(down.changes.map((change) => change.kind), ["correlated_outage"]);
+
+    fleet.indicators.github = "none";
+    fleet.clock.advance(ONE_INTERVAL_MS);
+    const first = await fleet.poller.runCycle(cfg);
+    fleet.indicators.cloudflare = "none";
+    fleet.clock.advance(ONE_INTERVAL_MS);
+    const second = await fleet.poller.runCycle(cfg);
+    assert.deepEqual([...first.changes, ...second.changes], [], "member recoveries wait for the last one");
+
+    fleet.indicators.anthropic = "none";
+    fleet.clock.advance(ONE_INTERVAL_MS);
+    const last = await fleet.poller.runCycle(cfg);
+
+    assert.deepEqual(last.changes.map((change) => change.kind), ["correlated_resolved"]);
+    const [summary] = last.changes;
+    assert.deepEqual(summary?.correlated?.providerIds.slice().sort(), ["anthropic", "cloudflare", "github"]);
+    assert.equal(summary?.currentStatus, "operational");
+    assert.ok((summary?.correlated?.durationMinutes ?? 0) >= 1);
+  } finally {
+    await fleet.close();
+  }
+});
+
+test("a member that went bad again is not counted as back", async () => {
+  const fleet = await threeProviders();
+  const cfg = fleet.cfg(true);
+  try {
+    await fleet.poller.runCycle(cfg);
+    for (const id of ["github", "cloudflare", "anthropic"] as const) fleet.indicators[id] = "critical";
+    fleet.clock.advance(ONE_INTERVAL_MS);
+    await fleet.poller.runCycle(cfg);
+
+    fleet.indicators.github = "none";
+    fleet.clock.advance(ONE_INTERVAL_MS);
+    await fleet.poller.runCycle(cfg);
+    fleet.indicators.github = "critical";
+    fleet.indicators.cloudflare = "none";
+    fleet.indicators.anthropic = "none";
+    fleet.clock.advance(ONE_INTERVAL_MS);
+    const cycle = await fleet.poller.runCycle(cfg);
+
+    assert.equal(
+      cycle.changes.some((change) => change.kind === "correlated_resolved"),
+      false,
+      "github is down again, so the failure is not over",
+    );
+  } finally {
+    await fleet.close();
+  }
+});
+
+test("without the summary policy each member's recovery is reported on its own", async () => {
+  const fleet = await threeProviders();
+  const cfg = fleet.cfg(false);
+  try {
+    await fleet.poller.runCycle(cfg);
+    for (const id of ["github", "cloudflare", "anthropic"] as const) fleet.indicators[id] = "critical";
+    fleet.clock.advance(ONE_INTERVAL_MS);
+    await fleet.poller.runCycle(cfg);
+    for (const id of ["github", "cloudflare", "anthropic"] as const) fleet.indicators[id] = "none";
+    fleet.clock.advance(ONE_INTERVAL_MS);
+    const cycle = await fleet.poller.runCycle(cfg);
+
+    assert.equal(cycle.changes.length, 3);
+    assert.ok(cycle.changes.every((change) => change.kind === "status_change"));
+  } finally {
+    await fleet.close();
+  }
+});
+
 test("correlation is off unless the operator asks for it", async () => {
   let indicator = "none";
   const respond = (_req: IncomingMessage, res: ServerResponse): void => {

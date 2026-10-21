@@ -365,6 +365,7 @@ export type StatusChangeKind =
   | "monitoring_degraded"
   // Several providers going bad inside one window, reported once (roadmap 2.7).
   | "correlated_outage"
+  | "correlated_resolved"
   // A provider's page claiming to be fine while our own probe cannot reach the
   // service it describes (roadmap 1.10).
   | "silent_outage"
@@ -762,6 +763,16 @@ export interface DeliveryPolicy {
   };
   /** Roadmap 3.4: tell the other channels when one keeps failing. Optional, as above. */
   channelHealth?: { enabled: boolean; afterFailures: number };
+  /** Roadmap 3.10: one message when a shared failure ends. Optional, as above. */
+  incidentSummary?: { enabled: boolean };
+  /** Roadmap 3.11: only the last update of an incident, once the window passes. Optional, as above. */
+  coalesce?: { enabled: boolean; windowMinutes: number };
+  /** Roadmap 3.14: updates of an announced major outage go to the digest. Optional, as above. */
+  knownOutage?: { enabled: boolean };
+  /** Roadmap 3.13: a weekly or monthly report on one channel. Optional, as above. */
+  report?: { enabled: boolean; frequency: "weekly" | "monthly"; channel: string };
+  /** Roadmap 3.12: attach the provider's last 24 hours as an SVG where a channel can carry one. Optional, as above. */
+  attachChart?: boolean;
 }
 
 /**

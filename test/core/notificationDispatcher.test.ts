@@ -1619,3 +1619,283 @@ test("a delivery that throws before it can try is logged and recorded, not dropp
   assert.equal(sent.filter((record) => !record.ok && record.channel === "telegram").length, 1);
   assert.ok(lines.some((line) => line.includes('"level":"error"')), "an error line was logged");
 });
+
+test("a periodic report goes to its own channel only, through quiet hours, the cap and the digest", async () => {
+  const chosen = recorder("slack");
+  const other = recorder("telegram");
+  const dispatcher = createDispatcher({ logger: silent });
+  const report: StatusChange = {
+    kind: "periodic_report",
+    providerId: "github",
+    currentStatus: "unknown",
+    report: { frequency: "weekly", from: "2026-10-12", to: "2026-10-18", fleetUptime: 99, incidentCount: 1, worst: [], sla: [] },
+    at: "2026-10-19T00:05:00.000Z",
+  };
+
+  const records = await dispatcher.dispatch([report], {
+    services,
+    locale: "en",
+    notifiers: [other.notifier, chosen.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({
+      report: { enabled: true, frequency: "weekly", channel: "slack" },
+      quietHours: { enabled: true, start: "00:00", end: "23:59", timeZone: "UTC", minSeverity: "major_outage" },
+      cap: { enabled: true, maxPerHour: 1 },
+      digest: { enabled: true, windowMinutes: 15, immediateFloor: "major_outage" },
+    }),
+  });
+
+  assert.equal(chosen.seen.length, 1);
+  assert.equal(chosen.seen[0]?.digest, undefined, "never batched");
+  assert.deepEqual(other.seen, [], "the rules did not widen it");
+  assert.equal(records.length, 1);
+});
+
+test("a report whose channel is not enabled is dropped with a warning, not sent elsewhere", async () => {
+  const other = recorder("telegram");
+  const lines: string[] = [];
+  const dispatcher = createDispatcher({ logger: createLogger("warn", (line) => lines.push(line)) });
+
+  const records = await dispatcher.dispatch(
+    [{ kind: "periodic_report", providerId: "github", currentStatus: "unknown", at: "2026-10-19T00:05:00.000Z" }],
+    {
+      services,
+      locale: "en",
+      notifiers: [other.notifier],
+      rules: [CATCH_ALL_RULE],
+      knownChannelIds: KNOWN,
+      delivery: delivery({ report: { enabled: true, frequency: "weekly", channel: "slack" } }),
+    },
+  );
+
+  assert.deepEqual(other.seen, []);
+  assert.deepEqual(records, []);
+  assert.ok(lines.some((line) => line.includes("channel is not enabled")), lines.join("\n"));
+});
+
+test("a chart is drawn once per change, for provider-state changes only, and a failure costs the picture not the alert", async () => {
+  const telegram = recorder("telegram");
+  const slack = recorder("slack");
+  const drawn: string[] = [];
+  const dispatcher = createDispatcher({
+    logger: silent,
+    charts: {
+      async uptimeBar(providerId, name) {
+        drawn.push(`${providerId}:${name}`);
+        return "<svg/>";
+      },
+    },
+  });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier, slack.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ attachChart: true }),
+  };
+
+  await dispatcher.dispatch([change(), change({ kind: "maintenance_started", currentStatus: "operational" })], ctx);
+
+  assert.deepEqual(drawn, ["github:GitHub"], "once, though two channels took it, and not for a maintenance notice");
+  assert.deepEqual(telegram.seen[0]?.chart, { svg: "<svg/>", filename: "github-uptime-24h.svg" });
+  assert.equal(telegram.seen[1]?.chart, undefined);
+
+  const broken = createDispatcher({
+    logger: silent,
+    charts: {
+      async uptimeBar() {
+        throw new Error("history unreadable");
+      },
+    },
+  });
+  const after = recorder("telegram");
+  const records = await broken.dispatch([change()], { ...ctx, notifiers: [after.notifier] });
+  assert.equal(records[0]?.ok, true);
+  assert.equal(after.seen[0]?.chart, undefined);
+});
+
+test("without the option, or in an edition that cannot draw one, no chart is attached", async () => {
+  const channel = recorder("telegram");
+  let asked = 0;
+  const charts = {
+    async uptimeBar() {
+      asked += 1;
+      return "<svg/>";
+    },
+  };
+  const base = { services, locale: "en", notifiers: [channel.notifier], rules: [CATCH_ALL_RULE], knownChannelIds: KNOWN };
+
+  await createDispatcher({ logger: silent, charts }).dispatch([change()], { ...base, delivery: delivery() });
+  await createDispatcher({ logger: silent }).dispatch([change()], { ...base, delivery: delivery({ attachChart: true }) });
+
+  assert.equal(asked, 0);
+  assert.ok(channel.seen.every((payload) => payload.chart === undefined));
+});
+
+const updated = (note: string, over: Partial<StatusChange> = {}): StatusChange =>
+  change({
+    kind: "incident_updated",
+    currentStatus: "degraded",
+    incident: { ...incident, status: note },
+    ...over,
+  });
+
+function coalescing(windowMinutes = 2): {
+  channel: ReturnType<typeof recorder>;
+  clock: ReturnType<typeof fakeClock>;
+  dispatcher: ReturnType<typeof createDispatcher>;
+  ctx: Parameters<ReturnType<typeof createDispatcher>["dispatch"]>[1];
+} {
+  const channel = recorder("telegram");
+  const clock = fakeClock();
+  return {
+    channel,
+    clock,
+    dispatcher: createDispatcher({ logger: silent, now: clock.now }),
+    ctx: {
+      services,
+      locale: "en",
+      notifiers: [channel.notifier],
+      rules: [CATCH_ALL_RULE],
+      knownChannelIds: KNOWN,
+      delivery: delivery({ coalesce: { enabled: true, windowMinutes } }),
+    },
+  };
+}
+
+test("coalescing sends only the last of several updates once the window has passed", async () => {
+  const { channel, clock, dispatcher, ctx } = coalescing();
+
+  await dispatcher.dispatch([updated("investigating")], ctx);
+  clock.advance(30_000);
+  await dispatcher.dispatch([updated("identified")], ctx);
+  clock.advance(30_000);
+  await dispatcher.dispatch([updated("monitoring")], ctx);
+  assert.deepEqual(channel.seen, [], "nothing goes out while updates keep arriving inside the window");
+
+  clock.advance(90_000);
+  const records = await dispatcher.dispatch([], ctx);
+
+  assert.equal(records.length, 1);
+  assert.equal(channel.seen.length, 1);
+  assert.equal(channel.seen[0]?.change.incident?.status, "monitoring");
+});
+
+test("coalescing does not wait forever on a provider that updates every minute", async () => {
+  const { channel, clock, dispatcher, ctx } = coalescing();
+
+  for (const note of ["a", "b", "c"]) {
+    await dispatcher.dispatch([updated(note)], ctx);
+    clock.advance(60_000);
+  }
+  // The window opened by "a" ran out as "c" arrived: the latest state it had
+  // seen goes out, and "c" starts the next window rather than extending the old.
+  assert.equal(channel.seen.length, 1, "released from the first update's clock, not the last");
+  assert.equal(channel.seen[0]?.change.incident?.status, "b");
+});
+
+test("coalescing keeps incidents apart and never holds an opening or a resolution", async () => {
+  const { channel, dispatcher, ctx } = coalescing();
+  const other = { ...incident, id: "i2" };
+
+  await dispatcher.dispatch(
+    [
+      change({ kind: "incident_opened", incident }),
+      updated("identified"),
+      updated("identified", { incident: { ...other, status: "identified" } }),
+    ],
+    ctx,
+  );
+
+  assert.equal(channel.seen.length, 1, "only the opening goes out at once");
+  assert.equal(channel.seen[0]?.change.kind, "incident_opened");
+});
+
+test("a resolution cancels the update still waiting, so it cannot arrive after it", async () => {
+  const { channel, clock, dispatcher, ctx } = coalescing();
+
+  await dispatcher.dispatch([updated("monitoring")], ctx);
+  await dispatcher.dispatch(
+    [change({ kind: "incident_resolved", currentStatus: "operational", incident: { ...incident, status: "resolved" } })],
+    ctx,
+  );
+  clock.advance(10 * 60_000);
+  await dispatcher.dispatch([], ctx);
+
+  assert.deepEqual(channel.seen.map((payload) => payload.change.kind), ["incident_resolved"]);
+});
+
+test("switching coalescing off releases what was waiting instead of stranding it", async () => {
+  const { channel, dispatcher, ctx } = coalescing();
+
+  await dispatcher.dispatch([updated("investigating")], ctx);
+  await dispatcher.dispatch([], { ...ctx, delivery: delivery() });
+
+  assert.equal(channel.seen.length, 1);
+});
+
+test("without the policy every update is sent as it arrives", async () => {
+  const channel = recorder("telegram");
+  const dispatcher = createDispatcher({ logger: silent });
+
+  await dispatcher.dispatch([updated("a"), updated("b")], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.equal(channel.seen.length, 2);
+});
+
+test("a known outage sends further updates to the digest and lets a resolution through", async () => {
+  const channel = recorder("telegram");
+  const clock = fakeClock();
+  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ knownOutage: { enabled: true } }),
+  };
+  const outage = { currentStatus: "major_outage" as const };
+
+  await dispatcher.dispatch([updated("identified", outage), updated("monitoring", outage)], ctx);
+  assert.deepEqual(channel.seen, [], "updates of a known major outage do not interrupt");
+
+  await dispatcher.dispatch(
+    [change({ kind: "incident_resolved", currentStatus: "operational", incident: { ...incident, status: "resolved" } })],
+    ctx,
+  );
+  assert.equal(channel.seen.length, 1, "the resolution interrupts");
+  assert.equal(channel.seen[0]?.change.kind, "incident_resolved");
+
+  clock.advance(16 * 60_000);
+  await dispatcher.dispatch([], ctx);
+  assert.equal(channel.seen.length, 2, "the held updates arrive as one digest");
+  assert.equal(channel.seen[1]?.digest?.items.length, 2);
+});
+
+test("a known outage still interrupts for an update below major, and for a change of status", async () => {
+  const channel = recorder("telegram");
+  const dispatcher = createDispatcher({ logger: silent });
+
+  await dispatcher.dispatch(
+    [updated("identified", { currentStatus: "partial_outage" }), change({ currentStatus: "major_outage", previousStatus: "partial_outage" })],
+    {
+      services,
+      locale: "en",
+      notifiers: [channel.notifier],
+      rules: [CATCH_ALL_RULE],
+      knownChannelIds: KNOWN,
+      delivery: delivery({ knownOutage: { enabled: true } }),
+    },
+  );
+
+  assert.equal(channel.seen.length, 2);
+});
