@@ -1674,8 +1674,8 @@ hypothetical set.
 
 ### 3.8 Delivery policy — quiet hours, digests, caps
 
-The routing rules decide *who* hears about a change. Seven further controls
-decide *how much* of it actually goes out, and in how many messages. All seven
+The routing rules decide *who* hears about a change. Twelve further controls
+decide *how much* of it actually goes out, and in how many messages. All of them
 are off by default, so an installation that configures none of them behaves
 exactly as it did before they existed.
 
@@ -1706,6 +1706,18 @@ delivery:
   channelHealth:
     enabled: true
     afterFailures: 3
+  incidentSummary:
+    enabled: true
+  coalesce:
+    enabled: true
+    windowMinutes: 2
+  knownOutage:
+    enabled: true
+  attachChart: true          # UI edition only
+  report:                    # UI edition only
+    enabled: true
+    frequency: weekly        # weekly | monthly
+    channel: slack
 ```
 
 **Quiet hours** are a routing *input*, not a filter bolted on after the rules:
@@ -1786,10 +1798,71 @@ is reported again. Quiet hours hold it back like any other monitoring change,
 and it goes out after them rather than never. An operator's **Send test** does
 not count. The runs live in memory like the cap, so a restart starts them over.
 
-The Light edition configures all seven as the `delivery` block above (with the
-caveat just given for `escalation`); the UI
-edition edits them under **Settings → Delivery**, where each row applies on its
-own without a restart.
+**`incidentSummary`** replaces the "resolved" messages of a shared failure with
+one. When several providers go bad inside the correlation window, the alert
+already says so once (`correlationThreshold`); this is the same story told at
+its end. While that failure is open, each member's return to normal
+is held back, and when the last one is back a single message says "the shared
+failure is over: 6 providers affected, 47 min in all", naming the probable cause
+if the providers declared one with `dependsOn`. It routes and edits in place like
+the alert that opened it, and closes it on an on-call channel. A member that goes
+bad again before the others recover is not counted as back, and one that never
+recovers does not hold the rest for ever: after six hours the summary goes out
+for the members that did recover and the others are reported on their own. The
+open failure lives in memory, so after a restart each recovery is reported
+individually.
+
+**`coalesce`** sends only the last of a run of updates to the same incident. A
+provider that posts four updates in ten minutes produces four messages, or four
+edits; with this on, an update waits `windowMinutes` (1–60, default 2) and is
+replaced by any newer one about the same incident, so what goes out is where the
+incident stands, once. The window runs from the *first* update of the run, so a
+provider that updates every minute still gets a message every `windowMinutes`
+rather than none. An incident's opening is never held, and its resolution is
+sent at once and cancels any update still waiting. What waits is judged by quiet
+hours, the cap and the digest when it is released, not when it arrived; the
+release happens on a poll cycle, so a window shorter than your cadence is no
+shorter. Held updates are in memory, so a restart drops at most one window's
+worth, and switching the option off releases whatever was waiting.
+
+**`knownOutage`** keeps an outage you were already told about from paging you
+again for every update. While a provider is in major outage, further updates of
+its incident go to the digest window instead of going out — whether or not
+`digest` itself is switched on — and arrive as one message. A change of status
+(including the one into or out of major outage), the resolution, and an update
+while the provider is below major outage still interrupt, and so does any
+incident you follow.
+
+**`attachChart`** adds the provider's last 24 hours to status and incident
+messages as an SVG — forty-eight half-hour cells, each as bad as the worst
+reading in it, grey where nothing was read, every cell titled so the colour is
+never the only carrier. SVG is all it draws, deliberately: a rasteriser would add
+a native dependency to every image. So it reaches only the channels that can
+carry one: **email** attaches it as `<provider>-uptime-24h.svg`, and the
+**webhook** adds a `chart: { contentType, svg }` field to its body. Every other
+channel sends the message as it always did. It is drawn once per change, never
+for a digest, a maintenance notice, a report or a channel alert, and a failure to
+draw it costs the picture and not the alert. **UI edition only**: it is drawn
+from stored readings.
+
+**`report`** delivers the fleet's week or month on one `channel`, instead of
+waiting for somebody to download the monthly report: fleet uptime, the three
+weakest providers below 100%, how many incidents, and the error budget spent for
+each provider with an `slaTarget`. `weekly` covers the last complete Monday-to-
+Sunday week and `monthly` the last calendar month, both UTC like every other day
+in the history; it is sent on the first poll after the period closes, once. The
+budget in a monthly report is that month's; in a weekly one it is the month so
+far, the figure the error-budget alert already warns about. It goes to the chosen
+channel only — it is not an alert, so routing rules, the cap and the digest do
+not apply — but it waits out quiet hours, and goes out after them rather than
+never. Turning it on sends the report for the last closed period at the next
+poll. A channel that is not enabled is said so in the log. **UI edition only**:
+it reads the stored history, so the Light edition ignores the block.
+
+The Light edition configures the `delivery` block above (with the caveats just
+given for `escalation`, `attachChart` and `report`); the UI edition edits them
+under **Settings → Delivery**, where each row applies on its own without a
+restart.
 
 ### 3.9 Validating a `config.yml` — the `check` command
 
