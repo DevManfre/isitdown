@@ -134,3 +134,16 @@ test("an empty secret is not a secret, so it cannot produce a signature nothing 
 
   assert.equal(stub.requests[0]?.headers[SIGNATURE_HEADER], undefined);
 });
+
+test("a chart rides in the body as an SVG field, and is absent when none was drawn", async () => {
+  const stub = stubFetch(() => jsonResponse({ received: true }));
+  try {
+    await createWebhookNotifier(settings).send({ ...payload, chart: { svg: "<svg/>", filename: "x.svg" } });
+    await createWebhookNotifier(settings).send(payload);
+  } finally {
+    stub.restore();
+  }
+  const [withChart, without] = stub.requests.map((request) => request.body as Record<string, unknown>);
+  assert.deepEqual(withChart?.chart, { contentType: "image/svg+xml", svg: "<svg/>" });
+  assert.equal("chart" in (without ?? {}), false);
+});

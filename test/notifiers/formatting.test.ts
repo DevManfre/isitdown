@@ -401,6 +401,80 @@ test("a shared failure names its probable cause only when one was declared", () 
   assert.ok(!renderMessage(payloadFor(change())).includes("Probable cause"));
 });
 
+test("the end of a shared failure says how many, how long, and the cause when one was declared", () => {
+  const change = (cause?: string): StatusChange => ({
+    kind: "correlated_resolved",
+    providerId: "vercel",
+    currentStatus: "operational",
+    correlated: {
+      providerIds: ["vercel", "linear", "cloudflare"],
+      windowMinutes: 10,
+      durationMinutes: 47,
+      ...(cause === undefined ? {} : { cause }),
+    },
+    at: "2026-08-19T14:32:07.000Z",
+  });
+
+  const named = renderMessage(payloadFor(change("cloudflare")));
+  assert.ok(named.includes("3 providers affected (vercel, linear, cloudflare), 47 min in all"), named);
+  assert.ok(named.includes("Probable cause was cloudflare"), named);
+  assert.ok(!renderMessage(payloadFor(change())).includes("Probable cause"));
+});
+
+test("a periodic report reads as figures, and leaves out the sections it has nothing for", () => {
+  const report = (over: Partial<NonNullable<StatusChange["report"]>> = {}): StatusChange => ({
+    kind: "periodic_report",
+    providerId: "github",
+    currentStatus: "unknown",
+    report: {
+      frequency: "weekly",
+      from: "2026-10-12",
+      to: "2026-10-18",
+      fleetUptime: 99.456,
+      incidentCount: 4,
+      worst: [
+        { providerId: "vercel", uptime: 97.1 },
+        { providerId: "linear", uptime: 99.2 },
+      ],
+      sla: [{ providerId: "github", target: 99.9, spentMinutes: 21.6, budgetMinutes: 43.2 }],
+      ...over,
+    },
+    at: "2026-10-19T00:05:00.000Z",
+  });
+
+  const full = renderMessage(payloadFor(report()));
+  assert.ok(full.includes("weekly report, 2026-10-12 to 2026-10-18"), full);
+  assert.ok(full.includes("Fleet uptime: 99.46%"), full);
+  assert.ok(full.includes("Incidents: 4"), full);
+  assert.ok(full.includes("• vercel — 97.10%"), full);
+  assert.ok(full.includes("• github — 22 of 43 min (50%)"), full);
+
+  const quiet = renderMessage(payloadFor(report({ worst: [], sla: [] })));
+  assert.ok(quiet.includes("No provider had any downtime."), quiet);
+  assert.ok(!quiet.includes("Error budget"), quiet);
+
+  const blank = renderMessage(payloadFor(report({ fleetUptime: null, worst: [], sla: [] })));
+  assert.ok(blank.includes("Nothing was measured in this period."), blank);
+  assert.ok(!blank.includes("Fleet uptime"), blank);
+});
+
+test("a periodic report ignores the channel's template and carries no provider context", () => {
+  const message = renderMessage({
+    ...payloadFor({
+      kind: "periodic_report",
+      providerId: "github",
+      currentStatus: "unknown",
+      report: { frequency: "monthly", from: "2026-09-01", to: "2026-09-30", fleetUptime: 100, incidentCount: 0, worst: [], sla: [] },
+      at: "2026-10-01T00:05:00.000Z",
+    }),
+    template: "CUSTOM {{provider}}",
+    service: { id: "github", name: "GitHub", statusUrl: "https://x", impact: "deploys blocked", owner: "platform" },
+  });
+  assert.ok(message.includes("monthly report"), message);
+  assert.ok(!message.includes("CUSTOM"), message);
+  assert.ok(!message.includes("deploys blocked"), message);
+});
+
 test("an upcoming window says how soon and for how long, and is not a start", () => {
   const upcoming: StatusChange = {
     kind: "maintenance_upcoming",

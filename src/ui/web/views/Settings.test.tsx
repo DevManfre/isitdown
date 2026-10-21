@@ -1609,6 +1609,64 @@ describe("Settings retention", () => {
     });
   });
 
+  // Roadmap 3.10–3.14.
+  describe("quieter and fuller messages", () => {
+    const on = (delivery: Record<string, unknown>) => ({
+      ...fixtures,
+      config: {
+        ...config,
+        delivery: {
+          quietHours: { enabled: false, start: "23:00", end: "07:00", timeZone: "auto", minSeverity: "major_outage" as const },
+          digest: { enabled: false, windowMinutes: 15, immediateFloor: "major_outage" as const },
+          cap: { enabled: false, maxPerHour: 10 },
+          updateInPlace: false,
+          ...delivery,
+        },
+      },
+    });
+
+    it.each([
+      ["field.incident-summary", { incidentSummary: { enabled: true } }],
+      ["field.coalesce", { coalesce: { enabled: true } }],
+      ["field.known-outage", { knownOutage: { enabled: true } }],
+      ["field.attach-chart", { attachChart: true }],
+      ["field.report", { report: { enabled: true } }],
+    ])("switches %s on with one patch to its own field", async (label, body) => {
+      renderSettings("delivery", fixtures);
+      const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+      expect(await screen.findByLabelText(i18n.t(label))).not.toBeChecked();
+      await userEvent.click(screen.getByLabelText(i18n.t(label)));
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([{ path: "/config/settings", method: "PATCH", body: { delivery: body } }]),
+      );
+    });
+
+    it("asks for the coalescing window only once coalescing is on, and refuses one outside 1–60", async () => {
+      renderSettings("delivery", on({ coalesce: { enabled: true, windowMinutes: 2 } }));
+      const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+      const field = await screen.findByLabelText(i18n.t("field.coalesce.window"));
+      expect(field).toHaveValue(2);
+      await userEvent.clear(field);
+      await userEvent.type(field, "90");
+      await userEvent.tab();
+      expect(writesIn(calls)).toEqual([]);
+      await userEvent.clear(field);
+      await userEvent.type(field, "5");
+      await userEvent.tab();
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          { path: "/config/settings", method: "PATCH", body: { delivery: { coalesce: { windowMinutes: 5 } } } },
+        ]),
+      );
+    });
+
+    it("shows the report's frequency and channel only once it is on", async () => {
+      renderSettings("delivery", on({ report: { enabled: true, frequency: "weekly", channel: "" } }));
+      expect(await screen.findByLabelText(i18n.t("field.report.frequency"))).toBeInTheDocument();
+      expect(screen.getByLabelText(i18n.t("field.report.channel"))).toBeInTheDocument();
+    });
+  });
+
   // Roadmap 3.5.
   describe("recipients", () => {
     const withChannels = {

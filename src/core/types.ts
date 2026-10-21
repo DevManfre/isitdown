@@ -96,6 +96,10 @@ export const STATUS_CHANGE_KINDS = [
   "maintenance_upcoming",
   "monitoring_degraded",
   "correlated_outage",
+  // The shared failure above is over: its members are back (roadmap 3.10).
+  "correlated_resolved",
+  // The fleet's week or month, sent on a schedule (roadmap 3.13).
+  "periodic_report",
   "silent_outage",
   "sla_burn",
   "slow_status_page",
@@ -145,6 +149,8 @@ export interface StatusChange {
         windowMinutes: number;
         /** The declared upstream most members run on (roadmap 2.9). */
         cause?: string | undefined;
+        /** Present on correlated_resolved only (roadmap 3.10): how long the shared failure lasted. */
+        durationMinutes?: number | undefined;
       }
     | undefined;
   /**
@@ -216,6 +222,26 @@ export interface StatusChange {
         /** ISO 8601, UTC. When the first failure of this run happened. */
         since: string;
         error?: string | undefined;
+      }
+    | undefined;
+  /**
+   * Present for periodic_report only (roadmap 3.13): what the period came to.
+   * Like sla_burn it is not about a moment, so it carries the whole
+   * calculation and the message reads figures rather than a status.
+   */
+  report?:
+    | {
+        frequency: "weekly" | "monthly";
+        /** First and last calendar day covered, inclusive, `YYYY-MM-DD`. */
+        from: string;
+        to: string;
+        /** Mean uptime of the measured providers; null when nothing was measured. */
+        fleetUptime: number | null;
+        incidentCount: number;
+        /** The worst measured providers below 100%, worst first, at most three. */
+        worst: { providerId: string; uptime: number }[];
+        /** Error budget per provider that has a target; empty when none has. */
+        sla: { providerId: string; target: number; spentMinutes: number; budgetMinutes: number }[];
       }
     | undefined;
   /** ISO 8601, UTC. */
@@ -351,4 +377,11 @@ export interface NotificationPayload {
    * severity still has one to read, and `items` is the batch itself.
    */
   digest?: { items: NotificationPayload[]; windowMinutes: number } | undefined;
+  /**
+   * The provider's last 24 hours as an SVG (roadmap 3.12), when the operator
+   * asked for one and this change is about a provider's state. Set by the
+   * dispatcher; a channel that cannot show an SVG ignores it, which is the
+   * normal case — only the ones that can carry it (email, webhook) read it.
+   */
+  chart?: { svg: string; filename: string } | undefined;
 }

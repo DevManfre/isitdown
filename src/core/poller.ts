@@ -51,6 +51,14 @@ const DUE_SLACK = 0.15;
 const BACKOFF_BASE_MS = 500;
 const BACKOFF_JITTER_MS = 250;
 
+/**
+ * How long a shared failure may wait for its last member before the summary
+ * goes out without it (roadmap 3.10). Long enough for a real incident to run its
+ * course, short enough that one provider stuck down does not silence everyone
+ * else's recovery for a week.
+ */
+const SUMMARY_HOLD_MS = 6 * 3600_000;
+
 /** FNV-1a, 32-bit: small, stable across runs, and no dependency. */
 function hash(value: string): number {
   let h = 0x811c9dc5;
@@ -265,6 +273,111 @@ export function createPoller(deps: PollerDeps): Poller {
    * news and re-announces; the same three still being down is not.
    */
   let announced: string | null = null;
+
+  /**
+   * The shared failure still waiting for its members (roadmap 3.10): who is in
+   * it, which of them have been seen back, since when, and the cause named when
+   * it was announced. While it is open the members' own recoveries are held
+   * back, because they are exactly what the single summary replaces.
+   *
+   * In memory like the window above. After a restart nothing is open and each
+   * provider's recovery is reported on its own, the direction that loses
+   * nothing.
+   */
+  let open: {
+    members: Set<string>;
+    recovered: Set<string>;
+    since: number;
+    lead: string;
+    cause: string | undefined;
+    windowMinutes: number;
+  } | null = null;
+
+  /**
+   * One message when a shared failure ends (roadmap 3.10), in place of one
+   * "resolved" per member.
+   *
+   * It lives here, beside the fold that announced the failure, because it is
+   * the same decision seen from the other end: which readings are news. A
+   * member's recovery is dropped from `changes` while the failure is open, and
+   * a single `correlated_resolved` takes their place once the last one is back.
+   *
+   * A member that stays down must not hold the others' recoveries for ever, so
+   * after `SUMMARY_HOLD_MS` the summary goes out for the members that did
+   * recover and the rest are reported on their own again.
+   */
+  function foldSummary(
+    changes: StatusChange[],
+    results: ProviderResult[],
+    announcedNow: StatusChange | null,
+    config: RuntimeConfig,
+    at: string,
+  ): void {
+    if (!(config.delivery ?? DELIVERY_DEFAULTS).incidentSummary.enabled) {
+      open = null;
+      return;
+    }
+    const now = Date.parse(at);
+
+    if (announcedNow?.correlated !== undefined) {
+      const { providerIds, windowMinutes, cause } = announcedNow.correlated;
+      const began = window
+        .filter((reading) => providerIds.includes(reading.providerId))
+        .map((reading) => Date.parse(reading.at))
+        .filter((taken) => !Number.isNaN(taken));
+      // A provider joining an open failure widens it rather than starting a
+      // second one, and is not "recovered" for having just gone bad.
+      open = {
+        members: new Set([...(open?.members ?? []), ...providerIds]),
+        recovered: new Set([...(open?.recovered ?? [])].filter((id) => !providerIds.includes(id))),
+        since: Math.min(open?.since ?? now, now, ...began),
+        lead: open?.lead ?? announcedNow.providerId,
+        cause: cause ?? open?.cause,
+        windowMinutes,
+      };
+    }
+    const failure = open;
+    if (failure === null) return;
+
+    for (const result of results) {
+      if (!failure.members.has(result.providerId) || result.status === undefined) continue;
+      const status = result.status.overallStatus;
+      if (status === "operational") failure.recovered.add(result.providerId);
+      else if (status !== "unknown") failure.recovered.delete(result.providerId);
+    }
+
+    // The recoveries the summary stands in for. A member that has gone bad
+    // again is no longer in `recovered`, so its next news is not swallowed.
+    const kept = changes.filter(
+      (change) =>
+        !(
+          failure.recovered.has(change.providerId) &&
+          ((change.kind === "status_change" && change.currentStatus === "operational") ||
+            change.kind === "incident_resolved")
+        ),
+    );
+    changes.length = 0;
+    changes.push(...kept);
+
+    const done = failure.recovered.size >= failure.members.size;
+    if (!done && now - failure.since <= SUMMARY_HOLD_MS) return;
+
+    open = null;
+    const providerIds = [...(done ? failure.members : failure.recovered)];
+    if (providerIds.length === 0) return;
+    changes.push({
+      kind: "correlated_resolved",
+      providerId: providerIds.includes(failure.lead) ? failure.lead : (providerIds[0] ?? failure.lead),
+      currentStatus: "operational",
+      correlated: {
+        providerIds,
+        windowMinutes: failure.windowMinutes,
+        durationMinutes: Math.max(1, Math.round((now - failure.since) / 60_000)),
+        ...(failure.cause === undefined ? {} : { cause: failure.cause }),
+      },
+      at,
+    });
+  }
 
   /**
    * Each status page's recent answer times, and how many slow readings in a
@@ -1072,6 +1185,7 @@ export function createPoller(deps: PollerDeps): Poller {
       changes.push(...judgeUpcoming(results, config));
 
       const correlated = foldCorrelated(changes, config, finishedAt);
+      foldSummary(changes, results, correlated, config, finishedAt);
       if (correlated !== null) {
         logger.warn(
           "several providers went bad inside the correlation window — reporting one shared failure",

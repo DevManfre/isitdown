@@ -62,6 +62,8 @@ const TEMPLATE: Record<StatusChangeKind, string> = {
   maintenance_upcoming: "notification.maintenance.upcoming",
   monitoring_degraded: "notification.monitoring.degraded",
   correlated_outage: "notification.correlated.outage",
+  correlated_resolved: "notification.correlated.resolved",
+  periodic_report: "notification.report.weekly",
   silent_outage: "notification.silent.outage",
   sla_burn: "notification.sla.burn",
   slow_status_page: "notification.slow.page",
@@ -86,7 +88,8 @@ function accentFor(change: StatusChange): { emoji: string; color: number } {
   if (
     change.kind === "monitoring_degraded" ||
     change.kind === "slow_status_page" ||
-    change.kind === "channel_failing"
+    change.kind === "channel_failing" ||
+    change.kind === "periodic_report"
   ) {
     return { emoji: EMOJI.unknown, color: COLOR.unknown };
   }
@@ -382,6 +385,11 @@ function summarise(payload: NotificationPayload): string {
           cause: change.correlated?.cause ?? "",
         },
       );
+    case "correlated_resolved":
+      return t(locale, "notification.digest.correlated-resolved", {
+        count: change.correlated?.providerIds.length ?? 0,
+        lasted: minutesLabel(change.correlated?.durationMinutes ?? 0),
+      });
     case "sla_burn":
       return t(locale, "notification.digest.sla", {
         target: (change.sla?.target ?? 0).toFixed(2),
@@ -397,7 +405,67 @@ function summarise(payload: NotificationPayload): string {
         channel: change.channel?.id ?? "",
         count: change.channel?.failures ?? 0,
       });
+    case "periodic_report":
+      return t(locale, "notification.digest.report", {
+        uptime: change.report?.fleetUptime?.toFixed(2) ?? "—",
+      });
   }
+}
+
+/**
+ * The periodic report (roadmap 3.13) as the lines somebody reads: the fleet's
+ * figure first, then who dragged it down, then the error budget. Built from
+ * catalog pieces rather than one template because the middle sections come and
+ * go — nothing measured, nothing below 100%, no provider with a target — and a
+ * template cannot say "omit this paragraph".
+ */
+function reportText(change: StatusChange, locale: string): string {
+  const report = change.report;
+  if (report === undefined) return t(locale, "notification.report.unmeasured");
+  const lines = [
+    t(locale, report.frequency === "weekly" ? "notification.report.weekly" : "notification.report.monthly", {
+      from: report.from,
+      to: report.to,
+    }),
+    "",
+  ];
+  if (report.fleetUptime === null) {
+    lines.push(t(locale, "notification.report.unmeasured"));
+  } else {
+    lines.push(
+      t(locale, "notification.report.uptime", { uptime: report.fleetUptime.toFixed(2) }),
+      t(locale, "notification.report.incidents", { count: report.incidentCount }),
+      "",
+    );
+    if (report.worst.length === 0) {
+      lines.push(t(locale, "notification.report.worst-none"));
+    } else {
+      lines.push(
+        t(locale, "notification.report.worst-heading"),
+        ...report.worst.map((entry) =>
+          t(locale, "notification.report.worst-line", {
+            provider: entry.providerId,
+            uptime: entry.uptime.toFixed(2),
+          }),
+        ),
+      );
+    }
+  }
+  if (report.sla.length > 0) {
+    lines.push(
+      "",
+      t(locale, "notification.report.budget-heading"),
+      ...report.sla.map((entry) =>
+        t(locale, "notification.report.budget-line", {
+          provider: entry.providerId,
+          spent: Math.round(entry.spentMinutes),
+          budget: Math.round(entry.budgetMinutes),
+          percent: entry.budgetMinutes <= 0 ? 100 : Math.round((entry.spentMinutes / entry.budgetMinutes) * 100),
+        }),
+      ),
+    );
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -465,6 +533,12 @@ function render(
     );
   }
 
+  // A report is its own document: no template describes it, and nothing about
+  // a provider's status belongs under it (roadmap 3.13).
+  if (payload.change.kind === "periodic_report") {
+    return withSuppressed(reportText(payload.change, payload.locale), payload);
+  }
+
   // The channel's own template, when it has one (roadmap 3.15). Checked after
   // the digest above and before the per-kind catalog below: a digest describes
   // a batch and a template describes one change, so the two never meet, and
@@ -502,7 +576,10 @@ function render(
       : change.kind === "correlated_outage" &&
           change.correlated?.cause !== undefined
         ? "notification.correlated.outage-cause"
-        : TEMPLATE[change.kind];
+        : change.kind === "correlated_resolved" &&
+            change.correlated?.cause !== undefined
+          ? "notification.correlated.resolved-cause"
+          : TEMPLATE[change.kind];
 
   const body = t(locale, key, {
     provider: service.name,
@@ -530,6 +607,7 @@ function render(
     providers: (change.correlated?.providerIds ?? []).join(", "),
     cause: change.correlated?.cause ?? "",
     minutes: change.correlated?.windowMinutes ?? 0,
+    lasted: minutesLabel(change.correlated?.durationMinutes ?? 0),
     startsIn: minutesLabel(change.startsInMinutes ?? 0),
     startsAt: formatUtc(change.maintenance?.startsAt ?? change.at),
     duration: plannedDuration(change, locale),
@@ -565,7 +643,7 @@ function render(
  * a provider only because the lost message happened to be about it.
  */
 function withContext(message: string, payload: NotificationPayload): string {
-  if (payload.change.kind === "channel_failing") return message;
+  if (payload.change.kind === "channel_failing" || payload.change.kind === "periodic_report") return message;
   const { impact, owner } = payload.service;
   const lines = [
     ...(impact === undefined || impact === "" ? [] : [t(payload.locale, "notification.impact", { impact })]),

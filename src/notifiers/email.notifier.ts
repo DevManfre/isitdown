@@ -99,6 +99,16 @@ export function createEmailNotifier(settings: Record<string, string>): Notifier 
           // A message with nothing under its heading still says the heading:
           // an empty mail body reads as a broken notification.
           text: text === "" ? heading : text,
+          // The day of uptime behind the alert (roadmap 3.12), when the
+          // dispatcher drew one. A mail client shows an attachment where it has
+          // no way to draw an SVG inline, which is why it is not in the body.
+          ...(payload.chart === undefined
+            ? {}
+            : {
+                attachments: [
+                  { filename: payload.chart.filename, contentType: "image/svg+xml", content: payload.chart.svg },
+                ],
+              }),
         },
       );
     },
