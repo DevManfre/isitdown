@@ -1,10 +1,9 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload, OverallStatus } from "../core/types.ts";
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { renderParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 const settingsSchema = z.object({
   /** The server, not a message path: `https://gotify.example.com`. */
@@ -51,11 +50,7 @@ export function createGotifyNotifier(settings: Record<string, string>): Notifier
       if (response.ok) return;
 
       const body = (await response.json().catch(() => ({}))) as { errorDescription?: string };
-      throw new Error(
-        `gotify notification failed: HTTP ${response.status}${
-          body.errorDescription === undefined ? "" : ` (${body.errorDescription})`
-        }`,
-      );
+      throw httpFailure("gotify", "failed", response.status, body.errorDescription);
     },
   };
 }

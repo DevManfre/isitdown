@@ -1,0 +1,106 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://www.zenduty.com/api/events/SECRET-KEY/",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "alert_type": "critical",
+        "message": "🔴 GitHub — MAJOR OUTAGE",
+        "summary": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC",
+        "entity_id": "isitdown/github/incident/inc-1",
+        "urls": [
+          {
+            "link_url": "https://www.githubstatus.com",
+            "link_text": "GitHub"
+          }
+        ],
+        "payload": {
+          "provider": "github",
+          "kind": "incident_opened",
+          "status": "major_outage"
+        }
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://www.zenduty.com/api/events/SECRET-KEY/",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "alert_type": "resolved",
+        "message": "🟢 GitHub — RESOLVED",
+        "summary": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC",
+        "entity_id": "isitdown/github/incident/inc-1",
+        "urls": [
+          {
+            "link_url": "https://www.githubstatus.com",
+            "link_text": "GitHub"
+          }
+        ],
+        "payload": {
+          "provider": "github",
+          "kind": "incident_resolved",
+          "status": "operational"
+        }
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://www.zenduty.com/api/events/SECRET-KEY/",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "alert_type": "warning",
+        "message": "🟡 GitHub — DEGRADED",
+        "summary": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC",
+        "entity_id": "isitdown/github/status",
+        "urls": [
+          {
+            "link_url": "https://www.githubstatus.com",
+            "link_text": "GitHub"
+          }
+        ],
+        "payload": {
+          "provider": "github",
+          "kind": "status_change",
+          "status": "degraded"
+        }
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://www.zenduty.com/api/events/SECRET-KEY/",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "alert_type": "info",
+        "message": "⚙️ GitHub — maintenance ahead",
+        "summary": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min",
+        "entity_id": "isitdown/github/maintenance/mnt-1",
+        "urls": [
+          {
+            "link_url": "https://www.githubstatus.com",
+            "link_text": "GitHub"
+          }
+        ],
+        "payload": {
+          "provider": "github",
+          "kind": "maintenance_upcoming",
+          "status": "operational"
+        }
+      }
+    }
+  ]
+}

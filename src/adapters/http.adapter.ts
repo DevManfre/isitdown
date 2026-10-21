@@ -1,6 +1,7 @@
 import { connect as tlsConnect } from "node:tls";
 import type { Adapter, FetchContext, ReadingNote, ServiceRef } from "../core/adapter.interface.ts";
 import { USER_AGENT } from "../core/http.ts";
+import { BodyTooLargeError, MAX_BODY_BYTES, guardedFetch, readCapped, readOutboundPolicy } from "../core/outboundPolicy.ts";
 import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
 
 /**
@@ -434,15 +435,19 @@ export const httpAdapter: Adapter = {
     let response: Response;
     const askedAt = Date.now();
     try {
-      response = await fetch(config.url, {
-        method: config.method,
-        headers: config.headers,
-        // A probe wants the current answer: a cache replaying a 200 would
-        // report a dead endpoint as healthy.
-        cache: "no-store",
-        redirect: config.followRedirects ? "follow" : "manual",
-        signal: AbortSignal.timeout(ctx.timeoutMs),
-      });
+      response = await guardedFetch(
+        config.url,
+        {
+          method: config.method,
+          headers: config.headers,
+          // A probe wants the current answer: a cache replaying a 200 would
+          // report a dead endpoint as healthy.
+          cache: "no-store",
+          signal: AbortSignal.timeout(ctx.timeoutMs),
+        },
+        readOutboundPolicy(process.env),
+        config.followRedirects,
+      );
     } catch (error) {
       // Refused, unresolvable, TLS rejected, or past the timeout. All four are
       // the endpoint failing to answer, which is a reading — and none of them
@@ -461,8 +466,13 @@ export const httpAdapter: Adapter = {
     let body: string | null = null;
     if (readsBody(config)) {
       try {
-        body = await response.text();
-      } catch {
+        body = new TextDecoder().decode(await readCapped(response, MAX_BODY_BYTES));
+      } catch (error) {
+        // An endpoint streaming past the cap is a failed probe, not a page
+        // with nothing on it.
+        if (error instanceof BodyTooLargeError) {
+          return reading(service, config, { answered: false, reason: error.message }, ctx);
+        }
         // The headers arrived and the body did not. The endpoint answered, but
         // not with the content the check was told to look for.
         body = "";

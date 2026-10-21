@@ -391,6 +391,23 @@ test("pruneOlderThan drops old samples and keeps recent ones", async () => {
   await store.close();
 });
 
+test("pruneOlderThan forgets message references nobody will edit again", async () => {
+  const { db, store } = await harness();
+  await store.saveRef("telegram", "github", "old-incident", "ref-old");
+  await store.saveRef("telegram", "github", "new-incident", "ref-new");
+  const old = new Date(Date.now() - 200 * 24 * 3600 * 1000).toISOString();
+  db.prepare("UPDATE message_refs SET updated_at = ? WHERE incident_id = ?").run(old, "old-incident");
+
+  await store.pruneOlderThan(120);
+
+  const rows = db.prepare("SELECT incident_id FROM message_refs").all() as { incident_id: string }[];
+  assert.deepEqual(
+    rows.map((row) => row.incident_id),
+    ["new-incident"],
+  );
+  await store.close();
+});
+
 test("a failed cycle writes no sample, so our own outage is not the provider's downtime", async () => {
   const { db, store } = await harness();
   await store.saveStatus(snap());

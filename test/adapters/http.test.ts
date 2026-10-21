@@ -466,3 +466,56 @@ test("a probe that times out says so rather than reporting an empty reason", asy
   assert.match(notes[0]?.text ?? "", /timed out|aborted/);
   assert.equal(notes[0]?.unreachable, true);
 });
+
+test("a redirect into a link-local address fails the probe with the refusal", async () => {
+  await withServer(
+    (_req, res) => {
+      res.writeHead(302, { location: "http://169.254.169.254/latest/meta-data" });
+      res.end();
+    },
+    async (baseUrl) => {
+      const notes: ReadingNote[] = [];
+      const reading = await httpAdapter.fetchStatus(service({}, baseUrl), { ...ctx, onNote: (note) => notes.push(note) });
+      assert.equal(reading.overallStatus, "major_outage");
+      assert.match(notes.map((note) => note.text).join(" "), /refused: link-local address/);
+    },
+  );
+});
+
+test("a body streamed past the cap fails the probe with the cap message", async () => {
+  await withServer(
+    (_req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      const chunk = Buffer.alloc(1024 * 1024, 97);
+      let sent = 0;
+      const push = (): void => {
+        while (sent < 12) {
+          sent++;
+          if (!res.write(chunk)) {
+            res.once("drain", push);
+            return;
+          }
+        }
+        res.end();
+      };
+      push();
+    },
+    async (baseUrl) => {
+      const notes: ReadingNote[] = [];
+      const reading = await httpAdapter.fetchStatus(service({ expectBody: "needle" }, baseUrl), {
+        ...ctx,
+        timeoutMs: 5000,
+        onNote: (note) => notes.push(note),
+      });
+      assert.equal(reading.overallStatus, "major_outage");
+      assert.match(notes.map((note) => note.text).join(" "), /response exceeded 8388608 bytes/);
+    },
+  );
+});
+
+test("a loopback target still answers when no policy is set", async () => {
+  await withServer(answering(200), async (baseUrl) => {
+    const reading = await httpAdapter.fetchStatus(service({}, baseUrl), ctx);
+    assert.equal(reading.overallStatus, "operational");
+  });
+});

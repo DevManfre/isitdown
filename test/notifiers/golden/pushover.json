@@ -1,0 +1,42 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://api.pushover.net/1/messages.json",
+      "headers": {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "token=SECRET-APP&user=SECRET-USER&title=%F0%9F%94%B4+GitHub+%E2%80%94+MAJOR+OUTAGE&message=Incident%3A+API+requests+failing%0AStatus%3A+Investigating%0AUpdated%3A+2026-08-19+14%3A32+UTC&url=https%3A%2F%2Fwww.githubstatus.com&url_title=GitHub&priority=1"
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://api.pushover.net/1/messages.json",
+      "headers": {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "token=SECRET-APP&user=SECRET-USER&title=%F0%9F%9F%A2+GitHub+%E2%80%94+RESOLVED&message=Incident+%22API+requests+failing%22+has+been+resolved.%0AUpdated%3A+2026-08-19+14%3A32+UTC&url=https%3A%2F%2Fwww.githubstatus.com&url_title=GitHub&priority=0"
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://api.pushover.net/1/messages.json",
+      "headers": {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "token=SECRET-APP&user=SECRET-USER&title=%F0%9F%9F%A1+GitHub+%E2%80%94+DEGRADED&message=Status+changed+from+Operational+to+Degraded.%0AUpdated%3A+2026-08-19+14%3A32+UTC&url=https%3A%2F%2Fwww.githubstatus.com&url_title=GitHub&priority=0"
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://api.pushover.net/1/messages.json",
+      "headers": {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "body": "token=SECRET-APP&user=SECRET-USER&title=%E2%9A%99%EF%B8%8F+GitHub+%E2%80%94+maintenance+ahead&message=Scheduled+maintenance+starts+in+2+h%3A+Database+upgrade%0AStarts%3A+2026-08-19+16%3A00+UTC+%E2%80%94+expected+duration%3A+30+min&url=https%3A%2F%2Fwww.githubstatus.com&url_title=GitHub&priority=0"
+    }
+  ]
+}

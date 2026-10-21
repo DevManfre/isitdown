@@ -1,0 +1,62 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://chat.googleapis.com/v1/spaces/AAA/messages?key=SECRET-KEY&token=SECRET-TOKEN&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD",
+      "headers": {
+        "content-type": "application/json; charset=UTF-8"
+      },
+      "body": {
+        "text": "*🔴 GitHub — MAJOR OUTAGE*\nIncident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\n<https://www.githubstatus.com|GitHub>",
+        "thread": {
+          "threadKey": "isitdown/github/incident/inc-1"
+        }
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://chat.googleapis.com/v1/spaces/AAA/messages?key=SECRET-KEY&token=SECRET-TOKEN&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD",
+      "headers": {
+        "content-type": "application/json; charset=UTF-8"
+      },
+      "body": {
+        "text": "*🟢 GitHub — RESOLVED*\nIncident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC\n\n<https://www.githubstatus.com|GitHub>",
+        "thread": {
+          "threadKey": "isitdown/github/incident/inc-1"
+        }
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://chat.googleapis.com/v1/spaces/AAA/messages?key=SECRET-KEY&token=SECRET-TOKEN&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD",
+      "headers": {
+        "content-type": "application/json; charset=UTF-8"
+      },
+      "body": {
+        "text": "*🟡 GitHub — DEGRADED*\nStatus changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\n<https://www.githubstatus.com|GitHub>",
+        "thread": {
+          "threadKey": "isitdown/github/status"
+        }
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://chat.googleapis.com/v1/spaces/AAA/messages?key=SECRET-KEY&token=SECRET-TOKEN&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD",
+      "headers": {
+        "content-type": "application/json; charset=UTF-8"
+      },
+      "body": {
+        "text": "*⚙️ GitHub — maintenance ahead*\nScheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\n<https://www.githubstatus.com|GitHub>",
+        "thread": {
+          "threadKey": "isitdown/github/maintenance/mnt-1"
+        }
+      }
+    }
+  ]
+}

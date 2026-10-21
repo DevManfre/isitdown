@@ -1,5 +1,6 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { apiToken } from "./apiToken.ts";
+import { originGuard } from "./originGuard.ts";
 import { badgeRoutes } from "./routes/badge.routes.ts";
 import { configRoutes } from "./routes/config.routes.ts";
 import { debugRoutes } from "./routes/debug.routes.ts";
@@ -40,6 +41,8 @@ export function createApp(runtime: UiRuntimeCore): Express {
   // should be refused before 512 MB of it has been read (roadmap 4.15). Does
   // nothing at all unless `API_TOKEN` is set.
   app.use(apiToken(runtime.env));
+  // Refuse a foreign-origin or rebound-host write before any body is parsed.
+  app.use(originGuard(runtime.env));
   app.use(express.json({ limit: "64kb" }));
   // The config import (roadmap 4.3) takes a `config.yml` as it stands, so the
   // YAML content types arrive as text rather than as a JSON string.

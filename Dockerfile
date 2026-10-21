@@ -65,6 +65,9 @@ FROM builder AS dev
 ENV NODE_ENV=development
 ENV DB_PATH=/app/data/isitdown.db
 ENV PORT=3000
+# Inside a container the published port reaches the container's own interface, so
+# loopback there would be unreachable; exposure is decided by the compose `ports` mapping.
+ENV BIND_HOST=0.0.0.0
 EXPOSE 3000
 # Same start period as the ui stage, and for the same reason: the probe is
 # readiness, so it stays 503 until the first cycle has read the fleet.
@@ -80,6 +83,9 @@ CMD ["sh", "-c", "npx vite build --watch & exec node --watch src/ui/server.ts"]
 FROM light AS ui
 ENV DB_PATH=/app/data/isitdown.db
 ENV PORT=3000
+# Inside a container the published port reaches the container's own interface, so
+# loopback there would be unreachable; exposure is decided by the compose `ports` mapping.
+ENV BIND_HOST=0.0.0.0
 USER root
 COPY --from=builder /app/dist/ui ./dist/ui
 RUN chown -R node:node /app/dist/ui

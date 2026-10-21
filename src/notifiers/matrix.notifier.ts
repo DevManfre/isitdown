@@ -1,10 +1,9 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
-import { renderParts } from "./formatting.ts";
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
+import { fitText, renderParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 const settingsSchema = z.object({
   /** The homeserver's client API root, not a room path: `https://matrix.org`. */
@@ -55,14 +54,16 @@ export function createMatrixNotifier(settings: Record<string, string>): Notifier
   async function fail(response: Response, verb: string): Promise<never> {
     const body = (await response.json().catch(() => ({}))) as { errcode?: string; error?: string };
     const reason = [body.errcode, body.error].filter((part) => part !== undefined).join(": ");
-    throw new Error(
-      `matrix notification ${verb}: HTTP ${response.status}${reason === "" ? "" : ` (${reason})`}`,
-    );
+    throw httpFailure("matrix", verb, response.status, reason);
   }
 
   /** The message body both a send and an edit are built from. */
   function content(payload: NotificationPayload): { body: string; formatted_body: string } {
-    const { heading, detail, url } = renderParts(payload);
+    const parts = renderParts(payload);
+    const { heading, url } = parts;
+    // A Matrix event is capped at 64 KiB and carries the text twice, the HTML
+    // copy escaped — so the detail is held well under half of it.
+    const detail = fitText(parts.detail, 8000);
     const lines = [heading, detail].filter((part) => part !== "");
     return {
       body: [...lines, url].join("\n\n"),

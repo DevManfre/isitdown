@@ -1,0 +1,54 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://ntfy.sh/isitdown",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "click": "https://www.githubstatus.com",
+        "priority": "5",
+        "title": "=?UTF-8?B?8J+UtCBHaXRIdWIg4oCUIE1BSk9SIE9VVEFHRQ==?="
+      },
+      "body": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC"
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://ntfy.sh/isitdown",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "click": "https://www.githubstatus.com",
+        "priority": "2",
+        "title": "=?UTF-8?B?8J+foiBHaXRIdWIg4oCUIFJFU09MVkVE?="
+      },
+      "body": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC"
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://ntfy.sh/isitdown",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "click": "https://www.githubstatus.com",
+        "priority": "3",
+        "title": "=?UTF-8?B?8J+foSBHaXRIdWIg4oCUIERFR1JBREVE?="
+      },
+      "body": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC"
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://ntfy.sh/isitdown",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "click": "https://www.githubstatus.com",
+        "priority": "2",
+        "title": "=?UTF-8?B?4pqZ77iPIEdpdEh1YiDigJQgbWFpbnRlbmFuY2UgYWhlYWQ=?="
+      },
+      "body": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://api.opsgenie.com/v2/alerts",
+      "headers": {
+        "authorization": "GenieKey SECRET-KEY",
+        "content-type": "application/json"
+      },
+      "body": {
+        "message": "🔴 GitHub — MAJOR OUTAGE",
+        "alias": "isitdown/github/incident/inc-1",
+        "description": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "priority": "P1",
+        "source": "IsItDown",
+        "entity": "github",
+        "tags": [
+          "isitdown",
+          "incident_opened"
+        ],
+        "details": {
+          "provider": "GitHub",
+          "previousStatus": "operational",
+          "currentStatus": "major_outage",
+          "statusUrl": "https://www.githubstatus.com"
+        }
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://api.opsgenie.com/v2/alerts/isitdown%2Fgithub%2Fincident%2Finc-1/close?identifierType=alias",
+      "headers": {
+        "authorization": "GenieKey SECRET-KEY",
+        "content-type": "application/json"
+      },
+      "body": {
+        "source": "IsItDown",
+        "note": "🟢 GitHub — RESOLVED"
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://api.opsgenie.com/v2/alerts",
+      "headers": {
+        "authorization": "GenieKey SECRET-KEY",
+        "content-type": "application/json"
+      },
+      "body": {
+        "message": "🟡 GitHub — DEGRADED",
+        "alias": "isitdown/github/status",
+        "description": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "priority": "P3",
+        "source": "IsItDown",
+        "entity": "github",
+        "tags": [
+          "isitdown",
+          "status_change"
+        ],
+        "details": {
+          "provider": "GitHub",
+          "previousStatus": "operational",
+          "currentStatus": "degraded",
+          "statusUrl": "https://www.githubstatus.com"
+        }
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://api.opsgenie.com/v2/alerts",
+      "headers": {
+        "authorization": "GenieKey SECRET-KEY",
+        "content-type": "application/json"
+      },
+      "body": {
+        "message": "⚙️ GitHub — maintenance ahead",
+        "alias": "isitdown/github/maintenance/mnt-1",
+        "description": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\nhttps://www.githubstatus.com",
+        "priority": "P5",
+        "source": "IsItDown",
+        "entity": "github",
+        "tags": [
+          "isitdown",
+          "maintenance_upcoming"
+        ],
+        "details": {
+          "provider": "GitHub",
+          "previousStatus": "",
+          "currentStatus": "operational",
+          "statusUrl": "https://www.githubstatus.com"
+        }
+      }
+    }
+  ]
+}

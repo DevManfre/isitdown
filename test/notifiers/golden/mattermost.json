@@ -1,0 +1,58 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://chat.example.com/api/v4/posts",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "channel_id": "chan",
+        "message": "**🔴 GitHub — MAJOR OUTAGE**\nIncident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\n[GitHub](https://www.githubstatus.com)"
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://chat.example.com/api/v4/posts",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "channel_id": "chan",
+        "message": "**🟢 GitHub — RESOLVED**\nIncident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC\n\n[GitHub](https://www.githubstatus.com)"
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://chat.example.com/api/v4/posts",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "channel_id": "chan",
+        "message": "**🟡 GitHub — DEGRADED**\nStatus changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\n[GitHub](https://www.githubstatus.com)"
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://chat.example.com/api/v4/posts",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "channel_id": "chan",
+        "message": "**⚙️ GitHub — maintenance ahead**\nScheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\n[GitHub](https://www.githubstatus.com)"
+      }
+    }
+  ]
+}

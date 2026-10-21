@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile } from "node:fs/promises";
+import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
@@ -195,5 +196,67 @@ test("an empty request is a request error, not an empty restore", async () => {
     assert.match((body as { error: { message: string } }).error.message, /request body/);
   } finally {
     await app.close();
+  }
+});
+
+const VAPID_ROWS = ["vapidPublicKey", "vapidPrivateKey"];
+
+const seedVapid = (app: Api, tag: string): Record<string, string> => {
+  const pair = { vapidPublicKey: `public-${tag}`, vapidPrivateKey: `private-${tag}` };
+  const insert = app.runtime.db.prepare(
+    "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+  );
+  for (const [key, value] of Object.entries(pair)) insert.run(key, value);
+  return pair;
+};
+
+const vapidRows = (app: Api): Record<string, string> => {
+  const rows = app.runtime.db
+    .prepare(`SELECT key, value FROM settings WHERE key IN (${VAPID_ROWS.map(() => "?").join(", ")})`)
+    .all(...VAPID_ROWS) as { key: string; value: string }[];
+  return Object.fromEntries(rows.map((row) => [row.key, row.value]));
+};
+
+test("a backup carries neither half of the VAPID key pair", async () => {
+  const app = await api();
+  try {
+    seedVapid(app, "one");
+    app.runtime.db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('locale', 'en')").run();
+    const { bytes } = await app.getBytes("/config/backup");
+
+    const file = join(app.dir, "downloaded.db");
+    await writeFile(file, bytes);
+    const copy = new DatabaseSync(file, { readOnly: true });
+    try {
+      const [vapid] = copy
+        .prepare("SELECT COUNT(*) AS n FROM settings WHERE key IN ('vapidPublicKey', 'vapidPrivateKey')")
+        .all() as { n: number }[];
+      const [other] = copy.prepare("SELECT COUNT(*) AS n FROM settings WHERE key = 'locale'").all() as { n: number }[];
+      assert.equal(vapid?.n, 0);
+      assert.equal(other?.n, 1, "the rest of settings is still in the backup");
+    } finally {
+      copy.close();
+    }
+    assert.equal(Object.keys(vapidRows(app)).length, 2, "the live database keeps its pair");
+  } finally {
+    await app.close();
+  }
+});
+
+test("a restore keeps the instance's own VAPID pair", async () => {
+  const source = await api();
+  const target = await api();
+  try {
+    seedVapid(source, "source");
+    const backup = await source.getBytes("/config/backup");
+    const own = seedVapid(target, "target");
+
+    const { status } = await target.postFile("/config/restore", backup.bytes);
+
+    assert.equal(status, 200);
+    assert.deepEqual(vapidRows(target), own);
+  } finally {
+    await source.close();
+    await target.close();
   }
 });

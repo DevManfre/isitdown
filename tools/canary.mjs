@@ -19,6 +19,29 @@ const TIMEOUT_MS = 15_000;
 const NOT_A_SHAPE = /malformed|broken|invalid/;
 
 /**
+ * Fields a recorded fixture has because it was taken mid-maintenance or
+ * mid-incident, and that a calm page legitimately does not carry (or that the
+ * adapter never reads). Their absence says nothing about the shape, so they
+ * are not judged; the adapter's own parse is still the final word.
+ */
+const CONDITIONAL = {
+  sorry: [
+    "$.components[].metrics_summary",
+    "$.components[].links.metrics",
+    "$.notices[].begins_at",
+    "$.notices[].ends_at",
+    "$.notices[].impact_time",
+  ],
+  cstate: [
+    "$.categories[].description",
+    "$.pinnedIssues",
+    "$.systems[].status",
+    "$.systems[].unresolvedIssues",
+    "$.systems[].description",
+  ],
+};
+
+/**
  * Every path a JSON value has, and the kinds of value seen at each.
  *
  * Arrays fold their elements into one `[]` segment, so a list of fifty
@@ -177,7 +200,8 @@ export function judge(entry, { captured, error, fixtures }) {
     const live = shapeOf(parsed);
     const fixture = bestFixture(live, fixtures);
     if (fixture === null) continue;
-    const items = driftBetween(fixture.shape, live);
+    const skip = CONDITIONAL[entry.adapter] ?? [];
+    const items = driftBetween(fixture.shape, live).filter((item) => !skip.includes(item.path));
     if (items.length > 0) drift.push({ url: response.url, fixture: fixture.name, items });
   }
 

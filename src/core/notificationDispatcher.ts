@@ -214,12 +214,26 @@ export function chainsOf(targets: readonly string[], recipients: readonly Recipi
   return chains;
 }
 
-/** A batch of delivery results, some of which came back as a chain's several records. */
-type Attempt = Promise<SentRecord | SentRecord[]>;
+/**
+ * A batch of delivery results, some of which came back as a chain's several
+ * records. The context says whose message it was, so a rejection nobody
+ * expected can still be logged and recorded against a provider and a channel.
+ */
+interface Attempt {
+  run: Promise<SentRecord | SentRecord[]>;
+  providerId: string;
+  /** For a chain, its preferred channel: the one the message was meant for. */
+  channel: string;
+  kind: StatusChangeKind;
+}
 
-async function settleAll(attempts: Attempt[]): Promise<SentRecord[]> {
-  const settled = await Promise.allSettled(attempts);
-  return settled.flatMap((outcome) => (outcome.status === "fulfilled" ? [outcome.value].flat() : []));
+function attempt(
+  run: Promise<SentRecord | SentRecord[]>,
+  providerId: string,
+  channel: string | undefined,
+  kind: StatusChangeKind,
+): Attempt {
+  return { run, providerId, channel: channel ?? "unknown", kind };
 }
 
 const RETRY_BASE_MS = 1000;
@@ -237,6 +251,21 @@ const realSleep = (ms: number): Promise<void> =>
  */
 export function createDispatcher(deps: DispatcherDeps): Dispatcher {
   const { logger, onSent } = deps;
+
+  // The poller has already moved the notify baseline by the time a dispatch
+  // runs, so a throwing lookup would lose the alert for good. Each one falls
+  // back to the answer that still delivers.
+  async function orElse<T>(what: string, fallback: T, read: () => Promise<T>, context: Record<string, unknown>): Promise<T> {
+    try {
+      return await read();
+    } catch (error) {
+      logger.error(`${what} failed; carrying on without it`, {
+        ...context,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return fallback;
+    }
+  }
   const sleep = deps.sleep ?? realSleep;
   const now = deps.now ?? Date.now;
   const messageRefs = deps.messageRefs;
@@ -370,6 +399,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
     );
 
     async function attemptDelivery(): Promise<SentRecord> {
+      let sentRef: string | void | undefined;
       while (attempts < maxAttempts) {
         if (attempts > 0) {
           // Jittered, like the poller's own backoff: a provider-wide incident
@@ -379,21 +409,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         }
         attempts += 1;
         try {
-          const ref = await notifier.send(payload);
-          // A channel that names its messages, an incident to attach it to, and
-          // somewhere to keep it: remember it so the next update edits this one.
-          // Not for the message that closes an incident — there is nothing left
-          // to edit — which is also what keeps the table from growing a row per
-          // incident forever.
-          if (
-            typeof ref === "string" &&
-            ref !== "" &&
-            link !== undefined &&
-            !link.final &&
-            messageRefs !== undefined
-          ) {
-            await messageRefs.saveRef(notifier.id, providerId, link.incidentId, ref);
-          }
+          sentRef = await notifier.send(payload);
           failure = undefined;
           break;
         } catch (error) {
@@ -406,6 +422,32 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
             kind,
             attempt: attempts,
             error: failure,
+          });
+        }
+      }
+
+      // A channel that names its messages, an incident to attach it to, and
+      // somewhere to keep it: remember it so the next update edits this one.
+      // Not for the message that closes an incident — there is nothing left
+      // to edit — which is also what keeps the table from growing a row per
+      // incident forever. Outside the send's try: the message has already
+      // gone, so a store that cannot keep its reference must not make the
+      // loop send it again.
+      if (
+        failure === undefined &&
+        typeof sentRef === "string" &&
+        sentRef !== "" &&
+        link !== undefined &&
+        !link.final &&
+        messageRefs !== undefined
+      ) {
+        try {
+          await messageRefs.saveRef(notifier.id, providerId, link.incidentId, sentRef);
+        } catch (error) {
+          logger.warn("could not remember the message for later edits", {
+            providerId,
+            channel: notifier.id,
+            error: error instanceof Error ? error.message : String(error),
           });
         }
       }
@@ -441,6 +483,43 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       await audit(record);
       return record;
     }
+  }
+
+  /**
+   * Waits for every attempt. One that rejected — a throw outside `deliver`'s
+   * own retry loop — is logged and recorded as a failed delivery rather than
+   * dropped: a failed delivery is always visible.
+   */
+  async function settleAll(attempts: Attempt[]): Promise<SentRecord[]> {
+    const settled = await Promise.allSettled(attempts.map((item) => item.run));
+    const records: SentRecord[] = [];
+    for (const [index, outcome] of settled.entries()) {
+      if (outcome.status === "fulfilled") {
+        records.push(...[outcome.value].flat());
+        continue;
+      }
+      const context = attempts[index];
+      if (context === undefined) continue;
+      const error = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      logger.error("a delivery failed before it could be tried", {
+        providerId: context.providerId,
+        channel: context.channel,
+        error,
+      });
+      const record: SentRecord = {
+        providerId: context.providerId,
+        channel: context.channel,
+        kind: context.kind,
+        text: "",
+        sentAt: new Date().toISOString(),
+        ok: false,
+        attempts: 0,
+        error,
+      };
+      await audit(record);
+      records.push(record);
+    }
+    return records;
   }
 
   /**
@@ -586,10 +665,15 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       };
       countSend(worst.change.providerId, at);
       sends.push(
-        deliverChain(chain, (target) => {
-          const payload = digestFor(target);
-          return deliver(target, payload, renderMessage(payload));
-        }),
+        attempt(
+          deliverChain(chain, (target) => {
+            const payload = digestFor(target);
+            return deliver(target, payload, renderMessage(payload));
+          }),
+          worst.change.providerId,
+          notifier.id,
+          worst.change.kind,
+        ),
       );
     }
 
@@ -705,15 +789,20 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       for (const chain of chainsOf(healthy, ctx.recipients)) {
         const notifiers = chain.flatMap((id) => byChannelId.get(id) ?? []);
         attempts.push(
-          deliverChain(notifiers, (notifier) => {
-            const message = ctx.channelMessages?.[notifier.id];
-            const payload: NotificationPayload = {
-              ...base,
-              locale: message?.locale ?? ctx.locale,
-              ...(message?.template === undefined ? {} : { template: message.template }),
-            };
-            return deliver(notifier, payload, renderMessage(payload));
-          }),
+          attempt(
+            deliverChain(notifiers, (notifier) => {
+              const message = ctx.channelMessages?.[notifier.id];
+              const payload: NotificationPayload = {
+                ...base,
+                locale: message?.locale ?? ctx.locale,
+                ...(message?.template === undefined ? {} : { template: message.template }),
+              };
+              return deliver(notifier, payload, renderMessage(payload));
+            }),
+            change.providerId,
+            notifiers[0]?.id,
+            change.kind,
+          ),
         );
       }
     }
@@ -796,7 +885,13 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       // Out of trouble, however it ended: forgotten, so the next stretch starts
       // a fresh clock. Judged on the provider's own state rather than on a
       // resolving change, because a mute or a maintenance window swallows that.
-      if (!(await escalationDeps.inTrouble(providerId))) {
+      const stillInTrouble = await orElse(
+        "checking whether a provider is still in trouble",
+        true,
+        () => escalationDeps.inTrouble(providerId),
+        { providerId },
+      );
+      if (!stillInTrouble) {
         pendingEscalations.delete(providerId);
         continue;
       }
@@ -839,7 +934,14 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         channel: policy.channel,
         afterMinutes: policy.afterMinutes,
       });
-      sends.push(deliver(notifier, payload, renderMessage(payload)));
+      sends.push(
+        attempt(
+          deliver(notifier, payload, renderMessage(payload)),
+          payload.change.providerId,
+          notifier.id,
+          payload.change.kind,
+        ),
+      );
     }
     return sends;
   }
@@ -935,8 +1037,16 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           follows !== undefined &&
           incidentId !== undefined &&
           (change.kind === "incident_opened" || change.kind === "incident_updated" || change.kind === "incident_resolved") &&
-          (await follows.isFollowed(change.providerId, incidentId));
-        if (followed && change.kind === "incident_resolved") await follows.unfollow(change.providerId, incidentId);
+          (await orElse("checking whether an incident is followed", false, () => follows.isFollowed(change.providerId, incidentId), {
+            providerId: change.providerId,
+            incidentId,
+          }));
+        if (followed && change.kind === "incident_resolved") {
+          await orElse("ending a follow", undefined, () => follows.unfollow(change.providerId, incidentId), {
+            providerId: change.providerId,
+            incidentId,
+          });
+        }
         // Quiet hours still hold a followed incident: following one says "tell
         // me every update", not "wake me for every update".
         const held = followed
@@ -1034,10 +1144,15 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
             };
           };
           attempts.push(
-            deliverChain(chain, (notifier) => {
-              const payload = payloadFor(notifier);
-              return deliver(notifier, payload, renderMessage(payload), MAX_ATTEMPTS, linkOf(change, delivery));
-            }),
+            attempt(
+              deliverChain(chain, (notifier) => {
+                const payload = payloadFor(notifier);
+                return deliver(notifier, payload, renderMessage(payload), MAX_ATTEMPTS, linkOf(change, delivery));
+              }),
+              change.providerId,
+              chain[0]?.id,
+              change.kind,
+            ),
           );
           sentNow = true;
         }

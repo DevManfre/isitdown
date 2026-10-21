@@ -1,0 +1,66 @@
+{
+  "incident-opened": [
+    {
+      "method": "PUT",
+      "url": "https://matrix.example.org/_matrix/client/v3/rooms/!room%3Aexample.org/send/m.room.message/<uuid>",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "msgtype": "m.text",
+        "format": "org.matrix.custom.html",
+        "body": "🔴 GitHub — MAJOR OUTAGE\n\nIncident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "formatted_body": "<strong>🔴 GitHub — MAJOR OUTAGE</strong><br/><br/>Incident: API requests failing<br/>Status: Investigating<br/>Updated: 2026-08-19 14:32 UTC<br/><br/><a href=\"https://www.githubstatus.com\">https://www.githubstatus.com</a>"
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "PUT",
+      "url": "https://matrix.example.org/_matrix/client/v3/rooms/!room%3Aexample.org/send/m.room.message/<uuid>",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "msgtype": "m.text",
+        "format": "org.matrix.custom.html",
+        "body": "🟢 GitHub — RESOLVED\n\nIncident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "formatted_body": "<strong>🟢 GitHub — RESOLVED</strong><br/><br/>Incident &quot;API requests failing&quot; has been resolved.<br/>Updated: 2026-08-19 14:32 UTC<br/><br/><a href=\"https://www.githubstatus.com\">https://www.githubstatus.com</a>"
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "PUT",
+      "url": "https://matrix.example.org/_matrix/client/v3/rooms/!room%3Aexample.org/send/m.room.message/<uuid>",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "msgtype": "m.text",
+        "format": "org.matrix.custom.html",
+        "body": "🟡 GitHub — DEGRADED\n\nStatus changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+        "formatted_body": "<strong>🟡 GitHub — DEGRADED</strong><br/><br/>Status changed from Operational to Degraded.<br/>Updated: 2026-08-19 14:32 UTC<br/><br/><a href=\"https://www.githubstatus.com\">https://www.githubstatus.com</a>"
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "PUT",
+      "url": "https://matrix.example.org/_matrix/client/v3/rooms/!room%3Aexample.org/send/m.room.message/<uuid>",
+      "headers": {
+        "authorization": "Bearer SECRET-TOKEN",
+        "content-type": "application/json"
+      },
+      "body": {
+        "msgtype": "m.text",
+        "format": "org.matrix.custom.html",
+        "body": "⚙️ GitHub — maintenance ahead\n\nScheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\nhttps://www.githubstatus.com",
+        "formatted_body": "<strong>⚙️ GitHub — maintenance ahead</strong><br/><br/>Scheduled maintenance starts in 2 h: Database upgrade<br/>Starts: 2026-08-19 16:00 UTC — expected duration: 30 min<br/><br/><a href=\"https://www.githubstatus.com\">https://www.githubstatus.com</a>"
+      }
+    }
+  ]
+}

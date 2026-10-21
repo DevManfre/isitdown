@@ -207,8 +207,69 @@ export function renderParts(payload: NotificationPayload): MessageParts {
   };
 }
 
+/**
+ * The same pieces, for a channel that posts in public — Mastodon, Bluesky
+ * (roadmap 3.9). Impact and owner are the operator's handover notes ("Owner:
+ * Maria, +39 …") and are dropped; everything else is the message every other
+ * channel sends. A template is left alone: what it prints is the operator's
+ * explicit choice.
+ */
+export function publicParts(payload: NotificationPayload): MessageParts {
+  const { impact: _impact, owner: _owner, ...service } = payload.service;
+  return renderParts({ ...payload, service });
+}
+
 export function renderMessage(payload: NotificationPayload): string {
   return render(payload, { omitUrl: false });
+}
+
+/** How a channel counts its limit: UTF-16 characters, UTF-8 bytes, or what a reader sees as one character. */
+export type LimitUnit = "chars" | "bytes" | "graphemes";
+
+const ELLIPSIS = "…";
+
+/**
+ * A text cut to what the channel accepts, with an ellipsis saying it was cut
+ * (roadmap 3.8). Every channel has a ceiling — Pushover's 1024 characters,
+ * Telegram's 4096, a syslog datagram's bytes — and a digest of forty changes or
+ * a long template crosses it; past it the API answers 400 and the alert is
+ * lost, which is a worse message than a shortened one.
+ *
+ * The cut never splits a character: not a surrogate pair in `chars`, not a
+ * multi-byte sequence in `bytes`, not an emoji with its modifiers in
+ * `graphemes`. Text already inside the limit comes back untouched, so a message
+ * that fits is byte for byte what it was before this existed.
+ */
+export function fitText(text: string, max: number, unit: LimitUnit = "chars"): string {
+  const units = unitsOf(text, unit);
+  if (measure(units, unit) <= max) return text;
+  const room = max - measure(unitsOf(ELLIPSIS, unit), unit);
+  let kept = "";
+  let used = 0;
+  for (const piece of units) {
+    const size = measure([piece], unit);
+    if (used + size > room) break;
+    kept += piece;
+    used += size;
+  }
+  return `${kept.trimEnd()}${ELLIPSIS}`;
+}
+
+const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/** The text in the pieces a cut may fall between. */
+function unitsOf(text: string, unit: LimitUnit): string[] {
+  if (unit === "graphemes") return Array.from(segmenter.segment(text), (part) => part.segment);
+  // Code points: the smallest piece that is never half a character.
+  return Array.from(text);
+}
+
+function measure(pieces: string[], unit: LimitUnit): number {
+  let total = 0;
+  for (const piece of pieces) {
+    total += unit === "bytes" ? Buffer.byteLength(piece, "utf8") : unit === "chars" ? piece.length : 1;
+  }
+  return total;
 }
 
 /**

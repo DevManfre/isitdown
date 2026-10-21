@@ -1,6 +1,7 @@
 import type { Adapter, FetchContext, ServiceRef } from "../core/adapter.interface.ts";
 import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { USER_AGENT } from "../core/http.ts";
+import { MAX_BODY_BYTES, readCapped } from "../core/outboundPolicy.ts";
 
 /**
  * Whether a public package registry or CDN answers, and whether a package you
@@ -180,7 +181,7 @@ export const registryAdapter: Adapter = {
       return reading(service, "major_outage");
     }
     try {
-      const body: unknown = JSON.parse(await response.text());
+      const body: unknown = JSON.parse(new TextDecoder().decode(await readCapped(response, MAX_BODY_BYTES)));
       if (body !== null && typeof body === "object" && Object.keys(body).length > 0) {
         return withRelease(service, reading(service, "operational"), body);
       }
