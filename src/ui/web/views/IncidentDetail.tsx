@@ -336,17 +336,23 @@ export function IncidentDetail() {
               the line between the dots is what says so. The connector stops at
               the last entry rather than running off the end of an incident that
               is still open — a line into nothing reads as a missing entry. */}
-          {timeline.map((entry, index) => (
+          {timeline.map((entry, index) => {
+            // Re-checks after the fact are secondary: shown, but greyed out so
+            // the opened/resolved milestones carry the story.
+            const secondary = entry.label === "observed";
+            return (
             <div
               key={`${entry.at}-${entry.label}`}
-              className="anim-rise grid grid-cols-[14px_62px_1fr] gap-3"
+              className={`anim-rise grid grid-cols-[14px_62px_1fr] gap-3${secondary ? " opacity-50" : ""}`}
               style={{ animationDelay: stagger(index, { base: 170, step: 38, cap: 420 }) }}
             >
               <span className="flex flex-col items-center">
                 <StatusDot
-                  status={entry.label === "resolved" ? "operational" : impactStatus(incident.impact)}
+                  status={
+                    secondary ? "unknown" : entry.label === "resolved" ? "operational" : impactStatus(incident.impact)
+                  }
                   size={9}
-                  pulse={index === timeline.length - 1 && incident.resolvedAt === null}
+                  pulse={index === timeline.length - 1 && incident.resolvedAt === null && !secondary}
                 />
                 {index < timeline.length - 1 && (
                   <span aria-hidden="true" className="mt-1 w-px flex-1 bg-border" />
@@ -362,7 +368,8 @@ export function IncidentDetail() {
                 {entry.status !== undefined && <span className="text-sm">{t(incidentStatusKey(entry.status))}</span>}
               </div>
             </div>
-          ))}
+            );
+          })}
         </BentoTile>
 
         {/* The one tinted tile: what IsItDown *did* is the only block on this

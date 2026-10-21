@@ -3,9 +3,11 @@ import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { createChatops } from "./chatops.ts";
 import { buildUiRuntime } from "./runtime.ts";
 import { REVISION_CHECK_INTERVAL_MS } from "./incidentRevisions.ts";
+import { readBindHost } from "./bindHost.ts";
 
 const DB_PATH = process.env["DB_PATH"] ?? "/app/data/isitdown.db";
 const PORT = Number(process.env["PORT"] ?? 3000);
+const HOST = readBindHost(process.env);
 
 const logger = createLogger(
   parseLogLevel(process.env["LOG_LEVEL"]),
@@ -24,8 +26,8 @@ try {
 }
 
 const started = runtime;
-const server = started.app.listen(PORT, () => {
-  logger.info("isitdown ui started", { port: PORT, dbPath: DB_PATH });
+const server = started.app.listen(PORT, HOST, () => {
+  logger.info("isitdown ui started", { host: HOST, port: PORT, dbPath: DB_PATH });
 });
 
 for (const signal of ["SIGTERM", "SIGINT"] as const) {

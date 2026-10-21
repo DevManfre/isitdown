@@ -112,9 +112,16 @@ describe("Rail", () => {
       .toHaveAttribute("data-active", "false");
   });
 
-  it("shows one dot per configured channel", async () => {
+  // The rail used to end in a chip per channel. With thirty of them it filled
+  // the rail's whole lower half with names nothing is ever clicked in; the
+  // channels live in Settings → Notifications, which says the same and more.
+  it("lists no channels — only the views", async () => {
     mount();
-    expect(await screen.findByText("telegram")).toBeInTheDocument();
+    await screen.findByRole("link", { name: i18n.t("nav.overview") });
+    // On the text rather than an element: a chip's name sits beside its dot,
+    // split across nodes, where `queryByText` would not find it either way.
+    expect(document.body.textContent).not.toContain("telegram");
+    expect(screen.queryByText(i18n.t("nav.channels"))).not.toBeInTheDocument();
   });
 
   // The brand mark sits next to the product name, so it has to stay out of the

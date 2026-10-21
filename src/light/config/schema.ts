@@ -134,6 +134,183 @@ const appriseSchema = z.object({
   urls: z.string().default(""),
 });
 
+/**
+ * Splunk On-Call (VictorOps) REST endpoint (roadmap 3.9): the integration's
+ * API key and the routing key that picks the escalation policy.
+ */
+const splunkOncallSchema = z.object({
+  enabled: z.boolean().default(false),
+  apiKey: z.string().default(""),
+  routingKey: z.string().default(""),
+});
+
+/**
+ * Squadcast Incident Webhook (roadmap 3.9); the URL carries the integration
+ * key.
+ */
+const squadcastSchema = z.object({
+  enabled: z.boolean().default(false),
+  webhookUrl: z.string().default(""),
+});
+
+/**
+ * Zenduty Events API (roadmap 3.9): one integration key.
+ */
+const zendutySchema = z.object({
+  enabled: z.boolean().default(false),
+  integrationKey: z.string().default(""),
+});
+
+/**
+ * incident.io HTTP alert source (roadmap 3.9): its config id and bearer token.
+ */
+const incidentIoSchema = z.object({
+  enabled: z.boolean().default(false),
+  alertSourceId: z.string().default(""),
+  token: z.string().default(""),
+});
+
+/**
+ * Grafana OnCall formatted webhook (roadmap 3.9); the URL is the credential.
+ */
+const grafanaOncallSchema = z.object({
+  enabled: z.boolean().default(false),
+  webhookUrl: z.string().default(""),
+});
+
+/**
+ * Mattermost through the API with a bot token (roadmap 3.9), so a post can be
+ * edited in place.
+ */
+const mattermostSchema = z.object({
+  enabled: z.boolean().default(false),
+  serverUrl: z.string().default(""),
+  token: z.string().default(""),
+  channelId: z.string().default(""),
+});
+
+/**
+ * Rocket.Chat through the REST API (roadmap 3.9): the bot user's id and token,
+ * and the room's id.
+ */
+const rocketchatSchema = z.object({
+  enabled: z.boolean().default(false),
+  serverUrl: z.string().default(""),
+  userId: z.string().default(""),
+  token: z.string().default(""),
+  roomId: z.string().default(""),
+});
+
+/**
+ * Zulip (roadmap 3.9): a bot's email and API key, the channel, and an optional
+ * fixed topic — empty means one topic per provider.
+ */
+const zulipSchema = z.object({
+  enabled: z.boolean().default(false),
+  siteUrl: z.string().default(""),
+  botEmail: z.string().default(""),
+  apiKey: z.string().default(""),
+  stream: z.string().default(""),
+  topic: z.string().default(""),
+});
+
+/**
+ * Google Chat incoming webhook (roadmap 3.9); the URL carries the key and
+ * token.
+ */
+const googleChatSchema = z.object({
+  enabled: z.boolean().default(false),
+  webhookUrl: z.string().default(""),
+});
+
+/**
+ * SMS through Twilio (roadmap 3.9). Numbers are E.164 (`+39…`).
+ */
+const twilioSmsSchema = z.object({
+  enabled: z.boolean().default(false),
+  accountSid: z.string().default(""),
+  authToken: z.string().default(""),
+  from: z.string().default(""),
+  to: z.string().default(""),
+});
+
+/**
+ * A voice call through Twilio (roadmap 3.9) — route only what is worth waking
+ * up for to it.
+ */
+const twilioCallSchema = z.object({
+  enabled: z.boolean().default(false),
+  accountSid: z.string().default(""),
+  authToken: z.string().default(""),
+  from: z.string().default(""),
+  to: z.string().default(""),
+});
+
+/**
+ * Bark iOS push (roadmap 3.9): the app's device key, and a self-hosted server
+ * when there is one.
+ */
+const barkSchema = z.object({
+  enabled: z.boolean().default(false),
+  deviceKey: z.string().default(""),
+  serverUrl: z.string().default(""),
+});
+
+/**
+ * Signal through a signal-cli-rest-api server (roadmap 3.9): the registered
+ * number, and recipients comma-separated.
+ */
+const signalSchema = z.object({
+  enabled: z.boolean().default(false),
+  serverUrl: z.string().default(""),
+  number: z.string().default(""),
+  recipients: z.string().default(""),
+});
+
+/**
+ * Syslog, RFC 5424 (roadmap 3.9): `udp://`, `tcp://` or `tls://host:port`, and
+ * a facility from local0 (the default) to local7.
+ */
+const syslogSchema = z.object({
+  enabled: z.boolean().default(false),
+  url: z.string().default(""),
+  facility: z.string().default(""),
+});
+
+/**
+ * MQTT (roadmap 3.9): `mqtt://` or `mqtts://` broker, a topic prefix (default
+ * `isitdown`), and credentials only for a broker that wants them.
+ */
+const mqttSchema = z.object({
+  enabled: z.boolean().default(false),
+  brokerUrl: z.string().default(""),
+  topic: z.string().default(""),
+  username: z.string().default(""),
+  password: z.string().default(""),
+});
+
+/**
+ * Mastodon public post (roadmap 3.9): instance, an access token with
+ * write:statuses, and a visibility (default public).
+ */
+const mastodonSchema = z.object({
+  enabled: z.boolean().default(false),
+  instanceUrl: z.string().default(""),
+  accessToken: z.string().default(""),
+  visibility: z.string().default(""),
+});
+
+/**
+ * Bluesky public post (roadmap 3.9): handle and an app password, and a PDS
+ * when it is not bsky.social.
+ */
+const blueskySchema = z.object({
+  enabled: z.boolean().default(false),
+  handle: z.string().default(""),
+  appPassword: z.string().default(""),
+  serviceUrl: z.string().default(""),
+});
+
 /** Required non-empty settings per channel, used to produce an actionable error. */
 export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   telegram: ["botToken", "chatId"],
@@ -155,6 +332,23 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
   // network, needs none — and requiring them would disable the channel for
   // exactly the setup this audience runs.
   email: ["host", "from", "to"],
+  "splunk-oncall": ["apiKey", "routingKey"],
+  squadcast: ["webhookUrl"],
+  zenduty: ["integrationKey"],
+  "incident-io": ["alertSourceId", "token"],
+  "grafana-oncall": ["webhookUrl"],
+  mattermost: ["serverUrl", "token", "channelId"],
+  rocketchat: ["serverUrl", "userId", "token", "roomId"],
+  zulip: ["siteUrl", "botEmail", "apiKey", "stream"],
+  "google-chat": ["webhookUrl"],
+  "twilio-sms": ["accountSid", "authToken", "from", "to"],
+  "twilio-call": ["accountSid", "authToken", "from", "to"],
+  bark: ["deviceKey"],
+  signal: ["serverUrl", "number", "recipients"],
+  syslog: ["url"],
+  mqtt: ["brokerUrl"],
+  mastodon: ["instanceUrl", "accessToken"],
+  bluesky: ["handle", "appPassword"],
 };
 
 /**
@@ -166,8 +360,8 @@ export const REQUIRED_CHANNEL_SETTINGS: Record<string, readonly string[]> = {
  * block, because they are settings *of the channel* — `notifications.telegram.
  * locale` is where an operator looks for them, and a parallel
  * `messageOptions.telegram.locale` would be a second place a channel is
- * configured. Applied through one helper so thirteen channels cannot end up
- * accepting thirteen slightly different spellings of the same two fields.
+ * configured. Applied through one helper so thirty channels cannot end up
+ * accepting thirty slightly different spellings of the same two fields.
  *
  * The template is only checked for length here; which tokens exist is
  * `notifiers/template.ts`'s business, and the loader reports its verdict with
@@ -197,6 +391,23 @@ const notificationsObject = z
     pagerduty: withMessageOptions(pagerdutySchema).optional(),
     opsgenie: withMessageOptions(opsgenieSchema).optional(),
     apprise: withMessageOptions(appriseSchema).optional(),
+    "splunk-oncall": withMessageOptions(splunkOncallSchema).optional(),
+    squadcast: withMessageOptions(squadcastSchema).optional(),
+    zenduty: withMessageOptions(zendutySchema).optional(),
+    "incident-io": withMessageOptions(incidentIoSchema).optional(),
+    "grafana-oncall": withMessageOptions(grafanaOncallSchema).optional(),
+    mattermost: withMessageOptions(mattermostSchema).optional(),
+    rocketchat: withMessageOptions(rocketchatSchema).optional(),
+    zulip: withMessageOptions(zulipSchema).optional(),
+    "google-chat": withMessageOptions(googleChatSchema).optional(),
+    "twilio-sms": withMessageOptions(twilioSmsSchema).optional(),
+    "twilio-call": withMessageOptions(twilioCallSchema).optional(),
+    bark: withMessageOptions(barkSchema).optional(),
+    signal: withMessageOptions(signalSchema).optional(),
+    syslog: withMessageOptions(syslogSchema).optional(),
+    mqtt: withMessageOptions(mqttSchema).optional(),
+    mastodon: withMessageOptions(mastodonSchema).optional(),
+    bluesky: withMessageOptions(blueskySchema).optional(),
     pushover: withMessageOptions(pushoverSchema).optional(),
     teams: withMessageOptions(teamsSchema).optional(),
     email: withMessageOptions(emailSchema).optional(),

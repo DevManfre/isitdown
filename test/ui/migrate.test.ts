@@ -213,19 +213,36 @@ test("seedDefaults registers every channel, disabled, referencing environment va
     rows.map((row) => row.id),
     [
       "apprise",
+      "bark",
+      "bluesky",
       "discord",
       "email",
+      "google-chat",
       "gotify",
+      "grafana-oncall",
+      "incident-io",
+      "mastodon",
       "matrix",
+      "mattermost",
+      "mqtt",
       "ntfy",
       "opsgenie",
       "pagerduty",
       "pushover",
+      "rocketchat",
+      "signal",
       "slack",
+      "splunk-oncall",
+      "squadcast",
+      "syslog",
       "teams",
       "telegram",
+      "twilio-call",
+      "twilio-sms",
       "webhook",
       "webpush",
+      "zenduty",
+      "zulip",
     ],
   );
   assert.ok(rows.every((row) => row.enabled === 0), "a seeded channel must start disabled");
@@ -321,7 +338,7 @@ test("seedDefaults run twice does not duplicate anything", async () => {
   const [services] = db.prepare("SELECT COUNT(*) AS n FROM services").all() as { n: number }[];
   const [channels] = db.prepare("SELECT COUNT(*) AS n FROM channels").all() as { n: number }[];
   assert.equal(services?.n, 3);
-  assert.equal(channels?.n, 14);
+  assert.equal(channels?.n, 31);
   db.close();
 });
 
@@ -687,5 +704,22 @@ test("a schema-29 database gains the heartbeats table", async () => {
   migrate(db);
 
   assert.ok(names(db, "table").includes("heartbeats"), "heartbeats missing after upgrade");
+  db.close();
+});
+
+test("a database left with only one pending-damping column is repaired on the next boot", async () => {
+  const db = await freshDb();
+  migrate(db);
+  // A boot that died between the two ALTER TABLE statements of the damping step.
+  db.exec("ALTER TABLE provider_state DROP COLUMN pending_count");
+  db.exec("PRAGMA user_version = 13");
+
+  migrate(db);
+
+  const columns = (db.prepare("PRAGMA table_info(provider_state)").all() as { name: string }[]).map(
+    (column) => column.name,
+  );
+  assert.ok(columns.includes("pending_signature"));
+  assert.ok(columns.includes("pending_count"));
   db.close();
 });

@@ -49,10 +49,10 @@ describe("motion.css after the react port", () => {
   });
 
   // The chrome around #view — the header's subtitle and countdown, the rail's
-  // badges and channel list — is not inside the gate above, so it used to
-  // paint its zero state (a "not polled yet" the server had never said, no
-  // badges, no channels) the moment React mounted and swap it for real figures
-  // when /status and /config landed, a second before the view itself entered.
+  // badges — is not inside the gate above, so it used to paint its zero state
+  // (a "not polled yet" the server had never said, no badges) the moment React
+  // mounted and swap it for real figures when /status landed, a second before
+  // the view itself entered.
   // `visibility` rather than `display` for the same reason #view uses it: the
   // boxes stay measured, so nothing reflows when the figures arrive.
   it("holds the chrome's own figures until the shell is ready", () => {
@@ -60,7 +60,7 @@ describe("motion.css after the react port", () => {
     expect(rule, "no hold rule for chrome with nothing to show yet").not.toBeNull();
     expect(rule?.[2]).toMatch(/visibility:\s*hidden/);
     const selector = `.console:not([data-ready])${rule?.[1] ?? ""}`;
-    for (const cls of ["header-meta", "poll-next", "rail-badge", "rail-channels"]) {
+    for (const cls of ["header-meta", "poll-next", "rail-badge"]) {
       expect(selector, `${cls} is chrome that reads from a query`).toContain(`.${cls}`);
     }
   });

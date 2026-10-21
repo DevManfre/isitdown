@@ -117,7 +117,7 @@ isitdown/
 │   ├── core/                          diff engine, poller, scheduler, dispatcher, i18n, schemas
 │   │   └── stateStore.contract.ts     one suite every StateStore implementation must pass
 │   ├── adapters/
-│   ├── notifiers/
+│   ├── notifiers/                     per-channel tests, plus contract.test.ts and golden/ (3.8)
 │   ├── light/
 │   ├── ui/                            store contract, aggregation, every API route, theme and locale guards
 │   ├── cli/                           watch's args, reducers, renderer, and the loop against a fake server
@@ -167,8 +167,8 @@ interfaces instead. A test enforces this, including the edition-only dependencie
 | Server state | TanStack Query | 30-second `refetchInterval`, refetch on focus, held while a dialog or a field is in use. |
 | Container | one multi-stage `Dockerfile` | `--target light` / `--target ui`, `node:24-alpine`. |
 
-Runtime dependencies, exhaustively: `zod`, `yaml` (both editions) and `express`
-(UI). Everything the dashboard uses — React, Vite, Tailwind, shadcn/ui's Radix
+Runtime dependencies, exhaustively: `zod` and `yaml` (both editions), `express`
+and `web-push` (UI, where the Web Push channel is built). Everything the dashboard uses — React, Vite, Tailwind, shadcn/ui's Radix
 primitives, TanStack Query, react-i18next, Recharts and the rest — is a
 devDependency compiled into static assets at build time, so the `ui` image gains
 a bundle, not a dependency tree. Dev dependencies otherwise: `typescript`,
@@ -252,6 +252,7 @@ npm run canary           # every catalog page, live, against its adapter's fixtu
 npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
+npm run lint             # Biome, check only: correctness + suspicious rules, no formatter
 npm run build:light      # tsc + copy assets, excluding src/ui
 npm run build:ui         # tsc + vite build + copy assets
 npm run build:cli        # tsc + copy assets, src/core/i18n and src/cli only (10.1)
@@ -349,8 +350,13 @@ Notable suites:
   provider not blocking a healthy one, and the monitoring warning firing once.
 - **Scheduler** — mocked timers and injected jitter: cadence, config re-read per
   cycle, a manual poll joining an in-flight cycle, a failed cycle not killing the loop.
-- **Notifiers** — outbound request shape per transition, and the assertion that a
-  failed Telegram send never puts the token in its error.
+- **Notifier contract** — one suite every channel must pass (roadmap 3.8): every
+  kind delivered, a refusal typed as `ChannelError` with no credential in it,
+  every capped field cut to fit, a stable de-duplication key, both plain and rich
+  renderings naming the incident, and the exact bytes on the wire against
+  `test/notifiers/golden/` — `UPDATE_GOLDEN=1 node --test
+  test/notifiers/contract.test.ts` rewrites them, to be reviewed like any diff. A
+  channel added to the registry without a case or a stated exemption fails it.
 - **API** — every route against a real server on a temp database, including the
   assertion that no response body contains a value from the environment.
 - **Theme and locale guards** — no hex outside the token file (the scan also
@@ -382,7 +388,8 @@ Notable suites:
 
   That 1.5%-of-edge-pixels noise assumes the machine running Chromium has the
   system fonts Playwright's own Chromium build expects — CI gets them because
-  it installs the browser with `npx playwright install --with-deps`, which
+  it installs the browser with `npx playwright@1.64.1 install --with-deps`
+  (the release is pinned; bumping it needs a reviewed baseline refresh), which
   pulls in `fontconfig` and `fonts-liberation` as root alongside Chromium
   itself (see `deb.deps` next to the cached binary for the full list). A
   sandbox that cannot run that installer as root and instead unpacks the same

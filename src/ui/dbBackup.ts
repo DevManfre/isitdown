@@ -48,6 +48,14 @@ const TABLES = [
   "map_geo_state",
 ] as const;
 
+/**
+ * The `settings` rows holding the web-push VAPID key pair. Mirrors the keys in
+ * `vapidKeys.ts`. The private half signs push messages as this server, so it
+ * never leaves the process: a backup carries neither row.
+ */
+const VAPID_KEYS = ["vapidPublicKey", "vapidPrivateKey"] as const;
+const VAPID_MARKS = VAPID_KEYS.map(() => "?").join(", ");
+
 export interface BackupSnapshot {
   bytes: Buffer;
   /** What the download is called; the date is the operator's own filing system. */
@@ -74,6 +82,10 @@ export function backupFilename(at: Date): string {
 /**
  * A consistent copy of the whole database, taken with `VACUUM INTO` so the
  * bytes are a snapshot rather than a file being written to as it is read.
+ *
+ * The VAPID key pair is left out of the copy: whoever holds the private key can
+ * sign push messages as this server, and a backup is a file that gets moved
+ * around. A restore keeps the target instance's own pair instead.
  */
 export function createBackup(db: DatabaseSync, at: Date = new Date()): BackupSnapshot {
   const dir = mkdtempSync(join(tmpdir(), "isitdown-backup-"));
@@ -83,6 +95,15 @@ export function createBackup(db: DatabaseSync, at: Date = new Date()): BackupSna
     // can name: `VACUUM INTO` takes a string literal, and a path from outside
     // would be the whole of the injection surface here.
     db.exec(`VACUUM INTO '${target.replaceAll("'", "''")}'`);
+    // Strip the key pair from the private copy, then VACUUM it so the deleted
+    // rows do not linger in free pages of the bytes handed out.
+    const copy = new DatabaseSync(target);
+    try {
+      copy.prepare(`DELETE FROM settings WHERE key IN (${VAPID_MARKS})`).run(...VAPID_KEYS);
+      copy.exec("VACUUM");
+    } finally {
+      copy.close();
+    }
     return {
       bytes: readFileSync(target),
       filename: backupFilename(at),
@@ -172,6 +193,10 @@ export function restoreBackup(db: DatabaseSync, bytes: Buffer, secretsPath?: str
       db.exec("PRAGMA defer_foreign_keys = ON");
       db.exec("BEGIN IMMEDIATE");
       try {
+        // The instance's own VAPID pair, set aside before `settings` is emptied.
+        const ownVapid = db
+          .prepare(`SELECT key, value FROM main.settings WHERE key IN (${VAPID_MARKS})`)
+          .all(...VAPID_KEYS) as { key: string; value: string }[];
         for (const table of [...TABLES].reverse()) db.exec(`DELETE FROM main.${table}`);
         for (const table of TABLES) {
           // By name, never `SELECT *`: a column added by an `ALTER TABLE` sits
@@ -186,6 +211,15 @@ export function restoreBackup(db: DatabaseSync, bytes: Buffer, secretsPath?: str
           const [count] = db.prepare(`SELECT COUNT(*) AS n FROM main.${table}`).all() as { n: number }[];
           tables[table] = count?.n ?? 0;
         }
+        // A backup made before the pair was left out may still carry someone
+        // else's private key: a restore must not adopt it, and must not wipe
+        // this instance's own either (that would silently invalidate every
+        // browser subscription on next use). Put the saved rows back.
+        db.prepare(`DELETE FROM main.settings WHERE key IN (${VAPID_MARKS})`).run(...VAPID_KEYS);
+        const put = db.prepare("INSERT INTO main.settings (key, value) VALUES (?, ?)");
+        for (const row of ownVapid) put.run(row.key, row.value);
+        const [settingsCount] = db.prepare("SELECT COUNT(*) AS n FROM main.settings").all() as { n: number }[];
+        tables["settings"] = settingsCount?.n ?? 0;
         db.exec("COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");

@@ -1,0 +1,90 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://gotify.example.com/message",
+      "headers": {
+        "content-type": "application/json",
+        "x-gotify-key": "SECRET-TOKEN"
+      },
+      "body": {
+        "title": "🔴 GitHub — MAJOR OUTAGE",
+        "message": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC",
+        "priority": 9,
+        "extras": {
+          "client::notification": {
+            "click": {
+              "url": "https://www.githubstatus.com"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://gotify.example.com/message",
+      "headers": {
+        "content-type": "application/json",
+        "x-gotify-key": "SECRET-TOKEN"
+      },
+      "body": {
+        "title": "🟢 GitHub — RESOLVED",
+        "message": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC",
+        "priority": 3,
+        "extras": {
+          "client::notification": {
+            "click": {
+              "url": "https://www.githubstatus.com"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://gotify.example.com/message",
+      "headers": {
+        "content-type": "application/json",
+        "x-gotify-key": "SECRET-TOKEN"
+      },
+      "body": {
+        "title": "🟡 GitHub — DEGRADED",
+        "message": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC",
+        "priority": 5,
+        "extras": {
+          "client::notification": {
+            "click": {
+              "url": "https://www.githubstatus.com"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://gotify.example.com/message",
+      "headers": {
+        "content-type": "application/json",
+        "x-gotify-key": "SECRET-TOKEN"
+      },
+      "body": {
+        "title": "⚙️ GitHub — maintenance ahead",
+        "message": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min",
+        "priority": 3,
+        "extras": {
+          "client::notification": {
+            "click": {
+              "url": "https://www.githubstatus.com"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

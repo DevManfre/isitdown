@@ -1037,7 +1037,7 @@ const escalationPolicy = (over: Partial<DeliveryConfig["escalation"]> = {}): Del
 
 function escalationHarness(over: { acked?: boolean; inTrouble?: boolean; delivery?: DeliveryConfig } = {}) {
   let at = Date.parse("2026-08-19T14:00:00.000Z");
-  const state = { acked: over.acked ?? false, inTrouble: over.inTrouble ?? true };
+  const state = { acked: over.acked ?? false, inTrouble: over.inTrouble ?? true, troubleLookupFails: false };
   const primary = recorder("telegram");
   const escalation = recorder("pushover");
   // Copied so a test can mute the provider after the outage was announced.
@@ -1048,7 +1048,10 @@ function escalationHarness(over: { acked?: boolean; inTrouble?: boolean; deliver
     sleep: async () => {},
     escalation: {
       isAcked: async () => state.acked,
-      inTrouble: async () => state.inTrouble,
+      inTrouble: async () => {
+        if (state.troubleLookupFails) throw new Error("database is locked");
+        return state.inTrouble;
+      },
     },
   });
   const run = (changes: StatusChange[]) =>
@@ -1092,6 +1095,14 @@ test("a major change nobody takes in charge is sent again, once, on the escalati
   h.advance(60);
   await h.run([]);
   assert.equal(h.escalation.seen.length, 1, "once per stretch of trouble, not every cycle");
+});
+
+test("a trouble lookup that throws does not abort the other changes", async () => {
+  const h = escalationHarness();
+  await h.run([outage()]);
+  h.state.troubleLookupFails = true;
+  await h.run([change({ currentStatus: "degraded" }), change({ currentStatus: "major_outage" })]);
+  assert.equal(h.primary.seen.length, 3);
 });
 
 test("somebody taking it in charge before the wait is up cancels the escalation", async () => {
@@ -1464,6 +1475,48 @@ test("a followed incident reaches every enabled channel whatever the rules say, 
   assert.equal(telegram.seen.length, 2);
 });
 
+test("a follow lookup that throws still delivers the change by the normal rules", async () => {
+  const telegram = recorder("telegram");
+  const dispatcher = createDispatcher({
+    logger: silent,
+    follows: {
+      isFollowed: async () => {
+        throw new Error("database is locked");
+      },
+      unfollow: async () => {},
+    },
+  });
+  await dispatcher.dispatch([change({ kind: "incident_opened", incident })], {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
+  assert.equal(telegram.seen.length, 1);
+});
+
+test("an unfollow that throws does not drop the resolution", async () => {
+  const telegram = recorder("telegram");
+  const dispatcher = createDispatcher({
+    logger: silent,
+    follows: {
+      isFollowed: async () => true,
+      unfollow: async () => {
+        throw new Error("database is locked");
+      },
+    },
+  });
+  await dispatcher.dispatch([change({ kind: "incident_resolved", incident, currentStatus: "operational" })], {
+    services,
+    locale: "en",
+    notifiers: [telegram.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
+  assert.equal(telegram.seen.length, 1);
+});
+
 test("quiet hours still hold a followed incident's update", async () => {
   const telegram = recorder("telegram");
   const dispatcher = createDispatcher({
@@ -1498,4 +1551,71 @@ test("a provider's impact and owner reach the payload", async () => {
   });
   assert.equal(channel.seen[0]?.service.impact, "deploys blocked");
   assert.equal(channel.seen[0]?.service.owner, "@alice");
+});
+
+test("a message reference that cannot be saved does not resend a delivered message", async () => {
+  const channel = editable("telegram");
+  const refs: MessageRefStore = {
+    ...refStore(),
+    async saveRef() {
+      throw new Error("database is locked");
+    },
+  };
+  const sent: SentRecord[] = [];
+  const dispatcher = createDispatcher({
+    logger: silent,
+    messageRefs: refs,
+    sleep: async () => {},
+    onSent: (record) => {
+      sent.push(record);
+    },
+  });
+
+  await dispatcher.dispatch([incidentChange("incident_opened")], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ updateInPlace: true }),
+  });
+
+  assert.equal(channel.sent.length, 1, "delivered once, not once per retry");
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0]?.ok, true);
+});
+
+test("a delivery that throws before it can try is logged and recorded, not dropped", async () => {
+  const channel = editable("telegram");
+  const refs: MessageRefStore = {
+    ...refStore(),
+    async getRef() {
+      throw new Error("database is locked");
+    },
+  };
+  const lines: string[] = [];
+  const sent: SentRecord[] = [];
+  const dispatcher = createDispatcher({
+    logger: createLogger("error", (line) => lines.push(line)),
+    messageRefs: refs,
+    sleep: async () => {},
+    onSent: (record) => {
+      sent.push(record);
+    },
+  });
+
+  const records = await dispatcher.dispatch([incidentChange("incident_updated", "identified")], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ updateInPlace: true }),
+  });
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.ok, false);
+  assert.equal(records[0]?.channel, "telegram");
+  assert.equal(sent.filter((record) => !record.ok && record.channel === "telegram").length, 1);
+  assert.ok(lines.some((line) => line.includes('"level":"error"')), "an error line was logged");
 });

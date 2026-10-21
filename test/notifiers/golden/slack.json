@@ -1,0 +1,142 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://hooks.slack.com/services/T0/B0/SECRET-WEBHOOK",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "🔴 GitHub — MAJOR OUTAGE",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*🔴 GitHub — MAJOR OUTAGE*\nIncident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC"
+            }
+          },
+          {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open status page",
+                  "emoji": true
+                },
+                "url": "https://www.githubstatus.com"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://hooks.slack.com/services/T0/B0/SECRET-WEBHOOK",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "🟢 GitHub — RESOLVED",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*🟢 GitHub — RESOLVED*\nIncident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC"
+            }
+          },
+          {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open status page",
+                  "emoji": true
+                },
+                "url": "https://www.githubstatus.com"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://hooks.slack.com/services/T0/B0/SECRET-WEBHOOK",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "🟡 GitHub — DEGRADED",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*🟡 GitHub — DEGRADED*\nStatus changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC"
+            }
+          },
+          {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open status page",
+                  "emoji": true
+                },
+                "url": "https://www.githubstatus.com"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://hooks.slack.com/services/T0/B0/SECRET-WEBHOOK",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "⚙️ GitHub — maintenance ahead",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*⚙️ GitHub — maintenance ahead*\nScheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min"
+            }
+          },
+          {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open status page",
+                  "emoji": true
+                },
+                "url": "https://www.githubstatus.com"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

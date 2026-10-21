@@ -83,10 +83,18 @@ background as files change rather than requiring a fresh image — see
 | | Light | UI |
 |---|---|---|
 | Mounts | `./config.yml:/app/config/config.yml:ro`, volume on `/app/data` | volume on `/app/data` |
-| Ports | none | `3000:3000` |
+| Ports | none | `127.0.0.1:3000:3000` |
 | Healthcheck | age of `state.json` — every cycle rewrites it, three intervals without a write is unhealthy | `GET /ready` |
 | Start period | 40s | 60s |
 | User | `node`, unprivileged | `node`, unprivileged |
+
+The `ui` service publishes `:3000` on the host's loopback only: the dashboard has no
+login unless `API_TOKEN` is set, so by default only this machine can reach it. To
+open it to the LAN, change the left side of the mapping in `docker-compose.yml` to
+`0.0.0.0:3000` **and** set `API_TOKEN` (see
+[`BIND_HOST` and `API_TOKEN`](configuration.md#312-reaching-the-api-from-another-host)).
+Inside the container the server listens on `0.0.0.0` (`BIND_HOST`), since the
+published port arrives on the container's own interface.
 
 The Light edition has no server to probe, which is why its liveness signal is the
 freshness of the state file rather than an HTTP response.

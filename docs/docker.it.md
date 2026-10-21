@@ -86,10 +86,18 @@ dashboard a ogni modifica invece di richiedere un'immagine nuova — vedi
 | | Light | UI |
 |---|---|---|
 | Mount | `./config.yml:/app/config/config.yml:ro`, volume su `/app/data` | volume su `/app/data` |
-| Porte | nessuna | `3000:3000` |
+| Porte | nessuna | `127.0.0.1:3000:3000` |
 | Healthcheck | età di `state.json` — ogni ciclo lo riscrive, tre intervalli senza scritture è unhealthy | `GET /ready` |
 | Start period | 40s | 60s |
 | Utente | `node`, non privilegiato | `node`, non privilegiato |
+
+Il servizio `ui` pubblica `:3000` solo sul loopback dell'host: la dashboard non ha
+login se `API_TOKEN` non è impostato, quindi per impostazione predefinita solo questa
+macchina può raggiungerla. Per aprirla alla LAN, cambia il lato sinistro della
+mappatura in `docker-compose.yml` in `0.0.0.0:3000` **e** imposta `API_TOKEN` (vedi
+[`BIND_HOST` e `API_TOKEN`](configuration.it.md#312-raggiungere-lapi-da-un-altro-host)).
+Dentro il container il server ascolta su `0.0.0.0` (`BIND_HOST`), perché la porta
+pubblicata arriva sull'interfaccia del container stesso.
 
 L'edizione Light non ha un server da interrogare: per questo il suo segnale di
 liveness è la freschezza del file di stato e non una risposta HTTP.

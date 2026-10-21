@@ -1,0 +1,66 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://oncall.example.com/integrations/v1/formatted_webhook/SECRET-TOKEN/",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "alert_uid": "isitdown/github/incident/inc-1",
+        "title": "🔴 GitHub — MAJOR OUTAGE",
+        "message": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC",
+        "state": "alerting",
+        "link_to_upstream_details": "https://www.githubstatus.com"
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://oncall.example.com/integrations/v1/formatted_webhook/SECRET-TOKEN/",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "alert_uid": "isitdown/github/incident/inc-1",
+        "title": "🟢 GitHub — RESOLVED",
+        "message": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC",
+        "state": "ok",
+        "link_to_upstream_details": "https://www.githubstatus.com"
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://oncall.example.com/integrations/v1/formatted_webhook/SECRET-TOKEN/",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "alert_uid": "isitdown/github/status",
+        "title": "🟡 GitHub — DEGRADED",
+        "message": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC",
+        "state": "alerting",
+        "link_to_upstream_details": "https://www.githubstatus.com"
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://oncall.example.com/integrations/v1/formatted_webhook/SECRET-TOKEN/",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "alert_uid": "isitdown/github/maintenance/mnt-1",
+        "title": "⚙️ GitHub — maintenance ahead",
+        "message": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min",
+        "state": "alerting",
+        "link_to_upstream_details": "https://www.githubstatus.com"
+      }
+    }
+  ]
+}

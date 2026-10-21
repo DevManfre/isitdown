@@ -1,0 +1,190 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://bsky.social/xrpc/com.atproto.server.createSession",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "identifier": "status.example.com",
+        "password": "SECRET-APP-PASSWORD"
+      }
+    },
+    {
+      "method": "POST",
+      "url": "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+      "headers": {
+        "authorization": "Bearer SECRET-JWT",
+        "content-type": "application/json"
+      },
+      "body": {
+        "repo": "did:plc:abc",
+        "collection": "app.bsky.feed.post",
+        "record": {
+          "$type": "app.bsky.feed.post",
+          "text": "🔴 GitHub — MAJOR OUTAGE\n\nIncident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+          "createdAt": "2026-10-20T08:00:00.000Z",
+          "langs": [
+            "en"
+          ],
+          "facets": [
+            {
+              "index": {
+                "byteStart": 114,
+                "byteEnd": 142
+              },
+              "features": [
+                {
+                  "$type": "app.bsky.richtext.facet#link",
+                  "uri": "https://www.githubstatus.com"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://bsky.social/xrpc/com.atproto.server.createSession",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "identifier": "status.example.com",
+        "password": "SECRET-APP-PASSWORD"
+      }
+    },
+    {
+      "method": "POST",
+      "url": "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+      "headers": {
+        "authorization": "Bearer SECRET-JWT",
+        "content-type": "application/json"
+      },
+      "body": {
+        "repo": "did:plc:abc",
+        "collection": "app.bsky.feed.post",
+        "record": {
+          "$type": "app.bsky.feed.post",
+          "text": "🟢 GitHub — RESOLVED\n\nIncident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+          "createdAt": "2026-10-20T08:00:00.000Z",
+          "langs": [
+            "en"
+          ],
+          "facets": [
+            {
+              "index": {
+                "byteStart": 108,
+                "byteEnd": 136
+              },
+              "features": [
+                {
+                  "$type": "app.bsky.richtext.facet#link",
+                  "uri": "https://www.githubstatus.com"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://bsky.social/xrpc/com.atproto.server.createSession",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "identifier": "status.example.com",
+        "password": "SECRET-APP-PASSWORD"
+      }
+    },
+    {
+      "method": "POST",
+      "url": "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+      "headers": {
+        "authorization": "Bearer SECRET-JWT",
+        "content-type": "application/json"
+      },
+      "body": {
+        "repo": "did:plc:abc",
+        "collection": "app.bsky.feed.post",
+        "record": {
+          "$type": "app.bsky.feed.post",
+          "text": "🟡 GitHub — DEGRADED\n\nStatus changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.githubstatus.com",
+          "createdAt": "2026-10-20T08:00:00.000Z",
+          "langs": [
+            "en"
+          ],
+          "facets": [
+            {
+              "index": {
+                "byteStart": 102,
+                "byteEnd": 130
+              },
+              "features": [
+                {
+                  "$type": "app.bsky.richtext.facet#link",
+                  "uri": "https://www.githubstatus.com"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://bsky.social/xrpc/com.atproto.server.createSession",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "identifier": "status.example.com",
+        "password": "SECRET-APP-PASSWORD"
+      }
+    },
+    {
+      "method": "POST",
+      "url": "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+      "headers": {
+        "authorization": "Bearer SECRET-JWT",
+        "content-type": "application/json"
+      },
+      "body": {
+        "repo": "did:plc:abc",
+        "collection": "app.bsky.feed.post",
+        "record": {
+          "$type": "app.bsky.feed.post",
+          "text": "⚙️ GitHub — maintenance ahead\n\nScheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min\n\nhttps://www.githubstatus.com",
+          "createdAt": "2026-10-20T08:00:00.000Z",
+          "langs": [
+            "en"
+          ],
+          "facets": [
+            {
+              "index": {
+                "byteStart": 151,
+                "byteEnd": 179
+              },
+              "features": [
+                {
+                  "$type": "app.bsky.richtext.facet#link",
+                  "uri": "https://www.githubstatus.com"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

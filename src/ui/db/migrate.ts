@@ -329,6 +329,8 @@ export function migrate(db: DatabaseSync): void {
     }
     if (!stateColumns.includes("pending_signature")) {
       db.exec("ALTER TABLE provider_state ADD COLUMN pending_signature TEXT");
+    }
+    if (!stateColumns.includes("pending_count")) {
       db.exec("ALTER TABLE provider_state ADD COLUMN pending_count INTEGER NOT NULL DEFAULT 0");
     }
     // A mute is per provider and set by the operator, so it belongs beside the

@@ -89,7 +89,7 @@ export async function withBrowser(options, body) {
   const binary = findChromium();
   if (binary === null) {
     throw new Error(
-      `no cached Chromium under ${CACHE}. Run "npx --yes playwright@latest install chromium" once, then retry.`,
+      `no cached Chromium under ${CACHE}. Run "npx --yes playwright@1.64.1 install chromium" once, then retry.`,
     );
   }
 

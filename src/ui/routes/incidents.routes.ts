@@ -198,5 +198,7 @@ function buildTimeline(
   if (incident.resolvedAt !== null) {
     timeline.push({ at: incident.resolvedAt, label: "resolved" });
   }
-  return timeline;
+  // Strictly by time: the watch that continues after the resolution belongs
+  // after "resolved", not before it.
+  return timeline.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }

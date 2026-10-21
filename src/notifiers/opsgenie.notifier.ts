@@ -1,10 +1,9 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload, OverallStatus } from "../core/types.ts";
-import { renderParts } from "./formatting.ts";
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
+import { fitText, renderParts } from "./formatting.ts";
 import { incidentKey, isResolution } from "./incidentKey.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 const API_URL = "https://api.opsgenie.com/v2/alerts";
 /** The EU instance, for an account provisioned there. */
@@ -45,11 +44,7 @@ export function createOpsgenieNotifier(settings: Record<string, string>): Notifi
   /** Whatever went wrong, in Opsgenie's own words and never with the key. */
   async function fail(response: Response, verb: string): Promise<never> {
     const body = (await response.json().catch(() => ({}))) as { message?: string };
-    throw new Error(
-      `opsgenie notification ${verb}: HTTP ${response.status}${
-        body.message === undefined ? "" : ` (${body.message})`
-      }`,
-    );
+    throw httpFailure("opsgenie", verb, response.status, body.message);
   }
 
   return {
@@ -84,9 +79,9 @@ export function createOpsgenieNotifier(settings: Record<string, string>): Notifi
         // past it; the heading is one line by construction, and the detail goes
         // to `description`, which has room for it.
         body: JSON.stringify({
-          message: heading.slice(0, 130),
+          message: fitText(heading, 130),
           alias,
-          description: [detail, url].filter((part) => part !== "").join("\n\n"),
+          description: fitText([detail, url].filter((part) => part !== "").join("\n\n"), 15_000),
           priority: PRIORITY[change.currentStatus],
           source: "IsItDown",
           entity: payload.service.id,

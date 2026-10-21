@@ -1,0 +1,78 @@
+{
+  "incident-opened": [
+    {
+      "method": "POST",
+      "url": "https://discord.com/api/webhooks/1/SECRET-WEBHOOK?wait=true",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "embeds": [
+          {
+            "title": "🔴 GitHub — MAJOR OUTAGE",
+            "url": "https://www.githubstatus.com",
+            "description": "Incident: API requests failing\nStatus: Investigating\nUpdated: 2026-08-19 14:32 UTC",
+            "color": 12131356
+          }
+        ]
+      }
+    }
+  ],
+  "incident-resolved": [
+    {
+      "method": "POST",
+      "url": "https://discord.com/api/webhooks/1/SECRET-WEBHOOK?wait=true",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "embeds": [
+          {
+            "title": "🟢 GitHub — RESOLVED",
+            "url": "https://www.githubstatus.com",
+            "description": "Incident \"API requests failing\" has been resolved.\nUpdated: 2026-08-19 14:32 UTC",
+            "color": 1409085
+          }
+        ]
+      }
+    }
+  ],
+  "status-degraded": [
+    {
+      "method": "POST",
+      "url": "https://discord.com/api/webhooks/1/SECRET-WEBHOOK?wait=true",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "embeds": [
+          {
+            "title": "🟡 GitHub — DEGRADED",
+            "url": "https://www.githubstatus.com",
+            "description": "Status changed from Operational to Degraded.\nUpdated: 2026-08-19 14:32 UTC",
+            "color": 10576391
+          }
+        ]
+      }
+    }
+  ],
+  "maintenance-upcoming": [
+    {
+      "method": "POST",
+      "url": "https://discord.com/api/webhooks/1/SECRET-WEBHOOK?wait=true",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "embeds": [
+          {
+            "title": "⚙️ GitHub — maintenance ahead",
+            "url": "https://www.githubstatus.com",
+            "description": "Scheduled maintenance starts in 2 h: Database upgrade\nStarts: 2026-08-19 16:00 UTC — expected duration: 30 min",
+            "color": 4668574
+          }
+        ]
+      }
+    }
+  ]
+}

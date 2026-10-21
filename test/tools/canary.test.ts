@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import {
   bestFixture,
   driftBetween,
@@ -93,6 +94,31 @@ test("a page that parses but lost a field its fixture has is drift, and one that
   assert.equal(drifted.outcome, "drift");
   assert.equal(drifted.drift?.[0]?.items[0]?.path, "$.incidents");
   assert.equal(judge(entry, { captured: [json("https://x", { status: { indicator: "none" }, incidents: [] })], fixtures }).outcome, "ok");
+});
+
+test("fields that exist only while a maintenance or an incident is open are not drift", () => {
+  const read = (adapter: string, file: string) =>
+    JSON.parse(readFileSync(join(root, "test", "fixtures", adapter, file), "utf8"));
+  const only = (adapter: string, file: string) => loadFixtures(root, adapter).filter((f) => f.name === file);
+
+  const notices = read("sorry", "notices.json");
+  for (const notice of notices.notices) {
+    delete notice.begins_at;
+    delete notice.ends_at;
+    delete notice.impact_time;
+  }
+  const sorry = { id: "pipedrive", adapter: "sorry" };
+  assert.equal(judge(sorry, { captured: [json("https://x/api/v1/notices", notices)], fixtures: only("sorry", "notices.json") }).outcome, "ok");
+
+  const index = read("cstate", "index.json");
+  delete index.pinnedIssues;
+  for (const system of index.systems) {
+    delete system.status;
+    delete system.unresolvedIssues;
+    delete system.description;
+  }
+  const cstate = { id: "civo", adapter: "cstate" };
+  assert.equal(judge(cstate, { captured: [json("https://x/index.json", index)], fixtures: only("cstate", "index.json") }).outcome, "ok");
 });
 
 test("only drift and broken pages are findings; the report lists them first and the network's noise apart", () => {

@@ -1,10 +1,9 @@
 import { z } from "zod";
 import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload, OverallStatus } from "../core/types.ts";
-import { renderParts } from "./formatting.ts";
+import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
+import { fitText, renderParts } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
-
-const REQUEST_TIMEOUT_MS = 10_000;
 
 const settingsSchema = z.object({
   /** The topic URL, server included: `https://ntfy.sh/my-topic`, or a self-hosted one. */
@@ -50,7 +49,9 @@ export function createNtfyNotifier(settings: Record<string, string>): Notifier {
           Click: url,
           ...(token === "" ? {} : { Authorization: `Bearer ${token}` }),
         },
-        body: detail === "" ? heading : detail,
+        // Past 4096 bytes ntfy turns the body into a file attachment, which a
+        // phone shows as "attachment.txt" instead of the alert.
+        body: fitText(detail === "" ? heading : detail, 4096, "bytes"),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
 
@@ -59,9 +60,7 @@ export function createNtfyNotifier(settings: Record<string, string>): Notifier {
       // ntfy answers an error as JSON with its own `error` text. The token is
       // the credential, so no error path here includes it.
       const body = (await response.json().catch(() => ({}))) as { error?: string };
-      throw new Error(
-        `ntfy notification failed: HTTP ${response.status}${body.error === undefined ? "" : ` (${body.error})`}`,
-      );
+      throw httpFailure("ntfy", "failed", response.status, body.error);
     },
   };
 }

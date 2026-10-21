@@ -1,6 +1,6 @@
 {
   "name": "isitdown",
-  "version": "2.20.0",
+  "version": "2.21.0",
   "private": true,
   "description": "Polls the public status pages of third-party providers and notifies on state transitions",
   "license": "MIT",
@@ -21,6 +21,7 @@
     "coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"tools/**\" --test-coverage-exclude=\"src/ui/web/**\" --test-coverage-exclude=\"**/isitdown-plugins-*/**\" --test-coverage-lines=95 --test-coverage-branches=88 --test-coverage-functions=93 \"test/**/*.test.ts\" && vitest run --coverage",
     "dev:ui": "concurrently -n server,vite -c blue,magenta \"DB_PATH=./data/isitdown.db WEB_DIR=./dist/ui/public node --watch --env-file-if-exists=.env src/ui/server.ts\" \"vite\"",
     "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
+    "lint": "biome lint .",
     "preversion": "npm run typecheck && npm test && npm run test:integration",
     "record-fixture": "node tools/record-fixture.mjs",
     "release-notes": "node tools/release-notes.mjs",
@@ -32,13 +33,13 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {
-    "cobe": "^2.0.1",
     "express": "^5.2.1",
     "web-push": "^3.6.7",
     "yaml": "^2.5.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.101.4",
     "@tanstack/react-table": "^9.1.2",
@@ -55,6 +56,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "cobe": "^2.0.1",
     "concurrently": "^10.0.5",
     "dotted-map": "^3.1.0",
     "happy-dom": "^20.11.6",
