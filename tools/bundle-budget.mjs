@@ -97,8 +97,13 @@ const ASSETS = "dist/ui/public/assets";
  * recipients editor, the follow button, the impact and owner fields and the
  * channel-health row, with about thirty-five new strings in six catalogs.
  * Measured: 547.7 kB before them, 553.6 kB after. The same remedy again.
+ *
+ * It moved 573,500 -> 583,500 (560.1 -> 569.8 kB) for roadmap 3.15-3.16: the
+ * on-call rotation editor and the routine-test switch, with fourteen new
+ * strings in six catalogs. Measured: under 560.1 kB before them, 562.7 kB
+ * after. The same remedy again.
  */
-export const BUDGET = { js: 573_500, css: 20_000 };
+export const BUDGET = { js: 583_500, css: 20_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
