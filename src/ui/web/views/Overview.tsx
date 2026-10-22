@@ -67,11 +67,22 @@ export function Overview() {
   const [returnFocus, setReturnFocus] = useState(false);
   // Only the server's answer may start a draft — never the placeholder a
   // pending query shows (⌘K and a bookmarked `?edit=1` can both get here first).
-  const editor = useLayoutEditor(dashboardPending ? undefined : dashboard, editing, gridRef, (message) => {
-    setParams({});
-    setReturnFocus(true);
-    if (message !== undefined) setNotice(message);
-  });
+  const openedFromButton = useRef(false);
+  const openEditor = () => {
+    openedFromButton.current = true;
+    setParams({ edit: "1" });
+  };
+  const editor = useLayoutEditor(
+    dashboardPending ? undefined : dashboard,
+    editing,
+    gridRef,
+    (message) => {
+      setParams({});
+      setReturnFocus(true);
+      if (message !== undefined) setNotice(message);
+    },
+    openedFromButton,
+  );
   useEffect(() => {
     if (!returnFocus || editing || customiseRef.current === null) return;
     customiseRef.current.focus();
@@ -316,7 +327,7 @@ export function Overview() {
             ref={customiseRef}
             type="button"
             variant="ghost"
-            onClick={() => setParams({ edit: "1" })}
+            onClick={openEditor}
           >
             <LayoutGrid aria-hidden="true" />
             {t("dashboard.customise")}
@@ -482,7 +493,7 @@ export function Overview() {
               <CardContent className="flex flex-col items-start gap-3">
                 <h3 className="text-base font-semibold">{t("dashboard.empty.title")}</h3>
                 <p className="max-w-[60ch] text-sm text-muted-foreground">{t("dashboard.empty.body")}</p>
-                <Button type="button" size="sm" onClick={() => setParams({ edit: "1" })}>
+                <Button type="button" size="sm" onClick={openEditor}>
                   <LayoutGrid aria-hidden="true" />
                   {t("dashboard.customise")}
                 </Button>

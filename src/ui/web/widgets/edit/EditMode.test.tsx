@@ -258,6 +258,9 @@ describe("Overview edit mode", () => {
     answer(dashboard(custom));
     const list = await screen.findByRole("list", { name: t("dashboard.edit.list-label") });
     expect(order(list)).toEqual(["fleet-list", "fleet-rings"]);
+    // Loaded straight into edit mode: no control vanished, so focus stays put.
+    await screen.findAllByRole("button", { name: new RegExp(`^${t("dashboard.move", { widget: "" })}`) });
+    expect(document.activeElement).toBe(document.body);
   });
 
   it("says so when the layout cannot be loaded, offers a retry, and does not offer to customise", async () => {
