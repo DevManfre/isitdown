@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { I18nextProvider } from "react-i18next";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -1658,6 +1658,64 @@ describe("Settings retention", () => {
           { path: "/config/settings", method: "PATCH", body: { delivery: { coalesce: { windowMinutes: 5 } } } },
         ]),
       );
+    });
+
+    // Roadmap 3.15 and 3.16.
+    describe("on call", () => {
+      const recipients = [
+        { id: "alice", name: "Alice", channels: ["telegram", "discord"] },
+        { id: "bob", name: "Bob", channels: ["pagerduty", "slack"] },
+      ];
+      const withRotation = (rotation: string[]) => {
+        const base = on({ onCall: { enabled: true, minSeverity: "major_outage", rotation, startsOn: "2026-10-05" } });
+        return { ...base, config: { ...base.config, recipients } };
+      };
+
+      it("cannot be switched on before there is a recipient to put in the rotation", async () => {
+        renderSettings("delivery", on({}));
+        expect(await screen.findByLabelText(i18n.t("field.on-call"))).toBeDisabled();
+        expect(screen.getByText(i18n.t("field.on-call.no-recipients"))).toBeInTheDocument();
+      });
+
+      it("adds a week, removes one, and saves the rotation as an ordered list of recipient ids", async () => {
+        renderSettings("delivery", withRotation(["alice"]));
+        const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+        await userEvent.click(await screen.findByRole("button", { name: i18n.t("field.on-call.add") }));
+        await waitFor(() =>
+          expect(writesIn(calls)).toEqual([
+            { path: "/config/settings", method: "PATCH", body: { delivery: { onCall: { rotation: ["alice", "alice"] } } } },
+          ]),
+        );
+        await userEvent.click(screen.getAllByRole("button", { name: i18n.t("field.on-call.remove") })[0]!);
+        await waitFor(() => expect(writesIn(calls)).toHaveLength(2));
+        // The fixture does not follow the write, so the list is still the one rendered.
+        expect(writesIn(calls)[1]?.body).toEqual({ delivery: { onCall: { rotation: [] } } });
+      });
+
+      it("changes who a week belongs to, and the start date", async () => {
+        renderSettings("delivery", withRotation(["alice", "alice"]));
+        const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+        await userEvent.click(await screen.findByRole("combobox", { name: i18n.t("field.on-call.week", { number: 2 }) }));
+        await userEvent.click(await screen.findByRole("option", { name: "Bob" }));
+        await waitFor(() =>
+          expect(writesIn(calls)[0]?.body).toEqual({ delivery: { onCall: { rotation: ["alice", "bob"] } } }),
+        );
+        fireEvent.change(screen.getByLabelText(i18n.t("field.on-call.starts-on")), { target: { value: "2026-11-02" } });
+        await waitFor(() =>
+          expect(writesIn(calls).at(-1)?.body).toEqual({ delivery: { onCall: { startsOn: "2026-11-02" } } }),
+        );
+      });
+
+      it("saves the routine delivery test switch", async () => {
+        renderSettings("delivery", on({}));
+        const calls = interceptWrites({ "PATCH /config/settings": { delivery: {} } });
+        await userEvent.click(await screen.findByLabelText(i18n.t("field.delivery-test")));
+        await waitFor(() =>
+          expect(writesIn(calls)).toEqual([
+            { path: "/config/settings", method: "PATCH", body: { delivery: { deliveryTest: { enabled: true } } } },
+          ]),
+        );
+      });
     });
 
     it("shows the report's frequency and channel only once it is on", async () => {
