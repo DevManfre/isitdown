@@ -67,6 +67,8 @@ export function useLayoutEditor(
   editing: boolean,
   grid: RefObject<HTMLElement | null>,
   onExit: (notice?: string) => void,
+  /** Set by the control that opens edit mode, which unmounts as it does. */
+  openedFrom: RefObject<boolean>,
 ): LayoutEditor | null {
   const { t } = useTranslation();
   const { data: status } = useStatus();
@@ -96,9 +98,13 @@ export function useLayoutEditor(
     if (editing && dashboard !== undefined && session === null) {
       leaving.current = false;
       // The control that opened edit mode is gone: focus goes to the first
-      // thing there is to edit.
-      const first = dashboard.layout.widgets[0];
-      setFocus(first === undefined ? { add: true } : { grip: first.id });
+      // thing there is to edit. A page that loads straight into edit mode had
+      // no such control, and does not take focus from wherever it is.
+      if (openedFrom.current) {
+        const first = dashboard.layout.widgets[0];
+        setFocus(first === undefined ? { add: true } : { grip: first.id });
+        openedFrom.current = false;
+      }
       setSession({
         draft: startDraft(dashboard.layout),
         saved: dashboard.layout,
