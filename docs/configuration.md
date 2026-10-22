@@ -2641,3 +2641,30 @@ the UI edition they are the **Why it matters** and **Owner** fields of the
 provider form, and `impact` / `owner` on `POST /config/services` and
 `PATCH /config/services/:id` (`null` clears either).
 
+### 3.24 Customising the Overview
+
+UI edition only. Everything under the Overview's headline is a list of widgets
+the operator arranges: **Customise** (beside the headline's actions, or
+**Customise the Overview** in ⌘K) turns the page into its own editor, with live
+data, and nothing is stored until **Save**.
+
+- **Widgets** are the blocks the Overview always drew — fleet rings, map, shared
+  failure, groups, fleet list. Each can appear more than once.
+- **Width** is one of full, two thirds, half or a third of the row; height is the
+  widget's own. Below 768px every widget takes the full width.
+- **Order** — drag the grip, press its ↑/↓ buttons, or focus the grip and use the
+  arrow keys (Home and End send it to either end). Every move is announced.
+- **Filter** — the three fleet widgets take groups ([3.10](#310-provider-groups--my-stack))
+  and individual providers, and show their union: "Cloud" beside "Payments", say.
+  A filtered widget is captioned with what it shows. A provider or group deleted
+  since is struck through in the filter, and a filter left with nothing in it
+  says so — it never quietly widens to the whole fleet.
+- **Reset to default** forgets the arrangement. An Overview nobody customised
+  follows the built-in layout, so blocks added by later releases reach it on
+  their own; a customised one keeps exactly what was saved.
+
+The headline above the widgets is fixed: it is the "is anything wrong?" answer,
+and no arrangement hides it. Two tabs editing at once do not overwrite each
+other — the later save is told and offered both copies. The layout lives in the
+database, so a backup carries it; over the API it is `GET`/`PUT /dashboards/default`
+([6](api.md)).

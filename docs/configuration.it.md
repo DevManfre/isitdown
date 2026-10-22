@@ -2744,3 +2744,33 @@ nessuno dei due. Nell'edizione UI sono i campi **Perché conta** e
 `POST /config/services` e `PATCH /config/services/:id` (`null` cancella l'uno o
 l'altro).
 
+### 3.24 Personalizzare la Panoramica
+
+Solo edizione UI. Tutto ciò che sta sotto il titolo della Panoramica è un elenco
+di widget che l'operatore dispone: **Personalizza** (accanto alle azioni del
+titolo, oppure **Personalizza la Panoramica** in ⌘K) trasforma la pagina nel suo
+stesso editor, con i dati veri, e nulla viene salvato prima di **Salva**.
+
+- **Widget** sono i blocchi che la Panoramica ha sempre disegnato — anelli della
+  flotta, mappa, guasto condiviso, gruppi, elenco della flotta. Ognuno può
+  comparire più volte.
+- **Larghezza** è una tra intera, due terzi, metà o un terzo della riga; l'altezza
+  è quella del widget. Sotto i 768px ogni widget prende tutta la larghezza.
+- **Ordine** — trascinare la maniglia, premere i suoi pulsanti ↑/↓, oppure dare il
+  focus alla maniglia e usare le frecce (Home e Fine la mandano a un estremo).
+  Ogni spostamento viene annunciato.
+- **Filtro** — i tre widget della flotta accettano gruppi ([3.10](#310-gruppi-di-provider--il-mio-stack))
+  e singoli provider, e ne mostrano l'unione: "Cloud" accanto a "Pagamenti", per
+  esempio. Un widget filtrato porta una didascalia con ciò che mostra. Un provider
+  o un gruppo cancellato nel frattempo appare barrato nel filtro, e un filtro
+  rimasto vuoto lo dice — non si allarga mai in silenzio all'intera flotta.
+- **Ripristina default** dimentica la disposizione. Una Panoramica mai
+  personalizzata segue la disposizione predefinita, così i blocchi aggiunti dalle
+  versioni successive le arrivano da soli; una personalizzata tiene esattamente
+  ciò che è stato salvato.
+
+Il titolo sopra i widget è fisso: è la risposta a "c'è qualcosa che non va?", e
+nessuna disposizione lo nasconde. Due schede che modificano insieme non si
+sovrascrivono — il salvataggio arrivato dopo lo viene a sapere e gli vengono
+offerte entrambe le copie. La disposizione vive nel database, quindi un backup la
+porta con sé; via API è `GET`/`PUT /dashboards/default` ([6](api.it.md)).
