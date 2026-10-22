@@ -171,6 +171,20 @@ const settingsSchema = z.object({
   /** Tell the other channels when one keeps failing (roadmap 3.4). */
   channelHealthEnabled: booleanSetting.catch(false),
   channelHealthAfterFailures: z.coerce.number().int().min(2).max(100).catch(3),
+  /** One message when a shared failure ends (roadmap 3.10). */
+  incidentSummaryEnabled: booleanSetting.catch(false),
+  /** Last update of an incident wins (roadmap 3.11). */
+  coalesceEnabled: booleanSetting.catch(false),
+  coalesceWindowMinutes: z.coerce.number().int().positive().max(60).catch(2),
+  /** Quiet updates while a major outage is known (roadmap 3.14). */
+  knownOutageEnabled: booleanSetting.catch(false),
+  /** The periodic report (roadmap 3.13), and the period it last went out for. */
+  reportEnabled: booleanSetting.catch(false),
+  reportFrequency: z.enum(["weekly", "monthly"]).catch("weekly"),
+  reportChannel: z.string().max(64).catch(""),
+  reportLastSent: z.string().max(32).catch(""),
+  /** Attach the provider's last 24 hours as an SVG where a channel can carry one (roadmap 3.12). */
+  attachChart: booleanSetting.catch(false),
 
   /**
    * "Is a newer version out" (roadmap 15.11a). Off by default: it is the only
@@ -314,6 +328,11 @@ export function deliveryOf(settings: Settings): {
     minSeverity: Settings["escalationMinSeverity"];
   };
   channelHealth: { enabled: boolean; afterFailures: number };
+  incidentSummary: { enabled: boolean };
+  coalesce: { enabled: boolean; windowMinutes: number };
+  knownOutage: { enabled: boolean };
+  report: { enabled: boolean; frequency: Settings["reportFrequency"]; channel: string };
+  attachChart: boolean;
 } {
   return {
     quietHours: {
@@ -347,6 +366,18 @@ export function deliveryOf(settings: Settings): {
       enabled: settings.channelHealthEnabled,
       afterFailures: settings.channelHealthAfterFailures,
     },
+    incidentSummary: { enabled: settings.incidentSummaryEnabled },
+    coalesce: {
+      enabled: settings.coalesceEnabled,
+      windowMinutes: settings.coalesceWindowMinutes,
+    },
+    knownOutage: { enabled: settings.knownOutageEnabled },
+    report: {
+      enabled: settings.reportEnabled,
+      frequency: settings.reportFrequency,
+      channel: settings.reportChannel,
+    },
+    attachChart: settings.attachChart,
   };
 }
 

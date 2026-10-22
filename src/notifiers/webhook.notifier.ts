@@ -83,6 +83,10 @@ export function createWebhookNotifier(settings: Record<string, string>): Notifie
         change: payload.change,
         service: payload.service,
         message: renderMessage(payload),
+        // The provider's last 24 hours as an SVG (roadmap 3.12). Absent unless
+        // the operator turned charts on, so a receiver that never asked for one
+        // sees the body it always saw.
+        ...(payload.chart === undefined ? {} : { chart: { contentType: "image/svg+xml", svg: payload.chart.svg } }),
       });
       const timestamp = new Date().toISOString();
 

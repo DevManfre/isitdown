@@ -53,6 +53,24 @@ test("a shared failure keys on who it covers, whatever order they arrived in", (
   assert.equal(one, other);
 });
 
+test("the end of a shared failure closes the alert its opening raised", () => {
+  const members = { providerIds: ["github", "cloudflare"], windowMinutes: 10 };
+  const opened = incidentKey({ ...base, kind: "correlated_outage", correlated: members });
+  const closed = { ...base, kind: "correlated_resolved" as const, correlated: { ...members, durationMinutes: 30 } };
+  assert.equal(incidentKey(closed), opened);
+  assert.equal(isResolution(closed), true);
+});
+
+test("a periodic report has a key per frequency and never resolves anything", () => {
+  const report = (frequency: "weekly" | "monthly") => ({
+    ...base,
+    kind: "periodic_report" as const,
+    report: { frequency, from: "2026-10-12", to: "2026-10-18", fleetUptime: 99, incidentCount: 0, worst: [], sla: [] },
+  });
+  assert.notEqual(incidentKey(report("weekly")), incidentKey(report("monthly")));
+  assert.equal(isResolution(report("weekly")), false);
+});
+
 test("only a genuine recovery closes an alert", () => {
   assert.equal(isResolution({ ...base, kind: "incident_resolved", incident }), true);
   assert.equal(

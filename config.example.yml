@@ -419,6 +419,38 @@ notifications:
 #   channelHealth:
 #     enabled: true
 #     afterFailures: 3
+#
+#   # When several providers fail together and then recover, send one message
+#   # ("6 providers, 47 minutes, probable cause: cloudflare") instead of one
+#   # "resolved" per provider. The members' own recoveries are held back until
+#   # the last one is back.
+#   incidentSummary:
+#     enabled: true
+#
+#   # A provider that posts several updates of the same incident in a short
+#   # time produces one message: the last state, sent once nothing newer has
+#   # arrived for this long.
+#   coalesce:
+#     enabled: true
+#     windowMinutes: 2
+#
+#   # While a provider is already in major outage, further updates of its
+#   # incident go to the digest window instead of interrupting. A change of
+#   # severity or the resolution still goes out at once.
+#   knownOutage:
+#     enabled: true
+#
+#   # UI edition only. Attach the provider's last 24 hours, as an SVG, to status
+#   # and incident messages. Only the email and webhook channels can carry it.
+#   attachChart: true
+#
+#   # UI edition only. The fleet's week or month on one channel: fleet uptime,
+#   # the weakest providers, incidents, error budget spent. It is not an alert,
+#   # so routing rules do not apply, but it waits out quiet hours.
+#   report:
+#     enabled: true
+#     frequency: weekly   # weekly | monthly
+#     channel: slack
 
 # People reached through more than one channel, preferred first. A change a
 # rule sends to several of one person's channels goes to the first only, and to

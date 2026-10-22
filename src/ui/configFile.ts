@@ -232,6 +232,14 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
           escalationMinSeverity: file.delivery.escalation?.minSeverity,
           channelHealthEnabled: file.delivery.channelHealth?.enabled,
           channelHealthAfterFailures: file.delivery.channelHealth?.afterFailures,
+          incidentSummaryEnabled: file.delivery.incidentSummary?.enabled,
+          coalesceEnabled: file.delivery.coalesce?.enabled,
+          coalesceWindowMinutes: file.delivery.coalesce?.windowMinutes,
+          knownOutageEnabled: file.delivery.knownOutage?.enabled,
+          attachChart: file.delivery.attachChart,
+          reportEnabled: file.delivery.report?.enabled,
+          reportFrequency: file.delivery.report?.frequency,
+          reportChannel: file.delivery.report?.channel,
         }),
   };
   const carried = Object.entries(settings).filter(([, value]) => value !== undefined);

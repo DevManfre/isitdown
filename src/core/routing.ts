@@ -38,6 +38,12 @@ const CLASS_OF: Record<StatusChangeKind, EventClass> = {
   // replaces the status alerts it folds, so it has to reach the same rules
   // they would have.
   correlated_outage: "status",
+  // The same story ending, so it reaches the rules that heard it begin (roadmap 3.10).
+  correlated_resolved: "status",
+  // A scheduled summary, not news about any provider (roadmap 3.13). The
+  // dispatcher sends it to its own channel and never consults the rules, so the
+  // class only has to be a true one: monitoring, which is what it is.
+  periodic_report: "monitoring",
   // The claim is about a provider's own status — that it is worse than its
   // page admits (roadmap 1.10) — not about our monitoring, so it reaches the
   // rules a status change would.

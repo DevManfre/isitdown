@@ -328,6 +328,36 @@ export const channelHealthSchema = z.object({
   afterFailures: z.number().int().min(2).max(100).default(3),
 });
 
+/** One summary when a shared failure ends (roadmap 3.10). */
+export const incidentSummarySchema = z.object({
+  enabled: z.boolean().default(false),
+});
+
+/**
+ * Wait for the incident's last update (roadmap 3.11). Capped at an hour: past
+ * that the "latest state" is stale news, and the escalation clock is running.
+ */
+export const coalesceSchema = z.object({
+  enabled: z.boolean().default(false),
+  windowMinutes: z.number().int().positive().max(60).default(2),
+});
+
+/** Quiet updates during an outage already announced (roadmap 3.14). */
+export const knownOutageSchema = z.object({
+  enabled: z.boolean().default(false),
+});
+
+/**
+ * The periodic report (roadmap 3.13). Weekly or monthly only: a daily one is a
+ * digest, which already exists, and anything in between is a calendar nobody
+ * asked for.
+ */
+export const reportSchema = z.object({
+  enabled: z.boolean().default(false),
+  frequency: z.enum(["weekly", "monthly"]).default("weekly"),
+  channel: z.string().trim().max(64).default(""),
+});
+
 export const deliverySchema = z.object({
   quietHours: quietHoursSchema.default({}),
   digest: digestSchema.default({}),
@@ -336,6 +366,11 @@ export const deliverySchema = z.object({
   maintenanceNotice: maintenanceNoticeSchema.default({}),
   escalation: escalationSchema.default({}),
   channelHealth: channelHealthSchema.default({}),
+  incidentSummary: incidentSummarySchema.default({}),
+  coalesce: coalesceSchema.default({}),
+  knownOutage: knownOutageSchema.default({}),
+  report: reportSchema.default({}),
+  attachChart: z.boolean().default(false),
 });
 
 /**

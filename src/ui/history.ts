@@ -510,37 +510,18 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
   }
 
   /**
-   * One calendar month, per provider and for the fleet — roadmap 4.7.
-   *
-   * It reads the same daily buckets and the same incident rows every other
-   * figure here comes from, so a month's report can never disagree with the
-   * History view it was taken beside. What it adds is the shape of a month
-   * rather than of a rolling window: the 30-day view answers "how have we been
-   * doing lately", and this answers "how was August", which is the one somebody
-   * asks for in writing.
-   *
-   * `month` is `YYYY-MM`, UTC. A month still running is reported as far as
-   * today and flagged `partial`, rather than refused — the useful time to read
-   * this month's report is during this month.
+   * Every provider and the fleet over `from`..`to`, both inclusive calendar days
+   * (roadmap 4.7, and the periodic report of 3.13). Shared by the monthly report
+   * and the weekly one so a figure means the same thing in both: the same daily
+   * buckets, the same incident rows, the same rule for who counts as measured.
    */
-  async function getMonthlyReport(
-    month: string,
+  async function getRangeReport(
+    from: string,
+    to: string,
     intervalMinutes: number,
     only?: string[] | undefined,
-  ): Promise<MonthlyReport> {
+  ): Promise<Omit<MonthlyReport, "month" | "partial">> {
     const zone = await zoneOf();
-    const todayKey = zonedDayKey(now(), zone);
-    const from = `${month}-01`;
-    // The last day of the month is the day before the first of the next one.
-    // Calendar arithmetic on the key, so a month containing a DST transition is
-    // still exactly as many days long as the calendar says.
-    const [year, monthNumber] = month.split("-").map(Number) as [number, number];
-    const lastDay = shiftDay(new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10), -1);
-    const to = lastDay > todayKey ? todayKey : lastDay;
-
-    // The month is asked for directly now rather than selected out of a window
-    // counted back from today: the store takes two ends, so a report on a month
-    // two years ago reads that month and nothing else.
     const segments = offsetSegments(from, to, zone);
 
     const providerIds = only ?? (await store.listProviderIds());
@@ -592,10 +573,8 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     );
 
     return {
-      month,
       from,
       to,
-      partial: lastDay > todayKey,
       fleetUptime:
         measured.length === 0
           ? null
@@ -603,6 +582,42 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
       providers,
       incidents: incidents.sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
     };
+  }
+
+  /**
+   * One calendar month, per provider and for the fleet — roadmap 4.7.
+   *
+   * It reads the same daily buckets and the same incident rows every other
+   * figure here comes from, so a month's report can never disagree with the
+   * History view it was taken beside. What it adds is the shape of a month
+   * rather than of a rolling window: the 30-day view answers "how have we been
+   * doing lately", and this answers "how was August", which is the one somebody
+   * asks for in writing.
+   *
+   * `month` is `YYYY-MM`, UTC. A month still running is reported as far as
+   * today and flagged `partial`, rather than refused — the useful time to read
+   * this month's report is during this month.
+   */
+  async function getMonthlyReport(
+    month: string,
+    intervalMinutes: number,
+    only?: string[] | undefined,
+  ): Promise<MonthlyReport> {
+    const zone = await zoneOf();
+    const todayKey = zonedDayKey(now(), zone);
+    const from = `${month}-01`;
+    // The last day of the month is the day before the first of the next one.
+    // Calendar arithmetic on the key, so a month containing a DST transition is
+    // still exactly as many days long as the calendar says.
+    const [year, monthNumber] = month.split("-").map(Number) as [number, number];
+    const lastDay = shiftDay(new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10), -1);
+    const to = lastDay > todayKey ? todayKey : lastDay;
+
+    // The month is asked for directly now rather than selected out of a window
+    // counted back from today: the store takes two ends, so a report on a month
+    // two years ago reads that month and nothing else.
+    const range = await getRangeReport(from, to, intervalMinutes, only);
+    return { month, partial: lastDay > todayKey, ...range };
   }
 
   /**
@@ -680,7 +695,14 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     };
   }
 
-  return { getProviderHistory, getProviderCalendar, getComponentHistories, getSummary, getMonthlyReport };
+  return {
+    getProviderHistory,
+    getProviderCalendar,
+    getComponentHistories,
+    getSummary,
+    getMonthlyReport,
+    getRangeReport,
+  };
 }
 
 const uptimeKey = (provider: ProviderHistory, days: number): number =>

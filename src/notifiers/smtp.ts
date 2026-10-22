@@ -48,6 +48,12 @@ export interface SmtpMessage {
   subject: string;
   /** Plain text, UTF-8. Encoded as base64 on the way out — see `bodyOf`. */
   text: string;
+  /**
+   * Files sent with the message (roadmap 3.12). Absent is the normal case and
+   * leaves the message exactly what it was: a single text part, no multipart
+   * wrapper for a mail client to render differently.
+   */
+  attachments?: { filename: string; contentType: string; content: string }[] | undefined;
 }
 
 interface Reply {
@@ -249,20 +255,50 @@ export function encodeHeader(value: string): string {
  * never advertised 8BITMIME.
  */
 export function bodyOf(message: SmtpMessage, at: Date, messageId: string): string {
-  const encoded = Buffer.from(message.text, "utf8")
-    .toString("base64")
-    .replace(/(.{76})/g, `$1${CRLF}`);
-  return [
+  const wrap = (value: string): string => value.replace(/(.{76})/g, `$1${CRLF}`);
+  const encoded = wrap(Buffer.from(message.text, "utf8").toString("base64"));
+  const headers = [
     `From: ${message.from}`,
     `To: ${message.to.join(", ")}`,
     `Subject: ${encodeHeader(message.subject)}`,
     `Date: ${at.toUTCString()}`,
     `Message-ID: ${messageId}`,
     "MIME-Version: 1.0",
+  ];
+  const attachments = message.attachments ?? [];
+  if (attachments.length === 0) {
+    return [
+      ...headers,
+      'Content-Type: text/plain; charset="utf-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      encoded,
+    ].join(CRLF);
+  }
+
+  // Derived from the message id, which is already unique per message, so the
+  // boundary cannot collide with anything in a base64 body (which has no `=`
+  // runs of this shape and no leading dashes).
+  const boundary = `isitdown-${messageId.replace(/[^A-Za-z0-9]/g, "").slice(0, 32)}`;
+  return [
+    ...headers,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
     'Content-Type: text/plain; charset="utf-8"',
     "Content-Transfer-Encoding: base64",
     "",
     encoded,
+    ...attachments.flatMap((file) => [
+      `--${boundary}`,
+      `Content-Type: ${file.contentType}; name="${file.filename}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${file.filename}"`,
+      "",
+      wrap(Buffer.from(file.content, "utf8").toString("base64")),
+    ]),
+    `--${boundary}--`,
+    "",
   ].join(CRLF);
 }
 
