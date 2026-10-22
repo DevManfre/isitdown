@@ -10,6 +10,7 @@ import { ViewError } from "@/components/ViewError.tsx";
 import { BusyProvider } from "@/hooks/useBusy.tsx";
 import { ThemeProvider } from "@/hooks/useTheme.tsx";
 import type { ProviderStatus } from "@/lib/types.ts";
+import { DEFAULT_LAYOUT } from "../../dashboardLayout.ts";
 
 type FixtureKey =
   | "status"
@@ -32,7 +33,8 @@ type FixtureKey =
   | "maintenances"
   | "serviceImpact"
   | "adapterDebug"
-  | "catalog";
+  | "catalog"
+  | "dashboard";
 
 export interface Fixtures {
   status?: unknown;
@@ -67,6 +69,8 @@ export interface Fixtures {
   catalog?: unknown;
   /** `/config/provider-push`, matched before `/config` — roadmap 1.2's subscription card. */
   providerPush?: unknown;
+  /** `/dashboards/…` — the Overview's widget layout (roadmap 4.1). */
+  dashboard?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -126,6 +130,8 @@ export function stubApi(fixtures: Fixtures): void {
                                   ? "config"
                                   : path.startsWith("/debug/adapters")
                                     ? "adapterDebug"
+                                    : path.startsWith("/dashboards")
+                                    ? "dashboard"
                                     : path.startsWith("/map")
                                       ? "map"
                                       : path.startsWith("/api/preferences")
@@ -164,6 +170,13 @@ export function stubApi(fixtures: Fixtures): void {
         annotations: { annotations: [] },
         providerPush: { enabled: false, tokenRevealed: false, providers: [] },
         messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },
+        dashboard: {
+          id: "default",
+          name: "Overview",
+          layout: DEFAULT_LAYOUT,
+          isDefault: true,
+          updatedAt: "2026-08-21T10:00:00.000Z",
+        },
       };
       const fixture = fixtures[key] ?? EMPTY[key];
       // Awaited, so a fixture can also be a promise that never settles — the

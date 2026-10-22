@@ -108,4 +108,17 @@ describe("motion.css after the react port", () => {
       expect(code, `${dead} outlived the rail's collapse control`).not.toContain(dead);
     }
   });
+
+  // Roadmap 4.1. The edit mode's two CSS-driven moments: a widget with nothing
+  // to draw growing out of its row (and folding back on close), and the ring
+  // on a just-added widget. Both are entries keyed on attributes, not on the
+  // view's remount gate, and both fall under the reduced-motion block.
+  it("grows an idle widget in and out of edit mode, and rings a just-added one", () => {
+    for (const name of ["cell-reveal", "cell-conceal", "arrival"]) {
+      expect(code).toContain(`@keyframes ${name}`);
+    }
+    expect(code).toMatch(/\[data-slot="edit-grid"\]\[data-closing\][^{]*\{\s*animation: cell-conceal/);
+    expect(code).toMatch(/\[data-slot="edit-arrival"\]\s*\{\s*animation: arrival/);
+    expect(code).not.toContain("#view[data-animate] [data-slot=\"edit-arrival\"]");
+  });
 });

@@ -1228,6 +1228,70 @@ circle[role="button"]:hover {
   animation: drawer-out 0.22s ease both;
 }
 
+/* — the composable Overview's edit mode (roadmap 4.1) — */
+
+/* A widget with nothing to draw is no cell at all in view mode, so in edit mode
+   it grows out of nothing — its row and the row gap above it — instead of
+   pushing everything below down in one frame. It folds back the same way when
+   edit mode closes, which is what lets the view grid take over without a jump.
+   The inner box clips only these cells, and only by its own 4px padding, so a
+   focus ring on the toolbar is never cut. */
+@keyframes cell-reveal {
+  from {
+    grid-template-rows: 0fr;
+    margin-top: -1rem;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    margin-top: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes cell-conceal {
+  from {
+    grid-template-rows: 1fr;
+    margin-top: 0;
+    opacity: 1;
+  }
+  to {
+    grid-template-rows: 0fr;
+    margin-top: -1rem;
+    opacity: 0;
+  }
+}
+
+[data-slot="edit-grid"] [data-slot="widget-cell"]:has([data-slot="widget-body"]:empty) {
+  display: grid;
+  animation: cell-reveal 0.22s var(--ease-entry) both;
+}
+
+[data-slot="edit-grid"] [data-slot="widget-cell"]:has([data-slot="widget-body"]:empty) > [data-slot="cell-inner"] {
+  overflow: hidden;
+}
+
+[data-slot="edit-grid"][data-closing] [data-slot="widget-cell"]:has([data-slot="widget-body"]:empty) {
+  animation: cell-conceal 0.18s var(--ease-out) both;
+}
+
+/* A widget just added from the catalogue: one ring that settles onto its frame
+   and fades, to say where it landed. */
+@keyframes arrival {
+  from {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+  to {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+[data-slot="edit-arrival"] {
+  animation: arrival 0.6s var(--ease-out) both;
+}
+
 /* Reduced motion keeps every state change, and none of the travel. */
 @media (prefers-reduced-motion: reduce) {
   *,

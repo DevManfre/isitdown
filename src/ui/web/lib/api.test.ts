@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getStatus } from "./api.ts";
+import { getStatus, putDashboard } from "./api.ts";
+import { DEFAULT_LAYOUT } from "../../dashboardLayout.ts";
 
 type FakeResponse = { ok: boolean; status: number; text: () => Promise<string> };
 
@@ -37,5 +38,26 @@ describe("request", () => {
       text: async () => "not json",
     });
     await expect(getStatus()).resolves.toBeUndefined();
+  });
+});
+
+describe("putDashboard", () => {
+  it("answers a 409 with the dashboard someone else saved, instead of throwing", async () => {
+    const current = { id: "default", name: "Overview", layout: DEFAULT_LAYOUT, isDefault: true, updatedAt: "b" };
+    stubFetch({
+      ok: false,
+      status: 409,
+      text: async () => JSON.stringify({ error: { message: "saved elsewhere" }, current }),
+    });
+    await expect(putDashboard("default", DEFAULT_LAYOUT, "a")).resolves.toEqual({ kind: "conflict", current });
+  });
+
+  it("still throws the server's message on any other failure", async () => {
+    stubFetch({
+      ok: false,
+      status: 400,
+      text: async () => JSON.stringify({ error: { message: "layout.widgets: too many" } }),
+    });
+    await expect(putDashboard("default", DEFAULT_LAYOUT, "a")).rejects.toThrow("layout.widgets: too many");
   });
 });
