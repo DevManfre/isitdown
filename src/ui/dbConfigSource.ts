@@ -183,6 +183,14 @@ const settingsSchema = z.object({
   reportFrequency: z.enum(["weekly", "monthly"]).catch("weekly"),
   reportChannel: z.string().max(64).catch(""),
   reportLastSent: z.string().max(32).catch(""),
+  /** Who is on call this week (roadmap 3.15). The rotation is recipient ids, comma-joined. */
+  onCallEnabled: booleanSetting.catch(false),
+  onCallMinSeverity: z.enum(SEVERITY_FLOORS).catch("major_outage"),
+  onCallRotation: z.string().max(2048).catch(""),
+  onCallStartsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).catch(""),
+  /** The routine weekly test (roadmap 3.16), and the week it last ran for. */
+  deliveryTestEnabled: booleanSetting.catch(false),
+  deliveryTestLastSent: z.string().max(32).catch(""),
   /** Attach the provider's last 24 hours as an SVG where a channel can carry one (roadmap 3.12). */
   attachChart: booleanSetting.catch(false),
 
@@ -332,6 +340,8 @@ export function deliveryOf(settings: Settings): {
   coalesce: { enabled: boolean; windowMinutes: number };
   knownOutage: { enabled: boolean };
   report: { enabled: boolean; frequency: Settings["reportFrequency"]; channel: string };
+  onCall: { enabled: boolean; minSeverity: Settings["onCallMinSeverity"]; rotation: string[]; startsOn: string };
+  deliveryTest: { enabled: boolean };
   attachChart: boolean;
 } {
   return {
@@ -377,6 +387,13 @@ export function deliveryOf(settings: Settings): {
       frequency: settings.reportFrequency,
       channel: settings.reportChannel,
     },
+    onCall: {
+      enabled: settings.onCallEnabled,
+      minSeverity: settings.onCallMinSeverity,
+      rotation: settings.onCallRotation === "" ? [] : settings.onCallRotation.split(","),
+      startsOn: settings.onCallStartsOn,
+    },
+    deliveryTest: { enabled: settings.deliveryTestEnabled },
     attachChart: settings.attachChart,
   };
 }

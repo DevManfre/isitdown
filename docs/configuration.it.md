@@ -1934,8 +1934,48 @@ polling successivo il report dell'ultimo periodo chiuso. Un canale non abilitato
 viene detto nel log. **Solo edizione UI**: legge lo storico conservato, quindi
 l'edizione Light ignora il blocco.
 
+**`onCall`** dice chi è di turno questa settimana, senza diventare un sistema
+di reperibilità: PagerDuty e Opsgenie sono già canali e questo non li sostituisce.
+È una rotazione di [destinatari](#321-destinatari--una-persona-più-canali) che
+esistono già — uno a settimana, a turno, poi si ricomincia — e chi è di turno
+riceve ogni cambiamento pari o sopra `minSeverity` (default `major_outage`) *in
+più* di chi hanno già scelto le regole di instradamento. Aggiunge un lettore e non
+ne toglie mai uno, quindi una rotazione sbagliata può solo notificare di troppo:
+una che nomina un destinatario che nessuno ha definito perde il lettore in più,
+non l'avviso, e lo dice nel log. Il destinatario è raggiunto come sempre — sul
+canale preferito, passando al successivo solo se quello fallisce. Le settimane
+vanno da lunedì a domenica, UTC; `startsOn` è un giorno qualsiasi della prima
+settimana (vuoto conta dal 1970), e una data illeggibile conta allo stesso modo
+invece di fermare un avviso. Non viene salvato nulla: chi è di turno è una
+funzione della data, quindi un riavvio non cambia niente e la dashboard mostra lo
+stesso nome che usa il dispatcher. Le ore di silenzio trattengono comunque prima
+un cambiamento.
+
+```yaml
+delivery:
+  onCall:
+    enabled: true
+    minSeverity: major_outage
+    startsOn: 2026-10-05
+    rotation: [alice, bob]   # id dei destinatari; la settimana 1 è di alice
+```
+
+**`deliveryTest`** è una notifica che dimostra che il sistema di notifica
+funziona ancora, non solo il giorno in cui è stato configurato. Una volta a
+settimana UTC ogni canale attivo riceve un messaggio che dice, nella lingua del
+canale, che è il test settimanale di routine e che non c'è nessun problema; il
+template di un canale non sostituisce quel testo. Ogni canale è provato per conto
+suo, quindi un esito appartiene sempre a un solo canale. Un fallimento conta come
+canale rotto subito — un solo test fallito è la prova a cui gli avvisi veri
+arrivano con più fallimenti, perché con un messaggio a settimana ce ne
+vorrebbe un mese per dirlo — e l'avviso esistente di
+[`channelHealth`](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti)
+avverte gli altri canali, se è attivo. Il test parte al primo poll della
+settimana, aspetta la fine delle ore di silenzio e non viene ritentato.
+**Solo edizione UI**: la settimana dell'ultima esecuzione sta nel database.
+
 L'edizione Light configura il blocco `delivery` sopra (con le riserve appena
-dette per `escalation`, `attachChart` e `report`); l'edizione UI li modifica da
+dette per `escalation`, `attachChart`, `report` e `deliveryTest`); l'edizione UI li modifica da
 **Impostazioni → Consegna**, dove ogni riga si applica da sé e senza riavvio.
 
 ### 3.9 Validare un `config.yml` — il comando `check`

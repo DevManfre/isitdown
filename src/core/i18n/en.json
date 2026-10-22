@@ -64,6 +64,8 @@
   "notification.digest.slow-page": "status page slow — {latency} against a usual {median}",
   "notification.digest.channel-failing": "channel {channel} failing — {count} message(s) in a row lost",
   "notification.digest.report": "periodic report — fleet uptime {uptime}%",
+  "notification.delivery-test": "IsItDown — routine delivery test\n\nThis is the scheduled weekly test of channel {channel}. Nothing is wrong: if you can read this, delivery works.",
+  "notification.digest.delivery-test": "routine delivery test of {channel}",
 
   "notification.suppressed": "{count} further alert(s) for this provider were suppressed by the hourly cap.",
   "notification.escalated": "⏫ Nobody took this in charge after {minutes} min — sending it again here.",

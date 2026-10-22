@@ -9,6 +9,8 @@ import {
   incidentSummarySchema,
   knownOutageSchema,
   reportSchema,
+  onCallSchema,
+  deliveryTestSchema,
   digestSchema,
   pollingSchema,
   quietHoursSchema,
@@ -50,6 +52,8 @@ const deliveryPatchSchema = z.object({
   coalesce: coalesceSchema.partial().optional(),
   knownOutage: knownOutageSchema.partial().optional(),
   report: reportSchema.partial().optional(),
+  onCall: onCallSchema.partial().optional(),
+  deliveryTest: deliveryTestSchema.partial().optional(),
   attachChart: z.boolean().optional(),
 });
 
@@ -77,7 +81,7 @@ function deliveryPatch(
   patch: z.infer<typeof deliveryPatchSchema> | undefined,
 ): Record<string, unknown> {
   if (patch === undefined) return {};
-  const { quietHours, digest, cap, updateInPlace, maintenanceNotice, escalation, channelHealth, incidentSummary, coalesce, knownOutage, report, attachChart } = patch;
+  const { quietHours, digest, cap, updateInPlace, maintenanceNotice, escalation, channelHealth, incidentSummary, coalesce, knownOutage, report, onCall, deliveryTest, attachChart } = patch;
   return {
     ...(quietHours?.enabled === undefined
       ? {}
@@ -124,6 +128,11 @@ function deliveryPatch(
     ...(report?.enabled === undefined ? {} : { reportEnabled: report.enabled }),
     ...(report?.frequency === undefined ? {} : { reportFrequency: report.frequency }),
     ...(report?.channel === undefined ? {} : { reportChannel: report.channel }),
+    ...(onCall?.enabled === undefined ? {} : { onCallEnabled: onCall.enabled }),
+    ...(onCall?.minSeverity === undefined ? {} : { onCallMinSeverity: onCall.minSeverity }),
+    ...(onCall?.rotation === undefined ? {} : { onCallRotation: onCall.rotation.join(",") }),
+    ...(onCall?.startsOn === undefined ? {} : { onCallStartsOn: onCall.startsOn }),
+    ...(deliveryTest?.enabled === undefined ? {} : { deliveryTestEnabled: deliveryTest.enabled }),
   };
 }
 
@@ -190,6 +199,17 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     if (!parsed.success) {
       res.status(400).json({ error: { message: issues(parsed.error) } });
       return;
+    }
+    // A rotation naming somebody nobody defined is refused here, where there
+    // is an operator to tell, rather than warned about when a major arrives.
+    const rotation = parsed.data.delivery?.onCall?.rotation;
+    if (rotation !== undefined) {
+      const known = new Set(listRecipients(db, runtime.logger).map((recipient) => recipient.id));
+      const unknown = rotation.filter((id) => !known.has(id));
+      if (unknown.length > 0) {
+        res.status(400).json({ error: { message: `unknown recipient in the on-call rotation: ${unknown.join(", ")}` } });
+        return;
+      }
     }
     writeSettings(db, {
       ...(parsed.data.intervalMinutes === undefined

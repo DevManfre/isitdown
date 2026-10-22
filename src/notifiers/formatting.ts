@@ -64,6 +64,7 @@ const TEMPLATE: Record<StatusChangeKind, string> = {
   correlated_outage: "notification.correlated.outage",
   correlated_resolved: "notification.correlated.resolved",
   periodic_report: "notification.report.weekly",
+  delivery_test: "notification.delivery-test",
   silent_outage: "notification.silent.outage",
   sla_burn: "notification.sla.burn",
   slow_status_page: "notification.slow.page",
@@ -89,7 +90,8 @@ function accentFor(change: StatusChange): { emoji: string; color: number } {
     change.kind === "monitoring_degraded" ||
     change.kind === "slow_status_page" ||
     change.kind === "channel_failing" ||
-    change.kind === "periodic_report"
+    change.kind === "periodic_report" ||
+    change.kind === "delivery_test"
   ) {
     return { emoji: EMOJI.unknown, color: COLOR.unknown };
   }
@@ -409,6 +411,8 @@ function summarise(payload: NotificationPayload): string {
       return t(locale, "notification.digest.report", {
         uptime: change.report?.fleetUptime?.toFixed(2) ?? "—",
       });
+    case "delivery_test":
+      return t(locale, "notification.digest.delivery-test", { channel: change.channel?.id ?? "" });
   }
 }
 
@@ -539,6 +543,16 @@ function render(
     return withSuppressed(reportText(payload.change, payload.locale), payload);
   }
 
+  // A routine test says what it is in the catalog's words, whatever template
+  // the channel has: a test that read like a real alert is the one thing it
+  // must not do (roadmap 3.16).
+  if (payload.change.kind === "delivery_test") {
+    return withSuppressed(
+      `${accentFor(payload.change).emoji} ${t(payload.locale, "notification.delivery-test", { channel: payload.change.channel?.id ?? "" })}`,
+      payload,
+    );
+  }
+
   // The channel's own template, when it has one (roadmap 3.15). Checked after
   // the digest above and before the per-kind catalog below: a digest describes
   // a batch and a template describes one change, so the two never meet, and
@@ -643,7 +657,12 @@ function render(
  * a provider only because the lost message happened to be about it.
  */
 function withContext(message: string, payload: NotificationPayload): string {
-  if (payload.change.kind === "channel_failing" || payload.change.kind === "periodic_report") return message;
+  if (
+    payload.change.kind === "channel_failing" ||
+    payload.change.kind === "periodic_report" ||
+    payload.change.kind === "delivery_test"
+  )
+    return message;
   const { impact, owner } = payload.service;
   const lines = [
     ...(impact === undefined || impact === "" ? [] : [t(payload.locale, "notification.impact", { impact })]),

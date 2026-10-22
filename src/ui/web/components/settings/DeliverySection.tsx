@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
   Select,
@@ -28,7 +29,8 @@ import type {
 } from "@/lib/types.ts";
 // The floors come from core's own list rather than a copy: a floor added there
 // has to appear here, and a literal array would silently not.
-import { SEVERITY_FLOORS } from "../../../../core/routing.ts";
+import { onCallRecipientId } from "../../../../core/onCall.ts";
+import { SEVERITY_FLOORS, type SeverityFloor } from "../../../../core/routing.ts";
 
 /** The two typed numbers in the delivery section, bounded like the engine's. */
 const DELIVERY_BOUNDS = {
@@ -154,6 +156,14 @@ export function DeliverySection({
   const coalesceWindow = coalesceWindow_ ?? coalesce.windowMinutes;
   const knownOutage = delivery.knownOutage ?? DELIVERY_OFF.knownOutage!;
   const report = delivery.report ?? DELIVERY_OFF.report!;
+  const onCall = delivery.onCall ?? DELIVERY_OFF.onCall!;
+  const deliveryTest = delivery.deliveryTest ?? DELIVERY_OFF.deliveryTest!;
+  const recipients = config.recipients ?? [];
+  const onCallNow = onCallRecipientId(
+    { ...onCall, minSeverity: onCall.minSeverity as SeverityFloor, enabled: true },
+    new Date(),
+  );
+  const onCallNowName = recipients.find((recipient) => recipient.id === onCallNow)?.name;
 
   /**
    * One field of the delivery policy at a time. The patch is partial at every
@@ -172,6 +182,8 @@ export function DeliverySection({
     coalesce?: Partial<NonNullable<DeliveryPolicy["coalesce"]>>;
     knownOutage?: Partial<NonNullable<DeliveryPolicy["knownOutage"]>>;
     report?: Partial<NonNullable<DeliveryPolicy["report"]>>;
+    onCall?: Partial<NonNullable<DeliveryPolicy["onCall"]>>;
+    deliveryTest?: Partial<NonNullable<DeliveryPolicy["deliveryTest"]>>;
     attachChart?: boolean;
   }): void => {
     toast("delivery", undefined);
@@ -604,6 +616,110 @@ export function DeliverySection({
           onCheckedChange={(next) =>
             commitDelivery({ knownOutage: { enabled: next } })
           }
+        />
+      </SettingRow>
+
+
+      <SettingRow
+        label={t("field.on-call")}
+        description={t("field.on-call.hint")}
+        align="top"
+      >
+        <Switch
+          id="on-call"
+          aria-label={t("field.on-call")}
+          checked={onCall.enabled}
+          disabled={recipients.length === 0}
+          onCheckedChange={(next) => commitDelivery({ onCall: { enabled: next } })}
+        />
+      </SettingRow>
+      {recipients.length === 0 ? (
+        <p className="text-muted-foreground px-4 py-3 text-sm">{t("field.on-call.no-recipients")}</p>
+      ) : null}
+
+      <Reveal open={onCall.enabled && recipients.length > 0}>
+        <SettingRow label={t("field.on-call.floor")} align="top">
+          <FloorSelect
+            id="on-call-floor"
+            label={t("field.on-call.floor")}
+            value={onCall.minSeverity as SeverityFloor}
+            onChange={(value) => commitDelivery({ onCall: { minSeverity: value } })}
+          />
+        </SettingRow>
+        <SettingRow label={t("field.on-call.starts-on")} description={t("field.on-call.starts-on.hint")} align="top">
+          <Input
+            id="on-call-starts-on"
+            type="date"
+            className="w-56"
+            aria-label={t("field.on-call.starts-on")}
+            value={onCall.startsOn}
+            onChange={(event) => commitDelivery({ onCall: { startsOn: event.target.value } })}
+          />
+        </SettingRow>
+        <SettingRow label={t("field.on-call.rotation")} description={t("field.on-call.rotation.hint")} align="top">
+          <div className="flex flex-col gap-2">
+            {onCall.rotation.map((id, index) => (
+              <div key={`${index}-${id}`} className="flex items-center gap-2">
+                <span className="text-muted-foreground w-20 text-sm">{t("field.on-call.week", { number: index + 1 })}</span>
+                <Select
+                  value={id}
+                  onValueChange={(next) =>
+                    commitDelivery({ onCall: { rotation: onCall.rotation.map((slot, at) => (at === index ? next : slot)) } })
+                  }
+                >
+                  <SelectTrigger className="w-56" aria-label={t("field.on-call.week", { number: index + 1 })}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {recipients.map((recipient) => (
+                      <SelectItem key={recipient.id} value={recipient.id}>
+                        {recipient.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    commitDelivery({ onCall: { rotation: onCall.rotation.filter((_, at) => at !== index) } })
+                  }
+                >
+                  {t("field.on-call.remove")}
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-fit"
+              onClick={() =>
+                commitDelivery({ onCall: { rotation: [...onCall.rotation, recipients[0]!.id] } })
+              }
+            >
+              {t("field.on-call.add")}
+            </Button>
+            <p className="text-sm" role="status">
+              {onCallNowName === undefined
+                ? t("field.on-call.nobody")
+                : t("field.on-call.now", { name: onCallNowName })}
+            </p>
+          </div>
+        </SettingRow>
+      </Reveal>
+
+      <SettingRow
+        label={t("field.delivery-test")}
+        description={t("field.delivery-test.hint")}
+        align="top"
+      >
+        <Switch
+          id="delivery-test"
+          aria-label={t("field.delivery-test")}
+          checked={deliveryTest.enabled}
+          onCheckedChange={(next) => commitDelivery({ deliveryTest: { enabled: next } })}
         />
       </SettingRow>
 

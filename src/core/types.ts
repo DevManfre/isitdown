@@ -100,6 +100,8 @@ export const STATUS_CHANGE_KINDS = [
   "correlated_resolved",
   // The fleet's week or month, sent on a schedule (roadmap 3.13).
   "periodic_report",
+  // A routine test of a channel, sent on a schedule (roadmap 3.16).
+  "delivery_test",
   "silent_outage",
   "sla_burn",
   "slow_status_page",
