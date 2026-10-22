@@ -771,6 +771,10 @@ export interface DeliveryPolicy {
   knownOutage?: { enabled: boolean };
   /** Roadmap 3.13: a weekly or monthly report on one channel. Optional, as above. */
   report?: { enabled: boolean; frequency: "weekly" | "monthly"; channel: string };
+  /** Roadmap 3.15: the recipient on call this week also hears a major. Optional, as above. */
+  onCall?: { enabled: boolean; minSeverity: string; rotation: string[]; startsOn: string };
+  /** Roadmap 3.16: a weekly test message on every enabled channel. Optional, as above. */
+  deliveryTest?: { enabled: boolean };
   /** Roadmap 3.12: attach the provider's last 24 hours as an SVG where a channel can carry one. Optional, as above. */
   attachChart?: boolean;
 }

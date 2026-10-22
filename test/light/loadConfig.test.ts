@@ -359,6 +359,8 @@ test("a file with no delivery block reads as every control off", async () => {
     coalesce: { enabled: false, windowMinutes: 2 },
     knownOutage: { enabled: false },
     report: { enabled: false, frequency: "weekly", channel: "" },
+    onCall: { enabled: false, minSeverity: "major_outage", rotation: [], startsOn: "" },
+    deliveryTest: { enabled: false },
     attachChart: false,
   });
 });

@@ -55,6 +55,10 @@ export function incidentKey(change: StatusChange): string {
     // overwrite the weekly one with the monthly one.
     case "periodic_report":
       return `isitdown/report/${change.report?.frequency ?? "unknown"}`;
+    // Per channel, like its failure alert: the test of one channel must never
+    // overwrite the test of another on a channel that edits in place.
+    case "delivery_test":
+      return `isitdown/delivery-test/${change.channel?.id ?? "unknown"}`;
   }
 }
 

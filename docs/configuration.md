@@ -1859,8 +1859,46 @@ never. Turning it on sends the report for the last closed period at the next
 poll. A channel that is not enabled is said so in the log. **UI edition only**:
 it reads the stored history, so the Light edition ignores the block.
 
+**`onCall`** says who is on call this week, without becoming an on-call system:
+PagerDuty and Opsgenie are already channels, and this does not replace them. It
+is a rotation of [recipients](#321-recipients--one-person-several-channels) that
+already exist — one per week, in turn, then it starts over — and whoever's week
+it is hears every change at or above `minSeverity` (default `major_outage`) *in
+addition to* whoever the routing rules already chose. It adds a reader and never
+removes one, so a rotation that is wrong can only over-notify: one that names a
+recipient nobody defined loses the extra reader, not the alert, and says so in
+the log. The recipient is reached the way recipients always are — on the
+preferred channel, falling back to the next only if that one fails. Weeks run
+Monday to Sunday, UTC; `startsOn` is any day of the first week (empty counts from
+1970), and a date that cannot be read counts the same way rather than stopping
+an alert. Nothing is stored: who is on call is a function of the date, so a
+restart changes nothing and the dashboard shows the same name the dispatcher
+uses. Quiet hours still hold a change back first.
+
+```yaml
+delivery:
+  onCall:
+    enabled: true
+    minSeverity: major_outage
+    startsOn: 2026-10-05
+    rotation: [alice, bob]   # recipient ids; week 1 is alice's
+```
+
+**`deliveryTest`** is a notification that proves the notification system still
+works, not just on the day it was configured. Once a UTC week every enabled
+channel gets a message that says, in the channel's own language, that it is the
+routine weekly test and that nothing is wrong; a channel's template does not
+replace that text. Each channel is tested on its own, so a result always belongs
+to one channel. A failure is counted as a broken channel at once — one failed
+test is the proof the real alerts need several failures to approach, since a
+weekly message would otherwise take a month to say so — and the existing
+[`channelHealth`](#38-delivery-policy--quiet-hours-digests-caps) alert tells the
+other channels, when that is switched on. The test goes out on the first poll of
+the week, waits out quiet hours, and is not retried. **UI edition only**: the
+week it last ran is kept in the database.
+
 The Light edition configures the `delivery` block above (with the caveats just
-given for `escalation`, `attachChart` and `report`); the UI edition edits them
+given for `escalation`, `attachChart`, `report` and `deliveryTest`); the UI edition edits them
 under **Settings → Delivery**, where each row applies on its own without a
 restart.
 

@@ -64,6 +64,8 @@
   "notification.digest.slow-page": "Statusseite langsam — {latency} statt sonst {median}",
   "notification.digest.channel-failing": "Kanal {channel} gestört — {count} Nachricht(en) in Folge verloren",
   "notification.digest.report": "periodischer Bericht — Verfügbarkeit der Flotte {uptime}%",
+  "notification.delivery-test": "IsItDown — routinemäßiger Zustellungstest\n\nDies ist der geplante wöchentliche Test des Kanals {channel}. Es ist nichts kaputt: Wenn Sie das lesen können, funktioniert die Zustellung.",
+  "notification.digest.delivery-test": "routinemäßiger Zustellungstest von {channel}",
 
   "notification.suppressed": "{count} weitere Meldungen zu diesem Anbieter wurden durch das Stundenlimit unterdrückt.",
   "notification.escalated": "⏫ Niemand hat das nach {minutes} Min. übernommen — deshalb hier noch einmal.",

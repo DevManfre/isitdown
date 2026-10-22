@@ -1021,6 +1021,8 @@ test("GET /config reports the delivery policy, and an unconfigured one reads as 
       coalesce: { enabled: false, windowMinutes: 2 },
       knownOutage: { enabled: false },
       report: { enabled: false, frequency: "weekly", channel: "" },
+      onCall: { enabled: false, minSeverity: "major_outage", rotation: [], startsOn: "" },
+      deliveryTest: { enabled: false },
       attachChart: false,
     });
   } finally {
@@ -1537,6 +1539,43 @@ test("a provider's impact and owner are stored, served, and cleared with null", 
     assert.equal((await read())?.impact, undefined);
     assert.equal((await read())?.owner, undefined);
     assert.equal((await app.request("PATCH", `/config/services/${id}`, { impact: "x".repeat(201) })).status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
+// Roadmap 3.15 and 3.16.
+test("PATCH /config/settings stores the on-call rotation and the routine test, and GET reads them back", async () => {
+  const app = await api();
+  try {
+    const recipients = [
+      { id: "alice", name: "Alice", channels: ["telegram", "discord"] },
+      { id: "bob", name: "Bob", channels: ["pagerduty", "slack"] },
+    ];
+    await app.request("PUT", "/config/recipients", { recipients });
+    const delivery = {
+      onCall: { enabled: true, minSeverity: "major_outage", rotation: ["alice", "bob"], startsOn: "2026-10-05" },
+      deliveryTest: { enabled: true },
+    };
+    const { status } = await app.request("PATCH", "/config/settings", { delivery });
+    assert.equal(status, 200);
+    const loaded = (await app.runtime.configSource.load()).delivery;
+    assert.deepEqual(loaded.onCall, delivery.onCall);
+    assert.deepEqual(loaded.deliveryTest, { enabled: true });
+  } finally {
+    await app.close();
+  }
+});
+
+test("PATCH /config/settings refuses a rotation that names an unknown recipient, and writes nothing", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.request("PATCH", "/config/settings", {
+      delivery: { onCall: { enabled: true, rotation: ["ghost"] } },
+    });
+    assert.equal(status, 400);
+    assert.match(JSON.stringify(body), /ghost/);
+    assert.equal((await app.runtime.configSource.load()).delivery.onCall.enabled, false);
   } finally {
     await app.close();
   }
