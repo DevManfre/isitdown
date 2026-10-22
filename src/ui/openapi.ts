@@ -396,6 +396,41 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }) },
     },
   },
+  "/dashboards/{id}": {
+    get: {
+      tags: ["Status"],
+      summary: "One dashboard's widget layout, the Overview's being `default`.",
+      description:
+        "Roadmap 4.1. A dashboard never customised answers the code default with `isDefault: true`; a stored layout this version cannot read answers the default with `layoutInvalid: true`.",
+      parameters: [path("id", "Dashboard id; `default` is the Overview.")],
+      responses: { "200": ok({ type: "object" }), "404": notFound },
+    },
+    put: {
+      tags: ["Status"],
+      summary: "Save a widget layout.",
+      description:
+        "Body `{ layout, updatedAt }`, `updatedAt` being the version the edit started from. A save based on a copy someone else has since replaced is refused with 409 and the current dashboard under `current`.",
+      parameters: [path("id", "Dashboard id.")],
+      requestBody: { required: true, ...json({ type: "object" }) },
+      responses: {
+        "200": ok({ type: "object" }),
+        "400": badRequest,
+        "404": notFound,
+        "409": {
+          description: "The dashboard was saved elsewhere since this copy was read.",
+          ...json({ type: "object" }),
+        },
+      },
+    },
+  },
+  "/dashboards/{id}/layout": {
+    delete: {
+      tags: ["Status"],
+      summary: "Forget the customisation: the dashboard follows the default layout again.",
+      parameters: [path("id", "Dashboard id.")],
+      responses: { "200": ok({ type: "object" }), "404": notFound },
+    },
+  },
   "/map": {
     get: {
       tags: ["Status"],

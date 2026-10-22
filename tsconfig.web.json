@@ -24,6 +24,7 @@
     "src/ui/web/**/*.ts",
     "src/ui/web/**/*.tsx",
     "src/ui/routePaths.ts",
+    "src/ui/dashboardLayout.ts",
     "src/core/routing.ts",
     "vite.config.ts"
   ]

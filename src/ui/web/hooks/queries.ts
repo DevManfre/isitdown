@@ -13,7 +13,8 @@ import {
   REFRESH_MS,
   statusRefetchDelay,
 } from "@/lib/statusRefetch.ts";
-import type { StatusResponse } from "@/lib/types.ts";
+import type { DashboardResponse, StatusResponse } from "@/lib/types.ts";
+import { DEFAULT_LAYOUT, type DashboardLayout } from "../../dashboardLayout.ts";
 import { useBusy } from "./useBusy.tsx";
 import { useLive } from "./useLive.tsx";
 
@@ -453,6 +454,44 @@ export const useDeliveryLog = (query: api.DeliveryLogQuery = {}) => {
  * a failed map must show its own error inside the card, not replace the
  * Overview with one.
  */
+/**
+ * The Overview's widget layout — roadmap 4.1. Never throws: a dashboard whose
+ * layout cannot be fetched still draws, as the default. The placeholder is the
+ * same default the server answers for an install nobody customised, so the
+ * first paint is the right one and there is no second skeleton.
+ */
+export function useDashboard(id = "default") {
+  const busy = useBusy();
+  const live = useLive();
+  return useQuery({
+    queryKey: ["dashboard", id],
+    queryFn: () => api.getDashboard(id),
+    placeholderData: { id, name: "", layout: DEFAULT_LAYOUT, isDefault: true, updatedAt: "" },
+    refetchInterval: idleInterval(busy, live),
+    throwOnError: false,
+  });
+}
+
+/**
+ * Save and reset for the Overview's layout. Both write the answer straight into
+ * the `["dashboard", id]` cache, so leaving edit mode shows the saved layout on
+ * the very next render instead of flashing the old one until a refetch lands.
+ */
+export function useDashboardMutations(id = "default") {
+  const client = useQueryClient();
+  const keep = (dashboard: DashboardResponse) => client.setQueryData(["dashboard", id], dashboard);
+  return {
+    save: useMutation({
+      mutationFn: ({ layout, updatedAt }: { layout: DashboardLayout; updatedAt: string }) =>
+        api.putDashboard(id, layout, updatedAt),
+      onSuccess: (result) => {
+        if (result.kind === "saved") keep(result.dashboard);
+      },
+    }),
+    reset: useMutation({ mutationFn: () => api.resetDashboard(id), onSuccess: keep }),
+  };
+}
+
 export function useMap(enabled: boolean) {
   const busy = useBusy();
   const live = useLive();

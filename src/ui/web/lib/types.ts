@@ -10,6 +10,8 @@
  * redacted to "is this env var set", never the resolved secret).
  */
 
+import type { DashboardLayout } from "../../dashboardLayout.ts";
+
 /** Normalised severity vocabulary. Providers' own words are mapped onto this. */
 export type OverallStatus =
   "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown";
@@ -894,6 +896,19 @@ export interface UnlocatedProvider {
   providerId: string;
   providerName: string;
   count: number;
+}
+
+/** `GET /dashboards/:id` — roadmap 4.1. */
+export interface DashboardResponse {
+  id: string;
+  name: string;
+  layout: DashboardLayout;
+  /** No customisation stored: the layout is the code default. */
+  isDefault: boolean;
+  /** The stored layout could not be read, so the default stands in for it. */
+  layoutInvalid?: true;
+  /** The version a save is checked against. */
+  updatedAt: string;
 }
 
 export interface MapResponse {
