@@ -1737,8 +1737,8 @@ un insieme ipotetico.
 ### 3.8 Politica di consegna — ore di silenzio, riepiloghi, limiti
 
 Le regole di instradamento decidono *chi* viene informato di un cambiamento.
-Altri sette controlli decidono *quanto* di quel cambiamento esce davvero, e in
-quanti messaggi. Tutti e sette sono disattivati per default, così
+Altri dodici controlli decidono *quanto* di quel cambiamento esce davvero, e in
+quanti messaggi. Tutti sono disattivati per default, così
 un'installazione che non ne configura nessuno si comporta esattamente come prima
 che esistessero.
 
@@ -1769,6 +1769,18 @@ delivery:
   channelHealth:
     enabled: true
     afterFailures: 3
+  incidentSummary:
+    enabled: true
+  coalesce:
+    enabled: true
+    windowMinutes: 2
+  knownOutage:
+    enabled: true
+  attachChart: true          # solo edizione UI
+  report:                    # solo edizione UI
+    enabled: true
+    frequency: weekly        # weekly | monthly
+    channel: slack
 ```
 
 **Le ore di silenzio** sono un *ingresso* dell'instradamento, non un filtro
@@ -1856,10 +1868,75 @@ silenzio lo trattengono come ogni altro cambiamento di monitoraggio, ed esce
 dopo invece che mai. Il **Invia test** dell'operatore non conta. Le serie vivono
 in memoria come il limite, quindi un riavvio le fa ripartire.
 
-L'edizione Light configura tutti e sette con il blocco `delivery` sopra (con la
-riserva appena detta per `escalation`);
-l'edizione UI li modifica da **Impostazioni → Consegna**, dove ogni riga si
-applica da sé e senza riavvio.
+**`incidentSummary`** sostituisce i messaggi "risolto" di un guasto condiviso con
+uno solo. Quando più provider peggiorano dentro la finestra di correlazione,
+l'avviso lo dice già una volta (`correlationThreshold`); questa è la stessa
+storia raccontata alla fine. Finché quel guasto è aperto, il rientro alla
+normalità di ogni membro viene trattenuto, e quando l'ultimo è tornato un solo
+messaggio dice "il guasto condiviso è finito: 6 provider coinvolti, 47 min in
+tutto", con la causa probabile se i provider ne hanno dichiarata una con
+`dependsOn`. Viene instradato e modificato sul posto come l'avviso che lo ha
+aperto, e lo chiude su un canale di reperibilità. Un membro che peggiora di nuovo
+prima che gli altri si riprendano non conta come rientrato, e uno che non si
+riprende mai non trattiene gli altri per sempre: dopo sei ore il riepilogo esce
+per i membri che si sono ripresi e gli altri vengono segnalati da soli. Il
+guasto aperto vive in memoria, quindi dopo un riavvio ogni rientro viene
+segnalato singolarmente.
+
+**`coalesce`** invia solo l'ultimo di una serie di aggiornamenti dello stesso
+incidente. Un provider che pubblica quattro aggiornamenti in dieci minuti produce
+quattro messaggi, o quattro modifiche; con questa opzione un aggiornamento
+aspetta `windowMinutes` (1–60, default 2) e viene sostituito da qualunque altro
+più recente sullo stesso incidente, così esce lo stato in cui si trova
+l'incidente, una volta sola. La finestra parte dal *primo* aggiornamento della
+serie, quindi un provider che aggiorna ogni minuto produce comunque un messaggio
+ogni `windowMinutes` invece di nessuno. L'apertura di un incidente non viene mai
+trattenuta, e la sua risoluzione parte subito e annulla ogni aggiornamento ancora
+in attesa. Ciò che aspetta viene giudicato da ore di silenzio, limite e riepilogo
+quando viene rilasciato, non quando è arrivato; il rilascio avviene a un ciclo di
+polling, quindi una finestra più corta della cadenza non è più corta. Gli
+aggiornamenti trattenuti vivono in memoria, quindi un riavvio ne perde al più una
+finestra, e disattivare l'opzione rilascia quanto era in attesa.
+
+**`knownOutage`** evita che un'interruzione di cui sei già stato avvisato ti
+chiami di nuovo a ogni aggiornamento. Finché un provider è in major outage, gli
+ulteriori aggiornamenti del suo incidente vanno nella finestra del riepilogo
+invece di uscire — che `digest` sia attivo o no — e arrivano come un solo
+messaggio. Un cambio di stato (compreso quello verso o da major outage), la
+risoluzione e un aggiornamento mentre il provider è sotto il major outage
+interrompono comunque, come ogni incidente che segui.
+
+**`attachChart`** aggiunge ai messaggi di stato e di incidente le ultime 24 ore
+del provider come SVG — quarantotto celle da mezz'ora, ognuna grave quanto la
+lettura peggiore al suo interno, grigia dove non si è letto nulla, ognuna con un
+titolo così il colore non è mai l'unico veicolo. Disegna solo SVG, di proposito:
+un rasterizzatore aggiungerebbe una dipendenza nativa a ogni immagine. Quindi
+arriva solo ai canali che possono portarlo: **email** lo allega come
+`<provider>-uptime-24h.svg`, e il **webhook** aggiunge al corpo un campo
+`chart: { contentType, svg }`. Ogni altro canale invia il messaggio come ha
+sempre fatto. Viene disegnato una volta per cambiamento, mai per un riepilogo,
+un avviso di manutenzione, un report o un avviso di canale, e un errore nel
+disegnarlo costa l'immagine e non l'avviso. **Solo edizione UI**: viene disegnato
+dalle letture conservate.
+
+**`report`** consegna la settimana o il mese della flotta su un solo `channel`,
+invece di aspettare che qualcuno scarichi il report mensile: uptime della flotta,
+i tre provider più deboli sotto il 100%, quanti incidenti, e il budget di errore
+speso per ogni provider con uno `slaTarget`. `weekly` copre l'ultima settimana
+completa da lunedì a domenica e `monthly` l'ultimo mese di calendario, entrambi
+in UTC come ogni altro giorno dello storico; esce al primo polling dopo la
+chiusura del periodo, una sola volta. Il budget di un report mensile è quello di
+quel mese; in uno settimanale è quello del mese finora, la cifra su cui l'avviso
+del budget di errore già avverte. Va al solo canale scelto — non è un avviso,
+quindi regole di instradamento, limite e riepilogo non si applicano — ma aspetta
+la fine delle ore di silenzio, ed esce dopo invece che mai. Attivarlo invia al
+polling successivo il report dell'ultimo periodo chiuso. Un canale non abilitato
+viene detto nel log. **Solo edizione UI**: legge lo storico conservato, quindi
+l'edizione Light ignora il blocco.
+
+L'edizione Light configura il blocco `delivery` sopra (con le riserve appena
+dette per `escalation`, `attachChart` e `report`); l'edizione UI li modifica da
+**Impostazioni → Consegna**, dove ogni riga si applica da sé e senza riavvio.
 
 ### 3.9 Validare un `config.yml` — il comando `check`
 

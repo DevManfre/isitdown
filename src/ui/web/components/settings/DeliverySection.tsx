@@ -37,6 +37,7 @@ const DELIVERY_BOUNDS = {
   leadMinutes: { min: 1, max: 10_080, labelKey: "field.maintenance-notice.lead" },
   afterMinutes: { min: 1, max: 1440, labelKey: "field.escalation.after" },
   afterFailures: { min: 2, max: 100, labelKey: "field.channel-health.after" },
+  coalesceMinutes: { min: 1, max: 60, labelKey: "field.coalesce.window" },
 };
 
 /**
@@ -138,6 +139,7 @@ export function DeliverySection({
   const [noticeLead_, setNoticeLead] = useState<number | undefined>(undefined);
   const [escalationAfter_, setEscalationAfter] = useState<number | undefined>(undefined);
   const [channelFailures_, setChannelFailures] = useState<number | undefined>(undefined);
+  const [coalesceWindow_, setCoalesceWindow] = useState<number | undefined>(undefined);
 
   const digestWindow = digestWindow_ ?? delivery.digest.windowMinutes;
   const capPerHour = capPerHour_ ?? delivery.cap.maxPerHour;
@@ -147,6 +149,11 @@ export function DeliverySection({
   const escalationAfter = escalationAfter_ ?? escalation.afterMinutes;
   const channelHealth = delivery.channelHealth ?? DELIVERY_OFF.channelHealth!;
   const channelFailures = channelFailures_ ?? channelHealth.afterFailures;
+  const incidentSummary = delivery.incidentSummary ?? DELIVERY_OFF.incidentSummary!;
+  const coalesce = delivery.coalesce ?? DELIVERY_OFF.coalesce!;
+  const coalesceWindow = coalesceWindow_ ?? coalesce.windowMinutes;
+  const knownOutage = delivery.knownOutage ?? DELIVERY_OFF.knownOutage!;
+  const report = delivery.report ?? DELIVERY_OFF.report!;
 
   /**
    * One field of the delivery policy at a time. The patch is partial at every
@@ -161,6 +168,11 @@ export function DeliverySection({
     maintenanceNotice?: Partial<NonNullable<DeliveryPolicy["maintenanceNotice"]>>;
     escalation?: Partial<NonNullable<DeliveryPolicy["escalation"]>>;
     channelHealth?: Partial<NonNullable<DeliveryPolicy["channelHealth"]>>;
+    incidentSummary?: Partial<NonNullable<DeliveryPolicy["incidentSummary"]>>;
+    coalesce?: Partial<NonNullable<DeliveryPolicy["coalesce"]>>;
+    knownOutage?: Partial<NonNullable<DeliveryPolicy["knownOutage"]>>;
+    report?: Partial<NonNullable<DeliveryPolicy["report"]>>;
+    attachChart?: boolean;
   }): void => {
     toast("delivery", undefined);
     settingsMutation.mutate(
@@ -203,7 +215,9 @@ export function DeliverySection({
             ? { escalation: { afterMinutes: value } }
             : field === "afterFailures"
               ? { channelHealth: { afterFailures: value } }
-              : { cap: { maxPerHour: value } },
+              : field === "coalesceMinutes"
+                ? { coalesce: { windowMinutes: value } }
+                : { cap: { maxPerHour: value } },
     );
   };
 
@@ -525,6 +539,130 @@ export function DeliverySection({
             }
             onFocus={fieldProps.onFocus}
             onBlur={fieldProps.onBlur}
+          />
+        </SettingRow>
+      </Reveal>
+
+      <SettingRow
+        label={t("field.incident-summary")}
+        description={t("field.incident-summary.hint")}
+        align="top"
+      >
+        <Switch
+          id="incident-summary"
+          aria-label={t("field.incident-summary")}
+          checked={incidentSummary.enabled}
+          onCheckedChange={(next) =>
+            commitDelivery({ incidentSummary: { enabled: next } })
+          }
+        />
+      </SettingRow>
+
+      <SettingRow
+        label={t("field.coalesce")}
+        description={t("field.coalesce.hint")}
+        align="top"
+      >
+        <Switch
+          id="coalesce"
+          aria-label={t("field.coalesce")}
+          checked={coalesce.enabled}
+          onCheckedChange={(next) =>
+            commitDelivery({ coalesce: { enabled: next } })
+          }
+        />
+      </SettingRow>
+
+      <Reveal open={coalesce.enabled}>
+        <SettingRow label={t("field.coalesce.window")} align="top">
+          <NumberSetting
+            id="coalesce-window"
+            label={t("field.coalesce.window")}
+            unit={t("unit.minutes")}
+            min={DELIVERY_BOUNDS.coalesceMinutes.min}
+            max={DELIVERY_BOUNDS.coalesceMinutes.max}
+            value={coalesceWindow}
+            onChange={setCoalesceWindow}
+            onCommit={(value) =>
+              commitDeliveryNumber("coalesceMinutes", value)
+            }
+            onFocus={fieldProps.onFocus}
+            onBlur={fieldProps.onBlur}
+          />
+        </SettingRow>
+      </Reveal>
+
+      <SettingRow
+        label={t("field.known-outage")}
+        description={t("field.known-outage.hint")}
+        align="top"
+      >
+        <Switch
+          id="known-outage"
+          aria-label={t("field.known-outage")}
+          checked={knownOutage.enabled}
+          onCheckedChange={(next) =>
+            commitDelivery({ knownOutage: { enabled: next } })
+          }
+        />
+      </SettingRow>
+
+      <SettingRow
+        label={t("field.attach-chart")}
+        description={t("field.attach-chart.hint")}
+        align="top"
+      >
+        <Switch
+          id="attach-chart"
+          aria-label={t("field.attach-chart")}
+          checked={delivery.attachChart ?? DELIVERY_OFF.attachChart!}
+          onCheckedChange={(next) => commitDelivery({ attachChart: next })}
+        />
+      </SettingRow>
+
+      <SettingRow
+        label={t("field.report")}
+        description={t("field.report.hint")}
+        align="top"
+      >
+        <Switch
+          id="report"
+          aria-label={t("field.report")}
+          checked={report.enabled}
+          onCheckedChange={(next) =>
+            commitDelivery({ report: { enabled: next } })
+          }
+        />
+      </SettingRow>
+
+      <Reveal open={report.enabled}>
+        <SettingRow label={t("field.report.frequency")} align="top">
+          <Select
+            value={report.frequency}
+            onValueChange={(next) =>
+              commitDelivery({ report: { frequency: next as "weekly" | "monthly" } })
+            }
+          >
+            <SelectTrigger
+              id="report-frequency"
+              className="w-56"
+              aria-label={t("field.report.frequency")}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly">{t("field.report.weekly")}</SelectItem>
+              <SelectItem value="monthly">{t("field.report.monthly")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
+        <SettingRow label={t("field.report.channel")} align="top">
+          <ChannelSelect
+            id="report-channel"
+            label={t("field.report.channel")}
+            value={report.channel}
+            channels={config.channels}
+            onChange={(value) => commitDelivery({ report: { channel: value } })}
           />
         </SettingRow>
       </Reveal>

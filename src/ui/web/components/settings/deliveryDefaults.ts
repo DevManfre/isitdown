@@ -18,4 +18,9 @@ export const DELIVERY_OFF: DeliveryPolicy = {
   maintenanceNotice: { enabled: false, leadMinutes: 120 },
   escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
   channelHealth: { enabled: false, afterFailures: 3 },
+  incidentSummary: { enabled: false },
+  coalesce: { enabled: false, windowMinutes: 2 },
+  knownOutage: { enabled: false },
+  report: { enabled: false, frequency: "weekly", channel: "" },
+  attachChart: false,
 };

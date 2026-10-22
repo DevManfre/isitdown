@@ -1017,6 +1017,11 @@ test("GET /config reports the delivery policy, and an unconfigured one reads as 
       maintenanceNotice: { enabled: false, leadMinutes: 120 },
       escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
       channelHealth: { enabled: false, afterFailures: 3 },
+      incidentSummary: { enabled: false },
+      coalesce: { enabled: false, windowMinutes: 2 },
+      knownOutage: { enabled: false },
+      report: { enabled: false, frequency: "weekly", channel: "" },
+      attachChart: false,
     });
   } finally {
     await it.close();
@@ -1420,6 +1425,88 @@ test("a delivery patch switches channel health on and sets its threshold", async
       (await app.request("PATCH", "/config/settings", { delivery: { channelHealth: { afterFailures: 1 } } })).status,
       400,
       "one failure is a blip, not a broken channel",
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+// Roadmap 3.10, 3.11, 3.14.
+test("a delivery patch sets the shared-failure summary, coalescing and known-outage controls", async () => {
+  const app = await api();
+  try {
+    const { status } = await app.request("PATCH", "/config/settings", {
+      delivery: {
+        incidentSummary: { enabled: true },
+        coalesce: { enabled: true, windowMinutes: 5 },
+        knownOutage: { enabled: true },
+      },
+    });
+    assert.equal(status, 200);
+    const delivery = (
+      (await app.request("GET", "/config")).body as {
+        delivery: { incidentSummary: unknown; coalesce: unknown; knownOutage: unknown };
+      }
+    ).delivery;
+    assert.deepEqual(delivery.incidentSummary, { enabled: true });
+    assert.deepEqual(delivery.coalesce, { enabled: true, windowMinutes: 5 });
+    assert.deepEqual(delivery.knownOutage, { enabled: true });
+
+    await app.request("PATCH", "/config/settings", { delivery: { coalesce: { enabled: false } } });
+    const after = ((await app.request("GET", "/config")).body as { delivery: { coalesce: unknown } }).delivery;
+    assert.deepEqual(after.coalesce, { enabled: false, windowMinutes: 5 }, "a partial patch leaves the window alone");
+
+    for (const windowMinutes of [0, 61]) {
+      assert.equal(
+        (await app.request("PATCH", "/config/settings", { delivery: { coalesce: { windowMinutes } } })).status,
+        400,
+        `${windowMinutes} minutes is outside what a coalescing window can mean`,
+      );
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+// Roadmap 3.12.
+test("a delivery patch switches the attached chart on and off", async () => {
+  const app = await api();
+  try {
+    const read = async () =>
+      ((await app.request("GET", "/config")).body as { delivery: { attachChart: unknown } }).delivery.attachChart;
+    assert.equal((await app.request("PATCH", "/config/settings", { delivery: { attachChart: true } })).status, 200);
+    assert.equal(await read(), true);
+    await app.request("PATCH", "/config/settings", { delivery: { attachChart: false } });
+    assert.equal(await read(), false);
+    assert.equal((await app.request("PATCH", "/config/settings", { delivery: { attachChart: "yes" } })).status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
+// Roadmap 3.13.
+test("a delivery patch sets the periodic report, one field at a time", async () => {
+  const app = await api();
+  try {
+    assert.equal(
+      (
+        await app.request("PATCH", "/config/settings", {
+          delivery: { report: { enabled: true, frequency: "monthly", channel: "slack" } },
+        })
+      ).status,
+      200,
+    );
+    const read = async () =>
+      ((await app.request("GET", "/config")).body as { delivery: { report: unknown } }).delivery.report;
+    assert.deepEqual(await read(), { enabled: true, frequency: "monthly", channel: "slack" });
+
+    await app.request("PATCH", "/config/settings", { delivery: { report: { frequency: "weekly" } } });
+    assert.deepEqual(await read(), { enabled: true, frequency: "weekly", channel: "slack" });
+
+    assert.equal(
+      (await app.request("PATCH", "/config/settings", { delivery: { report: { frequency: "daily" } } })).status,
+      400,
+      "a daily report is a digest, which already exists",
     );
   } finally {
     await app.close();

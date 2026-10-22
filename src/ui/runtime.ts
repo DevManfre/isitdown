@@ -21,6 +21,7 @@ import {
   listServices,
   purgeExpiredServices,
   readSettings,
+  writeSettings,
 } from "./dbConfigSource.ts";
 import { migrate } from "./db/migrate.ts";
 import { openDatabase } from "./db/open.ts";
@@ -34,7 +35,9 @@ import type { HistoryStore } from "./historyStore.interface.ts";
 import { createMapLane, type MapLane } from "./mapLane.ts";
 import { createMapStore, type MapStore } from "./mapStore.ts";
 import { createMetricsRegistry, type MetricsRegistry } from "./metrics.ts";
-import { componentTargetOf } from "../core/routing.ts";
+import { componentTargetOf, inQuietHours } from "../core/routing.ts";
+import { createReportService, reportPeriod } from "./periodicReport.ts";
+import { createChartService } from "./uptimeChart.ts";
 import { createSlaService, rememberSlaNotice, slaAlreadyTold } from "./sla.ts";
 import { createTrustService, type TrustPair } from "./trust.ts";
 import { createRevisionService, type RevisionService } from "./incidentRevisions.ts";
@@ -212,6 +215,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   // Roadmap 4.13. Reads the same monthly report the export and the History view
   // are drawn from, so a budget can never disagree with the uptime beside it.
   const sla = createSlaService({ history });
+  const reports = createReportService({ history, sla });
   const trust = createTrustService(db);
   const configSource = createDbConfigSource(db, options.env, logger);
 
@@ -247,6 +251,9 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   });
   const adapterDebug = createAdapterDebugStore();
 
+  const chartService = createChartService({
+    recentSamples: (providerId, limit) => store.getRecentSamples(providerId, limit),
+  });
   const dispatcher = createDispatcher({
     logger,
     // Where the id of the message already sent about an incident lives, so the
@@ -272,6 +279,12 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     follows: {
       isFollowed: (providerId, incidentId) => store.isIncidentFollowed(providerId, incidentId),
       unfollow: (providerId, incidentId) => store.unfollowIncident(providerId, incidentId),
+    },
+    // The day of uptime attached to a message (roadmap 3.12), drawn from the
+    // stored readings at the cadence they were taken.
+    charts: {
+      uptimeBar: async (providerId, name) =>
+        chartService.uptimeBar(providerId, name, (await configSource.load()).polling.intervalMinutes),
     },
     // What the dashboard's notification feed is built from, and — since every
     // outbound message passes here — what the delivery counters count.
@@ -338,6 +351,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
       });
 
       await reportSlaBurn();
+    await reportPeriodic();
       await rebuildTrust();
     },
   });
@@ -386,6 +400,48 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
       });
     }
   }
+
+  /**
+   * The weekly or monthly report (roadmap 3.13), after the cycle like the budget
+   * alert and for the same reason: it reads the stored history, which only this
+   * edition has.
+   *
+   * Held while quiet hours are on rather than sent through them: nobody asked to
+   * be woken for a summary, and because the marker is only written once the
+   * message has been handed over, the next cycle after the morning sends it.
+   */
+  async function reportPeriodic(): Promise<void> {
+    try {
+      const config = await configSource.load();
+      const policy = config.delivery.report;
+      if (!policy.enabled) return;
+      if (policy.channel === "") {
+        if (!reportWithoutChannelWarned) {
+          reportWithoutChannelWarned = true;
+          logger.warn("the periodic report is on but no channel is chosen for it, so nothing will be sent");
+        }
+        return;
+      }
+      const at = new Date();
+      if (inQuietHours(config.delivery.quietHours, at)) return;
+      const period = reportPeriod(policy.frequency, at);
+      if (readSettings(db, logger).reportLastSent === period.key) return;
+
+      const change = await reports.build(config.services, policy.frequency, config.polling.intervalMinutes, at);
+      if (change === null) return;
+      await dispatcher.dispatch(
+        [change],
+        dispatchContextOf(config, buildAllNotifiers(config.channels), [...interactiveChannels]),
+      );
+      writeSettings(db, { reportLastSent: period.key });
+      logger.info("the periodic report was sent", { period: period.key, channel: policy.channel });
+    } catch (error) {
+      logger.error("sending the periodic report failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  let reportWithoutChannelWarned = false;
 
   /** Every probe that names a page to cross-check, as a pair to fold episodes for. */
   function trustPairs(): TrustPair[] {

@@ -56,6 +56,27 @@ const BY_KIND: Record<StatusChangeKind, Omit<StatusChange, "kind" | "providerId"
     currentStatus: "major_outage",
     correlated: { providerIds: ["github", "vercel", "netlify"], windowMinutes: 10, cause: "cloudflare" },
   },
+  correlated_resolved: {
+    currentStatus: "operational",
+    correlated: {
+      providerIds: ["github", "vercel", "netlify"],
+      windowMinutes: 10,
+      durationMinutes: 47,
+      cause: "cloudflare",
+    },
+  },
+  periodic_report: {
+    currentStatus: "unknown",
+    report: {
+      frequency: "weekly",
+      from: "2026-08-10",
+      to: "2026-08-16",
+      fleetUptime: 99.46,
+      incidentCount: 4,
+      worst: [{ providerId: "vercel", uptime: 97.1 }],
+      sla: [{ providerId: "github", target: 99.9, spentMinutes: 21.6, budgetMinutes: 43.2 }],
+    },
+  },
   silent_outage: { currentStatus: "major_outage", crossCheck: { probeId: "github-api", note: "HTTP 503" } },
   sla_burn: {
     currentStatus: "degraded",

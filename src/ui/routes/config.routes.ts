@@ -5,6 +5,10 @@ import {
   maintenanceNoticeSchema,
   escalationSchema,
   channelHealthSchema,
+  coalesceSchema,
+  incidentSummarySchema,
+  knownOutageSchema,
+  reportSchema,
   digestSchema,
   pollingSchema,
   quietHoursSchema,
@@ -42,6 +46,11 @@ const deliveryPatchSchema = z.object({
   maintenanceNotice: maintenanceNoticeSchema.partial().optional(),
   escalation: escalationSchema.partial().optional(),
   channelHealth: channelHealthSchema.partial().optional(),
+  incidentSummary: incidentSummarySchema.partial().optional(),
+  coalesce: coalesceSchema.partial().optional(),
+  knownOutage: knownOutageSchema.partial().optional(),
+  report: reportSchema.partial().optional(),
+  attachChart: z.boolean().optional(),
 });
 
 const settingsPatchSchema = pollingSchema
@@ -68,7 +77,7 @@ function deliveryPatch(
   patch: z.infer<typeof deliveryPatchSchema> | undefined,
 ): Record<string, unknown> {
   if (patch === undefined) return {};
-  const { quietHours, digest, cap, updateInPlace, maintenanceNotice, escalation, channelHealth } = patch;
+  const { quietHours, digest, cap, updateInPlace, maintenanceNotice, escalation, channelHealth, incidentSummary, coalesce, knownOutage, report, attachChart } = patch;
   return {
     ...(quietHours?.enabled === undefined
       ? {}
@@ -107,6 +116,14 @@ function deliveryPatch(
     ...(channelHealth?.afterFailures === undefined
       ? {}
       : { channelHealthAfterFailures: channelHealth.afterFailures }),
+    ...(incidentSummary?.enabled === undefined ? {} : { incidentSummaryEnabled: incidentSummary.enabled }),
+    ...(coalesce?.enabled === undefined ? {} : { coalesceEnabled: coalesce.enabled }),
+    ...(coalesce?.windowMinutes === undefined ? {} : { coalesceWindowMinutes: coalesce.windowMinutes }),
+    ...(knownOutage?.enabled === undefined ? {} : { knownOutageEnabled: knownOutage.enabled }),
+    ...(attachChart === undefined ? {} : { attachChart }),
+    ...(report?.enabled === undefined ? {} : { reportEnabled: report.enabled }),
+    ...(report?.frequency === undefined ? {} : { reportFrequency: report.frequency }),
+    ...(report?.channel === undefined ? {} : { reportChannel: report.channel }),
   };
 }
 

@@ -78,6 +78,51 @@ export interface ChannelHealthConfig {
   afterFailures: number;
 }
 
+/**
+ * Roadmap 3.10: when a shared failure ends, one message — "6 providers, 47
+ * minutes, probable cause Cloudflare" — instead of one "resolved" per member.
+ * Decided in the poller, where the shared failure is recognised, because the
+ * member recoveries it replaces never leave it.
+ */
+export interface IncidentSummaryConfig {
+  enabled: boolean;
+}
+
+/**
+ * Roadmap 3.11: a provider that posts four updates in ten minutes produces one
+ * message — the last state — once the window has passed without another.
+ */
+export interface CoalesceConfig {
+  enabled: boolean;
+  /** How long an update waits for a newer one about the same incident. */
+  windowMinutes: number;
+}
+
+/**
+ * Roadmap 3.14: while a provider is already in major outage, further updates
+ * of its incident go to the digest. A change of severity or the resolution is
+ * not an update, and still interrupts.
+ */
+export interface KnownOutageConfig {
+  enabled: boolean;
+}
+
+/**
+ * Roadmap 3.13: the fleet's week or month, delivered on a channel rather than
+ * waiting for somebody to download it. UI edition only — it is written from the
+ * history only that edition keeps.
+ */
+export interface ReportConfig {
+  enabled: boolean;
+  frequency: "weekly" | "monthly";
+  /**
+   * The channel it is sent on, and only that one: a report is not an alert, so
+   * routing rules do not apply to it. Empty means none chosen, which is not a
+   * report — said in the log rather than sent to a guess.
+   */
+  channel: string;
+}
+
 export interface DeliveryConfig {
   quietHours: QuietHours;
   digest: DigestConfig;
@@ -92,6 +137,16 @@ export interface DeliveryConfig {
   maintenanceNotice: MaintenanceNoticeConfig;
   escalation: EscalationConfig;
   channelHealth: ChannelHealthConfig;
+  incidentSummary: IncidentSummaryConfig;
+  coalesce: CoalesceConfig;
+  knownOutage: KnownOutageConfig;
+  report: ReportConfig;
+  /**
+   * Roadmap 3.12: the provider's last 24 hours attached to a message, on the
+   * channels that can carry an SVG. UI edition only — the picture is drawn from
+   * stored readings, which the Light edition does not keep.
+   */
+  attachChart: boolean;
 }
 
 /**
@@ -113,4 +168,9 @@ export const DELIVERY_DEFAULTS: DeliveryConfig = {
   maintenanceNotice: { enabled: false, leadMinutes: 120 },
   escalation: { enabled: false, afterMinutes: 15, channel: "", minSeverity: "major_outage" },
   channelHealth: { enabled: false, afterFailures: 3 },
+  incidentSummary: { enabled: false },
+  coalesce: { enabled: false, windowMinutes: 2 },
+  knownOutage: { enabled: false },
+  report: { enabled: false, frequency: "weekly", channel: "" },
+  attachChart: false,
 };
