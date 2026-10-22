@@ -102,8 +102,18 @@ const ASSETS = "dist/ui/public/assets";
  * on-call rotation editor and the routine-test switch, with fourteen new
  * strings in six catalogs. Measured: under 560.1 kB before them, 562.7 kB
  * after. The same remedy again.
+ *
+ * It moved 583,500 -> 603,500 (569.8 -> 589.4 kB) and css 20,000 -> 21,500
+ * (19.5 -> 21.0 kB) for roadmap 4.1, the composable Overview: the widget
+ * registry and grid, the edit mode (toolbar, filter, catalogue, sticky bar,
+ * dialogs, drag) and about eighty-five new strings in six catalogs. Measured:
+ * 562.7 kB js and 19.5 kB css before it, 580.8 kB and 20.1 kB after — about
+ * half the js the strings, half the code. The edit mode was a lazy chunk at
+ * first; since this check sums every .js the build emits, splitting it only
+ * added a shared chunk and cost 6 kB more in total, so it ships in the one
+ * bundle like everything else.
  */
-export const BUDGET = { js: 583_500, css: 20_000 };
+export const BUDGET = { js: 603_500, css: 21_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
