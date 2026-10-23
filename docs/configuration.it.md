@@ -2752,14 +2752,34 @@ titolo, oppure **Personalizza la Panoramica** in ⌘K) trasforma la pagina nel s
 stesso editor, con i dati veri, e nulla viene salvato prima di **Salva**.
 
 - **Widget** sono i blocchi che la Panoramica ha sempre disegnato — anelli della
-  flotta, mappa, guasto condiviso, gruppi, elenco della flotta. Ognuno può
-  comparire più volte.
+  flotta, mappa, guasto condiviso, gruppi, elenco della flotta — più un catalogo
+  di altri dodici, ognuno costruito su dati che la dashboard legge già:
+
+  | Widget | Mostra | Punta a |
+  |---|---|---|
+  | Incidenti aperti | ogni incidente aperto, il più grave per primo, e da quanto è aperto | una parte della flotta |
+  | Manutenzioni in arrivo | le finestre annunciate nelle prossime due settimane, su una corsia con oggi segnato | una parte della flotta |
+  | Error budget | il budget del mese per ogni obiettivo SLA ([3.13](#313-obiettivi-sla-e-budget-di-errore)) confrontato con quanto mese è passato | una parte della flotta |
+  | Provider | un provider, in grande: stato, uptime, ultimi 30 giorni, l'incidente in corso | un provider, o il peggiore adesso |
+  | Ultimi 30 giorni | l'uptime giornaliero per provider su un'unica scala, e la variazione sui 30 giorni prima | una parte della flotta |
+  | Calendario annuale | un anno di un provider, una casella al giorno | un provider, o il peggiore |
+  | Quando nascono gli incidenti | gli inizi degli incidenti per giorno e ora su 90 giorni, da dieci incidenti in su | — |
+  | MTTR e MTBF | tempo di riparazione e tempo fra due guasti su 90 giorni | una parte della flotta |
+  | Annotazioni e deploy | i tuoi segni sulla stessa settimana degli incidenti, e quale incidente è seguito a quale deploy | — |
+  | Salute delle consegne | se gli avvisi sono arrivati, per canale, ora per ora | — |
+  | Heartbeat dei job | ogni dead-man's switch ([3.19](#319-heartbeat--il-dead-mans-switch)) e quanto manca perché scatti | — |
+  | Si rompono insieme | i provider che vanno giù insieme, con un `dependsOn` a un clic ([3.20](#320-dipendenze--su-cosa-gira)) | — |
+
+  Ognuno può comparire più volte, e a un terzo della riga disegna la sua
+  sintesi invece di una copia schiacciata della versione intera.
 - **Larghezza** è una tra intera, due terzi, metà o un terzo della riga; l'altezza
   è quella del widget. Sotto i 768px ogni widget prende tutta la larghezza.
 - **Ordine** — trascinare la maniglia, premere i suoi pulsanti ↑/↓, oppure dare il
   focus alla maniglia e usare le frecce (Home e Fine la mandano a un estremo).
   Ogni spostamento viene annunciato.
-- **Filtro** — i tre widget della flotta accettano gruppi ([3.10](#310-gruppi-di-provider--il-mio-stack))
+- **Provider** — il tile del provider e il calendario annuale puntano a un
+  provider, oppure (il default) a quello messo peggio in questo momento.
+- **Filtro** — i widget della flotta accettano gruppi ([3.10](#310-gruppi-di-provider--il-mio-stack))
   e singoli provider, e ne mostrano l'unione: "Cloud" accanto a "Pagamenti", per
   esempio. Un widget filtrato porta una didascalia con ciò che mostra. Un provider
   o un gruppo cancellato nel frattempo appare barrato nel filtro, e un filtro
