@@ -26,6 +26,7 @@
     "src/ui/routePaths.ts",
     "src/ui/dashboardLayout.ts",
     "src/core/routing.ts",
+    "src/core/heartbeat.ts",
     "vite.config.ts"
   ]
 }

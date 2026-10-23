@@ -141,12 +141,12 @@ export function WidgetToolbar({
         ))}
       </ToggleGroup>
 
-      {def.filterable && (
+      {def.props !== "none" && (
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
-          aria-label={t("dashboard.filter.button", { widget: name })}
+          aria-label={t(def.props === "fleet" ? "dashboard.filter.button" : "dashboard.provider.button", { widget: name })}
           aria-expanded={filterOpen}
           aria-controls={filterPanelId}
           className="aria-expanded:bg-accent aria-expanded:text-accent-foreground"

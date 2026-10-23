@@ -131,6 +131,11 @@ export function useLayoutEditor(
         if (announcement.key === "dashboard.announce.filter" && "filter" in widget.props) {
           values["filter"] = filterLabel(widget.props.filter, status, t);
         }
+        if (announcement.key === "dashboard.announce.provider" && "provider" in widget.props) {
+          const chosen = widget.props.provider;
+          values["provider"] =
+            chosen === null ? t("dashboard.provider.worst") : (status?.providers.find((p) => p.id === chosen)?.name ?? chosen);
+        }
       }
       setAnnounce((previous) => ({ text: t(announcement.key, values), seq: previous.seq + 1 }));
     },

@@ -1,5 +1,6 @@
 import {
   MAX_WIDGETS,
+  WIDGET_PROPS,
   WIDGET_WIDTHS,
   type DashboardLayout,
   type FleetFilter,
@@ -31,6 +32,7 @@ export type DraftAction =
   | { type: "remove"; id: string }
   | { type: "add"; widgetType: WidgetType }
   | { type: "toggleFilter"; id: string; field: keyof FleetFilter; value: string }
+  | { type: "setProvider"; id: string; provider: string | null }
   | { type: "replace"; layout: DashboardLayout };
 
 export interface Announcement {
@@ -85,13 +87,15 @@ function freshId(type: WidgetType, widgets: readonly WidgetConfig[]): string {
 }
 
 function newWidget(type: WidgetType, id: string): WidgetConfig {
-  switch (type) {
-    case "geo-map":
-    case "shared-failure":
-      return { id, type, width: "full", props: {} };
-    default:
-      return { id, type, width: "full", props: { filter: { groups: [], providers: [] } } };
-  }
+  const props =
+    WIDGET_PROPS[type] === "fleet"
+      ? { filter: { groups: [], providers: [] } }
+      : WIDGET_PROPS[type] === "provider"
+        ? { provider: null }
+        : {};
+  // The kind table and the union are the same rule written twice; the cast is
+  // where they meet.
+  return { id, type, width: "full", props } as WidgetConfig;
 }
 
 export function applyDraft(state: DraftState, action: DraftAction): DraftResult {
@@ -153,6 +157,18 @@ export function applyDraft(state: DraftState, action: DraftAction): DraftResult 
         state,
         widgets.map((w) => (w.id === action.id ? ({ ...w, props: { filter } } as WidgetConfig) : w)),
         { key: "dashboard.announce.filter", widget: action.id, values: {} },
+        null,
+      );
+    }
+    case "setProvider": {
+      const widget = widgets.find((w) => w.id === action.id);
+      if (widget === undefined || !("provider" in widget.props) || widget.props.provider === action.provider) {
+        return unchanged(state);
+      }
+      return changed(
+        state,
+        widgets.map((w) => (w.id === action.id ? ({ ...w, props: { provider: action.provider } } as WidgetConfig) : w)),
+        { key: "dashboard.announce.provider", widget: action.id, values: {} },
         null,
       );
     }

@@ -178,7 +178,7 @@ describe("Overview edit mode", () => {
     await waitFor(() => expect(screen.getByText(t("dashboard.saved"))).toBeInTheDocument());
     expect(calls[0]?.method).toBe("PUT");
     expect(calls[0]?.body).toMatchObject({ updatedAt: "2026-10-22T10:00:00.000Z" });
-    expect((calls[0]?.body as { layout: DashboardLayout }).layout.widgets.map((w) => w.type)).not.toContain("geo-map");
+    expect((calls[0]!.body as { layout: DashboardLayout }).layout.widgets.map((w) => w.type)).not.toContain("geo-map");
     await waitFor(() => expect(screen.queryByRole("list", { name: t("dashboard.edit.list-label") })).toBeNull());
   });
 
@@ -270,5 +270,20 @@ describe("Overview edit mode", () => {
     expect(screen.queryByRole("button", { name: t("dashboard.customise") })).toBeNull();
     // The Overview still draws, from the default layout.
     expect(screen.getAllByText("GitHub").length).toBeGreaterThan(0);
+  });
+
+  it("points a provider tile at one provider, or back at the worst of the fleet", async () => {
+    const tile: DashboardLayout = {
+      version: 1,
+      widgets: [{ id: "tile", type: "provider-tile", width: "half", props: { provider: null } }],
+    };
+    await openEditor(tile);
+    expect(screen.getAllByText(t("dashboard.provider.worst")).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: t("dashboard.provider.button", { widget: name("provider-tile") }) }));
+    const picker = screen.getByRole("radiogroup", { name: t("dashboard.provider.label") });
+    fireEvent.click(within(picker).getByRole("radio", { name: "AWS" }));
+    expect(screen.getByText(t("dashboard.announce.provider", { widget: name("provider-tile"), provider: "AWS" }))).toBeInTheDocument();
+    fireEvent.click(within(picker).getByRole("radio", { name: t("dashboard.provider.worst") }));
+    expect(within(picker).getByRole("radio", { name: t("dashboard.provider.worst") })).toHaveAttribute("aria-checked", "true");
   });
 });

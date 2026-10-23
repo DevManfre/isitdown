@@ -898,6 +898,13 @@ export interface UnlocatedProvider {
   count: number;
 }
 
+/** `GET /config/heartbeats` — when each dead-man's switch last heard from its job. */
+export interface HeartbeatsResponse {
+  enabled: boolean;
+  tokenRevealed: boolean;
+  heartbeats: { providerId: string; url: string | null; lastPingAt: string | null; pings: number }[];
+}
+
 /** `GET /dashboards/:id` — roadmap 4.1. */
 export interface DashboardResponse {
   id: string;

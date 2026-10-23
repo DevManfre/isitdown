@@ -114,7 +114,7 @@ describe("motion.css after the react port", () => {
   // on a just-added widget. Both are entries keyed on attributes, not on the
   // view's remount gate, and both fall under the reduced-motion block.
   it("grows an idle widget in and out of edit mode, and rings a just-added one", () => {
-    for (const name of ["cell-reveal", "cell-conceal", "arrival"]) {
+    for (const name of ["cell-reveal", "cell-conceal", "arrival", "row-sweep", "column-in", "fill-in", "stem-drop"]) {
       expect(code).toContain(`@keyframes ${name}`);
     }
     expect(code).toMatch(/\[data-slot="edit-grid"\]\[data-closing\][^{]*\{\s*animation: cell-conceal/);

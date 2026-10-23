@@ -84,3 +84,38 @@ for (const { name, widgets, path } of rejected) {
 test("the layout schema rejects a version it does not know", () => {
   assert.equal(issuePath({ version: 2, widgets: [] }), "version");
 });
+
+test("every catalogue widget is a valid layout entry with the props its kind takes", () => {
+  const parsed = layoutSchema.safeParse({
+    version: 1,
+    widgets: [
+      { id: "a", type: "open-incidents", width: "two-thirds", props: { filter: { groups: ["cloud"], providers: [] } } },
+      { id: "b", type: "maintenances", width: "third", props: {} },
+      { id: "c", type: "error-budget", width: "third", props: {} },
+      { id: "d", type: "provider-tile", width: "third", props: { provider: "github" } },
+      { id: "e", type: "sparklines", width: "full", props: {} },
+      { id: "f", type: "year-calendar", width: "half", props: { provider: null } },
+      { id: "g", type: "weekday-hours", width: "half", props: {} },
+      { id: "h", type: "reliability", width: "full", props: {} },
+      { id: "i", type: "annotations", width: "third", props: {} },
+      { id: "j", type: "delivery", width: "half", props: {} },
+      { id: "k", type: "heartbeats", width: "half", props: {} },
+      { id: "l", type: "coincidence", width: "third", props: {} },
+    ],
+  });
+  assert.equal(parsed.success, true, JSON.stringify(parsed.error?.issues));
+  // A provider widget left without one follows the fleet.
+  const tile = layoutSchema.parse({ version: 1, widgets: [{ id: "t", type: "provider-tile", width: "full", props: {} }] });
+  assert.deepEqual(tile.widgets[0]?.props, { provider: null });
+});
+
+test("a provider widget refuses a fleet filter, and a plain one refuses a provider", () => {
+  assert.equal(
+    issuePath({ version: 1, widgets: [{ id: "t", type: "provider-tile", width: "full", props: { filter: {} } }] }),
+    "widgets.0.props",
+  );
+  assert.equal(
+    issuePath({ version: 1, widgets: [{ id: "h", type: "heartbeats", width: "full", props: { provider: "x" } }] }),
+    "widgets.0.props",
+  );
+});
