@@ -1383,9 +1383,17 @@ circle[role="button"]:hover {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
-    /* Entries fill `backwards`, so a stagger left in place would hold each
-       one at its first frame for the length of its delay — a wait with
-       nothing moving, which is no use to someone who asked for no motion. */
+  }
+  /* The widget catalogue's entries fill `backwards`, so a stagger left in
+     place would hold each one at its first frame for the length of its delay
+     — a wait with nothing moving, of no use to someone who asked for no
+     motion. Scoped to these: zeroing every delay on the page changes how the
+     rest of the dashboard's text is composited, and every view's frames with
+     it. */
+  .anim-fill,
+  .anim-row-sweep,
+  .anim-column,
+  .anim-stem {
     animation-delay: 0s !important;
   }
   /* The beam is decoration with no still frame worth keeping: stopped at one
