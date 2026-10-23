@@ -25,6 +25,7 @@ import type {
   ProviderCalendar,
   CoincidenceReport,
   DashboardResponse,
+  HeartbeatsResponse,
   Recipient,
   ReliabilityReport,
   SlaResponse,
@@ -466,6 +467,8 @@ export const testChannel = (id: string) =>
   );
 
 export const getMap = () => request<MapResponse>("GET", "/map");
+
+export const getHeartbeats = () => request<HeartbeatsResponse>("GET", "/config/heartbeats");
 
 /** The composable Overview's layout — roadmap 4.1. */
 export const getDashboard = (id: string) =>

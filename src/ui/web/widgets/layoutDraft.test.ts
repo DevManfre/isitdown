@@ -88,6 +88,28 @@ describe("applyDraft", () => {
     expect(applyDraft(start(), { type: "toggleFilter", id: "map", field: "groups", value: "cloud" }).state.revision).toBe(0);
   });
 
+  it("gives a fresh widget the props its kind takes", () => {
+    const tile = applyDraft(start(), { type: "add", widgetType: "provider-tile" }).state.layout.widgets.at(-1);
+    const list = applyDraft(start(), { type: "add", widgetType: "open-incidents" }).state.layout.widgets.at(-1);
+    const plain = applyDraft(start(), { type: "add", widgetType: "heartbeats" }).state.layout.widgets.at(-1);
+    expect(tile?.props).toEqual({ provider: null });
+    expect(list?.props).toEqual({ filter: { groups: [], providers: [] } });
+    expect(plain?.props).toEqual({});
+  });
+
+  it("points a one-provider widget at a provider, or back at the worst of the fleet", () => {
+    const added = applyDraft(start(), { type: "add", widgetType: "provider-tile" });
+    const id = added.state.layout.widgets.at(-1)!.id;
+    const picked = applyDraft(added.state, { type: "setProvider", id, provider: "github" });
+    expect(picked.state.layout.widgets.at(-1)?.props).toEqual({ provider: "github" });
+    expect(picked.announcement).toEqual({ key: "dashboard.announce.provider", widget: id, values: {} });
+    const back = applyDraft(picked.state, { type: "setProvider", id, provider: null });
+    expect(back.state.layout.widgets.at(-1)?.props).toEqual({ provider: null });
+    // Same choice again, or a widget that takes no provider: nothing changes.
+    expect(applyDraft(back.state, { type: "setProvider", id, provider: null }).state.revision).toBe(back.state.revision);
+    expect(applyDraft(start(), { type: "setProvider", id: "fleet", provider: "github" }).state.revision).toBe(0);
+  });
+
   it("replaces the whole draft — Load theirs, or the default on reset", () => {
     const moved = applyDraft(start(), { type: "move", id: "rings", delta: 1 }).state;
     const result = applyDraft(moved, { type: "replace", layout: DEFAULT_LAYOUT });

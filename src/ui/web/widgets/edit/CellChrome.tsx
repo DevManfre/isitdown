@@ -3,6 +3,7 @@ import type { PointerEvent } from "react";
 import type { WidgetConfig } from "../../../dashboardLayout.ts";
 import type { DraftAction } from "../layoutDraft.ts";
 import { FilterPanel } from "./FilterPanel.tsx";
+import { ProviderPanel } from "./ProviderPanel.tsx";
 import { Reveal } from "./Reveal.tsx";
 import { WidgetToolbar } from "./WidgetToolbar.tsx";
 
@@ -51,6 +52,11 @@ export default function CellChrome({
         {filter !== null && filterOpen && (
           <Reveal key="filter">
             <FilterPanel id={panelId} widgetId={widget.id} filter={filter} dispatch={dispatch} />
+          </Reveal>
+        )}
+        {"provider" in widget.props && filterOpen && (
+          <Reveal key="provider">
+            <ProviderPanel id={panelId} widgetId={widget.id} provider={widget.props.provider} dispatch={dispatch} />
           </Reveal>
         )}
       </AnimatePresence>

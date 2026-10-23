@@ -24,7 +24,7 @@ import { suspectedHatchCss } from "@/lib/chartConfig.ts";
 import { OVERVIEW_WINDOW_DAYS } from "@/lib/fleetSlice.ts";
 import { overviewShape } from "@/lib/overviewShape.ts";
 import { cn } from "@/lib/utils.ts";
-import { DEFAULT_LAYOUT } from "../../dashboardLayout.ts";
+import { DEFAULT_LAYOUT, type WidgetConfig } from "../../dashboardLayout.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
 import { Reveal } from "@/widgets/edit/Reveal.tsx";
 import CellChrome from "@/widgets/edit/CellChrome.tsx";
@@ -346,6 +346,14 @@ export function Overview() {
   );
 
   const layout = editor?.draft.layout ?? dashboard?.layout ?? DEFAULT_LAYOUT;
+  /** What a widget's toolbar says it is pointed at: its fleet filter, or its one provider. */
+  const pointedAt = (widget: WidgetConfig): string | null => {
+    if ("filter" in widget.props) return filterLabel(widget.props.filter, status, t);
+    if (!("provider" in widget.props)) return null;
+    const chosen = widget.props.provider;
+    if (chosen === null) return t("dashboard.provider.worst");
+    return status?.providers.find((p) => p.id === chosen)?.name ?? t("dashboard.filter.removed", { name: chosen });
+  };
   const gridEdit: GridEditing | null =
     editor === null
       ? null
@@ -362,7 +370,7 @@ export function Overview() {
               index={index}
               total={total}
               closing={editor.closing}
-              filterText={"filter" in widget.props ? filterLabel(widget.props.filter, status, t) : null}
+              filterText={pointedAt(widget)}
               filterOpen={editor.filterOpen === widget.id}
               dispatch={editor.dispatch}
               onToggleFilter={() => editor.toggleFilter(widget.id)}

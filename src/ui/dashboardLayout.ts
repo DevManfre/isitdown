@@ -12,16 +12,60 @@
 export const WIDTHS = ["full", "two-thirds", "half", "third"] as const;
 export type Width = (typeof WIDTHS)[number];
 
-/** Widths each widget can take. The map has no third: it reads as a stripe. */
+/**
+ * Widths each widget can take. The map has no third: it reads as a stripe.
+ * Every catalogue widget takes all four — at a third each draws its summary,
+ * not a squeezed copy of its full self.
+ */
 export const WIDGET_WIDTHS = {
   "fleet-rings": WIDTHS,
   "geo-map": ["full", "two-thirds", "half"],
   "shared-failure": WIDTHS,
   "stack-band": WIDTHS,
   "fleet-list": WIDTHS,
+  "open-incidents": WIDTHS,
+  maintenances: WIDTHS,
+  "error-budget": WIDTHS,
+  "provider-tile": WIDTHS,
+  sparklines: WIDTHS,
+  "year-calendar": WIDTHS,
+  "weekday-hours": WIDTHS,
+  reliability: WIDTHS,
+  annotations: WIDTHS,
+  delivery: WIDTHS,
+  heartbeats: WIDTHS,
+  coincidence: WIDTHS,
 } as const satisfies Record<string, readonly Width[]>;
 
 export type WidgetType = keyof typeof WIDGET_WIDTHS;
+
+/**
+ * What a widget can be pointed at: a slice of the fleet, one provider, or
+ * nothing — the props schema, the edit toolbar and a fresh widget's defaults
+ * all follow from this one table.
+ */
+export const WIDGET_PROPS = {
+  "fleet-rings": "fleet",
+  "geo-map": "none",
+  "shared-failure": "none",
+  "stack-band": "fleet",
+  "fleet-list": "fleet",
+  "open-incidents": "fleet",
+  maintenances: "fleet",
+  "error-budget": "fleet",
+  "provider-tile": "provider",
+  sparklines: "fleet",
+  "year-calendar": "provider",
+  "weekday-hours": "none",
+  reliability: "fleet",
+  annotations: "none",
+  delivery: "none",
+  heartbeats: "none",
+  coincidence: "none",
+} as const satisfies Record<WidgetType, "fleet" | "provider" | "none">;
+
+export type PropKind = (typeof WIDGET_PROPS)[WidgetType];
+type TypesOf<K extends PropKind> = { [T in WidgetType]: (typeof WIDGET_PROPS)[T] extends K ? T : never }[WidgetType];
 
 /** Most widgets one layout can hold; past this the grid stops being a summary. */
 export const MAX_WIDGETS = 50;
@@ -36,15 +80,22 @@ export interface FleetFilter {
   providers: string[];
 }
 
+/**
+ * One provider, by id. `null` follows the fleet: whichever provider is worst
+ * right now, so a tile left on its default always shows the one to look at.
+ */
+export interface ProviderPick {
+  provider: string | null;
+}
+
 type FleetWidget<T extends WidgetType> = { id: string; type: T; width: Width; props: { filter: FleetFilter } };
+type ProviderWidget<T extends WidgetType> = { id: string; type: T; width: Width; props: ProviderPick };
 type PlainWidget<T extends WidgetType> = { id: string; type: T; width: Width; props: Record<string, never> };
 
 export type WidgetConfig =
-  | FleetWidget<"fleet-rings">
-  | PlainWidget<"geo-map">
-  | PlainWidget<"shared-failure">
-  | FleetWidget<"stack-band">
-  | FleetWidget<"fleet-list">;
+  | { [T in TypesOf<"fleet">]: FleetWidget<T> }[TypesOf<"fleet">]
+  | { [T in TypesOf<"provider">]: ProviderWidget<T> }[TypesOf<"provider">]
+  | { [T in TypesOf<"none">]: PlainWidget<T> }[TypesOf<"none">];
 
 export interface DashboardLayout {
   version: 1;

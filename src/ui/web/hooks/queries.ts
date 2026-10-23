@@ -454,6 +454,17 @@ export const useDeliveryLog = (query: api.DeliveryLogQuery = {}) => {
  * a failed map must show its own error inside the card, not replace the
  * Overview with one.
  */
+/** When each heartbeat last pinged — the heartbeats widget's clock. */
+export function useHeartbeats() {
+  const busy = useBusy();
+  const live = useLive();
+  return useQuery({
+    queryKey: ["heartbeats"],
+    queryFn: api.getHeartbeats,
+    refetchInterval: idleInterval(busy, live),
+  });
+}
+
 /**
  * The Overview's widget layout — roadmap 4.1. Never throws: a dashboard whose
  * layout cannot be fetched still draws, as the default. The placeholder is the

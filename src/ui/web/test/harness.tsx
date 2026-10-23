@@ -34,7 +34,9 @@ type FixtureKey =
   | "serviceImpact"
   | "adapterDebug"
   | "catalog"
-  | "dashboard";
+  | "dashboard"
+  | "sla"
+  | "heartbeats";
 
 export interface Fixtures {
   status?: unknown;
@@ -71,6 +73,10 @@ export interface Fixtures {
   providerPush?: unknown;
   /** `/dashboards/…` — the Overview's widget layout (roadmap 4.1). */
   dashboard?: unknown;
+  /** `/sla` — this month's error budgets. */
+  sla?: unknown;
+  /** `/config/heartbeats`, matched before `/config` — when each job last pinged. */
+  heartbeats?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -126,6 +132,10 @@ export function stubApi(fixtures: Fixtures): void {
                                 ? "catalog"
                                 : path.startsWith("/config/provider-push")
                                   ? "providerPush"
+                                : path.startsWith("/config/heartbeats")
+                                  ? "heartbeats"
+                                : path.startsWith("/sla")
+                                  ? "sla"
                                 : path.startsWith("/config")
                                   ? "config"
                                   : path.startsWith("/debug/adapters")
@@ -170,6 +180,8 @@ export function stubApi(fixtures: Fixtures): void {
         annotations: { annotations: [] },
         providerPush: { enabled: false, tokenRevealed: false, providers: [] },
         messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },
+        sla: { month: "2026-10", providers: [] },
+        heartbeats: { enabled: false, tokenRevealed: false, heartbeats: [] },
         dashboard: {
           id: "default",
           name: "Overview",

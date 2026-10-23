@@ -10,6 +10,7 @@ const filterSchema = z
   .strict();
 
 const fleetProps = z.object({ filter: filterSchema.default({}) }).strict();
+const providerProps = z.object({ provider: z.string().min(1).nullable().default(null) }).strict();
 const noProps = z.object({}).strict();
 
 function widget<T extends WidgetType, P extends z.ZodTypeAny>(type: T, props: P) {
@@ -29,6 +30,18 @@ const widgetSchema = z.discriminatedUnion("type", [
   widget("shared-failure", noProps),
   widget("stack-band", fleetProps),
   widget("fleet-list", fleetProps),
+  widget("open-incidents", fleetProps),
+  widget("maintenances", fleetProps),
+  widget("error-budget", fleetProps),
+  widget("provider-tile", providerProps),
+  widget("sparklines", fleetProps),
+  widget("year-calendar", providerProps),
+  widget("weekday-hours", noProps),
+  widget("reliability", fleetProps),
+  widget("annotations", noProps),
+  widget("delivery", noProps),
+  widget("heartbeats", noProps),
+  widget("coincidence", noProps),
 ]);
 
 export const layoutSchema: z.ZodType<DashboardLayout, z.ZodTypeDef, unknown> = z

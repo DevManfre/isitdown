@@ -1292,6 +1292,89 @@ circle[role="button"]:hover {
   animation: arrival 0.6s var(--ease-out) both;
 }
 
+/* — the widget catalogue (roadmap 4.1, second round) —
+
+   Every figure in a widget arrives the way the rest of the view does, and a
+   new value moves to its place rather than being redrawn there. Entries are
+   gated on #view[data-animate] like every other one, so a background refresh
+   plays nothing; the transitions are what make a refreshed bar, ring or tone
+   glide instead of jump. Entries fill `backwards`, never `both`: a finished
+   entry that kept its last keyframe would own `transform` for good and the
+   transition carrying the next value would never run. */
+
+/* A bar grows from its left edge; the same transform carries later values. */
+@keyframes fill-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+#view[data-animate] .anim-fill {
+  animation: fill-in 0.62s var(--ease-entry) backwards;
+}
+.widget-fill {
+  transition: transform 0.6s var(--ease-entry), background-color 0.4s ease;
+}
+/* A heartbeat's elapsed bar is a clock: it advances linearly between reads,
+   so it creeps forward like time instead of stepping every thirty seconds. */
+.widget-fill[data-live] {
+  transition: transform 30s linear, background-color 0.4s ease;
+}
+
+/* Dense grids (the hour map, the delivery hours) arrive a row at a time,
+   revealed left to right: one animation per row, never one per cell — a
+   hundred and sixty-eight cells each on their own compositor layer is how a
+   card ends up half painted. */
+@keyframes row-sweep {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+#view[data-animate] .anim-row-sweep {
+  animation: row-sweep 0.7s var(--ease-entry) backwards;
+}
+
+/* The year calendar's weeks rise in as columns, on the same reasoning. */
+@keyframes column-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+#view[data-animate] .anim-column {
+  animation: column-in 0.36s var(--ease-entry) backwards;
+}
+
+/* An annotation's stem drops from the axis it hangs on. */
+@keyframes stem-drop {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+#view[data-animate] .anim-stem {
+  transform-origin: top;
+  animation: stem-drop 0.4s var(--ease-entry) backwards;
+}
+
+/* Status colour changes on a refresh — a tile going from operational to
+   outage — cross over rather than switch in one frame. */
+.widget-tone {
+  transition: color 0.4s ease, background-color 0.4s ease, border-color 0.4s ease;
+}
+
+/* What is happening now breathes, once a second and a half, quietly. */
+@keyframes now-breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+.widget-now {
+  animation: now-breathe 1.6s ease-in-out infinite;
+}
+
 /* Reduced motion keeps every state change, and none of the travel. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1300,6 +1383,10 @@ circle[role="button"]:hover {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    /* Entries fill `backwards`, so a stagger left in place would hold each
+       one at its first frame for the length of its delay — a wait with
+       nothing moving, which is no use to someone who asked for no motion. */
+    animation-delay: 0s !important;
   }
   /* The beam is decoration with no still frame worth keeping: stopped at one
      iteration it would park a bright square in a corner of the card. */
