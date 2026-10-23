@@ -177,7 +177,14 @@ export async function withBrowser(options, body) {
           // back (see useViewReady). Without waiting for it, an empty document
           // reads as "quiet" — which is how a blank page got agreed as a
           // baseline.
-          const ready = document.querySelector("#view[data-animate]") !== null;
+          //
+          // And the web fonts, which load from Google Fonts after the page
+          // does. The entry cascade's stagger used to cover that wait by
+          // accident; once reduced motion stopped holding entries for their
+          // delays, a slower runner captured the fallback face first and every
+          // line of text in every view "moved".
+          const ready =
+            document.querySelector("#view[data-animate]") !== null && document.fonts.status === "loaded";
           const running = document.getAnimations().filter((a) => a.playState === "running").length;
           return (ready ? "ready" : "waiting") + "|" + running + "|" + document.body.innerHTML.length;
         })()`,

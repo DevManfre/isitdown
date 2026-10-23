@@ -4,6 +4,7 @@ import type { Logger } from "./logger.ts";
 import type { MessageRefStore } from "./messageRefStore.interface.ts";
 import type { Notifier } from "./notifier.interface.ts";
 import { isMuted } from "./diffEngine.ts";
+import { onCallRecipientId } from "./onCall.ts";
 import { clearsFloor, explain, inQuietHours, severityOf, type RoutingRule } from "./routing.ts";
 import type { NotificationPayload, StatusChange, StatusChangeKind } from "./types.ts";
 import { tracer } from "./tracing.ts";
@@ -737,15 +738,19 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
   }
 
   /** Each channel's run of failures, extended or ended by what just happened to it. */
-  function noteOutcomes(records: readonly SentRecord[]): void {
+  function noteOutcomes(records: readonly SentRecord[], afterFailures = 1): void {
     for (const record of records) {
       if (record.ok) {
         channelRuns.delete(record.channel);
         continue;
       }
       const run = channelRuns.get(record.channel);
+      // A routine test comes once a week, so waiting for `afterFailures` of
+      // them would take a month to say a channel is broken. One failed test is
+      // already the proof the others only approach (roadmap 3.16).
+      const proof = record.kind === "delivery_test" ? afterFailures : 0;
       channelRuns.set(record.channel, {
-        failures: (run?.failures ?? 0) + 1,
+        failures: Math.max((run?.failures ?? 0) + 1, proof),
         since: run?.since ?? record.sentAt,
         providerId: record.providerId,
         error: record.error,
@@ -982,7 +987,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
    */
   async function finish(attempts: Attempt[], ctx: DispatchContext, delivery: DeliveryConfig, at: number): Promise<SentRecord[]> {
     const records = await settleAll(attempts);
-    noteOutcomes(records);
+    noteOutcomes(records, delivery.channelHealth.afterFailures);
     const alerts = await channelAlerts(ctx, delivery, at);
     noteOutcomes(alerts);
     return [...records, ...alerts];
@@ -1100,6 +1105,27 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           continue;
         }
 
+        // A routine test goes to the one channel it tests, nowhere else
+        // (roadmap 3.16), and ignores quiet hours like any test does: its
+        // sender already chose the hour, and a test held back until morning
+        // proves nothing about tonight. Its failure feeds the same channel
+        // health the real alerts do — see `noteOutcomes`.
+        if (change.kind === "delivery_test") {
+          const target = byChannelId.get(change.channel?.id ?? "");
+          if (target === undefined) continue;
+          const message = ctx.channelMessages?.[target.id];
+          const payload: NotificationPayload = {
+            ...base,
+            locale: message?.locale ?? base.locale,
+          };
+          // One attempt, like the test button: a retry schedule would hide
+          // exactly the flakiness the test is there to find.
+          attempts.push(
+            attempt(deliver(target, payload, renderMessage(payload), 1), change.providerId, target.id, change.kind),
+          );
+          continue;
+        }
+
         // Who covers this change, and whether the hour of the day takes it
         // away from them again (roadmap 3.11). Evaluated together in core's own
         // evaluator, so the dashboard's dry run and this cannot disagree.
@@ -1142,7 +1168,18 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           });
           continue;
         }
-        const targets = followed ? [...new Set([...routed.targets, ...enabledChannelIds])] : routed.targets;
+        const routedTargets = followed ? [...new Set([...routed.targets, ...enabledChannelIds])] : routed.targets;
+        // Whoever is on call this week also hears it (roadmap 3.15). Added to
+        // the rules' targets, never replacing them: a rotation that names a
+        // recipient nobody defined loses the extra reader, not the alert.
+        const onCallId = delivery.onCall.enabled && clearsFloor(severityOf(change), delivery.onCall.minSeverity)
+          ? onCallRecipientId(delivery.onCall, new Date(at))
+          : undefined;
+        const onCallRecipient = onCallId === undefined ? undefined : ctx.recipients?.find((candidate) => candidate.id === onCallId);
+        if (onCallId !== undefined && onCallRecipient === undefined) {
+          logger.warn("the on-call rotation names a recipient that does not exist", { recipient: onCallId });
+        }
+        const targets = onCallRecipient === undefined ? routedTargets : [...new Set([...routedTargets, ...onCallRecipient.channels])];
         if (targets.length === 0) continue;
 
         // The cap is per provider and per change, so it is asked once here

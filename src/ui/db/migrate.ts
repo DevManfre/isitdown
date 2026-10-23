@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 33;
+export const SCHEMA_VERSION = 34;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -769,6 +769,24 @@ export function migrate(db: DatabaseSync): void {
         PRIMARY KEY (provider_id, incident_id)
       );
     `);
+  }
+
+  if (from < 34) {
+    // The composable Overview — roadmap 4.1. A table rather than a settings
+    // key so several named dashboards (4.2) are rows, not a migration. A NULL
+    // layout follows the default in code, so an operator who never customised
+    // still gets the blocks later releases add.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS dashboards (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        layout TEXT,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    db.prepare("INSERT OR IGNORE INTO dashboards (id, name, layout, updated_at) VALUES ('default', 'Overview', NULL, ?)").run(
+      new Date().toISOString(),
+    );
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

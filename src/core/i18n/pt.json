@@ -64,6 +64,8 @@
   "notification.digest.slow-page": "página de estado lenta — {latency} face aos habituais {median}",
   "notification.digest.channel-failing": "o canal {channel} está a falhar — {count} mensagem(ns) seguidas perdidas",
   "notification.digest.report": "relatório periódico — disponibilidade da frota {uptime}%",
+  "notification.delivery-test": "IsItDown — teste de entrega de rotina\n\nEste é o teste semanal programado do canal {channel}. Não há nenhum problema: se você consegue ler isto, a entrega funciona.",
+  "notification.digest.delivery-test": "teste de entrega de rotina de {channel}",
 
   "notification.suppressed": "Outros {count} alertas deste fornecedor foram suprimidos pelo limite horário.",
   "notification.escalated": "⏫ Ninguém assumiu isto após {minutes} min — volto a enviá-lo aqui.",

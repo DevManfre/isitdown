@@ -1,35 +1,38 @@
-import { Link, useNavigate } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { Check, LayoutGrid, Plus } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
+import { Card, CardContent } from "@/components/ui/card.tsx";
 import { BorderBeam } from "@/components/ui/border-beam.tsx";
 import { DotPattern } from "@/components/ui/dot-pattern.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { TypingAnimation } from "@/components/ui/typing-animation.tsx";
-import { FleetGroups } from "@/components/FleetGroups.tsx";
-import { FleetRings } from "@/components/FleetRings.tsx";
-import { FLEET_ROW_STAGGER, FleetRows } from "@/components/FleetRows.tsx";
 import { FleetSummary } from "@/components/FleetSummary.tsx";
 import { HeroStats } from "@/components/HeroStats.tsx";
-import { SharedFailureCard } from "@/components/SharedFailureCard.tsx";
-import { StackBand } from "@/components/StackBand.tsx";
-import { GeoCard } from "@/components/GeoCard.tsx";
+import { DashboardGrid, filterLabel, REORDER_SPRING, type GridEditing } from "@/components/DashboardGrid.tsx";
 import { EmptyFleet } from "@/components/EmptyFleet.tsx";
 import { ViewSkeleton } from "@/components/ViewSkeleton.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
-import { useConfigChrome, useHistory, useStatus } from "@/hooks/queries.ts";
+import { useDashboard, useHistory, useStatus } from "@/hooks/queries.ts";
 import { CoverageProvider } from "@/lib/coverage.tsx";
 import { statusLabelKey, worstTier } from "@/lib/chartConfig.ts";
 import { formatList, formatRelative } from "@/lib/format.ts";
-import { summaryProviders } from "@/lib/history.ts";
 import { isOffLine, shownStatus, suspectedOf } from "@/lib/suspicion.ts";
 import { suspectedHatchCss } from "@/lib/chartConfig.ts";
-import { sharedFailure } from "@/lib/sharedFailure.ts";
+import { OVERVIEW_WINDOW_DAYS } from "@/lib/fleetSlice.ts";
 import { overviewShape } from "@/lib/overviewShape.ts";
-import { stagger } from "@/lib/stagger.ts";
 import { cn } from "@/lib/utils.ts";
+import { DEFAULT_LAYOUT, type WidgetConfig } from "../../dashboardLayout.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
+import { Reveal } from "@/widgets/edit/Reveal.tsx";
+import CellChrome from "@/widgets/edit/CellChrome.tsx";
+import EditMode from "@/widgets/edit/EditMode.tsx";
+import { useLayoutEditor } from "@/widgets/edit/useLayoutEditor.ts";
 
-const WINDOW_DAYS = 90;
+/** How long the "Layout saved" line stays beside the actions. */
+const NOTICE_MS = 4000;
 
 /**
  * Design 3a's Overview: the gradient hero with the headline and two calls to
@@ -47,9 +50,49 @@ export function Overview() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { data: status } = useStatus();
-  const { data: summary } = useHistory({ days: WINDOW_DAYS });
-  // Roadmap 2.9. Declared dependencies live on the config, not on the status.
-  const { data: config } = useConfigChrome();
+  const { data: summary } = useHistory({ days: OVERVIEW_WINDOW_DAYS });
+  const {
+    data: dashboard,
+    isPlaceholderData: dashboardPending,
+    isError: dashboardFailed,
+    error: dashboardError,
+    refetch: refetchDashboard,
+  } = useDashboard();
+  const [params, setParams] = useSearchParams();
+  const editing = params.get("edit") === "1";
+  const [notice, setNotice] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const customiseRef = useRef<HTMLButtonElement>(null);
+  /** Edit mode just closed: its Save or Cancel is gone, so focus comes back to Customise. */
+  const [returnFocus, setReturnFocus] = useState(false);
+  // Only the server's answer may start a draft — never the placeholder a
+  // pending query shows (⌘K and a bookmarked `?edit=1` can both get here first).
+  const openedFromButton = useRef(false);
+  const openEditor = () => {
+    openedFromButton.current = true;
+    setParams({ edit: "1" });
+  };
+  const editor = useLayoutEditor(
+    dashboardPending ? undefined : dashboard,
+    editing,
+    gridRef,
+    (message) => {
+      setParams({});
+      setReturnFocus(true);
+      if (message !== undefined) setNotice(message);
+    },
+    openedFromButton,
+  );
+  useEffect(() => {
+    if (!returnFocus || editing || customiseRef.current === null) return;
+    customiseRef.current.focus();
+    setReturnFocus(false);
+  });
+  useEffect(() => {
+    if (notice === null) return;
+    const timer = setTimeout(() => setNotice(null), NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   // No `/status` yet: draw the page's shape, not its empty state. Read as
   // `data ?? []`, a slow first response told an operator with a full fleet
@@ -65,18 +108,7 @@ export function Overview() {
   const providers = configured.filter((provider) => provider.enabled);
   const allDisabled = configured.length > 0 && providers.length === 0;
   const noneConfigured = configured.length === 0;
-  const buckets = new Map(
-    summaryProviders(summary).map((p) => [p.providerId, p.buckets]),
-  );
   const shape = overviewShape(providers.length);
-  const shared = sharedFailure(
-    providers,
-    new Map(
-      (config?.services ?? []).flatMap((service) =>
-        service.dependsOn == null ? [] : [[service.id, service.dependsOn] as const],
-      ),
-    ),
-  );
 
   // The headline is chosen by plural rule, never assembled from fragments —
   // "one provider is off the line" and "3 providers are off the line" are
@@ -112,9 +144,24 @@ export function Overview() {
   // fleet's size, only where the fleet is drawn does.
   const heroCopy = (
     <div className="hero-copy flex flex-col gap-3">
-      <span className="anim-rise text-xs uppercase tracking-widest text-primary">
-        {t("overview.kicker")}
-      </span>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="anim-rise text-xs uppercase tracking-widest text-primary">
+          {t("overview.kicker")}
+        </span>
+        <AnimatePresence>
+          {editing && (
+            <motion.span
+              key="hero-fixed"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, transition: { duration: 0.22 } }}
+              exit={{ opacity: 0, transition: { duration: 0.18 } }}
+              className="rounded-full border border-dashed border-border px-2 py-0 font-mono text-xs leading-[14px] text-muted-foreground"
+            >
+              {t("dashboard.hero-fixed")}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </div>
       {/* The beacon shares the headline's line rather than sitting above
           it: the two say the same thing, and splitting them reads as two
           separate claims. */}
@@ -241,7 +288,7 @@ export function Overview() {
         </ul>
       )}
       <div
-        className="anim-rise anim-rise-hero flex gap-2"
+        className="anim-rise anim-rise-hero flex flex-wrap items-center gap-2"
         style={{ animationDelay: "150ms" }}
       >
         {withIncident !== undefined && (
@@ -263,8 +310,77 @@ export function Overview() {
         >
           {t("action.history-90d")}
         </Button>
+        {/* The layout could not be read: the default stands in, and the
+            page says so rather than presenting it as the operator's own. */}
+        {dashboardFailed && (
+          <span role="alert" className="flex items-center gap-2 text-sm text-muted-foreground">
+            {t("dashboard.load-failed", {
+              error: dashboardError instanceof Error ? dashboardError.message : String(dashboardError),
+            })}
+            <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => void refetchDashboard()}>
+              {t("action.retry")}
+            </Button>
+          </span>
+        )}
+        {!editing && !noneConfigured && !dashboardPending && !dashboardFailed && (
+          <Button
+            ref={customiseRef}
+            type="button"
+            variant="ghost"
+            onClick={openEditor}
+          >
+            <LayoutGrid aria-hidden="true" />
+            {t("dashboard.customise")}
+          </Button>
+        )}
+        <span role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          {notice !== null && (
+            <span className="anim-fade flex items-center gap-1.5">
+              <Check aria-hidden="true" className="size-4 text-[var(--status-operational)]" />
+              {t(notice)}
+            </span>
+          )}
+        </span>
       </div>
     </div>
+  );
+
+  const layout = editor?.draft.layout ?? dashboard?.layout ?? DEFAULT_LAYOUT;
+  /** What a widget's toolbar says it is pointed at: its fleet filter, or its one provider. */
+  const pointedAt = (widget: WidgetConfig): string | null => {
+    if ("filter" in widget.props) return filterLabel(widget.props.filter, status, t);
+    if (!("provider" in widget.props)) return null;
+    const chosen = widget.props.provider;
+    if (chosen === null) return t("dashboard.provider.worst");
+    return status?.providers.find((p) => p.id === chosen)?.name ?? t("dashboard.filter.removed", { name: chosen });
+  };
+  const gridEdit: GridEditing | null =
+    editor === null
+      ? null
+      : {
+          revision: editor.draft.revision,
+          closing: editor.closing,
+          entering: editor.entering,
+          arrived: editor.arrived,
+          label: t("dashboard.edit.list-label"),
+          onDragTo: (id, index) => editor.dispatch({ type: "moveTo", id, index }),
+          renderChrome: ({ widget, index, total, startDrag }) => (
+            <CellChrome
+              widget={widget}
+              index={index}
+              total={total}
+              closing={editor.closing}
+              filterText={pointedAt(widget)}
+              filterOpen={editor.filterOpen === widget.id}
+              dispatch={editor.dispatch}
+              onToggleFilter={() => editor.toggleFilter(widget.id)}
+              startDrag={startDrag}
+            />
+          ),
+        };
+  /* The rule sweeps in under the hero, before the rows arrive. */
+  const rule = (
+    <div className="fade-rule anim-sweep col-span-6 h-px bg-border" style={{ animationDelay: "170ms" }} />
   );
 
   return (
@@ -336,70 +452,65 @@ export function Overview() {
         </div>
       </div>
 
-      <div className="overview-rows flex flex-col gap-4">
-        {/* The rule sweeps in under the hero, before the rows arrive. */}
-        <div
-          className="fade-rule anim-sweep h-px bg-border"
-          style={{ animationDelay: "170ms" }}
-        />
-
-        {/* The fleet as tiles, in the two shapes that still draw them. Out of
-            the hero (see above) and into the page's own column, where a wrap is
-            free. */}
-        {shape !== "dense" && providers.length > 0 && (
-          <FleetRings providers={providers} shape={shape} />
-        )}
-
-        {/* A summary belongs above the detail. The card renders nothing at all
-            when `mapView` is `off`, which is the default, so the Overview's
-            existing shape is unchanged for anyone who has not asked for it. */}
-        <GeoCard />
-
-        {/* Roadmap 2.9: only while two providers that name the same upstream are
-            bad at once — a quiet fleet draws nothing. */}
-        {shared !== null && (
-          <SharedFailureCard
-            failure={shared}
-            nameOf={(id) => configured.find((p) => p.id === id)?.name ?? id}
-          />
-        )}
-
-        {/* Roadmap 2.6: the groups, above the flat fleet they summarise. */}
-        <StackBand groups={status?.groups ?? []} providers={providers} />
-
-        {noneConfigured ? (
-          <EmptyFleet />
-        ) : providers.length === 0 ? (
-          <p className="text-muted-foreground">{t("overview.all-disabled")}</p>
-        ) : (
-          <>
-            {shape === "dense" ? (
-              <FleetGroups providers={providers} buckets={buckets} />
-            ) : (
-              <FleetRows providers={providers} buckets={buckets} />
-            )}
-            <div
-              className="anim-fade text-sm text-muted-foreground"
-              style={{
-                animationDelay: stagger(providers.length, FLEET_ROW_STAGGER),
-              }}
-            >
-              <Trans
-                i18nKey="overview.uptime-window"
-                values={{ uptime: average }}
-                components={[
-                  <NumberTicker
-                    locale={i18n.language}
-                    value={average}
-                    decimalPlaces={2}
-                    suffix="%"
-                  />,
-                ]}
-              />
+      {/* Roadmap 4.1: under the rule, the Overview is the operator's own
+          layout — the default one being the fixed sequence this view always
+          drew. The rule and the first-run line share the grid's row gap, so
+          the default reads exactly as the fixed column did. */}
+      {/* One grid for both modes (roadmap 4.1): edit mode adds chrome around
+          the same mounted widgets, so opening it never replays an entry. */}
+      <DashboardGrid
+        className="overview-rows"
+        gridRef={gridRef}
+        layout={layout}
+        edit={gridEdit}
+        header={rule}
+        footer={
+          editor !== null ? (
+            <>
+              <p id="dashboard-move-hint" className="sr-only">
+                {t("dashboard.move.hint")}
+              </p>
+              <motion.div
+                layout="position"
+                layoutDependency={editor.draft.revision}
+                transition={{ layout: REORDER_SPRING }}
+                className="col-span-6"
+              >
+                <Reveal open={!editor.closing}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    data-add-widget
+                    className="h-14 w-full rounded-xl border-dashed border-primary text-primary"
+                    onClick={() => editor.setCatalogOpen(true)}
+                  >
+                    <Plus aria-hidden="true" />
+                    {t("dashboard.add")}
+                  </Button>
+                </Reveal>
+              </motion.div>
+            </>
+          ) : noneConfigured ? (
+            <div className="col-span-6">
+              <EmptyFleet />
             </div>
-          </>
-        )}
-      </div>
+          ) : providers.length === 0 ? (
+            <p className="col-span-6 text-muted-foreground">{t("overview.all-disabled")}</p>
+          ) : layout.widgets.length === 0 ? (
+            <Card className="col-span-6 border-dashed">
+              <CardContent className="flex flex-col items-start gap-3">
+                <h3 className="text-base font-semibold">{t("dashboard.empty.title")}</h3>
+                <p className="max-w-[60ch] text-sm text-muted-foreground">{t("dashboard.empty.body")}</p>
+                <Button type="button" size="sm" onClick={openEditor}>
+                  <LayoutGrid aria-hidden="true" />
+                  {t("dashboard.customise")}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null
+        }
+      />
+      {editor !== null && dashboard !== undefined && <EditMode editor={editor} dashboard={dashboard} />}
     </CoverageProvider>
   );
 }

@@ -22,5 +22,7 @@ export const DELIVERY_OFF: DeliveryPolicy = {
   coalesce: { enabled: false, windowMinutes: 2 },
   knownOutage: { enabled: false },
   report: { enabled: false, frequency: "weekly", channel: "" },
+  onCall: { enabled: false, minSeverity: "major_outage", rotation: [], startsOn: "" },
+  deliveryTest: { enabled: false },
   attachChart: false,
 };

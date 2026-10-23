@@ -64,6 +64,8 @@
   "notification.digest.slow-page": "page d'état lente — {latency} contre {median} d'habitude",
   "notification.digest.channel-failing": "canal {channel} en panne — {count} message(s) d’affilée perdus",
   "notification.digest.report": "rapport périodique — disponibilité de la flotte {uptime} %",
+  "notification.delivery-test": "IsItDown — test de livraison de routine\n\nCeci est le test hebdomadaire programmé du canal {channel}. Rien ne cloche : si vous lisez ce message, la livraison fonctionne.",
+  "notification.digest.delivery-test": "test de livraison de routine de {channel}",
 
   "notification.suppressed": "{count} autres alertes pour ce fournisseur ont été supprimées par la limite horaire.",
   "notification.escalated": "⏫ Personne ne l'a pris en charge après {minutes} min — je le renvoie ici.",

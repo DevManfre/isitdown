@@ -64,6 +64,8 @@
   "notification.digest.slow-page": "pagina di stato lenta — {latency} contro i soliti {median}",
   "notification.digest.channel-failing": "il canale {channel} non funziona — {count} messaggi di fila persi",
   "notification.digest.report": "report periodico — uptime della flotta {uptime}%",
+  "notification.delivery-test": "IsItDown — test di consegna di routine\n\nQuesto è il test settimanale programmato del canale {channel}. Non c'è nessun problema: se leggi questo messaggio, la consegna funziona.",
+  "notification.digest.delivery-test": "test di consegna di routine di {channel}",
 
   "notification.suppressed": "Altri {count} avvisi per questo provider sono stati soppressi dal limite orario.",
   "notification.escalated": "⏫ Nessuno l'ha preso in carico dopo {minutes} min — lo rimando qui.",

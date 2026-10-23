@@ -123,6 +123,25 @@ export interface ReportConfig {
   channel: string;
 }
 
+/**
+ * Roadmap 3.15: the recipient on call this week also hears every change at or
+ * above the floor. Additive on purpose: it adds the on-call person to whoever
+ * the rules already chose, so a rotation misconfigured can only over-notify.
+ */
+export interface OnCallConfig {
+  enabled: boolean;
+  minSeverity: SeverityFloor;
+  /** Recipient ids, one per week, in turn. */
+  rotation: string[];
+  /** A day in the first week of the rotation, `YYYY-MM-DD`; empty counts from 1970-01-05. */
+  startsOn: string;
+}
+
+/** Roadmap 3.16: a weekly test message on every enabled channel. */
+export interface DeliveryTestConfig {
+  enabled: boolean;
+}
+
 export interface DeliveryConfig {
   quietHours: QuietHours;
   digest: DigestConfig;
@@ -141,6 +160,8 @@ export interface DeliveryConfig {
   coalesce: CoalesceConfig;
   knownOutage: KnownOutageConfig;
   report: ReportConfig;
+  onCall: OnCallConfig;
+  deliveryTest: DeliveryTestConfig;
   /**
    * Roadmap 3.12: the provider's last 24 hours attached to a message, on the
    * channels that can carry an SVG. UI edition only — the picture is drawn from
@@ -172,5 +193,7 @@ export const DELIVERY_DEFAULTS: DeliveryConfig = {
   coalesce: { enabled: false, windowMinutes: 2 },
   knownOutage: { enabled: false },
   report: { enabled: false, frequency: "weekly", channel: "" },
+  onCall: { enabled: false, minSeverity: "major_outage", rotation: [], startsOn: "" },
+  deliveryTest: { enabled: false },
   attachChart: false,
 };

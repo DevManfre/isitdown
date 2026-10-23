@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { Activity, MonitorCog, RefreshCw, Server, Tv } from "lucide-react";
+import { Activity, LayoutGrid, MonitorCog, RefreshCw, Server, Tv } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -137,6 +137,14 @@ export function CommandPalette() {
           >
             <RefreshCw aria-hidden="true" />
             {t("action.poll-now")}
+          </CommandItem>
+          {/* Roadmap 4.1: straight into the Overview's edit mode. */}
+          <CommandItem
+            value={t("palette.customise-overview")}
+            onSelect={run(() => void navigate({ pathname: ROUTE_PATHS.overview, search: "?edit=1" }))}
+          >
+            <LayoutGrid aria-hidden="true" />
+            {t("palette.customise-overview")}
           </CommandItem>
           <CommandItem value={t("palette.cycle-theme")} onSelect={run(() => cycle())}>
             <MonitorCog aria-hidden="true" />

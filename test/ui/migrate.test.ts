@@ -28,6 +28,7 @@ test("migrate creates every table the dashboard reads", async () => {
     "annotations",
     "channels",
     "component_samples",
+    "dashboards",
     "heartbeats",
     "incident_follows",
     "incident_notes",
@@ -91,6 +92,41 @@ test("migrate is idempotent and never touches existing rows", async () => {
     ["github"],
   );
   db.close();
+});
+
+test("a fresh database has one default dashboard following the code default", async () => {
+  const db = await freshDb();
+  migrate(db);
+  const rows = db.prepare("SELECT id, name, layout FROM dashboards").all() as {
+    id: string;
+    name: string;
+    layout: string | null;
+  }[];
+  assert.deepEqual(
+    rows.map((row) => ({ ...row })),
+    [{ id: "default", name: "Overview", layout: null }],
+  );
+  migrate(db);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM dashboards").get() as { n: number }).n, 1);
+  db.close();
+});
+
+test("migrating from user_version 33 adds the dashboards table and keeps a stored layout", async () => {
+  const db = await freshDb();
+  migrate(db);
+  db.prepare("UPDATE dashboards SET layout = ? WHERE id = 'default'").run('{"version":1,"widgets":[]}');
+  db.exec("PRAGMA user_version = 33");
+  migrate(db);
+  const row = db.prepare("SELECT layout FROM dashboards WHERE id = 'default'").get() as { layout: string | null };
+  assert.equal(row.layout, '{"version":1,"widgets":[]}');
+
+  const old = new DatabaseSync(":memory:");
+  migrate(old);
+  old.exec("DROP TABLE dashboards; PRAGMA user_version = 33");
+  migrate(old);
+  assert.equal((old.prepare("SELECT COUNT(*) AS n FROM dashboards").get() as { n: number }).n, 1);
+  db.close();
+  old.close();
 });
 
 test("a fresh database gets the v2 component schema", () => {

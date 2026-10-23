@@ -358,6 +358,34 @@ export const reportSchema = z.object({
   channel: z.string().trim().max(64).default(""),
 });
 
+/**
+ * Who is on call (roadmap 3.15). A rotation of recipients that already exist —
+ * this is not a roster, only "which of them hears a major this week". Weeks
+ * run Monday to Sunday, UTC, counted from `startsOn`; a rotation of one is
+ * allowed (it is "always this person"). `rotation` holds recipient ids, whose
+ * existence is checked where both editions know their recipients, like routing
+ * rules do for channels.
+ */
+export const onCallSchema = z.object({
+  enabled: z.boolean().default(false),
+  minSeverity: z.enum(SEVERITY_FLOORS).default("major_outage"),
+  rotation: z.array(z.string().trim().min(1).max(64)).max(32).default([]),
+  startsOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "startsOn must be a YYYY-MM-DD date")
+    .or(z.literal(""))
+    .default(""),
+});
+
+/**
+ * The routine delivery test (roadmap 3.16): once a week every enabled channel
+ * gets a message that says it is a test. Weekly only — a daily one trains the
+ * team to ignore it, which defeats the point.
+ */
+export const deliveryTestSchema = z.object({
+  enabled: z.boolean().default(false),
+});
+
 export const deliverySchema = z.object({
   quietHours: quietHoursSchema.default({}),
   digest: digestSchema.default({}),
@@ -370,6 +398,8 @@ export const deliverySchema = z.object({
   coalesce: coalesceSchema.default({}),
   knownOutage: knownOutageSchema.default({}),
   report: reportSchema.default({}),
+  onCall: onCallSchema.default({}),
+  deliveryTest: deliveryTestSchema.default({}),
   attachChart: z.boolean().default(false),
 });
 

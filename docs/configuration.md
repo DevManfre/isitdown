@@ -1859,8 +1859,46 @@ never. Turning it on sends the report for the last closed period at the next
 poll. A channel that is not enabled is said so in the log. **UI edition only**:
 it reads the stored history, so the Light edition ignores the block.
 
+**`onCall`** says who is on call this week, without becoming an on-call system:
+PagerDuty and Opsgenie are already channels, and this does not replace them. It
+is a rotation of [recipients](#321-recipients--one-person-several-channels) that
+already exist — one per week, in turn, then it starts over — and whoever's week
+it is hears every change at or above `minSeverity` (default `major_outage`) *in
+addition to* whoever the routing rules already chose. It adds a reader and never
+removes one, so a rotation that is wrong can only over-notify: one that names a
+recipient nobody defined loses the extra reader, not the alert, and says so in
+the log. The recipient is reached the way recipients always are — on the
+preferred channel, falling back to the next only if that one fails. Weeks run
+Monday to Sunday, UTC; `startsOn` is any day of the first week (empty counts from
+1970), and a date that cannot be read counts the same way rather than stopping
+an alert. Nothing is stored: who is on call is a function of the date, so a
+restart changes nothing and the dashboard shows the same name the dispatcher
+uses. Quiet hours still hold a change back first.
+
+```yaml
+delivery:
+  onCall:
+    enabled: true
+    minSeverity: major_outage
+    startsOn: 2026-10-05
+    rotation: [alice, bob]   # recipient ids; week 1 is alice's
+```
+
+**`deliveryTest`** is a notification that proves the notification system still
+works, not just on the day it was configured. Once a UTC week every enabled
+channel gets a message that says, in the channel's own language, that it is the
+routine weekly test and that nothing is wrong; a channel's template does not
+replace that text. Each channel is tested on its own, so a result always belongs
+to one channel. A failure is counted as a broken channel at once — one failed
+test is the proof the real alerts need several failures to approach, since a
+weekly message would otherwise take a month to say so — and the existing
+[`channelHealth`](#38-delivery-policy--quiet-hours-digests-caps) alert tells the
+other channels, when that is switched on. The test goes out on the first poll of
+the week, waits out quiet hours, and is not retried. **UI edition only**: the
+week it last ran is kept in the database.
+
 The Light edition configures the `delivery` block above (with the caveats just
-given for `escalation`, `attachChart` and `report`); the UI edition edits them
+given for `escalation`, `attachChart`, `report` and `deliveryTest`); the UI edition edits them
 under **Settings → Delivery**, where each row applies on its own without a
 restart.
 
@@ -2603,3 +2641,51 @@ the UI edition they are the **Why it matters** and **Owner** fields of the
 provider form, and `impact` / `owner` on `POST /config/services` and
 `PATCH /config/services/:id` (`null` clears either).
 
+### 3.24 Customising the Overview
+
+UI edition only. Everything under the Overview's headline is a list of widgets
+the operator arranges: **Customise** (beside the headline's actions, or
+**Customise the Overview** in ⌘K) turns the page into its own editor, with live
+data, and nothing is stored until **Save**.
+
+- **Widgets** are the blocks the Overview always drew — fleet rings, map, shared
+  failure, groups, fleet list — plus a catalogue of twelve more, each built on
+  data the dashboard already reads:
+
+  | Widget | Shows | Points at |
+  |---|---|---|
+  | Open incidents | every open incident, worst first, and how long it has been open | a fleet slice |
+  | Upcoming maintenance | announced windows in the next two weeks, on a lane with today on it | a fleet slice |
+  | Error budget | this month's budget per SLA target ([3.13](#313-sla-targets-and-error-budgets)) against how much of the month is gone | a fleet slice |
+  | Provider | one provider, large: status, uptime, last 30 days, the incident in progress | one provider, or the worst right now |
+  | Last 30 days | daily uptime per provider on one scale, and the change on the 30 days before | a fleet slice |
+  | Year calendar | a year of one provider, a square a day | one provider, or the worst |
+  | When incidents start | incident starts by weekday and hour over 90 days, from ten incidents up | — |
+  | MTTR and MTBF | repair time and time between failures over 90 days | a fleet slice |
+  | Annotations and deploys | your markers on the same week as the incidents, and which incident followed which deploy | — |
+  | Delivery health | whether the alerts arrived, per channel, hour by hour | — |
+  | Job heartbeats | every dead-man's switch ([3.19](#319-heartbeats--the-dead-mans-switch)) and how close it is to going off | — |
+  | Break together | providers that go down together, with a one-click `dependsOn` ([3.20](#320-dependencies--what-this-runs-on)) | — |
+
+  Each can appear more than once, and each draws its summary at a third of the
+  row rather than a squeezed copy of its full self.
+- **Width** is one of full, two thirds, half or a third of the row; height is the
+  widget's own. Below 768px every widget takes the full width.
+- **Order** — drag the grip, press its ↑/↓ buttons, or focus the grip and use the
+  arrow keys (Home and End send it to either end). Every move is announced.
+- **Provider** — the provider tile and the year calendar point at one
+  provider, or (the default) at whichever is worst right now.
+- **Filter** — the fleet widgets take groups ([3.10](#310-provider-groups--my-stack))
+  and individual providers, and show their union: "Cloud" beside "Payments", say.
+  A filtered widget is captioned with what it shows. A provider or group deleted
+  since is struck through in the filter, and a filter left with nothing in it
+  says so — it never quietly widens to the whole fleet.
+- **Reset to default** forgets the arrangement. An Overview nobody customised
+  follows the built-in layout, so blocks added by later releases reach it on
+  their own; a customised one keeps exactly what was saved.
+
+The headline above the widgets is fixed: it is the "is anything wrong?" answer,
+and no arrangement hides it. Two tabs editing at once do not overwrite each
+other — the later save is told and offered both copies. The layout lives in the
+database, so a backup carries it; over the API it is `GET`/`PUT /dashboards/default`
+([6](api.md)).
