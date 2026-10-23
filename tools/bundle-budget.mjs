@@ -112,8 +112,16 @@ const ASSETS = "dist/ui/public/assets";
  * first; since this check sums every .js the build emits, splitting it only
  * added a shared chunk and cost 6 kB more in total, so it ships in the one
  * bundle like everything else.
+ *
+ * It moved 603,500 -> 635,500 (589.4 -> 620.6 kB) for the widget catalogue's
+ * second round: twelve widgets (open incidents, maintenance, error budget,
+ * provider tile, sparklines, year calendar, weekday × hour, MTTR/MTBF,
+ * annotations, delivery, heartbeats, break-together) and about a hundred and
+ * fifty strings in six catalogs. Measured: 580.8 kB before, 611.1 kB after —
+ * some 18 kB of it the strings, each widget's sentence that states its
+ * finding being long on purpose, the rest the twelve components.
  */
-export const BUDGET = { js: 603_500, css: 21_500 };
+export const BUDGET = { js: 635_500, css: 21_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
