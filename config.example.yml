@@ -451,6 +451,20 @@ notifications:
 #     enabled: true
 #     frequency: weekly   # weekly | monthly
 #     channel: slack
+#
+#   # Who is on call this week: a rotation of the recipients defined below,
+#   # one per week, Monday to Sunday UTC. Whoever's week it is also hears every
+#   # change at or above minSeverity, on top of what the routing rules chose.
+#   onCall:
+#     enabled: true
+#     minSeverity: major_outage
+#     startsOn: 2026-10-05   # any day of the first week
+#     rotation: [alice, bob]
+#
+#   # UI edition only. Once a week every enabled channel gets a message that
+#   # says it is a routine test; a failure raises the failing-channel alert.
+#   deliveryTest:
+#     enabled: true
 
 # People reached through more than one channel, preferred first. A change a
 # rule sends to several of one person's channels goes to the first only, and to

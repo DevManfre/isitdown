@@ -1934,8 +1934,48 @@ polling successivo il report dell'ultimo periodo chiuso. Un canale non abilitato
 viene detto nel log. **Solo edizione UI**: legge lo storico conservato, quindi
 l'edizione Light ignora il blocco.
 
+**`onCall`** dice chi è di turno questa settimana, senza diventare un sistema
+di reperibilità: PagerDuty e Opsgenie sono già canali e questo non li sostituisce.
+È una rotazione di [destinatari](#321-destinatari--una-persona-più-canali) che
+esistono già — uno a settimana, a turno, poi si ricomincia — e chi è di turno
+riceve ogni cambiamento pari o sopra `minSeverity` (default `major_outage`) *in
+più* di chi hanno già scelto le regole di instradamento. Aggiunge un lettore e non
+ne toglie mai uno, quindi una rotazione sbagliata può solo notificare di troppo:
+una che nomina un destinatario che nessuno ha definito perde il lettore in più,
+non l'avviso, e lo dice nel log. Il destinatario è raggiunto come sempre — sul
+canale preferito, passando al successivo solo se quello fallisce. Le settimane
+vanno da lunedì a domenica, UTC; `startsOn` è un giorno qualsiasi della prima
+settimana (vuoto conta dal 1970), e una data illeggibile conta allo stesso modo
+invece di fermare un avviso. Non viene salvato nulla: chi è di turno è una
+funzione della data, quindi un riavvio non cambia niente e la dashboard mostra lo
+stesso nome che usa il dispatcher. Le ore di silenzio trattengono comunque prima
+un cambiamento.
+
+```yaml
+delivery:
+  onCall:
+    enabled: true
+    minSeverity: major_outage
+    startsOn: 2026-10-05
+    rotation: [alice, bob]   # id dei destinatari; la settimana 1 è di alice
+```
+
+**`deliveryTest`** è una notifica che dimostra che il sistema di notifica
+funziona ancora, non solo il giorno in cui è stato configurato. Una volta a
+settimana UTC ogni canale attivo riceve un messaggio che dice, nella lingua del
+canale, che è il test settimanale di routine e che non c'è nessun problema; il
+template di un canale non sostituisce quel testo. Ogni canale è provato per conto
+suo, quindi un esito appartiene sempre a un solo canale. Un fallimento conta come
+canale rotto subito — un solo test fallito è la prova a cui gli avvisi veri
+arrivano con più fallimenti, perché con un messaggio a settimana ce ne
+vorrebbe un mese per dirlo — e l'avviso esistente di
+[`channelHealth`](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti)
+avverte gli altri canali, se è attivo. Il test parte al primo poll della
+settimana, aspetta la fine delle ore di silenzio e non viene ritentato.
+**Solo edizione UI**: la settimana dell'ultima esecuzione sta nel database.
+
 L'edizione Light configura il blocco `delivery` sopra (con le riserve appena
-dette per `escalation`, `attachChart` e `report`); l'edizione UI li modifica da
+dette per `escalation`, `attachChart`, `report` e `deliveryTest`); l'edizione UI li modifica da
 **Impostazioni → Consegna**, dove ogni riga si applica da sé e senza riavvio.
 
 ### 3.9 Validare un `config.yml` — il comando `check`
@@ -2704,3 +2744,53 @@ nessuno dei due. Nell'edizione UI sono i campi **Perché conta** e
 `POST /config/services` e `PATCH /config/services/:id` (`null` cancella l'uno o
 l'altro).
 
+### 3.24 Personalizzare la Panoramica
+
+Solo edizione UI. Tutto ciò che sta sotto il titolo della Panoramica è un elenco
+di widget che l'operatore dispone: **Personalizza** (accanto alle azioni del
+titolo, oppure **Personalizza la Panoramica** in ⌘K) trasforma la pagina nel suo
+stesso editor, con i dati veri, e nulla viene salvato prima di **Salva**.
+
+- **Widget** sono i blocchi che la Panoramica ha sempre disegnato — anelli della
+  flotta, mappa, guasto condiviso, gruppi, elenco della flotta — più un catalogo
+  di altri dodici, ognuno costruito su dati che la dashboard legge già:
+
+  | Widget | Mostra | Punta a |
+  |---|---|---|
+  | Incidenti aperti | ogni incidente aperto, il più grave per primo, e da quanto è aperto | una parte della flotta |
+  | Manutenzioni in arrivo | le finestre annunciate nelle prossime due settimane, su una corsia con oggi segnato | una parte della flotta |
+  | Error budget | il budget del mese per ogni obiettivo SLA ([3.13](#313-obiettivi-sla-e-budget-di-errore)) confrontato con quanto mese è passato | una parte della flotta |
+  | Provider | un provider, in grande: stato, uptime, ultimi 30 giorni, l'incidente in corso | un provider, o il peggiore adesso |
+  | Ultimi 30 giorni | l'uptime giornaliero per provider su un'unica scala, e la variazione sui 30 giorni prima | una parte della flotta |
+  | Calendario annuale | un anno di un provider, una casella al giorno | un provider, o il peggiore |
+  | Quando nascono gli incidenti | gli inizi degli incidenti per giorno e ora su 90 giorni, da dieci incidenti in su | — |
+  | MTTR e MTBF | tempo di riparazione e tempo fra due guasti su 90 giorni | una parte della flotta |
+  | Annotazioni e deploy | i tuoi segni sulla stessa settimana degli incidenti, e quale incidente è seguito a quale deploy | — |
+  | Salute delle consegne | se gli avvisi sono arrivati, per canale, ora per ora | — |
+  | Heartbeat dei job | ogni dead-man's switch ([3.19](#319-heartbeat--il-dead-mans-switch)) e quanto manca perché scatti | — |
+  | Si rompono insieme | i provider che vanno giù insieme, con un `dependsOn` a un clic ([3.20](#320-dipendenze--su-cosa-gira)) | — |
+
+  Ognuno può comparire più volte, e a un terzo della riga disegna la sua
+  sintesi invece di una copia schiacciata della versione intera.
+- **Larghezza** è una tra intera, due terzi, metà o un terzo della riga; l'altezza
+  è quella del widget. Sotto i 768px ogni widget prende tutta la larghezza.
+- **Ordine** — trascinare la maniglia, premere i suoi pulsanti ↑/↓, oppure dare il
+  focus alla maniglia e usare le frecce (Home e Fine la mandano a un estremo).
+  Ogni spostamento viene annunciato.
+- **Provider** — il tile del provider e il calendario annuale puntano a un
+  provider, oppure (il default) a quello messo peggio in questo momento.
+- **Filtro** — i widget della flotta accettano gruppi ([3.10](#310-gruppi-di-provider--il-mio-stack))
+  e singoli provider, e ne mostrano l'unione: "Cloud" accanto a "Pagamenti", per
+  esempio. Un widget filtrato porta una didascalia con ciò che mostra. Un provider
+  o un gruppo cancellato nel frattempo appare barrato nel filtro, e un filtro
+  rimasto vuoto lo dice — non si allarga mai in silenzio all'intera flotta.
+- **Ripristina default** dimentica la disposizione. Una Panoramica mai
+  personalizzata segue la disposizione predefinita, così i blocchi aggiunti dalle
+  versioni successive le arrivano da soli; una personalizzata tiene esattamente
+  ciò che è stato salvato.
+
+Il titolo sopra i widget è fisso: è la risposta a "c'è qualcosa che non va?", e
+nessuna disposizione lo nasconde. Due schede che modificano insieme non si
+sovrascrivono — il salvataggio arrivato dopo lo viene a sapere e gli vengono
+offerte entrambe le copie. La disposizione vive nel database, quindi un backup la
+porta con sé; via API è `GET`/`PUT /dashboards/default` ([6](api.it.md)).

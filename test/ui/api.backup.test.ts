@@ -118,6 +118,27 @@ test("a backup taken now, restored later, brings the fleet back as it was", asyn
   }
 });
 
+test("a restore brings back the customised Overview layout", async () => {
+  const app = await api();
+  try {
+    const custom = '{"version":1,"widgets":[]}';
+    app.runtime.db.prepare("UPDATE dashboards SET layout = ? WHERE id = 'default'").run(custom);
+    const backup = await app.getBytes("/config/backup");
+    app.runtime.db.prepare("UPDATE dashboards SET layout = NULL WHERE id = 'default'").run();
+
+    const { status, body } = await app.postFile("/config/restore", backup.bytes);
+
+    assert.equal(status, 200);
+    assert.equal((body as { tables: Record<string, number> }).tables["dashboards"], 1);
+    const row = app.runtime.db.prepare("SELECT layout FROM dashboards WHERE id = 'default'").get() as {
+      layout: string | null;
+    };
+    assert.equal(row.layout, custom);
+  } finally {
+    await app.close();
+  }
+});
+
 test("the restore reports the schema it read and that the credentials stayed put", async () => {
   const app = await api();
   try {

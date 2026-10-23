@@ -1899,3 +1899,106 @@ test("a known outage still interrupts for an update below major, and for a chang
 
   assert.equal(channel.seen.length, 2);
 });
+
+// Roadmap 3.15: whoever is on call this week also hears a major.
+const MONDAY_WEEK_2 = Date.parse("2026-10-12T10:00:00.000Z"); // the second week of the rotation below
+
+function onCallHarness(over: Partial<DeliveryConfig["onCall"]> = {}) {
+  const ana = recorder("ana-telegram");
+  const anaMail = recorder("ana-mail");
+  const bo = recorder("bo-telegram");
+  const boMail = recorder("bo-mail");
+  const team = recorder("team");
+  const dispatcher = createDispatcher({ logger: silent, now: () => MONDAY_WEEK_2 });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [ana.notifier, anaMail.notifier, bo.notifier, boMail.notifier, team.notifier],
+    rules: [{ ...CATCH_ALL_RULE, channels: ["team"] }],
+    knownChannelIds: [...KNOWN, "ana-telegram", "ana-mail", "bo-telegram", "bo-mail", "team"],
+    recipients: [
+      { id: "ana", name: "Ana", channels: ["ana-telegram", "ana-mail"] },
+      { id: "bo", name: "Bo", channels: ["bo-telegram", "bo-mail"] },
+    ],
+    delivery: {
+      ...DELIVERY_DEFAULTS,
+      onCall: { enabled: true, minSeverity: "major_outage" as const, rotation: ["ana", "bo"], startsOn: "2026-10-05", ...over },
+    },
+  };
+  return { ana, anaMail, bo, boMail, team, dispatch: (changes: StatusChange[]) => dispatcher.dispatch(changes, ctx) };
+}
+
+const major = () => change({ currentStatus: "major_outage" });
+
+test("a major also reaches the recipient on call this week, and not the one off duty", async () => {
+  const h = onCallHarness();
+  await h.dispatch([major()]);
+  assert.equal(h.team.seen.length, 1, "the routing rules still apply");
+  assert.equal(h.bo.seen.length, 1, "week two belongs to Bo");
+  assert.equal(h.ana.seen.length, 0);
+  assert.equal(h.boMail.seen.length, 0, "the recipient hears once, on the preferred channel");
+});
+
+test("a change under the on-call floor goes to the rules and nobody else", async () => {
+  const h = onCallHarness();
+  await h.dispatch([change({ currentStatus: "degraded" })]);
+  assert.equal(h.team.seen.length, 1);
+  assert.equal(h.bo.seen.length, 0);
+});
+
+test("a rotation naming a recipient that does not exist loses the extra reader, not the alert", async () => {
+  const h = onCallHarness({ rotation: ["ghost", "ghost"] });
+  await h.dispatch([major()]);
+  assert.equal(h.team.seen.length, 1);
+});
+
+test("with the rotation off nobody extra hears a major", async () => {
+  const h = onCallHarness({ enabled: false });
+  await h.dispatch([major()]);
+  assert.equal(h.bo.seen.length, 0);
+  assert.equal(h.team.seen.length, 1);
+});
+
+// Roadmap 3.16: the routine test goes to its own channel and feeds channel health.
+const testChange = (channel: string): StatusChange => ({
+  kind: "delivery_test",
+  providerId: "github",
+  currentStatus: "unknown",
+  channel: { id: channel, failures: 0, since: "2026-10-12T10:00:00.000Z" },
+  at: "2026-10-12T10:00:00.000Z",
+});
+
+test("a routine test reaches only the channel it tests, and says it is a test", async () => {
+  const a = recorder("telegram");
+  const b = recorder("slack");
+  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+  const records = await dispatcher.dispatch([testChange("telegram"), testChange("slack")], {
+    services,
+    locale: "en",
+    notifiers: [a.notifier, b.notifier],
+    rules: [],
+    knownChannelIds: KNOWN,
+    delivery: DELIVERY_DEFAULTS,
+  });
+  assert.equal(a.seen.length, 1);
+  assert.equal(b.seen.length, 1);
+  assert.equal(a.seen[0]?.change.channel?.id, "telegram");
+  assert.match(records[0]?.text ?? "", /routine delivery test/i);
+});
+
+test("one failed routine test is already a broken channel, and the others are told", async () => {
+  const broken = recorder("webhook", "throw");
+  const healthy = recorder("telegram");
+  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+  await dispatcher.dispatch([testChange("webhook"), testChange("telegram")], {
+    services,
+    locale: "en",
+    notifiers: [broken.notifier, healthy.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: { ...DELIVERY_DEFAULTS, channelHealth: { enabled: true, afterFailures: 3 } },
+  });
+  const alerts = healthy.seen.filter((payload) => payload.change.kind === "channel_failing");
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0]?.change.channel?.id, "webhook");
+});

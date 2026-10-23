@@ -240,6 +240,11 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
           reportEnabled: file.delivery.report?.enabled,
           reportFrequency: file.delivery.report?.frequency,
           reportChannel: file.delivery.report?.channel,
+          onCallEnabled: file.delivery.onCall?.enabled,
+          onCallMinSeverity: file.delivery.onCall?.minSeverity,
+          onCallRotation: file.delivery.onCall?.rotation?.join(","),
+          onCallStartsOn: file.delivery.onCall?.startsOn,
+          deliveryTestEnabled: file.delivery.deliveryTest?.enabled,
         }),
   };
   const carried = Object.entries(settings).filter(([, value]) => value !== undefined);

@@ -37,6 +37,8 @@ import { createMapStore, type MapStore } from "./mapStore.ts";
 import { createMetricsRegistry, type MetricsRegistry } from "./metrics.ts";
 import { componentTargetOf, inQuietHours } from "../core/routing.ts";
 import { createReportService, reportPeriod } from "./periodicReport.ts";
+import { weekKey } from "../core/onCall.ts";
+import type { StatusChange } from "../core/types.ts";
 import { createChartService } from "./uptimeChart.ts";
 import { createSlaService, rememberSlaNotice, slaAlreadyTold } from "./sla.ts";
 import { createTrustService, type TrustPair } from "./trust.ts";
@@ -352,6 +354,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
 
       await reportSlaBurn();
     await reportPeriodic();
+    await reportDeliveryTest();
       await rebuildTrust();
     },
   });
@@ -442,6 +445,52 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     }
   }
   let reportWithoutChannelWarned = false;
+
+  /**
+   * The routine delivery test (roadmap 3.16): once a UTC week, one message on
+   * every enabled channel that says it is a test. Goes through the dispatcher
+   * like everything else, whose channel-health tracking turns a failed test
+   * into the "channel failing" alert that already exists.
+   *
+   * Held while quiet hours are on, like the report: the marker is written only
+   * once the messages are handed over, so the first cycle after morning sends it.
+   */
+  async function reportDeliveryTest(): Promise<void> {
+    try {
+      const config = await configSource.load();
+      if (!config.delivery.deliveryTest.enabled) return;
+      const at = new Date();
+      if (inQuietHours(config.delivery.quietHours, at)) return;
+      const week = `weekly:${weekKey(at)}`;
+      if (readSettings(db, logger).deliveryTestLastSent === week) return;
+
+      const notifiers = buildAllNotifiers(config.channels);
+      const [subject] = config.services.filter((service) => service.enabled);
+      if (subject === undefined || notifiers.length === 0) return;
+      // One change per channel, so each result lands on its own channel's
+      // health record: a lone message to several channels could not say which.
+      const changes: StatusChange[] = notifiers.map((notifier) => ({
+        kind: "delivery_test",
+        providerId: subject.id,
+        currentStatus: "unknown",
+        channel: { id: notifier.id, failures: 0, since: at.toISOString() },
+        at: at.toISOString(),
+      }));
+      const records = await dispatcher.dispatch(
+        changes,
+        dispatchContextOf(config, notifiers, [...interactiveChannels]),
+      );
+      writeSettings(db, { deliveryTestLastSent: week });
+      logger.info("the routine delivery test was sent", {
+        week,
+        failed: records.filter((record) => record.kind === "delivery_test" && !record.ok).map((record) => record.channel),
+      });
+    } catch (error) {
+      logger.error("sending the routine delivery test failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   /** Every probe that names a page to cross-check, as a pair to fold episodes for. */
   function trustPairs(): TrustPair[] {

@@ -1228,6 +1228,153 @@ circle[role="button"]:hover {
   animation: drawer-out 0.22s ease both;
 }
 
+/* — the composable Overview's edit mode (roadmap 4.1) — */
+
+/* A widget with nothing to draw is no cell at all in view mode, so in edit mode
+   it grows out of nothing — its row and the row gap above it — instead of
+   pushing everything below down in one frame. It folds back the same way when
+   edit mode closes, which is what lets the view grid take over without a jump.
+   The inner box clips only these cells, and only by its own 4px padding, so a
+   focus ring on the toolbar is never cut. */
+@keyframes cell-reveal {
+  from {
+    grid-template-rows: 0fr;
+    margin-top: -1rem;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    margin-top: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes cell-conceal {
+  from {
+    grid-template-rows: 1fr;
+    margin-top: 0;
+    opacity: 1;
+  }
+  to {
+    grid-template-rows: 0fr;
+    margin-top: -1rem;
+    opacity: 0;
+  }
+}
+
+[data-slot="edit-grid"] [data-slot="widget-cell"]:has([data-slot="widget-body"]:empty) {
+  display: grid;
+  animation: cell-reveal 0.22s var(--ease-entry) both;
+}
+
+[data-slot="edit-grid"] [data-slot="widget-cell"]:has([data-slot="widget-body"]:empty) > [data-slot="cell-inner"] {
+  overflow: hidden;
+}
+
+[data-slot="edit-grid"][data-closing] [data-slot="widget-cell"]:has([data-slot="widget-body"]:empty) {
+  animation: cell-conceal 0.18s var(--ease-out) both;
+}
+
+/* A widget just added from the catalogue: one ring that settles onto its frame
+   and fades, to say where it landed. */
+@keyframes arrival {
+  from {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+  to {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+[data-slot="edit-arrival"] {
+  animation: arrival 0.6s var(--ease-out) both;
+}
+
+/* — the widget catalogue (roadmap 4.1, second round) —
+
+   Every figure in a widget arrives the way the rest of the view does, and a
+   new value moves to its place rather than being redrawn there. Entries are
+   gated on #view[data-animate] like every other one, so a background refresh
+   plays nothing; the transitions are what make a refreshed bar, ring or tone
+   glide instead of jump. Entries fill `backwards`, never `both`: a finished
+   entry that kept its last keyframe would own `transform` for good and the
+   transition carrying the next value would never run. */
+
+/* A bar grows from its left edge; the same transform carries later values. */
+@keyframes fill-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+#view[data-animate] .anim-fill {
+  animation: fill-in 0.62s var(--ease-entry) backwards;
+}
+.widget-fill {
+  transition: transform 0.6s var(--ease-entry), background-color 0.4s ease;
+}
+/* A heartbeat's elapsed bar is a clock: it advances linearly between reads,
+   so it creeps forward like time instead of stepping every thirty seconds. */
+.widget-fill[data-live] {
+  transition: transform 30s linear, background-color 0.4s ease;
+}
+
+/* Dense grids (the hour map, the delivery hours) arrive a row at a time,
+   revealed left to right: one animation per row, never one per cell — a
+   hundred and sixty-eight cells each on their own compositor layer is how a
+   card ends up half painted. */
+@keyframes row-sweep {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+#view[data-animate] .anim-row-sweep {
+  animation: row-sweep 0.7s var(--ease-entry) backwards;
+}
+
+/* The year calendar's weeks rise in as columns, on the same reasoning. */
+@keyframes column-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+#view[data-animate] .anim-column {
+  animation: column-in 0.36s var(--ease-entry) backwards;
+}
+
+/* An annotation's stem drops from the axis it hangs on. */
+@keyframes stem-drop {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+#view[data-animate] .anim-stem {
+  transform-origin: top;
+  animation: stem-drop 0.4s var(--ease-entry) backwards;
+}
+
+/* Status colour changes on a refresh — a tile going from operational to
+   outage — cross over rather than switch in one frame. */
+.widget-tone {
+  transition: color 0.4s ease, background-color 0.4s ease, border-color 0.4s ease;
+}
+
+/* What is happening now breathes, once a second and a half, quietly. */
+@keyframes now-breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+.widget-now {
+  animation: now-breathe 1.6s ease-in-out infinite;
+}
+
 /* Reduced motion keeps every state change, and none of the travel. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1236,6 +1383,18 @@ circle[role="button"]:hover {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+  /* The widget catalogue's entries fill `backwards`, so a stagger left in
+     place would hold each one at its first frame for the length of its delay
+     — a wait with nothing moving, of no use to someone who asked for no
+     motion. Scoped to these: zeroing every delay on the page changes how the
+     rest of the dashboard's text is composited, and every view's frames with
+     it. */
+  .anim-fill,
+  .anim-row-sweep,
+  .anim-column,
+  .anim-stem {
+    animation-delay: 0s !important;
   }
   /* The beam is decoration with no still frame worth keeping: stopped at one
      iteration it would park a bright square in a corner of the card. */

@@ -24,6 +24,8 @@ import type {
   MessagePreview,
   ProviderCalendar,
   CoincidenceReport,
+  DashboardResponse,
+  HeartbeatsResponse,
   Recipient,
   ReliabilityReport,
   SlaResponse,
@@ -40,6 +42,7 @@ import type {
   StorageReport,
 } from "./types.ts";
 import type { PushSubscriptionBody } from "./push.ts";
+import type { DashboardLayout } from "../../dashboardLayout.ts";
 
 /**
  * One thin wrapper per endpoint. Every failure surfaces the server's own
@@ -85,9 +88,24 @@ async function request<T>(
   if (!response.ok) {
     const message = (payload as { error?: { message?: string } })?.error
       ?.message;
-    throw new Error(message ?? `HTTP ${response.status}`);
+    throw new ApiError(message ?? `HTTP ${response.status}`, response.status, payload);
   }
   return payload as T;
+}
+
+/**
+ * A failed request, keeping what the server answered beside its message — for
+ * the one caller that reads a failure body rather than only showing it (a
+ * dashboard save's 409 carries the copy that won).
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly payload: unknown,
+  ) {
+    super(message);
+  }
 }
 
 export const getStatus = () => request<StatusResponse>("GET", "/status");
@@ -449,6 +467,32 @@ export const testChannel = (id: string) =>
   );
 
 export const getMap = () => request<MapResponse>("GET", "/map");
+
+export const getHeartbeats = () => request<HeartbeatsResponse>("GET", "/config/heartbeats");
+
+/** The composable Overview's layout — roadmap 4.1. */
+export const getDashboard = (id: string) =>
+  request<DashboardResponse>("GET", `/dashboards/${encodeURIComponent(id)}`);
+export type DashboardSave =
+  | { kind: "saved"; dashboard: DashboardResponse }
+  | { kind: "conflict"; current: DashboardResponse };
+/** A save based on a stale copy is an answer, not an error: the edit bar offers both sides. */
+export async function putDashboard(id: string, layout: DashboardLayout, updatedAt: string): Promise<DashboardSave> {
+  try {
+    const dashboard = await request<DashboardResponse>("PUT", `/dashboards/${encodeURIComponent(id)}`, {
+      layout,
+      updatedAt,
+    });
+    return { kind: "saved", dashboard };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) {
+      return { kind: "conflict", current: (error.payload as { current: DashboardResponse }).current };
+    }
+    throw error;
+  }
+}
+export const resetDashboard = (id: string) =>
+  request<DashboardResponse>("DELETE", `/dashboards/${encodeURIComponent(id)}/layout`);
 
 export const getPreferences = () =>
   request<Preferences>("GET", "/api/preferences");

@@ -10,6 +10,8 @@
  * redacted to "is this env var set", never the resolved secret).
  */
 
+import type { DashboardLayout } from "../../dashboardLayout.ts";
+
 /** Normalised severity vocabulary. Providers' own words are mapped onto this. */
 export type OverallStatus =
   "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown";
@@ -771,6 +773,10 @@ export interface DeliveryPolicy {
   knownOutage?: { enabled: boolean };
   /** Roadmap 3.13: a weekly or monthly report on one channel. Optional, as above. */
   report?: { enabled: boolean; frequency: "weekly" | "monthly"; channel: string };
+  /** Roadmap 3.15: the recipient on call this week also hears a major. Optional, as above. */
+  onCall?: { enabled: boolean; minSeverity: string; rotation: string[]; startsOn: string };
+  /** Roadmap 3.16: a weekly test message on every enabled channel. Optional, as above. */
+  deliveryTest?: { enabled: boolean };
   /** Roadmap 3.12: attach the provider's last 24 hours as an SVG where a channel can carry one. Optional, as above. */
   attachChart?: boolean;
 }
@@ -890,6 +896,26 @@ export interface UnlocatedProvider {
   providerId: string;
   providerName: string;
   count: number;
+}
+
+/** `GET /config/heartbeats` — when each dead-man's switch last heard from its job. */
+export interface HeartbeatsResponse {
+  enabled: boolean;
+  tokenRevealed: boolean;
+  heartbeats: { providerId: string; url: string | null; lastPingAt: string | null; pings: number }[];
+}
+
+/** `GET /dashboards/:id` — roadmap 4.1. */
+export interface DashboardResponse {
+  id: string;
+  name: string;
+  layout: DashboardLayout;
+  /** No customisation stored: the layout is the code default. */
+  isDefault: boolean;
+  /** The stored layout could not be read, so the default stands in for it. */
+  layoutInvalid?: true;
+  /** The version a save is checked against. */
+  updatedAt: string;
 }
 
 export interface MapResponse {

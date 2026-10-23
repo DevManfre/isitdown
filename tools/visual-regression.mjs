@@ -49,6 +49,8 @@ const WEB_DIR = join(ROOT, "dist/ui/public");
 /** Every view the rail can reach, by its hash route. */
 const VIEWS = [
   { name: "overview", hash: "#/overview" },
+  // Roadmap 4.1. The Overview's edit mode, opened the way a bookmark opens it.
+  { name: "overview-edit", hash: "#/overview?edit=1" },
   { name: "providers", hash: "#/providers" },
   { name: "incidents", hash: "#/incidents" },
   { name: "history", hash: "#/history" },

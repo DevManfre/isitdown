@@ -98,6 +98,16 @@ describe("CommandPalette", () => {
     );
   });
 
+  it("opens the Overview in edit mode — roadmap 4.1", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CommandPalette />, { status });
+    await open(user);
+
+    await user.click(await screen.findByRole("option", { name: i18n.t("palette.customise-overview") }));
+
+    await waitFor(() => expect(window.location.hash).toBe("#/overview?edit=1"));
+  });
+
   it("changing the theme stamps the next mode on the document", async () => {
     localStorage.setItem("isitdown.theme", "light");
     const user = userEvent.setup();

@@ -46,6 +46,7 @@ const TABLES = [
   "push_subscriptions",
   "map_points",
   "map_geo_state",
+  "dashboards",
 ] as const;
 
 /**
