@@ -2649,12 +2649,33 @@ the operator arranges: **Customise** (beside the headline's actions, or
 data, and nothing is stored until **Save**.
 
 - **Widgets** are the blocks the Overview always drew — fleet rings, map, shared
-  failure, groups, fleet list. Each can appear more than once.
+  failure, groups, fleet list — plus a catalogue of twelve more, each built on
+  data the dashboard already reads:
+
+  | Widget | Shows | Points at |
+  |---|---|---|
+  | Open incidents | every open incident, worst first, and how long it has been open | a fleet slice |
+  | Upcoming maintenance | announced windows in the next two weeks, on a lane with today on it | a fleet slice |
+  | Error budget | this month's budget per SLA target ([3.13](#313-sla-targets-and-error-budgets)) against how much of the month is gone | a fleet slice |
+  | Provider | one provider, large: status, uptime, last 30 days, the incident in progress | one provider, or the worst right now |
+  | Last 30 days | daily uptime per provider on one scale, and the change on the 30 days before | a fleet slice |
+  | Year calendar | a year of one provider, a square a day | one provider, or the worst |
+  | When incidents start | incident starts by weekday and hour over 90 days, from ten incidents up | — |
+  | MTTR and MTBF | repair time and time between failures over 90 days | a fleet slice |
+  | Annotations and deploys | your markers on the same week as the incidents, and which incident followed which deploy | — |
+  | Delivery health | whether the alerts arrived, per channel, hour by hour | — |
+  | Job heartbeats | every dead-man's switch ([3.19](#319-heartbeats--the-dead-mans-switch)) and how close it is to going off | — |
+  | Break together | providers that go down together, with a one-click `dependsOn` ([3.20](#320-dependencies--what-this-runs-on)) | — |
+
+  Each can appear more than once, and each draws its summary at a third of the
+  row rather than a squeezed copy of its full self.
 - **Width** is one of full, two thirds, half or a third of the row; height is the
   widget's own. Below 768px every widget takes the full width.
 - **Order** — drag the grip, press its ↑/↓ buttons, or focus the grip and use the
   arrow keys (Home and End send it to either end). Every move is announced.
-- **Filter** — the three fleet widgets take groups ([3.10](#310-provider-groups--my-stack))
+- **Provider** — the provider tile and the year calendar point at one
+  provider, or (the default) at whichever is worst right now.
+- **Filter** — the fleet widgets take groups ([3.10](#310-provider-groups--my-stack))
   and individual providers, and show their union: "Cloud" beside "Payments", say.
   A filtered widget is captioned with what it shows. A provider or group deleted
   since is struck through in the filter, and a filter left with nothing in it
