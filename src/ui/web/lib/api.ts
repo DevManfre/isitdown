@@ -25,6 +25,8 @@ import type {
   ProviderCalendar,
   CoincidenceReport,
   DashboardResponse,
+  DashboardSummary,
+  RemovedDashboard,
   HeartbeatsResponse,
   Recipient,
   ReliabilityReport,
@@ -493,6 +495,21 @@ export async function putDashboard(id: string, layout: DashboardLayout, updatedA
 }
 export const resetDashboard = (id: string) =>
   request<DashboardResponse>("DELETE", `/dashboards/${encodeURIComponent(id)}/layout`);
+
+/** Named dashboards — roadmap 4.2. */
+export const listDashboards = () => request<DashboardSummary[]>("GET", "/dashboards");
+export const createDashboard = (name: string, layout?: DashboardLayout) =>
+  request<DashboardResponse>("POST", "/dashboards", layout === undefined ? { name } : { name, layout });
+export const patchDashboard = (id: string, change: { name?: string; home?: true }) =>
+  request<DashboardResponse>("PATCH", `/dashboards/${encodeURIComponent(id)}`, change);
+export const deleteDashboard = (id: string) =>
+  request<RemovedDashboard>("DELETE", `/dashboards/${encodeURIComponent(id)}`);
+export const restoreDashboard = (removed: RemovedDashboard) =>
+  request<DashboardResponse>("POST", "/dashboards/restore", removed);
+/** The file itself goes to the server as parsed JSON; the server says what is wrong with it. */
+export const importDashboard = (file: unknown) => request<DashboardResponse>("POST", "/dashboards/import", file);
+/** A plain link, not a fetch: the response is an attachment and the browser saves it. */
+export const dashboardExportHref = (id: string) => `/dashboards/${encodeURIComponent(id)}/export`;
 
 export const getPreferences = () =>
   request<Preferences>("GET", "/api/preferences");

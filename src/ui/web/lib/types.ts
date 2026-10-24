@@ -912,10 +912,31 @@ export interface DashboardResponse {
   layout: DashboardLayout;
   /** No customisation stored: the layout is the code default. */
   isDefault: boolean;
+  /** The one the Overview opens on — roadmap 4.2. Optional: an older server sends none. */
+  home?: boolean;
   /** The stored layout could not be read, so the default stands in for it. */
   layoutInvalid?: true;
   /** The version a save is checked against. */
   updatedAt: string;
+}
+
+/** `GET /dashboards` — one rail entry per named dashboard (roadmap 4.2). */
+export interface DashboardSummary {
+  id: string;
+  name: string;
+  /** The one `#/overview` opens on. Exactly one is. */
+  home: boolean;
+  isDefault: boolean;
+  updatedAt: string;
+}
+
+/** What `DELETE /dashboards/:id` answers and `POST /dashboards/restore` takes back, for Undo. */
+export interface RemovedDashboard {
+  id: string;
+  name: string;
+  layout: string | null;
+  position: number;
+  home: boolean;
 }
 
 export interface MapResponse {

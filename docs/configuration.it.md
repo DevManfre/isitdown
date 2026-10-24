@@ -2794,3 +2794,21 @@ nessuna disposizione lo nasconde. Due schede che modificano insieme non si
 sovrascrivono — il salvataggio arrivato dopo lo viene a sapere e gli vengono
 offerte entrambe le copie. La disposizione vive nel database, quindi un backup la
 porta con sé; via API è `GET`/`PUT /dashboards/default` ([6](api.it.md)).
+
+**Dashboard nominate.** La Panoramica può avere più di una disposizione — "Il mio
+stack", "Vendor che pago", "Incidente in corso" — ciascuna con i suoi widget
+sotto lo stesso titolo. Il menu **⋯** dell'intestazione, accanto al titolo, ne
+crea una nuova: vuota, copia di quella aperta o con la disposizione predefinita;
+da quando ce n'è una seconda, sono elencate nel rail sotto **Panoramica** (sotto
+i 768px in un selettore in cima alla pagina, e in ⌘K). Lo stesso menu rinomina,
+duplica, elimina (con Annulla) e rende una di esse la **home** — quella su cui
+si apre `#/overview`; ognuna ha il suo indirizzo, `#/overview/<id>`, che una
+rinomina non cambia. I nomi sono unici senza badare alle maiuscole, e se ne
+possono avere fino a venti.
+
+**Esporta JSON**, nello stesso menu, scarica una dashboard come file
+(`{ format: "isitdown.dashboard", version: 1, name, layout }`) da condividere o
+conservare; **Importa da file** crea una nuova dashboard da uno di questi file,
+di questa installazione o di un'altra. Un nome importato già in uso viene
+numerato, e un provider citato dal file che qui non esiste viene mostrato come
+rimosso, come sopra.

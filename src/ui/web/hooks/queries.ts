@@ -13,7 +13,7 @@ import {
   REFRESH_MS,
   statusRefetchDelay,
 } from "@/lib/statusRefetch.ts";
-import type { DashboardResponse, StatusResponse } from "@/lib/types.ts";
+import type { DashboardResponse, RemovedDashboard, StatusResponse } from "@/lib/types.ts";
 import { DEFAULT_LAYOUT, type DashboardLayout } from "../../dashboardLayout.ts";
 import { useBusy } from "./useBusy.tsx";
 import { useLive } from "./useLive.tsx";
@@ -471,16 +471,79 @@ export function useHeartbeats() {
  * same default the server answers for an install nobody customised, so the
  * first paint is the right one and there is no second skeleton.
  */
-export function useDashboard(id = "default") {
+export function useDashboard(id: string | undefined) {
   const busy = useBusy();
   const live = useLive();
+  // `undefined` is "home, not known yet": the query waits for the list rather
+  // than guessing `default`, which an operator may have deleted.
   return useQuery({
     queryKey: ["dashboard", id],
-    queryFn: () => api.getDashboard(id),
-    placeholderData: { id, name: "", layout: DEFAULT_LAYOUT, isDefault: true, updatedAt: "" },
+    queryFn: () => api.getDashboard(id as string),
+    enabled: id !== undefined,
+    placeholderData: { id: id ?? "", name: "", layout: DEFAULT_LAYOUT, isDefault: true, updatedAt: "" },
     refetchInterval: idleInterval(busy, live),
     throwOnError: false,
   });
+}
+
+/** Every named dashboard, in the rail's order — roadmap 4.2. */
+export function useDashboards() {
+  const busy = useBusy();
+  const live = useLive();
+  return useQuery({
+    queryKey: ["dashboards"],
+    queryFn: api.listDashboards,
+    refetchInterval: idleInterval(busy, live),
+    throwOnError: false,
+  });
+}
+
+/**
+ * Create, rename, make home, delete, undo and import — roadmap 4.2. Each one
+ * refreshes the list, and the ones that answer a dashboard also put it in its
+ * own cache, so the page they navigate to draws without a second fetch.
+ */
+export function useDashboardAdmin() {
+  const client = useQueryClient();
+  const settle = (dashboard?: DashboardResponse) => {
+    if (dashboard !== undefined) client.setQueryData(["dashboard", dashboard.id], dashboard);
+    void client.invalidateQueries({ queryKey: ["dashboards"] });
+  };
+  return {
+    create: useMutation({
+      mutationFn: ({ name, layout }: { name: string; layout?: DashboardLayout | undefined }) =>
+        api.createDashboard(name, layout),
+      onSuccess: settle,
+    }),
+    rename: useMutation({
+      mutationFn: ({ id, name }: { id: string; name: string }) => api.patchDashboard(id, { name }),
+      onSuccess: settle,
+    }),
+    makeHome: useMutation({
+      mutationFn: (id: string) => api.patchDashboard(id, { home: true }),
+      // Home moved off another dashboard too, whose cached copy now says otherwise.
+      onSuccess: (dashboard) => {
+        void client.invalidateQueries({ queryKey: ["dashboard"] });
+        settle(dashboard);
+      },
+    }),
+    remove: useMutation({
+      mutationFn: api.deleteDashboard,
+      onSuccess: (removed) => {
+        client.removeQueries({ queryKey: ["dashboard", removed.id] });
+        void client.invalidateQueries({ queryKey: ["dashboard"] });
+        settle();
+      },
+    }),
+    restore: useMutation({
+      mutationFn: (removed: RemovedDashboard) => api.restoreDashboard(removed),
+      onSuccess: (dashboard) => {
+        void client.invalidateQueries({ queryKey: ["dashboard"] });
+        settle(dashboard);
+      },
+    }),
+    import: useMutation({ mutationFn: api.importDashboard, onSuccess: settle }),
+  };
 }
 
 /**
@@ -488,7 +551,7 @@ export function useDashboard(id = "default") {
  * the `["dashboard", id]` cache, so leaving edit mode shows the saved layout on
  * the very next render instead of flashing the old one until a refetch lands.
  */
-export function useDashboardMutations(id = "default") {
+export function useDashboardMutations(id: string) {
   const client = useQueryClient();
   const keep = (dashboard: DashboardResponse) => client.setQueryData(["dashboard", id], dashboard);
   return {

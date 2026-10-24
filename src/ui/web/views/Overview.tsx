@@ -15,7 +15,17 @@ import { DashboardGrid, filterLabel, REORDER_SPRING, type GridEditing } from "@/
 import { EmptyFleet } from "@/components/EmptyFleet.tsx";
 import { ViewSkeleton } from "@/components/ViewSkeleton.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
-import { useDashboard, useHistory, useStatus } from "@/hooks/queries.ts";
+import { useDashboard, useDashboards, useHistory, useStatus } from "@/hooks/queries.ts";
+import { useCurrentDashboardId } from "@/components/dashboards/DashboardMenu.tsx";
+import { dashboardPath } from "@/components/dashboards/DashboardActions.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
+import { ApiError } from "@/lib/api.ts";
 import { CoverageProvider } from "@/lib/coverage.tsx";
 import { statusLabelKey, worstTier } from "@/lib/chartConfig.ts";
 import { formatList, formatRelative } from "@/lib/format.ts";
@@ -51,13 +61,21 @@ export function Overview() {
   const navigate = useNavigate();
   const { data: status } = useStatus();
   const { data: summary } = useHistory({ days: OVERVIEW_WINDOW_DAYS });
+  // Roadmap 4.2: the dashboard named in the address, or home.
+  const dashboardId = useCurrentDashboardId();
+  const { data: dashboards } = useDashboards();
   const {
     data: dashboard,
     isPlaceholderData: dashboardPending,
-    isError: dashboardFailed,
+    isError: dashboardErrored,
     error: dashboardError,
     refetch: refetchDashboard,
-  } = useDashboard();
+  } = useDashboard(dashboardId);
+  /** A bookmark to a dashboard deleted since: not a failure to load, an answer. */
+  const dashboardMissing = dashboardErrored && dashboardError instanceof ApiError && dashboardError.status === 404;
+  const dashboardFailed = dashboardErrored && !dashboardMissing;
+  /** One of several: its empty state names it rather than "the Overview". */
+  const named = (dashboards?.length ?? 0) > 1;
   const [params, setParams] = useSearchParams();
   const editing = params.get("edit") === "1";
   const [notice, setNotice] = useState<string | null>(null);
@@ -322,7 +340,7 @@ export function Overview() {
             </Button>
           </span>
         )}
-        {!editing && !noneConfigured && !dashboardPending && !dashboardFailed && (
+        {!editing && !noneConfigured && !dashboardPending && !dashboardErrored && (
           <Button
             ref={customiseRef}
             type="button"
@@ -345,7 +363,9 @@ export function Overview() {
     </div>
   );
 
-  const layout = editor?.draft.layout ?? dashboard?.layout ?? DEFAULT_LAYOUT;
+  const layout = dashboardMissing
+    ? { version: 1 as const, widgets: [] }
+    : (editor?.draft.layout ?? dashboard?.layout ?? DEFAULT_LAYOUT);
   /** What a widget's toolbar says it is pointed at: its fleet filter, or its one provider. */
   const pointedAt = (widget: WidgetConfig): string | null => {
     if ("filter" in widget.props) return filterLabel(widget.props.filter, status, t);
@@ -458,6 +478,27 @@ export function Overview() {
           the default reads exactly as the fixed column did. */}
       {/* One grid for both modes (roadmap 4.1): edit mode adds chrome around
           the same mounted widgets, so opening it never replays an entry. */}
+      {/* Roadmap 4.2. Below 768px the rail is gone, so the named dashboards
+          are picked here instead — only once there is more than one. */}
+      {dashboards !== undefined && dashboards.length > 1 && dashboardId !== undefined && (
+        <div className="mb-4 flex flex-col gap-1.5 md:hidden">
+          <span id="dashboard-switcher" className="text-xs text-muted-foreground">
+            {t("dashboards.switcher")}
+          </span>
+          <Select value={dashboardId} onValueChange={(id) => void navigate(dashboardPath(id))}>
+            <SelectTrigger aria-labelledby="dashboard-switcher" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {dashboards.map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.home ? t("dashboards.home-suffix", { name: d.name }) : d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <DashboardGrid
         className="overview-rows"
         gridRef={gridRef}
@@ -490,6 +531,18 @@ export function Overview() {
                 </Reveal>
               </motion.div>
             </>
+          ) : dashboardMissing ? (
+            <Card className="col-span-6 border-dashed">
+              <CardContent className="flex flex-col items-start gap-3">
+                <h3 className="text-base font-semibold">{t("dashboards.missing.title")}</h3>
+                <p className="max-w-[60ch] text-sm text-muted-foreground">
+                  {t("dashboards.missing.body", { id: dashboardId ?? "" })}
+                </p>
+                <Button type="button" size="sm" onClick={() => void navigate(ROUTE_PATHS.overview)}>
+                  {t("dashboards.missing.open-home")}
+                </Button>
+              </CardContent>
+            </Card>
           ) : noneConfigured ? (
             <div className="col-span-6">
               <EmptyFleet />
@@ -499,8 +552,14 @@ export function Overview() {
           ) : layout.widgets.length === 0 ? (
             <Card className="col-span-6 border-dashed">
               <CardContent className="flex flex-col items-start gap-3">
-                <h3 className="text-base font-semibold">{t("dashboard.empty.title")}</h3>
-                <p className="max-w-[60ch] text-sm text-muted-foreground">{t("dashboard.empty.body")}</p>
+                {/* A named dashboard (4.2) is usually empty because it was made
+                    that way, not because everything was taken off it. */}
+                <h3 className="text-base font-semibold">
+                  {named ? t("dashboards.empty.title", { name: dashboard?.name ?? "" }) : t("dashboard.empty.title")}
+                </h3>
+                <p className="max-w-[60ch] text-sm text-muted-foreground">
+                  {t(named ? "dashboards.empty.body" : "dashboard.empty.body")}
+                </p>
                 <Button type="button" size="sm" onClick={openEditor}>
                   <LayoutGrid aria-hidden="true" />
                   {t("dashboard.customise")}
