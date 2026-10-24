@@ -7,6 +7,12 @@
  */
 export const ROUTE_PATHS = {
   overview: "/overview",
+  /**
+   * One named dashboard — roadmap 4.2. `#/overview` opens whichever is home;
+   * this is the address of a particular one, fixed at creation so a rename
+   * never breaks a bookmark.
+   */
+  overviewDashboard: "/overview/:dashboardId",
   providers: "/providers",
   /**
    * One provider, linkable — roadmap 5.6. `#/providers/github` is the page an
@@ -32,7 +38,10 @@ export const ROUTE_PATHS = {
 export type RouteName = keyof typeof ROUTE_PATHS;
 
 /** Every route that is a destination in its own right — the rail's own set. */
-export type NavRouteName = Exclude<RouteName, "settingsSection" | "providerDetail" | "wallboard">;
+export type NavRouteName = Exclude<
+  RouteName,
+  "settingsSection" | "providerDetail" | "wallboard" | "overviewDashboard"
+>;
 
 /** The rail's order, which is also the nav-label lookup order. */
 export const NAV_ROUTES: { name: NavRouteName; labelKey: string }[] = [

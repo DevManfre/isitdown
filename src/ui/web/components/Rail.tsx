@@ -1,6 +1,6 @@
-import { matchPath, NavLink, useLocation } from "react-router";
+import { Link, matchPath, NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Activity, History, Send, Server, Settings, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Activity, History, House, Plus, Send, Server, Settings, TriangleAlert, type LucideIcon } from "lucide-react";
 import { NAV_ROUTES, ROUTE_PATHS, type NavRouteName, type RouteName } from "../../routePaths.ts";
 import { BrandMark } from "@/components/BrandMark.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
@@ -13,8 +13,13 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar.tsx";
-import { useStatusChrome } from "@/hooks/queries.ts";
+import { useDashboards, useStatusChrome } from "@/hooks/queries.ts";
+import { useCurrentDashboardId } from "@/components/dashboards/DashboardMenu.tsx";
+import { dashboardCommand, dashboardPath, MAX_DASHBOARDS } from "@/components/dashboards/DashboardActions.tsx";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -50,6 +55,9 @@ export function Rail() {
   const { t, i18n } = useTranslation();
   const { pathname } = useLocation();
   const { data: status } = useStatusChrome();
+  const { data: dashboards = [] } = useDashboards();
+  const currentDashboard = useCurrentDashboardId();
+  const onOverview = matchPath({ path: ROUTE_PATHS.overview, end: false }, pathname) !== null;
 
   const badgeFor = (name: RouteName): number | undefined => {
     if (status === undefined) return undefined;
@@ -109,6 +117,50 @@ export function Rail() {
                     >
                       <NumberTicker locale={i18n.language} value={badge} />
                     </SidebarMenuBadge>
+                  )}
+                  {/* Roadmap 4.2. The named dashboards, under the view they
+                      are pages of — only once there is a second one: a list
+                      of one would repeat the row above it. The first is made
+                      from the header's menu. */}
+                  {name === "overview" && dashboards.length > 1 && (
+                    <SidebarMenuSub aria-label={t("dashboards.rail-label")} className="mr-0 pr-2">
+                      {dashboards.map((d) => (
+                        <SidebarMenuSubItem key={d.id}>
+                          <SidebarMenuSubButton asChild isActive={onOverview && d.id === currentDashboard}>
+                            {/* A plain Link: NavLink decides `aria-current` by the
+                                address alone, and the bare #/overview is home's
+                                page without naming it. */}
+                            <Link
+                              to={dashboardPath(d.id)}
+                              aria-current={onOverview && d.id === currentDashboard ? "page" : undefined}
+                            >
+                              <span className="min-w-0 flex-1 truncate">{d.name}</span>
+                              {d.home && (
+                                <House role="img" aria-label={t("dashboards.home")} className="text-primary" strokeWidth={1.8} />
+                              )}
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <button
+                            type="button"
+                            className="w-full text-primary"
+                            disabled={dashboards.length >= MAX_DASHBOARDS}
+                            title={
+                              dashboards.length >= MAX_DASHBOARDS ? t("dashboards.full", { max: MAX_DASHBOARDS }) : undefined
+                            }
+                            onClick={() =>
+                              dashboardCommand({ kind: "create", from: onOverview ? currentDashboard : undefined })
+                            }
+                          >
+                            <Plus aria-hidden="true" className="text-primary" />
+                            <span>{t("dashboards.new")}</span>
+                          </button>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
                   )}
                 </SidebarMenuItem>
               );

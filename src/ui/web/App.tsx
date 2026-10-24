@@ -1,6 +1,7 @@
 import { Outlet, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { CommandPalette } from "@/components/CommandPalette.tsx";
+import { DashboardActions } from "@/components/dashboards/DashboardActions.tsx";
 import { Rail } from "@/components/Rail.tsx";
 import { Header } from "@/components/Header.tsx";
 import { MobileNav } from "@/components/MobileNav.tsx";
@@ -64,7 +65,9 @@ export function App() {
   // remount, must not blank itself again each time the operator changes view.
   const ready = useViewReady(!seeded);
 
-  const paramString = [params["providerId"], params["incidentId"]].filter(Boolean).join("/");
+  // `dashboardId` is in the key so moving between named dashboards (roadmap
+  // 4.2) remounts the Overview: an edit open on one must not carry to another.
+  const paramString = [params["providerId"], params["incidentId"], params["dashboardId"]].filter(Boolean).join("/");
   const view = currentView(location.pathname, paramString !== "");
 
   return (
@@ -78,6 +81,9 @@ export function App() {
           shortcut has to answer on every screen, and a palette mounted inside
           a view would take its own key listener away with it on navigation. */}
       <CommandPalette />
+      {/* Roadmap 4.2. The named dashboards' dialogs and Undo notice, in the
+          shell for the palette's reason: rail, header and ⌘K all ask for them. */}
+      <DashboardActions />
       {/* Roadmap 7.6. The rail is `hidden md:block` inside the primitive, so
           below 768px the console had no navigation at all: this is what stands
           in for it — a tab bar and one sheet, both `md:hidden`. A sibling of

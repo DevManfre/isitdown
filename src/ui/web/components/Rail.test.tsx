@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createHashRouter, RouterProvider } from "react-router";
 import { I18nextProvider } from "react-i18next";
@@ -17,6 +17,10 @@ const status = {
   pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null,
 };
 const config = { polling: {}, services: [], channels: [{ id: "telegram", enabled: true, fields: [], locale: "", template: "" }] };
+
+let dashboards: unknown[] = [
+  { id: "default", name: "Overview", home: true, isDefault: true, updatedAt: "2026-08-21T00:00:00Z" },
+];
 
 // The rail is a `Sidebar`, so it needs the primitive's context — mounted the
 // way App mounts it, with `open` pinned true, since that pin is what leaves the
@@ -45,7 +49,7 @@ function mount(path = "/") {
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
     ok: true, status: 200,
-    text: async () => JSON.stringify(url.includes("/config") ? config : status),
+    text: async () => JSON.stringify(url.includes("/config") ? config : url === "/dashboards" ? dashboards : status),
   })));
 });
 
@@ -80,7 +84,7 @@ describe("Rail", () => {
     };
     vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
       ok: true, status: 200,
-      text: async () => JSON.stringify(url.includes("/config") ? config : disabled),
+      text: async () => JSON.stringify(url.includes("/config") ? config : url === "/dashboards" ? dashboards : disabled),
     })));
     mount();
 
@@ -122,6 +126,46 @@ describe("Rail", () => {
     // split across nodes, where `queryByText` would not find it either way.
     expect(document.body.textContent).not.toContain("telegram");
     expect(screen.queryByText(i18n.t("nav.channels"))).not.toBeInTheDocument();
+  });
+
+  // Roadmap 4.2. A list of one would repeat the Overview row above it.
+  it("lists no named dashboards while there is only one", async () => {
+    mount();
+    await screen.findByRole("link", { name: i18n.t("nav.overview") });
+    expect(screen.queryByRole("list", { name: i18n.t("dashboards.rail-label") })).toBeNull();
+  });
+
+  it("lists the named dashboards under the Overview once there are two, home marked, the open one current", async () => {
+    dashboards = [
+      { id: "default", name: "Overview", home: false, isDefault: true, updatedAt: "2026-08-21T00:00:00Z" },
+      { id: "il-mio-stack", name: "Il mio stack", home: true, isDefault: false, updatedAt: "2026-08-21T00:00:00Z" },
+    ];
+    try {
+      mount("/overview/default");
+      const list = await screen.findByRole("list", { name: i18n.t("dashboards.rail-label") });
+      const stack = within(list).getByRole("link", { name: new RegExp(`^Il mio stack ${i18n.t("dashboards.home")}$`) });
+      expect(stack).toHaveAttribute("href", "#/overview/il-mio-stack");
+      expect(stack).not.toHaveAttribute("aria-current");
+      expect(within(list).getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+      // The one control that is not a link: it opens a dialog, it goes nowhere.
+      expect(within(list).getByRole("button", { name: i18n.t("dashboards.new") })).toBeEnabled();
+    } finally {
+      dashboards = [{ id: "default", name: "Overview", home: true, isDefault: true, updatedAt: "2026-08-21T00:00:00Z" }];
+    }
+  });
+
+  it("marks home as current on the bare Overview address", async () => {
+    dashboards = [
+      { id: "default", name: "Overview", home: false, isDefault: true, updatedAt: "2026-08-21T00:00:00Z" },
+      { id: "ops", name: "Ops", home: true, isDefault: false, updatedAt: "2026-08-21T00:00:00Z" },
+    ];
+    try {
+      mount("/overview");
+      const list = await screen.findByRole("list", { name: i18n.t("dashboards.rail-label") });
+      expect(within(list).getByRole("link", { name: /^Ops/ })).toHaveAttribute("aria-current", "page");
+    } finally {
+      dashboards = [{ id: "default", name: "Overview", home: true, isDefault: true, updatedAt: "2026-08-21T00:00:00Z" }];
+    }
   });
 
   // The brand mark sits next to the product name, so it has to stay out of the

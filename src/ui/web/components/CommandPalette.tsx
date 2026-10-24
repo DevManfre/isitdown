@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { Activity, LayoutGrid, MonitorCog, RefreshCw, Server, Tv } from "lucide-react";
+import { Activity, LayoutGrid, MonitorCog, Plus, RefreshCw, Server, Tv, Upload } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -12,7 +12,8 @@ import {
   CommandSeparator,
 } from "@/components/ui/command.tsx";
 import { NAV_ROUTES, ROUTE_PATHS } from "../../routePaths.ts";
-import { usePollNow, useStatusChrome } from "@/hooks/queries.ts";
+import { useDashboards, usePollNow, useStatusChrome } from "@/hooks/queries.ts";
+import { dashboardCommand, dashboardPath, MAX_DASHBOARDS } from "@/components/dashboards/DashboardActions.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
 
 /**
@@ -81,6 +82,7 @@ export function CommandPalette() {
   };
 
   const providers = (status?.providers ?? []).filter((provider) => provider.enabled);
+  const { data: dashboards = [] } = useDashboards();
 
   return (
     <CommandDialog
@@ -105,6 +107,25 @@ export function CommandPalette() {
             </CommandItem>
           ))}
         </CommandGroup>
+
+        {/* Roadmap 4.2. Only once there is a choice to make. */}
+        {dashboards.length > 1 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading={t("palette.dashboards")}>
+              {dashboards.map((dashboard) => (
+                <CommandItem
+                  key={dashboard.id}
+                  value={`${t("dashboards.switcher")} ${dashboard.name} ${dashboard.id}`}
+                  onSelect={run(() => void navigate(dashboardPath(dashboard.id)))}
+                >
+                  <LayoutGrid aria-hidden="true" />
+                  {dashboard.home ? t("dashboards.home-suffix", { name: dashboard.name }) : dashboard.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
 
         {providers.length > 0 && (
           <>
@@ -145,6 +166,22 @@ export function CommandPalette() {
           >
             <LayoutGrid aria-hidden="true" />
             {t("palette.customise-overview")}
+          </CommandItem>
+          <CommandItem
+            value={t("dashboards.new")}
+            disabled={dashboards.length >= MAX_DASHBOARDS}
+            onSelect={run(() => dashboardCommand({ kind: "create" }))}
+          >
+            <Plus aria-hidden="true" />
+            {t("dashboards.new")}
+          </CommandItem>
+          <CommandItem
+            value={t("palette.import-dashboard")}
+            disabled={dashboards.length >= MAX_DASHBOARDS}
+            onSelect={run(() => dashboardCommand({ kind: "import" }))}
+          >
+            <Upload aria-hidden="true" />
+            {t("palette.import-dashboard")}
           </CommandItem>
           <CommandItem value={t("palette.cycle-theme")} onSelect={run(() => cycle())}>
             <MonitorCog aria-hidden="true" />
