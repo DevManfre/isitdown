@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 34;
+export const SCHEMA_VERSION = 35;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -787,6 +787,22 @@ export function migrate(db: DatabaseSync): void {
     db.prepare("INSERT OR IGNORE INTO dashboards (id, name, layout, updated_at) VALUES ('default', 'Overview', NULL, ?)").run(
       new Date().toISOString(),
     );
+  }
+
+  if (from < 35) {
+    // Named dashboards — roadmap 4.2. `position` is the rail's order; `home` the
+    // one the Overview opens on. A row with no home flag at all (a backup taken
+    // before this version) is not an error: the first by position is home.
+    const dashboardColumns = (db.prepare("PRAGMA table_info(dashboards)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!dashboardColumns.includes("position")) {
+      db.exec("ALTER TABLE dashboards ADD COLUMN position INTEGER NOT NULL DEFAULT 0");
+    }
+    if (!dashboardColumns.includes("home")) {
+      db.exec("ALTER TABLE dashboards ADD COLUMN home INTEGER NOT NULL DEFAULT 0");
+      db.exec("UPDATE dashboards SET home = 1 WHERE id = 'default'");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

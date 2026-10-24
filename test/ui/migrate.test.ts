@@ -129,6 +129,25 @@ test("migrating from user_version 33 adds the dashboards table and keeps a store
   old.close();
 });
 
+test("migrating from user_version 34 makes the existing dashboard home, first in the rail", () => {
+  const db = new DatabaseSync(":memory:");
+  migrate(db);
+  db.exec(`
+    DROP TABLE dashboards;
+    CREATE TABLE dashboards (id TEXT PRIMARY KEY, name TEXT NOT NULL, layout TEXT, updated_at TEXT NOT NULL);
+    INSERT INTO dashboards VALUES ('default', 'Overview', '{"version":1,"widgets":[]}', '2026-10-01T00:00:00.000Z');
+    PRAGMA user_version = 34;
+  `);
+  migrate(db);
+  const row = db.prepare("SELECT layout, position, home FROM dashboards WHERE id = 'default'").get() as {
+    layout: string;
+    position: number;
+    home: number;
+  };
+  assert.deepEqual({ ...row }, { layout: '{"version":1,"widgets":[]}', position: 0, home: 1 });
+  db.close();
+});
+
 test("a fresh database gets the v2 component schema", () => {
   const db = new DatabaseSync(":memory:");
   migrate(db);
