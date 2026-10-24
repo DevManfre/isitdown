@@ -272,6 +272,36 @@ describe("Overview edit mode", () => {
     expect(screen.getAllByText("GitHub").length).toBeGreaterThan(0);
   });
 
+  // Roadmap 4.2: a bookmark to a named dashboard deleted since.
+  it("says a dashboard no longer exists, draws none of its widgets, and offers home", async () => {
+    renderWithProviders(<Overview />, { status, history, errors: { dashboard: 404 } }, "/overview/:dashboardId", "/overview/gone");
+    expect(await screen.findByText(t("dashboards.missing.title"))).toBeInTheDocument();
+    expect(screen.getByText(t("dashboards.missing.body", { id: "gone" }))).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("button", { name: t("dashboard.customise") })).toBeNull();
+    expect(document.querySelectorAll("[data-slot=widget-cell]")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: t("dashboards.missing.open-home") }));
+    await waitFor(() => expect(window.location.hash).toBe("#/overview"));
+  });
+
+  it("opens the dashboard the address names, not home", async () => {
+    const named: DashboardLayout = { version: 1, widgets: [] };
+    renderWithProviders(
+      <Overview />,
+      {
+        status,
+        history,
+        dashboard: (path: string) =>
+          path === "/dashboards/ops"
+            ? { id: "ops", name: "Ops", layout: named, isDefault: false, home: false, updatedAt: "2026-10-01T00:00:00.000Z" }
+            : undefined,
+      },
+      "/overview/:dashboardId",
+      "/overview/ops",
+    );
+    expect(await screen.findByText(t("dashboard.empty.title"))).toBeInTheDocument();
+  });
+
   it("points a provider tile at one provider, or back at the worst of the fleet", async () => {
     const tile: DashboardLayout = {
       version: 1,
