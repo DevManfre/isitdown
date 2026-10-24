@@ -45,6 +45,7 @@ export const router = createHashRouter([
         errorElement: <ViewError />,
         children: [
           { path: ROUTE_PATHS.overview, element: <Overview /> },
+          { path: ROUTE_PATHS.overviewDashboard, element: <Overview /> },
           { path: ROUTE_PATHS.providers, element: <Providers /> },
           { path: ROUTE_PATHS.providerDetail, element: <ProviderDetail /> },
           { path: ROUTE_PATHS.incidents, element: <Incidents /> },

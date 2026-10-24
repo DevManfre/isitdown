@@ -2689,3 +2689,19 @@ and no arrangement hides it. Two tabs editing at once do not overwrite each
 other — the later save is told and offered both copies. The layout lives in the
 database, so a backup carries it; over the API it is `GET`/`PUT /dashboards/default`
 ([6](api.md)).
+
+**Named dashboards.** The Overview can have more than one arrangement — "My
+stack", "Vendors we pay", "Incident in progress" — each with its own widgets
+under the same headline. The header's **⋯** menu beside the title makes a new
+one, empty, as a copy of the one open, or on the built-in layout; once there is
+a second, they are listed in the rail under **Overview** (a picker at the top of
+the page below 768px, and in ⌘K). The same menu renames, duplicates, deletes
+(with Undo) and makes one **home** — the one `#/overview` opens on; each has its
+own address, `#/overview/<id>`, which a rename does not change. Names are unique
+regardless of case, and there can be up to twenty.
+
+**Export JSON** in that menu downloads one dashboard as a file
+(`{ format: "isitdown.dashboard", version: 1, name, layout }`) to share or keep;
+**Import from file** creates a new dashboard from one, from this install or
+another. An imported name already in use is numbered, and a provider the file
+names that does not exist here is shown as removed, as above.

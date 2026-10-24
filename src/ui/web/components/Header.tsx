@@ -6,6 +6,7 @@ import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler.tsx
 import { PollIndicator } from "./PollIndicator.tsx";
 import { openCommandPalette } from "./CommandPalette.tsx";
 import { openMoreSheet } from "./MobileNav.tsx";
+import { DashboardMenu } from "./dashboards/DashboardMenu.tsx";
 import { usePreferencesMutation, useStatusChrome } from "@/hooks/queries.ts";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme.tsx";
 import { formatRelative } from "@/lib/format.ts";
@@ -61,9 +62,14 @@ export function Header({ view }: { view: string }) {
        the two icon buttons above, the poll cluster below — so seven controls
        stop competing for one 390px line. */
     <header className="header grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-4 py-2 md:gap-x-4 md:px-8 md:py-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-      <h1 className="header-title col-start-1 row-start-1 truncate text-base font-medium md:text-lg">
-        {t(TITLE_KEYS[view] ?? "nav.overview")}
-      </h1>
+      {/* Roadmap 4.2: on the Overview the title carries which named dashboard
+          is open, and the menu of what can be done with it. */}
+      <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
+        <h1 className="header-title truncate text-base font-medium md:text-lg">
+          {t(TITLE_KEYS[view] ?? "nav.overview")}
+        </h1>
+        {view === "overview" && <DashboardMenu />}
+      </div>
 
       {/* The phone's own pair: search, and everything the desktop header shows
           inline. Both are 44px targets; the desktop keeps the labelled

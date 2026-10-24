@@ -35,6 +35,7 @@ type FixtureKey =
   | "adapterDebug"
   | "catalog"
   | "dashboard"
+  | "dashboards"
   | "sla"
   | "heartbeats";
 
@@ -73,6 +74,8 @@ export interface Fixtures {
   providerPush?: unknown;
   /** `/dashboards/…` — the Overview's widget layout (roadmap 4.1). */
   dashboard?: unknown;
+  /** `GET /dashboards` — the named dashboards list (roadmap 4.2). */
+  dashboards?: unknown;
   /** `/sla` — this month's error budgets. */
   sla?: unknown;
   /** `/config/heartbeats`, matched before `/config` — when each job last pinged. */
@@ -140,6 +143,8 @@ export function stubApi(fixtures: Fixtures): void {
                                   ? "config"
                                   : path.startsWith("/debug/adapters")
                                     ? "adapterDebug"
+                                    : path === "/dashboards"
+                                    ? "dashboards"
                                     : path.startsWith("/dashboards")
                                     ? "dashboard"
                                     : path.startsWith("/map")
@@ -182,6 +187,9 @@ export function stubApi(fixtures: Fixtures): void {
         messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },
         sla: { month: "2026-10", providers: [] },
         heartbeats: { enabled: false, tokenRevealed: false, heartbeats: [] },
+        dashboards: [
+          { id: "default", name: "Overview", home: true, isDefault: true, updatedAt: "2026-08-21T10:00:00.000Z" },
+        ],
         dashboard: {
           id: "default",
           name: "Overview",
