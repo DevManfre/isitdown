@@ -498,11 +498,13 @@ accanto a ciò che coprono.
 Due workflow, e la versione vive in un posto solo.
 
 `.github/workflows/ci.yml` gira su ogni pull request e su ogni push su `dev` o
-`main`, come quattro job affiancati su runner propri — typecheck, lint e parità
-del README; `coverage:server` e `test:integration`; `coverage:web`; e `build`,
-`check:bundle` e `test:visual` — così un run dura quanto il suo job più lento. Un
-quinto job, `verify`, passa solo se sono passati tutti e quattro: è il check che
-la ruleset di `main` richiede e quello che legge la release.
+`main`, come job affiancati su runner propri — typecheck, lint e parità
+del README; `coverage:server` e `test:integration`; Vitest diviso su due runner
+(`coverage:web:shard`), poi unito e confrontato con la soglia
+(`coverage:web:merge`); e `build`, `check:bundle` e `test:visual` — così un run
+dura quanto il suo percorso più lento. Un ultimo job, `verify`, passa solo se
+sono passati tutti gli altri: è il check che la ruleset di `main` richiede e
+quello che legge la release.
 
 Una release è un tag. `package.json` resta `private` (niente viene pubblicato su
 npm) ma il suo `version` è l'unica fonte di verità:
