@@ -181,6 +181,10 @@ export function Incidents() {
   // a page the narrowed result does not have.
   useEffect(() => {
     if (debounce.current !== undefined) clearTimeout(debounce.current);
+    // Nothing typed since the last query — the first render, or a keystroke
+    // undone — is not a new search, and must not pull an operator who has
+    // already paged on back to page 1 a quarter of a second after mount.
+    if (search.trim() === query) return;
     debounce.current = setTimeout(() => {
       setQuery(search.trim());
       setPage(1);
@@ -188,7 +192,7 @@ export function Incidents() {
     return () => {
       if (debounce.current !== undefined) clearTimeout(debounce.current);
     };
-  }, [search]);
+  }, [search, query]);
 
   // A poll can prune the list under an operator sitting on its last page (and a
   // remembered filter can be restored beside a page number that no longer
