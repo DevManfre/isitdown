@@ -5,7 +5,9 @@ description: Ship IsItDown from dev to a published release — push dev, wait fo
 
 # Release Flow
 
-One release = five gates, in order, each proven green before the next starts. Never tag a commit whose CI has not passed: `release.yml` builds and pushes public images to GHCR and creates a public GitHub release, and both are effectively irreversible.
+One release = two CI waits, not four. CI runs once on `dev` *with the version already bumped*; `main` then receives the same tree, so its own CI run is a formality the Release workflow waits on by itself (its first step blocks until CI's `verify` check on the tagged commit is green and stops the release otherwise). Images and the GitHub release are public and effectively irreversible, so that gate is never skipped — it just isn't babysat by hand twice.
+
+Don't re-run locally what CI is about to run: no `npm run preversion`, no `npm ci && npm test` after the merge. Every check below that replaces a test run proves the code is *identical* to code CI already passed.
 
 Branch model: `main` carries only the product, `dev` carries the product *plus* `.claude/`, `CLAUDE.md`, `.mergeexclude`, `.githooks/`, `scripts/`. `main` is a filtered replay of `dev` (rewritten SHAs), so merges are always `git mergeclean dev`, never `git merge dev` — guard hooks abort a plain merge.
 
@@ -19,31 +21,22 @@ gh auth status                          # gh must be logged in for the run gates
 
 Decide the version from the commits since the last tag: new feature → minor, fixes only → patch.
 
-## 1. Push dev, gate on CI
+## 1. Bump the version by hand, then push dev once
+
+Bump *before* pushing, so the one CI run on `dev` covers the commit that ships. `npm version` is broken in this repo: it fails after already writing the bumped version, so a retry double-bumps. Never run it. Patch both files:
 
 ```bash
-git push origin dev
-RUN=$(gh run list --branch dev --limit 1 --json databaseId -q '.[0].databaseId')
-gh run watch "$RUN" --exit-status --interval 15
-```
-
-`--exit-status` is the gate — a non-zero exit means stop and fix, never continue.
-
-## 2. Bump the version by hand
-
-`npm version` is broken in this repo: it fails after already writing the bumped version, so a retry double-bumps. Never run it. Run the checks yourself, then patch both files:
-
-```bash
-npm run preversion                       # typecheck + unit + integration, must exit 0
 npm pkg set version=X.Y.Z
 node -e 'const fs=require("fs"),p="package-lock.json",j=JSON.parse(fs.readFileSync(p,"utf8"));j.version="X.Y.Z";if(j.packages&&j.packages[""])j.packages[""].version="X.Y.Z";fs.writeFileSync(p,JSON.stringify(j,null,2)+"\n")'
 git commit -am "🔖 RELEASE - bump the version to X.Y.Z"
 git push origin dev
+RUN=$(gh run list --branch dev --limit 1 --json databaseId -q '.[0].databaseId')
+gh run watch "$RUN" --exit-status --interval 30
 ```
 
-Then gate on CI again (same two commands as step 1). If a botched attempt left a wrong version: `git checkout -- package.json package-lock.json`.
+`--exit-status` is the gate — a non-zero exit means stop and fix, never continue. Run the watch in the background (`run_in_background`) and prepare step 2's commands meanwhile; nothing on `main` is pushed until it is green. If a botched attempt left a wrong version: `git checkout -- package.json package-lock.json`.
 
-## 3. Merge into main
+## 2. Merge into main
 
 ```bash
 git switch main && git pull --ff-only origin main
@@ -62,25 +55,28 @@ git commit --amend -m "🔀 MAIN - merge dev without the excluded local paths"
 
 The amend is required: a conflicted merge finishes through `git commit`, which loses the alias's message and writes the default `Merge branch 'dev'`.
 
-Verify the merge locally before publishing it, then push and gate on CI:
+Prove the merge resolution is sound by comparing trees, not by re-running the suite: `main` must equal `dev` except for the excluded paths, which means it is the very code CI just passed.
 
 ```bash
-npm ci && npm run typecheck && npm test
-git push origin main
-gh run watch "$(gh run list --branch main --limit 1 --json databaseId -q '.[0].databaseId')" --exit-status --interval 15
+git diff --name-only dev HEAD | grep -vE '^(\.claude/|CLAUDE\.md$|\.githooks/|scripts/|\.mergeexclude$)'   # must print nothing
+SKIP_VISUAL=1 git push origin main
 ```
 
-## 4. Tag and gate on the Release workflow
+`SKIP_VISUAL=1` because the pre-push hook would rebuild and screenshot a tree whose baselines CI has just checked on `dev`. Any path the `grep` prints is a bad resolution — fix it with `git checkout dev -- <path>` and amend, never push it. Don't wait for `main`'s CI here: step 3's workflow waits for it.
+
+## 3. Tag and gate on the Release workflow
 
 ```bash
 git tag -a vX.Y.Z -m "🔖 RELEASE - vX.Y.Z"
 git push origin vX.Y.Z
-gh run watch "$(gh run list --limit 1 --json databaseId -q '.[0].databaseId')" --exit-status --interval 20
+gh run watch "$(gh run list --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')" --exit-status --interval 30
 ```
 
-The workflow re-verifies, checks the tag against `package.json`, builds both editions multi-arch, signs them with cosign, and creates the GitHub release. It takes minutes, not seconds.
+The workflow first waits for CI's `verify` check on the tagged commit (that is `main`'s run from step 2, usually still going), then checks the tag against `package.json`, builds both editions multi-arch, signs them with cosign, and creates the GitHub release. Run the watch in the background too.
 
-## 5. Prove the release is published
+If it stops at "Wait for CI on the tagged commit", `main`'s CI failed: nothing was published, but the tag is public. Read the CI log, fix on `dev`, and delete the tag before re-releasing: `git push --delete origin vX.Y.Z && git tag -d vX.Y.Z`.
+
+## 4. Prove the release is published
 
 ```bash
 gh release view vX.Y.Z --json tagName,isDraft,url
@@ -106,17 +102,17 @@ runner — read that step's log rather than re-tagging.
 
 | Gate | Command | Green means |
 |---|---|---|
-| dev CI | `gh run watch <id> --exit-status` | code compiles, tests pass |
-| dev CI after bump | same | the version commit is sound |
-| main CI | same | the merge resolution is sound |
-| Release | same | images pushed, release created |
+| dev CI (after bump) | `gh run watch <id> --exit-status` | the commit that ships compiles, tests pass |
+| Merge | `git diff --name-only dev HEAD` filtered | `main` is the tree CI just passed |
+| Release | `gh run watch <id> --exit-status` | `main`'s CI green, images pushed, release created |
 | Published | `gh release view` + `docker manifest inspect` | operators can pull it |
 
 ## Common mistakes
 
 - Reporting a release as published without checking the binary asset as well as the two image tags.
-- Tagging before `main`'s CI is green — the tag is public the moment it is pushed.
-- Running `npm version` — see step 2.
+- Pushing `main` when the tree comparison printed a path — that is the one case where `main` is not the code CI passed.
+- Re-running `npm test` / `preversion` locally "to be safe" — CI runs a superset of it a minute later; this is what made a release take half an hour.
+- Running `npm version` — see step 1.
 - `git merge dev` on `main` — the guard hook aborts it; use `git mergeclean dev`.
 - Treating mergeclean conflicts as a problem to debug instead of the expected outcome.
 - Leaving the default `Merge branch 'dev'` message after a conflicted merge.
