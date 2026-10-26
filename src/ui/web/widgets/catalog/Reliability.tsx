@@ -1,5 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useFilterLabel } from "@/components/DashboardGrid.tsx";
+import { DrillLink } from "@/components/DrillLink.tsx";
+import { historyHref, incidentsHref } from "@/lib/drillDown.ts";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { useReliability } from "@/hooks/queries.ts";
 import { TREND_CHART } from "@/lib/chartConfig.ts";
@@ -103,7 +105,14 @@ export function Reliability({ props }: { props: { filter: FleetFilter } }) {
             <div key={row.providerId} className="contents">
               <span className="truncate border-t border-border py-2.5 text-sm">{name(row.providerId)}</span>
               <div className="flex flex-col gap-1 border-t border-border py-2.5">
-                <span className="font-mono text-sm">{duration(row.mttrMinutes)}</span>
+                <DrillLink
+                  to={historyHref({ provider: row.providerId, days: data.days })}
+                  label={t("drill.provider-mttr", { provider: name(row.providerId), mttr: duration(row.mttrMinutes), count: data.days })}
+                  where={t("drill.where.history", { provider: name(row.providerId), count: data.days })}
+                  className="w-fit font-mono text-sm"
+                >
+                  {duration(row.mttrMinutes)}
+                </DrillLink>
                 <Fill value={(row.mttrMinutes ?? 0) / longestRepair} color="var(--color-accent)" className="h-1.5" delay={delay} />
               </div>
               <div className="flex flex-col gap-1 border-t border-border py-2.5">
@@ -116,7 +125,15 @@ export function Reliability({ props }: { props: { filter: FleetFilter } }) {
                   delay={delay}
                 />
               </div>
-              <span className="border-t border-border py-2.5 font-mono text-sm">{row.incidents}</span>
+              <span className="border-t border-border py-2.5 font-mono text-sm">
+                <DrillLink
+                  to={incidentsHref({ provider: row.providerId, days: data.days })}
+                  label={t("drill.provider-incidents", { provider: name(row.providerId), count: row.incidents, days: data.days })}
+                  where={t("drill.where.incidents", { provider: name(row.providerId), count: data.days })}
+                >
+                  {row.incidents}
+                </DrillLink>
+              </span>
               <span className="hidden border-t border-border py-2.5 text-right font-mono text-xs @2xl:block" style={{ color: change.color }}>
                 {change.text}
               </span>

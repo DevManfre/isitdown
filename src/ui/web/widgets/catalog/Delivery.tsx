@@ -1,6 +1,8 @@
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
+import { DrillLink } from "@/components/DrillLink.tsx";
+import { deliveryHref } from "@/lib/drillDown.ts";
 import { useConfigChrome, useDeliveryLog } from "@/hooks/queries.ts";
 import { useNow } from "@/hooks/useNow.ts";
 import { formatRelative } from "@/lib/format.ts";
@@ -92,9 +94,18 @@ export function Delivery() {
     <WidgetCard title={title} meta={meta} conclusion={conclusion} tone={broken.length > 0 ? "warn" : undefined} className="@container">
       {/* A third: the share that arrived. */}
       <div className="flex flex-col gap-1 @md:hidden">
-        <span className="font-mono text-3xl">
-          {rate === null ? "—" : new Intl.NumberFormat(i18n.language, { style: "percent", maximumFractionDigits: 1 }).format(rate)}
-        </span>
+        {rate === null ? (
+          <span className="font-mono text-3xl">—</span>
+        ) : (
+          <DrillLink
+            to={deliveryHref({ state: failed.length > 0 ? "failed" : "all" })}
+            label={t("drill.delivery", { ok: day.length - failed.length, total: day.length })}
+            where={t(failed.length > 0 ? "drill.where.delivery-failed" : "drill.where.delivery")}
+            className="w-fit font-mono text-3xl"
+          >
+            {new Intl.NumberFormat(i18n.language, { style: "percent", maximumFractionDigits: 1 }).format(rate)}
+          </DrillLink>
+        )}
         <span className="font-mono text-xs text-muted-foreground">{t("widget.delivery.share", { ok: day.length - failed.length, total: day.length })}</span>
       </div>
 
@@ -104,9 +115,18 @@ export function Delivery() {
           <li key={row.channel} className="flex items-center gap-2.5 text-sm">
             <StatusDot status={row.failed > 0 ? "major_outage" : row.sent > 0 ? "operational" : "unknown"} />
             <span className="flex-1 truncate">{channelName(row.channel)}</span>
-            <span className="font-mono text-xs" style={{ color: row.failed > 0 ? "var(--status-major-outage)" : undefined }}>
-              {row.failed > 0 ? t("widget.delivery.row-failed", { count: row.failed }) : t("widget.delivery.row-sent", { count: row.sent })}
-            </span>
+            {row.failed > 0 ? (
+              <DrillLink
+                to={deliveryHref({ state: "failed" })}
+                label={t("drill.delivery-failed", { count: row.failed, channel: channelName(row.channel) })}
+                where={t("drill.where.delivery-failed")}
+                className="font-mono text-xs text-[var(--status-major-outage)]"
+              >
+                {t("widget.delivery.row-failed", { count: row.failed })}
+              </DrillLink>
+            ) : (
+              <span className="font-mono text-xs">{t("widget.delivery.row-sent", { count: row.sent })}</span>
+            )}
           </li>
         ))}
       </ul>

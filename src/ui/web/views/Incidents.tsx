@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { DownloadMenu } from "@/components/DownloadMenu.tsx";
+import { FromOverviewChip } from "@/components/DrillLink.tsx";
+import { readDays, snapWindow } from "@/lib/drillDown.ts";
 import { Card } from "@/components/ui/card.tsx";
 import { BorderBeam } from "@/components/ui/border-beam.tsx";
 import { DotPattern } from "@/components/ui/dot-pattern.tsx";
@@ -98,7 +100,17 @@ function rememberFilter(filter: Filter): void {
 export function Incidents() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<Filter>(readFilter);
+  // Roadmap 4.3: a number on the Overview arrives here with its filters in the
+  // address. The address wins over the remembered filter — it is what the
+  // operator just clicked — and is only read on the way in; the controls below
+  // then drive the list as they always have.
+  const [params, setParams] = useSearchParams();
+  const askedState = FILTERS.find((entry) => entry.value === params.get("state"))?.value;
+  const askedDays = readDays(params.get("days"));
+  const [filter, setFilter] = useState<Filter>(() => askedState ?? readFilter());
+  // No control of its own: a provider is only ever narrowed to from a link, and
+  // the chip that link leaves behind is the way back to the whole list.
+  const [provider, setProvider] = useState<string | null>(() => params.get("provider"));
   // The feed opens at two rows: it sits beside the active-incident card, and a
   // full eight of them stretched that column far past it. The rest stay one
   // click away rather than on another screen.
@@ -109,9 +121,10 @@ export function Incidents() {
   // the first would fire a request per character.
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
-  const [days, setDays] = useState<number>(0);
+  const [days, setDays] = useState<number>(() => (askedDays === null ? 0 : snapWindow(askedDays, WINDOWS)));
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { data: incidents } = useIncidents({
+    ...(provider === null ? {} : { provider }),
     state: filter,
     ...(query === "" ? {} : { q: query }),
     ...(days === 0 ? {} : { days }),
@@ -144,7 +157,7 @@ export function Incidents() {
   // ...and only while nothing is being searched for: the search runs over
   // incident names on the server, so maintenance windows riding along under it
   // would be rows the operator's own query never matched.
-  const searching = query !== "" || days !== 0;
+  const searching = query !== "" || days !== 0 || provider !== null;
   const maintenanceRows = page === 1 && !searching ? (maintenances?.maintenances ?? []) : [];
   // The current page's incidents plus every declared maintenance window,
   // interleaved by when each started — newest first, same order the
@@ -239,10 +252,11 @@ export function Incidents() {
    * to save one.
    */
   const searchParams = (): string => {
-    const params = new URLSearchParams({ state: filter });
-    if (query !== "") params.set("q", query);
-    if (days !== 0) params.set("days", String(days));
-    return params.toString();
+    const search = new URLSearchParams({ state: filter });
+    if (provider !== null) search.set("provider", provider);
+    if (query !== "") search.set("q", query);
+    if (days !== 0) search.set("days", String(days));
+    return search.toString();
   };
 
   const exportHref = (format: "csv" | "json"): string =>
@@ -468,7 +482,21 @@ export function Incidents() {
           and a row here, since the list holds every state under `all`. */}
       <section aria-label={t("incidents.list")} className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("incidents.list")}</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("incidents.list")}</span>
+            {provider !== null && (
+              <FromOverviewChip
+                params={params}
+                summary={days === 0 ? nameOf(provider) : t("drill.provider-days", { provider: nameOf(provider), count: days })}
+                clearLabel={t("drill.clear-provider", { provider: nameOf(provider) })}
+                onClear={() => {
+                  setProvider(null);
+                  setPage(1);
+                  setParams({}, { replace: true });
+                }}
+              />
+            )}
+          </div>
           {/* The filter, the search and the window sit on the list they narrow,
               rather than at the top of the page, two sections away from their
               own effect. */}

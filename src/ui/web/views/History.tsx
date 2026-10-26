@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import { Trans, useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { DeltaChip } from "@/components/DeltaChip.tsx";
 import { DownloadMenu } from "@/components/DownloadMenu.tsx";
+import { FromOverviewChip } from "@/components/DrillLink.tsx";
+import { readDays, snapWindow } from "@/lib/drillDown.ts";
 import { ProviderHistoryDrawer } from "@/components/ProviderHistoryDrawer.tsx";
 import { ProviderTrendRow } from "@/components/ProviderTrendRow.tsx";
 import { StatTiles } from "@/components/StatTiles.tsx";
@@ -117,7 +119,13 @@ function downloadHistoryJson(summary: HistorySummary, days: number): void {
  */
 export function History() {
   const { t, i18n } = useTranslation();
-  const [days, setDays] = useState<number>(90);
+  // Roadmap 4.3: a number on the Overview arrives with the window it was counted
+  // in and, for a provider's figure, that provider — opened in the drawer, which
+  // is this page's own way of narrowing to one.
+  const [params, setParams] = useSearchParams();
+  const askedDays = readDays(params.get("days"));
+  const askedProvider = params.get("provider");
+  const [days, setDays] = useState<number>(() => (askedDays === null ? 90 : snapWindow(askedDays, RANGES)));
   /**
    * The picked range, or null while one of the fixed windows is selected
    * (roadmap 5.5). Kept beside `days` rather than replacing it: everything on
@@ -134,10 +142,18 @@ export function History() {
   const location = useLocation();
   const asked =
     (location.state as { openProvider?: string } | null)?.openProvider ?? null;
-  const [open, setOpen] = useState<string | null>(asked);
+  const [open, setOpen] = useState<string | null>(asked ?? askedProvider);
   useEffect(() => {
     if (asked !== null) setOpen(asked);
   }, [asked]);
+  useEffect(() => {
+    if (askedProvider !== null) setOpen(askedProvider);
+  }, [askedProvider]);
+  /** Closing the drawer a link opened takes the link's narrowing with it. */
+  const close = (): void => {
+    setOpen(null);
+    if (askedProvider !== null) setParams({}, { replace: true });
+  };
   // Null means "whichever the ordering picks": the fleet is not loaded yet on
   // the first render, and a comparison the operator did choose must survive a
   // range change that reorders the list under it.
@@ -272,6 +288,14 @@ export function History() {
               <span className="text-xs uppercase tracking-widest text-primary">
                 {t("history.kicker")}
               </span>
+              {askedProvider !== null && open === askedProvider && (
+                <FromOverviewChip
+                  params={params}
+                  summary={t("drill.provider-days", { provider: nameOf(askedProvider), count: days })}
+                  clearLabel={t("drill.close-provider", { provider: nameOf(askedProvider) })}
+                  onClear={close}
+                />
+              )}
               {/* The definition, on the number itself — roadmap 10.2. The
                   figure has always had an answer to "does degraded count";
                   until now the operator did not. The full table is in
@@ -656,7 +680,7 @@ export function History() {
               : (statusById.get(open)?.maintenance.upcoming ?? [])
           }
           historyWindow={window_}
-          onClose={() => setOpen(null)}
+          onClose={close}
         />
       </div>
     </CoverageProvider>
