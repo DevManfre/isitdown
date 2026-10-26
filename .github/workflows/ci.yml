@@ -1,7 +1,12 @@
 # Every push to a long-lived branch and every pull request must pass exactly
 # what a contributor runs locally: typecheck, unit tests, integration tests,
 # a build as a smoke check, and the visual baselines. Nothing in the release
-# workflow is trusted unless this one is green first.
+# workflow is trusted unless this one is green first — release.yml reads this
+# workflow's conclusion for the tagged commit instead of re-running it.
+#
+# Four jobs side by side rather than one in sequence: each gets its own runner,
+# so the run takes as long as its slowest job instead of the sum of all of them.
+# None depends on another's output, so none waits on another.
 name: CI
 
 on:
@@ -18,7 +23,8 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  static:
+    name: Typecheck, lint, README parity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -39,20 +45,57 @@ jobs:
       - name: Lint (check only)
         run: npm run lint
 
-      # Roadmap 7.2. The same two suites `npm test` runs, under a coverage
-      # floor: a new subsystem that lands without tests of its own drags the
-      # total under the floor and fails here rather than going unnoticed.
-      - name: Unit tests with a coverage floor (node:test + Vitest)
-        run: npm run coverage
-
-      - name: Integration tests
-        run: npm run test:integration
-
       # Roadmap 7.6. The Italian README is a translation of the English one,
       # section for section; this fails a hand edit that landed in only one of
       # them before it can reach main.
       - name: README translation parity
         run: npm run check:readme
+
+  # Roadmap 7.2. The same two suites `npm test` runs, each under a coverage
+  # floor: a new subsystem that lands without tests of its own drags the total
+  # under the floor and fails here rather than going unnoticed. One job per
+  # suite, because each one alone keeps a runner's cores busy.
+  server-tests:
+    name: Server tests (node:test, coverage) + integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Unit tests with a coverage floor (node:test)
+        run: npm run coverage:server
+
+      - name: Integration tests
+        run: npm run test:integration
+
+  dashboard-tests:
+    name: Dashboard tests (Vitest, coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Unit tests with a coverage floor (Vitest)
+        run: npm run coverage:web
+
+  build:
+    name: Build, bundle budget, visual regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
 
       # Builds every edition once: a compile or bundling error must fail here,
       # not at release time.
@@ -91,3 +134,22 @@ jobs:
           name: visual-regression
           path: test/visual/current
           if-no-files-found: ignore
+
+  # The one check `main`'s ruleset requires, and the one release.yml reads for
+  # the tagged commit — kept under its old name so neither had to change when
+  # the single `verify` job was split into the four above. `always()` so a
+  # failed or cancelled dependency still reports here as a failure rather than
+  # as "skipped", which a required check would let through.
+  verify:
+    needs: [static, server-tests, dashboard-tests, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job above passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            [ "$result" = success ] || exit 1
+          done
