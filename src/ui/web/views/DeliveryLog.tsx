@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Card } from "@/components/ui/card.tsx";
@@ -71,7 +72,13 @@ const isDeadLetter = (record: SentRecord): boolean => !record.ok && (record.atte
  */
 export function DeliveryLog() {
   const { t, i18n } = useTranslation();
-  const [state, setState] = useState<DeliveryState>("failed");
+  // Roadmap 4.3: a delivery count on the Overview arrives with its state in the
+  // address. Failures stay the default — they are what this view is for.
+  const [params] = useSearchParams();
+  const asked = params.get("state");
+  const [state, setState] = useState<DeliveryState>(
+    asked === "all" || asked === "sent" || asked === "failed" ? asked : "failed",
+  );
   const [channel, setChannel] = useState<string>(ALL_CHANNELS);
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<string | null>(null);

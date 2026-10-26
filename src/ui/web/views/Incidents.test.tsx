@@ -491,4 +491,38 @@ describe("Incidents", () => {
       );
     });
   });
+
+  // Roadmap 4.3: a count on the Overview opens this list with the filters it
+  // was counted under.
+  describe("arriving from a number on the Overview", () => {
+    const asked = () =>
+      (fetch as unknown as { mock: { calls: [string][] } }).mock.calls
+        .map(([path]) => String(path))
+        .filter((path) => path.startsWith("/incidents?"));
+
+    it("asks the server for the provider, state and window in the address", async () => {
+      renderWithProviders(<Incidents />, fixtures, "/", "/?provider=github&state=resolved&days=30&from=overview");
+      await screen.findByText(i18n.t("drill.from-overview"));
+      const query = new URLSearchParams(asked().at(-1)?.split("?")[1]);
+      expect(query.get("provider")).toBe("github");
+      expect(query.get("state")).toBe("resolved");
+      expect(query.get("days")).toBe("30");
+      expect(screen.getByRole("radio", radioNamed(i18n.t("filter.resolved")))).toBeChecked();
+    });
+
+    it("puts the provider in the export, so the file is the search on screen", async () => {
+      renderWithProviders(<Incidents />, fixtures, "/", "/?provider=github&from=overview");
+      await screen.findByText(i18n.t("drill.from-overview"));
+      await waitFor(() => expect(new URLSearchParams(asked().at(-1)?.split("?")[1]).get("provider")).toBe("github"));
+    });
+
+    it("goes back to the whole list when the chip is cleared", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Incidents />, fixtures, "/", "/?provider=github&days=30&from=overview");
+      await screen.findByText(i18n.t("drill.from-overview"));
+      await user.click(await screen.findByRole("button", { name: i18n.t("drill.clear-provider", { provider: "GitHub" }) }));
+      await waitFor(() => expect(new URLSearchParams(asked().at(-1)?.split("?")[1]).get("provider")).toBeNull());
+      expect(screen.queryByText(i18n.t("drill.from-overview"))).toBeNull();
+    });
+  });
 });

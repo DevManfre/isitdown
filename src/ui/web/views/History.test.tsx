@@ -651,4 +651,33 @@ describe("a provider's detail drawer", () => {
     await screen.findByText(/99[.,]42/);
     expect(screen.queryByText(i18n.t("coincidence.title"))).toBeNull();
   });
+
+  // Roadmap 4.3: a number on the Overview lands here narrowed to its provider
+  // and its window, and says so until the operator lets go of it.
+  describe("arriving from a number on the Overview", () => {
+    it("asks for the window in the address and opens that provider's drawer", async () => {
+      renderWithProviders(<History />, twoProviders, "/", "/?provider=cloudflare&days=30&from=overview");
+      expect(await screen.findByRole("dialog")).toBeInTheDocument();
+      expect(within(screen.getByRole("dialog")).getAllByText("Cloudflare").length).toBeGreaterThan(0);
+      const calls = (fetch as unknown as { mock: { calls: [string][] } }).mock.calls.map(([path]) => String(path));
+      expect(calls.some((path) => path.startsWith("/history?days=30"))).toBe(true);
+      expect(screen.getByText(i18n.t("drill.from-overview"))).toBeInTheDocument();
+    });
+
+    it("snaps a window it does not offer to the nearest wider one", async () => {
+      renderWithProviders(<History />, twoProviders, "/", "/?days=12&from=overview");
+      await screen.findByText(/99[.,]42/);
+      const calls = (fetch as unknown as { mock: { calls: [string][] } }).mock.calls.map(([path]) => String(path));
+      expect(calls.some((path) => path.startsWith("/history?days=30"))).toBe(true);
+    });
+
+    it("lets go of the provider, chip and address both, when its drawer closes", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<History />, twoProviders, "/", "/?provider=cloudflare&days=30&from=overview");
+      await screen.findByRole("dialog");
+      await user.keyboard("{Escape}");
+      expect(screen.queryByText(i18n.t("drill.from-overview"))).toBeNull();
+      expect(window.location.hash).toBe("#/");
+    });
+  });
 });

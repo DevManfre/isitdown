@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { useFilterLabel } from "@/components/DashboardGrid.tsx";
+import { DrillLink } from "@/components/DrillLink.tsx";
+import { historyHref } from "@/lib/drillDown.ts";
 import { useHistory } from "@/hooks/queries.ts";
 import { TREND_CHART, uptimeDomain } from "@/lib/chartConfig.ts";
 import { OVERVIEW_WINDOW_DAYS } from "@/lib/fleetSlice.ts";
@@ -154,7 +156,19 @@ export function Sparklines({ props }: { props: { filter: FleetFilter } }) {
               delay={stagger(index, { base: 140, step: 40 })}
               label={row.now === null ? undefined : t("widget.sparklines.row-label", { provider: name(row.id), uptime: pct(row.now), days: WINDOW })}
             />
-            <span className="w-16 shrink-0 text-right font-mono text-xs">{row.now === null ? "—" : `${pct(row.now)}%`}</span>
+            <span className="w-16 shrink-0 text-right font-mono text-xs">
+              {row.now === null ? (
+                "—"
+              ) : (
+                <DrillLink
+                  to={historyHref({ provider: row.id, days: WINDOW })}
+                  label={t("drill.provider-uptime", { provider: name(row.id), uptime: `${pct(row.now)}%`, count: WINDOW })}
+                  where={t("drill.where.history", { provider: name(row.id), count: WINDOW })}
+                >
+                  {`${pct(row.now)}%`}
+                </DrillLink>
+              )}
+            </span>
             <span className="w-12 shrink-0 text-right font-mono text-xs text-muted-foreground" style={{ color: deltaColor(row.delta) }}>
               {row.delta === null ? "" : signed(row.delta)}
             </span>
