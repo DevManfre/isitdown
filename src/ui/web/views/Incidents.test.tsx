@@ -302,6 +302,17 @@ describe("Incidents", () => {
     }
   });
 
+  it("stays on the page it was moved to once the search box has settled", async () => {
+    renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents(many(5)) });
+    expect(await screen.findByText("Blip 1")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("pagination.next") }));
+    expect(await screen.findByText("Blip 3")).toBeInTheDocument();
+    // Longer than the search debounce: an empty box that was never typed in
+    // is not a new search, so nothing may send the list back to page 1.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(screen.getByText("Blip 3")).toBeInTheDocument();
+  });
+
   it("moves to the next page and renders that page's rows", async () => {
     renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents(many(5)) });
     expect(await screen.findByText("Blip 1")).toBeInTheDocument();
