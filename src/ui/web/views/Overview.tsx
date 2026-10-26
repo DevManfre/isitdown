@@ -13,6 +13,7 @@ import { FleetSummary } from "@/components/FleetSummary.tsx";
 import { HeroStats } from "@/components/HeroStats.tsx";
 import { DashboardGrid, filterLabel, REORDER_SPRING, type GridEditing } from "@/components/DashboardGrid.tsx";
 import { EmptyFleet } from "@/components/EmptyFleet.tsx";
+import { AwaySummary } from "@/components/AwaySummary.tsx";
 import { ViewSkeleton } from "@/components/ViewSkeleton.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useDashboard, useDashboards, useHistory, useStatus } from "@/hooks/queries.ts";
@@ -504,7 +505,14 @@ export function Overview() {
         gridRef={gridRef}
         layout={layout}
         edit={gridEdit}
-        header={rule}
+        header={
+          <>
+            {rule}
+            {/* Roadmap 4.4. Not while customising: the recap is news, and edit
+                mode is about the grid under it. */}
+            {!editing && !dashboardMissing && <AwaySummary />}
+          </>
+        }
         footer={
           editor !== null ? (
             <>
