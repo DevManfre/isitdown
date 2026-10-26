@@ -42,6 +42,18 @@ const widgetSchema = z.discriminatedUnion("type", [
   widget("delivery", noProps),
   widget("heartbeats", noProps),
   widget("coincidence", noProps),
+  widget("page-delay", noProps),
+  widget("suspected", fleetProps),
+  widget("stale-readings", fleetProps),
+  widget("muted", noProps),
+  widget("page-honesty", noProps),
+  widget("groups", noProps),
+  widget("degraded-components", fleetProps),
+  widget("recent-alerts", noProps),
+  widget("poller-pulse", noProps),
+  widget("worsened", fleetProps),
+  widget("noisy", fleetProps),
+  widget("who-to-call", fleetProps),
 ]);
 
 export const layoutSchema: z.ZodType<DashboardLayout, z.ZodTypeDef, unknown> = z

@@ -299,4 +299,182 @@ describe("catalogue widgets", () => {
     show({ id: "w", type: "coincidence", width: "full", props: {} }, { coincidence: { days: 90, pairs: [pair] }, config: () => new Promise(() => {}) });
     expect(await screen.findByRole("button", { name: t("widget.coincidence.declare", { a: "Cloudflare", b: "GitHub" }) })).toBeDisabled();
   });
+
+  // The third round (roadmap 4.1, designed with 4.3 and 4.4).
+  describe("third round", () => {
+    const trustCard = (pageId: string, counted: number, never: number, median: number) => ({
+      key: `probe-${pageId}`,
+      pair: { probeId: `probe-${pageId}`, pageId, componentId: "" },
+      days: 90,
+      counted,
+      never,
+      delay: { medianMinutes: median, p90Minutes: median * 2, admitted: counted - never },
+      coverage: null,
+    });
+    const fleet = (providers: ReturnType<typeof providerFixture>[], extra: Record<string, unknown> = {}) => ({
+      status: { ...status, providers, ...extra },
+    });
+
+    it("who says it first: slowest page first, with the fleet's median in the sentence", async () => {
+      show(
+        { id: "w", type: "page-delay", width: "full", props: {} },
+        { trust: { days: 90, windows: [30, 90, 365], cards: [trustCard("github", 10, 1, 7), trustCard("cloudflare", 12, 0, 14)] } },
+      );
+      expect(await screen.findByText(t("widget.page-delay.conclusion", { minutes: 11, provider: "Cloudflare", slowest: 14 }))).toBeInTheDocument();
+    });
+
+    it("who says it first: below the floor, says how to start measuring", async () => {
+      show({ id: "w", type: "page-delay", width: "full", props: {} });
+      expect(await screen.findByText(t("widget.page-delay.none"))).toBeInTheDocument();
+    });
+
+    it("suspected: names a page that reads fine while its probe does not", async () => {
+      show(
+        { id: "w", type: "suspected", width: "full", props: { filter: none } },
+        fleet([providerFixture({ id: "github", name: "GitHub", suspected: { status: "major_outage", probeId: "p", since: iso(9) } })]),
+      );
+      expect(await screen.findByText(t("widget.suspected.conclusion", { count: 1 }))).toBeInTheDocument();
+      expect(screen.getByText(t("widget.suspected.versus", { page: t("status.operational"), probe: t("status.major-outage") }))).toBeInTheDocument();
+    });
+
+    it("suspected: agreement is good news, said in words", async () => {
+      show({ id: "w", type: "suspected", width: "full", props: { filter: none } });
+      expect(await screen.findByText(t("widget.suspected.none", { count: 3 }))).toBeInTheDocument();
+    });
+
+    it("stale readings: a failing adapter is named with its error count", async () => {
+      show(
+        { id: "w", type: "stale-readings", width: "full", props: { filter: none } },
+        fleet([providerFixture({ id: "github", name: "GitHub", failureCount: 5 }), providerFixture({ id: "stripe", name: "Stripe" })]),
+      );
+      expect(await screen.findByText(t("widget.stale-readings.failing", { count: 5 }))).toBeInTheDocument();
+      expect(screen.getByText(t("widget.stale-readings.meta", { count: 1, total: 2 }))).toBeInTheDocument();
+    });
+
+    it("muted: lists a muted provider and lifts the mute on request", async () => {
+      show(
+        { id: "w", type: "muted", width: "full", props: {} },
+        fleet([providerFixture({ id: "github", name: "GitHub", mutedUntil: ahead(200) })]),
+      );
+      const reads = globalThis.fetch;
+      const writes: { path: string; body: unknown }[] = [];
+      vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit): Promise<unknown> => {
+        if ((init?.method ?? "GET") === "GET") return reads(input, init);
+        writes.push({ path: String(input), body: JSON.parse(String(init?.body)) });
+        return { ok: true, status: 200, text: async () => "{}" };
+      }));
+      fireEvent.click(await screen.findByRole("button", { name: t("widget.muted.unmute-named", { provider: "GitHub" }) }));
+      await waitFor(() => expect(writes[0]?.body).toEqual({ mutedUntil: null }));
+      expect(writes[0]?.path).toContain("/config/services/github");
+    });
+
+    it("muted: a mute that has run out is not listed", async () => {
+      show({ id: "w", type: "muted", width: "full", props: {} }, fleet([providerFixture({ mutedUntil: iso(5) })]));
+      expect(await screen.findByText(t("widget.muted.none"))).toBeInTheDocument();
+    });
+
+    it("page honesty: the least forthcoming page first, against the most", async () => {
+      show(
+        { id: "w", type: "page-honesty", width: "full", props: {} },
+        { trust: { days: 90, windows: [30, 90, 365], cards: [trustCard("github", 10, 0, 3), trustCard("cloudflare", 10, 5, 9)] } },
+      );
+      expect(
+        await screen.findByText(t("widget.page-honesty.conclusion", { worst: "Cloudflare", worstShare: "50%", best: "GitHub", bestShare: "100%" })),
+      ).toBeInTheDocument();
+    });
+
+    it("group status: names the member that is the reason", async () => {
+      show(
+        { id: "w", type: "groups", width: "full", props: {} },
+        fleet(status.providers, { groups: [{ id: "edge", providers: ["cloudflare", "github"], status: "major_outage", affected: ["cloudflare"] }] }),
+      );
+      expect(await screen.findByText(t("widget.groups.meta", { count: 1, hit: 1 }))).toBeInTheDocument();
+      expect(screen.getAllByText(t("status.major-outage")).length).toBeGreaterThan(0);
+    });
+
+    it("degraded components: shows a broken component an operational provider hides", async () => {
+      show(
+        { id: "w", type: "degraded-components", width: "full", props: { filter: none } },
+        fleet([providerFixture({ id: "github", name: "GitHub", components: [{ id: "c", name: "Codespaces", status: "degraded" }, { id: "a", name: "API", status: "operational" }] })]),
+      );
+      expect(await screen.findByText(t("widget.degraded-components.meta", { count: 1, providers: 1 }))).toBeInTheDocument();
+      expect(screen.getAllByText("Codespaces").length).toBeGreaterThan(0);
+      expect(screen.getAllByText(t("widget.degraded-components.provider-fine")).length).toBeGreaterThan(0);
+    });
+
+    it("latest alerts: says which landed and which did not", async () => {
+      show(
+        { id: "w", type: "recent-alerts", width: "full", props: {} },
+        {
+          notifications: {
+            notifications: [
+              { providerId: "github", channel: "slack", kind: "incident_opened", text: "GitHub down", sentAt: iso(3), ok: false, attempts: 3 },
+              { providerId: "github", channel: "telegram", kind: "incident_opened", text: "GitHub down", sentAt: iso(3), ok: true },
+            ],
+          },
+        },
+      );
+      expect(await screen.findByText(t("widget.recent-alerts.failed", { count: 3 }))).toBeInTheDocument();
+      expect(screen.getAllByText(t("widget.recent-alerts.delivered")).length).toBeGreaterThan(0);
+    });
+
+    it("poller pulse: a poller that missed two cycles says it has stopped", async () => {
+      show({ id: "w", type: "poller-pulse", width: "full", props: {} }, fleet(status.providers, { lastPollAt: iso(30), nextPollAt: iso(25) }));
+      expect(await screen.findByText(t("widget.poller-pulse.state-stalled"))).toBeInTheDocument();
+    });
+
+    it("poller pulse: a fresh cycle reads as running", async () => {
+      show({ id: "w", type: "poller-pulse", width: "full", props: {} }, fleet(status.providers, { lastPollAt: iso(1), nextPollAt: ahead(4) }));
+      expect(await screen.findByText(t("widget.poller-pulse.state-alive"))).toBeInTheDocument();
+    });
+
+    it("who got worse: biggest fall first, and too little history said plainly", async () => {
+      show({ id: "w", type: "worsened", width: "full", props: { filter: none } });
+      expect(await screen.findByText(t("widget.worsened.young", { count: 60 }))).toBeInTheDocument();
+    });
+
+    it("noise ranking: the noisiest provider, its count a link to its incidents", async () => {
+      show(
+        { id: "w", type: "noisy", width: "full", props: { filter: none } },
+        {
+          reliability: {
+            days: 30,
+            providers: [
+              { providerId: "github", incidents: 7, mttrMinutes: 30, resolved: 7, mtbfMinutes: 100, longestOutageMinutes: 60, downtimeMinutes: 200, previousIncidents: 2 },
+              { providerId: "stripe", incidents: 2, mttrMinutes: 10, resolved: 2, mtbfMinutes: 400, longestOutageMinutes: 20, downtimeMinutes: 20, previousIncidents: 0 },
+            ],
+            byWeekdayHour: [],
+          },
+        },
+      );
+      // Twice by design: the third's summary and the full table, one of them hidden by width.
+      const links = await screen.findAllByRole("link", { name: t("drill.provider-incidents", { provider: "GitHub", count: 7, days: 30 }) });
+      for (const link of links) expect(link.getAttribute("href")).toBe("#/incidents?provider=github&days=30&from=overview");
+      expect(screen.getByText(t("widget.noisy.conclusion", { provider: "GitHub", count: 7, total: 9, quiet: 1 }))).toBeInTheDocument();
+    });
+
+    it("who to call: an outage carries the impact and owner written on it", async () => {
+      show(
+        { id: "w", type: "who-to-call", width: "full", props: { filter: none } },
+        fleet([providerFixture({ id: "cloudflare", name: "Cloudflare", overallStatus: "major_outage", impact: "Checkout returns 5xx", owner: "infra-oncall" })]),
+      );
+      expect(await screen.findByText("Checkout returns 5xx")).toBeInTheDocument();
+      expect(screen.getByText("infra-oncall")).toBeInTheDocument();
+    });
+
+    it("who to call: down without an owner says so rather than leaving a blank", async () => {
+      show(
+        { id: "w", type: "who-to-call", width: "full", props: { filter: none } },
+        fleet([providerFixture({ id: "cloudflare", name: "Cloudflare", overallStatus: "major_outage" })]),
+      );
+      expect(await screen.findByText(t("widget.who-to-call.no-owner"))).toBeInTheDocument();
+    });
+  });
+
+  // Roadmap 4.3: a figure opens the rows behind it.
+  it("open incidents: the count is a link to the open incidents", async () => {
+    show({ id: "w", type: "open-incidents", width: "third", props: { filter: none } }, { incidents: incidents([incident("cloudflare", "critical", 10, "Down")]) });
+    const link = await screen.findByRole("link", { name: t("drill.open-incidents", { count: 1 }) });
+    expect(link.getAttribute("href")).toBe("#/incidents?state=active&from=overview");
+  });
 });

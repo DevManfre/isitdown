@@ -32,6 +32,18 @@ import { Annotations } from "./catalog/Annotations.tsx";
 import { Delivery } from "./catalog/Delivery.tsx";
 import { Heartbeats } from "./catalog/Heartbeats.tsx";
 import { Coincidence } from "./catalog/Coincidence.tsx";
+import { PageDelay } from "./catalog/PageDelay.tsx";
+import { Suspected } from "./catalog/Suspected.tsx";
+import { StaleReadings } from "./catalog/StaleReadings.tsx";
+import { Muted } from "./catalog/Muted.tsx";
+import { PageHonesty } from "./catalog/PageHonesty.tsx";
+import { Groups } from "./catalog/Groups.tsx";
+import { DegradedComponents } from "./catalog/DegradedComponents.tsx";
+import { RecentAlerts } from "./catalog/RecentAlerts.tsx";
+import { PollerPulse } from "./catalog/PollerPulse.tsx";
+import { Worsened } from "./catalog/Worsened.tsx";
+import { Noisy } from "./catalog/Noisy.tsx";
+import { WhoToCall } from "./catalog/WhoToCall.tsx";
 
 /**
  * The composable Overview's widgets — roadmap 4.1.
@@ -290,6 +302,114 @@ export const WIDGETS: { [T in WidgetType]: WidgetDef<T> } = {
     props: WIDGET_PROPS["coincidence"],
     Component: Coincidence,
   },
+  "page-delay": {
+    type: "page-delay",
+    titleKey: "dashboard.widget.page-delay.title",
+    descriptionKey: "dashboard.widget.page-delay.description",
+    idleKey: "dashboard.widget.page-delay.idle",
+    widths: WIDGET_WIDTHS["page-delay"],
+    props: WIDGET_PROPS["page-delay"],
+    Component: PageDelay,
+  },
+  suspected: {
+    type: "suspected",
+    titleKey: "dashboard.widget.suspected.title",
+    descriptionKey: "dashboard.widget.suspected.description",
+    idleKey: "dashboard.widget.suspected.idle",
+    widths: WIDGET_WIDTHS["suspected"],
+    props: WIDGET_PROPS["suspected"],
+    Component: Suspected,
+  },
+  "stale-readings": {
+    type: "stale-readings",
+    titleKey: "dashboard.widget.stale-readings.title",
+    descriptionKey: "dashboard.widget.stale-readings.description",
+    idleKey: "dashboard.widget.stale-readings.idle",
+    widths: WIDGET_WIDTHS["stale-readings"],
+    props: WIDGET_PROPS["stale-readings"],
+    Component: StaleReadings,
+  },
+  muted: {
+    type: "muted",
+    titleKey: "dashboard.widget.muted.title",
+    descriptionKey: "dashboard.widget.muted.description",
+    idleKey: "dashboard.widget.muted.idle",
+    widths: WIDGET_WIDTHS["muted"],
+    props: WIDGET_PROPS["muted"],
+    Component: Muted,
+  },
+  "page-honesty": {
+    type: "page-honesty",
+    titleKey: "dashboard.widget.page-honesty.title",
+    descriptionKey: "dashboard.widget.page-honesty.description",
+    idleKey: "dashboard.widget.page-honesty.idle",
+    widths: WIDGET_WIDTHS["page-honesty"],
+    props: WIDGET_PROPS["page-honesty"],
+    Component: PageHonesty,
+  },
+  groups: {
+    type: "groups",
+    titleKey: "dashboard.widget.groups.title",
+    descriptionKey: "dashboard.widget.groups.description",
+    idleKey: "dashboard.widget.groups.idle",
+    widths: WIDGET_WIDTHS["groups"],
+    props: WIDGET_PROPS["groups"],
+    Component: Groups,
+  },
+  "degraded-components": {
+    type: "degraded-components",
+    titleKey: "dashboard.widget.degraded-components.title",
+    descriptionKey: "dashboard.widget.degraded-components.description",
+    idleKey: "dashboard.widget.degraded-components.idle",
+    widths: WIDGET_WIDTHS["degraded-components"],
+    props: WIDGET_PROPS["degraded-components"],
+    Component: DegradedComponents,
+  },
+  "recent-alerts": {
+    type: "recent-alerts",
+    titleKey: "dashboard.widget.recent-alerts.title",
+    descriptionKey: "dashboard.widget.recent-alerts.description",
+    idleKey: "dashboard.widget.recent-alerts.idle",
+    widths: WIDGET_WIDTHS["recent-alerts"],
+    props: WIDGET_PROPS["recent-alerts"],
+    Component: RecentAlerts,
+  },
+  "poller-pulse": {
+    type: "poller-pulse",
+    titleKey: "dashboard.widget.poller-pulse.title",
+    descriptionKey: "dashboard.widget.poller-pulse.description",
+    idleKey: "dashboard.widget.poller-pulse.idle",
+    widths: WIDGET_WIDTHS["poller-pulse"],
+    props: WIDGET_PROPS["poller-pulse"],
+    Component: PollerPulse,
+  },
+  worsened: {
+    type: "worsened",
+    titleKey: "dashboard.widget.worsened.title",
+    descriptionKey: "dashboard.widget.worsened.description",
+    idleKey: "dashboard.widget.worsened.idle",
+    widths: WIDGET_WIDTHS["worsened"],
+    props: WIDGET_PROPS["worsened"],
+    Component: Worsened,
+  },
+  noisy: {
+    type: "noisy",
+    titleKey: "dashboard.widget.noisy.title",
+    descriptionKey: "dashboard.widget.noisy.description",
+    idleKey: "dashboard.widget.noisy.idle",
+    widths: WIDGET_WIDTHS["noisy"],
+    props: WIDGET_PROPS["noisy"],
+    Component: Noisy,
+  },
+  "who-to-call": {
+    type: "who-to-call",
+    titleKey: "dashboard.widget.who-to-call.title",
+    descriptionKey: "dashboard.widget.who-to-call.description",
+    idleKey: "dashboard.widget.who-to-call.idle",
+    widths: WIDGET_WIDTHS["who-to-call"],
+    props: WIDGET_PROPS["who-to-call"],
+    Component: WhoToCall,
+  },
 };
 
 /** The catalogue's order: the order the default Overview draws them in. */
@@ -313,4 +433,19 @@ export const WIDGET_ORDER: readonly WidgetType[] = [
   "coincidence",
   "annotations",
   "delivery",
+  // The third round, in the same order of questions: what is wrong right now
+  // that the headline cannot say, whether the alerting reaches anyone, and how
+  // the record is moving.
+  "who-to-call",
+  "suspected",
+  "degraded-components",
+  "stale-readings",
+  "groups",
+  "poller-pulse",
+  "recent-alerts",
+  "muted",
+  "worsened",
+  "noisy",
+  "page-delay",
+  "page-honesty",
 ];
