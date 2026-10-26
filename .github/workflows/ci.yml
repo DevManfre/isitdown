@@ -4,7 +4,7 @@
 # workflow is trusted unless this one is green first — release.yml reads this
 # workflow's conclusion for the tagged commit instead of re-running it.
 #
-# Four jobs side by side rather than one in sequence: each gets its own runner,
+# Jobs side by side rather than one in sequence: each gets its own runner,
 # so the run takes as long as its slowest job instead of the sum of all of them.
 # None depends on another's output, so none waits on another.
 name: CI
@@ -72,8 +72,40 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
+  # Vitest is the slowest suite, so it runs as two shards on two runners. A
+  # shard sees half the files, so its own coverage is always under the floor:
+  # coverage:web:shard records without judging, and dashboard-coverage merges
+  # both halves and applies the floor to the whole, exactly as coverage:web
+  # does locally.
   dashboard-tests:
-    name: Dashboard tests (Vitest, coverage)
+    name: Dashboard tests (Vitest, shard ${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      # outputFile resolves against Vite's root (src/ui/web), not the checkout.
+      - name: Unit tests, coverage recorded (Vitest)
+        run: npm run coverage:web:shard -- --shard=${{ matrix.shard }}/2 --outputFile.blob=.vitest-reports/blob-${{ matrix.shard }}.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: src/ui/web/.vitest-reports
+          include-hidden-files: true
+          if-no-files-found: error
+
+  dashboard-coverage:
+    name: Dashboard coverage floor (merged shards)
+    needs: dashboard-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -83,8 +115,15 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Unit tests with a coverage floor (Vitest)
-        run: npm run coverage:web
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: vitest-blob-*
+          path: src/ui/web/.vitest-reports
+          merge-multiple: true
+
+      # Fails on a failed test in either shard as well as on the floor.
+      - name: Coverage floor over both shards (Vitest)
+        run: npm run coverage:web:merge
 
   build:
     name: Build, bundle budget, visual regression
@@ -137,11 +176,11 @@ jobs:
 
   # The one check `main`'s ruleset requires, and the one release.yml reads for
   # the tagged commit — kept under its old name so neither had to change when
-  # the single `verify` job was split into the four above. `always()` so a
+  # the single `verify` job was split into the jobs above. `always()` so a
   # failed or cancelled dependency still reports here as a failure rather than
   # as "skipped", which a required check would let through.
   verify:
-    needs: [static, server-tests, dashboard-tests, build]
+    needs: [static, server-tests, dashboard-tests, dashboard-coverage, build]
     if: always()
     runs-on: ubuntu-latest
     steps:
