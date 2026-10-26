@@ -60,8 +60,13 @@ describe("usePreferenceSync", () => {
   it("seeds the theme from the server on a browser with no stored choice", async () => {
     mount({ theme: "dark", uiLocale: "en", notificationLocale: "en" });
 
-    expect(await vi.waitFor(() => { expect(mode()).toBe("dark"); return mode(); })).toBe("dark");
-    expect(attr()).toBe("dark");
+    // Both inside the wait: the mode is state, set on render, but the attribute
+    // is written by useTheme's effect a commit later — on a loaded runner (a
+    // coverage shard) a bare check right after the wait ran before it.
+    await vi.waitFor(() => {
+      expect(mode()).toBe("dark");
+      expect(attr()).toBe("dark");
+    });
   });
 
   it("seeds the locale from the server on a browser with no stored choice", async () => {
