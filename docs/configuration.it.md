@@ -2753,7 +2753,7 @@ stesso editor, con i dati veri, e nulla viene salvato prima di **Salva**.
 
 - **Widget** sono i blocchi che la Panoramica ha sempre disegnato — anelli della
   flotta, mappa, guasto condiviso, gruppi, elenco della flotta — più un catalogo
-  di altri dodici, ognuno costruito su dati che la dashboard legge già:
+  di altri ventiquattro, ognuno costruito su dati che la dashboard legge già:
 
   | Widget | Mostra | Punta a |
   |---|---|---|
@@ -2769,9 +2769,30 @@ stesso editor, con i dati veri, e nulla viene salvato prima di **Salva**.
   | Salute delle consegne | se gli avvisi sono arrivati, per canale, ora per ora | — |
   | Heartbeat dei job | ogni dead-man's switch ([3.19](#319-heartbeat--il-dead-mans-switch)) e quanto manca perché scatti | — |
   | Si rompono insieme | i provider che vanno giù insieme, con un `dependsOn` a un clic ([3.20](#320-dipendenze--su-cosa-gira)) | — |
+  | Chi chiamare | ogni provider giù adesso, con l'impatto e il responsabile scritti sopra ([3.23](#323-perché-un-provider-conta--impatto-e-responsabile)) | una parte della flotta |
+  | Sospetti | i provider la cui pagina dice che va tutto bene mentre la sonda no | una parte della flotta |
+  | Componenti degradati | tutti i componenti rotti, anche quelli che un provider operativo nasconde | una parte della flotta |
+  | Letture ferme | i provider il cui adapter continua a fallire, o la cui pagina non si muove più | una parte della flotta |
+  | Stato dei gruppi | lo stato derivato di ogni gruppo, con il membro che ne è la causa ([3.10](#310-gruppi-di-provider--il-mio-stack)) | — |
+  | Battito del poller | quando è girato l'ultimo giro, quando arriva il prossimo, chi non ha risposto | — |
+  | Ultimi avvisi inviati | gli ultimi messaggi inviati, per canale, e se sono arrivati | — |
+  | Silenziati | i provider silenziati e quanto manca, con Riattiva | — |
+  | Chi è peggiorato | l'uptime su 30 giorni contro i 30 prima, il calo più grande per primo | una parte della flotta |
+  | Classifica del rumore | gli incidenti per provider su 30 giorni | una parte della flotta |
+  | Chi lo dice prima | quanto ci mette ogni pagina di stato ad ammettere un guasto visto dalla sonda | — |
+  | Onestà della pagina | dei guasti visti da una sonda, quanti la pagina ha mai ammesso | — |
 
   Ognuno può comparire più volte, e a un terzo della riga disegna la sua
   sintesi invece di una copia schiacciata della versione intera.
+- **Ogni numero è un link** (roadmap 4.3). Un conteggio, una durata o un uptime
+  in un widget apre le righe che ci stanno dietro, con i filtri già messi: un
+  conteggio di incidenti apre Incidenti su quel provider e quella finestra, un
+  uptime o un tempo di riparazione apre History con il drawer di quel provider,
+  un conteggio di consegne fallite apre il registro consegne sui fallimenti. I
+  filtri viaggiano nell'indirizzo (`#/incidents?provider=github&days=30`), quindi
+  il link è anche un segnalibro; la destinazione mostra un chip **Da
+  Panoramica** che dice a cosa è stata ristretta, e la sua ✕ torna all'elenco
+  intero.
 - **Larghezza** è una tra intera, due terzi, metà o un terzo della riga; l'altezza
   è quella del widget. Sotto i 768px ogni widget prende tutta la larghezza.
 - **Ordine** — trascinare la maniglia, premere i suoi pulsanti ↑/↓, oppure dare il
@@ -2788,6 +2809,15 @@ stesso editor, con i dati veri, e nulla viene salvato prima di **Salva**.
   personalizzata segue la disposizione predefinita, così i blocchi aggiunti dalle
   versioni successive le arrivano da soli; una personalizzata tiene esattamente
   ciò che è stato salvato.
+
+**Mentre eri via** (roadmap 4.4). Tornando dopo otto ore o più, la Panoramica
+si apre con una scheda sopra i widget: cosa è ancora aperto, cosa si è risolto,
+quali manutenzioni ci sono state e quanti avvisi sono partiti (e falliti)
+dall'ultima visita. **Ho visto** salva quell'ora nelle preferenze dell'istanza,
+così un altro browser non la ripropone; comprimerla è una scelta di questo
+browser. Una prima visita, un'assenza più breve o un'assenza in cui non è
+successo nulla non disegnano nessuna scheda — l'ultima visita si sposta
+semplicemente ad adesso.
 
 Il titolo sopra i widget è fisso: è la risposta a "c'è qualcosa che non va?", e
 nessuna disposizione lo nasconde. Due schede che modificano insieme non si
