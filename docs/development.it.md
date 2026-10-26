@@ -241,6 +241,7 @@ sviluppo; `docker inspect -f '{{.Config.Cmd}}' isitdown-ui` mostra
 ```bash
 npm test                 # suite node:test + vitest run
 npm run coverage         # le stesse due suite sotto una soglia minima di copertura
+                         # (coverage:server e coverage:web ne eseguono una ciascuno, come fa la CI)
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
 npm run test:visual      # baseline visive: ogni vista, entrambi i temi, entrambe le lingue
 npm run test:mutation    # mutation testing sul diff engine
@@ -497,8 +498,11 @@ accanto a ciò che coprono.
 Due workflow, e la versione vive in un posto solo.
 
 `.github/workflows/ci.yml` gira su ogni pull request e su ogni push su `dev` o
-`main`: Node da `.nvmrc`, `npm ci`, poi gli stessi quattro comandi che si
-eseguono in locale — `typecheck`, `test`, `test:integration`, `build`.
+`main`, come quattro job affiancati su runner propri — typecheck, lint e parità
+del README; `coverage:server` e `test:integration`; `coverage:web`; e `build`,
+`check:bundle` e `test:visual` — così un run dura quanto il suo job più lento. Un
+quinto job, `verify`, passa solo se sono passati tutti e quattro: è il check che
+la ruleset di `main` richiede e quello che legge la release.
 
 Una release è un tag. `package.json` resta `private` (niente viene pubblicato su
 npm) ma il suo `version` è l'unica fonte di verità:
@@ -509,10 +513,14 @@ npm version minor          # preversion esegue prima typecheck e le due suite di
 git push --follow-tags
 ```
 
-Il push del tag avvia `.github/workflows/release.yml`, che ripete i controlli (un
-push di tag non fa scattare la CI), si rifiuta di procedere se tag e
+Il push del tag avvia `.github/workflows/release.yml`, che prima attende il check
+`verify` della CI sul commit taggato (un push di tag non fa scattare la CI da
+solo, quindi legge il run avviato dal push di `main`) e si ferma se è fallito, si
+rifiuta di procedere se tag e
 `package.json` non concordano, costruisce entrambi i target per `linux/amd64` e
-`linux/arm64`, pubblica i quattro tag GHCR con SBOM e provenance, firma i due
+`linux/arm64` — lo stage di build gira una sola volta sulla piattaforma del
+runner, perché il suo output è JavaScript puro, così sotto emulazione arm64 resta
+solo l'`npm ci` di produzione — pubblica i quattro tag GHCR con SBOM e provenance, firma i due
 digest con `cosign` keyless e crea la release su GitHub.
 
 Lo stesso workflow costruisce l'edizione Light in un solo file (roadmap 6.7) con
