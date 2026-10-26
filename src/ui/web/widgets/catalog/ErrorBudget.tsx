@@ -2,6 +2,8 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { UptimeArc } from "@/components/charts/UptimeArc.tsx";
 import { useFilterLabel } from "@/components/DashboardGrid.tsx";
+import { DrillLink } from "@/components/DrillLink.tsx";
+import { historyHref } from "@/lib/drillDown.ts";
 import { useSla } from "@/hooks/queries.ts";
 import { formatDuration } from "@/lib/format.ts";
 import { stagger } from "@/lib/stagger.ts";
@@ -119,7 +121,14 @@ export function ErrorBudget({ props }: { props: { filter: FleetFilter } }) {
               />
             </div>
             <span className="hidden font-mono text-xs @2xl:block">
-              {formatDuration(i18n.language, b.spentMinutes)} / {formatDuration(i18n.language, b.budgetMinutes)}
+              <DrillLink
+                to={historyHref({ provider: b.providerId, days: 30 })}
+                label={t("drill.budget-spent", { provider: name(b.providerId), spent: formatDuration(i18n.language, b.spentMinutes) })}
+                where={t("drill.where.history", { provider: name(b.providerId), count: 30 })}
+              >
+                {formatDuration(i18n.language, b.spentMinutes)}
+              </DrillLink>{" "}
+              / {formatDuration(i18n.language, b.budgetMinutes)}
             </span>
             <span
               className="widget-tone hidden text-right font-mono text-[0.68rem] tracking-wider uppercase @2xl:block"

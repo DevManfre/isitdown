@@ -37,7 +37,8 @@ type FixtureKey =
   | "dashboard"
   | "dashboards"
   | "sla"
-  | "heartbeats";
+  | "heartbeats"
+  | "trust";
 
 export interface Fixtures {
   status?: unknown;
@@ -80,6 +81,8 @@ export interface Fixtures {
   sla?: unknown;
   /** `/config/heartbeats`, matched before `/config` — when each job last pinged. */
   heartbeats?: unknown;
+  /** `/trust` — how each status page tracked its probe (roadmap 8.1). */
+  trust?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -139,6 +142,8 @@ export function stubApi(fixtures: Fixtures): void {
                                   ? "heartbeats"
                                 : path.startsWith("/sla")
                                   ? "sla"
+                                : path.startsWith("/trust")
+                                  ? "trust"
                                 : path.startsWith("/config")
                                   ? "config"
                                   : path.startsWith("/debug/adapters")
@@ -182,6 +187,7 @@ export function stubApi(fixtures: Fixtures): void {
           ),
         },
         coincidence: { days: 90, pairs: [] },
+        trust: { days: 90, windows: [30, 90, 365], cards: [] },
         annotations: { annotations: [] },
         providerPush: { enabled: false, tokenRevealed: false, providers: [] },
         messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },

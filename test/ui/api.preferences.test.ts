@@ -61,6 +61,8 @@ test("preferences default to following the system theme and English", async () =
       density: "comfortable",
       // "auto" rather than a zone name: the default has to stay per-browser.
       timeZone: "auto",
+      // Roadmap 4.4: a fresh instance has never been looked at.
+      lastSeenAt: null,
     });
   } finally {
     await app.close();
@@ -77,7 +79,7 @@ test("a preference change round-trips and survives a restart", async () => {
     assert.equal(status, 200);
     assert.deepEqual(body, {
       theme: "dark", uiLocale: "it", notificationLocale: "en", mapView: "off",
-      density: "comfortable", timeZone: "auto",
+      density: "comfortable", timeZone: "auto", lastSeenAt: null,
     });
     await app.close();
 
@@ -90,6 +92,7 @@ test("a preference change round-trips and survives a restart", async () => {
         mapView: "off",
         density: "comfortable",
         timeZone: "auto",
+        lastSeenAt: null,
       });
     } finally {
       await restarted.close();
@@ -166,6 +169,28 @@ test("following the browser's own zone is expressible, not only a named zone", a
     const { body } = await app.request("PATCH", "/api/preferences", { timeZone: "auto" });
 
     assert.equal((body as { timeZone: string }).timeZone, "auto");
+  } finally {
+    await app.close();
+  }
+});
+
+test("the last visit is kept for the instance, cleared with null, and refused when it is not a date", async () => {
+  const app = await api();
+  try {
+    const at = "2026-10-24T18:42:00.000Z";
+    const { status, body } = await app.request("PATCH", "/api/preferences", { lastSeenAt: at });
+    assert.equal(status, 200);
+    assert.equal((body as { lastSeenAt: string | null }).lastSeenAt, at);
+
+    assert.equal((await app.request("PATCH", "/api/preferences", { lastSeenAt: "last friday" })).status, 400);
+    assert.equal(((await app.request("GET", "/api/preferences")).body as { lastSeenAt: string }).lastSeenAt, at);
+
+    // Another preference written later must not touch it.
+    await app.request("PATCH", "/api/preferences", { theme: "dark" });
+    assert.equal(((await app.request("GET", "/api/preferences")).body as { lastSeenAt: string }).lastSeenAt, at);
+
+    const cleared = await app.request("PATCH", "/api/preferences", { lastSeenAt: null });
+    assert.equal((cleared.body as { lastSeenAt: string | null }).lastSeenAt, null);
   } finally {
     await app.close();
   }

@@ -1,6 +1,9 @@
 import { Trans, useTranslation } from "react-i18next";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { UptimeArc } from "@/components/charts/UptimeArc.tsx";
+import { DrillLink } from "@/components/DrillLink.tsx";
+import { historyHref } from "@/lib/drillDown.ts";
+import { OVERVIEW_WINDOW_DAYS } from "@/lib/fleetSlice.ts";
 import type { ProviderStatus } from "@/lib/types.ts";
 import { shownStatus } from "@/lib/suspicion.ts";
 
@@ -73,9 +76,14 @@ export function HeroStats({ providers, average }: { providers: ProviderStatus[];
           <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
             {t("overview.summary.window")}
           </span>
-          <span className="font-mono text-sm">
+          <DrillLink
+            to={historyHref({ days: OVERVIEW_WINDOW_DAYS })}
+            label={t("drill.fleet-uptime", { count: OVERVIEW_WINDOW_DAYS })}
+            where={t("drill.where.history-fleet", { count: OVERVIEW_WINDOW_DAYS })}
+            className="w-fit font-mono text-sm"
+          >
             <NumberTicker locale={i18n.language} value={average} decimalPlaces={2} suffix="%" />
-          </span>
+          </DrillLink>
         </div>
         {rows.map((row) => (
           <div key={row.key} className="flex flex-col gap-0.5 border-t border-border pt-2">

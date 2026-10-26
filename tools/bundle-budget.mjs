@@ -125,8 +125,15 @@ const ASSETS = "dist/ui/public/assets";
  * dashboards: the rail's list, the header's menu, the create, rename, delete
  * and import dialogs with their Undo, and some sixty strings in six catalogs.
  * Measured: 612.0 kB before, 621.4 kB after — most of the 9.4 kB the strings.
+ *
+ * It moved 645,500 -> 675,500 (630.4 -> 659.7 kB), and CSS 21,500 -> 22,000,
+ * for roadmap 4.3's linked figures, 4.4's "while you were away" summary and the
+ * catalogue's third round of twelve widgets. Measured: 621.7 kB before, 648.1
+ * kB after — the bulk of the 26.4 kB the ~210 new strings in six catalogs,
+ * each widget again stating its finding as a sentence; CSS 21.0 -> 21.2 kB for
+ * the new utility classes the widgets draw with.
  */
-export const BUDGET = { js: 645_500, css: 21_500 };
+export const BUDGET = { js: 675_500, css: 22_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
