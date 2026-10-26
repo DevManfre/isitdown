@@ -29,7 +29,7 @@ export function StatusDot({
       data-status={status}
       {...(hatched ? { "data-suspected": true } : {})}
       {...(label === undefined ? { "aria-hidden": true } : { role: "img", "aria-label": label })}
-      className={cn("dot inline-block rounded-full", pulse && "dot-pulse")}
+      className={cn("dot inline-block shrink-0 rounded-full", pulse && "dot-pulse")}
       style={{
         width: size,
         height: size,
