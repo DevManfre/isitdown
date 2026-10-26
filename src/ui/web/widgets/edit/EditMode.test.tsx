@@ -150,6 +150,40 @@ describe("Overview edit mode", () => {
     await waitFor(() => expect(document.activeElement?.getAttribute("data-grip")).toBe("stack-band-1"));
   });
 
+  it("previews each catalogue widget as it draws today, once its card is in view", async () => {
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(private readonly report: IntersectionObserverCallback) {}
+        observe(target: Element) {
+          this.report([{ isIntersecting: true, target } as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+        }
+        disconnect() {}
+      },
+    );
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private readonly report: ResizeObserverCallback) {}
+        observe(target: Element) {
+          this.report([{ target, contentRect: { width: 480 } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+        }
+        disconnect() {}
+      },
+    );
+    await openEditor();
+    fireEvent.click(screen.getByRole("button", { name: t("dashboard.add") }));
+    const sheet = await screen.findByRole("dialog");
+
+    const card = within(sheet).getByRole("button", { name: new RegExp(name("fleet-list")) }).closest("li")!;
+    const preview = card.querySelector<HTMLElement>("[data-slot=catalog-preview]")!;
+    // The real widget, on the fleet's own data — not a picture of one.
+    expect(await within(preview).findByText("GitHub")).toBeInTheDocument();
+    expect(preview).toHaveAttribute("aria-hidden", "true");
+    // Nothing inside the preview can take focus away from the card's button.
+    expect(preview.hasAttribute("inert")).toBe(true);
+  });
+
   it("asks before throwing a dirty draft away, and leaves edit mode once told to", async () => {
     await openEditor();
     fireEvent.click(screen.getByRole("button", { name: t("dashboard.remove", { widget: name("geo-map") }) }));

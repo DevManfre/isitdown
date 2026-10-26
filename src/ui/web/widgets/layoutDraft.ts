@@ -86,7 +86,8 @@ function freshId(type: WidgetType, widgets: readonly WidgetConfig[]): string {
   return `${type}-${n}`;
 }
 
-function newWidget(type: WidgetType, id: string): WidgetConfig {
+/** A widget as "+ Add widget" makes it: full width, pointed at the whole fleet. */
+export function newWidget(type: WidgetType, id: string): WidgetConfig {
   const props =
     WIDGET_PROPS[type] === "fleet"
       ? { filter: { groups: [], providers: [] } }
