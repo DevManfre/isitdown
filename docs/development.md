@@ -244,6 +244,7 @@ mode.
 ```bash
 npm test                 # node:test suites + vitest run
 npm run coverage         # the same two suites under a coverage floor
+                         # (coverage:server and coverage:web run one each, as CI does)
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
 npm run test:visual      # visual baselines: every view, both themes, both locales
 npm run test:mutation    # mutation testing on the diff engine
@@ -480,8 +481,11 @@ to what they cover.
 Two workflows, and the version lives in exactly one place.
 
 `.github/workflows/ci.yml` runs on every pull request and on every push to `dev`
-or `main`: Node from `.nvmrc`, `npm ci`, then the same four commands a
-contributor runs locally — `typecheck`, `test`, `test:integration`, `build`.
+or `main`, as four jobs side by side on their own runners — typecheck, lint and
+README parity; `coverage:server` and `test:integration`; `coverage:web`; and
+`build`, `check:bundle` and `test:visual` — so a run lasts as long as its slowest
+job. A fifth job, `verify`, passes only when all four did: it is the check
+`main`'s ruleset requires and the one the release reads.
 
 A release is a tag. `package.json` stays `private` (nothing is published to
 npm) but its `version` is the single source of truth:
@@ -492,10 +496,14 @@ npm version minor          # preversion runs typecheck + both test suites first,
 git push --follow-tags
 ```
 
-Pushing the tag runs `.github/workflows/release.yml`, which re-runs the checks
-(a tag push does not trigger CI), refuses to continue if the tag and
+Pushing the tag runs `.github/workflows/release.yml`, which first waits for CI's
+`verify` check on the tagged commit (a tag push does not trigger CI itself, so
+it reads the run the `main` push started) and stops if it failed, refuses to
+continue if the tag and
 `package.json` disagree, builds both targets for `linux/amd64` and
-`linux/arm64`, pushes the four GHCR tags with an SBOM and provenance, signs both
+`linux/arm64` — the build stage runs once on the runner's own platform, since
+its output is plain JavaScript, so only the production `npm ci` runs under arm64
+emulation — pushes the four GHCR tags with an SBOM and provenance, signs both
 digests with keyless `cosign`, and creates the GitHub release.
 
 The same workflow builds the single-file Light edition (roadmap 6.7) with
