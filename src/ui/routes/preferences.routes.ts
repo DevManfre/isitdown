@@ -59,6 +59,9 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
         message: 'must be "auto" or an IANA time zone name',
       })
       .optional(),
+    // Roadmap 4.4. Null clears it, which brings the next visit back to "first
+    // visit": nothing to recount, only a time to start from.
+    lastSeenAt: z.string().datetime().nullable().optional(),
   });
 
   const current = () => {
@@ -70,6 +73,7 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
       mapView: settings.mapView,
       density: settings.density,
       timeZone: settings.timeZone,
+      lastSeenAt: settings.lastSeenAt === "" ? null : settings.lastSeenAt,
     };
   };
 
@@ -89,7 +93,11 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
       });
       return;
     }
-    writeSettings(runtime.db, parsed.data);
+    const { lastSeenAt, ...rest } = parsed.data;
+    writeSettings(runtime.db, {
+      ...rest,
+      ...(lastSeenAt === undefined ? {} : { lastSeenAt: lastSeenAt ?? "" }),
+    });
     res.json(current());
   });
 

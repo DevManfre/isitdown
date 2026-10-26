@@ -35,6 +35,20 @@ export const WIDGET_WIDTHS = {
   delivery: WIDTHS,
   heartbeats: WIDTHS,
   coincidence: WIDTHS,
+  // Roadmap 4.1's third round: twelve more, each reading an endpoint the
+  // dashboard already calls.
+  "page-delay": WIDTHS,
+  suspected: WIDTHS,
+  "stale-readings": WIDTHS,
+  muted: WIDTHS,
+  "page-honesty": WIDTHS,
+  groups: WIDTHS,
+  "degraded-components": WIDTHS,
+  "recent-alerts": WIDTHS,
+  "poller-pulse": WIDTHS,
+  worsened: WIDTHS,
+  noisy: WIDTHS,
+  "who-to-call": WIDTHS,
 } as const satisfies Record<string, readonly Width[]>;
 
 export type WidgetType = keyof typeof WIDGET_WIDTHS;
@@ -62,6 +76,18 @@ export const WIDGET_PROPS = {
   delivery: "none",
   heartbeats: "none",
   coincidence: "none",
+  "page-delay": "none",
+  suspected: "fleet",
+  "stale-readings": "fleet",
+  muted: "none",
+  "page-honesty": "none",
+  groups: "none",
+  "degraded-components": "fleet",
+  "recent-alerts": "none",
+  "poller-pulse": "none",
+  worsened: "fleet",
+  noisy: "fleet",
+  "who-to-call": "fleet",
 } as const satisfies Record<WidgetType, "fleet" | "provider" | "none">;
 
 export type PropKind = (typeof WIDGET_PROPS)[WidgetType];

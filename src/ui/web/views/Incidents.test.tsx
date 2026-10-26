@@ -302,6 +302,17 @@ describe("Incidents", () => {
     }
   });
 
+  it("stays on the page it was moved to once the search box has settled", async () => {
+    renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents(many(5)) });
+    expect(await screen.findByText("Blip 1")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("pagination.next") }));
+    expect(await screen.findByText("Blip 3")).toBeInTheDocument();
+    // Longer than the search debounce: an empty box that was never typed in
+    // is not a new search, so nothing may send the list back to page 1.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(screen.getByText("Blip 3")).toBeInTheDocument();
+  });
+
   it("moves to the next page and renders that page's rows", async () => {
     renderWithProviders(<Incidents />, { ...fixtures, incidents: pagedIncidents(many(5)) });
     expect(await screen.findByText("Blip 1")).toBeInTheDocument();
@@ -489,6 +500,40 @@ describe("Incidents", () => {
         "href",
         "/export/incidents.csv?state=resolved",
       );
+    });
+  });
+
+  // Roadmap 4.3: a count on the Overview opens this list with the filters it
+  // was counted under.
+  describe("arriving from a number on the Overview", () => {
+    const asked = () =>
+      (fetch as unknown as { mock: { calls: [string][] } }).mock.calls
+        .map(([path]) => String(path))
+        .filter((path) => path.startsWith("/incidents?"));
+
+    it("asks the server for the provider, state and window in the address", async () => {
+      renderWithProviders(<Incidents />, fixtures, "/", "/?provider=github&state=resolved&days=30&from=overview");
+      await screen.findByText(i18n.t("drill.from-overview"));
+      const query = new URLSearchParams(asked().at(-1)?.split("?")[1]);
+      expect(query.get("provider")).toBe("github");
+      expect(query.get("state")).toBe("resolved");
+      expect(query.get("days")).toBe("30");
+      expect(screen.getByRole("radio", radioNamed(i18n.t("filter.resolved")))).toBeChecked();
+    });
+
+    it("puts the provider in the export, so the file is the search on screen", async () => {
+      renderWithProviders(<Incidents />, fixtures, "/", "/?provider=github&from=overview");
+      await screen.findByText(i18n.t("drill.from-overview"));
+      await waitFor(() => expect(new URLSearchParams(asked().at(-1)?.split("?")[1]).get("provider")).toBe("github"));
+    });
+
+    it("goes back to the whole list when the chip is cleared", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<Incidents />, fixtures, "/", "/?provider=github&days=30&from=overview");
+      await screen.findByText(i18n.t("drill.from-overview"));
+      await user.click(await screen.findByRole("button", { name: i18n.t("drill.clear-provider", { provider: "GitHub" }) }));
+      await waitFor(() => expect(new URLSearchParams(asked().at(-1)?.split("?")[1]).get("provider")).toBeNull());
+      expect(screen.queryByText(i18n.t("drill.from-overview"))).toBeNull();
     });
   });
 });

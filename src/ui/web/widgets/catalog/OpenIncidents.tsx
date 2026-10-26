@@ -12,6 +12,8 @@ import { statusColor } from "@/lib/chartConfig.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { IncidentRow } from "@/lib/types.ts";
 import { useFilterLabel } from "@/components/DashboardGrid.tsx";
+import { DrillLink } from "@/components/DrillLink.tsx";
+import { incidentsHref } from "@/lib/drillDown.ts";
 import { ROUTE_PATHS } from "../../../routePaths.ts";
 import type { FleetFilter } from "../../../dashboardLayout.ts";
 import { MINUTE, useNames, useSliceIds } from "./shared.ts";
@@ -87,7 +89,13 @@ export function OpenIncidents({ props }: { props: { filter: FleetFilter } }) {
       {/* At a third: the count, and the one to open first. */}
       <div className="flex flex-col gap-3 @md:hidden">
         <div className="flex items-baseline gap-3">
-          <NumberTicker className="font-mono text-4xl leading-none" locale={i18n.language} value={open.length} />
+          <DrillLink
+            to={incidentsHref({ state: "active" })}
+            label={t("drill.open-incidents", { count: open.length })}
+            where={t("drill.where.incidents-active")}
+          >
+            <NumberTicker className="font-mono text-4xl leading-none" locale={i18n.language} value={open.length} />
+          </DrillLink>
           <span className="font-mono text-xs text-muted-foreground">{t("widget.open-incidents.count", { count: open.length })}</span>
         </div>
         <Link to={href(open[0]!)} className="flex min-w-0 items-center gap-2 border-t border-border pt-2.5 text-sm hover:text-primary">

@@ -130,6 +130,14 @@ const settingsSchema = z.object({
    * hundred of them wants compact at any width.
    */
   density: z.enum(["comfortable", "compact"]).catch("comfortable"),
+  /**
+   * When the operator last said "I have seen it" on the Overview's "while you
+   * were away" summary — roadmap 4.4. An instance preference rather than a
+   * browser one: the summary is about what this installation saw, and a second
+   * browser must not replay a weekend somebody has already read. Empty is
+   * "never", which is not a date to count from.
+   */
+  lastSeenAt: z.union([z.string().datetime(), z.literal("")]).catch(""),
 
   /**
    * Quiet hours (roadmap 3.11). Stored as five flat rows like every other

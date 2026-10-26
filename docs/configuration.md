@@ -2649,8 +2649,8 @@ the operator arranges: **Customise** (beside the headline's actions, or
 data, and nothing is stored until **Save**.
 
 - **Widgets** are the blocks the Overview always drew — fleet rings, map, shared
-  failure, groups, fleet list — plus a catalogue of twelve more, each built on
-  data the dashboard already reads:
+  failure, groups, fleet list — plus a catalogue of twenty-four more, each built
+  on data the dashboard already reads:
 
   | Widget | Shows | Points at |
   |---|---|---|
@@ -2666,9 +2666,29 @@ data, and nothing is stored until **Save**.
   | Delivery health | whether the alerts arrived, per channel, hour by hour | — |
   | Job heartbeats | every dead-man's switch ([3.19](#319-heartbeats--the-dead-mans-switch)) and how close it is to going off | — |
   | Break together | providers that go down together, with a one-click `dependsOn` ([3.20](#320-dependencies--what-this-runs-on)) | — |
+  | Who to call | every provider down right now, with the impact and owner written on it ([3.23](#323-why-a-provider-matters--impact-and-owner)) | a fleet slice |
+  | Suspected | providers whose page reads fine while their probe does not | a fleet slice |
+  | Degraded components | every broken component, including the ones an operational provider hides | a fleet slice |
+  | Stale readings | providers whose adapter keeps failing, or whose page has stopped moving | a fleet slice |
+  | Group status | each group's derived status, naming the member that is the reason ([3.10](#310-provider-groups--my-stack)) | — |
+  | Poller pulse | when the last cycle ran, when the next is due, who did not answer | — |
+  | Latest alerts | the last messages sent, per channel, and whether each landed | — |
+  | Muted | muted providers and how long is left, with Unmute | — |
+  | Who got worse | uptime over 30 days against the 30 before, biggest fall first | a fleet slice |
+  | Noise ranking | incidents per provider over 30 days | a fleet slice |
+  | Who says it first | how long each status page takes to admit a failure its probe saw | — |
+  | Page honesty | of the failures a probe saw, how many the page ever admitted | — |
 
   Each can appear more than once, and each draws its summary at a third of the
   row rather than a squeezed copy of its full self.
+- **Every number is a link** (roadmap 4.3). A count, a duration or an uptime on
+  a widget opens the rows behind it, with the filters already applied: an
+  incident count opens Incidents on that provider and window, an uptime or a
+  repair time opens History with that provider's drawer, a failed-delivery count
+  opens the delivery log on its failures. The filters travel in the address
+  (`#/incidents?provider=github&days=30`), so the link is a bookmark too; the
+  destination shows a **From the Overview** chip saying what it was narrowed to,
+  and its ✕ goes back to the whole list.
 - **Width** is one of full, two thirds, half or a third of the row; height is the
   widget's own. Below 768px every widget takes the full width.
 - **Order** — drag the grip, press its ↑/↓ buttons, or focus the grip and use the
@@ -2683,6 +2703,14 @@ data, and nothing is stored until **Save**.
 - **Reset to default** forgets the arrangement. An Overview nobody customised
   follows the built-in layout, so blocks added by later releases reach it on
   their own; a customised one keeps exactly what was saved.
+
+**While you were away** (roadmap 4.4). Coming back after eight hours or more,
+the Overview opens with one card above the widgets: what is still open, what
+resolved, which maintenance ran and how many alerts were sent (and failed) since
+the last visit. **Seen** stores that time in the instance's preferences, so
+another browser does not replay it; collapsing it is this browser's own choice.
+A first visit, a shorter absence or an absence nothing happened in draws no
+card — the last visit just moves to now.
 
 The headline above the widgets is fixed: it is the "is anything wrong?" answer,
 and no arrangement hides it. Two tabs editing at once do not overwrite each
