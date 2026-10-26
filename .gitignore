@@ -23,3 +23,6 @@ graphify-out
 
 # Local brainstorming, not versioned
 /roadmap.md
+
+# Vitest shard reports (coverage:web:shard), merged by coverage:web:merge
+src/ui/web/.vitest-reports/
