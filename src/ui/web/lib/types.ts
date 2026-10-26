@@ -961,6 +961,11 @@ export interface Preferences {
   density: "comfortable" | "compact";
   /** `auto` is the browser's own zone; anything else is an IANA name. */
   timeZone?: string;
+  /**
+   * When "while you were away" was last acknowledged — roadmap 4.4. Null is
+   * "never"; absent is a server that predates the summary, which then stays off.
+   */
+  lastSeenAt?: string | null;
 }
 
 /**
