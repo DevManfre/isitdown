@@ -16,6 +16,7 @@ permissions:
   contents: write # create the GitHub release
   packages: write # push to GHCR
   id-token: write # keyless cosign signing via the workflow's OIDC token
+  checks: read # CI's `verify` check on the tagged commit
 
 env:
   # GHCR rejects an uppercase reference, and the owner is spelled DevManfre.
@@ -39,12 +40,28 @@ jobs:
       - run: npm ci
 
       # A tag push does not run the CI workflow, and an image nobody verified
-      # must not reach a registry.
-      - name: Verify
+      # must not reach a registry. Rather than re-running a subset of it here,
+      # wait for CI's own `verify` check on the tagged commit — the same check
+      # `main`'s ruleset requires, and a superset of what this step used to run
+      # (coverage floors, build, bundle budget, visual baselines). A tag pushed
+      # right behind `main` waits for that run instead of racing it; a commit
+      # CI never saw, or one it failed, stops the release here.
+      - name: Wait for CI on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          npm run typecheck
-          npm test
-          npm run test:integration
+          for attempt in $(seq 1 120); do
+            state=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?check_name=verify" \
+              -q '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.started_at) | last | "\(.status // "missing") \(.conclusion // "")"')
+            case "$state" in
+              "completed success") echo "CI passed on $GITHUB_SHA"; exit 0 ;;
+              completed*) echo "CI did not pass on $GITHUB_SHA: $state" >&2; exit 1 ;;
+            esac
+            echo "CI on $GITHUB_SHA: $state — waiting"
+            sleep 15
+          done
+          echo "no finished CI run on $GITHUB_SHA after 30 minutes" >&2
+          exit 1
 
       - name: Read the version from package.json
         id: version
