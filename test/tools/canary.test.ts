@@ -119,6 +119,17 @@ test("fields that exist only while a maintenance or an incident is open are not 
   }
   const cstate = { id: "civo", adapter: "cstate" };
   assert.equal(judge(cstate, { captured: [json("https://x/index.json", index)], fixtures: only("cstate", "index.json") }).outcome, "ok");
+
+  // A Statuspage-compatible host (Recurly) ships no time_zone, resolved_at or
+  // shortlink: the adapter reads none of them, or falls back without one.
+  const history = read("statuspage", "incidents-history.json");
+  delete history.page.time_zone;
+  for (const incident of history.incidents) {
+    delete incident.resolved_at;
+    delete incident.shortlink;
+  }
+  const recurly = { id: "recurly", adapter: "statuspage" };
+  assert.equal(judge(recurly, { captured: [json("https://x/api/v2/summary.json", history)], fixtures: only("statuspage", "incidents-history.json") }).outcome, "ok");
 });
 
 test("only drift and broken pages are findings; the report lists them first and the network's noise apart", () => {

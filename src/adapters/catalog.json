@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-19T10:17:35.494Z",
+  "generatedAt": "2026-10-26T10:30:57.459Z",
   "entries": [
     {
       "id": "github",
@@ -946,8 +946,8 @@
     {
       "id": "mollie",
       "name": "Mollie",
-      "adapter": "rss",
-      "baseUrl": "https://status.mollie.com/history.rss"
+      "adapter": "instatus",
+      "baseUrl": "https://status.mollie.com"
     },
     {
       "id": "nhost",
