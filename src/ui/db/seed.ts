@@ -240,6 +240,18 @@ const DEFAULT_CHANNELS = [
 ];
 
 export function seedDefaults(db: DatabaseSync): void {
+  // One commit for every default row, not one fsync per insert.
+  db.exec("BEGIN");
+  try {
+    insertDefaults(db);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function insertDefaults(db: DatabaseSync): void {
   const [existing] = db.prepare("SELECT COUNT(*) AS n FROM services").all() as { n: number }[];
   if ((existing?.n ?? 0) === 0) {
     const insert = db.prepare(

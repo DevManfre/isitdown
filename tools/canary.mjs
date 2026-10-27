@@ -25,6 +25,10 @@ const NOT_A_SHAPE = /malformed|broken|invalid/;
  * are not judged; the adapter's own parse is still the final word.
  */
 const CONDITIONAL = {
+  // Hosts that speak Statuspage's API without being Atlassian's (Recurly) drop
+  // these: the adapter never reads time_zone or shortlink, and falls back to
+  // the last update when resolved_at is missing.
+  statuspage: ["$.page.time_zone", "$.incidents[].resolved_at", "$.incidents[].shortlink"],
   sorry: [
     "$.components[].metrics_summary",
     "$.components[].links.metrics",
