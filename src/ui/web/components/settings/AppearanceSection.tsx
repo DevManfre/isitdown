@@ -2,6 +2,8 @@ import { useTranslation } from "react-i18next";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { SettingRow } from "@/components/SettingRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { startGuidedTour } from "@/components/GuidedTour.tsx";
 import { InstallAppRow } from "@/components/settings/InstallAppRow.tsx";
 import { SECTION_REELS } from "@/components/settings/reels.ts";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
@@ -149,6 +151,12 @@ export function AppearanceSection({
       {/* Roadmap 5.21. Last in Appearance: it is about the window the
       dashboard lives in rather than about what is drawn inside it. */}
       <InstallAppRow />
+      {/* Roadmap 4.6 */}
+      <SettingRow label={t("tour.setting.label")} description={t("tour.setting.hint")}>
+        <Button type="button" variant="outline" size="sm" onClick={startGuidedTour}>
+          {t("tour.setting.action")}
+        </Button>
+      </SettingRow>
     </SettingsSection>
   );
 }

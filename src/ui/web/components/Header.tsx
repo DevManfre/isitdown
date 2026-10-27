@@ -114,6 +114,7 @@ export function Header({ view }: { view: string }) {
           the header had a hole in the middle of it anyway. */}
       <button
         type="button"
+        data-tour="search"
         className="header-search hidden items-center gap-2 rounded-md border border-border bg-card/60 py-1.5 pl-3 pr-2 text-xs text-muted-foreground lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:justify-self-center"
         onClick={openCommandPalette}
       >

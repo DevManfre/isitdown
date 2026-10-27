@@ -16,7 +16,7 @@ const logger = createLogger(
 
 let runtime: Awaited<ReturnType<typeof buildUiRuntime>> | undefined;
 try {
-  runtime = await buildUiRuntime({ dbPath: DB_PATH, env: process.env, logger });
+  runtime = await buildUiRuntime({ dbPath: DB_PATH, env: process.env, logger, seedProviders: false });
 } catch (error) {
   logger.error("isitdown ui failed to start", {
     error: error instanceof Error ? error.message : String(error),

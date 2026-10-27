@@ -59,6 +59,8 @@ test("preferences default to following the system theme and English", async () =
       // operator opts into once the fleet is big enough to want it (roadmap
       // 13.1), not one made for them.
       density: "comfortable",
+        wizardDone: false,
+        tourSeen: false,
       // "auto" rather than a zone name: the default has to stay per-browser.
       timeZone: "auto",
       // Roadmap 4.4: a fresh instance has never been looked at.
@@ -79,7 +81,7 @@ test("a preference change round-trips and survives a restart", async () => {
     assert.equal(status, 200);
     assert.deepEqual(body, {
       theme: "dark", uiLocale: "it", notificationLocale: "en", mapView: "off",
-      density: "comfortable", timeZone: "auto", lastSeenAt: null,
+      density: "comfortable", wizardDone: false, tourSeen: false, timeZone: "auto", lastSeenAt: null,
     });
     await app.close();
 
@@ -91,6 +93,8 @@ test("a preference change round-trips and survives a restart", async () => {
         notificationLocale: "en",
         mapView: "off",
         density: "comfortable",
+        wizardDone: false,
+        tourSeen: false,
         timeZone: "auto",
         lastSeenAt: null,
       });

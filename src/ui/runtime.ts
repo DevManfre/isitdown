@@ -58,6 +58,8 @@ export interface UiRuntimeOptions {
   dbPath: string;
   env: NodeJS.ProcessEnv;
   logger?: Logger | undefined;
+  /** Seed the three starter providers into an empty database. Defaults on; the server turns it off. */
+  seedProviders?: boolean | undefined;
 }
 
 /**
@@ -188,7 +190,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
 
   const db = openDatabase(options.dbPath);
   migrate(db);
-  seedDefaults(db);
+  seedDefaults(db, { providers: options.seedProviders ?? true });
   // Before the first cycle, like the plugins: a heartbeat provider row has to
   // resolve to its adapter on the first read (roadmap 2.5).
   const heartbeats = useHeartbeatLedger(db);
