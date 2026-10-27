@@ -778,3 +778,18 @@ test("a database left with only one pending-damping column is repaired on the ne
   assert.ok(columns.includes("pending_count"));
   db.close();
 });
+
+test("an upgrade that fails half way leaves the previous schema, not a half-applied one", async () => {
+  const db = await freshDb();
+  // A stray `dashboards` table without the `layout` column: CREATE TABLE IF NOT
+  // EXISTS skips it, so the version-34 step's INSERT fails long after the
+  // earlier steps have created their tables.
+  db.exec("CREATE TABLE dashboards (id TEXT PRIMARY KEY)");
+
+  assert.throws(() => migrate(db));
+
+  assert.deepEqual(names(db, "table"), ["dashboards"]);
+  const [row] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
+  assert.equal(row?.user_version, 0);
+  db.close();
+});
