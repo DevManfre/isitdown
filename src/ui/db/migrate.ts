@@ -15,6 +15,22 @@ export function migrate(db: DatabaseSync): void {
   const from = row?.user_version ?? 0;
   if (from >= SCHEMA_VERSION) return;
 
+  // One transaction for the whole upgrade: SQLite's DDL and `user_version` are
+  // both transactional, so an upgrade that dies half way leaves the previous
+  // schema rather than a half-applied one — and a fresh database pays one
+  // commit instead of one fsync per statement.
+  db.exec("BEGIN");
+  try {
+    upgrade(db, from);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function upgrade(db: DatabaseSync, from: number): void {
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS services (
       id          TEXT PRIMARY KEY,
