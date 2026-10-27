@@ -30,10 +30,28 @@ import type { AdapterProbeResult, ServiceDefinition } from "@/lib/types.ts";
  * It sits beside the provider's own Edit and Remove buttons rather than in the
  * Providers table: an operator fixing a selector is already in this row.
  */
-export function AdapterDebugDialog({ service }: { service: ServiceDefinition }) {
+export function AdapterDebugDialog({
+  service,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  service: ServiceDefinition;
+  /**
+   * Driven from outside — the command palette opens it without a row to click.
+   * Absent, the dialog owns its state and renders its own trigger.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const { t, i18n } = useTranslation();
   const { setDialogOpen } = useBusyControls();
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const controlled = controlledOpen !== undefined;
+  const open = controlled ? controlledOpen : ownOpen;
+  const setOpen = (next: boolean): void => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   // Fetched only while the dialog is open: a panel nobody is looking at has no
   // business on the polling interval.
   const { data } = useAdapterDebug(open);
@@ -62,11 +80,13 @@ export function AdapterDebugDialog({ service }: { service: ServiceDefinition }) 
         if (!next) probe.reset();
       }}
     >
-      <DialogTrigger asChild>
-        <Button type="button" variant="secondary" size="sm">
-          {t("action.debug-adapter")}
-        </Button>
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger asChild>
+          <Button type="button" variant="secondary" size="sm">
+            {t("action.debug-adapter")}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-[min(44rem,calc(100vw-2rem))]">
         <DialogHeader>
           <DialogTitle>{t("adapter.debug.title")}</DialogTitle>
