@@ -959,6 +959,9 @@ export interface Preferences {
    * the window is.
    */
   density: "comfortable" | "compact";
+  /** Roadmap 4.5 / 4.6. Optional: a server from before them answers without. */
+  wizardDone?: boolean;
+  tourSeen?: boolean;
   /** `auto` is the browser's own zone; anything else is an IANA name. */
   timeZone?: string;
   /**
