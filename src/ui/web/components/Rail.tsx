@@ -84,13 +84,13 @@ export function Rail() {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup className="rail-links p-0">
+        <SidebarGroup className="rail-links p-0" data-tour="rail">
           <SidebarMenu className="gap-0">
             {NAV_ROUTES.map(({ name, labelKey }) => {
               const badge = badgeFor(name);
               const Icon = NAV_ICONS[name];
               return (
-                <SidebarMenuItem key={name}>
+                <SidebarMenuItem key={name} data-tour={`nav-${name}`}>
                   <SidebarMenuButton
                     asChild
                     // What NavLink's own `isActive` computes, by the same rule:
