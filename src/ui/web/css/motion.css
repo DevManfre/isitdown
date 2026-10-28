@@ -406,6 +406,31 @@
   animation: fade 0.2s ease backwards;
 }
 
+/* The guided tour (roadmap 4.6). The ring and the card glide from one anchor to
+   the next instead of jumping, and the veil that softens everything else keeps
+   a hole where the anchor is: clip-path interpolates between two polygons with
+   the same number of points, so the hole travels with the ring. The blur is
+   deliberately slight — it says "look there", it does not hide the page. */
+.tour-veil {
+  backdrop-filter: blur(1.5px);
+  transition: clip-path 0.4s var(--ease-entry);
+  animation: fade 0.3s ease both;
+}
+.tour-ring {
+  transition:
+    top 0.4s var(--ease-entry),
+    left 0.4s var(--ease-entry),
+    width 0.4s var(--ease-entry),
+    height 0.4s var(--ease-entry);
+  animation: fade 0.3s ease both;
+}
+.tour-card {
+  transition:
+    top 0.4s var(--ease-entry),
+    left 0.4s var(--ease-entry);
+  animation: modal-in 0.36s var(--ease-entry) both;
+}
+
 /* The Advanced disclosure, on the channel list's mechanism: Radix measures the
    panel and publishes its height as a custom property, which is what lets a
    keyframe travel to a height no stylesheet can know. Scoped, like that one,

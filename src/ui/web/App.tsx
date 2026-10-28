@@ -1,6 +1,8 @@
 import { Outlet, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { CommandPalette } from "@/components/CommandPalette.tsx";
+import { GuidedTour } from "@/components/GuidedTour.tsx";
+import { SetupWizard } from "@/components/SetupWizard.tsx";
 import { DashboardActions } from "@/components/dashboards/DashboardActions.tsx";
 import { Rail } from "@/components/Rail.tsx";
 import { Header } from "@/components/Header.tsx";
@@ -81,6 +83,9 @@ export function App() {
           shortcut has to answer on every screen, and a palette mounted inside
           a view would take its own key listener away with it on navigation. */}
       <CommandPalette />
+      {/* Roadmaps 4.5 and 4.6: first-run chrome, in the shell for the palette's reason. */}
+      <SetupWizard />
+      <GuidedTour />
       {/* Roadmap 4.2. The named dashboards' dialogs and Undo notice, in the
           shell for the palette's reason: rail, header and ⌘K all ask for them. */}
       <DashboardActions />

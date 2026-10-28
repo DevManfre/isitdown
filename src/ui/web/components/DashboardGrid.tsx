@@ -182,6 +182,7 @@ function GridCell({
       role={editing ? "listitem" : undefined}
       data-slot="widget-cell"
       data-widget={widget.type}
+      data-tour="tile"
       // Position only: animating the size too would stretch every chart and
       // line of text inside for the length of the glide. Decided at mount,
       // because motion only builds a cell's projection then — and remounting

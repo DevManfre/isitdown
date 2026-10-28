@@ -520,9 +520,9 @@ just falls back to "last check didn't go through, retrying tomorrow", logged
 at debug level on the server and otherwise silent.
 
 Writes take effect on the **next poll cycle**, with no restart, because the
-scheduler re-reads its configuration every pass. A fresh database is seeded with
-GitHub, Cloudflare and Anthropic so the dashboard is useful immediately; your own
-list is never overwritten afterwards.
+scheduler re-reads its configuration every pass. A fresh database starts with
+no providers: the first-run wizard asks which ones to watch and sends a real test
+notification (roadmap 4.5).
 
 ### 3.3 Environment variables
 
