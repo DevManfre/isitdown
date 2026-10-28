@@ -129,4 +129,92 @@ describe("CommandPalette", () => {
     expect(await screen.findByRole("option", { name: i18n.t("action.poll-now") })).toBeInTheDocument();
     expect(await screen.findByRole("option", { name: i18n.t("nav.overview") })).toBeInTheDocument();
   });
+
+  describe("actions — roadmap 4.7", () => {
+    const config = {
+      services: [{ id: "github", name: "GitHub", adapter: "statuspage", baseUrl: "https://example.test", enabled: true }],
+      channels: [
+        { id: "telegram", enabled: true, fields: [], locale: "", template: "" },
+        { id: "slack", enabled: false, fields: [], locale: "", template: "" },
+      ],
+    };
+    const calls = (): unknown[][] => (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+
+    it("mutes a provider: action, provider, duration", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CommandPalette />, { status, config });
+      await open(user);
+
+      await user.click(await screen.findByRole("option", { name: i18n.t("palette.mute") }));
+      await user.click(await screen.findByRole("option", { name: "GitHub" }));
+      await user.click(await screen.findByRole("option", { name: i18n.t("mute.for-120") }));
+
+      await waitFor(() => {
+        const patch = calls().find((call) => String(call[0]) === "/config/services/github");
+        expect(patch).toBeDefined();
+        expect(JSON.parse(String((patch?.[1] as RequestInit).body)).mutedUntil).toEqual(expect.any(String));
+      });
+      expect(await screen.findByRole("status")).toHaveTextContent(i18n.t("toast.service.muted", { name: "GitHub" }));
+    });
+
+    it("steps back from a second page on Backspace in an empty input", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CommandPalette />, { status, config });
+      await open(user);
+
+      await user.click(await screen.findByRole("option", { name: i18n.t("palette.mute") }));
+      // A click on a row takes focus off the input in jsdom; the keyboard path
+      // (Enter on the row) leaves it there, which is the case this is about.
+      await user.click(screen.getByPlaceholderText(i18n.t("palette.pick-provider")));
+      await user.keyboard("{Backspace}");
+
+      expect(await screen.findByRole("option", { name: i18n.t("action.poll-now") })).toBeInTheDocument();
+    });
+
+    it("jumps to the latest incident", async () => {
+      const incidents = {
+        active: [],
+        counts: {},
+        page: {
+          page: 1,
+          pageSize: 1,
+          total: 1,
+          items: [{ providerId: "github", incidentId: "i1", name: "Down", impact: "major", status: "investigating", startedAt: "2026-10-20T10:00:00Z", updatedAt: "2026-10-20T10:00:00Z", resolvedAt: null }],
+        },
+      };
+      const user = userEvent.setup();
+      renderWithProviders(<CommandPalette />, { status, config, incidents });
+      await open(user);
+
+      await user.click(await screen.findByRole("option", { name: i18n.t("palette.last-incident") }));
+
+      await waitFor(() => expect(window.location.hash).toBe("#/incidents/github/i1"));
+    });
+
+    it("writes the typed text as a fleet-wide marker", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CommandPalette />, { status, config });
+      await open(user);
+
+      await user.click(await screen.findByRole("option", { name: i18n.t("palette.annotate") }));
+      await user.type(screen.getByPlaceholderText(i18n.t("palette.annotate-placeholder")), "deploy 4.2");
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => {
+        const post = calls().find((call) => String(call[0]) === "/annotations" && (call[1] as RequestInit).method === "POST");
+        expect(JSON.parse(String((post?.[1] as RequestInit).body))).toMatchObject({ label: "deploy 4.2" });
+      });
+    });
+
+    it("offers only enabled channels for a test notification", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CommandPalette />, { status, config });
+      await open(user);
+
+      await user.click(await screen.findByRole("option", { name: i18n.t("palette.send-test") }));
+
+      expect(await screen.findByRole("option", { name: i18n.t("channel.name.telegram") })).toBeInTheDocument();
+      expect(screen.queryByRole("option", { name: i18n.t("channel.name.slack") })).not.toBeInTheDocument();
+    });
+  });
 });

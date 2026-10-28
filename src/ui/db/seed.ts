@@ -3,7 +3,9 @@ import type { DatabaseSync } from "node:sqlite";
 /**
  * First-boot defaults, so a fresh container shows a working dashboard instead of
  * an empty grid. Providers are seeded only when the table is empty: an operator's
- * own list is never overwritten.
+ * own list is never overwritten. The server turns that off (`providers: false`):
+ * a real installation starts empty and the first-run wizard (roadmap 4.5) asks
+ * which providers to watch.
  *
  * Channels are seeded disabled and carry the *name* of the environment variable
  * holding each credential — never a value. That is the whole secret model of the
@@ -239,11 +241,11 @@ const DEFAULT_CHANNELS = [
   { id: "webpush", config: {} },
 ];
 
-export function seedDefaults(db: DatabaseSync): void {
+export function seedDefaults(db: DatabaseSync, { providers = true }: { providers?: boolean } = {}): void {
   // One commit for every default row, not one fsync per insert.
   db.exec("BEGIN");
   try {
-    insertDefaults(db);
+    insertDefaults(db, providers);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -251,9 +253,9 @@ export function seedDefaults(db: DatabaseSync): void {
   }
 }
 
-function insertDefaults(db: DatabaseSync): void {
+function insertDefaults(db: DatabaseSync, providers: boolean): void {
   const [existing] = db.prepare("SELECT COUNT(*) AS n FROM services").all() as { n: number }[];
-  if ((existing?.n ?? 0) === 0) {
+  if (providers && (existing?.n ?? 0) === 0) {
     const insert = db.prepare(
       "INSERT INTO services (id, name, adapter, base_url, options, enabled, created_at) VALUES (?, ?, ?, ?, NULL, 1, ?)",
     );

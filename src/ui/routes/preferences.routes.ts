@@ -48,6 +48,8 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
       .optional(),
     mapView: z.enum(["off", "map", "globe"]).optional(),
     density: z.enum(["comfortable", "compact"]).optional(),
+    wizardDone: z.boolean().optional(),
+    tourSeen: z.boolean().optional(),
     // Validated against the runtime's own zone table rather than a hand-kept
     // list: "is this a zone?" is a question Intl can answer exactly, and a
     // preference that stores a name nothing can format is a dashboard of
@@ -72,6 +74,8 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
       notificationLocale: settings.notificationLocale,
       mapView: settings.mapView,
       density: settings.density,
+      wizardDone: settings.wizardDone,
+      tourSeen: settings.tourSeen,
       timeZone: settings.timeZone,
       lastSeenAt: settings.lastSeenAt === "" ? null : settings.lastSeenAt,
     };

@@ -137,4 +137,9 @@ export function seedVisualFixture(db) {
   for (const row of log) insertNotification.run(...row);
 
   db.prepare("UPDATE settings SET value = ? WHERE key = 'mapView'").run("off");
+  // An installation that has been set up: the first-run wizard and tour
+  // (roadmap 4.5, 4.6) would otherwise open over every frame.
+  for (const key of ["wizardDone", "tourSeen"]) {
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, 'true')").run(key);
+  }
 }
