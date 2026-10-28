@@ -1,7 +1,23 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
-import { Activity, LayoutGrid, MonitorCog, Plus, RefreshCw, Server, Tv, Upload } from "lucide-react";
+import { generatePath, useNavigate } from "react-router";
+import {
+  Activity,
+  BellOff,
+  BellRing,
+  FileText,
+  LayoutGrid,
+  MessageSquarePlus,
+  MonitorCog,
+  Plus,
+  RefreshCw,
+  Send,
+  Server,
+  Stethoscope,
+  Tv,
+  Upload,
+  History,
+} from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -12,7 +28,18 @@ import {
   CommandSeparator,
 } from "@/components/ui/command.tsx";
 import { NAV_ROUTES, ROUTE_PATHS } from "../../routePaths.ts";
-import { useDashboards, usePollNow, useStatusChrome } from "@/hooks/queries.ts";
+import {
+  useAnnotationEdits,
+  useConfigChrome,
+  useDashboards,
+  usePollNow,
+  useServiceMutations,
+  useStatusChrome,
+} from "@/hooks/queries.ts";
+import { AdapterDebugDialog } from "@/components/settings/AdapterDebugDialog.tsx";
+import * as api from "@/lib/api.ts";
+import { isMuted } from "@/lib/mute.ts";
+import type { ServiceDefinition } from "@/lib/types.ts";
 import { dashboardCommand, dashboardPath, MAX_DASHBOARDS } from "@/components/dashboards/DashboardActions.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
 
@@ -41,6 +68,35 @@ export function openCommandPalette(): void {
   window.dispatchEvent(new Event(PALETTE_EVENT));
 }
 
+/** The durations the Mute action offers — the same four the Settings menu does. */
+const MUTE_DURATIONS: { minutes: number; labelKey: string }[] = [
+  { minutes: 30, labelKey: "mute.for-30" },
+  { minutes: 120, labelKey: "mute.for-120" },
+  { minutes: 480, labelKey: "mute.for-480" },
+  { minutes: 1440, labelKey: "mute.for-1440" },
+];
+
+/**
+ * Roadmap 4.7. An action that needs a target asks for it on a second page of
+ * the same palette, so the keyboard path is "action, provider, Enter" and
+ * Backspace on an empty input steps back.
+ */
+type Page =
+  | { kind: "root" }
+  | { kind: "provider"; action: "mute" | "diagnose" }
+  | { kind: "duration"; providerId: string }
+  | { kind: "annotate" }
+  | { kind: "channel" };
+
+const ROOT: Page = { kind: "root" };
+
+interface Notice {
+  text: string;
+  tone: "ok" | "error";
+}
+
+const failure = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
 export function CommandPalette() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -50,7 +106,27 @@ export function CommandPalette() {
   // escape the view's error boundary and take the console down with it. With no
   // data the palette still opens, with its views and its two actions.
   const { data: status } = useStatusChrome();
+  const { data: config } = useConfigChrome();
+  const { patch } = useServiceMutations();
+  const { add: addAnnotation } = useAnnotationEdits();
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState<Page>(ROOT);
+  const [search, setSearch] = useState("");
+  // Where an action's answer goes: the palette is not a Settings page, so there
+  // is no toast stack to land in, and a closed palette would swallow it.
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [diagnosing, setDiagnosing] = useState<ServiceDefinition | null>(null);
+
+  const goTo = (next: Page): void => {
+    setPage(next);
+    setSearch("");
+    setNotice(null);
+  };
+
+  // A palette reopened later starts from the top, not from a half-done action.
+  useEffect(() => {
+    if (!open) goTo(ROOT);
+  }, [open]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -83,18 +159,168 @@ export function CommandPalette() {
 
   const providers = (status?.providers ?? []).filter((provider) => provider.enabled);
   const { data: dashboards = [] } = useDashboards();
+  const channels = (config?.channels ?? []).filter((channel) => channel.enabled);
+  const channelName = (id: string): string => t(`channel.name.${id}`, { defaultValue: id });
+
+  /** An answer the operator reads in place: the palette stays open on the top page. */
+  const answer = (next: Notice): void => {
+    setPage(ROOT);
+    setSearch("");
+    setNotice(next);
+  };
+
+  const setMute = (providerId: string, minutes: number | null): void => {
+    const name = providers.find((provider) => provider.id === providerId)?.name ?? providerId;
+    patch.mutate(
+      {
+        id: providerId,
+        patch: {
+          mutedUntil: minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString(),
+        },
+      },
+      {
+        onSuccess: () =>
+          answer({ text: t(minutes === null ? "toast.service.unmuted" : "toast.service.muted", { name }), tone: "ok" }),
+        onError: (error) => answer({ text: t("toast.failed", { error: failure(error) }), tone: "error" }),
+      },
+    );
+  };
+
+  const jumpToLastIncident = (): void => {
+    api.getIncidents({ pageSize: 1 }).then(
+      ({ page: { items } }) => {
+        const latest = items[0];
+        if (latest === undefined) {
+          answer({ text: t("palette.no-incident"), tone: "error" });
+          return;
+        }
+        setOpen(false);
+        void navigate(generatePath(ROUTE_PATHS.incidentDetail, {
+            providerId: latest.providerId,
+            incidentId: latest.incidentId,
+          }));
+      },
+      (error: unknown) => answer({ text: t("toast.failed", { error: failure(error) }), tone: "error" }),
+    );
+  };
+
+  const addMarker = (label: string): void => {
+    addAnnotation.mutate(
+      { at: new Date().toISOString(), label, colour: "accent" },
+      {
+        onSuccess: () => answer({ text: t("palette.marker-added"), tone: "ok" }),
+        onError: (error) => answer({ text: t("toast.failed", { error: failure(error) }), tone: "error" }),
+      },
+    );
+  };
+
+  const sendTest = (channelId: string): void => {
+    api.testChannel(channelId).then(
+      (result) =>
+        answer(
+          result.ok
+            ? { text: t("channel.test-ok"), tone: "ok" }
+            : { text: t("channel.test-failed", { error: result.error ?? "" }), tone: "error" },
+        ),
+      (error: unknown) => answer({ text: t("channel.test-failed", { error: failure(error) }), tone: "error" }),
+    );
+  };
+
+  const diagnose = (providerId: string): void => {
+    const service = config?.services.find((entry) => entry.id === providerId);
+    if (service === undefined) return;
+    setOpen(false);
+    setDiagnosing(service);
+  };
+
+  const placeholders: Record<Page["kind"], string> = {
+    root: "palette.placeholder",
+    provider: "palette.pick-provider",
+    duration: "palette.pick-duration",
+    annotate: "palette.annotate-placeholder",
+    channel: "palette.pick-channel",
+  };
 
   return (
+    <>
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
       title={t("palette.title")}
       description={t("palette.description")}
     >
-      <CommandInput placeholder={t("palette.placeholder")} />
+      <CommandInput
+        placeholder={t(placeholders[page.kind])}
+        value={search}
+        onValueChange={setSearch}
+        onKeyDown={(event) => {
+          // Backspace on an empty input is "back", as it is in every
+          // two-step picker; anywhere else it is just a Backspace.
+          if (event.key === "Backspace" && search === "" && page.kind !== "root") {
+            event.preventDefault();
+            goTo(ROOT);
+          }
+        }}
+      />
       <CommandList>
         <CommandEmpty>{t("palette.empty")}</CommandEmpty>
 
+        {page.kind === "provider" && (
+          <CommandGroup heading={t("palette.providers")}>
+            {providers.map((provider) => {
+              const muted = page.action === "mute" && isMuted(provider.mutedUntil);
+              return (
+                <CommandItem
+                  key={provider.id}
+                  value={`${provider.name} ${provider.id}`}
+                  onSelect={() => {
+                    if (page.action === "diagnose") diagnose(provider.id);
+                    else if (muted) setMute(provider.id, null);
+                    else goTo({ kind: "duration", providerId: provider.id });
+                  }}
+                >
+                  {muted ? <BellRing aria-hidden="true" /> : <Server aria-hidden="true" />}
+                  {muted ? t("palette.unmute-provider", { name: provider.name }) : provider.name}
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        )}
+
+        {page.kind === "duration" && (
+          <CommandGroup heading={t("palette.mute-for")}>
+            {MUTE_DURATIONS.map(({ minutes, labelKey }) => (
+              <CommandItem key={minutes} value={t(labelKey)} onSelect={() => setMute(page.providerId, minutes)}>
+                <BellOff aria-hidden="true" />
+                {t(labelKey)}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {page.kind === "channel" && (
+          <CommandGroup heading={t("palette.channels")}>
+            {channels.map((channel) => (
+              <CommandItem key={channel.id} value={`${channelName(channel.id)} ${channel.id}`} onSelect={() => sendTest(channel.id)}>
+                <Send aria-hidden="true" />
+                {channelName(channel.id)}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {page.kind === "annotate" && search.trim() !== "" && (
+          <CommandGroup>
+            {/* The input is the marker's text, so cmdk's own filter must not hide
+                the one item that submits it. */}
+            <CommandItem forceMount value={search} onSelect={() => addMarker(search.trim())}>
+              <MessageSquarePlus aria-hidden="true" />
+              {t("palette.annotate-submit", { label: search.trim() })}
+            </CommandItem>
+          </CommandGroup>
+        )}
+
+        {page.kind === "root" && (<>
         <CommandGroup heading={t("palette.views")}>
           {NAV_ROUTES.map((route) => (
             <CommandItem
@@ -197,8 +423,62 @@ export function CommandPalette() {
             <Tv aria-hidden="true" />
             {t("palette.wallboard")}
           </CommandItem>
+          {/* Roadmap 4.7. Each is one step from the keyboard; the four that
+              need a target ask for it on the next page. */}
+          <CommandItem value={t("palette.mute")} onSelect={() => goTo({ kind: "provider", action: "mute" })}>
+            <BellOff aria-hidden="true" />
+            {t("palette.mute")}
+          </CommandItem>
+          <CommandItem value={t("palette.diagnose")} onSelect={() => goTo({ kind: "provider", action: "diagnose" })}>
+            <Stethoscope aria-hidden="true" />
+            {t("palette.diagnose")}
+          </CommandItem>
+          <CommandItem value={t("palette.last-incident")} onSelect={jumpToLastIncident}>
+            <History aria-hidden="true" />
+            {t("palette.last-incident")}
+          </CommandItem>
+          <CommandItem value={t("palette.annotate")} onSelect={() => goTo({ kind: "annotate" })}>
+            <MessageSquarePlus aria-hidden="true" />
+            {t("palette.annotate")}
+          </CommandItem>
+          <CommandItem
+            value={t("palette.send-test")}
+            disabled={channels.length === 0}
+            onSelect={() => goTo({ kind: "channel" })}
+          >
+            <Send aria-hidden="true" />
+            {t("palette.send-test")}
+          </CommandItem>
+          {/* No `month=`: the server's default is the current one, and a month
+              still running is reported as far as today. */}
+          <CommandItem
+            value={t("palette.export-month")}
+            onSelect={run(() => window.location.assign("/export/monthly.md"))}
+          >
+            <FileText aria-hidden="true" />
+            {t("palette.export-month")}
+          </CommandItem>
         </CommandGroup>
+        </>)}
       </CommandList>
+      {notice !== null && (
+        <p
+          role="status"
+          className={`border-t px-3 py-2 text-xs ${notice.tone === "error" ? "text-destructive" : "text-muted-foreground"}`}
+        >
+          {notice.text}
+        </p>
+      )}
     </CommandDialog>
+    {diagnosing !== null && (
+      <AdapterDebugDialog
+        service={diagnosing}
+        open
+        onOpenChange={(next) => {
+          if (!next) setDiagnosing(null);
+        }}
+      />
+    )}
+    </>
   );
 }

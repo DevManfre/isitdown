@@ -132,8 +132,14 @@ const ASSETS = "dist/ui/public/assets";
  * kB after — the bulk of the 26.4 kB the ~210 new strings in six catalogs,
  * each widget again stating its finding as a sentence; CSS 21.0 -> 21.2 kB for
  * the new utility classes the widgets draw with.
+ *
+ * It moved 675,500 -> 685,500 (659.7 -> 669.4 kB), and CSS 22,000 -> 22,500,
+ * for roadmap 4.6's first-run setup wizard and guided tour. Measured: 650.4 kB
+ * before, 659.6 kB after — 9.1 kB gzipped, the two components and some fifty
+ * new strings in six catalogs; CSS 21.4 -> 21.6 kB for the tour's veil, ring
+ * and card motion and the wizard's utility classes.
  */
-export const BUDGET = { js: 675_500, css: 22_000 };
+export const BUDGET = { js: 685_500, css: 22_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

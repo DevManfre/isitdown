@@ -538,9 +538,9 @@ riuscito, si riprova domani", registrato a livello debug sul server e per il
 resto silenzioso.
 
 Le scritture hanno effetto al **ciclo di poll successivo**, senza restart, perché lo
-scheduler rilegge la configurazione a ogni passaggio. Un database nuovo viene
-inizializzato con GitHub, Cloudflare e Anthropic così la dashboard è subito utile; la
-tua lista non viene più sovrascritta in seguito.
+scheduler rilegge la configurazione a ogni passaggio. Un database nuovo parte
+senza provider: il wizard di primo avvio chiede quali seguire e manda una notifica di
+prova reale (roadmap 4.5).
 
 ### 3.3 Variabili d'ambiente
 

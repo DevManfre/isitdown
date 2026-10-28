@@ -232,6 +232,14 @@ test("seedDefaults gives a fresh database three providers to watch", async () =>
   db.close();
 });
 
+test("seedDefaults can leave the provider list empty for the first-run wizard", async () => {
+  const db = await freshDb();
+  migrate(db);
+  seedDefaults(db, { providers: false });
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM services").get() as { n: number }).n, 0);
+  db.close();
+});
+
 test("seedDefaults writes the polling and preference defaults", async () => {
   const db = await freshDb();
   migrate(db);

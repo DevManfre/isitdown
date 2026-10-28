@@ -131,6 +131,13 @@ const settingsSchema = z.object({
    */
   density: z.enum(["comfortable", "compact"]).catch("comfortable"),
   /**
+   * First-run wizard and guided tour — roadmap 4.5 and 4.6. Instance
+   * preferences, not browser ones: an installation is set up once, and a
+   * second browser must not walk the operator through it again.
+   */
+  wizardDone: booleanSetting.catch(false),
+  tourSeen: booleanSetting.catch(false),
+  /**
    * When the operator last said "I have seen it" on the Overview's "while you
    * were away" summary — roadmap 4.4. An instance preference rather than a
    * browser one: the summary is about what this installation saw, and a second
