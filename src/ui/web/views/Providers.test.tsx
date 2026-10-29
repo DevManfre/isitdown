@@ -1,5 +1,6 @@
 import {
   screen,
+  waitFor,
   waitForElementToBeRemoved,
   within,
 } from "@testing-library/react";
@@ -859,5 +860,31 @@ describe("a fleet large enough to be a problem", () => {
     expect(
       await screen.findByText(i18n.t("density.compact")),
     ).toBeInTheDocument();
+  });
+
+  it("mounts only the rows near the viewport on a very large fleet", async () => {
+    renderWithProviders(<Providers />, {
+      status: { ...status, providers: many(300) },
+      history,
+    });
+    await waitFor(() =>
+      expect(document.querySelector("tr[data-spacer]")).not.toBeNull(),
+    );
+    // happy-dom lays nothing out, so every row is estimated: the window is the
+    // viewport's worth plus overscan, and the rest is one spacer row.
+    const mounted = renderedOrder().length;
+    expect(mounted).toBeGreaterThan(0);
+    expect(mounted).toBeLessThan(100);
+    expect(document.querySelector("tr[data-spacer='after']")).not.toBeNull();
+  });
+
+  it("mounts every row of a fleet below the threshold", async () => {
+    renderWithProviders(<Providers />, {
+      status: { ...status, providers: many(60) },
+      history,
+    });
+    await (await inTable()).findByText("Provider 000");
+    expect(renderedOrder()).toHaveLength(60);
+    expect(document.querySelector("tr[data-spacer]")).toBeNull();
   });
 });
