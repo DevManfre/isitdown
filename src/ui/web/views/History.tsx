@@ -7,7 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { DeltaChip } from "@/components/DeltaChip.tsx";
 import { DownloadMenu } from "@/components/DownloadMenu.tsx";
 import { FromOverviewChip } from "@/components/DrillLink.tsx";
-import { readDays, snapWindow } from "@/lib/drillDown.ts";
+import { FROM_PARAM, readDays, readRange, snapWindow } from "@/lib/drillDown.ts";
 import { ProviderHistoryDrawer } from "@/components/ProviderHistoryDrawer.tsx";
 import { ProviderTrendRow } from "@/components/ProviderTrendRow.tsx";
 import { StatTiles } from "@/components/StatTiles.tsx";
@@ -132,7 +132,32 @@ export function History() {
    * this page labels the window by its span, and a range is a span with two
    * ends rather than a different kind of thing.
    */
-  const [range, setRange] = useState<{ from: string; to: string } | null>(null);
+  const [range, setRange] = useState<{ from: string; to: string } | null>(() =>
+    readRange(params.get("since"), params.get("until")),
+  );
+  // The range lives in the address too (roadmap 4.11), as `since` and `until` — `from` is already the
+  // Overview link's marker — so a zoom is a link.
+  // Written from the state rather than at each place that sets it: the pills,
+  // the date inputs and the drag all end up here.
+  useEffect(() => {
+    setParams(
+      (current) => {
+        const from = range?.from ?? null;
+        const to = range?.to ?? null;
+        if (current.get("since") === from && current.get("until") === to) return current;
+        const next = new URLSearchParams(current);
+        if (range === null) {
+          next.delete("since");
+          next.delete("until");
+        } else {
+          next.set("since", range.from);
+          next.set("until", range.to);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }, [range, setParams]);
   const window_: HistoryWindow =
     range === null ? { days } : { days: spanOf(range), range };
   // The provider the command palette (roadmap 5.4) asked for, if any. Route
@@ -152,7 +177,17 @@ export function History() {
   /** Closing the drawer a link opened takes the link's narrowing with it. */
   const close = (): void => {
     setOpen(null);
-    if (askedProvider !== null) setParams({}, { replace: true });
+    if (askedProvider !== null) {
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          // `from` is the Overview link's own marker, not the range.
+          for (const key of ["provider", "days", FROM_PARAM]) next.delete(key);
+          return next;
+        },
+        { replace: true },
+      );
+    }
   };
   // Null means "whichever the ordering picks": the fleet is not loaded yet on
   // the first render, and a comparison the operator did choose must survive a
@@ -532,7 +567,9 @@ export function History() {
             series={summary.dailyUptime}
             label={t("history.trend-title")}
             annotations={annotations?.annotations ?? []}
+            onSelectRange={(from, to) => setRange({ from, to })}
           />
+          <p className="text-xs text-muted-foreground">{t("history.brush-hint")}</p>
 
           <AnnotationBar annotations={annotations?.annotations ?? []} />
 
