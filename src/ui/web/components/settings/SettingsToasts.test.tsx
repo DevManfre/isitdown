@@ -5,6 +5,7 @@ import i18n from "@/lib/i18n.ts";
 import { renderWithProviders } from "@/test/harness.tsx";
 import {
   SettingsToasts,
+  UNDO_MS,
   useSettingsToasts,
   type SettingsToastStatus,
   type SettingsToastKind,
@@ -113,5 +114,60 @@ describe("SettingsToasts", () => {
 
     await userEvent.click(screen.getByRole("button", { name: i18n.t("settings.toasts.dismiss") }));
     expect(screen.queryByText("Kept")).not.toBeInTheDocument();
+  });
+
+  // Roadmap 4.8: the write waits behind the toast, so Undo is a cancel rather
+  // than a second write that has to put things back.
+  describe("deferred writes", () => {
+    function Deferring({ commit, onUndo }: { commit: () => void; onUndo: () => void }) {
+      const { toasts, defer, dismiss } = useSettingsToasts();
+      return (
+        <>
+          <button type="button" onClick={() => defer("data", { text: "Cleared", commit, onUndo })}>
+            defer
+          </button>
+          <SettingsToasts toasts={toasts} onDismiss={dismiss} />
+        </>
+      );
+    }
+
+    it("holds the write until the window closes, then sends it once", () => {
+      vi.useFakeTimers();
+      const commit = vi.fn();
+      renderWithProviders(<Deferring commit={commit} onUndo={vi.fn()} />);
+      act(() => screen.getByRole("button", { name: "defer" }).click());
+
+      expect(screen.getByText("Cleared")).toBeInTheDocument();
+      act(() => void vi.advanceTimersByTime(UNDO_MS - 1));
+      expect(commit).not.toHaveBeenCalled();
+      act(() => void vi.advanceTimersByTime(1));
+      expect(commit).toHaveBeenCalledTimes(1);
+    });
+
+    it("never sends the write when Undo is pressed", () => {
+      vi.useFakeTimers();
+      const commit = vi.fn();
+      const onUndo = vi.fn();
+      renderWithProviders(<Deferring commit={commit} onUndo={onUndo} />);
+      act(() => screen.getByRole("button", { name: "defer" }).click());
+      act(() => screen.getByRole("button", { name: i18n.t("action.undo") }).click());
+      act(() => void vi.advanceTimersByTime(UNDO_MS * 2));
+
+      expect(onUndo).toHaveBeenCalledTimes(1);
+      expect(commit).not.toHaveBeenCalled();
+    });
+
+    it("sends the write when the card is dismissed or the page is left", () => {
+      vi.useFakeTimers();
+      const commit = vi.fn();
+      const view = renderWithProviders(<Deferring commit={commit} onUndo={vi.fn()} />);
+      act(() => screen.getByRole("button", { name: "defer" }).click());
+      act(() => screen.getByRole("button", { name: i18n.t("settings.toasts.dismiss") }).click());
+      expect(commit).toHaveBeenCalledTimes(1);
+
+      act(() => screen.getByRole("button", { name: "defer" }).click());
+      view.unmount();
+      expect(commit).toHaveBeenCalledTimes(2);
+    });
   });
 });

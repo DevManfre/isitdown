@@ -5,6 +5,7 @@ import { GuidedTour } from "@/components/GuidedTour.tsx";
 import { SetupWizard } from "@/components/SetupWizard.tsx";
 import { DashboardActions } from "@/components/dashboards/DashboardActions.tsx";
 import { Rail } from "@/components/Rail.tsx";
+import { ConnectionBanner } from "@/components/ConnectionBanner.tsx";
 import { Header } from "@/components/Header.tsx";
 import { MobileNav } from "@/components/MobileNav.tsx";
 import { ViewFrame } from "@/components/ViewFrame.tsx";
@@ -99,7 +100,8 @@ export function App() {
           a div. Its stock `bg-background` is dropped: the body carries
           --gradient-page, and an opaque fill here would paint over it. */}
       <SidebarInset className="min-w-0 bg-transparent">
-        <Header view={view} />
+        <ConnectionBanner />
+          <Header view={view} />
         <ViewFrame
           // The zone is in the key for the same reason the locale is: the
           // formatters read it at render time from a module-level value, so a

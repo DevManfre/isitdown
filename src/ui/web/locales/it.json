@@ -45,6 +45,8 @@
   "action.remove": "Rimuovi",
   "action.save": "Salva",
   "action.cancel": "Annulla",
+  "action.undo": "Annulla",
+  "connection.lost": "Connessione live persa: quello che vedi potrebbe non essere aggiornato. Riconnessione in corso…",
   "action.clear": "Cancella",
   "action.close": "Chiudi",
   "action.add": "Aggiungi",
@@ -741,6 +743,7 @@
   "push.push-service": "Il browser non \u00e8 riuscito a registrarsi al suo servizio push. Di solito \u00e8 disattivato nelle impostazioni del browser (Brave e alcune build di Chromium lo forniscono disattivato) oppure bloccato a monte da firewall, VPN o filtro DNS: consentilo, riavvia il browser e riprova.",
   "push.unsupported": "Questo browser non può ricevere notifiche push qui. Apri la dashboard su localhost o in HTTPS.",
   "push.no-devices": "Nessun browser registrato.",
+  "toast.push.removed": "{name} — rimosso",
   "push.devices": "Browser registrati",
 
   "error.load-failed": "Impossibile caricare questa vista: {error}",
