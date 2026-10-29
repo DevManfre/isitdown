@@ -29,13 +29,31 @@ export interface SettingsToastStatus {
   tone: "ok" | "error";
 }
 
+/**
+ * A write held back for a few seconds behind a toast, so the operator can take
+ * it back (roadmap 4.8). `commit` is the real write; it runs when the window
+ * closes, when the toast is dismissed, or when the page is left — never twice,
+ * and never after `onUndo`.
+ */
+export interface DeferredWrite {
+  text: string;
+  commit: () => void | Promise<unknown>;
+  /** Called once the write is settled one way or the other, to drop any "pending" look. */
+  onUndo?: () => void;
+}
+
 interface SettingsToast extends SettingsToastStatus {
   id: number;
   kind: SettingsToastKind;
+  /** Present on a deferred write: the toast shows an Undo button for it. */
+  undo?: () => void;
 }
 
 /** Long enough to read a sentence; an error stays twice as long as a receipt. */
 const DISMISS_MS = { ok: 4000, error: 8000 } as const;
+
+/** How long a deferred write waits for an Undo before it goes out. */
+export const UNDO_MS = 6000;
 
 /** Older receipts fall off the top rather than growing a column up the page. */
 const MAX_VISIBLE = 3;
@@ -62,6 +80,17 @@ export type SettingsToastReport = (kind: SettingsToastKind, status: SettingsToas
  */
 const ReportContext = createContext<SettingsToastReport>(() => {});
 
+export type SettingsDeferredWrite = (kind: SettingsToastKind, write: DeferredWrite) => void;
+
+/** Outside a provider there is no toast to undo from, so the write just goes out. */
+const DeferContext = createContext<SettingsDeferredWrite>((_kind, write) => {
+  void write.commit();
+});
+
+export function useDeferredWrite(): SettingsDeferredWrite {
+  return use(DeferContext);
+}
+
 export function useSettingsToastReport(): SettingsToastReport {
   return use(ReportContext);
 }
@@ -73,11 +102,15 @@ export function useSettingsToastReport(): SettingsToastReport {
 export function useSettingsToasts(): {
   toasts: SettingsToast[];
   report: (kind: SettingsToastKind, status: SettingsToastStatus | undefined) => void;
+  defer: SettingsDeferredWrite;
   dismiss: (id: number) => void;
 } {
   const [toasts, setToasts] = useState<SettingsToast[]>([]);
   const nextId = useRef(0);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  // Writes still waiting on their window, by toast id. Taking one out of here is
+  // what makes it run exactly once: whoever deletes it first owns it.
+  const held = useRef(new Map<number, DeferredWrite>());
 
   const dismiss = useCallback((id: number) => {
     const timer = timers.current.get(id);
@@ -86,7 +119,39 @@ export function useSettingsToasts(): {
       timers.current.delete(id);
     }
     setToasts((current) => current.filter((toast) => toast.id !== id));
+    // Closing the card is accepting the write, not cancelling it.
+    const write = held.current.get(id);
+    if (write !== undefined) {
+      held.current.delete(id);
+      void write.commit();
+    }
   }, []);
+
+  const undo = useCallback((id: number) => {
+    const write = held.current.get(id);
+    if (write === undefined) return;
+    held.current.delete(id);
+    write.onUndo?.();
+    const timer = timers.current.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timers.current.delete(id);
+    }
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
+
+  const defer = useCallback<SettingsDeferredWrite>(
+    (kind, write) => {
+      const id = nextId.current++;
+      held.current.set(id, write);
+      setToasts((current) => [...current, { id, kind, text: write.text, tone: "ok" as const, undo: () => undo(id) }].slice(-MAX_VISIBLE));
+      timers.current.set(
+        id,
+        setTimeout(() => dismiss(id), UNDO_MS),
+      );
+    },
+    [dismiss, undo],
+  );
 
   // Call sites clear their status before a mutation and set it on the answer,
   // so `undefined` means "nothing to say" — never "drop what is on screen".
@@ -105,13 +170,17 @@ export function useSettingsToasts(): {
 
   useEffect(() => {
     const pending = timers.current;
+    const writes = held.current;
     return () => {
       for (const timer of pending.values()) clearTimeout(timer);
       pending.clear();
+      // Leaving the page is not an Undo: the operator asked for these.
+      for (const write of writes.values()) void write.commit();
+      writes.clear();
     };
   }, []);
 
-  return { toasts, report, dismiss };
+  return { toasts, report, defer, dismiss };
 }
 
 /**
@@ -119,11 +188,13 @@ export function useSettingsToasts(): {
  * component so a page adds all three by wrapping itself in it once.
  */
 export function SettingsToastsProvider({ children }: { children: ReactNode }) {
-  const { toasts, report, dismiss } = useSettingsToasts();
+  const { toasts, report, defer, dismiss } = useSettingsToasts();
   return (
     <ReportContext.Provider value={report}>
-      {children}
-      <SettingsToasts toasts={toasts} onDismiss={dismiss} />
+      <DeferContext.Provider value={defer}>
+        {children}
+        <SettingsToasts toasts={toasts} onDismiss={dismiss} />
+      </DeferContext.Provider>
     </ReportContext.Provider>
   );
 }
@@ -184,6 +255,16 @@ function SettingsToastCard({ toast, onDismiss }: { toast: SettingsToast; onDismi
       <figcaption className={cn("min-w-0 flex-1 text-xs leading-relaxed", failed && "text-destructive")}>
         {toast.text}
       </figcaption>
+
+      {toast.undo !== undefined && (
+        <button
+          type="button"
+          onClick={toast.undo}
+          className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-accent"
+        >
+          {t("action.undo")}
+        </button>
+      )}
 
       <button
         type="button"

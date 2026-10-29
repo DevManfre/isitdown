@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "@/lib/queryClient.ts";
-import { LiveProvider, useLive } from "./useLive.tsx";
+import { LOST_AFTER_MS, LiveProvider, useLive, useStreamLost } from "./useLive.tsx";
 
 /**
  * happy-dom ships no `EventSource`, which is also the production fallback path
@@ -34,7 +34,13 @@ class FakeEventSource {
 
 function Probe() {
   const live = useLive();
-  return <span>{live ? "live" : "polling"}</span>;
+  const lost = useStreamLost();
+  return (
+    <span>
+      {live ? "live" : "polling"}
+      {lost ? " lost" : ""}
+    </span>
+  );
 }
 
 function renderProvider() {
@@ -121,5 +127,54 @@ describe("LiveProvider", () => {
     renderProvider();
 
     expect(screen.getByText("polling")).toBeInTheDocument();
+  });
+
+  // Roadmap 4.9: a stream down for a few seconds is a blip; one down for long
+  // enough means the tab is holding old state and has to say so, then re-read
+  // everything (not only the cycle keys) the moment frames resume.
+  it("calls the stream lost after a long outage and re-reads every query but config on return", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("EventSource", FakeEventSource);
+      const { invalidate } = renderProvider();
+      const source = FakeEventSource.last!;
+
+      act(() => source.emit("hello", {}));
+      act(() => source.emit("error"));
+      act(() => void vi.advanceTimersByTime(LOST_AFTER_MS - 1));
+      expect(screen.queryByText(/lost/)).not.toBeInTheDocument();
+
+      act(() => void vi.advanceTimersByTime(1));
+      expect(screen.getByText(/lost/)).toBeInTheDocument();
+
+      invalidate.mockClear();
+      act(() => source.emit("open"));
+      expect(screen.queryByText(/lost/)).not.toBeInTheDocument();
+      const options = invalidate.mock.calls[0]?.[0] as unknown as { predicate?: (query: { queryKey: unknown[] }) => boolean };
+      expect(options.predicate?.({ queryKey: ["status"] })).toBe(true);
+      expect(options.predicate?.({ queryKey: ["config", "services"] })).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not call a short blip lost, nor refetch everything when it recovers", () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("EventSource", FakeEventSource);
+      const { invalidate } = renderProvider();
+      const source = FakeEventSource.last!;
+
+      act(() => source.emit("error"));
+      act(() => void vi.advanceTimersByTime(LOST_AFTER_MS - 1));
+      invalidate.mockClear();
+      act(() => source.emit("open"));
+      act(() => void vi.advanceTimersByTime(LOST_AFTER_MS * 2));
+
+      expect(screen.queryByText(/lost/)).not.toBeInTheDocument();
+      expect(invalidate).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
