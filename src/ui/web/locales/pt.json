@@ -45,6 +45,8 @@
   "action.remove": "Remover",
   "action.save": "Guardar",
   "action.cancel": "Cancelar",
+  "action.undo": "Desfazer",
+  "connection.lost": "Ligação em direto perdida — o que vê pode estar desatualizado. A voltar a ligar…",
   "action.clear": "Limpar",
   "action.close": "Fechar",
   "action.add": "Adicionar",
@@ -741,6 +743,7 @@
   "push.push-service": "O navegador não conseguiu registar-se no seu serviço de push. Isso costuma estar desligado nas definições do próprio navegador (o Brave e algumas compilações do Chromium vêm assim) ou bloqueado a montante por uma firewall, uma VPN ou um filtro DNS — permite-o, reinicia o navegador e tenta de novo.",
   "push.unsupported": "Este navegador não consegue receber notificações push aqui. Abre o painel em localhost ou por HTTPS.",
   "push.no-devices": "Ainda não há nenhum navegador registado.",
+  "toast.push.removed": "{name} — removido",
   "push.devices": "Navegadores registados",
 
   "error.load-failed": "Não foi possível carregar esta vista: {error}",

@@ -733,10 +733,29 @@ describe("Settings", () => {
       const card = await openChannel(i18n.t("channel.name.telegram"));
       await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.clear") }));
 
+      // Roadmap 4.8: the write waits behind the toast. Closing the card accepts it.
       expect(await screen.findByText(i18n.t("channel.secret-cleared"))).toBeInTheDocument();
-      expect(writesIn(calls)).toEqual([
-        { method: "DELETE", path: "/config/channels/telegram/secrets/botToken", body: undefined },
-      ]);
+      expect(writesIn(calls)).toEqual([]);
+      await userEvent.click(screen.getByRole("button", { name: i18n.t("settings.toasts.dismiss") }));
+      await waitFor(() =>
+        expect(writesIn(calls)).toEqual([
+          { method: "DELETE", path: "/config/channels/telegram/secrets/botToken", body: undefined },
+        ]),
+      );
+    });
+
+    it("Undo on a cleared credential sends nothing and brings the Clear button back", async () => {
+      renderSettings("notifications", fixtures);
+      const calls = interceptWrites({});
+
+      const card = await openChannel(i18n.t("channel.name.telegram"));
+      await userEvent.click(within(card).getByRole("button", { name: i18n.t("action.clear") }));
+      expect(within(card).queryByRole("button", { name: i18n.t("action.clear") })).not.toBeInTheDocument();
+
+      await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.undo") }));
+
+      expect(within(card).getByRole("button", { name: i18n.t("action.clear") })).toBeInTheDocument();
+      expect(writesIn(calls)).toEqual([]);
     });
 
     it("send-test reports success and shows channel.test-ok", async () => {

@@ -3,7 +3,7 @@ import { LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { usePollNow, useStatusChrome } from "@/hooks/queries.ts";
-import { useLive } from "@/hooks/useLive.tsx";
+import { useLive, useStreamLost } from "@/hooks/useLive.tsx";
 import { msUntilNextPoll } from "@/lib/statusRefetch.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -12,6 +12,7 @@ export function PollIndicator() {
   const { data: status, dataUpdatedAt } = useStatusChrome();
   const poll = usePollNow();
   const live = useLive();
+  const lost = useStreamLost();
   // Re-renders once a second so the countdown ticks without refetching.
   const [, tick] = useState(0);
   useEffect(() => {
@@ -71,7 +72,11 @@ export function PollIndicator() {
         </span>
         <span className="flex min-h-5 items-center gap-1.5">
           <span
-            className={cn("poll-next-dot size-1.5 rounded-full bg-primary", polling && "dot-pulse")}
+            className={cn(
+              "poll-next-dot size-1.5 rounded-full",
+              lost ? "bg-muted-foreground" : "bg-primary",
+              polling && !lost && "dot-pulse",
+            )}
           />
           <span className="poll-next-time font-mono text-xs">{label}</span>
         </span>
