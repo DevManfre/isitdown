@@ -45,6 +45,8 @@
   "action.remove": "Entfernen",
   "action.save": "Speichern",
   "action.cancel": "Abbrechen",
+  "action.undo": "Rückgängig",
+  "connection.lost": "Live-Verbindung verloren – die Anzeige ist möglicherweise veraltet. Verbindung wird wiederhergestellt…",
   "action.clear": "Leeren",
   "action.close": "Schließen",
   "action.add": "Hinzufügen",
@@ -741,6 +743,7 @@
   "push.push-service": "Der Browser konnte sich nicht bei seinem Push-Dienst registrieren. Das ist meist in den Einstellungen des Browsers selbst abgeschaltet (Brave und einige Chromium-Builds liefern es aus) oder vorgelagert von einer Firewall, einem VPN oder einem DNS-Filter blockiert — erlaube es, starte den Browser neu und versuche es erneut.",
   "push.unsupported": "Dieser Browser kann hier keine Push-Benachrichtigungen empfangen. Öffne das Dashboard auf localhost oder über HTTPS.",
   "push.no-devices": "Noch kein Browser registriert.",
+  "toast.push.removed": "{name} — entfernt",
   "push.devices": "Registrierte Browser",
 
   "error.load-failed": "Diese Ansicht konnte nicht geladen werden: {error}",

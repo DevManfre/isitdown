@@ -45,6 +45,8 @@
   "action.remove": "Supprimer",
   "action.save": "Enregistrer",
   "action.cancel": "Annuler",
+  "action.undo": "Annuler",
+  "connection.lost": "Connexion en direct perdue — ce que vous voyez peut être périmé. Reconnexion…",
   "action.clear": "Effacer",
   "action.close": "Fermer",
   "action.add": "Ajouter",
@@ -741,6 +743,7 @@
   "push.push-service": "Le navigateur n'a pas pu s'enregistrer auprès de son service push. C'est en général désactivé dans les réglages du navigateur lui-même (Brave et certaines compilations de Chromium le livrent éteint) ou bloqué en amont par un pare-feu, un VPN ou un filtre DNS — autorisez-le, redémarrez le navigateur, puis réessayez.",
   "push.unsupported": "Ce navigateur ne peut pas recevoir de notifications push ici. Ouvrez le tableau de bord sur localhost ou en HTTPS.",
   "push.no-devices": "Aucun navigateur enregistré pour l'instant.",
+  "toast.push.removed": "{name} — retiré",
   "push.devices": "Navigateurs enregistrés",
 
   "error.load-failed": "Impossible de charger cette vue : {error}",

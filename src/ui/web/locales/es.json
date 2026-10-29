@@ -45,6 +45,8 @@
   "action.remove": "Eliminar",
   "action.save": "Guardar",
   "action.cancel": "Cancelar",
+  "action.undo": "Deshacer",
+  "connection.lost": "Conexión en vivo perdida: lo que ves puede estar desactualizado. Reconectando…",
   "action.clear": "Limpiar",
   "action.close": "Cerrar",
   "action.add": "Añadir",
@@ -741,6 +743,7 @@
   "push.push-service": "El navegador no pudo registrarse con su servicio de push. Normalmente está desactivado en los ajustes del propio navegador (Brave y algunas compilaciones de Chromium lo traen apagado) o bloqueado antes por un cortafuegos, una VPN o un filtro DNS: permítelo, reinicia el navegador y vuelve a intentarlo.",
   "push.unsupported": "Este navegador no puede recibir notificaciones push aquí. Abre el panel en localhost o por HTTPS.",
   "push.no-devices": "Todavía no hay ningún navegador registrado.",
+  "toast.push.removed": "{name} — quitado",
   "push.devices": "Navegadores registrados",
 
   "error.load-failed": "No se pudo cargar esta vista: {error}",

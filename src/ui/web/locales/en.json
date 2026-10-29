@@ -45,6 +45,8 @@
   "action.remove": "Remove",
   "action.save": "Save",
   "action.cancel": "Cancel",
+  "action.undo": "Undo",
+  "connection.lost": "Live connection lost — what you see may be out of date. Reconnecting…",
   "action.clear": "Clear",
   "action.close": "Close",
   "action.add": "Add",
@@ -741,6 +743,7 @@
   "push.push-service": "The browser could not register with its push service. It is usually turned off in the browser's own settings (Brave and some Chromium builds ship it off) or blocked upstream by a firewall, VPN or DNS filter \u2014 allow it, restart the browser, then try again.",
   "push.unsupported": "This browser cannot receive push notifications here. Open the dashboard on localhost or over HTTPS.",
   "push.no-devices": "No browser registered yet.",
+  "toast.push.removed": "{name} — removed",
   "push.devices": "Registered browsers",
 
   "error.load-failed": "Could not load this view: {error}",
