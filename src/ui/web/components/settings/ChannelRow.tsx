@@ -42,7 +42,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
-import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
+import { useDeferredWrite, useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useChannelMutations, usePushDevices, usePushMutations } from "@/hooks/queries.ts";
 import { useFieldProps } from "@/hooks/useBusy.tsx";
 import { getPushKey } from "@/lib/api.ts";
@@ -78,7 +78,17 @@ function PushDevices({
   const devices = usePushDevices();
   const { add, remove } = usePushMutations();
   const toast = useSettingsToastReport();
+  const defer = useDeferredWrite();
+  // Devices whose removal is waiting out its Undo window: hidden at once, so the
+  // list answers the click, while the write itself goes out afterwards.
+  const [removing, setRemoving] = useState<ReadonlySet<string>>(new Set());
   const supported = pushSupported();
+  const forget = (id: string): void =>
+    setRemoving((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
 
   const enable = async (): Promise<void> => {
     try {
@@ -110,7 +120,7 @@ function PushDevices({
     );
   }
 
-  const registered = devices.data?.devices ?? [];
+  const registered = (devices.data?.devices ?? []).filter((device) => !removing.has(device.id));
 
   return (
     <div className="flex flex-col gap-3">
@@ -139,7 +149,14 @@ function PushDevices({
             {registered.map((device) => (
               <div key={device.id} className="flex items-center justify-between gap-2 py-1 pl-3 pr-1">
                 <span className="font-mono text-xs">{device.label}</span>
-                <Button type="button" size="sm" variant="ghost" onClick={() => remove.mutate(device.id)}>
+                <Button type="button" size="sm" variant="ghost" onClick={() => {
+                    setRemoving((current) => new Set(current).add(device.id));
+                    defer("notifications", {
+                      text: t("toast.push.removed", { name: device.label }),
+                      commit: () => remove.mutate(device.id, { onSettled: () => forget(device.id) }),
+                      onUndo: () => forget(device.id),
+                    });
+                  }}>
                   {t("action.remove")}
                 </Button>
               </div>
@@ -360,6 +377,15 @@ export function ChannelRow({
   const fieldProps = useFieldProps();
   const { patch, saveSecrets, clearSecret, test } = useChannelMutations();
   const toast = useSettingsToastReport();
+  const defer = useDeferredWrite();
+  // Credentials whose clearing is waiting out its Undo window, as `field`.
+  const [clearing, setClearing] = useState<ReadonlySet<string>>(new Set());
+  const unclear = (field: string): void =>
+    setClearing((current) => {
+      const next = new Set(current);
+      next.delete(field);
+      return next;
+    });
   // Only what is being *changed* lives here: each field renders empty with the
   // stored variable name as its placeholder, so the hint can never be mistaken
   // for something the operator typed.
@@ -508,6 +534,7 @@ export function ChannelRow({
         {channel.fields.map((field) => {
           const inputId = `channel-${channel.id}-${field.name}`;
           const valueId = `${inputId}-value`;
+          const isSet = field.isSet && !clearing.has(field.name);
           return (
             <div key={field.name} className="flex flex-col gap-1.5">
               {/* The credential is the field: one box, because which variable
@@ -521,14 +548,14 @@ export function ChannelRow({
                 <span
                   className="font-mono text-xs"
                   style={{
-                    color: field.isSet
+                    color: isSet
                       ? "var(--status-operational)"
                       : field.optional === true
                         ? "var(--color-muted-foreground)"
                         : "var(--status-degraded)",
                   }}
                 >
-                  {field.isSet
+                  {isSet
                     ? t("channel.env-set")
                     : field.optional === true
                       ? t("channel.env-optional")
@@ -545,21 +572,24 @@ export function ChannelRow({
                   onChange={(event) => setSecretValues((prev) => ({ ...prev, [field.name]: event.target.value }))}
                   {...fieldProps}
                 />
-                {field.isSet && (
+                {isSet && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     disabled={clearSecret.isPending}
-                    onClick={() =>
-                      clearSecret.mutate(
-                        { id: channel.id, field: field.name },
-                        {
-                          onSuccess: () => toast("notifications", { text: t("channel.secret-cleared"), tone: "ok" }),
-                          onError: failed,
-                        },
-                      )
-                    }
+                    onClick={() => {
+                      setClearing((current) => new Set(current).add(field.name));
+                      defer("notifications", {
+                        text: t("channel.secret-cleared"),
+                        commit: () =>
+                          clearSecret.mutate(
+                            { id: channel.id, field: field.name },
+                            { onError: failed, onSettled: () => unclear(field.name) },
+                          ),
+                        onUndo: () => unclear(field.name),
+                      });
+                    }}
                   >
                     {t("action.clear")}
                   </Button>
