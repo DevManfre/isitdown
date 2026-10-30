@@ -251,6 +251,7 @@
   "history.delta": "{value} PP gegenüber den vorigen {days} Tagen",
   "history.delta-short": "{value} pp",
   "history.range-custom": "Eigener",
+  "history.brush-hint": "Ziehen Sie über das Verlaufsdiagramm, um einen Zeitraum zu vergrößern.",
   "history.range-custom-active": "{from} bis {to}",
   "history.range-from": "Von",
   "history.range-to": "Bis",

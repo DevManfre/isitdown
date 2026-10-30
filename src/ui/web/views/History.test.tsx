@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
@@ -215,6 +215,24 @@ describe("History", () => {
 
     const requested = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
     expect(requested.some((url) => url.includes("from=") && url.includes("to="))).toBe(true);
+  });
+
+  it("writes a picked range into the address and opens on one it finds there", async () => {
+    renderWithProviders(<History />, fixtures);
+    await screen.findByText(/99[.,]42/);
+    await userEvent.click(await screen.findByRole("radio", { name: i18n.t("history.range-custom") }));
+    const from = (await screen.findByLabelText(i18n.t("history.range-from"))) as HTMLInputElement;
+    await waitFor(() => expect(window.location.hash).toContain(`since=${from.value}`));
+    // Back to a fixed window takes the range out of the address again.
+    await userEvent.click(await screen.findByRole("radio", { name: i18n.t("column.range", { days: 7 }) }));
+    await waitFor(() => expect(window.location.hash).not.toContain("since="));
+  });
+
+  it("opens on the range the address carries", async () => {
+    renderWithProviders(<History />, fixtures, "/", "/?since=2026-10-01&until=2026-10-07");
+    expect(
+      await screen.findByText(i18n.t("history.range-custom-active", { from: "2026-10-01", to: "2026-10-07" })),
+    ).toBeInTheDocument();
   });
 
   it("names the picked range beside the toggle instead of a day count", async () => {

@@ -1,5 +1,6 @@
 import {
   Fragment,
+  type RefObject,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -53,6 +54,7 @@ import { summaryProviders } from "@/lib/history.ts";
 import { isMuted } from "@/lib/mute.ts";
 import { isReorder, rowShifts } from "@/lib/rowShift.ts";
 import { stagger } from "@/lib/stagger.ts";
+import { rowSpan, type RowSpan } from "@/lib/virtualRows.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
 import type {
   ComponentStatus,
@@ -78,6 +80,20 @@ const CARD_GRID_MAX = 6;
  * seeing teaches the operator to ignore the row it sits in.
  */
 const DENSITY_FROM = 12;
+
+/**
+ * Above this many rows the table mounts only the ones near the viewport —
+ * roadmap 4.10. Below it every row is in the DOM, which is what keeps the
+ * entry stagger, the exit animation and the reorder glide exactly as they are
+ * for the fleets most operators have.
+ */
+const VIRTUALIZE_FROM = 100;
+
+/** Rows mounted beyond each edge of the viewport, so a fast scroll never shows a gap. */
+const OVERSCAN = 6;
+
+/** What a row not yet seen is assumed to measure, by density, in pixels. */
+const ESTIMATED_ROW = { comfortable: 57, compact: 41 } as const;
 
 /** How long a dropped row stays mounted; in step with `.anim-sink` in motion.css. */
 const EXIT_MS = 220;
@@ -282,12 +298,14 @@ function useOutgoing(
  * keeps growing with no render to re-measure on — a stale baseline that the
  * next poll replayed as an 89px jump nothing had asked for.
  */
-function useRowShift() {
+function useRowShift(enabled: boolean) {
   const body = useRef<HTMLTableSectionElement>(null);
   const tops = useRef<ReadonlyMap<string, number>>(new Map());
 
   useLayoutEffect(() => {
-    if (body.current === null) return;
+    // A windowed table (see `useVirtualRows`) mounts and unmounts rows as it
+    // scrolls; reading that as a reorder would glide every row on every scroll.
+    if (!enabled || body.current === null) return;
     const rows = new Map(
       [
         ...body.current.querySelectorAll<HTMLTableRowElement>(
@@ -325,6 +343,85 @@ function useRowShift() {
   });
 
   return body;
+}
+
+/**
+ * Which rows of a long table to mount — roadmap 4.10.
+ *
+ * Variable heights are the reason this is not a library call: a row carries
+ * its accordion panel, so its height is whatever it measured the last time it
+ * was on screen (read the same way `useRowShift` reads positions: row top to
+ * the next row's top) and an estimate until then. The window follows the page
+ * scroll; the rows outside it are two spacer rows' worth of height.
+ */
+function useVirtualRows(
+  body: RefObject<HTMLTableSectionElement | null>,
+  ids: readonly string[],
+  enabled: boolean,
+  estimate: number,
+): RowSpan {
+  const measured = useRef(new Map<string, number>());
+  const [span, setSpan] = useState<RowSpan | null>(null);
+
+  const heightsOf = (): number[] =>
+    ids.map((id) => measured.current.get(id) ?? estimate);
+
+  const update = (): void => {
+    const element = body.current;
+    if (!enabled || element === null) return;
+    const children = [...element.children] as HTMLElement[];
+    children.forEach((child, index) => {
+      const id = child.dataset.rowId;
+      if (id === undefined) return;
+      const next = children
+        .slice(index + 1)
+        .find((c) => c.dataset.rowId !== undefined || c.dataset.spacer !== undefined);
+      const bottom = next?.offsetTop ?? element.offsetHeight;
+      // A row that has no layout (not rendered, or display: none) measures
+      // nothing, and nothing is not a height worth remembering.
+      const height = bottom - child.offsetTop;
+      if (height > 0) measured.current.set(id, height);
+    });
+    const next = rowSpan(
+      heightsOf(),
+      element.getBoundingClientRect().top,
+      window.innerHeight,
+      OVERSCAN,
+    );
+    setSpan((current) =>
+      current !== null &&
+      current.start === next.start &&
+      current.end === next.end &&
+      current.before === next.before &&
+      current.after === next.after
+        ? current
+        : next,
+    );
+  };
+
+  // After every commit: a panel that opened, a row that arrived, a density
+  // change all alter what the heights are.
+  useLayoutEffect(update);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let frame = 0;
+    const onMove = (): void => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    };
+    window.addEventListener("scroll", onMove, { passive: true });
+    window.addEventListener("resize", onMove);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onMove);
+      window.removeEventListener("resize", onMove);
+    };
+  });
+
+  const all = { start: 0, end: ids.length, before: 0, after: 0 };
+  if (!enabled) return all;
+  return span ?? rowSpan(heightsOf(), 0, window.innerHeight, OVERSCAN);
 }
 
 /**
@@ -370,7 +467,8 @@ export function Providers() {
   const shownIds = shownBy(providers, filter);
   // Sits above the empty-state return below: a hook cannot go behind one.
   const leaving = useOutgoing(shownIds, EXIT_MS);
-  const body = useRowShift();
+  const windowed = shownIds.length > VIRTUALIZE_FROM;
+  const body = useRowShift(!windowed);
 
   // The row model is rebuilt from this array's identity, so it is memoised on
   // the three things that actually change it. `leaving` is state: a new Set
@@ -603,6 +701,14 @@ export function Providers() {
     FOLD_MS,
   );
 
+  const span = useVirtualRows(
+    body,
+    rows.map((row) => row.id),
+    windowed,
+    ESTIMATED_ROW[density],
+  );
+  const columnCount = columns.length;
+
   return (
     // Roadmap 10.1: the strips in the table hatch the days the poller missed.
     <CoverageProvider coverage={summary?.dailyCoverage}>
@@ -695,7 +801,13 @@ export function Providers() {
               ))}
             </TableHeader>
             <TableBody ref={body}>
-              {rows.map((row, index) => {
+              {span.before > 0 && (
+                <tr aria-hidden="true" data-spacer="before" style={{ height: span.before }}>
+                  <td colSpan={columnCount} className="p-0" />
+                </tr>
+              )}
+              {rows.slice(span.start, span.end).map((row, offset) => {
+                const index = span.start + offset;
                 const isLeaving = leaving.has(row.id);
                 return (
                   <Fragment key={row.id}>
@@ -704,9 +816,11 @@ export function Providers() {
                       // own bookkeeping and never reaches the DOM.
                       data-row-id={row.id}
                       className={cn(
-                        isLeaving
-                          ? "anim-sink"
-                          : "anim-rise anim-rise-table-row",
+                        // A row that scrolls into a window is not an arrival.
+                        !windowed &&
+                          (isLeaving
+                            ? "anim-sink"
+                            : "anim-rise anim-rise-table-row"),
                       )}
                       // A row on its way out goes at once; only arrivals stagger.
                       style={{
@@ -767,6 +881,11 @@ export function Providers() {
                   </Fragment>
                 );
               })}
+              {span.after > 0 && (
+                <tr aria-hidden="true" data-spacer="after" style={{ height: span.after }}>
+                  <td colSpan={columnCount} className="p-0" />
+                </tr>
+              )}
             </TableBody>
           </Table>
         )}

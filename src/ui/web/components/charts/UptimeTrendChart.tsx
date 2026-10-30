@@ -1,8 +1,9 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceArea,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -38,6 +39,7 @@ export function UptimeTrendChart({
   series,
   label,
   annotations = [],
+  onSelectRange,
 }: {
   series: DayUptime[];
   label: string;
@@ -48,9 +50,17 @@ export function UptimeTrendChart({
    * resolution this chart does not have.
    */
   annotations?: Annotation[];
+  /**
+   * Dragging across the chart asks for the days between the two ends — roadmap
+   * 4.11. Left out, the chart is read-only. The date inputs beside the range
+   * pills stay the keyboard's way to the same request.
+   */
+  onSelectRange?: (from: string, to: string) => void;
 }) {
   const { t, i18n } = useTranslation();
   const gradientId = useId();
+  // The two days a drag started and is now over; null while nothing is held.
+  const [drag, setDrag] = useState<{ from: string; to: string } | null>(null);
   const domain = uptimeDomain(series.map((entry) => entry.uptime));
   // Only the ones inside the window: a marker with no matching day would be
   // placed by Recharts at the chart's edge, where it would read as an event on
@@ -71,6 +81,26 @@ export function UptimeTrendChart({
       <AreaChart
         data={series}
         margin={{ top: 4, right: 8, bottom: 0, left: 0 }}
+        className={onSelectRange === undefined ? "" : "cursor-crosshair select-none"}
+        onMouseDown={(state) => {
+          if (onSelectRange === undefined || state.activeLabel === undefined) return;
+          const day = String(state.activeLabel);
+          setDrag({ from: day, to: day });
+        }}
+        onMouseMove={(state) => {
+          if (drag === null || state.activeLabel === undefined) return;
+          setDrag({ from: drag.from, to: String(state.activeLabel) });
+        }}
+        onMouseUp={() => {
+          if (drag === null) return;
+          setDrag(null);
+          // A click without a drag is not a range: one day is the 7d pill's
+          // smallest honest question, and a stray click should not reload.
+          if (drag.from === drag.to) return;
+          const [from, to] = [drag.from, drag.to].sort();
+          onSelectRange?.(from as string, to as string);
+        }}
+        onMouseLeave={() => setDrag(null)}
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -134,6 +164,16 @@ export function UptimeTrendChart({
             }}
           />
         ))}
+        {drag !== null && (
+          <ReferenceArea
+            x1={drag.from}
+            x2={drag.to}
+            fill={TREND_CHART.stroke}
+            fillOpacity={0.15}
+            stroke={TREND_CHART.stroke}
+            strokeOpacity={0.4}
+          />
+        )}
         <Area
           type="monotone"
           dataKey="uptime"
