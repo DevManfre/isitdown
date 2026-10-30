@@ -48,3 +48,15 @@ export function readDays(value: string | null): number | null {
   const days = Number(value);
   return Number.isInteger(days) && days > 0 ? days : null;
 }
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The two ends of a picked range from the query string — roadmap 4.11 — or null
+ * unless both are real days and in order. A half-typed address is not a range.
+ */
+export function readRange(from: string | null, to: string | null): { from: string; to: string } | null {
+  if (from === null || to === null || !DAY.test(from) || !DAY.test(to)) return null;
+  if (Number.isNaN(Date.parse(`${from}T00:00:00Z`)) || Number.isNaN(Date.parse(`${to}T00:00:00Z`))) return null;
+  return from <= to ? { from, to } : null;
+}
