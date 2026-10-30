@@ -251,6 +251,7 @@
   "history.delta": "{value} pp vs previous {days} days",
   "history.delta-short": "{value} pp",
   "history.range-custom": "Custom",
+  "history.brush-hint": "Drag across the trend chart to zoom into a range.",
   "history.range-custom-active": "{from} to {to}",
   "history.range-from": "From",
   "history.range-to": "To",
