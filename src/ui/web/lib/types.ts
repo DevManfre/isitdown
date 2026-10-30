@@ -327,6 +327,39 @@ export interface IncidentsResponse {
   counts: Record<IncidentState, number>;
 }
 
+/** An operator note a text search matched, with the incident it sits on (roadmap 4.15). */
+export interface IncidentNoteHit extends IncidentNote {
+  providerId: string;
+  incidentId: string;
+  incidentName: string | null;
+}
+
+/** `/search` — what matched, grouped by where it was written (roadmap 4.15). */
+export interface SearchResponse {
+  query: string;
+  incidents: IncidentRow[];
+  notes: IncidentNoteHit[];
+  annotations: Annotation[];
+}
+
+/** `/history/latency` — response-time percentiles for one provider (roadmap 4.14). */
+export type LatencyRange = "24h" | "7d" | "30d";
+
+export interface LatencyResponse {
+  provider: string;
+  range: LatencyRange;
+  /** The provider's own threshold; null when it declares none. */
+  slowMs: number | null;
+  summary: { p50: number; p95: number; samples: number; overSlow: number | null } | null;
+  points: { at: string; p50: number; p95: number; samples: number }[];
+}
+
+/** `/incidents/timeline` — every incident in a window, for the Gantt (roadmap 4.12). */
+export interface TimelineResponse {
+  days: number;
+  incidents: import("./incidentTimeline.ts").TimelineIncident[];
+}
+
 /** A declared maintenance window, plus which provider and when we first/last saw it. */
 export type MaintenanceRow = MaintenanceWindow & {
   providerId: string;

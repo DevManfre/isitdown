@@ -1,16 +1,16 @@
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { useTranslation } from "react-i18next";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart.tsx";
-import { COMPARE_CHART, uptimeDomain } from "@/lib/chartConfig.ts";
+import { compareColor, uptimeDomain } from "@/lib/chartConfig.ts";
 import { formatDay, formatPercent, formatPercentShort } from "@/lib/format.ts";
 import type { ComparedDay } from "@/lib/history.ts";
 
 /**
- * Two providers' daily uptime on one pair of axes — roadmap 5.7.
+ * Up to five providers' daily uptime on one pair of axes — roadmap 5.7 and 4.13.
  *
- * Lines rather than the header chart's filled area: two translucent fills over
- * each other produce a third colour that belongs to neither provider, and the
- * question here is which line is higher, not how much area is under it.
+ * Lines rather than the header chart's filled area: translucent fills over each
+ * other produce colours that belong to no provider, and the question here is
+ * which line is higher, not how much area is under it.
  *
  * `connectNulls` stays off for the same reason it is off on the trend chart —
  * an unmeasured day is a hole in the record, and a provider added last week has
@@ -18,24 +18,21 @@ import type { ComparedDay } from "@/lib/history.ts";
  */
 export function UptimeCompareChart({
   rows,
-  leftLabel,
-  rightLabel,
+  labels,
   label,
 }: {
   rows: ComparedDay[];
-  leftLabel: string;
-  rightLabel: string;
+  labels: string[];
   label: string;
 }) {
   const { t, i18n } = useTranslation();
-  const domain = uptimeDomain(rows.flatMap((row) => [row.left, row.right]));
+  const domain = uptimeDomain(rows.flatMap((row) => row.values));
 
   return (
     <ChartContainer
-      config={{
-        left: { label: leftLabel, color: COMPARE_CHART.left },
-        right: { label: rightLabel, color: COMPARE_CHART.right },
-      }}
+      config={Object.fromEntries(
+        labels.map((name, index) => [`s${index}`, { label: name, color: compareColor(index) }]),
+      )}
       className="anim-bar h-44 w-full"
       aria-label={label}
     >
@@ -68,26 +65,19 @@ export function UptimeCompareChart({
             />
           }
         />
-        <Line
-          type="monotone"
-          dataKey="left"
-          name={leftLabel}
-          stroke={COMPARE_CHART.left}
-          strokeWidth={2}
-          connectNulls={false}
-          isAnimationActive={false}
-          dot={false}
-        />
-        <Line
-          type="monotone"
-          dataKey="right"
-          name={rightLabel}
-          stroke={COMPARE_CHART.right}
-          strokeWidth={2}
-          connectNulls={false}
-          isAnimationActive={false}
-          dot={false}
-        />
+        {labels.map((name, index) => (
+          <Line
+            key={name}
+            type="monotone"
+            dataKey={(row: ComparedDay) => row.values[index]}
+            name={name}
+            stroke={compareColor(index)}
+            strokeWidth={2}
+            connectNulls={false}
+            isAnimationActive={false}
+            dot={false}
+          />
+        ))}
       </LineChart>
     </ChartContainer>
   );

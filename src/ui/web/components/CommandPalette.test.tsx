@@ -218,3 +218,97 @@ describe("CommandPalette", () => {
     });
   });
 });
+
+describe("text search — roadmap 4.15", () => {
+  const withComponents = {
+    ...status,
+    providers: [
+      {
+        id: "github",
+        name: "GitHub",
+        enabled: true,
+        overallStatus: "operational",
+        activeIncidents: [],
+        components: [
+          { id: "actions", name: "GitHub Actions runners", status: "operational" },
+          { id: "pages", name: "Pages", status: "operational" },
+        ],
+      },
+    ],
+  };
+  const search = {
+    query: "database",
+    incidents: [
+      {
+        providerId: "github",
+        incidentId: "inc-1",
+        name: "Database connections exhausted",
+        impact: "major",
+        status: "resolved",
+        startedAt: "2026-10-01T10:00:00.000Z",
+        updatedAt: "2026-10-01T11:00:00.000Z",
+        resolvedAt: "2026-10-01T11:00:00.000Z",
+      },
+    ],
+    notes: [
+      {
+        id: 1,
+        providerId: "github",
+        incidentId: "inc-1",
+        incidentName: "Database connections exhausted",
+        body: "Root cause was the database pool.",
+        createdAt: "2026-10-01T12:00:00.000Z",
+      },
+    ],
+    annotations: [
+      {
+        id: 3,
+        at: "2026-10-01T09:00:00.000Z",
+        label: "Database migration",
+        colour: "accent",
+        providerId: null,
+        createdAt: "2026-10-01T09:00:00.000Z",
+      },
+    ],
+  };
+  const heading = (key: string) => screen.queryByText(i18n.t(key), { selector: "[cmdk-group-heading]" });
+
+  it("groups what the server found by where it was written", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CommandPalette />, { status: withComponents, search });
+    await open(user);
+    await user.type(screen.getByPlaceholderText(i18n.t("palette.placeholder")), "database");
+
+    await waitFor(() => expect(heading("palette.incidents")).toBeInTheDocument());
+    expect(heading("palette.notes")).toBeInTheDocument();
+    expect(heading("palette.annotations")).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /Database connections exhausted/ })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /Root cause was the database pool/ })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /Database migration/ })).toBeInTheDocument();
+  });
+
+  it("matches component names from the status it already holds, without asking the server", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CommandPalette />, { status: withComponents });
+    await open(user);
+    await user.type(screen.getByPlaceholderText(i18n.t("palette.placeholder")), "runners");
+
+    await waitFor(() => expect(heading("palette.components")).toBeInTheDocument());
+    expect(await screen.findByRole("option", { name: /GitHub Actions runners/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /^Pages/ })).toBeNull();
+  });
+
+  it("does not ask the server about a single character", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CommandPalette />, { status: withComponents, search });
+    await open(user);
+    await user.type(screen.getByPlaceholderText(i18n.t("palette.placeholder")), "d");
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const asked = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.some((call) =>
+      String(call[0]).startsWith("/search"),
+    );
+    expect(asked).toBe(false);
+    expect(heading("palette.incidents")).toBeNull();
+  });
+});

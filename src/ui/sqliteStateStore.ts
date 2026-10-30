@@ -31,6 +31,7 @@ import type {
   IncidentCounts,
   IncidentFilter,
   IncidentNote,
+  IncidentNoteHit,
   IncidentRow,
   MaintenanceFilter,
   MaintenanceRow,
@@ -101,6 +102,14 @@ const incidentNoteRowSchema = z.object({
   body: z.string(),
   created_at: z.string(),
 });
+
+const incidentNoteHitRowSchema = incidentNoteRowSchema.extend({
+  provider_id: z.string(),
+  incident_id: z.string(),
+  incident_name: z.string().nullable(),
+});
+
+const latencyRowSchema = z.object({ observed_at: z.string(), latency_ms: z.number() });
 
 const maintenanceRowSchema = z.object({
   provider_id: z.string(),
@@ -839,6 +848,55 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         .map((row) => ({ id: row.id, body: row.body, createdAt: row.created_at }));
     },
 
+    async searchIncidentNotes(query: string, providerIds: string[], limit: number): Promise<IncidentNoteHit[]> {
+      const term = likeTerm(query);
+      if (term === undefined || providerIds.length === 0) return [];
+      return (
+        db
+          .prepare(
+            `SELECT n.id, n.body, n.created_at, n.provider_id, n.incident_id, i.name AS incident_name
+             FROM incident_notes n
+             LEFT JOIN incidents i ON i.provider_id = n.provider_id AND i.incident_id = n.incident_id
+             WHERE n.body LIKE ? ESCAPE '\\' AND n.provider_id IN (${providerIds.map(() => "?").join(", ")})
+             ORDER BY n.created_at DESC, n.id DESC
+             LIMIT ?`,
+          )
+          .all(term, ...providerIds, limit) as unknown[]
+      )
+        .map((row) => incidentNoteHitRowSchema.parse(row))
+        .map((row) => ({
+          id: row.id,
+          body: row.body,
+          createdAt: row.created_at,
+          providerId: row.provider_id,
+          incidentId: row.incident_id,
+          incidentName: row.incident_name,
+        }));
+    },
+
+    async searchAnnotations(query: string, providerIds: string[], limit: number): Promise<Annotation[]> {
+      const term = likeTerm(query);
+      if (term === undefined) return [];
+      return db
+        .prepare(
+          `SELECT id, at, label, colour, provider_id, created_at FROM annotations
+           WHERE label LIKE ? ESCAPE '\\'
+             AND (provider_id IS NULL OR provider_id IN (${providerIds.map(() => "?").join(", ")}))
+           ORDER BY at DESC, id DESC
+           LIMIT ?`,
+        )
+        .all(term, ...providerIds, limit)
+        .map((raw) => annotationRowSchema.parse(raw))
+        .map((row) => ({
+          id: row.id,
+          at: row.at,
+          label: row.label,
+          colour: row.colour,
+          providerId: row.provider_id,
+          createdAt: row.created_at,
+        }));
+    },
+
     async addIncidentNote(providerId: string, incidentId: string, body: string): Promise<IncidentNote> {
       const createdAt = now().toISOString();
       const { lastInsertRowid } = db
@@ -1029,6 +1087,18 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         overallStatus: row.overall_status,
         ok: row.ok === 1,
       }));
+    },
+
+    async getLatencySamples(providerId: string, sinceIso: string): Promise<{ observedAt: string; latencyMs: number }[]> {
+      return db
+        .prepare(
+          `SELECT observed_at, latency_ms FROM status_samples
+           WHERE provider_id = ? AND observed_at >= ? AND latency_ms IS NOT NULL
+           ORDER BY observed_at`,
+        )
+        .all(providerId, sinceIso)
+        .map((raw) => latencyRowSchema.parse(raw))
+        .map((row) => ({ observedAt: row.observed_at, latencyMs: row.latency_ms }));
     },
 
     async pruneOlderThan(days: number): Promise<void> {
