@@ -400,15 +400,51 @@ describe("a provider's component breakdown (ComponentRows)", () => {
   });
 });
 
+/** A third and a fourth, between the other two, so the widened comparison has something to add. */
+const fourProviders = {
+  ...twoProviders,
+  history: {
+    ...twoProviders.history,
+    providers: [
+      ...twoProviders.history.providers,
+      { ...cloudflare, providerId: "vercel", uptime7: 90, uptime30: 90, uptime90: 90 },
+      { ...cloudflare, providerId: "npm", uptime7: 95, uptime30: 95, uptime90: 95 },
+    ],
+  },
+};
+
 describe("comparing two providers", () => {
+  it("adds a third provider, offering the worst one not yet drawn, and removes it again", async () => {
+    renderWithProviders(<History />, fourProviders);
+    const compare = within(await screen.findByRole("region", { name: i18n.t("history.compare.title") }));
+    // Only the first two slots are fixed: the extras can be taken out.
+    expect(compare.queryByRole("button", { name: /Remove/ })).toBeNull();
+
+    await userEvent.click(compare.getByRole("button", { name: i18n.t("history.compare.add") }));
+    expect(compare.getByRole("combobox", { name: i18n.t("history.compare.slot", { n: 3 }) })).toBeInTheDocument();
+
+    await userEvent.click(compare.getByRole("button", { name: /Remove/ }));
+    expect(compare.queryByRole("combobox", { name: i18n.t("history.compare.slot", { n: 3 }) })).toBeNull();
+  });
+
+  it("stops offering to add once there is no provider left to add", async () => {
+    renderWithProviders(<History />, fourProviders);
+    const compare = within(await screen.findByRole("region", { name: i18n.t("history.compare.title") }));
+    await userEvent.click(compare.getByRole("button", { name: i18n.t("history.compare.add") }));
+    await userEvent.click(compare.getByRole("button", { name: i18n.t("history.compare.add") }));
+
+    // Four providers, all four drawn: nothing left to add.
+    expect(compare.queryByRole("button", { name: i18n.t("history.compare.add") })).toBeNull();
+  });
+
   it("starts on the two worst providers, which is the comparison worth making", async () => {
     renderWithProviders(<History />, twoProviders);
 
     const compare = within(await screen.findByRole("region", { name: i18n.t("history.compare.title") }));
-    expect(compare.getByRole("combobox", { name: i18n.t("history.compare.left") })).toHaveTextContent(
+    expect(compare.getByRole("combobox", { name: i18n.t("history.compare.slot", { n: 1 }) })).toHaveTextContent(
       "Cloudflare",
     );
-    expect(compare.getByRole("combobox", { name: i18n.t("history.compare.right") })).toHaveTextContent(
+    expect(compare.getByRole("combobox", { name: i18n.t("history.compare.slot", { n: 2 }) })).toHaveTextContent(
       "GitHub",
     );
   });
@@ -419,7 +455,7 @@ describe("comparing two providers", () => {
     const compare = within(await screen.findByRole("region", { name: i18n.t("history.compare.title") }));
     // The chart names both providers rather than a legend of "series 1/2":
     // the question this answers is which of these two to buy.
-    expect(compare.getByLabelText(i18n.t("history.compare.chart", { left: "Cloudflare", right: "GitHub" })))
+    expect(compare.getByLabelText(i18n.t("history.compare.chart", { providers: "Cloudflare and GitHub" })))
       .toBeInTheDocument();
   });
 
@@ -427,14 +463,14 @@ describe("comparing two providers", () => {
     renderWithProviders(<History />, twoProviders);
 
     const compare = within(await screen.findByRole("region", { name: i18n.t("history.compare.title") }));
-    await userEvent.click(compare.getByRole("combobox", { name: i18n.t("history.compare.left") }));
+    await userEvent.click(compare.getByRole("combobox", { name: i18n.t("history.compare.slot", { n: 1 }) }));
     // GitHub is already on the right, so picking it on the left has to mean
     // "put these two the other way round" — a chart of one provider against
     // itself is the one comparison with nothing to say.
     await userEvent.click(await screen.findByRole("option", { name: "GitHub" }));
 
     expect(
-      compare.getByLabelText(i18n.t("history.compare.chart", { left: "GitHub", right: "Cloudflare" })),
+      compare.getByLabelText(i18n.t("history.compare.chart", { providers: "GitHub and Cloudflare" })),
     ).toBeInTheDocument();
   });
 
@@ -558,11 +594,14 @@ describe("a provider's detail drawer", () => {
     await screen.findAllByRole("button", { name: /Cloudflare/ });
 
     const urls = () => (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
-    expect(urls().some((url) => url.includes("provider=cloudflare"))).toBe(false);
+    // The latency card (roadmap 4.14) asks `/history/latency` for its own
+    // provider at once; what must stay lazy is the drawer's `/history` request.
+    const drawerRequest = (url: string) => url.includes("provider=cloudflare") && !url.startsWith("/history/latency");
+    expect(urls().some(drawerRequest)).toBe(false);
 
     await openCloudflare();
 
-    expect(urls().some((url) => url.includes("provider=cloudflare"))).toBe(true);
+    expect(urls().some(drawerRequest)).toBe(true);
   });
 
   it("keeps the view standing when a provider's own history fails", async () => {
