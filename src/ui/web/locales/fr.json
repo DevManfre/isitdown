@@ -251,6 +251,7 @@
   "history.delta": "{value} pp par rapport aux {days} jours précédents",
   "history.delta-short": "{value} pp",
   "history.range-custom": "Personnalisé",
+  "history.brush-hint": "Faites glisser sur le graphique de tendance pour zoomer sur une période.",
   "history.range-custom-active": "Du {from} au {to}",
   "history.range-from": "Du",
   "history.range-to": "Au",
