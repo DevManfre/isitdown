@@ -5,7 +5,9 @@ import {
   Activity,
   BellOff,
   BellRing,
+  Blocks,
   FileText,
+  Flag,
   LayoutGrid,
   MessageSquarePlus,
   MonitorCog,
@@ -14,6 +16,8 @@ import {
   Send,
   Server,
   Stethoscope,
+  StickyNote,
+  TriangleAlert,
   Tv,
   Upload,
   History,
@@ -38,6 +42,7 @@ import {
 } from "@/hooks/queries.ts";
 import { AdapterDebugDialog } from "@/components/settings/AdapterDebugDialog.tsx";
 import * as api from "@/lib/api.ts";
+import { useSearch } from "@/hooks/queries.ts";
 import { isMuted } from "@/lib/mute.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
 import { dashboardCommand, dashboardPath, MAX_DASHBOARDS } from "@/components/dashboards/DashboardActions.tsx";
@@ -90,6 +95,11 @@ type Page =
 
 const ROOT: Page = { kind: "root" };
 
+/** How long typing pauses before the text search asks the server. */
+const SEARCH_DEBOUNCE_MS = 200;
+/** Component names are matched here, so they are capped here: one provider can carry hundreds. */
+const COMPONENT_HITS = 8;
+
 interface Notice {
   text: string;
   tone: "ok" | "error";
@@ -116,6 +126,16 @@ export function CommandPalette() {
   // is no toast stack to land in, and a closed palette would swallow it.
   const [notice, setNotice] = useState<Notice | null>(null);
   const [diagnosing, setDiagnosing] = useState<ServiceDefinition | null>(null);
+
+  // Roadmap 4.15. Only the top page searches text: the others are pickers for a
+  // target, where what is typed narrows a list rather than asking a question.
+  const [asked, setAsked] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setAsked(search.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [search]);
+  const term = page.kind === "root" ? asked : "";
+  const { data: found } = useSearch(term);
 
   const goTo = (next: Page): void => {
     setPage(next);
@@ -158,6 +178,16 @@ export function CommandPalette() {
   };
 
   const providers = (status?.providers ?? []).filter((provider) => provider.enabled);
+  const componentHits =
+    term.length < 2
+      ? []
+      : providers
+          .flatMap((provider) =>
+            (provider.components ?? [])
+              .filter((component) => component.name.toLowerCase().includes(term.toLowerCase()))
+              .map((component) => ({ provider, component })),
+          )
+          .slice(0, COMPONENT_HITS);
   const { data: dashboards = [] } = useDashboards();
   const channels = (config?.channels ?? []).filter((channel) => channel.enabled);
   const channelName = (id: string): string => t(`channel.name.${id}`, { defaultValue: id });
@@ -321,6 +351,89 @@ export function CommandPalette() {
         )}
 
         {page.kind === "root" && (<>
+        {/* Roadmap 4.15. `forceMount` on the items and on their groups: cmdk would
+            otherwise filter these by its own fuzzy score over the label, and
+            hide a group none of whose items pass — but they already matched on
+            the server, or for components above, by what the operator typed. A
+            group is only here once it has something, so a bare heading never
+            shows. */}
+        {term.length >= 2 && (found?.incidents.length ?? 0) > 0 && (
+          <CommandGroup forceMount heading={t("palette.incidents")}>
+            {found?.incidents.map((incident) => (
+              <CommandItem
+                key={`${incident.providerId}/${incident.incidentId}`}
+                forceMount
+                value={`incident ${incident.providerId} ${incident.incidentId} ${incident.name}`}
+                onSelect={run(() =>
+                  void navigate(generatePath(ROUTE_PATHS.incidentDetail, {
+                    providerId: incident.providerId,
+                    incidentId: incident.incidentId,
+                  })),
+                )}
+              >
+                <TriangleAlert aria-hidden="true" />
+                {incident.name}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {term.length >= 2 && (found?.notes.length ?? 0) > 0 && (
+          <CommandGroup forceMount heading={t("palette.notes")}>
+            {found?.notes.map((note) => (
+              <CommandItem
+                key={note.id}
+                forceMount
+                value={`note ${note.id} ${note.body}`}
+                onSelect={run(() =>
+                  void navigate(generatePath(ROUTE_PATHS.incidentDetail, {
+                    providerId: note.providerId,
+                    incidentId: note.incidentId,
+                  })),
+                )}
+              >
+                <StickyNote aria-hidden="true" />
+                <span className="truncate">{note.body}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {term.length >= 2 && (found?.annotations.length ?? 0) > 0 && (
+          <CommandGroup forceMount heading={t("palette.annotations")}>
+            {found?.annotations.map((annotation) => (
+              <CommandItem
+                key={annotation.id}
+                forceMount
+                value={`annotation ${annotation.id} ${annotation.label}`}
+                onSelect={run(() => void navigate(ROUTE_PATHS.history))}
+              >
+                <Flag aria-hidden="true" />
+                {annotation.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {componentHits.length > 0 && (
+          <CommandGroup forceMount heading={t("palette.components")}>
+            {componentHits.map(({ provider, component }) => (
+              <CommandItem
+                key={`${provider.id}/${component.id}`}
+                forceMount
+                value={`component ${provider.id} ${component.id} ${component.name}`}
+                onSelect={run(() =>
+                  void navigate(ROUTE_PATHS.history, { state: { openProvider: provider.id } }),
+                )}
+              >
+                <Blocks aria-hidden="true" />
+                {component.name}
+                <span className="ml-auto text-xs text-muted-foreground">{provider.name}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
         <CommandGroup heading={t("palette.views")}>
           {NAV_ROUTES.map((route) => (
             <CommandItem

@@ -37,6 +37,9 @@ type FixtureKey =
   | "dashboard"
   | "dashboards"
   | "sla"
+  | "search"
+  | "latency"
+  | "timeline"
   | "heartbeats"
   | "trust";
 
@@ -79,6 +82,12 @@ export interface Fixtures {
   dashboards?: unknown;
   /** `/sla` — this month's error budgets. */
   sla?: unknown;
+  /** `/search` — the palette's text search (roadmap 4.15). */
+  search?: unknown;
+  /** `/history/latency` — one provider's percentiles (roadmap 4.14). */
+  latency?: unknown;
+  /** `/incidents/timeline`, matched before `/incidents/` — the Gantt's rows (roadmap 4.12). */
+  timeline?: unknown;
   /** `/config/heartbeats`, matched before `/config` — when each job last pinged. */
   heartbeats?: unknown;
   /** `/trust` — how each status page tracked its probe (roadmap 8.1). */
@@ -116,11 +125,15 @@ export function stubApi(fixtures: Fixtures): void {
           ? "annotations"
           : path.startsWith("/history/calendar")
             ? "providerCalendar"
-            : path.startsWith("/history/components")
+            : path.startsWith("/history/latency")
+          ? "latency"
+          : path.startsWith("/history/components")
               ? "componentHistory"
               : path.startsWith("/history")
                 ? "history"
-                : path.startsWith("/incidents/")
+                : path.startsWith("/incidents/timeline")
+            ? "timeline"
+            : path.startsWith("/incidents/")
                   ? "incident"
                   : path.startsWith("/incidents")
                     ? "incidents"
@@ -140,6 +153,8 @@ export function stubApi(fixtures: Fixtures): void {
                                   ? "providerPush"
                                 : path.startsWith("/config/heartbeats")
                                   ? "heartbeats"
+                                : path.startsWith("/search")
+                                  ? "search"
                                 : path.startsWith("/sla")
                                   ? "sla"
                                 : path.startsWith("/trust")
@@ -192,6 +207,9 @@ export function stubApi(fixtures: Fixtures): void {
         providerPush: { enabled: false, tokenRevealed: false, providers: [] },
         messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },
         sla: { month: "2026-10", providers: [] },
+        search: { query: "", incidents: [], notes: [], annotations: [] },
+        latency: { provider: "", range: "7d", slowMs: null, summary: null, points: [] },
+        timeline: { days: 30, incidents: [] },
         heartbeats: { enabled: false, tokenRevealed: false, heartbeats: [] },
         dashboards: [
           { id: "default", name: "Overview", home: true, isDefault: true, updatedAt: "2026-08-21T10:00:00.000Z" },

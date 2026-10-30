@@ -16,6 +16,10 @@ import type {
   DescribedChannel,
   IncidentDetail,
   IncidentsResponse,
+  SearchResponse,
+  LatencyRange,
+  TimelineResponse,
+  LatencyResponse,
   IncidentState,
   MaintenancesResponse,
   MapResponse,
@@ -213,6 +217,12 @@ export const getProviderPush = () => request<ProviderPushConfig>("GET", "/config
 export const getTrust = (days: number) =>
   request<TrustResponse>("GET", `/trust?days=${days}`);
 
+export const getLatency = (provider: string, range: LatencyRange) =>
+  request<LatencyResponse>(
+    "GET",
+    `/history/latency?provider=${encodeURIComponent(provider)}&range=${range}`,
+  );
+
 export const getComponentHistory = (provider: string, days: number) =>
   request<ComponentHistoryResponse>(
     "GET",
@@ -246,6 +256,13 @@ export const getIncidents = (query: IncidentListQuery = {}) => {
     `/incidents${search === "" ? "" : `?${search}`}`,
   );
 };
+
+/** The palette's text search (roadmap 4.15): the server matches, not the browser. */
+export const search = (q: string) =>
+  request<SearchResponse>("GET", `/search?q=${encodeURIComponent(q)}`);
+
+export const getIncidentTimeline = (days: number) =>
+  request<TimelineResponse>("GET", `/incidents/timeline?days=${days}`);
 
 export const getIncident = (providerId: string, incidentId: string) =>
   request<IncidentDetail>(

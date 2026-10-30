@@ -24,6 +24,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { ProviderIcon } from "@/components/ProviderIcon.tsx";
+import { IncidentTimelineCard } from "@/components/IncidentTimelineCard.tsx";
 import { useIncidents, useMaintenances, useNotifications, useStatus } from "@/hooks/queries.ts";
 import { formatDateTime, formatRelative, notificationHeadline } from "@/lib/format.ts";
 import { impactKey, impactStatus, incidentStatusKey, pageWindow } from "@/lib/incidents.ts";
@@ -480,6 +481,14 @@ export function Incidents() {
           )}
         </Card>
       </div>
+
+      {/* Roadmap 4.12. Between the hero and the list: the hero is "now", the
+          list is "one at a time", and this is "all of them together". */}
+      <IncidentTimelineCard
+        providers={(status?.providers ?? [])
+          .filter((provider) => provider.enabled)
+          .map((provider) => ({ id: provider.id, name: provider.name }))}
+      />
 
       {/* A named region, so a row query can be scoped to the list: the open
           incident is deliberately in two places at once — the hero card above

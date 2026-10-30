@@ -159,6 +159,16 @@ const paths: Json = {
       },
     },
   },
+  "/search": {
+    get: {
+      tags: ["History"],
+      summary: "One text search over incident titles, operator notes and annotations.",
+      description:
+        "Roadmap 4.15. Case-insensitive, at most eight of each, newest first, scoped to the enabled providers. A query shorter than two characters answers three empty lists rather than every row.",
+      parameters: [query("q", "The text to look for. Required.")],
+      responses: { "200": ok({ type: "object" }) },
+    },
+  },
   "/sla": {
     get: {
       tags: ["History"],
@@ -174,6 +184,19 @@ const paths: Json = {
       summary: "A year of day cells for one provider.",
       parameters: [query("provider", "Provider id. Required.")],
       responses: { "200": ok({ type: "object" }), "404": notFound },
+    },
+  },
+  "/history/latency": {
+    get: {
+      tags: ["History"],
+      summary: "Response-time percentiles for one provider.",
+      description:
+        "Roadmap 4.14. p50 and p95 per bucket over 24h, 7d or 30d, the provider's declared slowMs (null when it has none) and a summary with the count of readings at or over it. Buckets nothing was read in are absent, not zero.",
+      parameters: [
+        query("provider", "Provider id. Required."),
+        query("range", "24h, 7d (default) or 30d.", { type: "string", enum: ["24h", "7d", "30d"] }),
+      ],
+      responses: { "200": ok({ type: "object" }), "400": badRequest, "404": notFound },
     },
   },
   "/history/components": {
@@ -286,6 +309,16 @@ const paths: Json = {
       summary: "One page of the incident list, with the open ones beside it.",
       parameters: [...incidentFilters, ...paging],
       responses: { "200": ok({ type: "object" }) },
+    },
+  },
+  "/incidents/timeline": {
+    get: {
+      tags: ["Incidents"],
+      summary: "Every incident running at any point of a window, for the Gantt.",
+      description:
+        "Roadmap 4.12. Not paged: one row per incident with just what a bar needs, for the enabled providers, capped at 5000. An incident that began before the window and was still open in it is included.",
+      parameters: [query("days", "7, 30 (default) or 90.", { type: "integer", enum: [7, 30, 90] })],
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
   "/incidents/{providerId}/{incidentId}": {
