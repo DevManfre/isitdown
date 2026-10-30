@@ -159,6 +159,14 @@ export interface IncidentNote {
   createdAt: string;
 }
 
+/** An operator note a text search matched, with the incident it sits on (roadmap 4.15). */
+export interface IncidentNoteHit extends IncidentNote {
+  providerId: string;
+  incidentId: string;
+  /** Null when the incident row is gone: the note outlives it, by design. */
+  incidentName: string | null;
+}
+
 export interface HistoryStore extends StateStore, MessageRefStore, AckStore {
   /**
    * One row per day that has samples, oldest first. Days with none are absent.
@@ -241,6 +249,19 @@ export interface HistoryStore extends StateStore, MessageRefStore, AckStore {
    * beside them does.
    */
   listIncidentNotes(providerId: string, incidentId: string): Promise<IncidentNote[]>;
+  /**
+   * Notes whose body contains `query`, case-insensitively, newest first —
+   * roadmap 4.15. Scoped to `providerIds` like the incident list, so a
+   * disabled provider's notes are not news either. `query` is plain text, not a
+   * pattern.
+   */
+  searchIncidentNotes(query: string, providerIds: string[], limit: number): Promise<IncidentNoteHit[]>;
+  /**
+   * Annotations whose label contains `query`, newest first — roadmap 4.15.
+   * Fleet-wide markers match whatever `providerIds` says, as they do on every
+   * chart.
+   */
+  searchAnnotations(query: string, providerIds: string[], limit: number): Promise<Annotation[]>;
   /** Returns the stored note, so the caller never has to re-read to render it. */
   addIncidentNote(providerId: string, incidentId: string, body: string): Promise<IncidentNote>;
   /** False when the note is not this incident's, or is already gone. */
@@ -257,6 +278,12 @@ export interface HistoryStore extends StateStore, MessageRefStore, AckStore {
   listMaintenances(filter: MaintenanceFilter): Promise<MaintenanceRow[]>;
   /** Newest first, for the incident view's poll strip. */
   getRecentSamples(providerId: string, limit: number): Promise<SampleRow[]>;
+  /**
+   * Every response time recorded for the provider since `sinceIso`, oldest
+   * first — roadmap 4.14. Samples with no reading (a failed poll, a row from
+   * before the column existed) are left out: an absent latency is not 0 ms.
+   */
+  getLatencySamples(providerId: string, sinceIso: string): Promise<{ observedAt: string; latencyMs: number }[]>;
   pruneOlderThan(days: number): Promise<void>;
   /** MIN(observed_at) for the provider, or null when it has no samples yet. */
   getEarliestSampleTime(providerId: string): Promise<string | null>;
