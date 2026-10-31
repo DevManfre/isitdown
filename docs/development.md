@@ -246,7 +246,7 @@ npm test                 # node:test suites + vitest run
 npm run coverage         # the same two suites under a coverage floor
                          # (coverage:server and coverage:web run one each, as CI does)
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
-npm run test:visual      # visual baselines: every view, both themes, both locales
+npm run test:visual      # visual baselines + an axe-core pass: every view, both themes, both locales
 npm run test:mutation    # mutation testing on the diff engine
 npm run test:load        # 200 synthetic providers, a week of history, every read timed
 npm run canary           # every catalog page, live, against its adapter's fixtures (1.9)
@@ -271,6 +271,17 @@ stay at 95% of lines, 88% of branches and 93% of functions, and the dashboard at
 passes and a new subsystem landing with no test of its own drags the total under
 and fails CI. Raise a floor when the suite has genuinely climbed; never lower one
 to make a red run green.
+
+The **accessibility pass** (roadmap 4.20) rides the visual harness: after each view
+settles, `tools/visual-regression.mjs` injects axe-core and checks WCAG 2.0 and
+2.1 A and AA plus 2.2 AA (best-practice rules are left out on purpose). Unlike a
+screenshot, a violation is never baselined — the run fails and prints the rule,
+the frames it was found on and one selector each (`--verbose` adds what axe
+measured and the node's markup), also under `--update`, so agreeing to a picture
+cannot be mistaken for agreeing to a barrier. The three theme variants are
+audited too, without baselines. A rule that has to be waived goes in `ACCEPTED`
+in the harness with its reason beside it. axe-core is a dev dependency, injected
+into the page rather than shipped with it.
 
 The **load test** (roadmap 7.4) answers a question the other suites do not ask:
 not "is this fast" but "where does it stop being fast". `tools/loadtest.mjs`

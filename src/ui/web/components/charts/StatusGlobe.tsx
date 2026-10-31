@@ -90,7 +90,7 @@ export function StatusGlobe({
   useEffect(() => {
     const root = document.documentElement;
     const observer = new MutationObserver(() => setThemeEpoch((epoch) => epoch + 1));
-    observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    observer.observe(root, { attributes: true, attributeFilter: ["data-theme", "data-variant"] });
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const onScheme = () => setThemeEpoch((epoch) => epoch + 1);
     media.addEventListener("change", onScheme);
@@ -190,7 +190,8 @@ export function StatusGlobe({
       <svg
         viewBox={`${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}`}
         className="absolute inset-0 h-full w-full"
-        role="img"
+        // A group for the reason DottedWorld's is: the markers are focusable.
+        role="group"
         aria-label={t("map.aria.globe")}
       >
         {markers.map(({ cell, projected }) => {

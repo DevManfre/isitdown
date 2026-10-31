@@ -43,6 +43,18 @@ describe("IncidentTimelineCard — roadmap 4.12", () => {
     expect(bar).toHaveAttribute("href", "#/incidents/github/a");
   });
 
+  // WCAG 2.2 target size: a minute-long incident is a sliver of a 30-day axis,
+  // and the link around it must still be at least 24px wide.
+  it("never makes a bar's link narrower than 24px, however short the incident", async () => {
+    renderWithProviders(<IncidentTimelineCard providers={providers} />, {
+      timeline: { days: 30, incidents: [row("github", "a", 30, 20)] },
+    });
+
+    const bar = await screen.findByRole("link", { name: /github outage — .*Major/i });
+    // `min-w-6` is 1.5rem: 24px at the default size.
+    expect(bar).toHaveClass("min-w-6", "h-7");
+  });
+
   it("says in words when two providers were down at once", async () => {
     renderWithProviders(<IncidentTimelineCard providers={providers} />, {
       timeline: { days: 30, incidents: [row("github", "a", 30, 20), row("cloudflare", "b", 25, 15)] },

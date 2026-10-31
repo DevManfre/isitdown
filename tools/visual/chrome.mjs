@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -21,6 +22,21 @@ import { join } from "node:path";
  */
 
 const CACHE = join(homedir(), ".cache", "ms-playwright");
+
+/**
+ * axe-core's browser build, read once. Injected into the page after it has
+ * settled rather than loaded by it: the dashboard ships no test code, and the
+ * audit has to see the page exactly as an operator's browser built it.
+ */
+const AXE_PATH = createRequire(import.meta.url).resolve("axe-core/axe.min.js");
+
+/**
+ * The rule sets an audit runs: WCAG 2.0 and 2.1 at A and AA, and 2.2's AA
+ * additions. Best-practice rules are left out on purpose — they flag things like
+ * "page has no landmark" that are opinions, where these are the success
+ * criteria the dashboard's own skill (`dashboard-a11y`) already holds it to.
+ */
+const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 /** The cached Chromium binaries, newest revision first. */
 function findChromium() {
@@ -153,6 +169,7 @@ export async function withBrowser(options, body) {
   });
 
   const browser = await connect(endpoint);
+  const axeSource = await readFile(AXE_PATH, "utf8");
 
   /**
    * Waits for the page to stop changing, rather than for a fixed number of
@@ -203,7 +220,33 @@ export async function withBrowser(options, body) {
     console.warn(`page never went quiet within ${timeoutMs}ms: ${url}`);
   }
 
-  async function shot({ url, colorScheme, storage, width, height }) {
+  /**
+   * Runs axe over the settled page and returns what it found, trimmed to what a
+   * reviewer needs: the rule, how bad, and one selector per offending node. The
+   * raw result carries the whole DOM of every node, which is megabytes.
+   */
+  async function audit(send, axeSource) {
+    await send("Runtime.evaluate", { expression: axeSource });
+    const { result, exceptionDetails } = await send("Runtime.evaluate", {
+      expression: `axe.run(document, {
+        runOnly: { type: "tag", values: ${JSON.stringify(AXE_TAGS)} },
+        resultTypes: ["violations"],
+      }).then((report) => report.violations.map((violation) => ({
+        id: violation.id,
+        impact: violation.impact,
+        help: violation.help,
+        nodes: violation.nodes.map((node) => ({ target: node.target.join(" "), summary: node.failureSummary, html: node.html.slice(0, 240) })),
+      })))`,
+      awaitPromise: true,
+      returnByValue: true,
+    });
+    if (exceptionDetails !== undefined) {
+      throw new Error(`axe failed: ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
+    }
+    return result.value ?? [];
+  }
+
+  async function shot({ url, colorScheme, storage, width, height, audit: wantAudit = false }) {
     const { targetId } = await browser.send("Target.createTarget", { url: "about:blank" });
     const { sessionId } = await browser.send("Target.attachToTarget", { targetId, flatten: true });
     const send = (method, params) => browser.send(method, params, sessionId);
@@ -262,8 +305,11 @@ export async function withBrowser(options, body) {
       // event fires before the dashboard's own queries land.
       await waitForQuiet(send, url);
 
+      // Before the capture, on the same settled page: nothing the audit does
+      // (it injects a script and reads the DOM) changes a pixel.
+      const violations = wantAudit ? await audit(send, axeSource) : [];
       const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
-      return Buffer.from(data, "base64");
+      return { png: Buffer.from(data, "base64"), violations };
     } finally {
       await browser.send("Target.closeTarget", { targetId });
     }

@@ -72,7 +72,7 @@ describe("useDocumentStatus", () => {
     ]);
 
     await waitFor(() =>
-      expect(document.title).toBe(i18n.t("document.title.affected", { count: 2 })),
+      expect(document.title).toBe(i18n.t("document.title.affected", { count: 2, name: "IsItDown" })),
     );
     // The worst of the two decides the colour: a major outage beside a
     // degradation is not a degradation.
@@ -128,5 +128,29 @@ describe("useDocumentStatus", () => {
     mount([provider("github", "major_outage", false), provider("cloudflare", "operational")]);
 
     await waitFor(() => expect(document.title).toBe(ORIGINAL_TITLE));
+  });
+
+  // Roadmap 4.19: the tab names the instance, calm or not.
+  describe("with an instance name", () => {
+    const preferences = { theme: "system", uiLocale: "en", notificationLocale: "en", mapView: "off", density: "comfortable", instanceName: "Office wallboard" };
+
+    it("titles a calm tab with it", async () => {
+      withIconLink();
+      document.title = ORIGINAL_TITLE;
+      renderWithProviders(<Probe />, {
+        status: { providers: [provider("github", "operational")], pollIntervalMinutes: 3, lastPollAt: null, nextPollAt: null },
+        preferences,
+      });
+      await waitFor(() => expect(document.title).toBe("Office wallboard"));
+    });
+
+    it("ends the count in trouble with it instead of the product's name", async () => {
+      withIconLink();
+      renderWithProviders(<Probe />, {
+        status: { providers: [provider("github", "major_outage")], pollIntervalMinutes: 3, lastPollAt: null, nextPollAt: null },
+        preferences,
+      });
+      await waitFor(() => expect(document.title).toBe("1 provider in trouble \u00b7 Office wallboard"));
+    });
   });
 });

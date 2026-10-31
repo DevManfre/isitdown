@@ -10,6 +10,7 @@ import {
   Flag,
   LayoutGrid,
   MessageSquarePlus,
+  Keyboard,
   MonitorCog,
   Plus,
   RefreshCw,
@@ -47,6 +48,7 @@ import { isMuted } from "@/lib/mute.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
 import { dashboardCommand, dashboardPath, MAX_DASHBOARDS } from "@/components/dashboards/DashboardActions.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
+import { openShortcuts } from "@/components/ShortcutsDialog.tsx";
 
 /**
  * The command palette — roadmap 5.4. ⌘K, or Ctrl+K.
@@ -521,6 +523,12 @@ export function CommandPalette() {
           >
             <Upload aria-hidden="true" />
             {t("palette.import-dashboard")}
+          </CommandItem>
+          {/* Roadmap 4.17: the way to the map of keys for someone who has not
+              yet been told `?` exists. */}
+          <CommandItem value={t("palette.shortcuts")} onSelect={run(openShortcuts)}>
+            <Keyboard aria-hidden="true" />
+            {t("palette.shortcuts")}
           </CommandItem>
           <CommandItem value={t("palette.cycle-theme")} onSelect={run(() => cycle())}>
             <MonitorCog aria-hidden="true" />

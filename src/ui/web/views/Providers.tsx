@@ -21,7 +21,8 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import type { SortDirection } from "@tanstack/react-table";
+import type { SortDirection, SortingState, Updater } from "@tanstack/react-table";
+import { useViewParam } from "@/hooks/useViewParam.ts";
 import { ArrowDown, ArrowUp, ChevronRight, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -102,6 +103,34 @@ const EXIT_MS = 220;
 const FOLD_MS = 220;
 
 type Filter = "all" | "issues";
+
+/**
+ * The column sort as the one word the address and the memory carry
+ * (roadmap 4.16): `uptime.desc`. "No sort" — the problems-first order the
+ * view promises — is the empty word, which is also the default, so it never
+ * appears in a link.
+ */
+const NO_SORT = "";
+const SORT_COLUMNS = ["name", "adapter", "severity", "uptime", "incidents"] as const;
+
+const parseSort = (raw: string): string | null => {
+  const [column, direction, ...rest] = raw.split(".");
+  return rest.length === 0 &&
+    (SORT_COLUMNS as readonly string[]).includes(column ?? "") &&
+    (direction === "asc" || direction === "desc")
+    ? raw
+    : null;
+};
+
+const sortingOf = (word: string): SortingState => {
+  const [id, direction] = word.split(".");
+  return id === undefined || id === "" ? [] : [{ id, desc: direction === "desc" }];
+};
+
+const wordOf = (sorting: SortingState): string => {
+  const [first] = sorting;
+  return first === undefined ? NO_SORT : `${first.id}.${first.desc ? "desc" : "asc"}`;
+};
 
 /** No provider yet: a fresh fallback array each render would invalidate the row model. */
 const NO_PROVIDERS: ProviderStatus[] = [];
@@ -443,7 +472,16 @@ export function Providers() {
   const { t, i18n } = useTranslation();
   const { data: status } = useStatus();
   const { data: summary } = useHistory({ days: WINDOW_DAYS });
-  const [filter, setFilter] = useState<Filter>("all");
+  // Roadmap 4.16. The toggle and the column sort ride the address and are
+  // remembered, so a link shares the same page and the rail's "Providers" lands
+  // where the operator left it. The sort is one `column.direction` word.
+  const [filter, setFilter] = useViewParam<Filter>("providers", "show", "all", (raw) =>
+    raw === "all" || raw === "issues" ? raw : null,
+  );
+  const [sortWord, setSortWord] = useViewParam<string>("providers", "sort", NO_SORT, parseSort);
+  // Memoised on the word: a fresh array each render is a changed table state
+  // each render, which the table answers with another render.
+  const sorting = useMemo(() => sortingOf(sortWord), [sortWord]);
   // Roadmap 13.1. A stored preference, so it follows the instance rather than
   // the browser: the fleet size it is a reaction to is the same on every device.
   const { data: preferences } = usePreferences();
@@ -679,6 +717,10 @@ export function Providers() {
     features,
     columns,
     data,
+    // Controlled, so the sort can live in the address (roadmap 4.16).
+    state: { sorting },
+    onSortingChange: (updater: Updater<SortingState>) =>
+      setSortWord(wordOf(typeof updater === "function" ? updater(sorting) : updater)),
     // Provider ids are what the exit animation and the FLIP measure rows by.
     getRowId: (row) => row.id,
     // A third click on a header drops the sort instead of cycling back to

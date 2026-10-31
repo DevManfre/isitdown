@@ -209,8 +209,15 @@ export function SettingsToasts({ toasts, onDismiss }: { toasts: SettingsToast[];
   return (
     <div
       data-slot="settings-toasts"
+      // A role, because a name on a bare <div> is ignored (axe:
+      // aria-prohibited-attr) — the region is what the label is for. Polite and
+      // additions-only, and not atomic: a new card is read on its own, rather
+      // than the whole stack again each time one arrives.
+      role="region"
       aria-label={t("settings.toasts.aria")}
       aria-live="polite"
+      aria-atomic="false"
+      aria-relevant="additions"
       // The bottom padding clears the mobile tab bar, which is fixed over the
       // same corner: without it a toast reports a save from behind five tabs.
       className="pointer-events-none fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col justify-end gap-0 p-4 pb-24 sm:p-6 md:pb-6"
@@ -235,6 +242,10 @@ function SettingsToastCard({ toast, onDismiss }: { toast: SettingsToast; onDismi
       data-slot="settings-toast"
       data-kind={toast.kind}
       data-tone={toast.tone}
+      // A refused write interrupts: the card says what did not happen, and the
+      // operator is mid-edit on the very field it is about. A receipt waits its
+      // turn in the polite region around it.
+      {...(failed ? { role: "alert" } : {})}
       className={cn(
         "pointer-events-auto flex w-full items-center gap-3 rounded-2xl border bg-card p-3 shadow-[var(--shadow-lg)]",
         failed ? "border-[var(--status-outage-border)]" : "border-[var(--status-operational-border)]",

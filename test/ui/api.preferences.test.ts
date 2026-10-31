@@ -52,6 +52,9 @@ test("preferences default to following the system theme and English", async () =
     assert.equal(status, 200);
     assert.deepEqual(body, {
       theme: "system",
+      accentColor: "",
+      instanceName: "",
+      logoUrl: "",
       uiLocale: "en",
       notificationLocale: "en",
       mapView: "off",
@@ -80,7 +83,8 @@ test("a preference change round-trips and survives a restart", async () => {
     });
     assert.equal(status, 200);
     assert.deepEqual(body, {
-      theme: "dark", uiLocale: "it", notificationLocale: "en", mapView: "off",
+      theme: "dark", accentColor: "", instanceName: "", logoUrl: "",
+      uiLocale: "it", notificationLocale: "en", mapView: "off",
       density: "comfortable", wizardDone: false, tourSeen: false, timeZone: "auto", lastSeenAt: null,
     });
     await app.close();
@@ -89,6 +93,9 @@ test("a preference change round-trips and survives a restart", async () => {
     try {
       assert.deepEqual((await restarted.request("GET", "/api/preferences")).body, {
         theme: "dark",
+        accentColor: "",
+        instanceName: "",
+        logoUrl: "",
         uiLocale: "it",
         notificationLocale: "en",
         mapView: "off",
@@ -195,6 +202,72 @@ test("the last visit is kept for the instance, cleared with null, and refused wh
 
     const cleared = await app.request("PATCH", "/api/preferences", { lastSeenAt: null });
     assert.equal((cleared.body as { lastSeenAt: string | null }).lastSeenAt, null);
+  } finally {
+    await app.close();
+  }
+});
+
+test("the extra themes are accepted and an unknown one is refused", async () => {
+  const app = await api();
+  try {
+    for (const theme of ["contrast", "colorblind", "oled"]) {
+      const { status, body } = await app.request("PATCH", "/api/preferences", { theme });
+      assert.equal(status, 200);
+      assert.equal((body as { theme: string }).theme, theme);
+    }
+    const refused = await app.request("PATCH", "/api/preferences", { theme: "neon" });
+    assert.equal(refused.status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
+test("the instance identity round-trips, and an empty value puts the default back", async () => {
+  const app = await api();
+  try {
+    const set = await app.request("PATCH", "/api/preferences", {
+      accentColor: "#0a84ff",
+      instanceName: "  Office wallboard ",
+      logoUrl: "https://example.com/logo.svg",
+    });
+    assert.equal(set.status, 200);
+    assert.deepEqual(
+      {
+        accentColor: (set.body as Record<string, string>).accentColor,
+        instanceName: (set.body as Record<string, string>).instanceName,
+        logoUrl: (set.body as Record<string, string>).logoUrl,
+      },
+      { accentColor: "#0a84ff", instanceName: "Office wallboard", logoUrl: "https://example.com/logo.svg" },
+    );
+    const cleared = await app.request("PATCH", "/api/preferences", {
+      accentColor: "",
+      instanceName: "",
+      logoUrl: "",
+    });
+    assert.equal((cleared.body as Record<string, string>).accentColor, "");
+    assert.equal((cleared.body as Record<string, string>).logoUrl, "");
+  } finally {
+    await app.close();
+  }
+});
+
+test("an accent that is not a hex colour and a logo that is not an image address are refused", async () => {
+  const app = await api();
+  try {
+    for (const patch of [
+      { accentColor: "red" },
+      { accentColor: "#12345" },
+      { accentColor: "var(--primary)" },
+      { logoUrl: "javascript:alert(1)" },
+      { logoUrl: "data:image/svg+xml;base64,AAAA" },
+      { logoUrl: "//evil.example/logo.png" },
+      { instanceName: "x".repeat(41) },
+    ]) {
+      const { status } = await app.request("PATCH", "/api/preferences", patch);
+      assert.equal(status, 400, JSON.stringify(patch));
+    }
+    const root = await app.request("PATCH", "/api/preferences", { logoUrl: "/branding/logo.png" });
+    assert.equal(root.status, 200);
   } finally {
     await app.close();
   }

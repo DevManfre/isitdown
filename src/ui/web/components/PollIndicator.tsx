@@ -65,7 +65,7 @@ export function PollIndicator() {
           {/* Says where the freshness comes from: with the stream connected the
               dashboard is told about a cycle, it no longer asks on a timer. */}
           {live && (
-            <span className="poll-live rounded-full bg-primary/15 px-1.5 text-[10px] uppercase tracking-widest text-primary">
+            <span className="poll-live rounded-full bg-primary px-1.5 text-[10px] uppercase tracking-widest text-primary-foreground">
               {t("meta.live")}
             </span>
           )}

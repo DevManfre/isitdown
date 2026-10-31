@@ -170,4 +170,33 @@ describe("SettingsToasts", () => {
       expect(commit).toHaveBeenCalledTimes(2);
     });
   });
+
+  // Roadmap 4.20: what a screen reader is told. A `aria-label` on a bare <div>
+  // is ignored, so the stack is a named region; it is polite and additions-only
+  // so a new card is read alone, and a refusal — the one answer that is about
+  // the field the operator is editing — is an alert.
+  describe("what a screen reader hears", () => {
+    it("is a named, polite region that reads each new card on its own", () => {
+      renderWithProviders(<Harness reports={[]} />);
+      const region = screen.getByRole("region", { name: i18n.t("settings.toasts.aria") });
+      expect(region).toHaveAttribute("aria-live", "polite");
+      expect(region).toHaveAttribute("aria-atomic", "false");
+      expect(region).toHaveAttribute("aria-relevant", "additions");
+    });
+
+    it("announces a refusal as an alert and a receipt as nothing more than a card", async () => {
+      renderWithProviders(
+        <Harness
+          reports={[
+            { kind: "engine", status: { text: "Saved", tone: "ok" } },
+            { kind: "engine", status: { text: "Out of range", tone: "error" } },
+          ]}
+        />,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "report" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Out of range");
+      expect(screen.getAllByRole("alert")).toHaveLength(1);
+      expect(screen.getByText("Saved").closest("[data-slot='settings-toast']")).not.toHaveAttribute("role");
+    });
+  });
 });
