@@ -11,6 +11,7 @@ import { exportRoutes } from "./routes/export.routes.ts";
 import { feedsRoutes } from "./routes/feeds.routes.ts";
 import { historyRoutes } from "./routes/history.routes.ts";
 import { incidentsRoutes } from "./routes/incidents.routes.ts";
+import { searchRoutes } from "./routes/search.routes.ts";
 import { mapRoutes } from "./routes/map.routes.ts";
 import { dashboardsRoutes } from "./routes/dashboards.routes.ts";
 import { maintenancesRoutes } from "./routes/maintenances.routes.ts";
@@ -65,6 +66,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(actionsRoutes(runtime));
   app.use(heartbeatRoutes(runtime));
   app.use(incidentsRoutes(runtime));
+  app.use(searchRoutes(runtime));
   app.use(notificationsRoutes(runtime));
   app.use(configRoutes(runtime));
   app.use(preferencesRoutes(runtime));

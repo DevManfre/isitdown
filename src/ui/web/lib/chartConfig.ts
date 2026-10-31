@@ -66,9 +66,28 @@ export const AGGREGATE_FILL = "var(--status-accent)";
  * uses so the page reads as one chart layer; right is the token declared for
  * the second series.
  */
-export const COMPARE_CHART = {
-  left: "var(--compare-left)",
-  right: "var(--compare-right)",
+export const COMPARE_CHART = [
+  "var(--compare-1)",
+  "var(--compare-2)",
+  "var(--compare-3)",
+  "var(--compare-4)",
+  "var(--compare-5)",
+] as const;
+
+/** The colour of the nth compared series; past the fifth it wraps rather than going unpainted. */
+export const compareColor = (index: number): string =>
+  COMPARE_CHART[index % COMPARE_CHART.length] ?? COMPARE_CHART[0];
+
+/**
+ * The marks of the latency chart (roadmap 4.14). Identities again, borrowing
+ * the compare tokens: p50 versus p95 says which line is which, not that one is
+ * worse. Only the slow threshold is a verdict, and it is drawn in the
+ * major-outage colour because crossing it is what degrades a probe.
+ */
+export const LATENCY_CHART = {
+  p50: "var(--compare-1)",
+  p95: "var(--compare-2)",
+  slow: "var(--status-major-outage)",
 } as const;
 
 /** Which of the three bar rows a chart belongs to; each has its own scale. */

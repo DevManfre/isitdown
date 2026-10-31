@@ -13,7 +13,7 @@ import {
   REFRESH_MS,
   statusRefetchDelay,
 } from "@/lib/statusRefetch.ts";
-import type { DashboardResponse, RemovedDashboard, StatusResponse } from "@/lib/types.ts";
+import type { DashboardResponse, LatencyRange, RemovedDashboard, StatusResponse } from "@/lib/types.ts";
 import { DEFAULT_LAYOUT, type DashboardLayout } from "../../dashboardLayout.ts";
 import { useBusy } from "./useBusy.tsx";
 import { useLive } from "./useLive.tsx";
@@ -269,6 +269,28 @@ export const useComponentHistory = (provider: string, days: number) => {
  * usable: without it, every page change unmounts the rows for the length of a
  * request and the list flashes its empty state between pages.
  */
+/**
+ * The palette's text search (roadmap 4.15). Off below two characters, matching
+ * the server, which answers a shorter one with three empty lists; the previous
+ * answer stays on screen while the next keystroke's is in flight, so the groups
+ * do not flash away between letters.
+ */
+export const useSearch = (text: string) =>
+  useQuery({
+    queryKey: ["search", text],
+    queryFn: () => api.search(text),
+    enabled: text.length >= 2,
+    placeholderData: keepPreviousData,
+  });
+
+/** Every incident of a window, for the Gantt (roadmap 4.12): one request, not a paged list. */
+export const useIncidentTimeline = (days: number) =>
+  useQuery({
+    queryKey: ["incident-timeline", days],
+    queryFn: () => api.getIncidentTimeline(days),
+    placeholderData: keepPreviousData,
+  });
+
 export const useIncidents = (query: api.IncidentListQuery = {}) => {
   const busy = useBusy();
   const live = useLive();
@@ -323,6 +345,18 @@ export const useCoincidence = (days: number) =>
   useQuery({
     queryKey: ["coincidence", days],
     queryFn: () => api.getCoincidence(days),
+  });
+
+/**
+ * Response-time percentiles for one provider (roadmap 4.14). The previous
+ * provider's chart stays up while the next one loads, so switching the picker
+ * does not flash the card back to a skeleton.
+ */
+export const useLatency = (provider: string, range: LatencyRange) =>
+  useQuery({
+    queryKey: ["latency", provider, range],
+    queryFn: () => api.getLatency(provider, range),
+    placeholderData: keepPreviousData,
   });
 
 export const useReliability = (days: number) =>
