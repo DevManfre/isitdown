@@ -44,3 +44,14 @@ export function tokenRgb(
   // parsed here on purpose. Guessing a colour is worse than a neutral one.
   return FALLBACK;
 }
+
+/**
+ * A token as `#rrggbb`, or null when it is not a plain hex value (a `color-mix`,
+ * a `var()` chain, a token that is not declared). For callers that do contrast
+ * arithmetic and would rather say nothing than do it on a grey that was never
+ * the real colour.
+ */
+export function tokenHex(name: string, element: Element = document.documentElement): string | null {
+  const raw = getComputedStyle(element).getPropertyValue(name).trim();
+  return /^#[0-9a-f]{6}$/i.test(raw) ? raw.toLowerCase() : null;
+}

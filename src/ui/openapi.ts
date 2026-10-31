@@ -1046,7 +1046,7 @@ const paths: Json = {
   "/api/preferences": {
     get: {
       tags: ["Preferences"],
-      summary: "Theme, locales, map view and time zone.",
+      summary: "Theme, accent, instance name and logo, locales, map view and time zone.",
       responses: { "200": ok({ type: "object" }) },
     },
     patch: {

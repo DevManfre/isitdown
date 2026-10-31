@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { Menu, Monitor, Moon, Search, Sun } from "lucide-react";
+import { Contrast, Eye, Menu, Monitor, Moon, MoonStar, Search, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { isApplePlatform } from "@/lib/shortcut.ts";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler.tsx";
@@ -20,6 +20,11 @@ const THEME_ICONS: Record<ThemeMode, typeof Sun> = {
   light: Sun,
   dark: Moon,
   system: Monitor,
+  // Roadmap 4.18: reachable from Settings, shown here so the button still
+  // says which theme is on.
+  contrast: Contrast,
+  colorblind: Eye,
+  oled: MoonStar,
 };
 
 const TITLE_KEYS: Record<string, string> = {
@@ -120,7 +125,7 @@ export function Header({ view }: { view: string }) {
       >
         <Search className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
         {t("palette.open")}
-        <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+        <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground">
           {t(isApplePlatform() ? "palette.shortcut-mac" : "palette.shortcut-other")}
         </kbd>
       </button>
