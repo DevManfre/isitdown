@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useStatusChrome } from "@/hooks/queries.ts";
+import { useInstanceIdentity } from "@/hooks/useInstanceIdentity.ts";
 import { useTheme } from "@/hooks/useTheme.tsx";
 import { faviconDataUri, fleetStatus } from "@/lib/documentStatus.ts";
 
@@ -31,6 +32,8 @@ export function useDocumentStatus(): void {
   // so a theme change has to redraw it.
   const { mode } = useTheme();
   const { data } = useStatusChrome();
+  // Roadmap 4.19: the tab names the instance, not just the product.
+  const { name, custom } = useInstanceIdentity();
   /** The page's original icon href and title, captured before anything is written. */
   const original = useRef<{ href: string | null; title: string } | undefined>(undefined);
 
@@ -48,13 +51,15 @@ export function useDocumentStatus(): void {
 
     const calm = fleet.affected === 0;
     document.title = calm
-      ? original.current.title
-      : t("document.title.affected", { count: fleet.affected });
+      ? custom
+        ? name
+        : original.current.title
+      : t("document.title.affected", { count: fleet.affected, name });
 
     if (link === null) return;
     const href = calm ? original.current.href : faviconDataUri(fleet.worst);
     // Rewritten only on a change: assigning the same href still makes some
     // browsers re-fetch the icon, and this effect runs on every status read.
     if (href !== null && link.getAttribute("href") !== href) link.setAttribute("href", href);
-  }, [fleet?.affected, fleet?.worst, mode, t]);
+  }, [fleet?.affected, fleet?.worst, mode, t, name, custom]);
 }

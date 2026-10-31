@@ -73,9 +73,14 @@
      1.24:1 of each other and read as one muddy slab down a status column.
      Partial and major no longer share a hue either — orange and red separate
      them at a glance, where before only bar height and the label did. */
-  --status-operational: #15803d;
-  --status-degraded: #a16207;
-  --status-partial-outage: #c2410c;
+  /* Darkened a step from #15803d and #a16207 (roadmap 4.20): the Overview draws
+     these as large figures on their own tint, a surface 10-12% of the same hue,
+     and axe measured 4.1:1 and 3.95:1 there — under the 4.5 text needs, though
+     both cleared it on the bare card, which is all the palette test used to
+     check. tokens.test.ts now holds each word to its own wash too. */
+  --status-operational: #14773a;
+  --status-degraded: #94590a;
+  --status-partial-outage: #b43b0b;
   --status-major-outage: #b91c1c;
   --status-unknown: #71717a;
 
@@ -249,7 +254,10 @@
   --color-neutral-200: #e4e7f5;
   --color-neutral-300: #cfd3e5;
   --color-neutral-400: #b2b6ca;
-  --color-neutral-500: #9397ab;
+  /* Lifted from #9397ab (roadmap 4.20): --muted-foreground lands here, and
+     on --muted (neutral-800) that was 3.46:1 — every chip and kbd in dark read
+     under the 4.5 text needs. axe found it; tokens.test.ts now holds the pair. */
+  --color-neutral-500: #acb0c4;
   --color-neutral-600: #75798c;
   --color-neutral-700: #595d6c;
   --color-neutral-800: #3f424d;
@@ -277,12 +285,12 @@
      token is now a grey that reads. Every value below clears 4.5:1 on both
      `--color-bg` and `--color-surface` (tokens.test.ts checks the arithmetic,
      so a future palette tweak cannot quietly undo it). */
-  --status-operational: #56a37f;
+  --status-operational: #5eac88;
   --status-degraded: #d8a34a;
   --status-partial-outage: #de8c4f;
-  --status-major-outage: #e2685f;
+  --status-major-outage: #ec766e;
   --status-unknown: #9397ab;
-  --status-accent: #9184d9;
+  --status-accent: #a094e4;
 
   --compare-1: #9184d9;
   --compare-2: #4bb3c9;
@@ -422,7 +430,7 @@
     --color-neutral-200: #e4e7f5;
     --color-neutral-300: #cfd3e5;
     --color-neutral-400: #b2b6ca;
-    --color-neutral-500: #9397ab;
+    --color-neutral-500: #acb0c4;
     --color-neutral-600: #75798c;
     --color-neutral-700: #595d6c;
     --color-neutral-800: #3f424d;
@@ -439,12 +447,12 @@
     --color-accent-800: #423a6a;
     --color-accent-900: #2b2741;
 
-    --status-operational: #56a37f;
+    --status-operational: #5eac88;
     --status-degraded: #d8a34a;
     --status-partial-outage: #de8c4f;
-    --status-major-outage: #e2685f;
+    --status-major-outage: #ec766e;
     --status-unknown: #9397ab;
-    --status-accent: #9184d9;
+    --status-accent: #a094e4;
 
     --compare-1: #9184d9;
     --compare-2: #4bb3c9;
@@ -576,6 +584,94 @@
   --brand-mark-from: #968ae0;
   --brand-mark-to: #5d5294;
   --brand-mark-trace: #ffffff;
+
+  /* The two inks a custom accent (roadmap 4.19) can carry on a button: the
+     operator picks the fill, so the text on it cannot be one fixed token the
+     way it is for the built-in accent. lib/accent.ts picks the one that reads. */
+  --on-accent-light: #ffffff;
+  --on-accent-dark: #18181b;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Theme variants — roadmap 4.18.
+
+   A variant is not a fourth palette, it is a correction laid over one of the
+   two the file already carries: the attribute pair is `data-theme` (the ground,
+   light or dark — what Tailwind's `dark:` and the globe read) plus
+   `data-variant` (what is different about it). So everything a variant does
+   not mention — every semantic token, the sidebar family, the shadows — stays
+   the base theme's own, and a variant is only ever the handful of palette
+   values it exists to change. Declared after both bases so that, at equal
+   specificity, it is the later rule that wins.
+
+   Tested in tokens.test.ts: `contrast` clears WCAG AAA (7:1) on both grounds,
+   `colorblind` and `oled` clear AA like the rest, and `colorblind` is not
+   allowed to lean on red against green.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* High contrast. Light ground, black text, a divider that is a line rather than
+   a suggestion, and every written status colour taken to 7:1. The painted
+   fills are darkened with them, so a bar is as readable as the word beside it. */
+:root[data-variant="contrast"] {
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-text: #000000;
+  --color-divider: #3f3f46;
+  --color-neutral-500: #27272a;
+  --color-accent: #2e2790;
+  --status-accent: #2e2790;
+  --status-operational: #14532d;
+  --status-degraded: #713f12;
+  --status-partial-outage: #7c2d12;
+  --status-major-outage: #7f1d1d;
+  --status-unknown: #3f3f46;
+  --status-operational-fill: #14532d;
+  --status-degraded-fill: #713f12;
+  --status-partial-outage-fill: #7c2d12;
+  --status-major-outage-fill: #7f1d1d;
+  --status-unknown-fill: #52525b;
+  --status-operational-border: #14532d;
+  --status-degraded-border: #713f12;
+  --status-outage-border: #7f1d1d;
+  --status-accent-border: #2e2790;
+  --compare-1: #2e2790;
+  --compare-2: #134e4a;
+  --compare-3: #831843;
+  --compare-4: #1e3a8a;
+  --compare-5: #451a03;
+}
+
+/* Colour-blind safe. The pair every status page leans on — green for fine, red
+   for not — is the one most common deficiency cannot tell apart, so the scale
+   runs blue, amber, orange, deep purple instead (Okabe–Ito's hues, darkened to
+   clear 4.5:1 as text). The dashboard never relied on colour alone — each
+   status carries a word and a shape — so this is the second line of defence,
+   not the only one. */
+:root[data-variant="colorblind"] {
+  --status-operational: #0066a6;
+  --status-degraded: #7a5c00;
+  --status-partial-outage: #a84300;
+  --status-major-outage: #7a1d6b;
+  --status-operational-fill: #0072b2;
+  --status-degraded-fill: #b38600;
+  --status-partial-outage-fill: #d55e00;
+  --status-major-outage-fill: #8f2a7d;
+  --status-operational-tint: rgba(0, 114, 178, 0.10);
+  --status-degraded-tint: rgba(179, 134, 0, 0.12);
+  --status-outage-tint: rgba(143, 42, 125, 0.10);
+  --status-operational-border: rgba(0, 114, 178, 0.34);
+  --status-degraded-border: rgba(179, 134, 0, 0.40);
+  --status-outage-border: rgba(143, 42, 125, 0.36);
+}
+
+/* OLED black, for the wallboard: the ground is off, not dark, so an
+   always-on panel lights nothing but its content. Surfaces step up from it by
+   a hair, enough to read as planes and no more. */
+:root[data-variant="oled"] {
+  --color-bg: #000000;
+  --color-surface: #0b0b0e;
+  --color-divider: color-mix(in srgb, #e9e9ed 22%, transparent);
+  --status-unknown-fill: #1a1a1f;
 }
 
 /* Tailwind's `dark:` prefix must follow this repo's attribute, not shadcn's
