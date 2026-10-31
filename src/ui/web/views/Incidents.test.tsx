@@ -537,3 +537,40 @@ describe("Incidents", () => {
     });
   });
 });
+
+// Roadmap 4.16: what the operator narrowed the list to is carried by the address
+// and remembered, so a link is the same list and the rail brings it back.
+describe("Incidents remembers its filters", () => {
+  it("puts the chosen state in the address", async () => {
+    renderWithProviders(<Incidents />, fixtures);
+    expect(await list().findByText("API errors")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", radioNamed(i18n.t("filter.resolved"))));
+    await waitFor(() => expect(window.location.hash).toContain("state=resolved"));
+  });
+
+  it("puts the chosen window in the address, and leaves it out when it is the default", async () => {
+    renderWithProviders(<Incidents />, fixtures);
+    expect(await list().findByText("API errors")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: i18n.t("incidents.window.days", { count: 7 }) }));
+    await waitFor(() => expect(window.location.hash).toContain("days=7"));
+    await userEvent.click(screen.getByRole("radio", { name: i18n.t("incidents.window.all") }));
+    await waitFor(() => expect(window.location.hash).not.toContain("days"));
+  });
+
+  it("reopens on the state and window it was left on when the address says nothing", async () => {
+    localStorage.setItem("isitdown.views", JSON.stringify({ incidents: { state: "resolved", days: "30" } }));
+    renderWithProviders(<Incidents />, fixtures);
+    expect(await screen.findByRole("radio", radioNamed(i18n.t("filter.resolved")))).toBeChecked();
+    expect(screen.getByRole("radio", { name: i18n.t("incidents.window.days", { count: 30 }) })).toBeChecked();
+    const query = new URLSearchParams(window.location.hash.split("?")[1]);
+    expect(query.get("state")).toBe("resolved");
+    expect(query.get("days")).toBe("30");
+  });
+
+  it("keeps the search in the address once it has been sent to the server", async () => {
+    renderWithProviders(<Incidents />, fixtures);
+    expect(await list().findByText("API errors")).toBeInTheDocument();
+    await userEvent.type(screen.getByRole("searchbox", { name: i18n.t("incidents.search.label") }), "latency");
+    await waitFor(() => expect(window.location.hash).toContain("q=latency"));
+  });
+});
