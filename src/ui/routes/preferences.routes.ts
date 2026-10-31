@@ -2,7 +2,14 @@ import { readdirSync } from "node:fs";
 import { Router } from "express";
 import { z } from "zod";
 import { availableLocales as notificationLocales } from "../../core/i18n/index.ts";
-import { readSettings, writeSettings } from "../dbConfigSource.ts";
+import {
+  accentColor,
+  INSTANCE_NAME_MAX,
+  logoUrl,
+  readSettings,
+  writeSettings,
+} from "../dbConfigSource.ts";
+import { THEME_MODES } from "../themeModes.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 
 const LOCALES_DIR = new URL("../web/locales/", import.meta.url);
@@ -41,7 +48,10 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
   const uiLocales = availableUiLocales();
 
   const patchSchema = z.object({
-    theme: z.enum(["light", "dark", "system"]).optional(),
+    theme: z.enum(THEME_MODES).optional(),
+    accentColor: accentColor.optional(),
+    instanceName: z.string().trim().max(INSTANCE_NAME_MAX).optional(),
+    logoUrl: logoUrl.optional(),
     uiLocale: z.enum(uiLocales as [string, ...string[]]).optional(),
     notificationLocale: z
       .enum(notificationLocales as unknown as [string, ...string[]])
@@ -70,6 +80,9 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
     const settings = readSettings(runtime.db, runtime.logger);
     return {
       theme: settings.theme,
+      accentColor: settings.accentColor,
+      instanceName: settings.instanceName,
+      logoUrl: settings.logoUrl,
       uiLocale: settings.uiLocale,
       notificationLocale: settings.notificationLocale,
       mapView: settings.mapView,

@@ -982,7 +982,14 @@ export interface MapResponse {
 export type MapView = "off" | "map" | "globe";
 
 export interface Preferences {
-  theme: "light" | "dark" | "system";
+  theme: "light" | "dark" | "system" | "contrast" | "colorblind" | "oled";
+  /**
+   * Instance identity — roadmap 4.19. Empty strings mean "the product's own";
+   * optional because a server from before it answers without them.
+   */
+  accentColor?: string;
+  instanceName?: string;
+  logoUrl?: string;
   uiLocale: string;
   notificationLocale: string;
   mapView: MapView;

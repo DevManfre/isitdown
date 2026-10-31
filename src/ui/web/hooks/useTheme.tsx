@@ -1,8 +1,26 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 const KEY = "isitdown.theme";
-const MODES = ["light", "dark", "system"] as const;
-export type ThemeMode = (typeof MODES)[number];
+import { BASE_THEMES, THEME_MODES, type ThemeMode } from "../../themeModes.ts";
+
+const MODES = THEME_MODES;
+export type { ThemeMode };
+
+/**
+ * What each mode stamps on <html> — roadmap 4.18. A variant rides beside a
+ * ground (`data-theme`) rather than replacing it, so Tailwind's `dark:` and the
+ * globe, which read the ground, keep working for every variant, and a variant's
+ * stylesheet block only has to list what it changes. `system` stamps nothing:
+ * the media query decides.
+ */
+const STAMPS: Record<ThemeMode, { theme: "light" | "dark" | null; variant: string | null }> = {
+  light: { theme: "light", variant: null },
+  dark: { theme: "dark", variant: null },
+  system: { theme: null, variant: null },
+  contrast: { theme: "light", variant: "contrast" },
+  colorblind: { theme: "light", variant: "colorblind" },
+  oled: { theme: "dark", variant: "oled" },
+};
 
 interface ThemeApi {
   mode: ThemeMode;
@@ -37,8 +55,11 @@ const read = (): ThemeMode => stored() ?? "system";
 
 const stamp = (mode: ThemeMode) => {
   const root = document.documentElement;
-  if (mode === "system") root.removeAttribute("data-theme");
-  else root.setAttribute("data-theme", mode);
+  const { theme, variant } = STAMPS[mode];
+  if (theme === null) root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", theme);
+  if (variant === null) root.removeAttribute("data-variant");
+  else root.setAttribute("data-variant", variant);
 };
 
 /**
@@ -90,7 +111,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // of `mode` — would only matter for two cycles dispatched within one
   // render, which a theme button cannot do.
   const cycle = useCallback((): ThemeMode => {
-    const next = MODES[(MODES.indexOf(mode) + 1) % MODES.length] as ThemeMode;
+    // Only the base three: the button is a quick flip between moods, and the
+    // variants answer a need, so they are chosen in Settings. From a variant
+    // the button goes back to the start of the cycle.
+    const at = BASE_THEMES.indexOf(mode as (typeof BASE_THEMES)[number]);
+    const next = BASE_THEMES[(at + 1) % BASE_THEMES.length] as ThemeMode;
     // Stamped here and not only in the effect above: the theme button runs
     // this inside a view transition, which snapshots the document the moment
     // the callback returns. A passive effect is too late for that snapshot —
