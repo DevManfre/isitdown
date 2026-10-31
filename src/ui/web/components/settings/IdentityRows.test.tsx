@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
 import { renderWithProviders } from "@/test/harness.tsx";
+import fixtures from "@/lib/accent.fixtures.json";
 import type { Preferences } from "@/lib/types.ts";
 import { IdentityRows } from "./IdentityRows.tsx";
 
@@ -58,9 +59,9 @@ describe("IdentityRows", () => {
 
   it("writes the colour it was given, and the reset puts the product's own back", async () => {
     const user = userEvent.setup();
-    mount({ ...base, accentColor: "#0a84ff" });
-    fireEvent.change(screen.getByLabelText(i18n.t("settings.accent.label")), { target: { value: "#ff8800" } });
-    await waitFor(() => expect(patches()).toContainEqual({ accentColor: "#ff8800" }));
+    mount({ ...base, accentColor: fixtures.picked });
+    fireEvent.change(screen.getByLabelText(i18n.t("settings.accent.label")), { target: { value: fixtures.repicked } });
+    await waitFor(() => expect(patches()).toContainEqual({ accentColor: fixtures.repicked }));
     await user.click(screen.getByRole("button", { name: i18n.t("settings.accent.reset") }));
     await waitFor(() => expect(patches()).toContainEqual({ accentColor: "" }));
   });
