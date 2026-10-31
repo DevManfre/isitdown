@@ -52,7 +52,11 @@ export function DottedWorld({
     <svg
       viewBox={`0 0 ${width} ${height}`}
       className="h-full w-full"
-      role="img"
+      // A group, not an image (roadmap 4.20): the markers inside are focusable
+      // buttons with names of their own, and `role="img"` makes its children
+      // presentational — keyboard users could land on a control a screen reader
+      // had been told does not exist (axe: nested-interactive).
+      role="group"
       aria-label={t("map.aria.world")}
     >
       <g data-testid="dotted-world-base">{base}</g>

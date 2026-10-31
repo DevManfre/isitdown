@@ -46,7 +46,7 @@ describe("IncidentMap", () => {
 
   it("draws only the incident provider's own locations, never the whole fleet", async () => {
     mount("map");
-    const world = await screen.findByRole("img", { name: i18n.t("map.aria.world") });
+    const world = await screen.findByRole("group", { name: i18n.t("map.aria.world") });
     const markers = within(world).getAllByRole("button");
     expect(markers).toHaveLength(1);
     expect(markers[0]).toHaveAccessibleName(/Ashburn/);
@@ -55,7 +55,7 @@ describe("IncidentMap", () => {
   it("keeps a keyed empty state when this provider has no located component", async () => {
     mount("map", map({ points: [point("cloudflare", "Amsterdam", 52.31, 4.76)] }));
     expect(await screen.findByText(i18n.t("incident.map.empty", { name: "GitHub" }))).toBeInTheDocument();
-    expect(screen.queryByRole("img", { name: i18n.t("map.aria.world") })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: i18n.t("map.aria.world") })).not.toBeInTheDocument();
   });
 
   it("counts located and unplaced components for this provider only", async () => {
