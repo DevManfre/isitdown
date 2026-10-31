@@ -138,8 +138,15 @@ const ASSETS = "dist/ui/public/assets";
  * before, 659.6 kB after — 9.1 kB gzipped, the two components and some fifty
  * new strings in six catalogs; CSS 21.4 -> 21.6 kB for the tour's veil, ring
  * and card motion and the wizard's utility classes.
+ *
+ * It moved 685,500 -> 695,500 (669.4 -> 679.2 kB), and CSS 22,500 -> 23,000,
+ * for roadmaps 4.16 to 4.20: the persisted view state, the shortcut map and its
+ * matcher, three theme variants, the accent, name and logo rows, the status
+ * announcer, and some sixty strings in six catalogs. Measured: 667.1 kB before,
+ * 674.8 kB after — 7.7 kB gzipped, most of it the strings and the two dialogs'
+ * worth of components; CSS 21.7 -> 22.0 kB for the variants' override blocks.
  */
-export const BUDGET = { js: 685_500, css: 22_500 };
+export const BUDGET = { js: 695_500, css: 23_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
