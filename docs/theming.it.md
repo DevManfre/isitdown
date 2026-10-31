@@ -4,7 +4,41 @@
 
 ### 8.1 Tema
 
-Edizione UI. Tre stati: **chiaro / scuro / sistema**, ciclati dall'header.
+Edizione UI. Tre stati: **chiaro / scuro / sistema**, ciclati dall'header — e tre
+varianti scelte in **Impostazioni → Aspetto** (roadmap 4.18): **alto contrasto**,
+**per daltonici** e **nero OLED**.
+
+- **Una variante è una correzione sopra uno sfondo, non una quarta palette.** Il
+  documento porta due attributi: `data-theme` (lo sfondo, `light` o `dark`, che
+  leggono il `dark:` di Tailwind e il globo) e `data-variant` (cosa ha di diverso).
+  `contrast` e `colorblind` stanno sullo sfondo chiaro, `oled` su quello scuro, e
+  ogni blocco in `tokens.css` elenca solo i valori di palette che cambia.
+  - **Alto contrasto** porta ogni colore del testo a WCAG AAA (7:1) su entrambi gli
+    sfondi, rende il divisore una linea vera e scurisce con esso i riempimenti di
+    stato.
+  - **Per daltonici** sostituisce la coppia rosso/verde su cui si appoggiano i colori
+    di stato con blu, ambra, arancio e viola scuro (le tinte di Okabe–Ito, scurite per
+    superare 4.5:1 come testo). Ogni stato porta già una parola e una forma, quindi è
+    la seconda linea di difesa, non l'unica. Un test rifiuta una palette in cui
+    "operativo" non sia blu o "disservizio grave" non abbia blu per distinguersi dal
+    verde.
+  - **Nero OLED** spegne del tutto lo sfondo (`#000`) per un wallboard sempre acceso.
+  - Il pulsante nell'header cicla ancora chiaro, scuro e sistema; premuto su una
+    variante torna al chiaro. `tokens.test.ts` tiene ogni variante alla propria soglia
+    di contrasto.
+- **Identità dell'istanza** (roadmap 4.19). Impostazioni → Aspetto prende anche un
+  **colore d'accento**, un **nome dell'istanza** e un **indirizzo del logo**, per una
+  dashboard su un monitor in ufficio. L'accento scrive `--color-accent`,
+  `--status-accent`, `--primary-foreground` e `--primary-hover` sul documento — il
+  testo su un pulsante è quello tra due inchiostri che si legge meglio sul colore
+  scelto — e mai un colore di stato, che farebbe mentire la dashboard. Un suggerimento
+  avverte quando l'accento è sotto 3:1 rispetto alla pagina, e il tema ad alto
+  contrasto mantiene il proprio. Il nome sostituisce quello del prodotto nella barra
+  laterale, nel wallboard e nel titolo della scheda; il logo (un indirizzo `https`, o
+  un percorso sullo stesso host — mai `data:` né `javascript:`) sostituisce il
+  simbolo accanto, e ripiega su quello del prodotto se non si carica. Ciascuno è vuoto
+  di default e ripiega per conto suo. L'accento è salvato anche nel browser, così lo
+  script inline lo dipinge prima che parta React.
 
 - **Token, non colori per componente.** Ogni colore è una custom property CSS.
   `css/tokens.css` è l'unico file della dashboard a cui è permesso contenere un colore
@@ -114,7 +148,8 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
 (roadmap 5.13). Cosa è garantito, e verificato:
 
 - **Contrasto.** Ogni colore di stato usato come *testo* supera WCAG AA (4.5:1)
-  sia sulla pagina sia sulla card, in entrambi i temi — `src/ui/web/css/tokens.test.ts`
+  sia sulla pagina sia sulla card, in entrambi i temi — e sulla tinta su cui è
+  disegnato, e il testo secondario sul riempimento dei chip. `src/ui/web/css/tokens.test.ts`
   calcola i rapporti da `tokens.css`, così una modifica alla palette che ne rompe
   uno fa fallire la suite invece di essere spedita. L'audit ha trovato due
   difetti reali nel tema scuro: un'interruzione parziale e una grave avevano lo
@@ -128,6 +163,33 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   scontato. Gli elementi cliccabili scritti a mano (una riga di provider, una
   tile ad anello) ricevono un anello di focus visibile da `base.css` a
   specificità zero, sotto quello che una primitiva ha già.
+- **Scorciatoie da tastiera** (roadmap 4.17). La grammatica di GitHub e Linear: `g`
+  seguito da una lettera porta da qualche parte — `g o` Panoramica, `g p` Provider,
+  `g i` Incidenti, `g h` Storico, `g d` Registro delle consegne, `g s` Impostazioni —
+  e un tasto da solo fa una cosa: `/` apre la palette, `p` interroga ora, `?` mostra
+  la mappa di tutte (anche nella palette). Restano fuori da un campo di testo, da un
+  dialogo aperto e da qualunque combinazione con ⌘, Ctrl o Alt, e una `g` dimenticata
+  per 1,2 secondi viene dimenticata. Una sola tabella in `lib/shortcuts.ts` guida sia
+  il riconoscitore sia la mappa, quindi una scorciatoia che funziona è una
+  scorciatoia elencata.
+- **Filtri che restano** (roadmap 4.16). Stato, finestra e ricerca degli Incidenti, la
+  finestra dello Storico, l'ordinamento e l'interruttore tutti/problemi dei Provider e
+  lo stato del Registro delle consegne sono portati dall'indirizzo — un link incollato
+  riapre la stessa vista — e ricordati per browser, così il link nella barra laterale
+  atterra dove era stato lasciato. La precedenza è: l'indirizzo, poi ciò che era
+  ricordato, poi il valore predefinito; una scelta uguale al predefinito viene tolta da
+  entrambi, così i link restano corti e un filtro azzerato non ritorna.
+- **Screen reader** (roadmap 4.20). `tools/visual-regression.mjs` esegue axe-core
+  (WCAG 2.0/2.1 A e AA, 2.2 AA) su ogni schermata che cattura — tutte le viste, entrambi
+  i temi, entrambe le lingue — e sulle tre varianti di tema, e fallisce a una
+  violazione; una deroga va in `ACCEPTED` con la sua ragione, nel diff. Ha trovato e
+  corretto: parole di stato sotto 4.5:1 sulla propria tinta, testo secondario a 3.46:1
+  sui chip in scuro, un badge distruttivo a 2.89:1, tre grafici con un nome ma senza
+  `role="img"`, un'area dei toast la cui etichetta veniva ignorata e un link il cui nome
+  ometteva il numero stampato. Ora anche ciò che il flusso cambia viene detto a voce:
+  un'unica area educata nascosta nella shell nomina i provider il cui stato è cambiato
+  dall'ultima lettura (tre nominati, gli altri contati), la pila dei toast annuncia ogni
+  nuova scheda da sola e una scrittura rifiutata è un avviso.
 - **La palette dei comandi.** `⌘K` (o `Ctrl+K`) su qualsiasi schermata — oppure
   il pulsante di ricerca nell'header, che porta scritta la scorciatoia perché il
   secondo utilizzo sia da tastiera — apre una
