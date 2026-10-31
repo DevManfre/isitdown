@@ -2,7 +2,14 @@ import { Router } from "express";
 import { z } from "zod";
 import type { IncidentRow } from "../historyStore.interface.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
+import { ALLOWED_DAYS, parseDays } from "./historyWindow.ts";
 import { pageSchema, pageSizeSchema, readIncidentQuery } from "./incidentQuery.ts";
+
+/** The timeline's own default: a month is the span overlaps are still worth reading across. */
+const TIMELINE_DEFAULT_DAYS = 30;
+/** A ceiling, not a page: a chart of the window cannot be paged, but one request must not read a retention's worth. */
+const TIMELINE_MAX_ROWS = 5000;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** How many recent polls the incident view's strip shows. */
 const POLL_STRIP_SIZE = 24;
@@ -71,6 +78,41 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
     ]);
 
     res.json({ active, page: { items, page, pageSize, total: counts[state] }, counts });
+  });
+
+  /**
+   * Every incident that was running at any point of the window, for the
+   * dashboard's Gantt (roadmap 4.12). Not the list's page: a chart of the whole
+   * window cannot be a page of twenty. Only what a bar needs, so a month of a
+   * busy fleet stays a small payload.
+   *
+   * An incident that began before the window and was still open in it is
+   * included (`openFrom`), as the monthly report's rule is: an outage that
+   * ran into the window is part of it.
+   */
+  router.get("/incidents/timeline", async (req, res) => {
+    const days = parseDays(req.query["days"] ?? TIMELINE_DEFAULT_DAYS);
+    if (days === null) {
+      res.status(400).json({ error: { message: `days must be one of ${ALLOWED_DAYS.join(", ")}` } });
+      return;
+    }
+    const openFrom = new Date(Date.now() - days * MS_PER_DAY).toISOString().slice(0, 10);
+    const rows = await runtime.store.listIncidents({
+      providerIds: runtime.enabledProviderIds(),
+      openFrom,
+      limit: TIMELINE_MAX_ROWS,
+    });
+    res.json({
+      days,
+      incidents: rows.map((row) => ({
+        providerId: row.providerId,
+        incidentId: row.incidentId,
+        name: row.name,
+        impact: row.impact,
+        startedAt: row.startedAt,
+        resolvedAt: row.resolvedAt,
+      })),
+    });
   });
 
   router.get("/incidents/:providerId/:incidentId", async (req, res) => {
