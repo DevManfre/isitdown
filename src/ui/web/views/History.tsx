@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 import { Trans, useTranslation } from "react-i18next";
+import { Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
@@ -8,6 +10,7 @@ import { DeltaChip } from "@/components/DeltaChip.tsx";
 import { DownloadMenu } from "@/components/DownloadMenu.tsx";
 import { FromOverviewChip } from "@/components/DrillLink.tsx";
 import { FROM_PARAM, readDays, readRange, snapWindow } from "@/lib/drillDown.ts";
+import { LatencyCard } from "@/components/LatencyCard.tsx";
 import { ProviderHistoryDrawer } from "@/components/ProviderHistoryDrawer.tsx";
 import { ProviderTrendRow } from "@/components/ProviderTrendRow.tsx";
 import { StatTiles } from "@/components/StatTiles.tsx";
@@ -40,7 +43,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
-import { COMPARE_CHART } from "@/lib/chartConfig.ts";
+import { COMPARE_CHART, compareColor } from "@/lib/chartConfig.ts";
+import { formatList } from "@/lib/format.ts";
 import { formatDuration } from "@/lib/format.ts";
 import { Input } from "@/components/ui/input.tsx";
 import { alignSeries, uptimeForRange } from "@/lib/history.ts";
@@ -192,13 +196,7 @@ export function History() {
   // Null means "whichever the ordering picks": the fleet is not loaded yet on
   // the first render, and a comparison the operator did choose must survive a
   // range change that reorders the list under it.
-  const [compare, setCompare] = useState<{
-    left: string | null;
-    right: string | null;
-  }>({
-    left: null,
-    right: null,
-  });
+  const [compare, setCompare] = useState<string[] | null>(null);
   const { data } = useHistory(window_);
   const { data: status } = useStatus();
   // Roadmap 12.1. Its own query: see `useAnnotations`.
@@ -252,47 +250,44 @@ export function History() {
   /**
    * The two worst by default (roadmap 5.7): the page already ranks worst first,
    * and "how do these two compare" is a question about the two that are
-   * costing something, not about the two that happen to sort first.
+   * costing something, not about the two that happen to sort first. The
+   * operator can widen it to five (roadmap 4.13), the most the `--compare-*`
+   * tokens keep apart.
    */
-  const left = compare.left ?? ordered[0]?.providerId ?? null;
-  const right = compare.right ?? ordered[1]?.providerId ?? null;
-  const leftHistory = ordered.find((provider) => provider.providerId === left);
-  const rightHistory = ordered.find(
-    (provider) => provider.providerId === right,
+  const compared = (
+    compare ?? ordered.slice(0, 2).map((provider) => provider.providerId)
+  )
+    .map((id) => ordered.find((provider) => provider.providerId === id))
+    .filter((provider): provider is ProviderHistory => provider !== undefined);
+  const comparedIds = compared.map((provider) => provider.providerId);
+  const nextToAdd = ordered.find(
+    (provider) => !comparedIds.includes(provider.providerId),
   );
 
-  const picker = (side: "left" | "right", value: string) => (
-    <div className="flex items-center gap-2">
+  const picker = (index: number, value: string) => (
+    <div key={value} className="flex items-center gap-2">
       <span
         aria-hidden="true"
         className="size-2 shrink-0 rounded-full"
-        style={{ backgroundColor: COMPARE_CHART[side] }}
+        style={{ backgroundColor: compareColor(index) }}
       />
       <Select
         value={value}
         onValueChange={(next) => {
-          // Picking the provider that is already on the other side swaps them:
-          // a provider drawn against itself is the one comparison with nothing
-          // to say, and a click that silently did nothing would read as a
-          // broken control.
-          const other = side === "left" ? right : left;
-          if (next === other) {
-            setCompare({ left: right, right: left });
-            return;
-          }
-          setCompare({ left, right, [side]: next });
+          // Picking a provider that is already in the comparison swaps the two
+          // slots: a provider drawn against itself is the one comparison with
+          // nothing to say, and a click that silently did nothing would read as
+          // a broken control.
+          const ids = [...comparedIds];
+          const taken = ids.indexOf(next);
+          if (taken !== -1) ids[taken] = value;
+          ids[index] = next;
+          setCompare(ids);
         }}
       >
-        {/* Both keys spelled out rather than built from `side`: a key assembled
-            at runtime is invisible to the catalog guard, which is what keeps a
-            dead or missing string from shipping. */}
         <SelectTrigger
           size="sm"
-          aria-label={
-            side === "left"
-              ? t("history.compare.left")
-              : t("history.compare.right")
-          }
+          aria-label={t("history.compare.slot", { n: index + 1 })}
           className="w-44"
         >
           <SelectValue />
@@ -305,6 +300,18 @@ export function History() {
           ))}
         </SelectContent>
       </Select>
+      {index >= 2 ? (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t("history.compare.remove", { name: nameOf(value) })}
+          onClick={() =>
+            setCompare(comparedIds.filter((id) => id !== value))
+          }
+        >
+          <X aria-hidden="true" />
+        </Button>
+      ) : null}
     </div>
   );
 
@@ -611,9 +618,7 @@ export function History() {
           reads better as its own surface than as more of the hero. Only
           rendered once there are two providers to compare: one drawn against
           itself is a chart with nothing to say. */}
-        {leftHistory !== undefined &&
-        rightHistory !== undefined &&
-        left !== right ? (
+        {compared.length >= 2 ? (
           <>
             <section
               aria-label={t("history.compare.title")}
@@ -626,17 +631,32 @@ export function History() {
                     {t("history.compare.title")}
                   </span>
                   <div className="flex flex-wrap items-center gap-3">
-                    {picker("left", leftHistory.providerId)}
-                    {picker("right", rightHistory.providerId)}
+                    {compared.map((provider, index) =>
+                      picker(index, provider.providerId),
+                    )}
+                    {compared.length < COMPARE_CHART.length &&
+                    nextToAdd !== undefined ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCompare([...comparedIds, nextToAdd.providerId])
+                        }
+                      >
+                        <Plus aria-hidden="true" />
+                        {t("history.compare.add")}
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
                 <UptimeCompareChart
-                  rows={alignSeries(leftHistory, rightHistory)}
-                  leftLabel={nameOf(leftHistory.providerId)}
-                  rightLabel={nameOf(rightHistory.providerId)}
+                  rows={alignSeries(compared)}
+                  labels={compared.map((provider) => nameOf(provider.providerId))}
                   label={t("history.compare.chart", {
-                    left: nameOf(leftHistory.providerId),
-                    right: nameOf(rightHistory.providerId),
+                    providers: formatList(
+                      i18n.language,
+                      compared.map((provider) => nameOf(provider.providerId)),
+                    ),
                   })}
                 />
               </Card>
@@ -647,6 +667,17 @@ export function History() {
               style={{ animationDelay: "240ms" }}
             />
           </>
+        ) : null}
+
+        {/* Roadmap 4.14. Under the comparison: both are "one vendor against its own
+            history" questions, and neither is a row of the list below. */}
+        {ordered.length > 0 ? (
+          <LatencyCard
+            providers={ordered.map((provider) => ({
+              id: provider.providerId,
+              name: nameOf(provider.providerId),
+            }))}
+          />
         ) : null}
 
         {summary.providers.length === 0 ? (

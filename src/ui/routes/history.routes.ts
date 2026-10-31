@@ -2,8 +2,19 @@ import { Router } from "express";
 import { z } from "zod";
 import { dayStart, resolveZone, shiftDay, zonedDayKey } from "../calendarDays.ts";
 import { ANNOTATION_COLOURS } from "../historyStore.interface.ts";
+import { latencySeries, latencySummary } from "../latencySeries.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { ALLOWED_DAYS, CALENDAR_DAYS, parseDays, parseWindow } from "./historyWindow.ts";
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+/** The latency chart's ranges, each with the bucket that keeps it near thirty points (roadmap 4.14). */
+const LATENCY_RANGES: Record<string, { spanMs: number; bucketMs: number } | undefined> = {
+  "24h": { spanMs: DAY_MS, bucketMs: HOUR_MS },
+  "7d": { spanMs: 7 * DAY_MS, bucketMs: 6 * HOUR_MS },
+  "30d": { spanMs: 30 * DAY_MS, bucketMs: DAY_MS },
+};
 
 /**
  * One marker (roadmap 12.1). The label is capped at a line: this is "v2.4.0
@@ -43,6 +54,39 @@ export function historyRoutes(runtime: UiRuntimeCore): Router {
       return;
     }
     res.json(await runtime.history.getProviderCalendar(provider, CALENDAR_DAYS));
+  });
+
+  /**
+   * Response-time percentiles for one provider — roadmap 4.14. Three fixed
+   * ranges, each with the bucket that keeps its chart near thirty points: a
+   * day by the hour, a week by six hours, a month by the day.
+   */
+  router.get("/history/latency", async (req, res) => {
+    const range = LATENCY_RANGES[String(req.query["range"] ?? "7d")];
+    if (range === undefined) {
+      res.status(400).json({ error: { message: `range must be one of ${Object.keys(LATENCY_RANGES).join(", ")}` } });
+      return;
+    }
+    const provider = req.query["provider"];
+    if (typeof provider !== "string" || provider === "") {
+      res.status(400).json({ error: { message: "provider is required" } });
+      return;
+    }
+    const service = runtime.listAllServices().find((entry) => entry.id === provider);
+    if (service === undefined) {
+      res.status(404).json({ error: { message: `unknown provider: ${provider}` } });
+      return;
+    }
+    const samples = await runtime.store.getLatencySamples(provider, new Date(Date.now() - range.spanMs).toISOString());
+    const declared = Number(service.options?.["slowMs"]);
+    const slowMs = Number.isInteger(declared) && declared > 0 ? declared : null;
+    res.json({
+      provider,
+      range: String(req.query["range"] ?? "7d"),
+      slowMs,
+      summary: latencySummary(samples, slowMs),
+      points: latencySeries(samples, range.bucketMs),
+    });
   });
 
   router.get("/history/components", async (req, res) => {

@@ -26,36 +26,36 @@ export function uptimeForRange(provider: ProviderHistory, days: number): number 
   return days <= 7 ? provider.uptime7 : days <= 30 ? provider.uptime30 : provider.uptime90;
 }
 
-/** One day, as the two providers being compared each measured it. */
+/** One day, as every provider being compared measured it, in picker order. */
 export interface ComparedDay {
   day: string;
-  left: number | null;
-  right: number | null;
+  values: (number | null)[];
 }
 
 /**
- * Two providers' daily series on shared rows, so one chart can overlay them
- * (roadmap 5.7).
+ * The compared providers' daily series on shared rows, so one chart can overlay
+ * them (roadmap 5.7, widened to up to five by 4.13).
  *
- * A day only one of them measured keeps the other `null` rather than 0: a
+ * A day only some of them measured keeps the others `null` rather than 0: a
  * provider that was not being watched did not have a full outage, and the
  * chart draws a gap there for the same reason `UptimeTrendChart` refuses to
  * connect across one.
  *
- * The union of both sets of days rather than the intersection, because a
+ * The union of all the sets of days rather than the intersection, because a
  * provider added last week must still be comparable against one watched all
  * quarter — it just has nothing to say about the days before it arrived.
  */
-export function alignSeries(left: ProviderHistory, right: ProviderHistory): ComparedDay[] {
+export function alignSeries(providers: ProviderHistory[]): ComparedDay[] {
   const rows = new Map<string, ComparedDay>();
   const put = (day: string): ComparedDay => {
-    const existing = rows.get(day) ?? { day, left: null, right: null };
+    const existing = rows.get(day) ?? { day, values: providers.map(() => null) };
     rows.set(day, existing);
     return existing;
   };
 
-  for (const entry of left.dailySeries) put(entry.day).left = entry.uptime;
-  for (const entry of right.dailySeries) put(entry.day).right = entry.uptime;
+  providers.forEach((provider, index) => {
+    for (const entry of provider.dailySeries) put(entry.day).values[index] = entry.uptime;
+  });
 
   return [...rows.values()].sort((a, b) => a.day.localeCompare(b.day));
 }
