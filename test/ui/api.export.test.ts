@@ -252,8 +252,12 @@ test("the monthly report is served as a dated Markdown download", async () => {
     );
     assert.match(text, /^# Uptime report — /);
     // The month is still running, and the document has to say so rather than
-    // reading as a finished one three weeks later.
-    assert.match(text, /still running/);
+    // reading as a finished one three weeks later. On the month's last UTC day
+    // it is complete, so there is nothing to flag.
+    const now = new Date();
+    const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+    if (now.getUTCDate() < lastDay) assert.match(text, /still running/);
+    else assert.doesNotMatch(text, /still running/);
   } finally {
     await app.close();
   }
