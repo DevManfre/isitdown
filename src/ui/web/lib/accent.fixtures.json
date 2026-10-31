@@ -4,6 +4,7 @@
   "midTones": ["#ff0000", "#00ff00", "#0000ff", "#808080", "#ffa500", "#14b8a6", "#a855f7"],
   "notAccents": ["", "red", "#abc", "#12345g", "rgb(1,2,3)", "var(--primary)"],
   "picked": "#0a84ff",
+  "repicked": "#ff8800",
   "black": "#000000",
   "white": "#ffffff",
   "nearWhite": "#fafafa"
