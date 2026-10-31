@@ -76,6 +76,9 @@ export function UptimeTrendChart({
         uptime: { label: t("history.trend-title"), color: TREND_CHART.stroke },
       }}
       className="anim-bar h-44 w-full"
+      // A name on a bare <div> is ignored (axe: aria-prohibited-attr) — the
+      // role is what makes the conclusion in `label` reach a screen reader.
+      role="img"
       aria-label={label}
     >
       <AreaChart

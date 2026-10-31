@@ -19,6 +19,10 @@ import { cn } from "@/lib/utils"
  * hand-repeated the same `outline` + `border-transparent bg-muted
  * text-muted-foreground` combination — the third repetition is what earned
  * the variant, not the first.
+ *
+ * `destructive` also drops stock shadcn's `dark:bg-destructive/60`: at 60% the
+ * fill is #a05757 in dark, and `text-destructive-foreground` on it is 2.89:1
+ * (axe, roadmap 4.20). Solid, the pair is the one the palette already clears.
  */
 const badgeVariants = cva(
   "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3",
@@ -29,7 +33,7 @@ const badgeVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
         destructive:
-          "bg-destructive text-destructive-foreground focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40 [a&]:hover:bg-destructive/90",
+          "bg-destructive text-destructive-foreground focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 [a&]:hover:bg-destructive/90",
         outline:
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         muted: "border-transparent bg-muted text-muted-foreground",

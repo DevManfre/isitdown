@@ -62,6 +62,21 @@ const VIEWS = [
 ];
 
 const THEMES = ["light", "dark"];
+
+/**
+ * The theme variants (roadmap 4.18) are audited but not baselined: they differ
+ * from the two above in a handful of palette values, which `tokens.test.ts`
+ * holds to arithmetic, so a picture of each would be four more files that move
+ * whenever anything does. What only a browser can say — does the page *as
+ * rendered* still pass axe, with these colours on these components — is what
+ * this pass is for. Each is paired with the colour scheme its ground is built on.
+ */
+const AUDITED_VARIANTS = [
+  { theme: "contrast", scheme: "light" },
+  { theme: "colorblind", scheme: "light" },
+  { theme: "oled", scheme: "dark" },
+];
+const AUDITED_VARIANT_VIEWS = ["overview", "providers", "incidents", "settings"];
 const LOCALES = ["en", "it"];
 
 /** 16:10 at a laptop width: the shape the dashboard was designed against. */
@@ -100,6 +115,15 @@ const MAX_RECOLOURED = 3;
  * moderate one, and a status dot is a small strong change.
  */
 const STRONG_THRESHOLD = 40;
+
+/**
+ * Rules axe may report on a frame without failing the run. Empty on purpose: a
+ * waiver goes here with the reason beside it, in the diff, or it does not go
+ * anywhere.
+ *
+ * @type {{ id: string, frame: RegExp, reason: string }[]}
+ */
+const ACCEPTED = [];
 
 const shotName = (view, theme, locale) => `${view}-${theme}-${locale}.png`;
 
@@ -158,6 +182,44 @@ async function withServer(body) {
   }
 }
 
+/**
+ * Prints what axe found, one block per rule with the frames it was found on,
+ * and says whether there was nothing to print.
+ *
+ * Violations are not baselined: a screenshot can be agreed to, a barrier cannot.
+ * A rule that has to be waived goes in `ACCEPTED` below with its reason, so the
+ * exception is in the diff where a reviewer reads it rather than in a number.
+ */
+function reportAccessibility(found) {
+  const live = found.filter((violation) => !ACCEPTED.some((rule) => rule.id === violation.id && rule.frame.test(violation.frame)));
+  if (live.length === 0) return true;
+  const byRule = new Map();
+  for (const violation of live) {
+    const entry = byRule.get(violation.id) ?? { violation, frames: [], targets: new Set(), summaries: new Map() };
+    entry.frames.push(violation.frame);
+    for (const node of violation.nodes) {
+      entry.targets.add(node.target);
+      entry.summaries.set(node.target, `${node.summary}\n${node.html}`);
+    }
+    byRule.set(violation.id, entry);
+  }
+  console.error(`axe found ${byRule.size} accessibility problem${byRule.size === 1 ? "" : "s"}:`);
+  const verbose = process.argv.includes("--verbose");
+  for (const { violation, frames, targets, summaries } of byRule.values()) {
+    console.error(`  ${violation.id} (${violation.impact}): ${violation.help}`);
+    console.error(`    on ${frames.length} frame${frames.length === 1 ? "" : "s"}: ${frames.slice(0, 4).join(", ")}${frames.length > 4 ? ", …" : ""}`);
+    const shown = verbose ? targets.size : 5;
+    for (const target of [...targets].slice(0, shown)) {
+      console.error(`    ${target}`);
+      // What axe says is wrong with this node — the contrast ratio, the name it
+      // computed — which is the half of the report a selector cannot give.
+      if (verbose) console.error(`      ${String(summaries.get(target)).replace(/\n\s*/g, " | ")}`);
+    }
+    if (targets.size > shown) console.error(`    … and ${targets.size - shown} more (--verbose lists them)`);
+  }
+  return false;
+}
+
 async function main() {
   const update = process.argv.includes("--update");
   const only = process.argv.find((argument) => argument.startsWith("--only="))?.slice("--only=".length);
@@ -174,6 +236,10 @@ async function main() {
   const targetDir = update ? BASELINE_DIR : OUTPUT_DIR;
   const failures = [];
   const written = [];
+  // What axe found on every frame (roadmap 4.20). Gathered across the run and
+  // reported together, so one bad token is one line per frame rather than a run
+  // that stops at the first.
+  const accessibility = [];
 
   await withServer(async (base) => {
     await withBrowser({ frozenAt: NOW, timeZone: TIME_ZONE }, async ({ shot }) => {
@@ -182,7 +248,7 @@ async function main() {
         for (const theme of THEMES) {
           for (const locale of LOCALES) {
             const name = shotName(view.name, theme, locale);
-            const png = await shot({
+            const { png, violations } = await shot({
               url: `${base}/${view.hash}`,
               colorScheme: theme,
               // Written straight into localStorage, which is where the
@@ -190,7 +256,11 @@ async function main() {
               // an operator's own browser takes.
               storage: { "isitdown.theme": theme, "isitdown.uiLocale": locale },
               ...VIEWPORT,
+              audit: true,
             });
+            for (const violation of violations) {
+              accessibility.push({ frame: `${view.name}-${theme}-${locale}`, ...violation });
+            }
 
             const path = join(targetDir, name);
             await writeFile(path, png);
@@ -223,8 +293,26 @@ async function main() {
           }
         }
       }
+      for (const { theme, scheme } of AUDITED_VARIANTS) {
+        for (const view of VIEWS) {
+          if (!AUDITED_VARIANT_VIEWS.includes(view.name)) continue;
+          if (only !== undefined && view.name !== only) continue;
+          const { violations } = await shot({
+            url: `${base}/${view.hash}`,
+            colorScheme: scheme,
+            storage: { "isitdown.theme": theme, "isitdown.uiLocale": "en" },
+            ...VIEWPORT,
+            audit: true,
+          });
+          for (const violation of violations) {
+            accessibility.push({ frame: `${view.name}-${theme}-en`, ...violation });
+          }
+        }
+      }
     });
   });
+
+  const accessible = reportAccessibility(accessibility);
 
   if (update) {
     // A view that was removed leaves a baseline nothing renders any more, and a
@@ -236,10 +324,14 @@ async function main() {
       for (const name of stale) await rm(join(BASELINE_DIR, name));
     }
     console.log(`agreed ${written.length} baselines${stale.length > 0 && only === undefined ? `, dropped ${stale.length} stale` : ""}`);
+    // Agreeing to a picture is not agreeing to a violation: the baselines are
+    // written, and the run still fails so the two are not mistaken for one.
+    if (!accessible) process.exit(1);
     return;
   }
 
-  if (failures.length > 0) {
+  if (failures.length > 0 || !accessible) {
+    if (failures.length === 0) process.exit(1);
     console.error(`visual regression in ${failures.length} of ${written.length} views:`);
     for (const failure of failures) console.error(`  ${failure}`);
     console.error("\nIf the change is intended: node tools/visual-regression.mjs --update");

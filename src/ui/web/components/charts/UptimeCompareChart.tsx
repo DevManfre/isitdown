@@ -34,6 +34,9 @@ export function UptimeCompareChart({
         labels.map((name, index) => [`s${index}`, { label: name, color: compareColor(index) }]),
       )}
       className="anim-bar h-44 w-full"
+      // A name on a bare <div> is ignored (axe: aria-prohibited-attr) — the
+      // role is what makes the conclusion in `label` reach a screen reader.
+      role="img"
       aria-label={label}
     >
       <LineChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>

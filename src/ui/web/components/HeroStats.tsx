@@ -2,6 +2,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { UptimeArc } from "@/components/charts/UptimeArc.tsx";
 import { DrillLink } from "@/components/DrillLink.tsx";
+import { formatPercent } from "@/lib/format.ts";
 import { historyHref } from "@/lib/drillDown.ts";
 import { OVERVIEW_WINDOW_DAYS } from "@/lib/fleetSlice.ts";
 import type { ProviderStatus } from "@/lib/types.ts";
@@ -78,7 +79,10 @@ export function HeroStats({ providers, average }: { providers: ProviderStatus[];
           </span>
           <DrillLink
             to={historyHref({ days: OVERVIEW_WINDOW_DAYS })}
-            label={t("drill.fleet-uptime", { count: OVERVIEW_WINDOW_DAYS })}
+            // The figure is in the name as well as on screen: an accessible name that
+            // leaves out the visible text fails WCAG 2.5.3 (axe, roadmap 4.20), and
+            // a voice-control user says what they see.
+            label={t("drill.fleet-uptime", { count: OVERVIEW_WINDOW_DAYS, uptime: formatPercent(i18n.language, average) })}
             where={t("drill.where.history-fleet", { count: OVERVIEW_WINDOW_DAYS })}
             className="w-fit font-mono text-sm"
           >

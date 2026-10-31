@@ -93,7 +93,7 @@ export function IncidentTimelineCard({ providers }: { providers: { id: string; n
             {lanes.map((lane) => (
               <div key={lane.providerId} className="contents">
                 <span className="truncate border-t py-2.5 pr-2 text-sm">{nameOf(lane.providerId)}</span>
-                <div className="relative h-10 border-t">
+                <div className="relative h-10 border-t [container-type:inline-size]">
                   {together.map((band) => (
                     <span
                       key={`${band.startMs}-${band.endMs}`}
@@ -129,13 +129,29 @@ export function IncidentTimelineCard({ providers }: { providers: { id: string; n
                         })}
                         aria-label={label}
                         title={label}
-                        className="absolute top-2.5 h-5 rounded-sm outline-offset-2 focus-visible:outline-2"
+                        // Roadmap 4.20 (WCAG 2.2 target size): the link is at least
+                        // 24px each way and centred on the bar, while the bar drawn
+                        // inside keeps its true width — a minute-long incident is a
+                        // sliver on a 30-day axis, and it is still something to click.
+                        // On a dense axis neighbours still overlap, which axe's
+                        // target-size reports on real data: that is inherent to a
+                        // Gantt, and WCAG 2.5.8 allows it where the same function
+                        // is on the page in a compliant control — every incident
+                        // here is also a full-size row in the list below.
+                        className="absolute top-1.5 h-7 min-w-6 -translate-x-1/2 rounded-sm outline-offset-2 focus-visible:outline-2"
                         style={{
-                          left: `${bar.left}%`,
+                          left: `calc(${bar.left}% + ${bar.width}% / 2)`,
                           width: `${bar.width}%`,
-                          backgroundColor: impactColor(bar.incident.impact),
                         }}
-                      />
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-y-1 left-1/2 -translate-x-1/2 rounded-sm"
+                          // `cqw` is a share of the lane (its container), which is
+                          // what `bar.width` is a percentage of.
+                          style={{ width: `calc(${bar.width} * 1cqw)`, backgroundColor: impactColor(bar.incident.impact) }}
+                        />
+                      </Link>
                     );
                   })}
                 </div>
