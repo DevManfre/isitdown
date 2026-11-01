@@ -26,6 +26,7 @@ export interface Shortcut {
 export const SHORTCUTS: readonly Shortcut[] = [
   { keys: ["g", "o"], action: { kind: "go", to: ROUTE_PATHS.overview }, labelKey: "shortcuts.go-overview", group: "navigation" },
   { keys: ["g", "p"], action: { kind: "go", to: ROUTE_PATHS.providers }, labelKey: "shortcuts.go-providers", group: "navigation" },
+  { keys: ["g", "c"], action: { kind: "go", to: ROUTE_PATHS.components }, labelKey: "shortcuts.go-components", group: "navigation" },
   { keys: ["g", "i"], action: { kind: "go", to: ROUTE_PATHS.incidents }, labelKey: "shortcuts.go-incidents", group: "navigation" },
   { keys: ["g", "h"], action: { kind: "go", to: ROUTE_PATHS.history }, labelKey: "shortcuts.go-history", group: "navigation" },
   { keys: ["g", "d"], action: { kind: "go", to: ROUTE_PATHS.deliveryLog }, labelKey: "shortcuts.go-delivery-log", group: "navigation" },

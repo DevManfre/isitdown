@@ -2,10 +2,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useRouteError } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
+import { ApiError } from "@/lib/api.ts";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+/**
+ * Whether the request never reached a server at all — the container stopped,
+ * the network gone — rather than a server that answered with an error
+ * (roadmap 4.21). Every `request` failure that has a response is an
+ * `ApiError`; `fetch` rejecting outright is a bare `TypeError`.
+ */
+const unreachable = (error: unknown): boolean => error instanceof TypeError && !(error instanceof ApiError);
 
 /**
  * Catches a failed initial load for any view. Mounted on the pathless
@@ -49,7 +58,14 @@ export function ViewError() {
 
   return (
     <div className="flex flex-col items-start gap-3">
-      <p className="text-muted-foreground">{t("error.load-failed", { error: errorMessage(error) })}</p>
+      {unreachable(error) ? (
+        <div role="alert" className="flex flex-col gap-1">
+          <p className="font-medium">{t("error.unreachable.title")}</p>
+          <p className="max-w-[60ch] text-sm text-muted-foreground">{t("error.unreachable.body")}</p>
+        </div>
+      ) : (
+        <p role="alert" className="text-muted-foreground">{t("error.load-failed", { error: errorMessage(error) })}</p>
+      )}
       <Button
         type="button"
         variant="secondary"
