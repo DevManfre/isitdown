@@ -20,6 +20,8 @@ export const ROUTE_PATHS = {
    * stays the one-click look, not the only way in.
    */
   providerDetail: "/providers/:providerId",
+  /** Every component of every provider — roadmap 4.23. */
+  components: "/components",
   incidents: "/incidents",
   incidentDetail: "/incidents/:providerId/:incidentId",
   history: "/history",
@@ -47,6 +49,7 @@ export type NavRouteName = Exclude<
 export const NAV_ROUTES: { name: NavRouteName; labelKey: string }[] = [
   { name: "overview", labelKey: "nav.overview" },
   { name: "providers", labelKey: "nav.providers" },
+  { name: "components", labelKey: "nav.components" },
   { name: "incidents", labelKey: "nav.incidents" },
   { name: "history", labelKey: "nav.history" },
   { name: "deliveryLog", labelKey: "nav.delivery-log" },

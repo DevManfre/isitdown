@@ -165,7 +165,7 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   specificità zero, sotto quello che una primitiva ha già.
 - **Scorciatoie da tastiera** (roadmap 4.17). La grammatica di GitHub e Linear: `g`
   seguito da una lettera porta da qualche parte — `g o` Panoramica, `g p` Provider,
-  `g i` Incidenti, `g h` Storico, `g d` Registro delle consegne, `g s` Impostazioni —
+  `g c` Componenti, `g i` Incidenti, `g h` Storico, `g d` Registro delle consegne, `g s` Impostazioni —
   e un tasto da solo fa una cosa: `/` apre la palette, `p` interroga ora, `?` mostra
   la mappa di tutte (anche nella palette). Restano fuori da un campo di testo, da un
   dialogo aperto e da qualunque combinazione con ⌘, Ctrl o Alt, e una `g` dimenticata
@@ -190,6 +190,32 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   un'unica area educata nascosta nella shell nomina i provider il cui stato è cambiato
   dall'ultima lettura (tre nominati, gli altri contati), la pila dei toast annuncia ogni
   nuova scheda da sola e una scrittura rifiutata è un avviso.
+- **Componenti** (roadmap 4.23). Tutti i componenti di tutti i provider in una tabella,
+  i peggiori prima, su `#/components` — "c'è qualcosa che si chiama API giù?" senza
+  aprire ogni provider. Il filtro testuale cerca nel nome del componente o del suo
+  provider (è così che si trova "eu-west": i componenti non hanno una regione propria),
+  e i chip di stato contano quanti ne ha ogni stato; entrambi stanno nell'indirizzo
+  come i filtri della 4.16.
+- **Modalità incidente** (roadmap 4.22). Finché è aperta un'interruzione grave — su un
+  provider né silenziato né in una finestra di manutenzione dichiarata — una banda
+  sopra il layout della Panoramica porta l'incidente, da quanto è aperto, chi altro
+  coinvolge, gli ultimi aggiornamenti con le note dell'operatore, le annotazioni
+  dell'ultimo giorno e un campo "Aggiungi una nota". "Torna alla vista normale" la
+  nasconde solo per quell'incidente; il successivo la riporta. Alla risoluzione, una
+  striscia di una riga dice quanto è durato per dieci minuti, con un link
+  all'incidente per il post-mortem.
+- **Ordine della flotta** (roadmap 4.24). "Ordina" sulla Panoramica apre un dialogo in
+  cui provider e gruppi si trascinano — o si spostano con le frecce accanto a ogni
+  riga — nell'ordine in cui i widget della Panoramica e il wallboard li elencano.
+  L'ordine è tenuto dall'istanza (`fleetOrder` e `groupOrder` in `/api/preferences`),
+  così lo schermo in ufficio concorda con il portatile che l'ha sistemato; un provider
+  aggiunto dopo va in fondo, e "Ordine automatico" lo dimentica.
+- **Stati vuoti, di caricamento ed errore, rivisti insieme** (roadmap 4.21). L'harness
+  visivo cattura anche ogni vista senza nulla configurato, con una flotta tranquilla
+  che non ha ancora incidenti, storia o messaggi, e con il backend spento. La passata
+  ne ha cambiati tre: una finestra senza letture mostra `—` invece di 0,00% e non
+  nomina un provider migliore o peggiore, un server fermo lo dice invece di "Failed
+  to fetch", e la Panoramica vuota non offre più una storia di 90 giorni del nulla.
 - **La palette dei comandi.** `⌘K` (o `Ctrl+K`) su qualsiasi schermata — oppure
   il pulsante di ricerca nell'header, che porta scritta la scorciatoia perché il
   secondo utilizzo sia da tastiera — apre una
