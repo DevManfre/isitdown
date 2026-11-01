@@ -1,6 +1,6 @@
 ---
 name: git-commit-style
-description: Use whenever writing a git commit message, amending a commit, squashing, or drafting commits in a PR — enforces the "<emoji> <TITLE> - <description>" gitmoji format, English-only text, and the absolute ban on adding Claude as co-author.
+description: Use whenever writing a git commit message, amending a commit, squashing, drafting commits in a PR, or opening a feature pull request into dev — enforces the "<emoji> <TITLE> - <description>" gitmoji format, English-only text, the absolute ban on adding Claude as co-author, and deleting the previous merged feature branches before a new PR.
 ---
 
 # Git Commit Style
@@ -149,6 +149,27 @@ EOF
 ## Splitting commits
 
 If the diff mixes intents (a feature + an unrelated formatting pass), stage and commit them separately with `git add -p`. One emoji per commit is the forcing function that keeps history readable.
+
+## Opening a feature PR into dev: clean up the previous branch
+
+Every time you open a pull request from a feature branch into `dev` (releases into `main` follow `release-flow` instead), first delete the feature branches left over from earlier PRs, both locally and on `origin`. That way only `dev`, `main` and the branch of the new PR remain.
+
+```bash
+git fetch --prune
+for b in $(git branch --format='%(refname:short)' | grep -vE '^(dev|main)$'); do
+  [ "$b" = "$(git branch --show-current)" ] && continue   # the branch of the PR being opened
+  if [ "$(git rev-list --count origin/dev.."$b")" = 0 ]; then
+    git branch -d "$b" && git push origin --delete "$b" 2>/dev/null
+  else
+    echo "KEEP $b: has commits not in dev"                 # stop and ask the user
+  fi
+done
+```
+
+- Delete only branches whose commits are all in `dev`. Use `git branch -d`, never `-D`.
+- If a branch still has commits that are not in `dev` (often an open or forgotten PR), do not delete it. Name it to the user and ask. Deleting it on `origin` closes its PR and can lose work.
+- Never delete the branch the new PR comes from, or `dev` or `main`.
+- Opening the PR itself still follows the rules above: English title in the gitmoji format, and no Claude attribution in the body.
 
 ## Red flags
 
