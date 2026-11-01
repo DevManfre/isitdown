@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { isApplePlatform } from "@/lib/shortcut.ts";
 import {
   Activity,
+  Boxes,
   History,
   Menu,
   Monitor,
@@ -47,6 +48,7 @@ const TAB_ROUTES: NavRouteName[] = ["overview", "providers", "incidents", "histo
 const NAV_ICONS: Record<NavRouteName, LucideIcon> = {
   overview: Activity,
   providers: Server,
+  components: Boxes,
   incidents: TriangleAlert,
   history: History,
   deliveryLog: Send,

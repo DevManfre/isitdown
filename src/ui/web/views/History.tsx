@@ -242,8 +242,13 @@ export function History() {
   // other two are sums over the window. Empty fleets never reach the tiles
   // (the block is gated on `ordered.length`), so the non-null assertions here
   // are the same guard read twice.
-  const worst = ordered[0] as ProviderHistory;
-  const best = ordered[ordered.length - 1] as ProviderHistory;
+  //
+  // Roadmap 4.21: only among providers with a reading in the window. One that
+  // was never measured has no uptime, which is not 0% — ranking it would name
+  // a "worst provider" for a fleet that has simply not been polled yet.
+  const measured = ordered.filter((provider) => provider.sampleCount > 0);
+  const worst = measured[0];
+  const best = measured.at(-1);
   const totalIncidents = summary.providers.reduce(
     (sum, p) => sum + p.incidentCount,
     0,
@@ -357,12 +362,20 @@ export function History() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="w-fit cursor-help font-mono text-3xl font-medium decoration-dotted underline-offset-4 hover:underline">
-                      <NumberTicker
-                        locale={i18n.language}
-                        value={summary.aggregateUptime}
-                        decimalPlaces={2}
-                        suffix="%"
-                      />
+                      {measured.length === 0 ? (
+                        // Never a 0.00% for a window nothing was read in.
+                        <span>
+              <span aria-hidden="true">—</span>
+              <span className="sr-only">{t("history.unmeasured")}</span>
+            </span>
+                      ) : (
+                        <NumberTicker
+                          locale={i18n.language}
+                          value={summary.aggregateUptime}
+                          decimalPlaces={2}
+                          suffix="%"
+                        />
+                      )}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
@@ -544,15 +557,15 @@ export function History() {
                 {
                   id: "best",
                   label: t("history.stat.best"),
-                  value: nameOf(best.providerId),
-                  note: percent(uptimeForRange(best, days)),
+                  value: best === undefined ? "—" : nameOf(best.providerId),
+                  note: best === undefined ? t("history.unmeasured") : percent(uptimeForRange(best, days)),
                   accent: "var(--status-operational)",
                 },
                 {
                   id: "worst",
                   label: t("history.stat.worst"),
-                  value: nameOf(worst.providerId),
-                  note: percent(uptimeForRange(worst, days)),
+                  value: worst === undefined ? "—" : nameOf(worst.providerId),
+                  note: worst === undefined ? t("history.unmeasured") : percent(uptimeForRange(worst, days)),
                   accent: "var(--status-major-outage)",
                 },
                 {

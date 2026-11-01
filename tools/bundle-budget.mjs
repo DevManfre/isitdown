@@ -145,8 +145,15 @@ const ASSETS = "dist/ui/public/assets";
  * announcer, and some sixty strings in six catalogs. Measured: 667.1 kB before,
  * 674.8 kB after — 7.7 kB gzipped, most of it the strings and the two dialogs'
  * worth of components; CSS 21.7 -> 22.0 kB for the variants' override blocks.
+ *
+ * It moved 695,500 -> 709,500 (679.2 -> 692.9 kB) for roadmaps 4.21 to 4.24:
+ * the Components view, the incident band, the fleet-order dialog, the
+ * unreachable-server and unmeasured states, and some seventy-five strings in
+ * six catalogs. Measured: 675.6 kB before, 687.6 kB after — 12.0 kB gzipped, of
+ * which the dialog with motion's `Reorder` is 3.1 kB and the rest is mostly the
+ * strings (51 kB raw over the whole change, nearly all of it catalog text).
  */
-export const BUDGET = { js: 695_500, css: 23_000 };
+export const BUDGET = { js: 709_500, css: 23_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

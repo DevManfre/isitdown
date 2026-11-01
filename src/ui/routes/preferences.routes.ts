@@ -12,6 +12,16 @@ import {
 import { THEME_MODES } from "../themeModes.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 
+/**
+ * A manual fleet or group order — roadmap 4.24. Distinct slugs only: a
+ * duplicate would rank one provider twice, and a comma would split into two
+ * once stored (see `slugListSetting`). Capped well above any real fleet.
+ */
+const slugOrder = z
+  .array(z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "must be a lowercase slug"))
+  .max(1000)
+  .refine((ids) => new Set(ids).size === ids.length, { message: "must not repeat an id" });
+
 const LOCALES_DIR = new URL("../web/locales/", import.meta.url);
 
 /**
@@ -60,6 +70,8 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
     density: z.enum(["comfortable", "compact"]).optional(),
     wizardDone: z.boolean().optional(),
     tourSeen: z.boolean().optional(),
+    fleetOrder: slugOrder.optional(),
+    groupOrder: slugOrder.optional(),
     // Validated against the runtime's own zone table rather than a hand-kept
     // list: "is this a zone?" is a question Intl can answer exactly, and a
     // preference that stores a name nothing can format is a dashboard of
@@ -87,6 +99,8 @@ export function preferencesRoutes(runtime: UiRuntimeCore): Router {
       notificationLocale: settings.notificationLocale,
       mapView: settings.mapView,
       density: settings.density,
+      fleetOrder: settings.fleetOrder,
+      groupOrder: settings.groupOrder,
       wizardDone: settings.wizardDone,
       tourSeen: settings.tourSeen,
       timeZone: settings.timeZone,

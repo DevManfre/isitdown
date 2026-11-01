@@ -50,8 +50,8 @@ docker history isitdown:ui --no-trunc --format "{{.CreatedBy}}" | grep -iE "TOKE
 
 ### 5.2 La dashboard
 
-Apri **http://localhost:3000** e percorri il rail: Overview · Providers · Incidents ·
-History · Log invii · Settings. Poi prova i due controlli a runtime nell'header:
+Apri **http://localhost:3000** e percorri il rail: Overview · Providers · Componenti ·
+Incidents · History · Log invii · Settings. Poi prova i due controlli a runtime nell'header:
 
 - il pulsante del **tema** cicla chiaro → scuro → sistema e sopravvive a un reload;
 - lo switch **EN / IT** cambia ogni stringa senza ricaricare la pagina, incluso il
