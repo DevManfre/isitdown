@@ -23,8 +23,27 @@
       (function () {
         try {
           var stored = localStorage.getItem("isitdown.theme");
-          if (stored === "light" || stored === "dark") {
-            document.documentElement.setAttribute("data-theme", stored);
+          // Same table as STAMPS in hooks/useTheme.tsx: a variant is a ground
+          // plus a correction laid over it (roadmap 4.18).
+          var stamps = {
+            light: ["light"], dark: ["dark"], contrast: ["light", "contrast"],
+            colorblind: ["light", "colorblind"], oled: ["dark", "oled"]
+          };
+          var stamp = stored && stamps.hasOwnProperty(stored) ? stamps[stored] : null;
+          if (stamp) {
+            document.documentElement.setAttribute("data-theme", stamp[0]);
+            if (stamp[1]) document.documentElement.setAttribute("data-variant", stamp[1]);
+          }
+          // The custom accent (roadmap 4.19), already worked out by
+          // lib/accent.ts the last time it was chosen. The high-contrast theme
+          // keeps its own accent, so it is not painted there.
+          var identity = JSON.parse(localStorage.getItem("isitdown.identity") || "null");
+          if (identity && stored !== "contrast") {
+            var style = document.documentElement.style;
+            style.setProperty("--color-accent", identity.accent);
+            style.setProperty("--status-accent", identity.accent);
+            style.setProperty("--primary-foreground", identity.foreground);
+            style.setProperty("--primary-hover", identity.hover);
           }
           var lang = localStorage.getItem("isitdown.uiLocale");
           if (lang) document.documentElement.setAttribute("lang", lang);

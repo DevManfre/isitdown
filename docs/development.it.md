@@ -243,7 +243,7 @@ npm test                 # suite node:test + vitest run
 npm run coverage         # le stesse due suite sotto una soglia minima di copertura
                          # (coverage:server e coverage:web ne eseguono una ciascuno, come fa la CI)
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
-npm run test:visual      # baseline visive: ogni vista, entrambi i temi, entrambe le lingue
+npm run test:visual      # baseline visive + un passaggio axe-core: ogni vista, entrambi i temi, entrambe le lingue
 npm run test:mutation    # mutation testing sul diff engine
 npm run test:load        # 200 provider sintetici, una settimana di storico, ogni lettura cronometrata
 npm run canary           # ogni pagina del catalogo, dal vivo, contro i fixture del suo adapter (1.9)
@@ -269,6 +269,18 @@ attuale, così il movimento ordinario passa e un sottosistema nuovo che arriva
 senza test propri trascina il totale sotto la soglia e fa fallire la CI. Alza una
 soglia quando la suite è davvero salita; non abbassarne mai una per far tornare
 verde una run rossa.
+
+Il **passaggio sull'accessibilità** (roadmap 4.20) viaggia sull'harness visivo: dopo
+che ogni vista si è assestata, `tools/visual-regression.mjs` inietta axe-core e
+controlla WCAG 2.0 e 2.1 A e AA più 2.2 AA (le regole di best practice sono escluse
+di proposito). A differenza di uno screenshot, una violazione non viene mai messa a
+baseline — l'esecuzione fallisce e stampa la regola, le schermate in cui è stata
+trovata e un selettore ciascuna (`--verbose` aggiunge ciò che axe ha misurato e il
+markup del nodo), anche con `--update`, così accettare un'immagine non si confonde con
+accettare una barriera. Anche le tre varianti di tema vengono verificate, senza
+baseline. Una regola che va derogata entra in `ACCEPTED` nell'harness con la sua
+ragione accanto. axe-core è una dipendenza di sviluppo, iniettata nella pagina e non
+distribuita con essa.
 
 Il **load test** (roadmap 7.4) risponde a una domanda che le altre suite non
 pongono: non "è veloce" ma "dove smette di esserlo". `tools/loadtest.mjs`

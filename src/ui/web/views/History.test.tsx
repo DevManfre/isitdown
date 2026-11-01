@@ -319,7 +319,9 @@ describe("a provider's component breakdown (ComponentRows)", () => {
    */
   const openDrawer = async (): Promise<HTMLElement> => {
     await userEvent.click(
-      await screen.findByRole("button", { name: i18n.t("history.open-detail", { name: "GitHub" }) }),
+      // Named by what the row shows (provider, figures) with the invitation as
+      // its description — see ProviderTrendRow — so it is found by the first.
+      (await screen.findAllByRole("button", { description: i18n.t("history.open-detail", { name: "GitHub" }) }))[0] as HTMLElement,
     );
     return screen.findByRole("dialog");
   };
@@ -728,13 +730,21 @@ describe("a provider's detail drawer", () => {
       expect(calls.some((path) => path.startsWith("/history?days=30"))).toBe(true);
     });
 
-    it("lets go of the provider, chip and address both, when its drawer closes", async () => {
+    // The window is the page's own state since roadmap 4.16, carried by the
+    // address like the range beside it, so it outlives the drawer: closing the
+    // drawer lets go of the provider and of the marker saying where the link came
+    // from, and nothing else.
+    it("lets go of the provider and the marker, but keeps the window, when its drawer closes", async () => {
       const user = userEvent.setup();
       renderWithProviders(<History />, twoProviders, "/", "/?provider=cloudflare&days=30&from=overview");
       await screen.findByRole("dialog");
       await user.keyboard("{Escape}");
       expect(screen.queryByText(i18n.t("drill.from-overview"))).toBeNull();
-      expect(window.location.hash).toBe("#/");
+      expect(window.location.hash).toBe("#/?days=30");
+      expect(screen.getByRole("radio", { name: i18n.t("column.range", { days: 30 }) })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
     });
   });
 });

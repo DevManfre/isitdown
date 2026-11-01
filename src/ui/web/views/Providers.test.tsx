@@ -888,3 +888,39 @@ describe("a fleet large enough to be a problem", () => {
     expect(document.querySelector("tr[data-spacer]")).toBeNull();
   });
 });
+
+// Roadmap 4.16: the column sort and the all/issues toggle are carried by the
+// address and remembered.
+describe("Providers remembers its sort and filter", () => {
+  it("puts the sort in the address, and takes it out when the third click drops it", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Providers />, { status, history });
+    await (await inTable()).findByText("GitHub");
+    await sortBy(user, "column.provider");
+    expect(window.location.hash).toContain("sort=name.asc");
+    await sortBy(user, "column.provider");
+    expect(window.location.hash).toContain("sort=name.desc");
+    await sortBy(user, "column.provider");
+    expect(window.location.hash).not.toContain("sort");
+  });
+
+  it("reopens in the order it was left in", async () => {
+    localStorage.setItem("isitdown.views", JSON.stringify({ providers: { sort: "name.desc" } }));
+    renderWithProviders(<Providers />, { status, history });
+    await (await inTable()).findByText("GitHub");
+    expect(renderedOrder()).toEqual(["GitHub", "Discord", "Cloudflare"]);
+  });
+
+  it("opens in the order a link names, over the one it was left in", async () => {
+    localStorage.setItem("isitdown.views", JSON.stringify({ providers: { sort: "name.desc" } }));
+    renderWithProviders(<Providers />, { status, history }, "/", "/?sort=name.asc");
+    await (await inTable()).findByText("GitHub");
+    expect(renderedOrder()).toEqual(["Cloudflare", "Discord", "GitHub"]);
+  });
+
+  it("ignores a sort that names no column", async () => {
+    renderWithProviders(<Providers />, { status, history }, "/", "/?sort=password.asc");
+    await (await inTable()).findByText("GitHub");
+    expect(renderedOrder()).toEqual(["Discord", "Cloudflare", "GitHub"]);
+  });
+});

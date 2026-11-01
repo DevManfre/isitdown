@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router";
+import { useViewParam } from "@/hooks/useViewParam.ts";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Card } from "@/components/ui/card.tsx";
@@ -74,10 +74,11 @@ export function DeliveryLog() {
   const { t, i18n } = useTranslation();
   // Roadmap 4.3: a delivery count on the Overview arrives with its state in the
   // address. Failures stay the default — they are what this view is for.
-  const [params] = useSearchParams();
-  const asked = params.get("state");
-  const [state, setState] = useState<DeliveryState>(
-    asked === "all" || asked === "sent" || asked === "failed" ? asked : "failed",
+  // Roadmap 4.16: carried by the address and remembered, with the same
+  // precedence as everywhere else — the address, then what was left, then the
+  // failures this view is for.
+  const [state, setState] = useViewParam<DeliveryState>("delivery-log", "state", "failed", (raw) =>
+    raw === "all" || raw === "sent" || raw === "failed" ? raw : null,
   );
   const [channel, setChannel] = useState<string>(ALL_CHANNELS);
   const [page, setPage] = useState(1);
