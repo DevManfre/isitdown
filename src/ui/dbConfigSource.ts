@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
+import { THEME_MODES, type ThemeMode } from "./themeModes.ts";
 import {
   componentSelectionSchema,
   deliverySchema,
@@ -54,7 +55,38 @@ const booleanSetting = z
 /** A 24-hour wall clock time, the shape `quietHoursSchema` accepts. */
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
-export type ThemePreference = "light" | "dark" | "system";
+export type ThemePreference = ThemeMode;
+
+/** Longest instance name the header has room for before it truncates anyway. */
+export const INSTANCE_NAME_MAX = 40;
+
+/**
+ * `#rrggbb` or nothing. A named colour or a `var(...)` would be written into a
+ * stylesheet the operator never reviews, so the one shape that cannot carry
+ * anything but a colour is the only one stored.
+ */
+export const accentColor = z.union([z.string().regex(/^#[0-9a-f]{6}$/i), z.literal("")]);
+
+/**
+ * An address the browser can load an image from: absolute http(s), or a path on
+ * this same host. Never `javascript:` or `data:` — the value lands in an
+ * `<img src>` that every viewer's browser fetches.
+ */
+export const logoUrl = z.union([
+  z
+    .string()
+    .max(500)
+    .refine((value) => {
+      if (value.startsWith("/") && !value.startsWith("//")) return true;
+      try {
+        const { protocol } = new URL(value);
+        return protocol === "https:" || protocol === "http:";
+      } catch {
+        return false;
+      }
+    }),
+  z.literal(""),
+]);
 
 const settingsSchema = z.object({
   pollIntervalMinutes: z.coerce.number().int().positive().max(1440).catch(3),
@@ -103,7 +135,16 @@ const settingsSchema = z.object({
    * anyone who wants year-on-year comparisons more than they want the disk.
    */
   retentionDays: z.coerce.number().int().min(7).max(3650).catch(120),
-  theme: z.enum(["light", "dark", "system"]).catch("system"),
+  theme: z.enum(THEME_MODES).catch("system"),
+  /**
+   * Instance identity (roadmap 4.19): the accent colour, the name and the logo
+   * a dashboard on an office monitor — or a public page — carries as its own.
+   * Empty means "the product's own", so a fresh install and a cleared field are
+   * the same thing, and each falls back on its own rather than together.
+   */
+  accentColor: accentColor.catch(""),
+  instanceName: z.string().trim().max(INSTANCE_NAME_MAX).catch(""),
+  logoUrl: logoUrl.catch(""),
   /**
    * Which zone clock times are rendered in. `auto` — the default — is the
    * browser's own, which is why the preference is stored as a name rather than

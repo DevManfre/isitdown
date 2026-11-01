@@ -1,6 +1,8 @@
 import { Outlet, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { CommandPalette } from "@/components/CommandPalette.tsx";
+import { ShortcutsDialog } from "@/components/ShortcutsDialog.tsx";
+import { StatusAnnouncer } from "@/components/StatusAnnouncer.tsx";
 import { GuidedTour } from "@/components/GuidedTour.tsx";
 import { SetupWizard } from "@/components/SetupWizard.tsx";
 import { DashboardActions } from "@/components/dashboards/DashboardActions.tsx";
@@ -12,6 +14,8 @@ import { ViewFrame } from "@/components/ViewFrame.tsx";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useTheme } from "@/hooks/useTheme.tsx";
 import { useDocumentStatus } from "@/hooks/useDocumentStatus.tsx";
+import { useAccent } from "@/hooks/useInstanceIdentity.ts";
+import { useShortcuts } from "@/hooks/useShortcuts.ts";
 import { usePreferenceSync } from "@/hooks/usePreferenceSync.tsx";
 import { usePreferences } from "@/hooks/queries.ts";
 import { useViewReady } from "@/hooks/useViewReady.ts";
@@ -54,6 +58,12 @@ export function App() {
   // default theme and again in the operator's.
   const seeded = usePreferenceSync();
   const { data: preferences } = usePreferences();
+  // Roadmap 4.19. In the shell for the seed's reason: the accent belongs to the
+  // document, not to any one view.
+  useAccent();
+  // Roadmap 4.17. The keys answer on every screen, so the listener lives in
+  // the shell with the palette it complements.
+  useShortcuts();
   // The browser tab reflects the worst status in the fleet. Mounted in the
   // shell, like the seed above, because the tab belongs to no single view.
   useDocumentStatus();
@@ -84,6 +94,10 @@ export function App() {
           shortcut has to answer on every screen, and a palette mounted inside
           a view would take its own key listener away with it on navigation. */}
       <CommandPalette />
+      <ShortcutsDialog />
+      {/* Roadmap 4.20. What the stream changes, said aloud: in the shell because
+          no single view owns the fleet. */}
+      <StatusAnnouncer />
       {/* Roadmaps 4.5 and 4.6: first-run chrome, in the shell for the palette's reason. */}
       <SetupWizard />
       <GuidedTour />

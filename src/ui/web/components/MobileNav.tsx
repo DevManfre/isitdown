@@ -20,7 +20,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { openCommandPalette } from "./CommandPalette.tsx";
 import { NAV_ROUTES, ROUTE_PATHS, type NavRouteName } from "../../routePaths.ts";
 import { useConfigChrome, usePreferencesMutation, useStatusChrome } from "@/hooks/queries.ts";
-import { useTheme, type ThemeMode } from "@/hooks/useTheme.tsx";
+import { useTheme } from "@/hooks/useTheme.tsx";
+import { BASE_THEMES } from "../../themeModes.ts";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -53,7 +54,9 @@ const NAV_ICONS: Record<NavRouteName, LucideIcon> = {
   incidentDetail: TriangleAlert,
 };
 
-const THEME_ICONS: Record<ThemeMode, LucideIcon> = {
+// The base three: the variants (roadmap 4.18) are picked in Settings, where each
+// one is explained, and the sheet keeps its three-up row.
+const THEME_ICONS: Record<(typeof BASE_THEMES)[number], LucideIcon> = {
   light: Sun,
   dark: Moon,
   system: Monitor,
@@ -199,7 +202,7 @@ export function MobileNav() {
                 a phone has room for the whole set, and a control that has to be
                 pressed twice to reach "system" is worse than one that says so. */}
             <div className="mobile-more-group grid grid-cols-3 gap-1 rounded-md bg-muted/60 p-1">
-              {(Object.keys(THEME_ICONS) as ThemeMode[]).map((option) => {
+              {(Object.keys(THEME_ICONS) as (keyof typeof THEME_ICONS)[]).map((option) => {
                 const Icon = THEME_ICONS[option];
                 return (
                   <button
