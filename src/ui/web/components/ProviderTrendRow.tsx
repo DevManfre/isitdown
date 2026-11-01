@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { DeltaChip } from "@/components/DeltaChip.tsx";
@@ -31,61 +32,75 @@ export function ProviderTrendRow({
 }) {
   const { t, i18n } = useTranslation();
   const uptime = uptimeForRange(provider, days);
+  const describedBy = useId();
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      aria-label={t("history.open-detail", { name })}
-      // `subgrid`, not a grid template of its own: the tracks belong to the
-      // list, so every row's figure sits under the header that names it.
-      // `subgrid`, not a grid template of its own: the tracks belong to the
-      // list, so every row's figure sits under the header that names it. Below
-      // `md` the list is a column of cards and there are no shared tracks to
-      // sit under, so the row draws its own two-column card instead.
-      className="history-row anim-rise grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-md border border-border p-3 text-left hover:bg-muted/40 lg:col-span-full lg:grid-cols-subgrid lg:gap-y-0 lg:border-0 lg:px-2 lg:py-2"
-      style={{ animationDelay: delay }}
-    >
-      <span className="col-start-1 row-start-1 flex items-center gap-2 text-sm">
-        <StatusDot status={status} label={t(statusLabelKey(status))} />
-        <span className="provider-name break-words">{name}</span>
+    <>
+      {/* Outside the button, so the invitation is its description and not a
+          second copy of it in its name. Out of flow (`sr-only` is absolutely
+          positioned), so the list's grid sees no extra item. */}
+      <span id={describedBy} className="sr-only">
+        {t("history.open-detail", { name })}
       </span>
-      <span className="col-span-2 col-start-1 row-start-3 lg:col-span-1 lg:col-start-2 lg:row-start-1">
-        <TrendSparkline series={provider.dailySeries} />
-      </span>
-      <span className="col-start-2 row-start-1 text-right font-mono text-sm lg:col-start-3 lg:text-left">
-        <NumberTicker locale={i18n.language} value={uptime} decimalPlaces={2} suffix="%" />
-      </span>
-      {/* The chip is wrapped rather than dropped in bare: `DeltaChip` renders
-          nothing at all for a provider with no previous window, and a row that
-          emits no element for a track loses the track — its incidents cell
-          slides left into the delta column and the header stops matching. An
-          empty span holds the column open. */}
-      <span className="col-start-1 row-start-2 lg:col-start-4 lg:row-start-1">
-        <DeltaChip
-          delta={
-            provider.previousUptime === null
-              ? null
-              : Math.round((uptime - provider.previousUptime) * 100) / 100
-          }
-          days={days}
-          compact
-        />
-      </span>
-      <span className="col-start-2 row-start-2 text-right font-mono text-xs text-muted-foreground lg:col-start-5 lg:row-start-1 lg:text-left">
-        <Trans
-          i18nKey="history.incidents"
-          count={provider.incidentCount}
-          values={{ count: provider.incidentCount }}
-          components={[<NumberTicker locale={i18n.language} value={provider.incidentCount} />]}
-        />
-        {" · "}
-        <Trans
-          i18nKey="history.downtime"
-          values={{ minutes: provider.downtimeMinutes }}
-          components={[<NumberTicker locale={i18n.language} value={provider.downtimeMinutes} />]}
-        />
-      </span>
-    </button>
+      <button
+        type="button"
+        onClick={onOpen}
+        // Named by what it shows rather than by a label of its own: axe's
+        // label-content-name-mismatch (WCAG 2.5.3) fails an `aria-label` that
+        // leaves out the figures printed on the row, and a screen reader is better
+        // served hearing them — provider, status, uptime — than "Open … detail".
+        // The invitation is the description.
+        aria-describedby={describedBy}
+        // `subgrid`, not a grid template of its own: the tracks belong to the
+        // list, so every row's figure sits under the header that names it.
+        // `subgrid`, not a grid template of its own: the tracks belong to the
+        // list, so every row's figure sits under the header that names it. Below
+        // `md` the list is a column of cards and there are no shared tracks to
+        // sit under, so the row draws its own two-column card instead.
+        className="history-row anim-rise grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-md border border-border p-3 text-left hover:bg-muted/40 lg:col-span-full lg:grid-cols-subgrid lg:gap-y-0 lg:border-0 lg:px-2 lg:py-2"
+        style={{ animationDelay: delay }}
+      >
+        <span className="col-start-1 row-start-1 flex items-center gap-2 text-sm">
+          <StatusDot status={status} label={t(statusLabelKey(status))} />
+          <span className="provider-name break-words">{name}</span>
+        </span>
+        <span className="col-span-2 col-start-1 row-start-3 lg:col-span-1 lg:col-start-2 lg:row-start-1">
+          <TrendSparkline series={provider.dailySeries} />
+        </span>
+        <span className="col-start-2 row-start-1 text-right font-mono text-sm lg:col-start-3 lg:text-left">
+          <NumberTicker locale={i18n.language} value={uptime} decimalPlaces={2} suffix="%" />
+        </span>
+        {/* The chip is wrapped rather than dropped in bare: `DeltaChip` renders
+            nothing at all for a provider with no previous window, and a row that
+            emits no element for a track loses the track — its incidents cell
+            slides left into the delta column and the header stops matching. An
+            empty span holds the column open. */}
+        <span className="col-start-1 row-start-2 lg:col-start-4 lg:row-start-1">
+          <DeltaChip
+            delta={
+              provider.previousUptime === null
+                ? null
+                : Math.round((uptime - provider.previousUptime) * 100) / 100
+            }
+            days={days}
+            compact
+          />
+        </span>
+        <span className="col-start-2 row-start-2 text-right font-mono text-xs text-muted-foreground lg:col-start-5 lg:row-start-1 lg:text-left">
+          <Trans
+            i18nKey="history.incidents"
+            count={provider.incidentCount}
+            values={{ count: provider.incidentCount }}
+            components={[<NumberTicker locale={i18n.language} value={provider.incidentCount} />]}
+          />
+          {" · "}
+          <Trans
+            i18nKey="history.downtime"
+            values={{ minutes: provider.downtimeMinutes }}
+            components={[<NumberTicker locale={i18n.language} value={provider.downtimeMinutes} />]}
+          />
+        </span>
+      </button>
+    </>
   );
 }

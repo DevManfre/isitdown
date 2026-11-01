@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { DownloadMenu } from "@/components/DownloadMenu.tsx";
 import { FromOverviewChip } from "@/components/DrillLink.tsx";
-import { readDays, snapWindow } from "@/lib/drillDown.ts";
+import { FROM_PARAM, readDays, snapWindow } from "@/lib/drillDown.ts";
+import { useViewParam } from "@/hooks/useViewParam.ts";
 import { Card } from "@/components/ui/card.tsx";
 import { BorderBeam } from "@/components/ui/border-beam.tsx";
 import { DotPattern } from "@/components/ui/dot-pattern.tsx";
@@ -63,25 +64,21 @@ type TimelineListEntry =
   | { kind: "incident"; at: string; incident: IncidentRow }
   | { kind: "maintenance"; at: string; maintenance: MaintenanceRow };
 
-/** Chosen filter survives reload, the way the rail's collapsed state does. */
-const FILTER_STORAGE_KEY = "isitdown.incidentFilter";
+/** The filter as the address and the memory carry it (roadmap 4.16): a legal state, or nothing. */
+const parseFilter = (raw: string): Filter | null => FILTERS.find((entry) => entry.value === raw)?.value ?? null;
 
-function readFilter(): Filter {
-  try {
-    const stored = localStorage.getItem(FILTER_STORAGE_KEY);
-    return FILTERS.some((entry) => entry.value === stored) ? (stored as Filter) : "all";
-  } catch {
-    return "all";
-  }
-}
+/**
+ * The window as text, snapped to one the control has: an address from the
+ * Overview (roadmap 4.3) can name any number of days, a pill cannot.
+ */
+const parseWindow = (raw: string): string | null => {
+  if (raw === "0") return raw;
+  const days = readDays(raw);
+  return days === null ? null : String(snapWindow(days, WINDOWS));
+};
 
-function rememberFilter(filter: Filter): void {
-  try {
-    localStorage.setItem(FILTER_STORAGE_KEY, filter);
-  } catch {
-    /* only costs the choice surviving a reload */
-  }
-}
+/** A search as the address carries it: any text, within what the server will take. */
+const parseQuery = (raw: string): string | null => (raw.length <= 200 ? raw : null);
 
 /**
  * Design 3a's Incidents view: an accent-tinted active incident card beside the
@@ -101,14 +98,17 @@ function rememberFilter(filter: Filter): void {
 export function Incidents() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  // Roadmap 4.3: a number on the Overview arrives here with its filters in the
-  // address. The address wins over the remembered filter — it is what the
-  // operator just clicked — and is only read on the way in; the controls below
-  // then drive the list as they always have.
+  // Roadmaps 4.3 and 4.16. The state, the window and the search are carried by
+  // the address and remembered per browser: a number on the Overview arrives
+  // here with its filters already in the address, which wins over what was
+  // remembered because it is what the operator just clicked; a link pasted from
+  // a colleague reopens the same list; and "Incidents" in the rail, with nothing
+  // in the address, is the list as it was left.
   const [params, setParams] = useSearchParams();
-  const askedState = FILTERS.find((entry) => entry.value === params.get("state"))?.value;
-  const askedDays = readDays(params.get("days"));
-  const [filter, setFilter] = useState<Filter>(() => askedState ?? readFilter());
+  const [filter, setFilter] = useViewParam<Filter>("incidents", "state", "all", parseFilter);
+  const [daysWord, setDaysWord] = useViewParam<string>("incidents", "days", "0", parseWindow);
+  const days = Number(daysWord);
+  const [queryParam, setQueryParam] = useViewParam<string>("incidents", "q", "", parseQuery);
   // No control of its own: a provider is only ever narrowed to from a link, and
   // the chip that link leaves behind is the way back to the whole list.
   const [provider, setProvider] = useState<string | null>(() => params.get("provider"));
@@ -120,9 +120,8 @@ export function Incidents() {
   // Two pieces of state for one field: `search` is what is on screen and has to
   // echo every keystroke, `query` is what the server has been asked for. Sending
   // the first would fire a request per character.
-  const [search, setSearch] = useState("");
-  const [query, setQuery] = useState("");
-  const [days, setDays] = useState<number>(() => (askedDays === null ? 0 : snapWindow(askedDays, WINDOWS)));
+  const [search, setSearch] = useState(queryParam);
+  const [query, setQuery] = useState(queryParam);
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const { data: incidents } = useIncidents({
     ...(provider === null ? {} : { provider }),
@@ -188,12 +187,13 @@ export function Incidents() {
     if (search.trim() === query) return;
     debounce.current = setTimeout(() => {
       setQuery(search.trim());
+      setQueryParam(search.trim());
       setPage(1);
     }, SEARCH_DEBOUNCE_MS);
     return () => {
       if (debounce.current !== undefined) clearTimeout(debounce.current);
     };
-  }, [search, query]);
+  }, [search, query, setQueryParam]);
 
   // A poll can prune the list under an operator sitting on its last page (and a
   // remembered filter can be restored beside a page number that no longer
@@ -236,7 +236,7 @@ export function Incidents() {
         value={String(days)}
         onValueChange={(next) => {
           if (next === "") return;
-          setDays(Number(next));
+          setDaysWord(next);
           setPage(1);
         }}
         aria-label={t("incidents.window.label")}
@@ -317,7 +317,6 @@ export function Incidents() {
         if (!FILTERS.some((entry) => entry.value === next)) return;
         const picked = next as Filter;
         setFilter(picked);
-        rememberFilter(picked);
         setPage(1);
       }}
       aria-label={t("incidents.filter.label")}
@@ -505,7 +504,17 @@ export function Incidents() {
                 onClear={() => {
                   setProvider(null);
                   setPage(1);
-                  setParams({}, { replace: true });
+                  // Only the narrowing the chip stands for: the state, window
+                  // and search beside it are the operator's own and stay.
+                  setParams(
+                    (current) => {
+                      const next = new URLSearchParams(current);
+                      next.delete("provider");
+                      next.delete(FROM_PARAM);
+                      return next;
+                    },
+                    { replace: true },
+                  );
                 }}
               />
             )}

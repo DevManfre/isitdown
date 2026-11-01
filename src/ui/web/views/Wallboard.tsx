@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { Maximize2, X } from "lucide-react";
 import { useStatus } from "@/hooks/queries.ts";
+import { InstanceMark } from "@/components/InstanceMark.tsx";
+import { useAccent, useInstanceIdentity } from "@/hooks/useInstanceIdentity.ts";
 import { statusColor, statusFill, statusLabelKey } from "@/lib/chartConfig.ts";
 import { formatPercent, formatTime } from "@/lib/format.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
@@ -52,6 +54,9 @@ const wantsStillness = (): boolean => {
 
 export function Wallboard() {
   const { t, i18n } = useTranslation();
+  // Outside the shell, so the accent and the name have to be asked for here.
+  useAccent();
+  const identity = useInstanceIdentity();
   const { data: status } = useStatus();
   const [page, setPage] = useState(0);
 
@@ -97,7 +102,13 @@ export function Wallboard() {
     >
       <header className="flex flex-wrap items-baseline justify-between gap-4">
         <div className="flex items-baseline gap-4">
-          <h1 className="text-3xl font-semibold tracking-tight">{t("app.name")}</h1>
+          <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight">
+            {/* Only the operator's own logo: with none set, the wallboard has
+                always been the name alone, and a mark nobody chose is not an
+                improvement a wallboard asked for. */}
+            {identity.logoUrl !== null && <InstanceMark className="size-8" />}
+            {identity.name}
+          </h1>
           <span
             className="text-2xl font-medium"
             style={{ color: alarm.length === 0 ? "var(--status-operational)" : "var(--status-major-outage)" }}

@@ -111,7 +111,7 @@ describe("GeoCard", () => {
     // With nothing located the card renders `map.empty` rather than the
     // footnote — the sentence that says the map is blank *and* why.
     expect(screen.getByText(i18n.t("map.empty", { count: 12 }))).toBeInTheDocument();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
     // The brief's own suspicion about the error test ("would it pass if the
     // card rendered an error for every state?") applies just as much here:
     // an alert that leaked into every branch would only ever be caught by a
@@ -135,7 +135,7 @@ describe("GeoCard", () => {
       isError: false,
     });
     renderCard();
-    expect(screen.getByRole("img")).toBeInTheDocument();
+    expect(screen.getByRole("group")).toBeInTheDocument();
     expect(screen.getByText(i18n.t("map.footnote", { count: 2, unplaced: 12 }))).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -158,7 +158,7 @@ describe("GeoCard", () => {
       isError: false,
     });
     renderCard();
-    expect(screen.getByRole("img").getAttribute("aria-label")).toMatch(/globe|globo/i);
+    expect(screen.getByRole("group").getAttribute("aria-label")).toMatch(/globe|globo/i);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     // The footnote sits outside the map/globe ternary in GeoCard.tsx (it is
     // rendered whenever `located > 0`, regardless of `view`), so it must show
@@ -181,7 +181,7 @@ describe("GeoCard", () => {
     getMap.mockReturnValue({ data: undefined, isError: false, isPending: true });
     renderCard();
     expect(screen.queryByText(/could not be placed/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 

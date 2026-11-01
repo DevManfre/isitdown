@@ -4,7 +4,39 @@
 
 ### 8.1 Themes
 
-UI edition. Three states: **light / dark / system**, cycled from the header.
+UI edition. Three states: **light / dark / system**, cycled from the header — and
+three variants chosen in **Settings → Appearance** (roadmap 4.18): **high
+contrast**, **colour-blind safe** and **OLED black**.
+
+- **A variant is a correction laid over a ground, not a fourth palette.** The
+  document carries two attributes: `data-theme` (the ground, `light` or `dark`,
+  which Tailwind's `dark:` and the globe read) and `data-variant` (what is different
+  about it). `contrast` and `colorblind` sit on the light ground, `oled` on the dark
+  one, and each block in `tokens.css` lists only the palette values it changes.
+  - **High contrast** takes every text colour to WCAG AAA (7:1) on both grounds,
+    makes the divider a real line and darkens the painted status fills with it.
+  - **Colour-blind safe** replaces the red/green pair the status colours lean on
+    with blue, amber, orange and deep purple (Okabe–Ito's hues, darkened to clear
+    4.5:1 as text). Every status already carried a word and a shape, so this is the
+    second line of defence, not the only one. A test refuses a palette where
+    "operational" is not blue or "major outage" has no blue in it to tell it from
+    green.
+  - **OLED black** turns the ground fully off (`#000`) for an always-on wallboard.
+  - The header button still cycles light, dark and system; pressed on a variant it
+    goes back to light. `tokens.test.ts` holds each variant to its own contrast floor.
+- **Instance identity** (roadmap 4.19). Settings → Appearance also takes an
+  **accent colour**, an **instance name** and a **logo address**, for a dashboard on
+  an office monitor. The accent writes `--color-accent`, `--status-accent`,
+  `--primary-foreground` and `--primary-hover` on the document — the text on a
+  button is whichever of two inks reads better on the colour picked — and never a
+  status colour, which would make the dashboard lie. A hint says when the accent is
+  under 3:1 against the page, and the high-contrast theme keeps its own accent. The
+  name replaces the product's in the rail, on the wallboard and in the tab title;
+  the logo (an `https` address, or a path on the same host — never `data:` or
+  `javascript:`) replaces the mark beside it, and falls back to the product's own
+  if it does not load. Each is empty by default and falls back on its own. The
+  accent is stored in the browser as well, so the inline script paints it before
+  React runs.
 
 - **Tokens, not per-component colours.** Every colour is a CSS custom property.
   `css/tokens.css` is the only file in the dashboard allowed to contain a colour
@@ -100,7 +132,8 @@ keyboard, a screen reader, a high-contrast setting, or all three (roadmap 5.13).
 What is guaranteed, and checked:
 
 - **Contrast.** Every status colour used as *text* clears WCAG AA (4.5:1) against
-  both the page and the card, in both themes — `src/ui/web/css/tokens.test.ts`
+  both the page and the card, in both themes — and against the tint it is drawn
+  over, and secondary copy against the chip fill. `src/ui/web/css/tokens.test.ts`
   computes the ratios from `tokens.css`, so a palette tweak that breaks one
   fails the suite rather than shipping. The audit found two real defects in the
   dark theme: a partial outage and a major one were the same colour, and the
@@ -113,6 +146,32 @@ What is guaranteed, and checked:
   each have a test that shows it rather than assuming it. Hand-written
   clickables (a provider row, a ring tile) get a visible focus ring from
   `base.css` at zero specificity, under whatever ring a primitive already has.
+- **Keyboard shortcuts** (roadmap 4.17). GitHub's and Linear's grammar: `g` then a
+  letter goes somewhere — `g o` Overview, `g p` Providers, `g i` Incidents, `g h`
+  History, `g d` Delivery log, `g s` Settings — and a bare key does one thing:
+  `/` opens the palette, `p` polls now, `?` shows the map of all of them (also in
+  the palette). They stay out of a text field, out of an open dialog and out of
+  anything held with ⌘, Ctrl or Alt, and a `g` forgotten for 1.2 seconds is
+  forgotten. One table in `lib/shortcuts.ts` drives both the matcher and the map,
+  so a shortcut that works is a shortcut that is listed.
+- **Filters that stay** (roadmap 4.16). The Incidents state, window and search, the
+  History window, the Providers sort and all/issues toggle and the Delivery log
+  state are carried by the address — a pasted link reopens the same view — and
+  remembered per browser, so the rail's link lands where it was left. Precedence is
+  the address, then what was remembered, then the default; a choice equal to the
+  default is removed from both, so links stay short and a cleared filter does not
+  come back.
+- **Screen readers** (roadmap 4.20). `tools/visual-regression.mjs` runs axe-core
+  (WCAG 2.0/2.1 A and AA, 2.2 AA) over every frame it captures — all views, both
+  themes, both locales — and over the three theme variants, and fails on a
+  violation; a waiver goes in `ACCEPTED` with its reason, in the diff. It found
+  and fixed: status words under 4.5:1 on their own tint, secondary copy at 3.46:1
+  on chips in dark, a destructive badge at 2.89:1, three charts with a name but no
+  `role="img"`, a toast region whose label was ignored, and a link whose name left
+  out the number printed on it. What the stream changes is now said aloud, too: one
+  hidden polite region in the shell names the providers whose status moved since
+  the last read (three named, the rest counted), the toast stack announces each new
+  card alone, and a refused write is an alert.
 - **The command palette.** `⌘K` (or `Ctrl+K`) on any screen — or the header's
   search button, which carries the shortcut on it so the second use is the
   keystroke — opens one search box over the console (roadmap 5.4): every view the rail lists, every enabled

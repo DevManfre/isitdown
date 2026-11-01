@@ -11,6 +11,9 @@ const status = vi.fn();
 vi.mock("@/hooks/queries.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/queries.ts")>()),
   useStatus: () => status(),
+  // The identity (roadmap 4.19) is read from the preferences; this suite mounts
+  // the view with no query client, so it answers "nothing set" itself.
+  usePreferences: () => ({ data: undefined }),
 }));
 
 const provider = (id: string, over: Partial<ProviderStatus> = {}): ProviderStatus => ({
