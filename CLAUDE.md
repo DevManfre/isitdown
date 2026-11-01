@@ -175,7 +175,7 @@ node tools/visual-regression.mjs --only=settings --update   # agree that view
   check failing forever. When that happens, agree the frame the check run
   produced instead: `cp test/visual/current/<frame>.png test/visual/baseline/`
   — after looking at it, like any other baseline.
-- **Never `--update` with no `--only`.** It rewrites all 24 frames, including
+- **Never `--update` with no `--only`.** It rewrites every frame, including
   views you never touched, and a single bad capture then *is* the baseline —
   which has happened: a half-rendered Overview, missing a provider tile and an
   uptime row, was agreed that way and had to be reverted by hand.
