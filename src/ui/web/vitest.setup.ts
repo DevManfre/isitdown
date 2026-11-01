@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { afterEach } from "vitest";
 import { configure } from "@testing-library/dom";
 import { MotionGlobalConfig } from "motion/react";
 
@@ -18,3 +19,15 @@ configure({ asyncUtilTimeout: 5_000 });
 // reduced-motion preference: paint the target on the first frame. It is set
 // here rather than faked per test because every suite wants the settled figure.
 MotionGlobalConfig.skipAnimations = true;
+
+// What a view remembers between visits (roadmap 4.16) lives in localStorage, so
+// without this a filter chosen in one test is the starting point of the next —
+// the order of the tests would be part of what they assert. Cleared here rather
+// than in each file because every suite that mounts a view is exposed to it.
+afterEach(() => {
+  try {
+    localStorage.clear();
+  } catch {
+    /* a test that blocks storage on purpose has nothing to clear */
+  }
+});

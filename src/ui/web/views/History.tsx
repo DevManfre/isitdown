@@ -10,6 +10,7 @@ import { DeltaChip } from "@/components/DeltaChip.tsx";
 import { DownloadMenu } from "@/components/DownloadMenu.tsx";
 import { FromOverviewChip } from "@/components/DrillLink.tsx";
 import { FROM_PARAM, readDays, readRange, snapWindow } from "@/lib/drillDown.ts";
+import { useViewParam } from "@/hooks/useViewParam.ts";
 import { LatencyCard } from "@/components/LatencyCard.tsx";
 import { ProviderHistoryDrawer } from "@/components/ProviderHistoryDrawer.tsx";
 import { ProviderTrendRow } from "@/components/ProviderTrendRow.tsx";
@@ -127,9 +128,16 @@ export function History() {
   // in and, for a provider's figure, that provider — opened in the drawer, which
   // is this page's own way of narrowing to one.
   const [params, setParams] = useSearchParams();
-  const askedDays = readDays(params.get("days"));
   const askedProvider = params.get("provider");
-  const [days, setDays] = useState<number>(() => (askedDays === null ? 90 : snapWindow(askedDays, RANGES)));
+  // Roadmap 4.16. The window is carried by the address and remembered, like the
+  // filters on Incidents: a link reopens the same window, and "History" in the
+  // rail is the window it was left on. An address from the Overview (4.3) can
+  // name any number of days, so it is snapped to a pill the control has.
+  const [daysWord, setDaysWord] = useViewParam<string>("history", "days", "90", (raw) => {
+    const asked = readDays(raw);
+    return asked === null ? null : String(snapWindow(asked, RANGES));
+  });
+  const days = Number(daysWord);
   /**
    * The picked range, or null while one of the fixed windows is selected
    * (roadmap 5.5). Kept beside `days` rather than replacing it: everything on
@@ -186,7 +194,7 @@ export function History() {
         (current) => {
           const next = new URLSearchParams(current);
           // `from` is the Overview link's own marker, not the range.
-          for (const key of ["provider", "days", FROM_PARAM]) next.delete(key);
+          for (const key of ["provider", FROM_PARAM]) next.delete(key);
           return next;
         },
         { replace: true },
@@ -417,7 +425,7 @@ export function History() {
                     return;
                   }
                   setRange(null);
-                  setDays(Number(next));
+                  setDaysWord(next);
                 }}
               >
                 {/* The visible label stays the prototype's compact "7d" pill; the

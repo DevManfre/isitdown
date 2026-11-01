@@ -4,11 +4,14 @@ import { SettingRow } from "@/components/SettingRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { startGuidedTour } from "@/components/GuidedTour.tsx";
+import { IdentityRows } from "@/components/settings/IdentityRows.tsx";
 import { InstallAppRow } from "@/components/settings/InstallAppRow.tsx";
 import { SECTION_REELS } from "@/components/settings/reels.ts";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
 import { useSettingsReceipt } from "@/components/settings/useSettingsReceipt.ts";
 import { usePreferencesMutation } from "@/hooks/queries.ts";
+import { useTheme, type ThemeMode } from "@/hooks/useTheme.tsx";
+import { THEME_MODES } from "../../../themeModes.ts";
 import { localeName, supportedLocales, switchLocale } from "@/lib/i18n.ts";
 import { effectiveTimeZone, setTimeZone, TIME_ZONES } from "@/lib/timeZone.ts";
 import { stagger } from "@/lib/stagger.ts";
@@ -27,6 +30,7 @@ export function AppearanceSection({
   const { t, i18n } = useTranslation();
   const patchPreferences = usePreferencesMutation();
   const receipt = useSettingsReceipt();
+  const theme = useTheme();
   return (
     <SettingsSection
       id="appearance"
@@ -74,6 +78,31 @@ export function AppearanceSection({
           </SelectContent>
         </Select>
       </SettingRow>
+      {/* Roadmap 4.18. The header button flips between light, dark and system;
+          the variants answer a need rather than a mood, so they are picked here,
+          where the sentence under them can say what each is for. */}
+      <SettingRow label={t("settings.theme.label")} description={t("settings.theme.hint")} align="top">
+        <Select
+          value={theme.mode}
+          onValueChange={(value) => {
+            theme.set(value as ThemeMode);
+            patchPreferences.mutate({ theme: value as ThemeMode }, receipt("appearance"));
+          }}
+        >
+          <SelectTrigger id="theme-mode" className="w-56" aria-label={t("settings.theme.label")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {THEME_MODES.map((mode) => (
+              <SelectItem key={mode} value={mode}>
+                {t(`theme.${mode}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SettingRow>
+
+      <IdentityRows preferences={preferences} />
       <SettingRow
         label={t("settings.timezone.label")}
         description={t("settings.timezone.hint", {
