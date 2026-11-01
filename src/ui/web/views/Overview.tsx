@@ -14,6 +14,8 @@ import { HeroStats } from "@/components/HeroStats.tsx";
 import { DashboardGrid, filterLabel, REORDER_SPRING, type GridEditing } from "@/components/DashboardGrid.tsx";
 import { EmptyFleet } from "@/components/EmptyFleet.tsx";
 import { AwaySummary } from "@/components/AwaySummary.tsx";
+import { FleetOrderDialog } from "@/components/FleetOrderDialog.tsx";
+import { IncidentBand } from "@/components/IncidentBand.tsx";
 import { ViewSkeleton } from "@/components/ViewSkeleton.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useDashboard, useDashboards, useHistory, useStatus } from "@/hooks/queries.ts";
@@ -322,13 +324,17 @@ export function Overview() {
             {t("action.incident-details")}
           </Button>
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => navigate(ROUTE_PATHS.history)}
-        >
-          {t("action.history-90d")}
-        </Button>
+        {/* Roadmap 4.21: nothing configured has no history, and the only
+            next step is the one the card below offers. */}
+        {!noneConfigured && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => navigate(ROUTE_PATHS.history)}
+          >
+            {t("action.history-90d")}
+          </Button>
+        )}
         {/* The layout could not be read: the default stands in, and the
             page says so rather than presenting it as the operator's own. */}
         {dashboardFailed && (
@@ -352,6 +358,8 @@ export function Overview() {
             {t("dashboard.customise")}
           </Button>
         )}
+        {/* Roadmap 4.24: the fleet's own order, beside the layout's. */}
+        {!editing && !noneConfigured && <FleetOrderDialog />}
         <span role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground">
           {notice !== null && (
             <span className="anim-fade flex items-center gap-1.5">
@@ -481,6 +489,9 @@ export function Overview() {
           the same mounted widgets, so opening it never replays an entry. */}
       {/* Roadmap 4.2. Below 768px the rail is gone, so the named dashboards
           are picked here instead — only once there is more than one. */}
+      {/* Roadmap 4.22: while a major outage is open, the incident sits above
+          the operator's own layout instead of replacing it. */}
+      {!editing && <IncidentBand providers={providers} />}
       {dashboards !== undefined && dashboards.length > 1 && dashboardId !== undefined && (
         <div className="mb-4 flex flex-col gap-1.5 md:hidden">
           <span id="dashboard-switcher" className="text-xs text-muted-foreground">

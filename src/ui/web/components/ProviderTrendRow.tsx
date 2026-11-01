@@ -68,7 +68,15 @@ export function ProviderTrendRow({
           <TrendSparkline series={provider.dailySeries} />
         </span>
         <span className="col-start-2 row-start-1 text-right font-mono text-sm lg:col-start-3 lg:text-left">
-          <NumberTicker locale={i18n.language} value={uptime} decimalPlaces={2} suffix="%" />
+          {/* Never measured is no figure, not 0% (roadmap 4.21). */}
+          {provider.sampleCount === 0 ? (
+            <span>
+              <span aria-hidden="true">—</span>
+              <span className="sr-only">{t("history.unmeasured")}</span>
+            </span>
+          ) : (
+            <NumberTicker locale={i18n.language} value={uptime} decimalPlaces={2} suffix="%" />
+          )}
         </span>
         {/* The chip is wrapped rather than dropped in bare: `DeltaChip` renders
             nothing at all for a provider with no previous window, and a row that

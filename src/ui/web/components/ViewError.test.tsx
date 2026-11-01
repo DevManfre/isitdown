@@ -70,6 +70,16 @@ describe("ViewError", () => {
     expect(await screen.findByText(/Could not load this view/)).toBeInTheDocument();
   });
 
+  // Roadmap 4.21. A stopped container is not "Failed to fetch": the operator
+  // is told what that means, with the retry still under it.
+  it("says the server is not answering when the request never reached one", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
+    mount();
+    expect(await screen.findByText(i18n.t("error.unreachable.title"))).toBeInTheDocument();
+    expect(screen.queryByText(/Failed to fetch/)).toBeNull();
+    expect(screen.getByRole("button", { name: i18n.t("action.retry") })).toBeInTheDocument();
+  });
+
   // The whole point of the affordance: the error state is a way back, not a
   // dead end. Before this, ViewError rendered one paragraph and nothing else,
   // and an operator whose first load lost a race with the server had to reload

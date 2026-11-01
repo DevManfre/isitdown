@@ -30,6 +30,7 @@ const THEME_ICONS: Record<ThemeMode, typeof Sun> = {
 const TITLE_KEYS: Record<string, string> = {
   overview: "nav.overview",
   providers: "nav.providers",
+  components: "nav.components",
   incidents: "nav.incidents",
   incident: "nav.incidents",
   history: "nav.history",

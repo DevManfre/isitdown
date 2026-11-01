@@ -999,6 +999,13 @@ export interface Preferences {
    * the window is.
    */
   density: "comfortable" | "compact";
+  /**
+   * The operator's own order for providers and groups — roadmap 4.24. Empty is
+   * the automatic order; `/status` already answers in this one, so only the
+   * dialog that arranges it reads these. Optional: an older server omits them.
+   */
+  fleetOrder?: string[];
+  groupOrder?: string[];
   /** Roadmap 4.5 / 4.6. Optional: a server from before them answers without. */
   wizardDone?: boolean;
   tourSeen?: boolean;
