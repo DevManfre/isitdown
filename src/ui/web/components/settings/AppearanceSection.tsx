@@ -5,6 +5,7 @@ import { SettingsSection } from "@/components/SettingsSection.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { startGuidedTour } from "@/components/GuidedTour.tsx";
 import { IdentityRows } from "@/components/settings/IdentityRows.tsx";
+import { SoundRows } from "@/components/settings/SoundRows.tsx";
 import { InstallAppRow } from "@/components/settings/InstallAppRow.tsx";
 import { SECTION_REELS } from "@/components/settings/reels.ts";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
@@ -177,6 +178,9 @@ export function AppearanceSection({
           </SelectContent>
         </Select>
       </SettingRow>
+      {/* Roadmap 4.28. Beside the other things this browser decides for itself. */}
+      <SoundRows />
+
       {/* Roadmap 5.21. Last in Appearance: it is about the window the
       dashboard lives in rather than about what is drawn inside it. */}
       <InstallAppRow />
