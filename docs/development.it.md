@@ -403,6 +403,11 @@ Suite notevoli:
   — perché una colonna oraria, il default di un campo data e un bucket
   giornaliero sono letture da orologio da parete: fissato solo l'istante, una
   baseline concordata a Roma non può mai essere verde su un runner in UTC.
+  Oltre alla flotta piena, alcune viste sono disegnate con le fixture `empty`
+  (nulla configurato) e `quiet` (provider ma nessun incidente, storia o messaggio),
+  e la Panoramica ancora una volta contro un server che serve il bundle e chiude
+  ogni richiesta API — gli stati che la roadmap 4.21 fissa (`overview-empty`,
+  `history-quiet`, `overview-offline`, …).
   `node tools/visual-regression.mjs --update` accetta un cambio
   voluto, `--only=<vista>` serve mentre si itera su una sola.
 

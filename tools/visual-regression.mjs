@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLogger } from "../src/core/logger.ts";
-import { NOW, seedVisualFixture } from "./visual/fixture.mjs";
+import { FIXTURES, NOW, seedVisualFixture } from "./visual/fixture.mjs";
 import { withBrowser } from "./visual/chrome.mjs";
 import { comparePng, decodePng, downscale } from "./visual/png.mjs";
 
@@ -59,7 +59,24 @@ const VIEWS = [
   // Roadmap 5.8. Outside the app shell, so it is the one frame with no rail and
   // no header in it — which is exactly the property worth a baseline.
   { name: "wallboard", hash: "#/wallboard" },
+  // Roadmap 4.23.
+  { name: "components", hash: "#/components" },
+
+  // Roadmap 4.21: the states a view is in before it has anything to show,
+  // reviewed together and pinned like the busy ones. Each names the fixture
+  // it is drawn of (see `FIXTURES` in fixture.mjs); `offline` is a server
+  // that hands out the dashboard and nothing else, the backend gone.
+  { name: "overview-empty", hash: "#/overview", fixture: "empty" },
+  { name: "providers-empty", hash: "#/providers", fixture: "empty" },
+  { name: "components-empty", hash: "#/components", fixture: "empty" },
+  { name: "incidents-quiet", hash: "#/incidents", fixture: "quiet" },
+  { name: "history-quiet", hash: "#/history", fixture: "quiet" },
+  { name: "delivery-log-quiet", hash: "#/delivery-log", fixture: "quiet" },
+  { name: "overview-offline", hash: "#/overview", fixture: "offline" },
 ];
+
+/** Every fixture a view can be drawn of, in the order the run visits them. */
+const RUN_FIXTURES = [...FIXTURES, "offline"];
 
 const THEMES = ["light", "dark"];
 
@@ -153,7 +170,30 @@ function freezeClock(at) {
   globalThis.Date = FrozenDate;
 }
 
-async function withServer(body) {
+/**
+ * The dashboard with no backend behind it — roadmap 4.21's "backend
+ * unreachable" frame. The bundle is served so the page boots; every other
+ * request has its connection dropped, which is what a stopped container looks
+ * like from the browser.
+ */
+async function withOfflineServer(body) {
+  const { default: express } = await import("express");
+  const app = express();
+  app.use(express.static(WEB_DIR, { index: "index.html" }));
+  app.use((req) => req.socket.destroy());
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  const { port } = server.address();
+  try {
+    return await body(`http://127.0.0.1:${port}`);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+async function withServer(fixture, body) {
+  if (fixture === "offline") return withOfflineServer(body);
   const dir = await mkdtemp(join(tmpdir(), "isitdown-visual-db-"));
   // Before the app module is loaded, not merely before the server listens:
   // `WEB_DIR` is read once at import time, and a static import would have
@@ -165,7 +205,7 @@ async function withServer(body) {
     env: {},
     logger: createLogger("error", () => {}),
   });
-  seedVisualFixture(runtime.db);
+  seedVisualFixture(runtime.db, fixture);
 
   // The scheduler is deliberately never started: a poll landing mid-run would
   // overwrite the fixture with whatever the real internet says today.
@@ -241,76 +281,80 @@ async function main() {
   // that stops at the first.
   const accessibility = [];
 
-  await withServer(async (base) => {
-    await withBrowser({ frozenAt: NOW, timeZone: TIME_ZONE }, async ({ shot }) => {
-      for (const view of VIEWS) {
-        if (only !== undefined && view.name !== only) continue;
-        for (const theme of THEMES) {
-          for (const locale of LOCALES) {
-            const name = shotName(view.name, theme, locale);
-            const { png, violations } = await shot({
+  for (const fixture of RUN_FIXTURES) {
+    const views = VIEWS.filter(
+      (view) => (view.fixture ?? "default") === fixture && (only === undefined || view.name === only),
+    );
+    if (views.length === 0) continue;
+    await withServer(fixture, async (base) => {
+      await withBrowser({ frozenAt: NOW, timeZone: TIME_ZONE }, async ({ shot }) => {
+        for (const view of views) {
+          for (const theme of THEMES) {
+            for (const locale of LOCALES) {
+              const name = shotName(view.name, theme, locale);
+              const { png, violations } = await shot({
+                url: `${base}/${view.hash}`,
+                colorScheme: theme,
+                // Written straight into localStorage, which is where the
+                // pre-paint script in index.html reads both from — the same path
+                // an operator's own browser takes.
+                storage: { "isitdown.theme": theme, "isitdown.uiLocale": locale },
+                ...VIEWPORT,
+                audit: true,
+              });
+              for (const violation of violations) {
+                accessibility.push({ frame: `${view.name}-${theme}-${locale}`, ...violation });
+              }
+
+              const path = join(targetDir, name);
+              await writeFile(path, png);
+              written.push(name);
+
+              if (update) continue;
+
+              const baselinePath = join(BASELINE_DIR, name);
+              if (!existsSync(baselinePath)) {
+                failures.push(`${name}: no baseline yet — review ${path} and re-run with --update`);
+                continue;
+              }
+              const result = comparePng(
+                downscale(decodePng(await readFile(baselinePath)), SCALE),
+                downscale(decodePng(png), SCALE),
+                CHANNEL_THRESHOLD,
+                STRONG_THRESHOLD,
+              );
+              if (result.sizeChanged) {
+                failures.push(`${name}: the frame changed size`);
+              } else if (result.differing > MAX_MOVED) {
+                failures.push(
+                  `${name}: ${result.differing} of ${result.total} cells moved (${(result.ratio * 100).toFixed(2)}%) — see ${path}`,
+                );
+              } else if (result.recoloured > MAX_RECOLOURED) {
+                failures.push(
+                  `${name}: ${result.recoloured} cells changed colour outright — see ${path}`,
+                );
+              }
+            }
+          }
+        }
+        for (const { theme, scheme } of AUDITED_VARIANTS) {
+          for (const view of views) {
+            if (!AUDITED_VARIANT_VIEWS.includes(view.name)) continue;
+            const { violations } = await shot({
               url: `${base}/${view.hash}`,
-              colorScheme: theme,
-              // Written straight into localStorage, which is where the
-              // pre-paint script in index.html reads both from — the same path
-              // an operator's own browser takes.
-              storage: { "isitdown.theme": theme, "isitdown.uiLocale": locale },
+              colorScheme: scheme,
+              storage: { "isitdown.theme": theme, "isitdown.uiLocale": "en" },
               ...VIEWPORT,
               audit: true,
             });
             for (const violation of violations) {
-              accessibility.push({ frame: `${view.name}-${theme}-${locale}`, ...violation });
-            }
-
-            const path = join(targetDir, name);
-            await writeFile(path, png);
-            written.push(name);
-
-            if (update) continue;
-
-            const baselinePath = join(BASELINE_DIR, name);
-            if (!existsSync(baselinePath)) {
-              failures.push(`${name}: no baseline yet — review ${path} and re-run with --update`);
-              continue;
-            }
-            const result = comparePng(
-              downscale(decodePng(await readFile(baselinePath)), SCALE),
-              downscale(decodePng(png), SCALE),
-              CHANNEL_THRESHOLD,
-              STRONG_THRESHOLD,
-            );
-            if (result.sizeChanged) {
-              failures.push(`${name}: the frame changed size`);
-            } else if (result.differing > MAX_MOVED) {
-              failures.push(
-                `${name}: ${result.differing} of ${result.total} cells moved (${(result.ratio * 100).toFixed(2)}%) — see ${path}`,
-              );
-            } else if (result.recoloured > MAX_RECOLOURED) {
-              failures.push(
-                `${name}: ${result.recoloured} cells changed colour outright — see ${path}`,
-              );
+              accessibility.push({ frame: `${view.name}-${theme}-en`, ...violation });
             }
           }
         }
-      }
-      for (const { theme, scheme } of AUDITED_VARIANTS) {
-        for (const view of VIEWS) {
-          if (!AUDITED_VARIANT_VIEWS.includes(view.name)) continue;
-          if (only !== undefined && view.name !== only) continue;
-          const { violations } = await shot({
-            url: `${base}/${view.hash}`,
-            colorScheme: scheme,
-            storage: { "isitdown.theme": theme, "isitdown.uiLocale": "en" },
-            ...VIEWPORT,
-            audit: true,
-          });
-          for (const violation of violations) {
-            accessibility.push({ frame: `${view.name}-${theme}-en`, ...violation });
-          }
-        }
-      }
+      });
     });
-  });
+  }
 
   const accessible = reportAccessibility(accessibility);
 
