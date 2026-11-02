@@ -161,4 +161,33 @@ describe("the wallboard", () => {
     expect(screen.getByLabelText(i18n.t("wallboard.exit"))).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: i18n.t("action.poll-now") })).toBeNull();
   });
+
+  // Roadmap 4.26.
+  describe("the QR code", () => {
+    const code = () => screen.findByRole("img", { name: /Scan|Inquadra/ });
+
+    it("opens the dashboard when nothing is wrong", async () => {
+      status.mockReturnValue(answer([provider("github"), provider("cloudflare")]));
+      show();
+      expect(await code()).toHaveAccessibleName(i18n.t("wallboard.qr-overview"));
+    });
+
+    it("opens the provider in the worst trouble, wherever the rotation is", async () => {
+      status.mockReturnValue(
+        answer([
+          provider("github", { name: "GitHub", overallStatus: "degraded" }),
+          provider("anthropic", { name: "Anthropic", overallStatus: "major_outage" }),
+          provider("cloudflare"),
+        ]),
+      );
+      show();
+      expect(await code()).toHaveAccessibleName(i18n.t("wallboard.qr-provider", { name: "Anthropic" }));
+    });
+
+    it("draws nothing for an empty fleet", () => {
+      status.mockReturnValue(answer([]));
+      const { container } = show();
+      expect(container.querySelector('[data-slot="qr-code"]')).toBeNull();
+    });
+  });
 });

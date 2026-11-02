@@ -10,6 +10,10 @@ import { statusColor, statusFill, statusLabelKey } from "@/lib/chartConfig.ts";
 import { formatPercent, formatTime } from "@/lib/format.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
 import { isOffLine, shownStatus } from "@/lib/suspicion.ts";
+import { QrCode } from "@/components/QrCode.tsx";
+import { useStatusFeedback } from "@/hooks/useStatusFeedback.ts";
+import { statusRank } from "@/lib/statusChanges.ts";
+import { pulseAttr, usePulses } from "@/lib/statusPulse.ts";
 
 /**
  * The office screen — roadmap 5.8.
@@ -58,6 +62,11 @@ export function Wallboard() {
   useAccent();
   const identity = useInstanceIdentity();
   const { data: status } = useStatus();
+  // Roadmaps 4.27 and 4.28. The shell mounts this for every other screen; the
+  // wallboard is outside it, and is the screen most likely to be the one with
+  // a speaker and a second monitor.
+  useStatusFeedback(status);
+  const pulses = usePulses();
   const [page, setPage] = useState(0);
 
   const providers = (status?.providers ?? []).filter((provider) => provider.enabled);
@@ -80,6 +89,24 @@ export function Wallboard() {
   const shown = providers.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
   // Roadmap 1.3: the same rule as the Overview's headline.
   const alarm = providers.filter(isOffLine);
+
+  // Roadmap 4.26. The provider the code opens is the one most in trouble, on
+  // whatever page it is — a code that followed the rotation would point at a
+  // different provider every fifteen seconds, and nobody scans a moving target.
+  // With nothing wrong it opens the dashboard itself.
+  const highlighted = alarm.reduce<(typeof alarm)[number] | undefined>(
+    (worst, provider) =>
+      worst === undefined || statusRank(shownStatus(provider).status) > statusRank(shownStatus(worst).status) ? provider : worst,
+    undefined,
+  );
+  const qrTarget =
+    typeof window === "undefined"
+      ? ""
+      : `${window.location.origin}${window.location.pathname}#${
+          highlighted === undefined ? ROUTE_PATHS.overview : ROUTE_PATHS.providerDetail.replace(":providerId", highlighted.id)
+        }`;
+  const qrCaption =
+    highlighted === undefined ? t("wallboard.qr-overview") : t("wallboard.qr-provider", { name: highlighted.name });
 
   const goFullscreen = (): void => {
     // Best effort: a browser that refuses (no gesture, an iframe, a policy) is
@@ -162,6 +189,7 @@ export function Wallboard() {
             <article
               key={provider.id}
               data-suspected={look.hatched || undefined}
+          {...pulseAttr(pulses, provider.id)}
               className={cn(
                 "flex min-h-40 flex-col justify-between gap-3 rounded-lg border p-5",
                 look.hatched && "border-dashed",
@@ -195,6 +223,15 @@ export function Wallboard() {
             );
           })}
         </div>
+      )}
+      {/* Roadmap 4.26. Fixed to the corner so the page rotation under it never
+          moves it; hidden until the encoder has arrived, so a slow chunk does
+          not leave an empty white square on the wall. */}
+      {qrTarget !== "" && providers.length > 0 && (
+        <figure className="fixed right-6 bottom-6 flex w-36 flex-col items-center gap-2 rounded-lg bg-(--qr-ground) p-2 text-center text-(--qr-ink)">
+          <QrCode text={qrTarget} label={qrCaption} className="w-full" />
+          <figcaption className="text-sm leading-tight">{qrCaption}</figcaption>
+        </figure>
       )}
     </main>
   );
