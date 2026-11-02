@@ -51,7 +51,7 @@ docker history isitdown:ui --no-trunc --format "{{.CreatedBy}}" | grep -iE "TOKE
 ### 5.2 The dashboard
 
 Open **http://localhost:3000** and walk the rail: Overview · Providers ·
-Incidents · History · Delivery log · Settings. Then check the two runtime controls
+Components · Incidents · History · Delivery log · Settings. Then check the two runtime controls
 in the header:
 
 - the **theme** button cycles light → dark → system and survives a reload;

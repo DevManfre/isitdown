@@ -24,7 +24,49 @@ const providers = [
   { id: "vercel", name: "Vercel", baseUrl: "https://www.vercel-status.com", status: "operational" },
 ];
 
+/**
+ * What each provider's page lists as its parts — roadmap 4.23's Components
+ * view is drawn from these. Kept apart from `providers` so the rows above
+ * stay one line each.
+ */
+const COMPONENTS = {
+  github: [
+    { id: "git", name: "Git Operations", status: "operational" },
+    { id: "api", name: "API Requests", status: "operational" },
+    { id: "actions", name: "Actions", status: "operational" },
+  ],
+  cloudflare: [
+    { id: "cdn-eu-west", name: "CDN eu-west", status: "degraded" },
+    { id: "dns", name: "Authoritative DNS", status: "operational" },
+  ],
+  anthropic: [
+    { id: "api", name: "Claude API", status: "major_outage" },
+    { id: "console", name: "Console", status: "operational" },
+  ],
+};
+
 const iso = (offsetMs) => new Date(NOW - offsetMs).toISOString();
+
+/**
+ * The fleets a frame can be taken of — roadmap 4.21. Every view is drawn of
+ * `default`; the state frames are drawn of the other two, so an empty or a
+ * quiet page is pinned as carefully as a busy one:
+ *
+ * - `empty`: nothing configured — the first-run fleet, every view's zero state.
+ * - `quiet`: providers set up and all well, but nothing has happened yet — no
+ *   incident, no history, no message sent. The good-news states.
+ */
+export const FIXTURES = ["default", "empty", "quiet"];
+
+/** The settings every fixture shares: a set-up installation, no map. */
+function seedSettings(db) {
+  db.prepare("UPDATE settings SET value = ? WHERE key = 'mapView'").run("off");
+  // An installation that has been set up: the first-run wizard and tour
+  // (roadmap 4.5, 4.6) would otherwise open over every frame.
+  for (const key of ["wizardDone", "tourSeen"]) {
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, 'true')").run(key);
+  }
+}
 
 /**
  * Writes the fixture into an already-migrated database.
@@ -33,18 +75,22 @@ const iso = (offsetMs) => new Date(NOW - offsetMs).toISOString();
  * fixture needs 90 days of samples at exact timestamps, which is a thing the
  * store deliberately cannot express — it stamps its own.
  */
-export function seedVisualFixture(db) {
+export function seedVisualFixture(db, fixture = "default") {
   db.exec("DELETE FROM services");
   db.exec("DELETE FROM provider_state");
   db.exec("DELETE FROM status_samples");
   db.exec("DELETE FROM incidents");
   db.exec("DELETE FROM notifications");
+  if (fixture === "empty") {
+    seedSettings(db);
+    return;
+  }
 
   const insertService = db.prepare(
     "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, created_at) VALUES (?, ?, 'statuspage', ?, NULL, 1, NULL, 0, NULL, ?, ?)",
   );
   const insertState = db.prepare(
-    "INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified) VALUES (?, ?, ?, '[]', '[]', ?, 0, 0)",
+    "INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified) VALUES (?, ?, ?, ?, '[]', ?, 0, 0)",
   );
   const insertSample = db.prepare(
     "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok, latency_ms) VALUES (?, ?, ?, ?, ?)",
@@ -55,6 +101,15 @@ export function seedVisualFixture(db) {
   const insertNotification = db.prepare(
     "INSERT INTO notifications (provider_id, channel, kind, text, sent_at, ok, error, attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
+
+  if (fixture === "quiet") {
+    for (const provider of providers) {
+      insertService.run(provider.id, provider.name, provider.baseUrl, null, iso(DAY));
+      insertState.run(provider.id, "operational", "[]", "[]", iso(4 * 60_000));
+    }
+    seedSettings(db);
+    return;
+  }
 
   for (const provider of providers) {
     insertService.run(
@@ -78,7 +133,7 @@ export function seedVisualFixture(db) {
             },
           ])
         : "[]";
-    insertState.run(provider.id, provider.status, incidents, iso(4 * 60_000));
+    insertState.run(provider.id, provider.status, incidents, JSON.stringify(COMPONENTS[provider.id] ?? []), iso(4 * 60_000));
 
     // Three months of daily samples: enough for every window the history view
     // offers, with one bad stretch so the bars are not a flat green wall.
@@ -136,10 +191,5 @@ export function seedVisualFixture(db) {
   ];
   for (const row of log) insertNotification.run(...row);
 
-  db.prepare("UPDATE settings SET value = ? WHERE key = 'mapView'").run("off");
-  // An installation that has been set up: the first-run wizard and tour
-  // (roadmap 4.5, 4.6) would otherwise open over every frame.
-  for (const key of ["wizardDone", "tourSeen"]) {
-    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, 'true')").run(key);
-  }
+  seedSettings(db);
 }
