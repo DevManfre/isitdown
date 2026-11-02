@@ -152,8 +152,15 @@ const ASSETS = "dist/ui/public/assets";
  * six catalogs. Measured: 675.6 kB before, 687.6 kB after — 12.0 kB gzipped, of
  * which the dialog with motion's `Reorder` is 3.1 kB and the rest is mostly the
  * strings (51 kB raw over the whole change, nearly all of it catalog text).
+ *
+ * It moved 709,500 -> 720,500 (692.9 -> 703.6 kB) for roadmaps 4.25 to 4.28.
+ * Measured: 687.6 kB before, 698.2 kB after — 10.6 kB gzipped, of which 7.0 kB
+ * is `qrcode-generator` (the wallboard's QR code), loaded only on that screen
+ * but counted all the same because this check sums every emitted chunk. The
+ * rest is the sound and pulse code and some fifteen strings in six catalogs.
+ * The e-ink PNG is server-side and weighs nothing here.
  */
-export const BUDGET = { js: 709_500, css: 23_000 };
+export const BUDGET = { js: 720_500, css: 23_000 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
