@@ -1,11 +1,12 @@
 # Catalog build
 
-Generated 2026-10-26T10:30:57.459Z: 205 providers in the catalog, 109 candidates left out.
+Generated 2026-11-02T12:52:31.271Z: 206 providers in the catalog, 108 candidates left out.
 
 ## Kept although they failed this run
 
 Already in the catalog, so a single failed read does not remove them.
 
+- **Datadog** — https://status.datadoghq.com: statuspage fetch for datadog failed: HTTP 403
 - **Postmark** — https://status.postmarkapp.com: no adapter recognises the page
 - **Gemfury** — https://status.gemfury.com: no adapter recognises the page
 
@@ -28,7 +29,6 @@ Already in the catalog, so a single failed read does not remove them.
 - Intercom — https://www.intercomstatus.com: no adapter recognises the page
 - JetBrains — https://status.jetbrains.com: no adapter recognises the page
 - Mailchimp — https://status.mailchimp.com: no adapter recognises the page
-- Mistral AI — https://status.mistral.ai: no adapter recognises the page
 - Neon — https://neonstatus.com: no adapter recognises the page
 - OpenRouter — https://status.openrouter.ai: no adapter recognises the page
 - PagerDuty — https://status.pagerduty.com: no adapter recognises the page
