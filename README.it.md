@@ -11,7 +11,7 @@
 
 [![Dipendenze runtime](https://img.shields.io/badge/runtime%20deps-4-lightgrey?style=flat-square)](docs/development.it.md#92-stack-tecnologico)
 [![Docker](https://img.shields.io/badge/docker-light%20%7C%20ui-2496ED?style=flat-square&logo=docker&logoColor=white)](docs/docker.it.md#4-docker)
-[![i18n](https://img.shields.io/badge/i18n-en%20%7C%20it-orange?style=flat-square)](docs/theming.it.md#82-localizzazione)
+[![i18n](https://img.shields.io/badge/i18n-en%20%7C%20de%20%7C%20es%20%7C%20fr%20%7C%20it%20%7C%20pt-orange?style=flat-square)](docs/theming.it.md#82-localizzazione)
 
 [English](README.md) · **Italiano**
 
@@ -86,8 +86,8 @@ Anthropic       operational    ████████████████�
 | State store | file JSON, scritture atomiche | SQLite (contiene anche la cronologia) |
 | Server HTTP | assente | Express sulla :3000 |
 | Cronologia uptime e grafici | — | viste 7/30/90 giorni, più un calendario annuale per provider |
-| Tema | — | chiaro / scuro / sistema |
-| Localizzazione | testo delle notifiche | testo delle notifiche **e** tutta la dashboard |
+| Tema | — | chiaro / scuro / sistema, più varianti ad alto contrasto, per daltonici e OLED e un accento personalizzato |
+| Localizzazione | testo delle notifiche | testo delle notifiche **e** tutta la dashboard, in sei lingue (`en`, `de`, `es`, `fr`, `it`, `pt`) |
 | Impronta | immagine 264MB, nessuna porta in ascolto | 267MB: l'immagine Light più un layer |
 
 Entrambe le edizioni eseguono lo stesso core. Differiscono solo per ciò che viene
@@ -189,7 +189,28 @@ polling per provider, la vista del log invii, una rimozione di provider
 annullabile entro una finestra di ripristino, ntfy e Gotify accanto agli altri
 canali, un calendario annuale per provider, la readiness separata dalla
 liveness, una verifica di integrità con vacuum su richiesta e una dashboard
-Grafana committata.
+Grafana committata, poi:
+
+- **Notifiche**: oltre trenta canali tenuti a un unico contratto — chat, push,
+  strumenti di reperibilità e di incidenti, email, SMS e chiamate — con una
+  politica di consegna (riepilogo dei guasti condivisi, accorpamento degli
+  aggiornamenti, un periodo di silenzio per le interruzioni note, un report
+  periodico, una rotazione di reperibilità e un test settimanale di consegna).
+- **Dashboard**: una Overview componibile costruita da un catalogo di widget, con
+  dashboard con nome, un riepilogo «mentre eri via» e numeri che rimandano alle
+  loro righe; un Gantt degli incidenti, percentili di latenza, confronto a cinque,
+  cronologia con zoom, una vista Components, un ordine manuale della flotta, una
+  command palette con ricerca testuale, scorciatoie da tastiera, filtri conservati
+  nell'indirizzo, una procedura guidata al primo avvio con tour guidato e un passaggio
+  di accessibilità (axe) su ogni frame.
+- **Wallboard e feed**: un codice QR che apre il provider nei guai peggiori, un
+  impulso e un suono opzionale quando una tile cambia, e la flotta servita come
+  PNG a 1 bit e SVG per cornici e-ink e chat.
+- **Hardening**: la dashboard ascolta di default solo sul loopback, rifiuta
+  scritture cross-origin e con host rebound, limita le dimensioni delle risposte e
+  rifiuta i target link-local.
+- **Catalogo e strumenti**: un catalogo di 205 provider, i comandi `isitdown
+  discover` e `isitdown import` e una CI divisa in job paralleli.
 
 Ancora aperto:
 
