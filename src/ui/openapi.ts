@@ -1252,6 +1252,24 @@ const paths: Json = {
       },
     },
   },
+  "/render/fleet.png": {
+    get: {
+      tags: ["Live"],
+      summary: "The fleet as a 1-bit black-and-white PNG, for e-ink frames and chats.",
+      description:
+        "Worst readings first, a provider that is not operational drawn inverted. `w` and `h` are clamped to 200–2000 (default 800×480).",
+      parameters: [query("w", "Width in pixels."), query("h", "Height in pixels.")],
+      responses: { "200": media("image/png", "The picture.") },
+    },
+  },
+  "/render/fleet.svg": {
+    get: {
+      tags: ["Live"],
+      summary: "The same picture as SVG.",
+      parameters: [query("w", "Width in pixels."), query("h", "Height in pixels.")],
+      responses: { "200": media("image/svg+xml", "The picture.") },
+    },
+  },
   "/homeassistant": {
     get: {
       tags: ["Live"],
