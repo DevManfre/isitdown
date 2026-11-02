@@ -394,7 +394,12 @@ Notable suites:
   a zone, on both sides — the harness renders in UTC and tells the browser to do
   the same — because an hour column, a date field's default and a daily bucket
   are wall-clock readings: pinned only to the instant, a baseline agreed in
-  Rome can never be green on a runner in UTC. Run
+  Rome can never be green on a runner in UTC. Besides the busy fleet, a few
+  views are drawn of the fixtures `empty` (nothing configured) and `quiet`
+  (providers but no incident, history or message), and the Overview once more
+  against a server that serves the bundle and drops every API request — the
+  states roadmap 4.21 pins (`overview-empty`, `history-quiet`,
+  `overview-offline`, …). Run
   `node tools/visual-regression.mjs --update` to agree to an intended change, and
   `--only=<view>` while iterating on one.
 

@@ -6,6 +6,8 @@ import { isActive } from "../../core/maintenance.ts";
 import { staleReading } from "../../core/freshness.ts";
 import { openSuspicion } from "../../core/suspicion.ts";
 import { readiness } from "../readiness.ts";
+import { readSettings } from "../dbConfigSource.ts";
+import { applyOrder } from "../fleetOrder.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 
 /**
@@ -120,10 +122,14 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
       providers.map((provider) => [provider.id, provider.overallStatus]),
     );
     const groups = deriveGroups(services, (id) => byId.get(id) ?? "unknown");
+    // Roadmap 4.24. Ordered here, once, so every surface that lists the fleet
+    // — the Overview's widgets, the wallboard, the palette — agrees with the
+    // order the operator arranged without each one re-sorting it.
+    const { fleetOrder, groupOrder } = readSettings(runtime.db, runtime.logger);
 
     res.json({
-      providers,
-      groups,
+      providers: applyOrder(providers, fleetOrder),
+      groups: applyOrder(groups, groupOrder),
       pollIntervalMinutes: config.polling.intervalMinutes,
       lastPollAt: runtime.lastCycleAt(),
       // The scheduler's armed deadline, never `lastPollAt + interval`: the two

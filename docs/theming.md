@@ -147,8 +147,8 @@ What is guaranteed, and checked:
   clickables (a provider row, a ring tile) get a visible focus ring from
   `base.css` at zero specificity, under whatever ring a primitive already has.
 - **Keyboard shortcuts** (roadmap 4.17). GitHub's and Linear's grammar: `g` then a
-  letter goes somewhere — `g o` Overview, `g p` Providers, `g i` Incidents, `g h`
-  History, `g d` Delivery log, `g s` Settings — and a bare key does one thing:
+  letter goes somewhere — `g o` Overview, `g p` Providers, `g c` Components, `g i`
+  Incidents, `g h` History, `g d` Delivery log, `g s` Settings — and a bare key does one thing:
   `/` opens the palette, `p` polls now, `?` shows the map of all of them (also in
   the palette). They stay out of a text field, out of an open dialog and out of
   anything held with ⌘, Ctrl or Alt, and a `g` forgotten for 1.2 seconds is
@@ -172,6 +172,33 @@ What is guaranteed, and checked:
   hidden polite region in the shell names the providers whose status moved since
   the last read (three named, the rest counted), the toast stack announces each new
   card alone, and a refused write is an alert.
+- **Components** (roadmap 4.23). Every component of every provider in one table,
+  worst first, at `#/components` — "is anything called API down?" without opening
+  each provider. The text filter matches the component's name or its provider's
+  (which is how "eu-west" is found: components carry no region of their own), and
+  the status chips count what each state holds; both ride the address like 4.16's
+  filters.
+- **Incident mode** (roadmap 4.22). While a major outage is open — on a provider
+  that is neither muted nor in a declared maintenance window — a band above the
+  Overview's own layout carries the incident, how long it has been open, who else
+  it is hitting, its latest updates with the operator's notes among them, the
+  last day's annotations and an "Add a note" field. "Back to normal view" hides it
+  for that incident only; the next one brings it back. When it resolves, a
+  one-line strip says how long it lasted for ten minutes, with a link to the
+  incident for the post-mortem.
+- **Fleet order** (roadmap 4.24). "Arrange" on the Overview opens a dialog where
+  providers and groups are dragged — or moved with the arrows beside each row —
+  into the order the Overview's widgets and the wallboard list them in. The order
+  is kept by the instance (`fleetOrder` and `groupOrder` in `/api/preferences`),
+  so the office screen agrees with the laptop that arranged it; a provider added
+  later goes at the end, and "Automatic order" forgets it.
+- **Empty, loading and error states, reviewed together** (roadmap 4.21). The
+  visual harness also captures each view with nothing configured, with a quiet
+  fleet that has no incident, history or message yet, and with the backend gone.
+  The pass changed three of them: a window with no readings shows `—` rather than
+  0.00% and names no best or worst provider, a stopped server says so rather than
+  "Failed to fetch", and the empty Overview no longer offers a 90-day history of
+  nothing.
 - **The command palette.** `⌘K` (or `Ctrl+K`) on any screen — or the header's
   search button, which carries the shortcut on it so the second use is the
   keystroke — opens one search box over the console (roadmap 5.4): every view the rail lists, every enabled
