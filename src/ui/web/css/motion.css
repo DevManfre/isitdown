@@ -1400,8 +1400,54 @@ circle[role="button"]:hover {
   animation: now-breathe 1.6s ease-in-out infinite;
 }
 
+/* Roadmap 4.27. A tile whose status just moved — `data-pulse`, set for about
+   two seconds by `useStatusFeedback` — gives off one ring in the colour it
+   moved toward, so a change does not pass unseen in a dense view. Worse is the
+   outage colour and better the operational one, but the ring is only a cue:
+   the announcer says the same thing in words and the dot has already changed.
+
+   The entry class owns `animation` on the tiles that carry one, and an id
+   selector outranks a plain attribute, so those tiles get the two composed —
+   `rise` has long finished by now and is named only to stay in the list — and
+   the stagger's inline delay, which would otherwise hold the ring back by up
+   to 400ms, is zeroed. */
+@keyframes status-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pulse-color) 70%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--pulse-color) 0%, transparent);
+  }
+}
+
+[data-pulse="worse"] {
+  --pulse-color: var(--status-major-outage);
+}
+
+[data-pulse="better"] {
+  --pulse-color: var(--status-operational);
+}
+
+[data-pulse] {
+  animation: status-pulse 1.8s ease-out 1;
+}
+
+#view[data-animate] .anim-rise[data-pulse] {
+  animation:
+    rise 0.42s var(--ease-entry) both,
+    status-pulse 1.8s ease-out 1;
+  animation-delay: 0s !important;
+}
+
 /* Reduced motion keeps every state change, and none of the travel. */
 @media (prefers-reduced-motion: reduce) {
+  /* The ring does not travel, but the cue is kept: a still ring for as long
+     as the tile is flagged. */
+  [data-pulse] {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--pulse-color);
+  }
   *,
   *::before,
   *::after {
