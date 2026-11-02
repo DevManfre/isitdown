@@ -1,6 +1,6 @@
 import { Link, matchPath, NavLink, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Activity, History, House, Plus, Send, Server, Settings, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Activity, Boxes, History, House, Plus, Send, Server, Settings, TriangleAlert, type LucideIcon } from "lucide-react";
 import { NAV_ROUTES, ROUTE_PATHS, type NavRouteName, type RouteName } from "../../routePaths.ts";
 import { InstanceMark } from "@/components/InstanceMark.tsx";
 import { useInstanceIdentity } from "@/hooks/useInstanceIdentity.ts";
@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils.ts";
 const NAV_ICONS: Record<NavRouteName, LucideIcon> = {
   overview: Activity,
   providers: Server,
+  components: Boxes,
   incidents: TriangleAlert,
   history: History,
   deliveryLog: Send,

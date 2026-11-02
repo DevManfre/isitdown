@@ -52,6 +52,18 @@ const booleanSetting = z
   .enum(["true", "false"])
   .transform((value) => value === "true");
 
+/**
+ * A list of slugs, stored comma-joined — roadmap 4.24's fleet and group
+ * orders. Comma-joined rather than JSON because that is exactly what
+ * `writeSettings`' `String(value)` makes of an array, so the read-back
+ * comparison in `readSettings` holds and an empty list is the empty row.
+ * Safe because a slug carries no comma (`config.schema.ts`).
+ */
+const slugListSetting = z
+  .string()
+  .transform((value) => (value === "" ? [] : value.split(",")))
+  .pipe(z.array(z.string().regex(/^[a-z0-9][a-z0-9-]*$/)));
+
 /** A 24-hour wall clock time, the shape `quietHoursSchema` accepts. */
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
@@ -171,6 +183,14 @@ const settingsSchema = z.object({
    * hundred of them wants compact at any width.
    */
   density: z.enum(["comfortable", "compact"]).catch("comfortable"),
+  /**
+   * The operator's own order for the fleet and its groups — roadmap 4.24.
+   * Empty is the automatic order. Stored on the instance rather than in the
+   * browser, because the wallboard on the office screen has to agree with
+   * the laptop that arranged it.
+   */
+  fleetOrder: slugListSetting.catch([]),
+  groupOrder: slugListSetting.catch([]),
   /**
    * First-run wizard and guided tour — roadmap 4.5 and 4.6. Instance
    * preferences, not browser ones: an installation is set up once, and a

@@ -136,6 +136,21 @@ describe("History", () => {
     expect(await screen.findByText(i18n.t("history.month-no-data"))).toBeInTheDocument();
   });
 
+  // Roadmap 4.21: a fleet set up but never polled has no uptime, not 0%.
+  it("claims no figure and names no best or worst before anything was read", async () => {
+    const unread = {
+      ...summary,
+      aggregateUptime: 0,
+      aggregateDelta: null,
+      providers: summary.providers.map((provider) => ({ ...provider, sampleCount: 0, uptime7: 0, uptime30: 0, uptime90: 0 })),
+    };
+    renderWithProviders(<History />, { ...fixtures, history: unread });
+    // The headline, the provider's own row, and the best and worst tiles —
+    // each says it was not measured instead of a figure.
+    expect(await screen.findAllByText(i18n.t("history.unmeasured"))).toHaveLength(4);
+    expect(screen.queryByText("0.00%")).toBeNull();
+  });
+
   it("offers 7, 30 and 90 day ranges", async () => {
     renderWithProviders(<History />, fixtures);
     for (const days of [7, 30, 90]) {
