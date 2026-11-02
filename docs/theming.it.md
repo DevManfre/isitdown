@@ -210,6 +210,32 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   L'ordine è tenuto dall'istanza (`fleetOrder` e `groupOrder` in `/api/preferences`),
   così lo schermo in ufficio concorda con il portatile che l'ha sistemato; un provider
   aggiunto dopo va in fondo, e "Ordine automatico" lo dimentica.
+- **QR code del wallboard** (roadmap 4.26). Un QR code sta nell'angolo del wallboard e
+  apre la dashboard sul telefono, alla pagina del provider messo peggio — o alla
+  Panoramica quando non c'è nulla che non va. Segue il provider peggiore, non la
+  pagina su cui è la rotazione, perché nessuno inquadra un codice che cambia ogni
+  quindici secondi. È nero su bianco in ogni tema, perché una fotocamera legge il
+  contrasto, e codifica l'indirizzo a cui il wallboard è stato aperto: aprilo
+  dall'indirizzo di rete della macchina e non da `localhost`, o il telefono verrà
+  mandato a se stesso.
+- **Pulse di stato** (roadmap 4.27). Quando lo stream porta il cambio di stato di un
+  provider, il suo tile, la sua card o la sua riga emette un anello — rosso per uno stato
+  peggiore, verde per uno migliore — per circa due secondi, così un cambiamento non
+  passa inosservato in una vista densa. La prima lettura dopo aver aperto la scheda è
+  solo un riferimento e non fa pulsare nulla. Con `prefers-reduced-motion` l'anello non
+  si propaga: resta fermo per gli stessi due secondi. L'annuncio per lo screen reader
+  (roadmap 4.20) dice lo stesso cambiamento a parole.
+- **Suono di avviso** (roadmap 4.28). Impostazioni → Aspetto può riprodurre un tono
+  breve quando un provider peggiora mentre la scheda è aperta — pensato per un secondo
+  monitor. È disattivato di default, con un volume (25, 50 o 100%) e la gravità minima
+  che suona ancora (Degradato, Interruzione parziale o Interruzione grave). Il tono è
+  sintetizzato, non un file, e scende di tono con la gravità; un tono per aggiornamento,
+  per il cambio peggiore al suo interno, mai uno per provider. Una ripresa, e un
+  provider che ha appena iniziato o smesso di essere misurato, non suonano. La scelta è
+  tenuta in questo browser, non nell'istanza, perché un altoparlante appartiene alla
+  macchina su cui la scheda è aperta. I browser tengono una pagina muta finché non è
+  stata cliccata una volta; il pulsante **Prova** lo dice se è per questo che è rimasto
+  zitto.
 - **Stati vuoti, di caricamento ed errore, rivisti insieme** (roadmap 4.21). L'harness
   visivo cattura anche ogni vista senza nulla configurato, con una flotta tranquilla
   che non ha ancora incidenti, storia o messaggi, e con il backend spento. La passata

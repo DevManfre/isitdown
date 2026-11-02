@@ -1,3 +1,4 @@
+import { pulseAttr, usePulses } from "@/lib/statusPulse.ts";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
@@ -57,6 +58,8 @@ function severityChrome(status: OverallStatus): string {
  */
 export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
   const { t, i18n } = useTranslation();
+  // Roadmap 4.27: the one-off ring on a card whose status just moved.
+  const pulses = usePulses();
 
   return (
     <div className="provider-cards grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-2">
@@ -66,6 +69,7 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
         <SpotlightCard
           key={provider.id}
           data-slot="provider-card"
+          {...pulseAttr(pulses, provider.id)}
           {...(look.hatched ? { "data-suspected": true } : {})}
           className={cn(
             "tile-lit anim-rise flex gap-4 rounded-lg border bg-card/70 p-4",

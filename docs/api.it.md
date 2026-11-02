@@ -106,6 +106,7 @@ sono toccate.
 | `GET` | `/badge.svg` | Un badge SVG per l'intero parco provider: la lettura peggiore in circolazione. Non JSON — vedi [6.6](#66-badge-e-riepilogo-widget). |
 | `GET` | `/badge/:providerId.svg` | Lo stesso per un singolo provider. `404` (comunque come badge) se quell'id non esiste. |
 | `GET` | `/widget` | Un oggetto di riepilogo piatto per il widget "custom API" di una dashboard homelab — vedi [6.6](#66-badge-e-riepilogo-widget). |
+| `GET` | `/render/fleet.png`, `/render/fleet.svg` | Il parco provider come immagine fissa in bianco e nero (roadmap 4.25), per una cornice e-ink, un TRMNL, un Kindle in modalità kiosk o una chat. `?w=` e `?h=` impostano la dimensione in pixel, limitata a 200–2000 (default 800×480). Non JSON — vedi [6.6](#66-badge-e-riepilogo-widget). |
 | `GET` | `/homeassistant` | Un oggetto piatto per provider per l'integrazione `rest` di Home Assistant (roadmap 4.12): `state` è `ON` per qualsiasi cosa diversa da operativo, che è ciò che `device_class: problem` si aspetta, più un sensore `fleet` acceso quando lo è qualcosa. Indicizzato per id del provider, così un `value_template` legge `value_json.providers.github.state` invece di cercare in una lista. |
 | `GET` | `/homeassistant/configuration.yaml` | La configurazione Home Assistant di quel parco provider, generata e pronta da incollare: una risorsa `rest`, un binary sensor per provider. |
 | `GET` | `/openapi.json` | L'intera API, leggibile da una macchina (roadmap 4.10) — OpenAPI 3.1, per generare un client. |
@@ -325,6 +326,19 @@ widget "custom API" — conteggi e una parola, nessuno storico annidato:
 Nessuno dei due contatta un provider e nessuno dei due registra qualcosa: sono
 letture dello stato salvato, ed è questo che li rende interrogabili spesso.
 
+
+`GET /render/fleet.png?w=800&h=480` disegna il parco provider come immagine per uno
+schermo senza colori e senza browser (roadmap 4.25): un PNG a 1 bit, inchiostro nero su
+bianco, per una cornice e-ink, un TRMNL, un Kindle in modalità kiosk o una chat che
+vuole un'unica immagine. Lo stato è detto a parole (`OK`, `DEGRADED`, `PARTIAL OUTAGE`,
+`DOWN`, `UNKNOWN`) e con la forma: un provider non operativo è disegnato invertito,
+bianco su una barra nera, e le righe peggiori vengono per prime, così un parco troppo
+lungo per il pannello perde la coda sana e un'ultima riga dice `+N MORE`. Il testo è
+grande quanto permette l'intero parco. Viene rasterizzato nel server con un font 5×7
+incorporato — maiuscole, cifre e la punteggiatura che un nome porta; il resto è
+disegnato come `?` — quindi non serve alcun pacchetto in più. `/render/fleet.svg` è la
+stessa pagina come testo vettoriale. Entrambi hanno `Cache-Control: max-age=60` e, come
+il badge, leggono lo stato salvato senza contattare un provider.
 
 ### 6.7 La pagina di stato pubblica
 
