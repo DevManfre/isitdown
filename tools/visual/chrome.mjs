@@ -297,6 +297,16 @@ export async function withBrowser(options, body) {
           } catch {
             /* a blocked localStorage only costs the pre-paint hint */
           }
+          // The wallboard's QR code (roadmap 4.26) encodes this page's own
+          // address, and the harness serves on a port the OS picks every run,
+          // so its modules are different in every capture. They are blanked,
+          // not the card: the white square and its caption stay in the frame,
+          // so a code that goes missing or moves is still a difference.
+          document.addEventListener("DOMContentLoaded", () => {
+            const style = document.createElement("style");
+            style.textContent = '[data-slot="qr-code"] path { visibility: hidden; }';
+            document.head.appendChild(style);
+          });
         })();`,
       });
 
