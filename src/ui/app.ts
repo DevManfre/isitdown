@@ -19,6 +19,7 @@ import { metricsRoutes } from "./routes/metrics.routes.ts";
 import { notificationsRoutes } from "./routes/notifications.routes.ts";
 import { preferencesRoutes } from "./routes/preferences.routes.ts";
 import { publicRoutes } from "./routes/public.routes.ts";
+import { renderRoutes } from "./routes/render.routes.ts";
 import { reliabilityRoutes } from "./routes/reliability.routes.ts";
 import { coincidenceRoutes } from "./routes/coincidence.routes.ts";
 import { pushRoutes } from "./routes/push.routes.ts";
@@ -77,6 +78,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(maintenancesRoutes(runtime));
   app.use(metricsRoutes(runtime));
   app.use(badgeRoutes(runtime));
+  app.use(renderRoutes(runtime));
   app.use(debugRoutes(runtime));
   app.use(homeassistantRoutes(runtime));
   app.use(openapiRoutes());

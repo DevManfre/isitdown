@@ -11,7 +11,7 @@
 
 [![Runtime dependencies](https://img.shields.io/badge/runtime%20deps-4-lightgrey?style=flat-square)](docs/development.md#92-tech-stack)
 [![Docker](https://img.shields.io/badge/docker-light%20%7C%20ui-2496ED?style=flat-square&logo=docker&logoColor=white)](docs/docker.md#4-docker)
-[![i18n](https://img.shields.io/badge/i18n-en%20%7C%20it-orange?style=flat-square)](docs/theming.md#82-localisation)
+[![i18n](https://img.shields.io/badge/i18n-en%20%7C%20de%20%7C%20es%20%7C%20fr%20%7C%20it%20%7C%20pt-orange?style=flat-square)](docs/theming.md#82-localisation)
 
 **English** · [Italiano](README.it.md)
 
@@ -85,8 +85,8 @@ Anthropic       operational    ████████████████�
 | State store | JSON file, atomic writes | SQLite (also carries history) |
 | HTTP server | none | Express on :3000 |
 | Uptime history and charts | — | 7/30/90-day views, plus a year heat calendar per provider |
-| Theme | — | light / dark / system |
-| Localisation | notification text | notification text **and** the whole dashboard |
+| Theme | — | light / dark / system, plus high-contrast, colour-blind and OLED variants and a custom accent |
+| Localisation | notification text | notification text **and** the whole dashboard, in six languages (`en`, `de`, `es`, `fr`, `it`, `pt`) |
 | Footprint | 264MB image, no listening socket | 267MB — the Light image plus one layer |
 
 Both editions run the same core engine. They differ only in what gets injected
@@ -186,7 +186,25 @@ requests so most cycles are a `304`, a per-provider poll cadence, the delivery l
 view, a provider removal that can be undone inside a restore window, ntfy and
 Gotify alongside the other channels, a year heat calendar per provider,
 readiness split from liveness, an integrity check and vacuum on demand, and a
-committed Grafana dashboard.
+committed Grafana dashboard, then:
+
+- **Notifications**: over thirty channels held to one contract — chat, push, on-call
+  and incident tools, email, SMS and calls — with a delivery policy (shared-failure
+  summary, update coalescing, a quiet period for known outages, a periodic report,
+  an on-call rotation and a weekly routine delivery test).
+- **Dashboard**: a composable Overview built from a widget catalogue, with named
+  dashboards, a "while you were away" summary and numbers that link to their rows;
+  an incident Gantt, latency percentiles, five-way compare, zoomable history,
+  a Components view, a manual fleet order, a command palette with text search,
+  keyboard shortcuts, filters kept in the address, a first-run wizard and guided
+  tour, and an accessibility pass (axe) over every frame.
+- **Wallboard and feeds**: a QR code that opens the provider in the worst trouble,
+  a pulse and an optional sound when a tile changes, and the fleet served as a
+  1-bit PNG and SVG for e-ink frames and chats.
+- **Hardening**: the dashboard binds to loopback by default, refuses cross-origin
+  and rebound-host writes, caps response bodies and refuses link-local targets.
+- **Catalogue and tooling**: a provider catalogue of 205 entries, the `isitdown
+  discover` and `isitdown import` commands, and CI split into parallel jobs.
 
 Still open:
 
