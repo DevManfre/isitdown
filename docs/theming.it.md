@@ -236,6 +236,14 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   macchina su cui la scheda è aperta. I browser tengono una pagina muta finché non è
   stata cliccata una volta; il pulsante **Prova** lo dice se è per questo che è rimasto
   zitto.
+- **Panoramica su telefono** (roadmap 4.29). Sotto i 768px la Panoramica si apre su
+  una lista pensata per una mano: prima ciò che va controllato, in righe abbastanza
+  alte da colpire, e i provider operativi ripiegati sotto un pulsante "Mostra tutti".
+  Scorri una riga con un problema a sinistra per silenziarla per 1 o 24 ore (una barra
+  Annulla aspetta sei secondi); il menu ⋯ della riga fa lo stesso con le quattro durate
+  consuete, per chi non scorre. Tira giù la pagina dall'alto e rilascia per interrogare
+  subito — il "Aggiorna ora" dell'intestazione, a portata di pollice. Lo stato è sempre
+  scritto accanto all'icona, e il silenziamento è la stessa scrittura delle Impostazioni.
 - **Stati vuoti, di caricamento ed errore, rivisti insieme** (roadmap 4.21). L'harness
   visivo cattura anche ogni vista senza nulla configurato, con una flotta tranquilla
   che non ha ancora incidenti, storia o messaggi, e con il backend spento. La passata

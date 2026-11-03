@@ -16,6 +16,7 @@ import { EmptyFleet } from "@/components/EmptyFleet.tsx";
 import { AwaySummary } from "@/components/AwaySummary.tsx";
 import { FleetOrderDialog } from "@/components/FleetOrderDialog.tsx";
 import { IncidentBand } from "@/components/IncidentBand.tsx";
+import { MobileProblems } from "@/components/MobileProblems.tsx";
 import { ViewSkeleton } from "@/components/ViewSkeleton.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useDashboard, useDashboards, useHistory, useStatus } from "@/hooks/queries.ts";
@@ -467,17 +468,21 @@ export function Overview() {
           )}
         >
           {heroCopy}
-          {shape === "dense" ? (
-            <FleetSummary
-              average={average}
-              operational={providers.length - down.length}
-              alarm={down.length}
-            />
-          ) : (
-            providers.length > 0 && (
-              <HeroStats providers={providers} average={average} />
-            )
-          )}
+          {/* Roadmap 4.29: on a phone the list under the hero says the same
+              thing in rows, so the figures step aside and the problems rise. */}
+          <div className="hidden md:contents">
+            {shape === "dense" ? (
+              <FleetSummary
+                average={average}
+                operational={providers.length - down.length}
+                alarm={down.length}
+              />
+            ) : (
+              providers.length > 0 && (
+                <HeroStats providers={providers} average={average} />
+              )
+            )}
+          </div>
         </div>
       </div>
 
@@ -492,6 +497,8 @@ export function Overview() {
       {/* Roadmap 4.22: while a major outage is open, the incident sits above
           the operator's own layout instead of replacing it. */}
       {!editing && <IncidentBand providers={providers} />}
+      {/* Roadmap 4.29: below 768px, what needs attention comes first. */}
+      {!editing && providers.length > 0 && <MobileProblems providers={providers} />}
       {dashboards !== undefined && dashboards.length > 1 && dashboardId !== undefined && (
         <div className="mb-4 flex flex-col gap-1.5 md:hidden">
           <span id="dashboard-switcher" className="text-xs text-muted-foreground">
