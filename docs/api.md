@@ -104,6 +104,7 @@ e.g. a reverse proxy's name). Requests without an `Origin` (curl, scripts) and t
 | `GET` | `/badge.svg` | An SVG badge for the whole fleet: the worst reading anything is showing. Not JSON — see [6.6](#66-badges-and-the-widget-summary). |
 | `GET` | `/badge/:providerId.svg` | The same for one provider. `404` (still as a badge) when nothing knows that id. |
 | `GET` | `/widget` | One flat summary object for a homelab dashboard's custom-API widget — see [6.6](#66-badges-and-the-widget-summary). |
+| `GET` | `/render/fleet.png`, `/render/fleet.svg` | The fleet as a still black-and-white picture (roadmap 4.25), for an e-ink frame, a TRMNL, a kiosk Kindle or a chat. `?w=` and `?h=` set the size in pixels, clamped to 200–2000 (default 800×480). Not JSON — see [6.6](#66-badges-and-the-widget-summary). |
 | `GET` | `/homeassistant` | One flat object per provider for Home Assistant's `rest` integration (roadmap 4.12): `state` is `ON` for anything but operational, which is what `device_class: problem` expects, plus a `fleet` sensor that is on when anything is. Keyed by provider id, so a `value_template` reads `value_json.providers.github.state` rather than searching a list. |
 | `GET` | `/homeassistant/configuration.yaml` | That fleet's Home Assistant configuration, generated and ready to paste: one `rest` resource, one binary sensor per provider. |
 | `GET` | `/openapi.json` | The whole API, machine-readable (roadmap 4.10) — OpenAPI 3.1, for a generated client. |
@@ -319,6 +320,19 @@ widget — counts and one word, no nested history:
 
 Neither endpoint contacts a provider and neither records anything: both are
 reads of stored state, which is what makes them safe to poll often.
+
+`GET /render/fleet.png?w=800&h=480` draws the fleet as a picture for a screen
+that has no colour and no browser (roadmap 4.25): a 1-bit PNG, black ink on white,
+for an e-ink photo frame, a TRMNL, a Kindle in kiosk mode, or a chat that wants one
+image. Status is said in words (`OK`, `DEGRADED`, `PARTIAL OUTAGE`, `DOWN`,
+`UNKNOWN`) and by shape: a provider that is not operational is drawn inverted,
+white on a black bar, and the worst rows come first, so a fleet too long for the
+panel loses its healthy tail and a last line says `+N MORE`. The text is as large
+as the whole fleet allows. It is rasterised in the server with a built-in 5×7
+font — capitals, digits and the punctuation a name carries; anything else draws
+as `?` — so it needs no extra package. `/render/fleet.svg` is the same page as
+vector text. Both are `Cache-Control: max-age=60` and, like the badge, read stored
+state without contacting a provider.
 
 ### 6.7 The public status page
 

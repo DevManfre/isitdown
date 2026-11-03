@@ -3,6 +3,7 @@ import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeBarRow } from "@/components/charts/UptimeBarRow.tsx";
 import { statusColor, statusLabelKey } from "@/lib/chartConfig.ts";
 import { stagger } from "@/lib/stagger.ts";
+import { pulseAttr, usePulses } from "@/lib/statusPulse.ts";
 import { shownStatus } from "@/lib/suspicion.ts";
 import { SuspicionTooltip } from "@/components/SuspicionTooltip.tsx";
 import type { HistoryBucket, ProviderStatus } from "@/lib/types.ts";
@@ -30,6 +31,8 @@ export function ProviderRow({
 }) {
   const { t } = useTranslation();
   const shown = shownStatus(provider);
+  // Roadmap 4.27: the one-off ring on a row whose status just moved.
+  const pulses = usePulses();
 
   return (
     /* Two rows on a phone, one from `md` up. Those three fixed columns left the
@@ -37,6 +40,7 @@ export function ProviderRow({
        are 336 of it — so below 768px the bar takes its own full-width line
        under the pair that labels it. */
     <div
+      {...pulseAttr(pulses, provider.id)}
       className="overview-row anim-rise grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 lg:grid-cols-[minmax(0,180px)_1fr_minmax(0,156px)] lg:gap-4"
       style={delay === undefined ? undefined : { animationDelay: delay }}
     >
