@@ -1,3 +1,4 @@
+import { useStatusFeedback } from "@/hooks/useStatusFeedback.ts";
 import { Outlet, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { CommandPalette } from "@/components/CommandPalette.tsx";
@@ -17,7 +18,7 @@ import { useDocumentStatus } from "@/hooks/useDocumentStatus.tsx";
 import { useAccent } from "@/hooks/useInstanceIdentity.ts";
 import { useShortcuts } from "@/hooks/useShortcuts.ts";
 import { usePreferenceSync } from "@/hooks/usePreferenceSync.tsx";
-import { usePreferences } from "@/hooks/queries.ts";
+import { usePreferences, useStatusChrome } from "@/hooks/queries.ts";
 import { useViewReady } from "@/hooks/useViewReady.ts";
 
 /**
@@ -67,6 +68,9 @@ export function App() {
   // The browser tab reflects the worst status in the fleet. Mounted in the
   // shell, like the seed above, because the tab belongs to no single view.
   useDocumentStatus();
+  // Roadmaps 4.27 and 4.28: the pulse on a tile that moved, and the optional
+  // tone — in the shell, because no single view owns the fleet.
+  useStatusFeedback(useStatusChrome().data);
   // The same readiness `ViewFrame` gates the view on, held here for the chrome
   // around it. `Rail`, `Header` and `PollIndicator` are siblings of the frame,
   // so they were never behind its gate: they painted a countdown that said

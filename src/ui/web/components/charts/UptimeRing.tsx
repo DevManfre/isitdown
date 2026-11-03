@@ -1,3 +1,4 @@
+import { pulseAttr, usePulses } from "@/lib/statusPulse.ts";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RadialBar, RadialBarChart, PolarAngleAxis } from "recharts";
@@ -37,6 +38,8 @@ export function UptimeRing({
   // Roadmap 1.3: the ring is drawn in what the dashboard shows for this
   // provider, which a hatched suspicion can make differ from the page's word.
   const shown = shownStatus(provider);
+  // Roadmap 4.27: the one-off ring on a tile whose status just moved.
+  const pulses = usePulses();
   const patternId = `suspected-${useId().replace(/:/g, "")}`;
   const ringFill = shown.hatched ? `url(#${patternId})` : statusFill(shown.status);
 
@@ -58,6 +61,7 @@ export function UptimeRing({
       // StatusDot's `data-status` and the shadcn primitives' `data-slot`.
       data-slot="uptime-ring"
       {...(shown.hatched ? { "data-suspected": true } : {})}
+      {...pulseAttr(pulses, provider.id)}
       ref={ref}
       {...spotlightProps}
       className={cn(

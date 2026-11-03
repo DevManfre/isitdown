@@ -192,6 +192,31 @@ What is guaranteed, and checked:
   is kept by the instance (`fleetOrder` and `groupOrder` in `/api/preferences`),
   so the office screen agrees with the laptop that arranged it; a provider added
   later goes at the end, and "Automatic order" forgets it.
+- **Wallboard QR code** (roadmap 4.26). A QR code sits in the corner of the
+  wallboard and opens the dashboard on a phone, at the page of the provider in
+  the worst trouble — or the Overview when nothing is wrong. It follows the
+  worst provider, not the page the rotation is on, because nobody scans a code
+  that changes every fifteen seconds. It is black on white in every theme, since
+  a camera reads contrast, and it encodes the address the wallboard was opened
+  at: open the wallboard through the machine's network address rather than
+  `localhost`, or the phone will be sent to itself.
+- **Status pulse** (roadmap 4.27). When the stream brings a provider's status
+  change, its tile, card or row gives off one ring — red for a worse status,
+  green for a better one — for about two seconds, so a change does not pass unseen
+  in a dense view. The first read after opening the tab is only a baseline and
+  pulses nothing. With `prefers-reduced-motion` the ring does not travel: it stays
+  still for the same two seconds. The screen-reader announcement (roadmap 4.20)
+  says the same change in words.
+- **Alert sound** (roadmap 4.28). Settings → Appearance can play a short tone when
+  a provider gets worse while the tab is open — for a second monitor. It is off by
+  default, with a volume (25, 50 or 100%) and the mildest severity that still
+  sounds (Degraded, Partial outage or Major outage). The tone is synthesised, not
+  a file, and falls in pitch with the severity; one tone per refresh, for the worst
+  change in it, never one per provider. A recovery, and a provider that has only
+  just started or stopped being measured, make no sound. The choice is kept in
+  this browser, not on the instance, because a speaker belongs to the machine the
+  tab is open on. Browsers keep a page silent until it has been clicked once; the
+  **Play** button says so if that is why it stayed quiet.
 - **Empty, loading and error states, reviewed together** (roadmap 4.21). The
   visual harness also captures each view with nothing configured, with a quiet
   fleet that has no incident, history or message yet, and with the backend gone.
