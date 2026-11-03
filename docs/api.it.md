@@ -340,6 +340,31 @@ disegnato come `?` — quindi non serve alcun pacchetto in più. `/render/fleet.
 stessa pagina come testo vettoriale. Entrambi hanno `Cache-Control: max-age=60` e, come
 il badge, leggono lo stato salvato senza contattare un provider.
 
+#### Widget per la home del telefono
+
+Roadmap 4.30. Il non-goal "nessuna app mobile" esclude un'app nativa, non un
+widget: le due ricette qui sotto leggono `/widget` e non aggiungono codice a
+IsItDown. Il telefono deve raggiungere l'istanza — stessa Wi-Fi, una VPN o un nome
+sulla tailnet.
+
+- **iOS, con [Scriptable](https://scriptable.app).** Copia
+  [`docs/widgets/isitdown.scriptable.js`](widgets/isitdown.scriptable.js) in
+  Scriptable, imposta `BASE_URL`, poi aggiungi alla home un widget Scriptable e
+  scegli lo script. Mostra lo stato peggiore a parole e a colore, i conteggi e
+  l'ultimo poll; un tocco apre la dashboard. Se l'istanza non risponde scrive
+  `Unreachable` invece dell'ultima risposta buona.
+- **Android, con [KWGT](https://kustom.rocks).** Aggiungi un livello Testo e usa la
+  formula web-get, che restituisce un campo del JSON per chiamata:
+
+  ```text
+  $wg("http://isitdown.local:3000/widget", json, ".status")$
+  $wg("http://isitdown.local:3000/widget", json, ".operational")$/$wg("http://isitdown.local:3000/widget", json, ".providers")$ up
+  ```
+
+  Imposta l'intervallo di aggiornamento del livello a cinque minuti; un'azione al
+  tocco sul widget può aprire l'URL della dashboard. Colora per stato con
+  `$if(wg("…", json, ".status") = major_outage, #f87171, #34d399)$`.
+
 ### 6.7 La pagina di stato pubblica
 
 Due rotte, spente se `PUBLIC_PAGE` non è `true`, che rispondono `404` quando non
