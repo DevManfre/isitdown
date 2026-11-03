@@ -22,6 +22,14 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 :root {
+  /* The QR code on the wallboard (roadmap 4.26). Black on white in every theme,
+     deliberately outside the palette: a phone camera reads contrast, and the
+     inverted code the OLED theme would otherwise draw is the one that fails. */
+  --qr-ground: #ffffff;
+  --qr-ink: #000000;
+  /* The ring a tile gives off when its status moves (roadmap 4.27); motion.css
+     points it at the status colour the tile moved toward. */
+  --pulse-color: var(--status-operational);
   /* Light is no longer an inversion of Nocturne, and no longer tries to be.
      Nocturne is a dark, violet-tinted system; read from the other end it gave
      a lavender ground, three painted washes and a slate-blue rail, and the
@@ -245,6 +253,10 @@
 }
 
 :root[data-theme="dark"] {
+  /* Not themed — see the light block: a QR code scans on black-on-white only. */
+  --qr-ground: #ffffff;
+  --qr-ink: #000000;
+  --pulse-color: var(--status-operational);
   --color-bg: #161826;
   --color-surface: #232532;
   --color-text: #e9e9ed;
@@ -421,6 +433,9 @@
    Guarded so an explicit light choice still wins on a dark desktop. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    --qr-ground: #ffffff;
+    --qr-ink: #000000;
+    --pulse-color: var(--status-operational);
     --color-bg: #161826;
     --color-surface: #232532;
     --color-text: #e9e9ed;

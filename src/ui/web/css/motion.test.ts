@@ -121,4 +121,13 @@ describe("motion.css after the react port", () => {
     expect(code).toMatch(/\[data-slot="edit-arrival"\]\s*\{\s*animation: arrival/);
     expect(code).not.toContain("#view[data-animate] [data-slot=\"edit-arrival\"]");
   });
+
+  // Roadmap 4.27. The ring on a tile that just changed, which has to share
+  // `animation` with the entry class on the tiles that carry one.
+  it("pulses a tile that just changed, without dropping its entry animation", () => {
+    expect(code).toContain("@keyframes status-pulse");
+    expect(code).toMatch(/#view\[data-animate\] \.anim-rise\[data-pulse\]\s*\{\s*animation:\s*rise[^;]*,\s*status-pulse/);
+    // Reduced motion keeps a still ring rather than nothing.
+    expect(code).toMatch(/prefers-reduced-motion: reduce\) \{[\s\S]*?\[data-pulse\] \{[^}]*box-shadow/);
+  });
 });
