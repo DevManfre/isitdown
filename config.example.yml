@@ -46,6 +46,22 @@ services:
     # reads as a handover note.
     impact: deploys blocked, CI stopped
     owner: "@alice"
+    # Optional: what to do when it is down, in Markdown. Shown on the provider's
+    # page; every alert ends with its first link, or its first line.
+    runbook: |
+      Switch CI to the GitLab mirror: https://wiki.example.com/runbooks/github
+    # Optional: free labels beside the group. A routing rule can name one as
+    # `provider: tag:critical`.
+    tags: [paid, critical]
+    # Optional: planned mutes — a weekly window (may wrap midnight) or one span.
+    # While one runs the provider is muted exactly like the dashboard's Mute.
+    muteSchedules:
+      - { days: [sun], start: "03:00", end: "04:00", timeZone: Europe/Rome }
+    # Optional: maintenance you declare because the provider does not. It
+    # silences, is announced and is drawn on the timeline like the provider's
+    # own; it always needs an end.
+    # maintenanceWindows:
+    #   - { title: Our deploy, startsAt: "2026-12-01T22:00:00Z", endsAt: "2026-12-01T23:00:00Z" }
 
   - name: Cloudflare
     id: cloudflare
