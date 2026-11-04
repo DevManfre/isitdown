@@ -206,6 +206,13 @@ Grafana committata, poi:
 - **Wallboard e feed**: un codice QR che apre il provider nei guai peggiori, un
   impulso e un suono opzionale quando una tile cambia, e la flotta servita come
   PNG a 1 bit e SVG per cornici e-ink e chat.
+- **Qualità della vita per l'operatore**: un runbook Markdown per provider,
+  mostrato nella sua pagina e citato in ogni avviso; tag accanto al gruppo,
+  filtrabili e instradabili come `tag:<nome>`; silenziamenti pianificati,
+  settimanali o una tantum; finestre di manutenzione dichiarate dall'operatore,
+  che silenziano e vengono disegnate come quelle del provider; modifica in blocco
+  di cadenza, gruppo, tag, silenziamento e interrogazione su una selezione; e
+  Duplica su ogni provider ([3.25–3.29](docs/configuration.it.md#325-runbook--cosa-fare-se-è-giù)).
 - **Hardening**: la dashboard ascolta di default solo sul loopback, rifiuta
   scritture cross-origin e con host rebound, limita le dimensioni delle risposte e
   rifiuta i target link-local.

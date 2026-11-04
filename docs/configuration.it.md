@@ -1690,7 +1690,7 @@ di un dato cambiamento. Ogni regola ha quattro parti:
 
 ```yaml
 routing:
-  - provider: "*"            # un id di servizio, `group:<slug>` (§3.10), `<id>#<componente>`, o "*"
+  - provider: "*"            # un id di servizio, `group:<slug>` (§3.10), `tag:<slug>` (§3.26), `<id>#<componente>`, o "*"
     classes: [status, incident]  # una o più tra: status, incident, maintenance, monitoring
     minSeverity: major_outage  # any | degraded | partial_outage | major_outage
     channels: [telegram]       # id dei canali, o "*" per ogni canale abilitato; [] silenzia
@@ -2139,6 +2139,7 @@ I segnaposti, che la dashboard elenca anche sotto il campo:
 | `{{incidentStatus}}` | La parola di ciclo di vita del provider per l'incidente, tradotta dove è nota. |
 | `{{impact}}` | Cosa si rompe quando questo provider va giù, come scritto sul provider ([3.23](#323-perché-un-provider-conta--impatto-e-responsabile)); vuoto se non impostato. |
 | `{{owner}}` | Chi risponde di questo provider; vuoto se non impostato. |
+| `{{runbook}}` | Da dove partire quando è giù: il primo link del runbook, o la sua prima riga ([3.25](#325-runbook--cosa-fare-se-è-giù)); vuoto se non impostato. |
 | `{{url}}` | La pagina di stato pubblica del provider. Vuota su un canale che rende il link da sé (un embed Discord), così non viene mai stampato due volte. |
 | `{{at}}` | Quando è successo, UTC. |
 
@@ -2842,3 +2843,146 @@ conservare; **Importa da file** crea una nuova dashboard da uno di questi file,
 di questa installazione o di un'altra. Un nome importato già in uso viene
 numerato, e un provider citato dal file che qui non esiste viene mostrato come
 rimosso, come sopra.
+
+### 3.25 Runbook — cosa fare se è giù
+
+Un provider può avere un runbook: qualche riga di Markdown che dice cosa fare
+quando va giù — cambiare region, attivare il mirror npm, avvisare il team.
+Riguarda il provider, non un singolo incidente; per quello ci sono le note
+dell'incidente.
+
+```yaml
+services:
+  - name: npm
+    id: npm
+    adapter: statuspage
+    baseUrl: https://status.npmjs.org
+    runbook: |              # Markdown, fino a 4000 caratteri
+      ## Se npm è giù
+      1. Punta la CI al mirror: https://wiki.example.com/runbooks/npm-mirror
+      2. Avvisa #dev su Slack
+```
+
+L'edizione UI lo mostra nella pagina del provider, sopra lo storico, con
+titoli, elenchi, enfasi e link `http(s)` resi — nient'altro diventa markup,
+quindi un runbook non può mai iniettare HTML. Un messaggio non può portarsi
+dietro una pagina di Markdown, quindi ogni avviso sul provider si chiude con
+**una riga** del runbook, sotto impatto e responsabile
+([3.23](#323-perché-un-provider-conta--impatto-e-responsabile)): il primo link
+del runbook se ne ha uno (la maggior parte dei runbook vive in una wiki),
+altrimenti la sua prima riga — `Runbook: https://wiki.example.com/runbooks/npm-mirror`.
+Un template lo posiziona con `{{runbook}}`; i canali pubblici (Mastodon,
+Bluesky) lo omettono, come impatto e responsabile.
+
+Nell'edizione UI è il campo **Runbook** del form del provider, `runbook` su
+`POST /config/services` e `PATCH /config/services/:id` (`null` lo cancella).
+
+### 3.26 Tag
+
+Un provider sta in al massimo un gruppo ([3.10](#310-gruppi-di-provider--il-mio-stack)),
+ma può avere fino a 20 **tag** — `pagato`, `critico`, `team-backend`, `eu`.
+Ognuno è uno slug minuscolo.
+
+```yaml
+services:
+  - name: Stripe
+    id: stripe
+    adapter: statuspage
+    baseUrl: https://status.stripe.com
+    group: payments
+    tags: [pagato, critico, eu]
+
+routing:
+  - provider: tag:critico    # ogni provider con il tag critico
+    channels: [pagerduty]
+```
+
+Una regola di routing indica un tag come `tag:<slug>` e copre ogni provider
+che lo porta, in qualunque gruppo stia. Nell'edizione UI i tag si scrivono nel
+form del provider, separati da virgole e trasformati in slug al salvataggio
+("Team Backend" diventa `team`, `backend` — scrivi `team-backend` per tenerlo
+un tag solo); compaiono sotto il nome del provider in **Impostazioni** e nella
+sua pagina, filtrano sia l'elenco delle Impostazioni sia la tabella Provider
+(il selettore dei tag compare appena un provider ne ha uno), e l'editor del
+routing li offre come destinazione.
+
+### 3.27 Silenziamenti pianificati
+
+Il pulsante **Silenzia** silenzia per un po' da adesso. Un silenziamento
+pianificato si imposta in anticipo:
+
+```yaml
+services:
+  - name: Legacy API
+    id: legacy-api
+    adapter: http
+    baseUrl: https://legacy.example.com/health
+    muteSchedules:
+      # ogni martedì 02:00–04:00 ora di Roma — manutenzione settimanale non dichiarata
+      - { days: [tue], start: "02:00", end: "04:00", timeZone: Europe/Rome }
+      # una finestra può superare la mezzanotte: sabato 23:00 – domenica 01:00
+      - { days: [sat], start: "23:00", end: "01:00", timeZone: auto }
+      # una volta: da venerdì alle 18 a lunedì alle 8
+      - { from: "2026-11-06T17:00:00Z", until: "2026-11-09T07:00:00Z" }
+```
+
+Fino a 20 per provider. `days` sono `mon`…`sun`; `timeZone` è un nome IANA, o
+`auto` per il fuso in cui gira il processo. Finché uno è attivo il provider è
+silenziato esattamente come con il pulsante — viene comunque interrogato e
+registrato, compare comunque in dashboard (come silenziato, fino alla fine
+della pianificazione), e il diff engine non riporta nulla. Un fuso sconosciuto
+o un orario malformato non silenziano niente: una pianificazione rotta perde
+contro l'avviso invece di zittirlo.
+
+Nell'edizione UI è il pulsante **Pianifica** nella riga del provider in
+**Impostazioni** (la metà dei silenziamenti), `muteSchedules` sul `PATCH` del
+provider (`null` li cancella).
+
+### 3.28 Manutenzioni dichiarate
+
+Le finestre di manutenzione arrivano di solito dalla pagina del provider.
+Quando un provider non ne pubblica — o il "provider" è la tua sonda HTTP e stai
+per fare un deploy — dichiarane una tu:
+
+```yaml
+services:
+  - name: Our API
+    id: our-api
+    adapter: http
+    baseUrl: https://api.example.com/health
+    maintenanceWindows:
+      - title: Migrazione database
+        startsAt: "2026-12-01T22:00:00Z"
+        endsAt: "2026-12-01T23:30:00Z"   # sempre obbligatoria
+```
+
+Si comporta esattamente come una pubblicata dal provider: mentre è attiva,
+nient'altro sul provider fa notizia; inizio e fine vengono annunciati
+(`maintenance_started` / `maintenance_ended`, la fine con lo stato in cui il
+provider ne è uscito); il preavviso prima dell'apertura parte se è attivo
+([3.8](#38-politica-di-consegna--ore-di-silenzio-riepiloghi-limiti)); e la timeline
+la disegna. A differenza di quelle del provider, deve avere una fine — una
+finestra che nessuno chiuderà zittirebbe il provider per sempre. Fino a 50 per
+provider; una già finita si può lasciare o togliere.
+
+Nell'edizione UI è l'altra metà della finestra **Pianifica**,
+`maintenanceWindows` sul `PATCH` del provider (`null` le cancella).
+
+### 3.29 Modifica in blocco e duplica
+
+Solo edizione UI. Con cento provider, modificarne uno alla volta non scala:
+
+- **Seleziona** sopra l'elenco dei provider in **Impostazioni** mostra una
+  casella per riga; **Modifica N** apre un'unica finestra per tutti. Ogni campo
+  parte da *Lascia com'è*, e viene scritto solo ciò che cambi: interrogazione
+  attiva o no, la cadenza (un numero di minuti, o di nuovo quella globale), il
+  gruppo (spostare in uno, o toglierlo), tag da **aggiungere** e tag da
+  **rimuovere** (ogni provider tiene gli altri suoi), e un silenziamento. È
+  tutto o niente — un id sconosciuto, o una cadenza che l'adapter di un
+  provider rifiuta, non scrive nulla. Via API è `PATCH /config/services`
+  ([6](api.it.md)).
+- **Duplica** nella riga di un provider apre il form di aggiunta al secondo
+  passo, con ogni campo copiato — adapter, URL base, opzioni, componenti,
+  cadenza, gruppo, tag, runbook, silenziamenti pianificati e finestre
+  dichiarate — con il nome "<nome> (copia)", da cui deriva il nuovo id. Dieci
+  sonde HTTP che differiscono solo per il path sono una sonda e nove duplicati.

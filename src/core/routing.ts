@@ -117,7 +117,7 @@ export const QUIET_HOURS_OFF: QuietHours = {
 };
 
 /** "HH:MM" as minutes since midnight, or null when it is not that shape. */
-function minutesOfClock(value: string): number | null {
+export function minutesOfClock(value: string): number | null {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
   if (match === null) return null;
   return Number(match[1]) * 60 + Number(match[2]);
@@ -177,6 +177,9 @@ export function inQuietHours(quiet: QuietHours, at: Date): boolean {
 /** How a rule names a group rather than one provider (roadmap 2.6). */
 export const GROUP_PREFIX = "group:";
 
+/** How a rule names every provider carrying a tag (roadmap 5.4). */
+export const TAG_PREFIX = "tag:";
+
 /**
  * How a rule names one component of one provider (roadmap 2.9):
  * `github#8l4ygp009s5s`. A component transition already carries its own
@@ -196,8 +199,9 @@ export function componentTargetOf(target: string): { providerId: string; compone
 export interface RoutingRule {
   /**
    * A provider id, `group:<slug>` for every provider in that group (roadmap
-   * 2.6), `<provider>#<component>` for one component of one provider (roadmap
-   * 2.9), or "*" for every provider.
+   * 2.6), `tag:<slug>` for every provider carrying that tag (roadmap 5.4),
+   * `<provider>#<component>` for one component of one provider (roadmap 2.9),
+   * or "*" for every provider.
    */
   provider: string;
   classes: EventClass[];
@@ -288,11 +292,14 @@ export interface RoutingOptions {
    * rule then matches.
    */
   providerGroup?: string | undefined;
+  /** The tags the change's own provider carries (roadmap 5.4), for `tag:` rules. */
+  providerTags?: readonly string[] | undefined;
 }
 
 /**
  * Whether one rule's target covers this change: the provider itself, every
- * provider ("*"), the group the provider is in, or one named component of it.
+ * provider ("*"), the group the provider is in, a tag it carries, or one named
+ * component of it.
  *
  * A component target is the only one that narrows *within* a provider, so it is
  * also the only one that can fail to match a change from the provider it names:
@@ -300,9 +307,15 @@ export interface RoutingOptions {
  * is what lets it sit above a `github` rule and route one component elsewhere
  * without taking the rest of the provider with it.
  */
-function coversChange(target: string, change: StatusChange, group: string | undefined): boolean {
+function coversChange(
+  target: string,
+  change: StatusChange,
+  group: string | undefined,
+  tags: readonly string[] | undefined,
+): boolean {
   if (target === "*") return true;
   if (target.startsWith(GROUP_PREFIX)) return group !== undefined && target.slice(GROUP_PREFIX.length) === group;
+  if (target.startsWith(TAG_PREFIX)) return tags?.includes(target.slice(TAG_PREFIX.length)) ?? false;
   const component = componentTargetOf(target);
   if (component !== null) {
     return component.providerId === change.providerId && component.componentId === change.component?.id;
@@ -346,7 +359,7 @@ export function explain(
       outcomes.push({ kind: "unreached" });
       continue;
     }
-    if (!coversChange(rule.provider, change, options.providerGroup)) {
+    if (!coversChange(rule.provider, change, options.providerGroup, options.providerTags)) {
       outcomes.push({ kind: "skipped", because: "provider" });
       continue;
     }

@@ -8,7 +8,6 @@ import {
 import {
   confirmedChanges,
   correlatedOutage,
-  isMuted,
   silentOutage,
   slowStatusPage,
   upcomingMaintenance,
@@ -17,7 +16,8 @@ import {
 } from "./diffEngine.ts";
 import { DELIVERY_DEFAULTS } from "./delivery.ts";
 import { pushLatency } from "./latency.ts";
-import { activeWindows } from "./maintenance.ts";
+import { activeWindows, withOperatorMaintenance } from "./maintenance.ts";
+import { effectiveMutedUntil } from "./mute.ts";
 import { RetryAfterError, type StatusPageRead } from "./http.ts";
 import type { Logger } from "./logger.ts";
 import type {
@@ -567,7 +567,14 @@ export function createPoller(deps: PollerDeps): Poller {
         { status: outcome.status, note: outcome.note },
         await remote,
       );
-      outcome = { ...outcome, status: decided.status, note: decided.note };
+      // The operator's own maintenance windows (roadmap 5.3) join the reading
+      // here, before the engine sees it, so they silence and announce exactly
+      // as a window the page published would.
+      outcome = {
+        ...outcome,
+        status: withOperatorMaintenance(decided.status, service.maintenanceWindows),
+        note: decided.note,
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // A provider that said "not now" is held off until it said to come back
@@ -631,7 +638,8 @@ export function createPoller(deps: PollerDeps): Poller {
       last: before.last,
       pending: before.pending,
       confirmations: config.polling.confirmSamples,
-      mutedUntil: service.mutedUntil ?? null,
+      // Pressed and planned mutes alike (roadmap 5.2), folded into one instant.
+      mutedUntil: effectiveMutedUntil(service, outcome.status.fetchedAt),
     });
     const changes = gate.changes;
     await store.saveStatus(outcome.status, {
@@ -977,7 +985,7 @@ export function createPoller(deps: PollerDeps): Poller {
       if (streak < 2 || slowAnnounced.has(service.id)) continue;
       // The operator's "I know" and the provider's declared window both cover a
       // slow page as much as they cover anything else about it.
-      if (isMuted(service.mutedUntil, status.fetchedAt)) continue;
+      if (effectiveMutedUntil(service, status.fetchedAt) !== null) continue;
       if (activeWindows(status).length > 0) continue;
       slowAnnounced.add(service.id);
       logger.warn("a status page is answering far slower than it usually does", {
@@ -1027,7 +1035,7 @@ export function createPoller(deps: PollerDeps): Poller {
       const said = new Set([...(announcedWindows.get(service.id) ?? [])].filter((id) => listed.has(id)));
       announcedWindows.set(service.id, said);
 
-      if (isMuted(service.mutedUntil, status.fetchedAt)) continue;
+      if (effectiveMutedUntil(service, status.fetchedAt) !== null) continue;
       if (activeWindows(status).length > 0) continue;
       for (const change of upcomingMaintenance({
         status,
