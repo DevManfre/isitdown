@@ -334,6 +334,29 @@ as `?` — so it needs no extra package. `/render/fleet.svg` is the same page as
 vector text. Both are `Cache-Control: max-age=60` and, like the badge, read stored
 state without contacting a provider.
 
+#### Phone home-screen widgets
+
+Roadmap 4.30. The "no mobile app" non-goal rules out a native app, not a widget:
+both recipes below read `/widget` and add no code to IsItDown. The phone has to
+reach the instance — the same Wi-Fi, a VPN, or a tailnet name.
+
+- **iOS, with [Scriptable](https://scriptable.app).** Copy
+  [`docs/widgets/isitdown.scriptable.js`](widgets/isitdown.scriptable.js) into
+  Scriptable, set `BASE_URL`, then add a Scriptable widget to the home screen and
+  choose the script. It shows the worst status in words and colour, the counts,
+  and the last poll; a tap opens the dashboard. Without a reply it says
+  `Unreachable` rather than the last good answer.
+- **Android, with [KWGT](https://kustom.rocks).** Add a Text layer and use the
+  web-get formula, which returns one field of the JSON per call:
+
+  ```text
+  $wg("http://isitdown.local:3000/widget", json, ".status")$
+  $wg("http://isitdown.local:3000/widget", json, ".operational")$/$wg("http://isitdown.local:3000/widget", json, ".providers")$ up
+  ```
+
+  Set the layer's update interval to five minutes; a tap action on the widget can
+  open the dashboard URL. Colour by status with `$if(wg("…", json, ".status") = major_outage, #f87171, #34d399)$`.
+
 ### 6.7 The public status page
 
 Two routes, off unless `PUBLIC_PAGE` is `true`, both answering `404` when it is

@@ -282,8 +282,12 @@ describe("Overview's fleet shapes", () => {
     await screen.findByText(i18n.t("overview.group.problems"));
     // The one provider in trouble is drawn as a row; the fourteen healthy ones
     // are a strip of dots, so none of their names is on the page yet.
-    expect(screen.getByText("Provider 0")).toBeInTheDocument();
-    expect(screen.queryByText("Provider 7")).toBeNull();
+    // The phone's own list (roadmap 4.29, CSS-hidden above 768px) names the
+    // provider in trouble too; this is about the desktop group.
+    const desktop = (name: string) =>
+      screen.queryAllByText(name).filter((el) => el.closest("[data-mobile-overview]") === null);
+    expect(desktop("Provider 0")).toHaveLength(1);
+    expect(desktop("Provider 7")).toHaveLength(0);
   });
 
   it("reveals the operational rows when its group is opened", async () => {
