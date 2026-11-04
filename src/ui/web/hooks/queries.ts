@@ -695,6 +695,7 @@ export function useServiceMutations() {
       onSuccess: invalidate,
     }),
     purge: useMutation({ mutationFn: api.purgeService, onSuccess: invalidate }),
+    bulk: useMutation({ mutationFn: api.bulkPatchServices, onSuccess: invalidate }),
     test: useMutation({ mutationFn: api.testService }),
   };
 }

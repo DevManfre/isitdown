@@ -23,6 +23,30 @@ const previewComponentsSchema = serviceDefinitionSchema.pick({
   baseUrl: true,
 });
 
+const tagList = serviceDefinitionSchema.shape.tags.unwrap();
+
+/** A bulk edit (roadmap 5.5): which providers, and the fleet-wide fields to set on each. */
+const bulkPatchSchema = z
+  .object({
+    ids: z
+      .array(z.string().min(1))
+      .min(1)
+      .max(500)
+      .refine((list) => new Set(list).size === list.length, { message: "ids must be unique" }),
+    patch: servicePatchSchema
+      .pick({ enabled: true, intervalMinutes: true, group: true, mutedUntil: true, tags: true })
+      .strict()
+      .default({}),
+    /** Added to whatever each provider already carries, rather than replacing it. */
+    addTags: tagList.default([]),
+    removeTags: tagList.default([]),
+  })
+  .strict()
+  .refine(
+    (body) => Object.keys(body.patch).length > 0 || body.addTags.length > 0 || body.removeTags.length > 0,
+    { message: "nothing to change" },
+  );
+
 /** Whatever the operator pasted into the base url field, before it is a service. */
 const detectSchema = z.object({ url: z.string().min(1).max(2048) });
 
@@ -234,6 +258,64 @@ export function configServiceRoutes(runtime: UiRuntimeCore, router: Router): voi
       return;
     }
     res.json(listServices(db).find((service) => service.id === req.params.id));
+  });
+
+  /**
+   * Several providers changed together — roadmap 5.5. Only the fields that make
+   * sense across a fleet (cadence, group, tags, mute, on/off): a name or a base
+   * url shared by ten providers is a mistake, not an edit.
+   *
+   * All or nothing: every id is checked to exist and every cadence checked
+   * against its own adapter before anything is written, then the writes happen
+   * in one transaction, so a bulk edit never leaves half the selection changed.
+   */
+  router.patch("/config/services", (req, res) => {
+    const parsed = bulkPatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+    const { ids, patch, addTags, removeTags } = parsed.data;
+    const byId = new Map(listServices(db).map((service) => [service.id, service]));
+    const unknown = ids.filter((id) => !byId.has(id));
+    if (unknown.length > 0) {
+      res.status(404).json({ error: { message: `unknown service: ${unknown.join(", ")}` } });
+      return;
+    }
+    const problems: string[] = [];
+    const writes = ids.map((id) => {
+      const existing = byId.get(id)!;
+      let tags = patch.tags === undefined ? existing.tags ?? [] : patch.tags ?? [];
+      tags = [...new Set([...tags.filter((tag) => !removeTags.includes(tag)), ...addTags])];
+      const tagsChanged = patch.tags !== undefined || addTags.length > 0 || removeTags.length > 0;
+      if (patch.intervalMinutes !== undefined) {
+        // A minute cadence clears a seconds one (see `updateService`), so the
+        // row is judged as it will be once the write lands.
+        for (const problem of cadenceProblems({
+          adapter: existing.adapter,
+          intervalMinutes: patch.intervalMinutes,
+          intervalSeconds: typeof patch.intervalMinutes === "number" ? null : existing.intervalSeconds,
+        })) {
+          problems.push(`${id}: ${problem}`);
+        }
+      }
+      if (tags.length > 20) problems.push(`${id}: a provider carries at most 20 tags`);
+      return { id, patch: { ...patch, ...(tagsChanged ? { tags: tags.length === 0 ? null : tags } : {}) } };
+    });
+    if (problems.length > 0) {
+      res.status(400).json({ error: { message: problems.join("; ") } });
+      return;
+    }
+    db.exec("BEGIN");
+    try {
+      for (const write of writes) updateService(db, write.id, write.patch);
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+    const wanted = new Set(ids);
+    res.json({ services: listServices(db).filter((service) => wanted.has(service.id)) });
   });
 
   // Read before the destructive write it precedes: the confirmation names what

@@ -5,6 +5,8 @@ import {
   componentSelectionSchema,
   deliverySchema,
   localeSchema,
+  muteSchedulesSchema,
+  operatorMaintenanceWindowsSchema,
   pollingSchema,
   recipientSchema,
   recipientsSchema,
@@ -313,6 +315,10 @@ const serviceRowSchema = z.object({
   authority: z.enum(["declared", "observed"]).nullable(),
   impact: z.string().nullable(),
   owner: z.string().nullable(),
+  runbook: z.string().nullable(),
+  tags: z.string().nullable(),
+  mute_schedules: z.string().nullable(),
+  maintenance_windows: z.string().nullable(),
 });
 
 const removedRowSchema = z.object({
@@ -493,7 +499,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner, runbook, tags, mute_schedules, maintenance_windows
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -549,8 +555,36 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // Absent rather than null, like every optional above (roadmap 3.7).
       ...(row.impact === null ? {} : { impact: row.impact }),
       ...(row.owner === null ? {} : { owner: row.owner }),
+      // Roadmap 5.1–5.4, absent rather than null like every optional above. A
+      // list that no longer parses reads as no list: a planned mute that cannot
+      // be read must lose to the alert, never silence it.
+      ...(row.runbook === null ? {} : { runbook: row.runbook }),
+      ...jsonColumn("tags", row.tags, serviceDefinitionSchema.shape.tags.unwrap()),
+      ...jsonColumn("muteSchedules", row.mute_schedules, muteSchedulesSchema),
+      ...jsonColumn("maintenanceWindows", row.maintenance_windows, operatorMaintenanceWindowsSchema),
     }));
 }
+
+/** A JSON list column as the optional field it stores, or nothing when empty or unreadable. */
+function jsonColumn<K extends string, T>(
+  key: K,
+  value: string | null,
+  schema: z.ZodType<T[], z.ZodTypeDef, unknown>,
+): Partial<Record<K, T[]>> {
+  if (value === null) return {};
+  let raw: unknown;
+  try {
+    raw = JSON.parse(value);
+  } catch {
+    return {};
+  }
+  const parsed = schema.safeParse(raw);
+  return parsed.success && parsed.data.length > 0 ? ({ [key]: parsed.data } as Partial<Record<K, T[]>>) : {};
+}
+
+/** A list as its column: null for none, so an emptied list reads back as absent. */
+const listColumn = (list: readonly unknown[] | null | undefined): string | null =>
+  list === null || list === undefined || list.length === 0 ? null : JSON.stringify(list);
 
 export function insertService(
   db: DatabaseSync,
@@ -558,7 +592,7 @@ export function insertService(
 ): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner, runbook, tags, mute_schedules, maintenance_windows, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -578,6 +612,10 @@ export function insertService(
     parsed.authority ?? null,
     parsed.impact ?? null,
     parsed.owner ?? null,
+    parsed.runbook ?? null,
+    listColumn(parsed.tags),
+    listColumn(parsed.muteSchedules),
+    listColumn(parsed.maintenanceWindows),
     new Date().toISOString(),
   );
 }
@@ -626,6 +664,11 @@ export const servicePatchSchema = serviceDefinitionSchema
     /** Null clears why the provider matters, or who answers for it (roadmap 3.7). */
     impact: serviceDefinitionSchema.shape.impact.unwrap().nullable().optional(),
     owner: serviceDefinitionSchema.shape.owner.unwrap().nullable().optional(),
+    /** Null clears the runbook, the tags, the planned mutes or the declared windows (roadmap 5.1–5.4). */
+    runbook: serviceDefinitionSchema.shape.runbook.unwrap().nullable().optional(),
+    tags: serviceDefinitionSchema.shape.tags.unwrap().nullable().optional(),
+    muteSchedules: muteSchedulesSchema.nullable().optional(),
+    maintenanceWindows: operatorMaintenanceWindowsSchema.nullable().optional(),
   });
 
 /** Returns false when there was no such service, so a route can answer 404. */
@@ -674,6 +717,11 @@ export function updateService(
   if (parsed.authority !== undefined) columns["authority"] = parsed.authority;
   if (parsed.impact !== undefined) columns["impact"] = parsed.impact;
   if (parsed.owner !== undefined) columns["owner"] = parsed.owner;
+  if (parsed.runbook !== undefined) columns["runbook"] = parsed.runbook;
+  if (parsed.tags !== undefined) columns["tags"] = listColumn(parsed.tags);
+  if (parsed.muteSchedules !== undefined) columns["mute_schedules"] = listColumn(parsed.muteSchedules);
+  if (parsed.maintenanceWindows !== undefined)
+    columns["maintenance_windows"] = listColumn(parsed.maintenanceWindows);
   if (Object.keys(columns).length === 0) return exists(db, id);
 
   const assignments = Object.keys(columns)

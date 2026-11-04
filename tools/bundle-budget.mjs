@@ -164,8 +164,14 @@ const ASSETS = "dist/ui/public/assets";
  * Overview: the phone's problems-first list, its swipe-to-mute rows and the
  * pull-to-poll indicator. No stylesheet changed — measured 22.4 kB before,
  * 22.6 kB after, all of it the new utility classes `MobileProblems` draws with.
+ *
+ * It moved 720,500 -> 731,000 (703.6 -> 713.9 kB) for roadmaps 5.1 to 5.6.
+ * Measured: 701.9 kB before, 712.5 kB after — 10.6 kB gzipped, 42 kB raw, most
+ * of it some eighty strings in six catalogs (the schedule and bulk-edit
+ * dialogs are mostly labels). The rest is those two dialogs and the runbook's
+ * Markdown renderer, which is a few regular expressions rather than a library.
  */
-export const BUDGET = { js: 720_500, css: 23_500 };
+export const BUDGET = { js: 731_000, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
