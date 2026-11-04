@@ -35,6 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentRows } from "@/components/ComponentRows.tsx";
 import { ProviderCards } from "@/components/ProviderCards.tsx";
@@ -244,10 +245,12 @@ const hasIssue = (provider: ProviderStatus) =>
 const shownBy = (
   providers: readonly ProviderStatus[],
   filter: Filter,
+  tag = "",
 ): string[] =>
-  (filter === "issues" ? providers.filter(hasIssue) : providers).map(
-    (provider) => provider.id,
-  );
+  (filter === "issues" ? providers.filter(hasIssue) : providers)
+    // Roadmap 5.4: and, when one is picked, only what carries that tag.
+    .filter((provider) => tag === "" || (provider.tags ?? []).includes(tag))
+    .map((provider) => provider.id);
 
 /**
  * The ids that were on the page a render ago and are not any more, held for
@@ -478,6 +481,9 @@ export function Providers() {
   const [filter, setFilter] = useViewParam<Filter>("providers", "show", "all", (raw) =>
     raw === "all" || raw === "issues" ? raw : null,
   );
+  const [tag, setTag] = useViewParam<string>("providers", "tag", "", (raw) =>
+    /^[a-z0-9][a-z0-9-]*$/.test(raw) ? raw : null,
+  );
   const [sortWord, setSortWord] = useViewParam<string>("providers", "sort", NO_SORT, parseSort);
   // Memoised on the word: a fresh array each render is a changed table state
   // each render, which the table answers with another render.
@@ -502,7 +508,13 @@ export function Providers() {
 
   // providers.js:64-67 — showIssuesOnly filters client-side to the providers
   // with an open issue; "all" is otherwise the fleet in its configured order.
-  const shownIds = shownBy(providers, filter);
+  const fleetTags = useMemo(
+    () => [...new Set(providers.flatMap((provider) => provider.tags ?? []))].sort(),
+    [providers],
+  );
+  // A tag nobody carries any more filters to nothing; read it as no tag.
+  const activeTag = fleetTags.includes(tag) ? tag : "";
+  const shownIds = shownBy(providers, filter, activeTag);
   // Sits above the empty-state return below: a hook cannot go behind one.
   const leaving = useOutgoing(shownIds, EXIT_MS);
   const windowed = shownIds.length > VIRTUALIZE_FROM;
@@ -518,7 +530,7 @@ export function Providers() {
         provider,
       ]),
     );
-    const shown = new Set(shownBy(providers, filter));
+    const shown = new Set(shownBy(providers, filter, activeTag));
     return (
       providers
         .filter(
@@ -561,7 +573,7 @@ export function Providers() {
             left.name.localeCompare(right.name),
         )
     );
-  }, [providers, summary, filter, leaving]);
+  }, [providers, summary, filter, activeTag, leaving]);
 
   // Rebuilt when the catalog language changes, since every header label and
   // the status labels are resolved through `t()` in here.
@@ -787,6 +799,23 @@ export function Providers() {
               {t("filter.issues")}
             </ToggleGroupItem>
           </ToggleGroup>
+          {/* Roadmap 5.4. Only once some provider carries a tag: a select with
+              nothing to pick is a control that teaches the eye to skip it. */}
+          {fleetTags.length > 0 && (
+            <Select value={activeTag === "" ? "*" : activeTag} onValueChange={(next) => setTag(next === "*" ? "" : next)}>
+              <SelectTrigger aria-label={t("filter.tag")} className="h-8 w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="*">{t("filter.tag-any")}</SelectItem>
+                {fleetTags.map((entry) => (
+                  <SelectItem key={entry} value={entry}>
+                    #{entry}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {/* Roadmap 13.1. Only once the fleet is big enough for the trade to
               be worth making: at eight providers the breathing room costs
               nothing, and a control that changes nothing visible is a control
