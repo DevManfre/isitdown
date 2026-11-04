@@ -71,6 +71,7 @@
   "notification.escalated": "⏫ Nobody took this in charge after {minutes} min — sending it again here.",
   "notification.impact": "Impact: {impact}",
   "notification.owner": "Owner: {owner}",
+  "notification.runbook": "Runbook: {runbook}",
 
   "chatops.help": "IsItDown commands\n\n/status — every provider, worst first\n/status <provider> — one provider\n/history <provider> [7|30|90] — uptime over a window\n/mute <provider> <30m|2h|1d> — stop alerts for a while\n/unmute <provider> — start them again\n/ack <provider> — say you are on it\n/help — this message",
   "chatops.status.heading": "{count} of {total} provider(s) are not operational.",

@@ -66,6 +66,81 @@ export const componentSelectionSchema = z
     },
   );
 
+/**
+ * A wall-clock time of day, as an operator writes one. Validated as a string
+ * rather than parsed into minutes here, because both editions store it as
+ * written — a config file an operator can read back is worth more than a
+ * normalised number.
+ */
+const clockTime = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be a 24-hour time such as 23:00");
+
+/** The weekdays a recurring mute names, in the order a week is read. */
+export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+
+const isoInstant = z.string().datetime({ offset: true });
+
+/**
+ * One planned mute — roadmap 5.2. Either a single span ("from Friday 18:00 to
+ * Monday 08:00") or a weekly window ("every Tuesday 02:00–04:00, Rome time").
+ * A weekly window may wrap midnight, like quiet hours: 23:00–01:00 on a
+ * Saturday runs into Sunday morning.
+ */
+export const muteScheduleSchema = z.union([
+  z
+    .object({
+      from: isoInstant,
+      until: isoInstant,
+    })
+    .strict()
+    .refine((span) => Date.parse(span.from) < Date.parse(span.until), {
+      message: "until must be after from",
+      path: ["until"],
+    }),
+  z
+    .object({
+      days: z
+        .array(z.enum(WEEKDAYS))
+        .min(1)
+        .refine((list) => new Set(list).size === list.length, {
+          message: "days must be unique",
+        }),
+      start: clockTime,
+      end: clockTime,
+      /** An IANA zone name, or "auto" for the zone the process runs in. */
+      timeZone: z.string().trim().max(64).default("auto"),
+    })
+    .strict()
+    .refine((window) => window.start !== window.end, {
+      message: "end must differ from start",
+      path: ["end"],
+    }),
+]);
+
+export const muteSchedulesSchema = z.array(muteScheduleSchema).max(20);
+
+/**
+ * One maintenance window the operator declared — roadmap 5.3. Unlike a
+ * provider's own it always has an end: a window with none would rely on a
+ * lifecycle word nobody is going to update, and silence the provider forever.
+ */
+export const operatorMaintenanceWindowSchema = z
+  .object({
+    title: z.string().trim().max(120).default(""),
+    startsAt: isoInstant,
+    endsAt: isoInstant,
+  })
+  .strict()
+  .refine((window) => Date.parse(window.startsAt) < Date.parse(window.endsAt), {
+    message: "endsAt must be after startsAt",
+    path: ["endsAt"],
+  });
+
+export const operatorMaintenanceWindowsSchema = z
+  .array(operatorMaintenanceWindowSchema)
+  .max(50);
+
 export const serviceDefinitionSchema = z.object({
   id: slug,
   name: z.string().trim().min(1),
@@ -153,6 +228,37 @@ export const serviceDefinitionSchema = z.object({
    */
   impact: z.string().trim().min(1).max(200).optional(),
   owner: z.string().trim().min(1).max(80).optional(),
+  /**
+   * What to do when this provider is down — roadmap 5.1. Markdown, written by
+   * the operator, shown on the provider's page and linked from every message
+   * about it. About the provider rather than about one incident, which is what
+   * an incident note is for. Bounded so it stays a runbook and not a wiki.
+   */
+  runbook: z.string().trim().min(1).max(4000).optional(),
+  /**
+   * Free labels beside the single group — roadmap 5.4. A provider sits in one
+   * group but carries any number of tags (`paid`, `critical`, `eu`), each one
+   * a slug so a routing rule can name it as `tag:critical`.
+   */
+  tags: z
+    .array(slug)
+    .max(20)
+    .refine((list) => new Set(list).size === list.length, {
+      message: "tags must be unique",
+    })
+    .optional(),
+  /**
+   * Mutes the operator planned rather than pressed — roadmap 5.2. Each one is
+   * either a single future span or a weekly window; while any runs, the
+   * provider is muted exactly as `mutedUntil` mutes it.
+   */
+  muteSchedules: muteSchedulesSchema.optional(),
+  /**
+   * Maintenance the operator declares because the provider does not — roadmap
+   * 5.3. Merged into every reading as if the page had published it, so it
+   * silences, notifies and draws on the timeline the same way.
+   */
+  maintenanceWindows: operatorMaintenanceWindowsSchema.optional(),
 });
 
 export const pollingSchema = z.object({
@@ -231,6 +337,10 @@ const groupTarget = z
     "must be group: followed by a lowercase slug",
   );
 
+const tagTarget = z
+  .string()
+  .regex(/^tag:[a-z0-9][a-z0-9-]*$/, "must be tag: followed by a lowercase slug");
+
 const componentTarget = z
   .string()
   .regex(
@@ -239,7 +349,7 @@ const componentTarget = z
   );
 
 export const routingRuleSchema = z.object({
-  provider: z.union([z.literal("*"), groupTarget, componentTarget, slug]),
+  provider: z.union([z.literal("*"), groupTarget, tagTarget, componentTarget, slug]),
   classes: z.array(z.enum(EVENT_CLASSES)).default([...EVENT_CLASSES]),
   minSeverity: z.enum(SEVERITY_FLOORS).default("any"),
   /** `["*"]` means every enabled channel; `[]` mutes. */
@@ -247,16 +357,6 @@ export const routingRuleSchema = z.object({
 });
 
 export const routingRulesSchema = z.array(routingRuleSchema);
-
-/**
- * A wall-clock time of day, as an operator writes one. Validated as a string
- * rather than parsed into minutes here, because both editions store it as
- * written — a config file an operator can read back is worth more than a
- * normalised number.
- */
-const clockTime = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be a 24-hour time such as 23:00");
 
 /**
  * Quiet hours (roadmap 3.11). The floor defaults to `major_outage` rather than
