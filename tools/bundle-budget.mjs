@@ -159,8 +159,13 @@ const ASSETS = "dist/ui/public/assets";
  * but counted all the same because this check sums every emitted chunk. The
  * rest is the sound and pulse code and some fifteen strings in six catalogs.
  * The e-ink PNG is server-side and weighs nothing here.
+ *
+ * CSS moved 23,000 -> 23,500 (22.5 -> 22.9 kB) for roadmap 4.29's one-hand
+ * Overview: the phone's problems-first list, its swipe-to-mute rows and the
+ * pull-to-poll indicator. No stylesheet changed — measured 22.4 kB before,
+ * 22.6 kB after, all of it the new utility classes `MobileProblems` draws with.
  */
-export const BUDGET = { js: 720_500, css: 23_000 };
+export const BUDGET = { js: 720_500, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
