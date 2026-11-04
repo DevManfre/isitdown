@@ -217,6 +217,14 @@ What is guaranteed, and checked:
   this browser, not on the instance, because a speaker belongs to the machine the
   tab is open on. Browsers keep a page silent until it has been clicked once; the
   **Play** button says so if that is why it stayed quiet.
+- **Phone Overview** (roadmap 4.29). Below 768px the Overview opens on a list made
+  for one hand: what needs a look first, as rows tall enough to hit, and the
+  operational providers folded under a "Show all" button. Swipe a problem row
+  left to mute it for 1 or 24 hours (an Undo bar waits six seconds); the row's
+  ⋯ menu does the same with the four usual durations, for anyone who does not
+  swipe. Pull the page down from the top and release to poll now — the header's
+  "Poll now", within thumb reach. Status is always written next to its icon, and
+  the mute is the same write Settings makes.
 - **Empty, loading and error states, reviewed together** (roadmap 4.21). The
   visual harness also captures each view with nothing configured, with a quiet
   fleet that has no incident, history or message yet, and with the backend gone.
