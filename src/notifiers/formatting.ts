@@ -220,7 +220,7 @@ export function renderParts(payload: NotificationPayload): MessageParts {
  * explicit choice.
  */
 export function publicParts(payload: NotificationPayload): MessageParts {
-  const { impact: _impact, owner: _owner, ...service } = payload.service;
+  const { impact: _impact, owner: _owner, runbook: _runbook, ...service } = payload.service;
   return renderParts({ ...payload, service });
 }
 
@@ -515,6 +515,7 @@ export function templateValues(
     incidentStatus: incidentStatusLabel(change.incident?.status ?? "", locale),
     impact: service.impact ?? "",
     owner: service.owner ?? "",
+    runbook: service.runbook ?? "",
     // Dropped for a channel that links the status page itself, on the same rule
     // the default rendering follows: a Discord embed already carries the link
     // as a button, and a template that printed it again would print it twice.
@@ -663,10 +664,12 @@ function withContext(message: string, payload: NotificationPayload): string {
     payload.change.kind === "delivery_test"
   )
     return message;
-  const { impact, owner } = payload.service;
+  const { impact, owner, runbook } = payload.service;
   const lines = [
     ...(impact === undefined || impact === "" ? [] : [t(payload.locale, "notification.impact", { impact })]),
     ...(owner === undefined || owner === "" ? [] : [t(payload.locale, "notification.owner", { owner })]),
+    // Roadmap 5.1: where to start, under who to call.
+    ...(runbook === undefined || runbook === "" ? [] : [t(payload.locale, "notification.runbook", { runbook })]),
   ];
   return lines.length === 0 ? message : `${message}\n\n${lines.join("\n")}`;
 }

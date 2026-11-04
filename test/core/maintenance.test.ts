@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { activeWindows, isActive } from "../../src/core/maintenance.ts";
+import {
+  activeWindows,
+  isActive,
+  OPERATOR_WINDOW_PREFIX,
+  withOperatorMaintenance,
+} from "../../src/core/maintenance.ts";
 import type { MaintenanceWindow, NormalizedStatus } from "../../src/core/types.ts";
 
 const window = (over: Partial<MaintenanceWindow> = {}): MaintenanceWindow => ({
@@ -82,4 +87,43 @@ test("activeWindows reads status against its own fetch time", () => {
     activeWindows(status).map((entry) => entry.id),
     ["m1"],
   );
+});
+
+// Roadmap 5.3: the operator's own windows, merged into the reading.
+test("an operator window joins the reading, and one already over does not", () => {
+  const status: NormalizedStatus = {
+    provider: "api",
+    overallStatus: "operational",
+    activeIncidents: [],
+    components: [],
+    maintenances: [window()],
+    fetchedAt: "2026-09-02T02:00:00.000Z",
+  };
+  const merged = withOperatorMaintenance(status, [
+    { title: "Deploy", startsAt: "2026-09-02T01:30:00.000Z", endsAt: "2026-09-02T02:30:00.000Z" },
+    { title: "Later", startsAt: "2026-09-03T01:00:00.000Z", endsAt: "2026-09-03T02:00:00.000Z" },
+    { title: "Over", startsAt: "2026-09-01T01:00:00.000Z", endsAt: "2026-09-01T02:00:00.000Z" },
+  ]);
+  assert.deepEqual(
+    merged.maintenances.map((entry) => [entry.name, entry.status]),
+    [
+      ["Database upgrade", "scheduled"],
+      ["Deploy", "in_progress"],
+      ["Later", "scheduled"],
+    ],
+  );
+  assert.deepEqual(
+    activeWindows(merged).map((entry) => entry.name),
+    ["Database upgrade", "Deploy"],
+  );
+  // The same declaration is the same window on the next poll, never a second copy.
+  const again = withOperatorMaintenance(merged, [
+    { title: "Deploy", startsAt: "2026-09-02T01:30:00.000Z", endsAt: "2026-09-02T02:30:00.000Z" },
+  ]);
+  assert.deepEqual(
+    again.maintenances.map((entry) => entry.id),
+    ["m1", `${OPERATOR_WINDOW_PREFIX}2026-09-02T01:30:00.000Z/2026-09-02T02:30:00.000Z`],
+  );
+  // No declarations and nothing to strip hands the reading back as it was.
+  assert.equal(withOperatorMaintenance(status, undefined), status);
 });

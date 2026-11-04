@@ -93,6 +93,32 @@ export interface ServiceDefinition {
    */
   impact?: string | undefined;
   owner?: string | undefined;
+  /** What to do when it is down, in Markdown (roadmap 5.1). Absent is the normal case. */
+  runbook?: string | undefined;
+  /** Free labels beside the group, each a slug a rule can name as `tag:<slug>` (roadmap 5.4). */
+  tags?: string[] | undefined;
+  /** Planned mutes, single spans or weekly windows (roadmap 5.2). See `src/core/mute.ts`. */
+  muteSchedules?: MuteSchedule[] | undefined;
+  /** Maintenance the operator declared for this provider (roadmap 5.3). */
+  maintenanceWindows?: OperatorMaintenanceWindow[] | undefined;
+}
+
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+/**
+ * A planned mute (roadmap 5.2): one span between two instants, or a window that
+ * repeats on the named weekdays, wall clock in `timeZone`.
+ */
+export type MuteSchedule =
+  | { from: string; until: string }
+  | { days: Weekday[]; start: string; end: string; timeZone: string };
+
+/** A maintenance window the operator declared (roadmap 5.3). Always bounded. */
+export interface OperatorMaintenanceWindow {
+  title: string;
+  /** ISO 8601. */
+  startsAt: string;
+  endsAt: string;
 }
 
 /**
