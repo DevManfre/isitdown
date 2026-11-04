@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 35;
+export const SCHEMA_VERSION = 36;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -818,6 +818,19 @@ function upgrade(db: DatabaseSync, from: number): void {
     if (!dashboardColumns.includes("home")) {
       db.exec("ALTER TABLE dashboards ADD COLUMN home INTEGER NOT NULL DEFAULT 0");
       db.exec("UPDATE dashboards SET home = 1 WHERE id = 'default'");
+    }
+  }
+
+  if (from < 36) {
+    // Runbook, tags, planned mutes and the operator's own maintenance windows —
+    // roadmap 5.1–5.4. On the row, like `impact` and `owner`: the Light edition
+    // writes all four as fields of the provider, and a side table would describe
+    // one thing two ways. The three lists are JSON, like `depends_on`.
+    const serviceColumns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    for (const column of ["runbook", "tags", "mute_schedules", "maintenance_windows"]) {
+      if (!serviceColumns.includes(column)) db.exec(`ALTER TABLE services ADD COLUMN ${column} TEXT`);
     }
   }
 

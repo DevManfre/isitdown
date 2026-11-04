@@ -1,3 +1,4 @@
+import { effectiveMutedUntil } from "../../core/mute.ts";
 import { authorityOf } from "../../core/authority.ts";
 import { getAdapter } from "../../adapters/index.ts";
 import { Router } from "express";
@@ -83,7 +84,12 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
           failureCount: state.failureCount,
           // Only ever a live mute: `listServices` drops one that has expired,
           // so the dashboard never has to work out whether it still counts.
-          mutedUntil: service.mutedUntil ?? null,
+          // Planned mutes too (roadmap 5.2): a schedule running now is a mute
+          // like any other, and the dashboard shows it as one.
+          mutedUntil: effectiveMutedUntil(service, serverNow),
+          // Roadmap 5.1/5.4: where to start when it is down, and its labels.
+          runbook: service.runbook ?? null,
+          tags: service.tags ?? [],
           // Roadmap 9.1. Resolved rather than echoed, so the dashboard shows
           // what this provider's authority actually *is* — including for the
           // majority of rows that have never said, which is where a raw null
