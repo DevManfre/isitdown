@@ -62,7 +62,11 @@ export function WidgetCard({
   className,
   style,
   children,
+  ...landmark
 }: {
+  /** A card that is a landmark of its own (`role="region"` plus its name). */
+  role?: "region" | undefined;
+  "aria-label"?: string | undefined;
   title: string;
   meta?: ReactNode | undefined;
   conclusion?: ReactNode | undefined;
@@ -103,6 +107,7 @@ export function WidgetCard({
   return (
     <Card
       data-slot="widget-card"
+      {...landmark}
       data-tone={tone}
       aria-busy={busy || undefined}
       style={style}

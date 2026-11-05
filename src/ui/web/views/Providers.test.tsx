@@ -33,32 +33,22 @@ const history = {
   ],
 };
 
-// Every fixture provider shares one baseUrl, so the host line the provider
-// cell renders beneath the name strips back out of the cell's text.
-const HOST = "www.githubstatus.com";
-
-/** The provider names in the order the table renders them, top row first. */
+/**
+ * The provider names in the order the table renders them, top row first —
+ * read off each row's name link, so the host and authority line beneath it
+ * stays out of the reading.
+ */
 const renderedOrder = (): string[] =>
   screen
     .getAllByRole("row")
     .slice(1)
-    .map((row) =>
-      (within(row).getAllByRole("cell")[1]?.textContent ?? "").replace(
-        HOST,
-        "",
-      ),
-    );
+    .map((row) => within(within(row).getAllByRole("cell")[1]!).getByRole("link").textContent ?? "");
 
 /** Clicks a column header, which is the data table's sort control. */
 const sortBy = (user: ReturnType<typeof userEvent.setup>, columnKey: string) =>
   user.click(screen.getByRole("button", { name: i18n.t(columnKey) }));
 
-/**
- * The table alone. The cards above it (roadmap 7.6) render the same provider
- * names, hosts, status labels and uptime figures, so a bare `screen` query for
- * any of them now matches twice — by design: the grid answers "what is wrong",
- * the table answers "how do these compare".
- */
+/** The table, the view's one reading of the fleet. */
 const inTable = async () => within(await screen.findByRole("table"));
 
 afterEach(() => vi.unstubAllGlobals());
@@ -72,8 +62,8 @@ describe("Providers", () => {
     ).toBeInTheDocument();
   });
 
-  // Roadmap 1.3: the card, the dot and the status column all say the same thing.
-  it("marks a suspected provider in its card, its dot and its status column", async () => {
+  // Roadmap 1.3: the dot and the status column say the same thing.
+  it("marks a suspected provider in its dot and its status column", async () => {
     const suspected = {
       ...status,
       providers: status.providers.map((provider) =>
@@ -90,8 +80,17 @@ describe("Providers", () => {
     const table = await inTable();
     const label = i18n.t("suspected.short", { status: i18n.t("status.major-outage").toLowerCase() });
     expect(await table.findByText(label, { exact: false })).toBeInTheDocument();
-    expect(container.querySelector('[data-slot="provider-card"][data-suspected]')).not.toBeNull();
     expect(container.querySelector("table [data-suspected]")).not.toBeNull();
+  });
+
+  // Roadmap 9.1: how each row is read, said beside its host now the cards
+  // that used to say it are gone.
+  it("names each provider's authority beside its host", async () => {
+    const { container } = renderWithProviders(<Providers />, { status, history });
+    await (await inTable()).findByText("GitHub");
+    expect(container.querySelector('table [data-authority="declared"]')).toHaveTextContent(
+      i18n.t("authority.source.declared"),
+    );
   });
 
   it("is read-only: no edit or remove control lives here", async () => {
