@@ -159,7 +159,7 @@ export function Heartbeats() {
                 {job.last === null ? t("widget.heartbeats.never") : formatRelative(i18n.language, job.last)}
               </span>
               <span
-                className={cn("widget-tone hidden text-right font-mono text-[0.68rem] tracking-wider uppercase @2xl:block")}
+                className={cn("widget-tone hidden text-right font-mono text-xs tracking-wider uppercase @2xl:block")}
                 style={{ color: COLOR[job.state] }}
               >
                 {word(job)}

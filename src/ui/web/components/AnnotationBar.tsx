@@ -77,7 +77,7 @@ export function AnnotationBar({
 
       <form className="flex flex-wrap items-end gap-2" onSubmit={submit}>
         <label className="flex min-w-48 flex-1 flex-col gap-1">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">
             {t("annotation.label")}
           </span>
           <Input
@@ -87,7 +87,7 @@ export function AnnotationBar({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">
             {t("annotation.when")}
           </span>
           <Input
@@ -97,7 +97,7 @@ export function AnnotationBar({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">
             {t("annotation.colour")}
           </span>
           <Select value={colour} onValueChange={setColour}>

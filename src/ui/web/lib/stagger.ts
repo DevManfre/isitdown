@@ -14,13 +14,16 @@
  * lands together, which is what an operator wants from rows they have to
  * scroll to anyway.
  *
- * The whole page is meant to be still inside about 800ms of the first frame it
- * shows, which is what the caps here and the durations in motion.css are set
- * against. A cascade that reads as unhurried at eight rows reads as a wait at
- * forty, and the operator is looking at a dashboard, not an entrance.
+ * The design direction (dashboard-design-direction § Motion) sets the limits
+ * centrally rather than per call site: a step is never longer than
+ * STAGGER_STEP, and no delay, base included, runs past STAGGER_CAP. A call
+ * site can ask for less, never for more, so a list that asks for a 70ms step
+ * or a 420ms cap still settles with the rest of the page. A cascade that reads
+ * as unhurried at eight rows reads as a wait at forty, and the operator is
+ * looking at a dashboard, not an entrance.
  */
-export const STAGGER_STEP = 35;
-export const STAGGER_CAP = 420;
+export const STAGGER_STEP = 30;
+export const STAGGER_CAP = 200;
 
 export function stagger(
   index: number,
@@ -30,5 +33,6 @@ export function stagger(
     cap = STAGGER_CAP,
   }: { base?: number; step?: number; cap?: number } = {},
 ): string {
-  return `${Math.min(base + index * step, cap)}ms`;
+  const ceiling = Math.min(cap, STAGGER_CAP);
+  return `${Math.min(base + index * Math.min(step, STAGGER_STEP), ceiling)}ms`;
 }

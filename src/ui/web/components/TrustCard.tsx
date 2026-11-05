@@ -207,7 +207,7 @@ function Axis({
       <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
       <span className="font-mono text-2xl leading-none">{value}</span>
       <span className="text-xs text-muted-foreground">{detail}</span>
-      {note === "" ? null : <span className="font-mono text-[11px] text-muted-foreground">{note}</span>}
+      {note === "" ? null : <span className="font-mono text-xs text-muted-foreground">{note}</span>}
     </div>
   );
 }

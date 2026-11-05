@@ -125,7 +125,7 @@ export function MobileNav() {
               to={ROUTE_PATHS[name]}
               className={({ isActive }) =>
                 cn(
-                  "mobile-tab relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px]",
+                  "mobile-tab relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-xs",
                   isActive ? "text-primary" : "text-muted-foreground",
                 )
               }
@@ -133,7 +133,7 @@ export function MobileNav() {
               <Icon className="size-5" strokeWidth={1.7} aria-hidden="true" />
               <span className="max-w-full truncate">{t(labelKey)}</span>
               {name === "incidents" && openIncidents > 0 && (
-                <span className="mobile-tab-badge absolute left-1/2 top-1 ml-1.5 flex min-w-4 items-center justify-center rounded-full bg-destructive/15 px-1 text-[10px] font-semibold text-destructive">
+                <span className="mobile-tab-badge absolute left-1/2 top-1 ml-1.5 flex min-w-4 items-center justify-center rounded-full bg-destructive/15 px-1 text-xs font-semibold text-destructive">
                   {openIncidents}
                 </span>
               )}
@@ -144,7 +144,7 @@ export function MobileNav() {
         <button
           type="button"
           className={cn(
-            "mobile-tab flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-[10px]",
+            "mobile-tab flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-xs",
             moreActive ? "text-primary" : "text-muted-foreground",
           )}
           aria-haspopup="dialog"
@@ -189,7 +189,7 @@ export function MobileNav() {
               <span className="flex-1">{t("palette.open")}</span>
               {/* Only where a keyboard is likely: the drawer is a phone's
                   surface, and a shortcut hint there names keys nobody has. */}
-              <kbd className="hidden rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground md:inline">
+              <kbd className="hidden rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground md:inline">
                 {t(isApplePlatform() ? "palette.shortcut-mac" : "palette.shortcut-other")}
               </kbd>
             </button>
@@ -197,7 +197,7 @@ export function MobileNav() {
 
 
           <div className="flex flex-col gap-2 border-t border-border px-4 py-3">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            <span className="text-xs uppercase tracking-widest text-muted-foreground">
               {t("nav.theme")}
             </span>
             {/* Three explicit choices rather than the header's cycling button:

@@ -99,8 +99,12 @@ two clicks and from the command palette.
 Only state changes animate: something enters, leaves, expands, collapses, is
 pressed, changes view, or changes status. **Nothing animates ambiently.** No
 typing headlines, border beams, spotlights, drifting dot patterns, breathing
-idle states, or numbers ticking up on first paint. The only continuous motion
-allowed is the pulse on an *active* incident, because it signals something.
+idle states, or numbers ticking up on first paint. Two exceptions are
+allowed, because they signal something:
+
+- the continuous pulse on an *active* problem (an open incident's dot, the
+  Overview beacon on warn or danger);
+- the one-shot ring (`data-pulse`, 1.2s) on a tile whose status just changed.
 
 The three `--duration-*` tokens are introduced in `tokens.css` by phase 0
 of the redesign. Until they exist, use the same values literally inside
@@ -114,7 +118,9 @@ of the redesign. Until they exist, use the same values literally inside
 | `--ease-out` | existing | every entry and every state transition |
 | `--ease-entry` | existing | view and dialog entry only |
 
-Nothing runs longer than 300ms. An exit takes about 75% of its entry's duration.
+Nothing runs longer than 300ms, apart from the two exceptions above and
+the guided tour's glide between anchors. An exit takes about 75% of its
+entry's duration.
 
 - **Animate only `transform` and `opacity`.** The exception is accordion
   height through Radix's `--radix-*-content-height`. Don't animate `width`,
@@ -132,9 +138,17 @@ Nothing runs longer than 300ms. An exit takes about 75% of its entry's duration.
   arrow navigation, tab key focus and shortcut toggles.
 - **Respect `prefers-reduced-motion: reduce`.** Drop every translate and scale,
   and keep opacity fades at 150ms or less.
-- **Keep one motion system.** Use `css/motion.css` plus the tokens above. No
-  framer-motion or `motion/react`. A new keyframe needs a state change to
-  justify it, written in its comment.
+- **Keep one motion system.** Use `css/motion.css` plus the tokens above. A
+  new keyframe needs a state change to justify it, written in its comment.
+  `motion/react` is already used for what CSS cannot do: drag-reorder and
+  layout animation in edit mode (`widgets/edit/`, `DashboardGrid`,
+  `FleetOrderDialog`) and the `NumberTicker` spring. Keep it there. Don't
+  import it into a new file. The `design-guard` hook refuses it unless the
+  file already imports it.
+- **Stagger is clamped centrally.** `lib/stagger.ts` caps the step at 30ms
+  and the total delay at 200ms, whatever a call site asks for.
+- **Numbers never count up on first paint.** `NumberTicker` paints the real
+  figure, then counts only when the value changes.
 
 ## Charts
 

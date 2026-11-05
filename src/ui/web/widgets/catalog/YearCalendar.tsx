@@ -120,7 +120,7 @@ export function YearCalendar({ props }: { props: ProviderPick }) {
           <Grid columns={recent} cell="0.9rem" compact />
         </div>
         <div className="hidden flex-col gap-1.5 @md:flex">
-          <div className="relative h-3.5 font-mono text-[0.65rem] text-muted-foreground" aria-hidden="true">
+          <div className="relative h-3.5 font-mono text-xs text-muted-foreground" aria-hidden="true">
             {monthTicks.slice(1).map((tick) => (
               <span key={tick.day} className="absolute top-0" style={{ left: `${(tick.index / all.length) * 100}%` }}>
                 {new Intl.DateTimeFormat(i18n.language, { month: "short" }).format(new Date(`${tick.day}T12:00:00Z`))}

@@ -7,9 +7,6 @@ interface NumberTickerProps extends ComponentPropsWithoutRef<"span"> {
   value: number
   locale: string
   suffix?: string
-  startValue?: number
-  direction?: "up" | "down"
-  delay?: number
   decimalPlaces?: number
 }
 
@@ -38,20 +35,21 @@ interface NumberTickerProps extends ComponentPropsWithoutRef<"span"> {
  *    preference or by `MotionGlobalConfig.skipAnimations`. motion.css already
  *    honours the preference for every other animation in the app, but a spring
  *    is invisible to a stylesheet, so it has to opt out here.
- * 6. Upstream gates the count on `useInView`, so a figure below the fold sits
- *    at its start value until the operator scrolls down to it. Here the count
- *    runs on mount instead: the dashboard is read as one screenful of figures,
- *    and a tally that only moves once looked at reads as a broken number
- *    rather than a flourish.
+ * 6. Upstream counts up from `startValue` on mount, gated on `useInView`.
+ *    The design direction (dashboard-design-direction § Motion) rules out
+ *    numbers ticking up on first paint, so the figure is painted at its real
+ *    value on the first frame and the spring only runs when the value
+ *    *changes* under it — a state change, the one thing allowed to move.
+ *    `startValue`, `direction` and `delay` went with it.
  */
 /** Longest and shortest a count may run for, in seconds. */
-const SLOWEST = 1.4
-const FASTEST = 0.5
+const SLOWEST = 0.28
+const FASTEST = 0.16
 /** Seconds taken off the run for every power of ten in the figure. */
-const DECADE_GAIN = 0.3
+const DECADE_GAIN = 0.03
 
 /**
- * How long a figure takes to arrive. A spring settles in the same time
+ * How long a change takes to arrive, inside the design's --duration-slow. A spring settles in the same time
  * whatever distance it covers, so a fleet of 7 and a tally of 8,500 minutes
  * used to run for exactly as long — and the big one reads as the slower of the
  * two, because its digits are still turning at a glance where the small one
@@ -65,16 +63,15 @@ export function NumberTicker({
   value,
   locale,
   suffix = "",
-  startValue = 0,
-  direction = "up",
-  delay = 0,
   className,
   decimalPlaces = 0,
   ...props
 }: NumberTickerProps) {
   const ref = useRef<HTMLSpanElement>(null)
   const still = useReducedMotion() === true || MotionGlobalConfig.skipAnimations === true
-  const motionValue = useMotionValue(direction === "down" ? value : startValue)
+  // Seeded at the value itself, so the first frame is the real figure and the
+  // effect below is a no-op on mount: the spring only moves on a change.
+  const motionValue = useMotionValue(value)
   const springValue = useSpring(motionValue, {
     visualDuration: tickerDuration(value),
     bounce: 0,
@@ -87,20 +84,13 @@ export function NumberTicker({
     }).format(Number(latest.toFixed(decimalPlaces))) + suffix
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null
-
-    if (!still) {
-      timer = setTimeout(() => {
-        motionValue.set(direction === "down" ? startValue : value)
-      }, delay * 1000)
+    if (still) {
+      motionValue.jump(value)
+      springValue.jump(value)
+    } else {
+      motionValue.set(value)
     }
-
-    return () => {
-      if (timer !== null) {
-        clearTimeout(timer)
-      }
-    }
-  }, [motionValue, still, delay, value, direction, startValue])
+  }, [motionValue, springValue, still, value])
 
   // Deliberately unkeyed: `format` closes over every prop that decides how a
   // frame reads, so re-subscribing each render is what keeps a locale or
@@ -116,7 +106,10 @@ export function NumberTicker({
 
   return (
     <span ref={ref} className={cn("inline-block tabular-nums", className)} {...props}>
-      {format(still ? value : startValue)}
+      {/* On a change React re-renders before the spring's first frame; painting
+          the spring's current figure rather than the new target keeps that
+          render from flashing the end value and snapping back to count. */}
+      {format(still ? value : springValue.get())}
     </span>
   )
 }

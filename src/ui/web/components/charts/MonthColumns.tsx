@@ -69,7 +69,7 @@ export function MonthColumns({
         </svg>
         {months.map((month, index) => (
           <div key={month.month} className="month-col flex min-w-0 flex-1 flex-col items-center gap-1">
-            <span className="anim-fade font-mono text-[10px] text-muted-foreground md:text-xs">
+            <span className="anim-fade font-mono text-xs text-muted-foreground md:text-xs">
               {month.uptime === null ? (
                 noDataLabel
               ) : (

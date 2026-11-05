@@ -115,7 +115,7 @@ export function ServicesSection({
                 onClick={() => setServiceFilter(filter.id)}
               >
                 {t(filter.labelKey)}
-                <span className="font-mono text-[11px] tabular-nums opacity-70">
+                <span className="font-mono text-xs tabular-nums opacity-70">
                   {services.filter(filter.of).length}
                 </span>
               </Button>

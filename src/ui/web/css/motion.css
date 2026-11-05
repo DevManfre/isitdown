@@ -157,20 +157,6 @@
   }
 }
 
-/* The beacon's calm state: nothing to attend to, so it only breathes. Scale
-   rather than the dot's expanding ring — an icon has a silhouette, and growing
-   a box-shadow around one draws a square halo. */
-@keyframes breathe {
-  0%,
-  100% {
-    opacity: 0.9;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.06);
-  }
-}
 
 /* The theme glyph arriving after a click: a quarter turn out of the button and
    a fade, so a mode change reads as one mark replacing another rather than a
@@ -197,7 +183,7 @@
 }
 
 #view[data-animate] {
-  animation: view-in 0.36s var(--ease-entry) both;
+  animation: view-in var(--duration-slow) var(--ease-entry) both;
 }
 
 /* The chrome around the view — the header's subtitle and countdown, the rail's
@@ -218,48 +204,48 @@
 .console[data-ready] .header-meta,
 .console[data-ready] .poll-next,
 .console[data-ready] .rail-badge {
-  animation: fade 0.36s var(--ease-entry) both;
+  animation: fade var(--duration-slow) var(--ease-entry) both;
 }
 /* The incident detail enters a touch slower; it is a page, not a panel. */
 #view[data-animate="incident"] {
-  animation-duration: 0.4s;
+  animation-duration: var(--duration-slow);
 }
 
 #view[data-animate] .anim-rise {
-  animation: rise 0.42s var(--ease-entry) both;
+  animation: rise var(--duration-slow) var(--ease-entry) both;
 }
 #view[data-animate] .anim-rise-hero {
-  animation-duration: 0.5s;
+  animation-duration: var(--duration-slow);
 }
 #view[data-animate] .anim-rise-column {
-  animation-duration: 0.48s;
+  animation-duration: var(--duration-slow);
 }
 #view[data-animate] .anim-rise-row {
-  animation-duration: 0.4s;
+  animation-duration: var(--duration-slow);
 }
 #view[data-animate] .anim-rise-table-row {
-  animation-duration: 0.38s;
+  animation-duration: var(--duration-slow);
 }
 #view[data-animate] .anim-fade {
-  animation: fade 0.42s var(--ease-entry) both;
+  animation: fade var(--duration-slow) var(--ease-entry) both;
 }
 #view[data-animate] .anim-sweep {
-  animation: sweep 0.55s var(--ease-entry) both;
+  animation: sweep var(--duration-slow) var(--ease-entry) both;
 }
 #view[data-animate] .anim-sweep-step {
-  animation-duration: 0.45s;
+  animation-duration: var(--duration-slow);
 }
 #view[data-animate] .anim-ring {
-  animation: ring-in 0.55s var(--ease-entry) both;
+  animation: ring-in var(--duration-slow) var(--ease-entry) both;
 }
 #view[data-animate] .anim-bar {
-  animation: bar-grow 0.42s var(--ease-entry) both;
+  animation: bar-grow var(--duration-slow) var(--ease-entry) both;
 }
 #view[data-animate] .anim-bar-strip {
-  animation-duration: 0.38s;
+  animation-duration: var(--duration-slow);
 }
 #view[data-animate] .anim-bar-month {
-  animation-duration: 0.5s;
+  animation-duration: var(--duration-slow);
 }
 
 /* — exit animations — */
@@ -270,7 +256,7 @@
    Keep the duration in step with EXIT_MS in Providers.tsx, which is what holds
    the row mounted long enough to play it. */
 .anim-sink {
-  animation: sink 0.22s ease both;
+  animation: sink var(--duration-base) ease both;
 }
 
 /* An accordion row unfolding open. Outside the #view[data-animate] gate for
@@ -285,7 +271,7 @@
 .anim-unfold {
   display: grid;
   grid-template-rows: 1fr;
-  animation: unfold 0.28s var(--ease-entry) both;
+  animation: unfold var(--duration-slow) var(--ease-entry) both;
 }
 /* And closing again. The panel used to be cut away in the frame the chevron
    was clicked, with the rows beneath it jumping up its full height after it;
@@ -295,7 +281,7 @@
 .anim-fold {
   display: grid;
   grid-template-rows: 0fr;
-  animation: fold 0.22s ease both;
+  animation: fold var(--duration-base) ease both;
 }
 .anim-unfold > *,
 .anim-fold > * {
@@ -318,12 +304,11 @@
   animation: pulse 2.4s ease-out infinite;
 }
 
-/* The Overview beacon. Motion graded to the news: a settled estate breathes, a
-   fault pulses on the dot's own 2.4s, and a major outage runs it at half that
-   — fast enough to catch an eye crossing the room. */
-.beacon-breathe {
-  animation: breathe 3.6s ease-in-out infinite;
-}
+/* The Overview beacon. Motion graded to the news: a settled estate stays
+   still (nothing to attend to, so nothing moves), a fault pulses on the dot's
+   own 2.4s, and a major outage runs it at half that — fast enough to catch an
+   eye crossing the room. The only continuous motion the design direction
+   allows, because it means something. */
 .beacon-pulse {
   animation: pulse 2.4s ease-out infinite;
   border-radius: 50%;
@@ -337,18 +322,18 @@
    prototype's own. Closing runs the entry in reverse and faster: leaving should
    not be a wait. */
 [data-slot="dialog-overlay"][data-state="open"] {
-  animation: fade 0.28s ease both;
+  animation: fade var(--duration-slow) ease both;
   backdrop-filter: blur(3px);
 }
 [data-slot="dialog-content"][data-state="open"] {
-  animation: modal-in 0.42s var(--ease-entry) 40ms both;
+  animation: modal-in var(--duration-slow) var(--ease-entry) 40ms both;
 }
 [data-slot="dialog-overlay"][data-state="closed"] {
-  animation: fade-out 0.22s ease both;
+  animation: fade-out var(--duration-base) ease both;
   pointer-events: none;
 }
 [data-slot="dialog-content"][data-state="closed"] {
-  animation: modal-out 0.22s ease both;
+  animation: modal-out var(--duration-base) ease both;
 }
 
 /* — the service dialog's wizard — */
@@ -378,17 +363,17 @@
   }
 }
 .anim-step {
-  animation: step-in-next 0.26s var(--ease-entry) both;
+  animation: step-in-next var(--duration-slow) var(--ease-entry) both;
 }
 .anim-step-back {
-  animation: step-in-back 0.26s var(--ease-entry) both;
+  animation: step-in-back var(--duration-slow) var(--ease-entry) both;
 }
 
 /* Switching source inside step one swaps a panel without moving the three
    buttons above it, so this one only fades up — a sideways travel would read
    as a step change, which it is not. */
 .anim-panel {
-  animation: rise 0.24s var(--ease-entry) both;
+  animation: rise var(--duration-base) var(--ease-entry) both;
 }
 
 /* The catalog grid cascades in, the way every other list on the dashboard
@@ -403,7 +388,7 @@
    otherwise. `backwards` still holds the tile invisible through its stagger
    delay, and hands opacity back to the cascade the moment it lands. */
 .anim-tile {
-  animation: fade 0.2s ease backwards;
+  animation: fade var(--duration-base) ease backwards;
 }
 
 /* The guided tour (roadmap 4.6). The ring and the card glide from one anchor to
@@ -413,22 +398,22 @@
    deliberately slight — it says "look there", it does not hide the page. */
 .tour-veil {
   backdrop-filter: blur(1.5px);
-  transition: clip-path 0.4s var(--ease-entry);
-  animation: fade 0.3s ease both;
+  transition: clip-path var(--duration-slow) var(--ease-entry);
+  animation: fade var(--duration-slow) ease both;
 }
 .tour-ring {
   transition:
-    top 0.4s var(--ease-entry),
-    left 0.4s var(--ease-entry),
-    width 0.4s var(--ease-entry),
-    height 0.4s var(--ease-entry);
-  animation: fade 0.3s ease both;
+    top var(--duration-slow) var(--ease-entry),
+    left var(--duration-slow) var(--ease-entry),
+    width var(--duration-slow) var(--ease-entry),
+    height var(--duration-slow) var(--ease-entry);
+  animation: fade var(--duration-slow) ease both;
 }
 .tour-card {
   transition:
-    top 0.4s var(--ease-entry),
-    left 0.4s var(--ease-entry);
-  animation: modal-in 0.36s var(--ease-entry) both;
+    top var(--duration-slow) var(--ease-entry),
+    left var(--duration-slow) var(--ease-entry);
+  animation: modal-in var(--duration-slow) var(--ease-entry) both;
 }
 
 /* The Advanced disclosure, on the channel list's mechanism: Radix measures the
@@ -439,48 +424,38 @@
   overflow: hidden;
 }
 .panel-advanced [data-slot="collapsible-content"][data-state="open"] {
-  animation: channel-unfold 0.26s var(--ease-entry);
+  animation: channel-unfold var(--duration-slow) var(--ease-entry);
 }
 .panel-advanced [data-slot="collapsible-content"][data-state="closed"] {
-  animation: channel-fold 0.2s ease;
+  animation: channel-fold var(--duration-base) ease;
 }
 /* The advanced disclosure and the channel row's own trigger are both covered
    by the general rule further down; what is scoped here is only the panel's
    fold, which measures itself. */
 
 /* — rail — */
-/* Hovering nudges the label 4px further in, pressing settles at 2px.
-
-   `SidebarMenuButton` supplies the row's fill and its active state, so the
-   only things left here are the accent edge the prototype gives the active
-   row — which no shadcn variant draws — and the nudge. The base padding is
-   set here too: the hand-rolled row carried Tailwind's `pl-6` (24px) while
-   these rules nudged to `--space-6 + 4px` (20.8px), so hovering pulled the
-   label *left*. One origin, one unit, and the nudge goes the way it reads. */
+/* `SidebarMenuButton` supplies the row's fill and its active state, so the
+   only thing left here is the accent edge the prototype gives the active
+   row, which no shadcn variant draws. Hover answers with the fill alone: the
+   label used to step in on `padding-left`, a layout property animated on
+   every row the pointer crossed. */
 [data-slot="sidebar-menu-button"] {
-  padding-left: var(--space-6);
+  padding-left: var(--space-3);
   border-left: 2px solid transparent;
   transition:
-    background 0.22s var(--ease-out),
-    color 0.22s ease,
-    border-color 0.22s ease,
-    padding-left 0.22s var(--ease-out);
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease;
 }
 [data-slot="sidebar-menu-button"][data-active="true"] {
   border-left-color: var(--color-primary);
-}
-[data-slot="sidebar-menu-button"]:hover {
-  padding-left: calc(var(--space-6) + 4px);
-}
-[data-slot="sidebar-menu-button"]:active {
-  padding-left: calc(var(--space-6) + 2px);
 }
 
 /* — header controls — */
 .theme-btn {
   transition:
-    background 0.24s ease,
-    color 0.2s ease;
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease;
 }
 
 /* It had the transition and nothing to transition to: the one control in the
@@ -490,7 +465,7 @@
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 .theme-btn svg {
-  transition: transform 0.16s var(--ease-out);
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 .theme-btn:active svg {
   transform: scale(0.88);
@@ -499,7 +474,7 @@
    transition the way the prototype's dot spun between two modes. Header.tsx
    keys the icon on the mode; the remount plays this instead. */
 .theme-icon {
-  animation: theme-swap 0.34s var(--ease-out) both;
+  animation: theme-swap var(--duration-slow) var(--ease-out) both;
 }
 
 /* — buttons — */
@@ -514,14 +489,14 @@
 [data-slot="dropdown-menu-trigger"][data-variant],
 [data-slot="sheet-trigger"][data-variant] {
   transition:
-    background 0.22s ease,
-    border-color 0.22s ease,
-    color 0.2s ease,
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
     /* .btn-ghost transitioned opacity; the merged rule must keep it or a
        dim-by-default ghost button snaps to full brightness instead of fading. */
-    opacity 0.2s ease,
-    transform 0.18s var(--ease-out),
-    box-shadow 0.24s ease;
+    opacity var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) ease;
 }
 [data-slot="button"]:active,
 [data-slot="dialog-trigger"][data-variant]:active,
@@ -543,8 +518,8 @@
 
 .back-link {
   transition:
-    color 0.2s ease,
-    transform 0.22s var(--ease-out);
+    color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
 }
 .back-link:hover {
   color: var(--color-accent);
@@ -554,17 +529,17 @@
 /* — segmented controls, badges and table rows — */
 [data-slot="toggle-group-item"] {
   transition:
-    background 0.22s ease,
-    color 0.2s ease,
-    border-color 0.22s ease,
-    box-shadow 0.22s ease;
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
 }
 [data-slot="badge"] {
   transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.16s ease;
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
 }
 [data-slot="badge"]:hover {
   background: color-mix(in srgb, var(--color-accent) 13%, transparent);
@@ -580,21 +555,21 @@
    precedes it, so the gap closes as a settle rather than a second snap. */
 [data-slot="table-row"] {
   transition:
-    background 0.2s ease,
-    translate 0.28s var(--ease-out);
+    background var(--duration-fast) ease,
+    translate var(--duration-base) var(--ease-out);
 }
 [data-slot="table-cell"] {
-  transition: color 0.2s ease;
+  transition: color var(--duration-fast) ease;
 }
 
 /* — rows, tiles and panels — */
 .incident-row {
-  transition: background 0.2s ease;
+  transition: background var(--duration-fast) ease;
 }
 .ring-tile {
   transition:
-    border-color 0.24s ease,
-    transform 0.24s var(--ease-out);
+    border-color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
 }
 .ring-tile:hover {
   border-color: var(--color-accent);
@@ -602,8 +577,8 @@
 }
 .service-row {
   transition:
-    background-color 0.22s ease,
-    transform 0.22s var(--ease-out);
+    background-color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
 }
 .service-row:hover {
   background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
@@ -644,10 +619,10 @@
   overflow: hidden;
 }
 .panel-channel [data-slot="collapsible-content"][data-state="open"] {
-  animation: channel-unfold 0.26s var(--ease-entry);
+  animation: channel-unfold var(--duration-slow) var(--ease-entry);
 }
 .panel-channel [data-slot="collapsible-content"][data-state="closed"] {
-  animation: channel-fold 0.2s ease;
+  animation: channel-fold var(--duration-base) ease;
 }
 
 /* ── roadmap 7.6, the cinematic chrome ──────────────────────────────────────
@@ -667,7 +642,7 @@
   z-index: 0;
   border-radius: inherit;
   opacity: var(--spot-opacity, 0);
-  transition: opacity 0.24s var(--ease-out);
+  transition: opacity var(--duration-fast) var(--ease-out);
   background: radial-gradient(
     240px circle at var(--spot-x, 50%) var(--spot-y, 50%),
     color-mix(in srgb, var(--color-accent) 16%, transparent),
@@ -679,22 +654,6 @@
   z-index: 1;
 }
 
-/* The poll meter in the header: a band of light crossing a short track, once
-   per second, for as long as the poller is armed. It is the one looping
-   animation in the chrome, and it says the same thing the countdown beside it
-   says — which is why reduced motion is allowed to stop it dead (the block at
-   the foot of this file pins every iteration count to 1). */
-@keyframes meter-sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(200%);
-  }
-}
-.poll-meter-beam {
-  animation: meter-sweep 2.4s var(--ease-out) infinite;
-}
 
 /* An arc drawing itself on, for the hero's aggregate figure
    (components/charts/UptimeArc.tsx). It cannot use `.anim-ring` above: that
@@ -714,52 +673,18 @@
   }
 }
 #view[data-animate] .anim-arc {
-  animation: arc-draw 0.62s var(--ease-entry) both;
+  animation: arc-draw var(--duration-slow) var(--ease-entry) both;
 }
 
-/* The beam that travels a lit card's border (components/ui/border-beam.tsx).
-   The element rides an `offset-path` the component sets inline — the path is
-   the card's own rounded rectangle, which only the call site knows the radius
-   of — and this moves it along that path. Duration and start offset are
-   inline too, so two beams on one screen do not travel in lockstep. */
-@keyframes beam-travel {
-  from {
-    offset-distance: 0%;
-  }
-  to {
-    offset-distance: 100%;
-  }
-}
-.border-beam-run {
-  animation: beam-travel linear infinite;
-}
 
-/* The caret at the end of the headline while it types itself in
-   (components/ui/typing-animation.tsx). It blinks only while characters are
-   still arriving: the component drops the caret on the last one, and under
-   reduced motion it never renders a caret at all, so the block at the foot of
-   this file has nothing to stop. */
-@keyframes caret-blink {
-  0%,
-  45% {
-    opacity: 1;
-  }
-  55%,
-  100% {
-    opacity: 0;
-  }
-}
-.typing-caret {
-  animation: caret-blink 1s steps(1, end) infinite;
-}
 
 /* A tile that lifts under the pointer. Same travel as .ring-tile so the two
    fleet shapes do not hover differently. */
 .tile-lit {
   transition:
-    transform 0.2s var(--ease-out),
-    box-shadow 0.2s var(--ease-out),
-    border-color 0.2s var(--ease-out);
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
 }
 .tile-lit:hover {
   transform: translateY(-2px);
@@ -888,14 +813,14 @@
 [data-slot="dropdown-menu-content"][data-state="open"],
 [data-slot="dropdown-menu-sub-content"][data-state="open"],
 [data-slot="hover-card-content"][data-state="open"] {
-  animation: pop-in 0.18s var(--ease-entry) both;
+  animation: pop-in var(--duration-base) var(--ease-entry) both;
 }
 
 [data-slot="select-content"][data-state="closed"],
 [data-slot="dropdown-menu-content"][data-state="closed"],
 [data-slot="dropdown-menu-sub-content"][data-state="closed"],
 [data-slot="hover-card-content"][data-state="closed"] {
-  animation: pop-out 0.12s ease both;
+  animation: pop-out var(--duration-fast) ease both;
 }
 
 /* A tooltip is smaller and answers a hover, not a click, so it only rises the
@@ -913,11 +838,11 @@
 
 [data-slot="tooltip-content"][data-state="delayed-open"],
 [data-slot="tooltip-content"][data-state="instant-open"] {
-  animation: tip-in 0.14s var(--ease-entry) both;
+  animation: tip-in var(--duration-fast) var(--ease-entry) both;
 }
 
 [data-slot="tooltip-content"][data-state="closed"] {
-  animation: fade-out 0.1s ease both;
+  animation: fade-out var(--duration-fast) ease both;
 }
 
 /* — the rows inside them — */
@@ -932,9 +857,9 @@
 [data-slot="dropdown-menu-sub-trigger"],
 [data-slot="command-item"] {
   transition:
-    background-color 0.16s ease,
-    color 0.16s ease,
-    transform 0.16s var(--ease-out);
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
 }
 
 [data-slot="select-item"][data-highlighted],
@@ -954,10 +879,10 @@
    click that set it. */
 [data-slot="select-trigger"] {
   transition:
-    border-color 0.22s ease,
-    background-color 0.22s ease,
-    box-shadow 0.22s ease,
-    transform 0.18s var(--ease-out);
+    border-color var(--duration-fast) ease,
+    background-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
 }
 
 [data-slot="select-trigger"]:hover {
@@ -970,7 +895,7 @@
 }
 
 [data-slot="select-trigger"] svg {
-  transition: rotate 0.22s var(--ease-out);
+  transition: rotate var(--duration-fast) var(--ease-out);
 }
 
 [data-slot="select-trigger"][data-state="open"] svg {
@@ -996,9 +921,9 @@
 
 [data-slot="toggle"] {
   transition:
-    background-color 0.22s ease,
-    color 0.2s ease,
-    transform 0.16s var(--ease-out);
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
 }
 
 /* — switches — */
@@ -1009,9 +934,9 @@
    travel stays the thing that reads. */
 [data-slot="switch"] {
   transition:
-    background-color 0.22s ease,
-    box-shadow 0.22s ease,
-    transform 0.14s var(--ease-out);
+    background-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
 }
 
 [data-slot="switch"]:active {
@@ -1028,9 +953,9 @@
 [data-slot="textarea"],
 [data-slot="command-input"] {
   transition:
-    border-color 0.2s ease,
-    box-shadow 0.22s ease,
-    background-color 0.2s ease;
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease,
+    background-color var(--duration-fast) ease;
 }
 
 [data-slot="input"]:hover:not(:focus),
@@ -1043,9 +968,9 @@
    here beyond the hover it never had. */
 input[type="file"]::file-selector-button {
   transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease;
+    background-color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
 }
 
 input[type="file"]:hover::file-selector-button {
@@ -1058,10 +983,10 @@ input[type="file"]:hover::file-selector-button {
    button rules above reach it. Same lift, same press. */
 [data-slot="pagination-link"] {
   transition:
-    background-color 0.22s ease,
-    border-color 0.22s ease,
-    color 0.2s ease,
-    transform 0.18s var(--ease-out);
+    background-color var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-out);
 }
 
 [data-slot="pagination-link"]:hover {
@@ -1078,7 +1003,7 @@ input[type="file"]:hover::file-selector-button {
    from 3 to 12 presses the same 28px box nine times. The glyph itself takes
    the press, so the repeat reads as a count rather than one long dip. */
 [data-slot="number-stepper"] svg {
-  transition: transform 0.12s var(--ease-out);
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
 [data-slot="number-stepper"]:active svg {
@@ -1095,8 +1020,8 @@ input[type="file"]:hover::file-selector-button {
    a Button keeps the Button's own lift instead; this is for the bare ones. */
 [data-slot="collapsible-trigger"]:not([data-variant]) {
   transition:
-    background-color 0.18s ease,
-    color 0.18s ease;
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
 }
 
 [data-slot="collapsible-trigger"]:not([data-variant]):hover {
@@ -1111,8 +1036,8 @@ input[type="file"]:hover::file-selector-button {
    row carries `.anim-rise`, whose filled entry owns `transform` for good. */
 .delivery-row {
   transition:
-    background-color 0.22s ease,
-    translate 0.22s var(--ease-out);
+    background-color var(--duration-fast) ease,
+    translate var(--duration-fast) var(--ease-out);
 }
 
 .delivery-row:hover {
@@ -1130,7 +1055,7 @@ input[type="file"]:hover::file-selector-button {
 circle[role="button"] {
   transform-box: fill-box;
   transform-origin: center;
-  transition: transform 0.18s var(--ease-out);
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
 circle[role="button"]:hover {
@@ -1151,8 +1076,8 @@ circle[role="button"]:hover {
   grid-template-rows: 1fr;
   opacity: 1;
   transition:
-    grid-template-rows 0.26s var(--ease-out),
-    opacity 0.2s ease,
+    grid-template-rows var(--duration-base) var(--ease-out),
+    opacity var(--duration-fast) ease,
     visibility 0s;
 }
 
@@ -1165,29 +1090,22 @@ circle[role="button"]:hover {
   opacity: 0;
   visibility: hidden;
   transition:
-    grid-template-rows 0.26s var(--ease-out),
-    opacity 0.16s ease,
-    visibility 0s linear 0.26s;
+    grid-template-rows var(--duration-base) var(--ease-out),
+    opacity var(--duration-fast) ease,
+    visibility 0s linear var(--duration-base);
 }
 
 /* — the settings rail — */
 
-/* A second rail, anchors rather than buttons, so it earns the main rail's
-   gesture rather than a new one: the label steps in under the pointer. */
-/* The base padding is set here too, for the reason the main rail's is: the
-   nudge and the resting state have to be the same unit, or hovering moves the
-   label the wrong way by whatever the two scales differ by. */
+/* A second rail, anchors rather than buttons, so it answers the pointer the
+   way the main rail does: with its fill, not by moving the label. */
 [data-slot="settings-nav-link"] {
-  padding-left: var(--space-4);
+  padding-left: var(--space-3);
   transition:
-    background-color 0.22s var(--ease-out),
-    color 0.22s ease,
-    padding-left 0.22s var(--ease-out);
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) ease;
 }
 
-[data-slot="settings-nav-link"]:hover {
-  padding-left: calc(var(--space-4) + 3px);
-}
 
 /* — the history rows — */
 
@@ -1200,8 +1118,8 @@ circle[role="button"]:hover {
    and the row never moved. */
 .history-row {
   transition:
-    background-color 0.22s ease,
-    translate 0.22s var(--ease-out);
+    background-color var(--duration-fast) ease,
+    translate var(--duration-fast) var(--ease-out);
 }
 
 .history-row:hover {
@@ -1237,20 +1155,20 @@ circle[role="button"]:hover {
 }
 
 [data-slot="sheet-overlay"][data-state="open"] {
-  animation: fade 0.28s ease both;
+  animation: fade var(--duration-slow) ease both;
 }
 
 [data-slot="sheet-overlay"][data-state="closed"] {
-  animation: fade-out 0.22s ease both;
+  animation: fade-out var(--duration-base) ease both;
   pointer-events: none;
 }
 
 [data-slot="sheet-content"][data-state="open"] {
-  animation: drawer-in 0.32s var(--ease-entry) both;
+  animation: drawer-in var(--duration-slow) var(--ease-entry) both;
 }
 
 [data-slot="sheet-content"][data-state="closed"] {
-  animation: drawer-out 0.22s ease both;
+  animation: drawer-out var(--duration-base) ease both;
 }
 
 /* — the composable Overview's edit mode (roadmap 4.1) — */
@@ -1289,7 +1207,7 @@ circle[role="button"]:hover {
 
 [data-slot="edit-grid"] [data-slot="widget-cell"]:has([data-slot="widget-body"]:empty) {
   display: grid;
-  animation: cell-reveal 0.22s var(--ease-entry) both;
+  animation: cell-reveal var(--duration-base) var(--ease-entry) both;
 }
 
 [data-slot="edit-grid"] [data-slot="widget-cell"]:has([data-slot="widget-body"]:empty) > [data-slot="cell-inner"] {
@@ -1297,7 +1215,7 @@ circle[role="button"]:hover {
 }
 
 [data-slot="edit-grid"][data-closing] [data-slot="widget-cell"]:has([data-slot="widget-body"]:empty) {
-  animation: cell-conceal 0.18s var(--ease-out) both;
+  animation: cell-conceal var(--duration-base) var(--ease-out) both;
 }
 
 /* A widget just added from the catalogue: one ring that settles onto its frame
@@ -1314,7 +1232,7 @@ circle[role="button"]:hover {
 }
 
 [data-slot="edit-arrival"] {
-  animation: arrival 0.6s var(--ease-out) both;
+  animation: arrival var(--duration-slow) var(--ease-out) both;
 }
 
 /* — the widget catalogue (roadmap 4.1, second round) —
@@ -1334,15 +1252,15 @@ circle[role="button"]:hover {
   }
 }
 #view[data-animate] .anim-fill {
-  animation: fill-in 0.62s var(--ease-entry) backwards;
+  animation: fill-in var(--duration-slow) var(--ease-entry) backwards;
 }
 .widget-fill {
-  transition: transform 0.6s var(--ease-entry), background-color 0.4s ease;
+  transition: transform var(--duration-slow) var(--ease-entry), background-color var(--duration-slow) ease;
 }
 /* A heartbeat's elapsed bar is a clock: it advances linearly between reads,
    so it creeps forward like time instead of stepping every thirty seconds. */
 .widget-fill[data-live] {
-  transition: transform 30s linear, background-color 0.4s ease;
+  transition: transform 30s linear, background-color var(--duration-slow) ease;
 }
 
 /* Dense grids (the hour map, the delivery hours) arrive a row at a time,
@@ -1358,7 +1276,7 @@ circle[role="button"]:hover {
   }
 }
 #view[data-animate] .anim-row-sweep {
-  animation: row-sweep 0.7s var(--ease-entry) backwards;
+  animation: row-sweep var(--duration-slow) var(--ease-entry) backwards;
 }
 
 /* The year calendar's weeks rise in as columns, on the same reasoning. */
@@ -1369,7 +1287,7 @@ circle[role="button"]:hover {
   }
 }
 #view[data-animate] .anim-column {
-  animation: column-in 0.36s var(--ease-entry) backwards;
+  animation: column-in var(--duration-slow) var(--ease-entry) backwards;
 }
 
 /* An annotation's stem drops from the axis it hangs on. */
@@ -1381,24 +1299,15 @@ circle[role="button"]:hover {
 }
 #view[data-animate] .anim-stem {
   transform-origin: top;
-  animation: stem-drop 0.4s var(--ease-entry) backwards;
+  animation: stem-drop var(--duration-slow) var(--ease-entry) backwards;
 }
 
 /* Status colour changes on a refresh — a tile going from operational to
    outage — cross over rather than switch in one frame. */
 .widget-tone {
-  transition: color 0.4s ease, background-color 0.4s ease, border-color 0.4s ease;
+  transition: color var(--duration-slow) ease, background-color var(--duration-slow) ease, border-color var(--duration-slow) ease;
 }
 
-/* What is happening now breathes, once a second and a half, quietly. */
-@keyframes now-breathe {
-  50% {
-    opacity: 0.55;
-  }
-}
-.widget-now {
-  animation: now-breathe 1.6s ease-in-out infinite;
-}
 
 /* Roadmap 4.27. A tile whose status just moved — `data-pulse`, set for about
    two seconds by `useStatusFeedback` — gives off one ring in the colour it
@@ -1430,13 +1339,13 @@ circle[role="button"]:hover {
 }
 
 [data-pulse] {
-  animation: status-pulse 1.8s ease-out 1;
+  animation: status-pulse 1.2s var(--ease-out) 1;
 }
 
 #view[data-animate] .anim-rise[data-pulse] {
   animation:
-    rise 0.42s var(--ease-entry) both,
-    status-pulse 1.8s ease-out 1;
+    rise var(--duration-slow) var(--ease-entry) both,
+    status-pulse 1.2s var(--ease-out) 1;
   animation-delay: 0s !important;
 }
 
@@ -1467,11 +1376,6 @@ circle[role="button"]:hover {
   .anim-stem {
     animation-delay: 0s !important;
   }
-  /* The beam is decoration with no still frame worth keeping: stopped at one
-     iteration it would park a bright square in a corner of the card. */
-  .border-beam-run {
-    display: none;
-  }
   .tile-lit:hover,
   .ring-tile:hover,
   .service-row:hover,
@@ -1479,10 +1383,6 @@ circle[role="button"]:hover {
   [data-slot="button"]:active,
   [data-slot="badge"]:active {
     transform: none;
-  }
-  [data-slot="sidebar-menu-button"]:hover,
-  [data-slot="sidebar-menu-button"]:active {
-    padding-left: var(--space-6);
   }
   /* The rest of the calls to action: the tint, the ring and the chevron's
      turn all survive — they say what the control is doing — and only the
@@ -1518,8 +1418,5 @@ circle[role="button"]:hover {
   circle[role="button"]:hover,
   .theme-btn:active svg {
     transform: none;
-  }
-  [data-slot="settings-nav-link"]:hover {
-    padding-left: var(--space-4);
   }
 }

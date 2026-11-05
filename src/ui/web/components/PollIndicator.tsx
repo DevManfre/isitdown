@@ -60,12 +60,12 @@ export function PollIndicator() {
             line and left the title and the meta line truncated to nothing. The
             countdown below carries the meaning on its own; the words come back
             at `lg`, where there is room for them. */}
-        <span className="hidden items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground lg:flex">
+        <span className="hidden items-center gap-1.5 text-xs uppercase tracking-widest text-muted-foreground lg:flex">
           {t("meta.next-poll-label")}
           {/* Says where the freshness comes from: with the stream connected the
               dashboard is told about a cycle, it no longer asks on a timer. */}
           {live && (
-            <span className="poll-live rounded-full bg-primary px-1.5 text-[10px] uppercase tracking-widest text-primary-foreground">
+            <span className="poll-live rounded-full bg-primary px-1.5 text-xs uppercase tracking-widest text-primary-foreground">
               {t("meta.live")}
             </span>
           )}

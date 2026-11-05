@@ -35,7 +35,7 @@ export function ProviderIcon({
         />
       )}
       {!loaded && (
-        <span className="font-mono text-[9px] leading-none text-muted-foreground">
+        <span className="font-mono text-xs leading-none text-muted-foreground">
           {name.slice(0, 2).toUpperCase()}
         </span>
       )}

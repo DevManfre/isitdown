@@ -150,7 +150,7 @@ export function UptimeRing({
           )}
           {!loaded && (
             <span
-              className={cn("font-mono", large ? "text-sm" : "text-[11px]")}
+              className={cn("font-mono", large ? "text-sm" : "text-xs")}
               style={{ color: statusColor(shown.status) }}
             >
               {provider.name.slice(0, 3).toUpperCase()}

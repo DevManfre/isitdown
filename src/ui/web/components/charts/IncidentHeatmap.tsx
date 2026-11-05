@@ -59,7 +59,7 @@ export function IncidentHeatmap({ grid }: { grid: number[][] }) {
         >
           {grid.map((row, weekday) => (
             <div key={weekdays[weekday]} className="flex items-center gap-2">
-              <span className="w-10 shrink-0 font-mono text-[10px] uppercase text-muted-foreground">
+              <span className="w-10 shrink-0 font-mono text-xs uppercase text-muted-foreground">
                 {weekdays[weekday]}
               </span>
               <div className="flex flex-1 gap-px">

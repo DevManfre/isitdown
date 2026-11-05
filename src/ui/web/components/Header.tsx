@@ -126,7 +126,7 @@ export function Header({ view }: { view: string }) {
       >
         <Search className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
         {t("palette.open")}
-        <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground">
+        <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
           {t(isApplePlatform() ? "palette.shortcut-mac" : "palette.shortcut-other")}
         </kbd>
       </button>

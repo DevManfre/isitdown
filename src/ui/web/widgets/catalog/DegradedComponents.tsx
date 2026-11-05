@@ -76,7 +76,7 @@ export function DegradedComponents({ props }: { props: { filter: FleetFilter } }
             >
               <StatusDot status={component.status} />
               <span
-                className="hidden w-40 shrink-0 truncate font-mono text-[0.68rem] tracking-wider uppercase @2xl:inline"
+                className="hidden w-40 shrink-0 truncate font-mono text-xs tracking-wider uppercase @2xl:inline"
                 style={{ color: statusColor(component.status) }}
               >
                 {t(statusLabelKey(component.status))}
@@ -88,7 +88,7 @@ export function DegradedComponents({ props }: { props: { filter: FleetFilter } }
                   {t("widget.degraded-components.provider-fine")}
                 </span>
               ) : selected(provider, component) ? (
-                <span className="ml-auto shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.7rem]">
+                <span className="ml-auto shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs">
                   {t("widget.degraded-components.selected")}
                 </span>
               ) : null}

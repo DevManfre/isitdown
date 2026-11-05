@@ -182,7 +182,7 @@ export function ProviderDetail() {
           data-testid="provider-runbook"
           className="flex max-w-3xl flex-col gap-2 rounded-md border border-border p-4"
         >
-          <h2 id="runbook-heading" className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          <h2 id="runbook-heading" className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
             {t("field.runbook")}
           </h2>
           <Markdown source={provider.runbook ?? ""} className="flex flex-col gap-2 text-sm" />

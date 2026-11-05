@@ -119,7 +119,7 @@ export function Annotations() {
         })}
       </ul>
       <div className="hidden @2xl:block" aria-hidden="true">
-        <div className="relative mb-1 flex justify-between font-mono text-[0.65rem] text-muted-foreground">
+        <div className="relative mb-1 flex justify-between font-mono text-xs text-muted-foreground">
           {Array.from({ length: DAYS + 1 }, (_, i) => (
             <span key={i}>{i === DAYS ? t("widget.maintenances.today") : day.format(new Date(start + i * DAY))}</span>
           ))}
@@ -141,7 +141,7 @@ export function Annotations() {
             <div key={marker.id} className="absolute top-0 flex flex-col items-start" style={{ left: at(Date.parse(marker.at)) }}>
               <span className="anim-stem h-5 w-0.5" style={{ background: annotationColour(marker.colour), animationDelay: stagger(index, { base: 320, step: 70 }) }} />
               <span
-                className="anim-fade max-w-36 truncate font-mono text-[0.7rem]"
+                className="anim-fade max-w-36 truncate font-mono text-xs"
                 style={{ animationDelay: stagger(index, { base: 420, step: 70 }), transform: Date.parse(marker.at) > now - DAY ? "translateX(-100%)" : undefined }}
               >
                 {marker.label}

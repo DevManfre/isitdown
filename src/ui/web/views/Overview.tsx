@@ -5,10 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
-import { BorderBeam } from "@/components/ui/border-beam.tsx";
-import { DotPattern } from "@/components/ui/dot-pattern.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
-import { TypingAnimation } from "@/components/ui/typing-animation.tsx";
 import { FleetSummary } from "@/components/FleetSummary.tsx";
 import { HeroStats } from "@/components/HeroStats.tsx";
 import { DashboardGrid, filterLabel, REORDER_SPRING, type GridEditing } from "@/components/DashboardGrid.tsx";
@@ -211,11 +208,8 @@ export function Overview() {
             )
           ) : down.length === 1 ? (
             // The one-provider headline is a plain sentence — the plural
-            // entry is the only one that carries a figure — so it types
-            // itself in instead of arriving whole. The count-bearing
-            // entry keeps the ticker: a number counting up inside a line
-            // that is still being typed reads as two flourishes fighting.
-            <TypingAnimation text={t("overview.title.down", { count: 1 })} />
+            // entry is the only one that carries a figure.
+            t("overview.title.down", { count: 1 })
           ) : (
             <Trans
               i18nKey="overview.title.down"
@@ -446,19 +440,6 @@ export function Overview() {
               : "var(--gradient-hero-live), var(--gradient-hero)",
         }}
       >
-        <DotPattern className="text-foreground/8" />
-        <span
-          aria-hidden="true"
-          className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary to-transparent"
-        />
-        {down.length > 0 && (
-          <BorderBeam
-            size={160}
-            duration={9}
-            colorFrom="var(--status-major-outage)"
-            colorTo="var(--status-degraded)"
-          />
-        )}
         <div
           className={cn(
             "relative grid gap-8",

@@ -8,8 +8,6 @@ import { FromOverviewChip } from "@/components/DrillLink.tsx";
 import { FROM_PARAM, readDays, snapWindow } from "@/lib/drillDown.ts";
 import { useViewParam } from "@/hooks/useViewParam.ts";
 import { Card } from "@/components/ui/card.tsx";
-import { BorderBeam } from "@/components/ui/border-beam.tsx";
-import { DotPattern } from "@/components/ui/dot-pattern.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { useCountWidth } from "@/hooks/useCountWidth.ts";
@@ -338,7 +336,7 @@ export function Incidents() {
               run, not just at the end. */}
           <span
             aria-hidden="true"
-            className="ml-1.5 inline-block text-right text-[10px] text-muted-foreground"
+            className="ml-1.5 inline-block text-right text-xs text-muted-foreground"
             style={{ minWidth: countWidth }}
           >
             <NumberTicker locale={i18n.language} value={counts[entry.value]} />
@@ -366,15 +364,6 @@ export function Incidents() {
             )}
             style={{ animationDelay: "60ms" }}
           >
-            <DotPattern className="text-foreground/6" />
-            {current !== undefined && (
-              <BorderBeam
-                size={140}
-                duration={8}
-                colorFrom="var(--status-major-outage)"
-                colorTo="var(--status-degraded)"
-              />
-            )}
             <div className="relative flex items-center justify-between">
               <span
                 className={cn(
@@ -458,7 +447,7 @@ export function Incidents() {
                       first line only here, same as incidents.js:195, minus the
                       leading status emoji the provider icon now stands in for. */}
                   <span className="text-xs">{notificationHeadline(record.text)}</span>
-                  <span className="font-mono text-[10.5px] text-muted-foreground">
+                  <span className="font-mono text-xs text-muted-foreground">
                     {record.channel} · {formatDateTime(i18n.language, record.sentAt)} · {nameOf(record.providerId)}
                   </span>
                 </span>

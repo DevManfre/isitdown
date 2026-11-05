@@ -56,7 +56,7 @@ export function ProviderRow({
       {shown.hatched ? (
         // Roadmap 1.3: both words, the page's first, so the row never claims
         // the provider said something it did not.
-        <span className="col-start-2 row-start-1 flex flex-wrap justify-end gap-x-1.5 font-mono text-right text-[11.5px] lg:col-start-3">
+        <span className="col-start-2 row-start-1 flex flex-wrap justify-end gap-x-1.5 font-mono text-right text-xs lg:col-start-3">
           <span className="text-muted-foreground">{t(statusLabelKey(provider.overallStatus)).toUpperCase()}</span>
           <span style={{ color: statusColor(shown.status) }}>
             · {t("suspected.short", { status: t(statusLabelKey(shown.status)).toLowerCase() }).toUpperCase()}
@@ -64,7 +64,7 @@ export function ProviderRow({
         </span>
       ) : (
         <span
-          className="col-start-2 row-start-1 font-mono text-right text-[11.5px] lg:col-start-3"
+          className="col-start-2 row-start-1 font-mono text-right text-xs lg:col-start-3"
           style={{ color: statusColor(shown.status) }}
         >
           {t(statusLabelKey(shown.status)).toUpperCase()}
