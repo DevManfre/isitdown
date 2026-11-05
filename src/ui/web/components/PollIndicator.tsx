@@ -86,7 +86,7 @@ export function PollIndicator() {
         type="button"
         size="sm"
         variant="ghost"
-        className="h-7 rounded-md bg-primary/10 px-2.5 text-primary hover:bg-primary/15 hover:text-primary"
+        className="h-7 rounded-md bg-primary/10 px-2.5 text-foreground hover:bg-primary/15"
         disabled={polling}
         aria-busy={polling}
         onClick={() => poll.mutate()}
