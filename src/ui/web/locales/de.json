@@ -270,7 +270,12 @@
   "incident.map.title": "Wo {name} läuft",
   "incident.map.empty": "Kein bekannter Standort für {name}.",
 
-  "history.kicker": "Gesamtverfügbarkeit",
+  "history.tab.trend": "Verlauf",
+  "history.tab.reliability": "Zuverlässigkeit",
+  "history.tab.patterns": "Muster",
+  "history.tab.compare": "Vergleich",
+  "history.tab.latency": "Latenz",
+  "history.tabs": "Ansichten des Verlaufs",
   "history.subtitle": "Mittel über <0>{count}</0> Anbieter, letzte {days} Tage",
   "history.incidents_one": "<0>{count}</0> Störung",
   "history.incidents_other": "<0>{count}</0> Störungen",

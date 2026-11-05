@@ -38,7 +38,7 @@ export function LatencyCard({ providers }: { providers: { id: string; name: stri
   return (
     <Card className="flex flex-col gap-3 p-4" aria-label={t("latency.title")} role="region">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("latency.title")}</span>
+        <span className="text-base font-medium">{t("latency.title")}</span>
         <div className="flex flex-wrap items-center gap-3">
           <Select value={selected.id} onValueChange={setChosen}>
             <SelectTrigger size="sm" aria-label={t("latency.provider")} className="w-44">

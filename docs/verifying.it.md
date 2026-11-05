@@ -74,6 +74,14 @@ che porta via la vista sta dietro a un unico menu **Scarica**. Prima un toggle d
 intervallo, due frasi di download e due coppie di formati avevano tutti lo stesso
 peso, e niente diceva quali stessero insieme.
 
+**History** tiene in alto il titolo della finestra e le sue quattro cifre, e
+divide il resto in cinque schede, una domanda ciascuna: **Andamento** (il
+grafico giornaliero, l'elenco per provider e, chiusi, i tuoi marcatori),
+**Affidabilità** (MTTR, MTBF e i mesi), **Ricorrenze** (quando iniziano gli
+incidenti e quali provider cadono insieme), **Confronta** e **Latenza**. La
+scheda viaggia nell'indirizzo — `#/history?tab=reliability` — così un link apre
+quella che intende, e una che qui non ha nulla da mostrare torna su Andamento.
+
 Su **History**, cliccare la riga di un provider apre il suo drawer: le tre
 finestre, le barre giornaliere con la loro legenda di colori e — roadmap 5.20 —
 un **calendario annuale**, una cella per giorno colorata dallo stato peggiore di

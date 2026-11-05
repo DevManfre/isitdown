@@ -45,7 +45,7 @@ export function StatTiles({ stats, className }: { stats: Stat[]; className?: str
             }}
           />
           <span className="flex flex-col gap-1">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               {stat.label}
             </span>
             <span className="font-mono text-2xl font-medium tracking-tight">{stat.value}</span>

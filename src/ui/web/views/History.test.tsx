@@ -116,7 +116,13 @@ const withDrawer = {
   },
 };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  // The tab is remembered per browser (useViewParam): one case's choice must
+  // not open the next case on it.
+  localStorage.clear();
+  sessionStorage.clear();
+});
 
 /**
  * The provider list alone. The stat tiles above it name the best and the worst
@@ -131,8 +137,9 @@ describe("History", () => {
     expect(await screen.findByText(/99[.,]42/)).toBeInTheDocument();
   });
 
+  // The months live under the Reliability tab (dashboard-design-direction).
   it("labels a month with no samples rather than drawing it as 0%", async () => {
-    renderWithProviders(<History />, fixtures);
+    renderWithProviders(<History />, fixtures, "/", "/?tab=reliability");
     expect(await screen.findByText(i18n.t("history.month-no-data"))).toBeInTheDocument();
   });
 
@@ -291,6 +298,33 @@ describe("History", () => {
 // Review Finding 5: providerFixture() defaults componentSelection to [], so
 // ComponentRows never mounted anywhere above — none of this branch was
 // covered. These give a provider an actual selection so it does.
+describe("the tabs", () => {
+  // dashboard-design-direction: eleven stacked sections became five tabs,
+  // each its own question; the one shown travels in the address.
+  it("opens on Trend and moves to another tab, writing it to the address", async () => {
+    renderWithProviders(<History />, twoProviders);
+    const trend = await screen.findByRole("tab", { name: i18n.t("history.tab.trend") });
+    expect(trend).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(screen.getByRole("tab", { name: i18n.t("history.tab.reliability") }));
+    expect(screen.getByRole("tab", { name: i18n.t("history.tab.reliability") })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(window.location.hash).toContain("tab=reliability"));
+  });
+
+  it("falls back to Trend when the named tab has nothing to show", async () => {
+    renderWithProviders(<History />, fixtures, "/", "/?tab=compare");
+    expect(await screen.findByRole("tab", { name: i18n.t("history.tab.trend") })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab", { name: i18n.t("history.tab.compare") })).toBeNull();
+  });
+
+  it("folds the operator's markers shut on the Trend tab", async () => {
+    renderWithProviders(<History />, twoProviders);
+    expect(await screen.findByRole("button", { name: new RegExp(i18n.t("annotation.title")) })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+});
+
 describe("a provider's component breakdown (ComponentRows)", () => {
   const withSelection = (extra: { componentHistory?: unknown; errors?: Record<string, number> }) => ({
     // The breakdown lives in the drawer now, and the drawer asks for
@@ -404,9 +438,13 @@ describe("a provider's component breakdown (ComponentRows)", () => {
     // errorElement and replaced every bit of that tree with ViewError — not
     // just this provider's component breakdown.
     expect(await screen.findByText(/99[.,]42/)).toBeInTheDocument();
-    expect(await screen.findByText(i18n.t("history.month-no-data"))).toBeInTheDocument();
     expect(await (await inList()).findByText("GitHub")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: i18n.t("action.download") })).toBeInTheDocument();
+    // The month columns, one tab over, are the same tree and stand too.
+    await userEvent.click(screen.getByRole("tab", { name: i18n.t("history.tab.reliability") }));
+    expect(await screen.findByText(i18n.t("history.month-no-data"))).toBeInTheDocument();
+    // The drawer opens from the list, which is on Trend.
+    await userEvent.click(screen.getByRole("tab", { name: i18n.t("history.tab.trend") }));
 
     // Asserted before the drawer opens on purpose: a modal sheet marks the rest
     // of the page `aria-hidden`, which takes it out of every `*ByRole` query.
@@ -432,7 +470,7 @@ const fourProviders = {
 
 describe("comparing two providers", () => {
   it("adds a third provider, offering the worst one not yet drawn, and removes it again", async () => {
-    renderWithProviders(<History />, fourProviders);
+    renderWithProviders(<History />, fourProviders, "/", "/?tab=compare");
     const compare = within(await screen.findByRole("region", { name: i18n.t("history.compare.title") }));
     // Only the first two slots are fixed: the extras can be taken out.
     expect(compare.queryByRole("button", { name: /Remove/ })).toBeNull();
@@ -445,7 +483,7 @@ describe("comparing two providers", () => {
   });
 
   it("stops offering to add once there is no provider left to add", async () => {
-    renderWithProviders(<History />, fourProviders);
+    renderWithProviders(<History />, fourProviders, "/", "/?tab=compare");
     const compare = within(await screen.findByRole("region", { name: i18n.t("history.compare.title") }));
     await userEvent.click(compare.getByRole("button", { name: i18n.t("history.compare.add") }));
     await userEvent.click(compare.getByRole("button", { name: i18n.t("history.compare.add") }));
@@ -455,7 +493,7 @@ describe("comparing two providers", () => {
   });
 
   it("starts on the two worst providers, which is the comparison worth making", async () => {
-    renderWithProviders(<History />, twoProviders);
+    renderWithProviders(<History />, twoProviders, "/", "/?tab=compare");
 
     const compare = within(await screen.findByRole("region", { name: i18n.t("history.compare.title") }));
     expect(compare.getByRole("combobox", { name: i18n.t("history.compare.slot", { n: 1 }) })).toHaveTextContent(
@@ -467,7 +505,7 @@ describe("comparing two providers", () => {
   });
 
   it("overlays the two series in one chart, each named", async () => {
-    renderWithProviders(<History />, twoProviders);
+    renderWithProviders(<History />, twoProviders, "/", "/?tab=compare");
 
     const compare = within(await screen.findByRole("region", { name: i18n.t("history.compare.title") }));
     // The chart names both providers rather than a legend of "series 1/2":
@@ -477,7 +515,7 @@ describe("comparing two providers", () => {
   });
 
   it("swaps the two rather than drawing a provider against itself", async () => {
-    renderWithProviders(<History />, twoProviders);
+    renderWithProviders(<History />, twoProviders, "/", "/?tab=compare");
 
     const compare = within(await screen.findByRole("region", { name: i18n.t("history.compare.title") }));
     await userEvent.click(compare.getByRole("combobox", { name: i18n.t("history.compare.slot", { n: 1 }) }));
@@ -492,7 +530,7 @@ describe("comparing two providers", () => {
   });
 
   it("says a comparison needs two providers rather than drawing one against itself", async () => {
-    renderWithProviders(<History />, fixtures);
+    renderWithProviders(<History />, fixtures, "/", "/?tab=compare");
 
     await screen.findByText(/99[.,]42/);
     expect(screen.queryByRole("region", { name: i18n.t("history.compare.title") })).toBeNull();
@@ -641,7 +679,6 @@ describe("a provider's detail drawer", () => {
     // which is what the default `throwOnError` does to any query whose first
     // load fails in this tree.
     expect(await screen.findByText(/99[.,]42/)).toBeInTheDocument();
-    expect(screen.getByText(i18n.t("history.month-no-data"))).toBeInTheDocument();
     // The list, by its column header and by the provider that is *not* open —
     // "Cloudflare" itself now reads twice, once in the row and once as the open
     // sheet's title. GitHub is asked for with getAllByText because the compare
@@ -715,7 +752,7 @@ describe("a provider's detail drawer", () => {
         days: 90,
         pairs: [{ providerId: "github", otherId: "cloudflare", together: 7, incidents: 9, rate: 0.78, lift: 11.4, declared: false }],
       },
-    });
+    }, "/", "/?tab=patterns");
     expect(await screen.findByText(i18n.t("coincidence.title"))).toBeInTheDocument();
     expect(screen.getByRole("button", { name: i18n.t("coincidence.declare") })).toBeInTheDocument();
   });
