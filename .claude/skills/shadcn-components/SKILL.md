@@ -188,6 +188,26 @@ import { chartConfigFor, statusFill } from "@/lib/chartConfig.ts";
   Recharts animation back on "to make it smoother" — it fights the app's
   single animation mechanism.
 
+## Using primitives under the design direction
+
+`dashboard-design-direction` sets how primitives are used. The CLI hazards
+above cover how they are generated.
+
+- **Stock sizes.** Don't override a primitive's height or text size to cram
+  a row (`h-7`, `text-[11px]`, `px-1.5` on a `Button`). When a row doesn't
+  fit, the row has too much in it.
+- **Variants carry hierarchy.** Use one `default` (primary) `Button` per view.
+  Everything else is `outline`, `ghost` or `link`.
+- **Disclosure comes from primitives.** Use `Tabs`, `Collapsible` and
+  `DropdownMenu` to hide secondary features, not a hand-rolled toggle.
+- **Magic UI decorative effects are retired.** Don't add new uses of
+  `border-beam`, `typing-animation`, `spotlight-card` or `dot-pattern`; the
+  `design-guard` hook refuses the import. `number-ticker` and `animated-list`
+  are allowed only for a *change* of value or membership, never on first paint.
+- **Regenerated motion.** shadcn ships `animate-in`/`animate-out` classes
+  with its own durations. Keep them on the `--duration-*`/`--ease-*` tokens
+  (see § Motion in the design skill). Don't leave the CLI's defaults in place.
+
 ## Checklist before committing anything touched by the CLI
 
 - [ ] `git diff tsconfig.json` is empty (Hazard 1 workaround was reverted).

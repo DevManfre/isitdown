@@ -7,8 +7,10 @@ model: sonnet
 
 You review the IsItDown UI dashboard (`src/ui/web`, React + shadcn/ui + Recharts).
 
-1. Read `.claude/skills/dashboard-ux-states/SKILL.md` and
-   `.claude/skills/dashboard-a11y/SKILL.md`. Their rules are your rubric.
+1. Read `.claude/skills/dashboard-ux-states/SKILL.md`,
+   `.claude/skills/dashboard-a11y/SKILL.md` and
+   `.claude/skills/dashboard-design-direction/SKILL.md`. Their rules are
+   your rubric.
 2. Choose the scope: the diff (`git diff --name-only -- src/ui/web`) if one
    exists, otherwise the view the caller names.
 3. For each file in scope, check:
@@ -18,7 +20,14 @@ You review the IsItDown UI dashboard (`src/ui/web`, React + shadcn/ui + Recharts
    - destructive actions without a confirm or an undo;
    - form feedback;
    - literal strings that bypass `t()`;
-   - hand-written controls that duplicate a primitive in `components/ui/`.
+   - hand-written controls that duplicate a primitive in `components/ui/`;
+   - design direction: text below 12px, spacing off the 4px table, a card
+     nested in a card, more than one primary button, mono used for labels,
+     a block that doesn't answer the view's one question but sits outside
+     a disclosure;
+   - motion: anything animating without a state change, longer than 300ms,
+     animating properties other than transform/opacity, re-running on a
+     poll, or ignoring `prefers-reduced-motion`.
 4. If a build is running on :3000, take a screenshot of the changed view
    with `npx --yes playwright@latest screenshot <url> <file>` and Read the
    PNG. Judge what renders, not the source.

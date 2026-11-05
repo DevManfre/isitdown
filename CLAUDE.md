@@ -221,6 +221,7 @@ This repo ships with Claude Code skills under `.claude/skills/` tailored to recu
 - `i18n-strings` — every user-facing string goes in an English source catalog and gets translated; no literals in code.
 - `dashboard-ux-states` — every dashboard surface handles loading (skeleton, never the empty state), empty (with a next action), error and populated; destructive actions confirm or undo; dirty dialogs guard their close.
 - `dashboard-a11y` — status never by colour alone, charts state their conclusion as text, everything keyboard-reachable, form errors announced.
+- `dashboard-design-direction` — the agreed visual direction in numbers: calm and airy (4px spacing table, 12px type floor, one card level, one accent), one job per view with secondary features hidden behind disclosure rather than deleted, and functional motion only (state changes, ≤ 300ms, transform/opacity, nothing ambient). Read before any visual change under `src/ui/web`.
 - `readme-translation-sync` — an edit to `README.md` or a `docs/` page lands in its `.it.md` twin in the same pass, section for section.
 - `git-commit-style` — write commit messages in the required `<emoji> <TITLE> - <description>` format.
 - `release-flow` — ship a release: push `dev`, gate on CI, bump the version, `mergeclean` into `main`, tag, verify the published images.
@@ -229,7 +230,7 @@ This repo ships with Claude Code skills under `.claude/skills/` tailored to recu
 
 Consult the relevant skill before doing free-form implementation of these recurring tasks — they encode conventions that aren't obvious from the code alone.
 
-The `ux-reviewer` subagent (`.claude/agents/`) audits a dashboard diff against the two dashboard skills, read-only. Project hooks in `.claude/hooks/` enforce some rules mechanically: a dashboard edit is typechecked and its related Vitest files run; a JSX literal outside `t()` is refused (`// i18n-ignore` on the line opts out); `--update` without `--only` on the visual harness is blocked; and stopping with undeployed `src/ui` edits brings up the prove-it-live reminder.
+The `ux-reviewer` subagent (`.claude/agents/`) audits a dashboard diff against the three dashboard skills, read-only. Project hooks in `.claude/hooks/` enforce some rules mechanically: a dashboard edit is typechecked and its related Vitest files run; a JSX literal outside `t()` is refused (`// i18n-ignore` on the line opts out); text below 12px, a retired Magic UI effect or a second animation library is refused (`design-ignore` on the line opts out); `--update` without `--only` on the visual harness is blocked; and stopping with undeployed `src/ui` edits brings up the prove-it-live reminder.
 
 ## Git commits
 
