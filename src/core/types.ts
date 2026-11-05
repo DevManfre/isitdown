@@ -332,6 +332,11 @@ export interface NotificationPayload {
      */
     impact?: string | undefined;
     owner?: string | undefined;
+    /**
+     * Where to start when it is down — roadmap 5.1: the runbook's first link,
+     * or its first line, never the whole Markdown. See `core/runbook.ts`.
+     */
+    runbook?: string | undefined;
   };
   /**
    * The language this message is written in. The configured notification

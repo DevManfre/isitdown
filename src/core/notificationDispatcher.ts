@@ -3,7 +3,8 @@ import { DELIVERY_DEFAULTS, type DeliveryConfig } from "./delivery.ts";
 import type { Logger } from "./logger.ts";
 import type { MessageRefStore } from "./messageRefStore.interface.ts";
 import type { Notifier } from "./notifier.interface.ts";
-import { isMuted } from "./diffEngine.ts";
+import { effectiveMutedUntil } from "./mute.ts";
+import { runbookHint } from "./runbook.ts";
 import { onCallRecipientId } from "./onCall.ts";
 import { clearsFloor, explain, inQuietHours, severityOf, type RoutingRule } from "./routing.ts";
 import type { NotificationPayload, StatusChange, StatusChangeKind } from "./types.ts";
@@ -206,6 +207,7 @@ function payloadServiceOf(service: ServiceDefinition): NotificationPayload["serv
     statusUrl: service.baseUrl,
     ...(service.impact === undefined ? {} : { impact: service.impact }),
     ...(service.owner === undefined ? {} : { owner: service.owner }),
+    ...(runbookHint(service.runbook) === null ? {} : { runbook: runbookHint(service.runbook)! }),
   };
 }
 
@@ -801,6 +803,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         quietHours: delivery.quietHours,
         at: new Date(at),
         ...(service.group === undefined ? {} : { providerGroup: service.group }),
+        ...(service.tags === undefined ? {} : { providerTags: service.tags }),
       });
       if (routed.quieted) continue;
       const healthy = routed.targets.filter((id) => id !== channelId && !broken(id) && byChannelId.has(id));
@@ -939,7 +942,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         pendingEscalations.delete(providerId);
         continue;
       }
-      if (isMuted(service.mutedUntil, new Date(at).toISOString())) continue;
+      if (effectiveMutedUntil(service, new Date(at).toISOString()) !== null) continue;
 
       const notifier = byChannelId.get(policy.channel);
       if (notifier === undefined) {
@@ -1136,6 +1139,8 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           // ids (roadmap 2.6). Read off the service the change already resolved
           // to, so the evaluator stays pure and knows nothing about the fleet.
           ...(service.group === undefined ? {} : { providerGroup: service.group }),
+          // And "everything tagged critical" (roadmap 5.4), the same way.
+          ...(service.tags === undefined ? {} : { providerTags: service.tags }),
         });
         // Followed from the dashboard (roadmap 3.6): every enabled channel
         // hears this incident whatever the rules say about its provider. Its

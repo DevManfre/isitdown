@@ -71,6 +71,7 @@
   "notification.escalated": "⏫ Niemand hat das nach {minutes} Min. übernommen — deshalb hier noch einmal.",
   "notification.impact": "Auswirkung: {impact}",
   "notification.owner": "Verantwortlich: {owner}",
+  "notification.runbook": "Runbook: {runbook}",
 
   "chatops.help": "IsItDown-Befehle\n\n/status — alle Anbieter, die schlimmsten zuerst\n/status <Anbieter> — ein einzelner Anbieter\n/history <Anbieter> [7|30|90] — Verfügbarkeit über einen Zeitraum\n/mute <Anbieter> <30m|2h|1d> — Meldungen eine Weile stummschalten\n/unmute <Anbieter> — wieder einschalten\n/ack <Anbieter> — übernehmen\n/help — diese Nachricht",
   "chatops.status.heading": "{count} von {total} Anbietern sind nicht betriebsbereit.",

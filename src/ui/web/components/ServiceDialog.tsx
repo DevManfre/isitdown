@@ -25,6 +25,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { StepPanel, Stepper } from "@/components/ui/stepper.tsx";
 import {
@@ -131,7 +132,12 @@ export function ServiceDialog({
   service,
   trigger,
 }: {
-  mode: "add" | "edit";
+  /**
+   * `clone` (roadmap 5.6) is an add that starts from an existing provider: the
+   * second step, every field filled in from `service`, a new name to derive a
+   * new id from. Ten HTTP probes that differ only in their path are ten clones.
+   */
+  mode: "add" | "edit" | "clone";
   service?: ServiceDefinition;
   trigger: ReactNode;
 }) {
@@ -184,6 +190,11 @@ export function ServiceDialog({
   // Roadmap 3.7. Free text the operator writes for the 3 a.m. reader.
   const [impact, setImpact] = useState(service?.impact ?? "");
   const [owner, setOwner] = useState(service?.owner ?? "");
+  // Roadmap 5.4. Typed as one comma-separated line and slugified on the way
+  // out, the way the group is: "Team Backend" is a legal tag, not a refusal.
+  const [tags, setTags] = useState((service?.tags ?? []).join(", "));
+  // Roadmap 5.1. Markdown, shown on the provider's page.
+  const [runbook, setRunbook] = useState(service?.runbook ?? "");
   // Adapter-specific extras, of which the scrape adapter is so far the only
   // user. Kept as the raw record the service definition carries, rather than as
   // named fields, so an adapter that grows an option later needs no new state.
@@ -209,7 +220,7 @@ export function ServiceDialog({
   // opened, so a close with anything changed asks first.
   const formState = JSON.stringify([
     picked, name, adapter, baseUrl, selection, scopeToComponents, intervalMinutes,
-    intervalUnit, group, slaTarget, authority, dependsOn, impact, owner, options, header,
+    intervalUnit, group, slaTarget, authority, dependsOn, impact, owner, tags, runbook, options, header,
   ]);
   const [pristine, setPristine] = useState(formState);
   const [capturePristine, setCapturePristine] = useState(false);
@@ -223,7 +234,7 @@ export function ServiceDialog({
   }, [capturePristine, formState]);
   // Only while adding, and only while the dialog is open: an edit already has
   // every answer the catalog would offer.
-  const { data: catalog } = useCatalog(open && mode === "add");
+  const { data: catalog } = useCatalog(open && mode !== "edit");
   const { data: config } = useConfig();
   const existingGroups = [
     ...new Set(
@@ -239,10 +250,10 @@ export function ServiceDialog({
   // accepts `/^[a-z0-9][a-z0-9-]*$/`, so anything an operator typed naturally
   // ("Google Cloud") came back as a rejected write. Derive it from the name
   // instead — one field to fill, and the value is valid by construction.
-  const id = mode === "add" ? slugify(name) : (service?.id ?? "");
+  const id = mode === "edit" ? (service?.id ?? "") : slugify(name);
   // The adapter is only choosable while adding; an edit shows the fields of the
   // adapter the service already has.
-  const activeAdapter = mode === "add" ? adapter : (service?.adapter ?? "");
+  const activeAdapter = mode === "edit" ? (service?.adapter ?? "") : adapter;
   const probing = activeAdapter === PROBE_ADAPTER;
   const tcpProbing = activeAdapter === TCP_ADAPTER;
   const sequenceProbing = activeAdapter === SEQUENCE_ADAPTER;
@@ -318,14 +329,17 @@ export function ServiceDialog({
   // now), so a fresh open needs its own reset — otherwise a cancelled edit's
   // half-typed field would still be sitting there next time.
   const resetForm = (): void => {
-    setStep(1);
+    const cloning = mode === "clone" && service !== undefined;
+    // A clone opens on the second step: where its status comes from is the
+    // one thing it already knows.
+    setStep(cloning ? 2 : 1);
     setStepBack(false);
     setSource("catalog");
     setPicked(undefined);
     setAdvanced(false);
     setCatalogQuery("");
-    setName(service?.name ?? "");
-    setAdapter(DEFAULT_ADAPTER);
+    setName(cloning ? t("clone.name", { name: service.name }) : (service?.name ?? ""));
+    setAdapter(cloning ? service.adapter : DEFAULT_ADAPTER);
     setBaseUrl(service?.baseUrl ?? "");
     setSelection(service?.components ?? []);
     setScopeToComponents(service?.scopeToComponents ?? false);
@@ -337,6 +351,8 @@ export function ServiceDialog({
     setDependsOn(service?.dependsOn ?? []);
     setImpact(service?.impact ?? "");
     setOwner(service?.owner ?? "");
+    setTags((service?.tags ?? []).join(", "));
+    setRunbook(service?.runbook ?? "");
     setOptions(service?.options ?? {});
     setHeader(storedHeader(service?.options));
     setPreview(undefined);
@@ -512,11 +528,12 @@ export function ServiceDialog({
     // than noise: the rejection landed *after* the operator had stepped on,
     // so step two opened carrying an error about fields it had not yet been
     // given. The form is only submittable from the step that can fill it in.
-    if (mode === "add" && step === 1) return;
+    if (mode !== "edit" && step === 1) return;
     setSaving(true);
     setMessage(undefined);
+    const tagList = parseTags(tags);
     try {
-      if (mode === "add") {
+      if (mode !== "edit") {
         await add.mutateAsync({
           id,
           name,
@@ -548,6 +565,14 @@ export function ServiceDialog({
           ...(dependsOn.length === 0 ? {} : { dependsOn }),
           ...(impact.trim() === "" ? {} : { impact: impact.trim() }),
           ...(owner.trim() === "" ? {} : { owner: owner.trim() }),
+          ...(tagList.length === 0 ? {} : { tags: tagList }),
+          ...(runbook.trim() === "" ? {} : { runbook: runbook.trim() }),
+          // A clone keeps its source's planned mutes and declared windows: a
+          // probe copied for a sibling path shares the deploy it is silenced for.
+          ...(mode === "clone" && service?.muteSchedules ? { muteSchedules: service.muteSchedules } : {}),
+          ...(mode === "clone" && service?.maintenanceWindows
+            ? { maintenanceWindows: service.maintenanceWindows }
+            : {}),
         });
         const result = await test.mutateAsync(id);
         if (!result.ok) {
@@ -594,6 +619,8 @@ export function ServiceDialog({
           dependsOn: dependsOn.length === 0 ? null : dependsOn,
             impact: impact.trim() === "" ? null : impact.trim(),
             owner: owner.trim() === "" ? null : owner.trim(),
+            tags: tagList.length === 0 ? null : tagList,
+            runbook: runbook.trim() === "" ? null : runbook.trim(),
             ...savedOptions(),
           },
         });
@@ -612,7 +639,7 @@ export function ServiceDialog({
     }
   };
 
-  const adding = mode === "add";
+  const adding = mode !== "edit";
   const onSource = adding && step === 1;
   // Nothing downstream of step one works without a base URL — the catalog
   // fills one in, detection answers with one, and a hand-picked adapter needs
@@ -646,7 +673,7 @@ export function ServiceDialog({
             <Input id="service-id" className="font-mono" value={id} readOnly />
           </div>
         </div>
-        {mode === "edit" && (
+        {mode !== "add" && (
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="service-base-url">{t("field.base-url")}</Label>
             <Input
@@ -820,6 +847,41 @@ export function ServiceDialog({
             {...fieldProps}
           />
         </div>
+        {/* Roadmap 5.4. Beside the group, not instead of it: one group, any
+            number of tags, each one a target a routing rule can name. */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-tags">{t("field.tags")}</Label>
+          <Input
+            id="service-tags"
+            placeholder={t("field.tags-placeholder")}
+            value={tags}
+            onChange={(event) => setTags(event.target.value)}
+            aria-describedby="service-tags-hint"
+            {...fieldProps}
+          />
+          <span id="service-tags-hint" className="text-xs text-muted-foreground">
+            {t("field.tags-hint")}
+          </span>
+        </div>
+        {/* Roadmap 5.1. What to do when it is down: the provider's page shows
+            it, and every message quotes its first link or line. */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-runbook">{t("field.runbook")}</Label>
+          <Textarea
+            id="service-runbook"
+            rows={4}
+            maxLength={4000}
+            className="font-mono text-xs"
+            placeholder={t("field.runbook-placeholder")}
+            value={runbook}
+            onChange={(event) => setRunbook(event.target.value)}
+            aria-describedby="service-runbook-hint"
+            {...fieldProps}
+          />
+          <span id="service-runbook-hint" className="text-xs text-muted-foreground">
+            {t("field.runbook-hint")}
+          </span>
+        </div>
       </Section>
 
       <Section
@@ -889,7 +951,7 @@ export function ServiceDialog({
           <DialogHeader>
             {adding ? (
               <>
-                <DialogTitle>{t("add.title")}</DialogTitle>
+                <DialogTitle>{t(mode === "clone" ? "clone.title" : "add.title")}</DialogTitle>
                 <DialogDescription>
                   {t(onSource ? "add.subtitle-source" : "add.subtitle-details")}
                 </DialogDescription>
@@ -1139,4 +1201,12 @@ function StepRail({ step, onBack }: { step: 1 | 2; onBack: () => void }) {
       ]}
     />
   );
+}
+
+/**
+ * The tags field as the list it stores (roadmap 5.4): split on commas or
+ * spaces, each one slugified the way a group is, duplicates dropped.
+ */
+export function parseTags(value: string): string[] {
+  return [...new Set(value.split(/[,\s]+/).map(slugify).filter((tag) => tag !== ""))];
 }

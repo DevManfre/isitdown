@@ -58,6 +58,7 @@ export const TEMPLATE_TOKENS = {
   incidentStatus: "The provider's own lifecycle word for the incident, translated where known.",
   impact: "What breaks when this provider does, as the operator wrote it; empty when not set.",
   owner: "Who answers for this provider; empty when not set.",
+  runbook: "Where to start when it is down: the runbook's first link, or its first line; empty when not set.",
   url: "The provider's public status page.",
   at: "When it happened, UTC.",
 } as const;

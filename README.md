@@ -201,6 +201,12 @@ committed Grafana dashboard, then:
 - **Wallboard and feeds**: a QR code that opens the provider in the worst trouble,
   a pulse and an optional sound when a tile changes, and the fleet served as a
   1-bit PNG and SVG for e-ink frames and chats.
+- **Operator quality of life**: a Markdown runbook per provider, shown on its
+  page and quoted in every alert; tags beside the group, filterable and routable
+  as `tag:<name>`; planned mutes, weekly or one-off; maintenance windows the
+  operator declares, silencing and drawn like a provider's own; bulk edit of
+  cadence, group, tags, mute and polling across a selection; and Duplicate on
+  any provider ([3.25–3.29](docs/configuration.md#325-runbooks--what-to-do-when-it-is-down)).
 - **Hardening**: the dashboard binds to loopback by default, refuses cross-origin
   and rebound-host writes, caps response bodies and refuses link-local targets.
 - **Catalogue and tooling**: a provider catalogue of 205 entries, the `isitdown

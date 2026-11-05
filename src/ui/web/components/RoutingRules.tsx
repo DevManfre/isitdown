@@ -22,6 +22,7 @@ import {
   COMPONENT_SEPARATOR,
   EVENT_CLASSES,
   GROUP_PREFIX,
+  TAG_PREFIX,
   SEVERITY_FLOORS,
   componentTargetOf,
   explain,
@@ -109,11 +110,16 @@ const DRYRUN_EVENTS: { id: string; change: Omit<StatusChange, "providerId" | "at
   },
 ];
 
+/** The tags a fleet carries (roadmap 5.4), sorted like the groups. */
+const tagsOf = (services: { tags?: string[] | null }[]): string[] =>
+  [...new Set(services.flatMap((service) => service.tags ?? []))].sort();
+
 /** A provider as this panel needs it: enough to name it, group it and address its components. */
 interface RoutedService {
   id: string;
   name: string;
   group?: string | null;
+  tags?: string[] | null;
   /** The operator's selected components, which are the ones a rule can name. */
   components?: { id: string; name: string }[];
 }
@@ -202,6 +208,7 @@ function DryRun({
   const result = explain(change, rules, enabledChannelIds, {
     ...(quietHours === undefined ? {} : { quietHours }),
     ...(group === null || group === undefined ? {} : { providerGroup: group }),
+    ...(picked?.tags ? { providerTags: picked.tags } : {}),
   });
 
   const won = result.winner === null ? undefined : rules[result.winner];
@@ -457,6 +464,12 @@ export function RoutingRules({
                       {groupsOf(services).map((group) => (
                         <SelectItem key={group} value={`${GROUP_PREFIX}${group}`}>
                           {t("routing.provider.group", { group })}
+                        </SelectItem>
+                      ))}
+                      {/* And tags (roadmap 5.4): "everything critical", wherever it sits. */}
+                      {tagsOf(services).map((tag) => (
+                        <SelectItem key={`tag-${tag}`} value={`${TAG_PREFIX}${tag}`}>
+                          {t("routing.provider.tag", { tag })}
                         </SelectItem>
                       ))}
                       {services.flatMap((service) => [
