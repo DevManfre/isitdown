@@ -800,6 +800,19 @@ const paths: Json = {
     },
   },
   "/config/services": {
+    patch: {
+      tags: ["Configuration"],
+      summary:
+        "Edit several services at once (roadmap 5.5) — all or nothing.",
+      description:
+        "`{ ids, patch, addTags?, removeTags? }`. `patch` takes only the fleet-wide fields: `enabled`, `intervalMinutes`, `group`, `mutedUntil`, `tags` (null clears). `addTags` and `removeTags` change each provider's own tags instead of replacing them. Every id must exist and every cadence suit its adapter, or nothing is written.",
+      requestBody: { required: true, ...json({ type: "object", required: ["ids"] }) },
+      responses: {
+        "200": ok({ type: "object" }, "{ services } — the edited services as stored."),
+        "400": badRequest,
+        "404": notFound,
+      },
+    },
     post: {
       tags: ["Configuration"],
       summary: "Add a service.",
@@ -1426,6 +1439,36 @@ const schemas: Json = {
         maxLength: 80,
         nullable: true,
         description: "Who answers for this provider (roadmap 3.7). Carried into every message.",
+      },
+      runbook: {
+        type: "string",
+        maxLength: 4000,
+        nullable: true,
+        description:
+          "What to do when it is down, in Markdown (roadmap 5.1). Shown on the provider's page; a message carries its first link, or its first line.",
+      },
+      tags: {
+        type: "array",
+        maxItems: 20,
+        nullable: true,
+        items: { type: "string" },
+        description: "Free labels beside the group (roadmap 5.4); a routing rule names one as `tag:<slug>`.",
+      },
+      muteSchedules: {
+        type: "array",
+        maxItems: 20,
+        nullable: true,
+        items: { type: "object" },
+        description:
+          "Planned mutes (roadmap 5.2): `{ from, until }` for one span, or `{ days, start, end, timeZone }` for a weekly window — days `mon`…`sun`, times `HH:MM`, may wrap midnight.",
+      },
+      maintenanceWindows: {
+        type: "array",
+        maxItems: 50,
+        nullable: true,
+        items: { type: "object" },
+        description:
+          "Maintenance the operator declares (roadmap 5.3): `{ title, startsAt, endsAt }`. Silences and announces like a window the provider published.",
       },
     },
   },

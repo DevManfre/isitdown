@@ -7,6 +7,7 @@ import { ServiceDialog } from "@/components/ServiceDialog.tsx";
 import { AdapterDebugDialog } from "@/components/settings/AdapterDebugDialog.tsx";
 import { MuteMenu } from "@/components/settings/MuteMenu.tsx";
 import { RemoveServiceDialog } from "@/components/settings/RemoveServiceDialog.tsx";
+import { ScheduleDialog } from "@/components/settings/ScheduleDialog.tsx";
 import { useSettingVisible } from "@/components/settings/SettingsChrome.tsx";
 import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useServiceMutations } from "@/hooks/queries.ts";
@@ -38,17 +39,24 @@ export function ServiceRow({
   service,
   open,
   onOpenChange,
+  selected,
+  onSelectedChange,
 }: {
   service: ServiceDefinition;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Present only while the list is selecting for a bulk edit (roadmap 5.5). */
+  selected?: boolean | undefined;
+  onSelectedChange?: ((selected: boolean) => void) | undefined;
 }) {
   const { t, i18n } = useTranslation();
   const { patch } = useServiceMutations();
   const toast = useSettingsToastReport();
   const host = hostOf(service.baseUrl);
   const muted = isMuted(service.mutedUntil);
-  const visible = useSettingVisible(`${service.name} ${service.adapter} ${host} ${service.group ?? ""}`);
+  const visible = useSettingVisible(
+    `${service.name} ${service.adapter} ${host} ${service.group ?? ""} ${(service.tags ?? []).join(" ")}`,
+  );
 
   if (!visible) return null;
 
@@ -66,6 +74,15 @@ export function ServiceRow({
   return (
     <Collapsible open={open} onOpenChange={onOpenChange} className="service-row">
       <div className="flex items-center gap-2.5 px-4 py-3">
+        {onSelectedChange !== undefined && (
+          <input
+            type="checkbox"
+            className="size-4 shrink-0 accent-primary"
+            aria-label={t("bulk.select", { name: service.name })}
+            checked={selected ?? false}
+            onChange={(event) => onSelectedChange(event.target.checked)}
+          />
+        )}
         <span
           className="size-1.5 shrink-0 rounded-full"
           style={{
@@ -82,6 +99,11 @@ export function ServiceRow({
             <span className="truncate text-sm">{service.name}</span>
             <span className="truncate text-xs text-muted-foreground">
               {service.adapter} · {host}
+              {(service.tags ?? []).map((tag) => (
+                <span key={tag} className="ml-1.5 font-mono">
+                  #{tag}
+                </span>
+              ))}
             </span>
           </span>
         </CollapsibleTrigger>
@@ -126,6 +148,29 @@ export function ServiceRow({
             trigger={
               <Button type="button" variant="secondary" size="sm">
                 {t("action.edit")}
+              </Button>
+            }
+          />
+          {/* Roadmap 5.6: the same form, filled in, under a new name. */}
+          <ServiceDialog
+            mode="clone"
+            service={service}
+            trigger={
+              <Button type="button" variant="secondary" size="sm">
+                {t("action.duplicate")}
+              </Button>
+            }
+          />
+          {/* Roadmap 5.2/5.3: when this provider should be quiet, planned. */}
+          <ScheduleDialog
+            service={service}
+            trigger={
+              <Button type="button" variant="secondary" size="sm">
+                {(service.muteSchedules?.length ?? 0) + (service.maintenanceWindows?.length ?? 0) > 0
+                  ? t("action.schedule-count", {
+                      count: (service.muteSchedules?.length ?? 0) + (service.maintenanceWindows?.length ?? 0),
+                    })
+                  : t("action.schedule")}
               </Button>
             }
           />

@@ -91,6 +91,10 @@ export interface ProviderStatus {
    */
   impact?: string | null;
   owner?: string | null;
+  /** Roadmap 5.1: what to do when it is down, Markdown. Null when unset. */
+  runbook?: string | null;
+  /** Roadmap 5.4: free labels beside the group. Optional for an older server. */
+  tags?: string[];
   /**
    * Roadmap 1.3. A reading a probe measured and the page has not declared;
    * null when there is none. Optional so a dashboard served by an older server
@@ -538,6 +542,28 @@ export interface ServiceDefinition {
    */
   impact?: string | null;
   owner?: string | null;
+  /** What to do when it is down, Markdown (roadmap 5.1). `null` clears it on a patch. */
+  runbook?: string | null;
+  /** Free labels beside the group (roadmap 5.4). `null` clears them on a patch. */
+  tags?: string[] | null;
+  /** Planned mutes (roadmap 5.2). `null` clears them on a patch. */
+  muteSchedules?: MuteSchedule[] | null;
+  /** Maintenance the operator declared (roadmap 5.3). `null` clears it on a patch. */
+  maintenanceWindows?: OperatorMaintenanceWindow[] | null;
+}
+
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+/** A planned mute (roadmap 5.2): one span, or a weekly window in a time zone. */
+export type MuteSchedule =
+  | { from: string; until: string }
+  | { days: Weekday[]; start: string; end: string; timeZone: string };
+
+/** A maintenance window the operator declared (roadmap 5.3). */
+export interface OperatorMaintenanceWindow {
+  title: string;
+  startsAt: string;
+  endsAt: string;
 }
 
 /** One provider's month against its target — `GET /sla` (roadmap 4.13). */

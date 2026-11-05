@@ -405,6 +405,13 @@ export const patchService = (id: string, patch: unknown) =>
     `/config/services/${encodeURIComponent(id)}`,
     patch,
   );
+/** Several providers at once, all or nothing (roadmap 5.5). */
+export const bulkPatchServices = (body: {
+  ids: string[];
+  patch?: Record<string, unknown>;
+  addTags?: string[];
+  removeTags?: string[];
+}) => request<unknown>("PATCH", "/config/services", body);
 /** Read before the remove, so the confirmation can name what the cascade takes. */
 export const getServiceImpact = (id: string) =>
   request<ServiceImpact>(

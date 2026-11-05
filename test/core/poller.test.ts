@@ -1227,6 +1227,79 @@ test("a muted provider is polled and recorded, and reports nothing", async () =>
   }
 });
 
+// Roadmap 5.2: a planned mute running now silences exactly as a pressed one does.
+test("a planned mute running now reports nothing, like a pressed one", async () => {
+  let indicator = "none";
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary(indicator));
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const planned = service("github", provider.baseUrl, {
+    muteSchedules: [
+      { from: new Date(Date.now() - 3_600_000).toISOString(), until: new Date(Date.now() + 3_600_000).toISOString() },
+    ],
+  });
+
+  try {
+    await poller.runCycle(config([planned]));
+    indicator = "major";
+    clock.advance(ONE_INTERVAL_MS);
+    assert.deepEqual((await poller.runCycle(config([planned]))).changes, []);
+  } finally {
+    await store.close();
+    await provider.close();
+  }
+});
+
+// Roadmap 5.3: the operator's window swallows the outage and is announced itself.
+test("a maintenance window the operator declares silences the provider and is announced", async () => {
+  let indicator = "none";
+  const provider = await fakeProvider((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(summary(indicator));
+  });
+  const store = await freshStore();
+  const timer = fakeSleep();
+  const clock = fakeClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const plain = service("github", provider.baseUrl);
+  const declared = {
+    ...plain,
+    maintenanceWindows: [
+      {
+        title: "Our deploy",
+        startsAt: new Date(Date.now() - 60_000).toISOString(),
+        endsAt: new Date(Date.now() + 3_600_000).toISOString(),
+      },
+    ],
+  };
+
+  try {
+    await poller.runCycle(config([plain]));
+    indicator = "major";
+    clock.advance(ONE_INTERVAL_MS);
+    const cycle = await poller.runCycle(config([declared]));
+
+    assert.deepEqual(
+      cycle.changes.map((change) => [change.kind, change.maintenance?.name]),
+      [["maintenance_started", "Our deploy"]],
+    );
+    const stored = (await store.getState("github")).last?.maintenances ?? [];
+    assert.deepEqual(
+      stored.map((window) => window.name),
+      ["Our deploy"],
+      "stored like a provider's own window, so the timeline draws it",
+    );
+  } finally {
+    await store.close();
+    await provider.close();
+  }
+});
+
 const outcome = (over: Partial<ProviderResult>): ProviderResult => ({
   providerId: "p",
   ok: true,
