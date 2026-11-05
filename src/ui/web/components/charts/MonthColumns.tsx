@@ -49,7 +49,7 @@ export function MonthColumns({
 
   return (
     <div className="month-cols flex flex-col gap-2">
-      <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+      <span className="text-base font-medium">
         {heading}
       </span>
       {/* The baseline sits directly under the bar row, not under the month

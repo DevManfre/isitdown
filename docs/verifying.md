@@ -73,6 +73,14 @@ sits behind a single **Download** menu. Before, a range toggle, two download
 sentences and two format pairs were all ghost buttons of the same weight, and
 nothing said which of them belonged together.
 
+**History** keeps the window's headline and its four figures at the top, and
+splits the rest into five tabs, one question each: **Trend** (the daily chart,
+the per-provider list and, folded shut, your own markers), **Reliability**
+(MTTR, MTBF and the months), **Patterns** (when incidents start, and which
+providers break together), **Compare** and **Latency**. The tab travels in the
+address — `#/history?tab=reliability` — so a link opens the one it means, and
+one that has nothing to show here falls back to Trend.
+
 On **History**, clicking a provider's row opens its drawer: the three windows,
 the daily bars with their colour key, and — roadmap 5.20 — a **year heat
 calendar**, one cell per day coloured by that day's worst status. Retention can

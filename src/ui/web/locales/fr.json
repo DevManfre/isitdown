@@ -270,7 +270,12 @@
   "incident.map.title": "Où tourne {name}",
   "incident.map.empty": "Aucun emplacement connu pour {name}.",
 
-  "history.kicker": "Disponibilité agrégée",
+  "history.tab.trend": "Tendance",
+  "history.tab.reliability": "Fiabilité",
+  "history.tab.patterns": "Récurrences",
+  "history.tab.compare": "Comparer",
+  "history.tab.latency": "Latence",
+  "history.tabs": "Vues de l’historique",
   "history.subtitle": "moyenne sur <0>{count}</0> fournisseurs, {days} derniers jours",
   "history.incidents_one": "<0>{count}</0> incident",
   "history.incidents_other": "<0>{count}</0> incidents",

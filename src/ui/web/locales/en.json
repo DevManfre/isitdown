@@ -270,7 +270,12 @@
   "incident.map.title": "Where {name} runs",
   "incident.map.empty": "No known location for {name}.",
 
-  "history.kicker": "Aggregate uptime",
+  "history.tab.trend": "Trend",
+  "history.tab.reliability": "Reliability",
+  "history.tab.patterns": "Patterns",
+  "history.tab.compare": "Compare",
+  "history.tab.latency": "Latency",
+  "history.tabs": "History views",
   "history.subtitle": "average across <0>{count}</0> providers, last {days} days",
   "history.incidents_one": "<0>{count}</0> incident",
   "history.incidents_other": "<0>{count}</0> incidents",

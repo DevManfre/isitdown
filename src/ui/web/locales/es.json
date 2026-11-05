@@ -270,7 +270,12 @@
   "incident.map.title": "Dónde funciona {name}",
   "incident.map.empty": "No se conoce la ubicación de {name}.",
 
-  "history.kicker": "Disponibilidad agregada",
+  "history.tab.trend": "Tendencia",
+  "history.tab.reliability": "Fiabilidad",
+  "history.tab.patterns": "Patrones",
+  "history.tab.compare": "Comparar",
+  "history.tab.latency": "Latencia",
+  "history.tabs": "Vistas del historial",
   "history.subtitle": "media de <0>{count}</0> proveedores, últimos {days} días",
   "history.incidents_one": "<0>{count}</0> incidencia",
   "history.incidents_other": "<0>{count}</0> incidencias",

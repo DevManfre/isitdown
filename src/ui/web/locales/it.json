@@ -270,7 +270,12 @@
   "incident.map.title": "Dove si trova {name}",
   "incident.map.empty": "Nessuna posizione nota per {name}.",
 
-  "history.kicker": "Uptime aggregato",
+  "history.tab.trend": "Andamento",
+  "history.tab.reliability": "Affidabilità",
+  "history.tab.patterns": "Ricorrenze",
+  "history.tab.compare": "Confronta",
+  "history.tab.latency": "Latenza",
+  "history.tabs": "Viste della cronologia",
   "history.subtitle": "media su <0>{count}</0> provider, ultimi {days} giorni",
   "history.incidents_one": "<0>{count}</0> incidente",
   "history.incidents_other": "<0>{count}</0> incidenti",

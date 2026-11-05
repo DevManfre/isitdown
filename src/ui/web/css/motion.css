@@ -1417,3 +1417,19 @@ circle[role="button"]:hover {
 .widget-fold-chevron[data-open] {
   transform: rotate(90deg);
 }
+
+/* — tabs — */
+/* A tab's panel arriving (components/ui/tabs.tsx). Opacity only: the panel
+   replaces the one beside it in place, so any travel would read as the page
+   moving. Radix mounts the panel on selection, which is what plays it. */
+@keyframes tab-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+[data-slot="tabs-content"][data-state="active"] {
+  animation: tab-in var(--duration-base) var(--ease-out);
+}
