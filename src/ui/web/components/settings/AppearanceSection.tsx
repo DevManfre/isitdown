@@ -7,7 +7,6 @@ import { startGuidedTour } from "@/components/GuidedTour.tsx";
 import { IdentityRows } from "@/components/settings/IdentityRows.tsx";
 import { SoundRows } from "@/components/settings/SoundRows.tsx";
 import { InstallAppRow } from "@/components/settings/InstallAppRow.tsx";
-import { SECTION_REELS } from "@/components/settings/reels.ts";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
 import { useSettingsReceipt } from "@/components/settings/useSettingsReceipt.ts";
 import { usePreferencesMutation } from "@/hooks/queries.ts";
@@ -36,7 +35,6 @@ export function AppearanceSection({
     <SettingsSection
       id="appearance"
       title={t("settings.section.appearance")}
-      reel={SECTION_REELS.appearance}
       className="lg:col-span-3"
       delay={stagger(5, SECTION_CASCADE)}
     >

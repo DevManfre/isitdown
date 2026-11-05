@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card.tsx";
-import { BentoCard } from "@/components/ui/bento-grid.tsx";
-import { SettingsReel, type ReelPainter } from "@/components/settings/SettingsReel.tsx";
 import {
   SettingsSectionScope,
   useSectionCount,
@@ -10,7 +8,7 @@ import {
 import { cn } from "@/lib/utils.ts";
 
 /**
- * One named group of the Settings page: a kicker (with an optional action,
+ * One named group of the Settings page: a heading (with an optional action
  * beside it) above a single card of divided rows, and last a footer that
  * carries either the sentence explaining the group or what just happened to
  * it.
@@ -31,7 +29,6 @@ export function SettingsSection({
   status,
   delay,
   className,
-  reel,
   children,
 }: {
   id: string;
@@ -41,8 +38,6 @@ export function SettingsSection({
   status?: ReactNode;
   delay: string;
   className?: string;
-  /** The tile's motion band, when the page laying this section out has one. */
-  reel?: ReelPainter;
   children: ReactNode;
 }) {
   const footer = status ?? note;
@@ -63,49 +58,23 @@ export function SettingsSection({
         // `undefined` is "no row has reported yet", which is every section on
         // the first render, and never a reason to hide.
         hidden={emptied}
-        className={cn("anim-rise scroll-mt-6 flex flex-col gap-2.5", className)}
+        className={cn("anim-rise scroll-mt-6 flex flex-col gap-3", className)}
         style={{ animationDelay: delay }}
       >
         {/* `min-h-8` so a kicker without an action lines up with one that has a
             small Button in it, instead of sitting 8px higher. */}
         <div className="flex min-h-8 items-center justify-between gap-3">
-          <span className="text-xs uppercase tracking-widest text-primary">{title}</span>
+          <h2 className="text-base font-medium">{title}</h2>
           {action}
         </div>
-        {/* Same rows either way: a reel changes what is behind them, never
-            what they are. Without one the section keeps the plain card, so
-            this component still suits a page that is not laid out as a bento. */}
-        {reel === undefined ? (
-          <Card className="gap-0 divide-y divide-border py-0">
-            {children}
-            {footer !== undefined && footer !== null && (
-              <div data-slot="settings-section-footer" className="px-4 py-2.5 text-xs text-muted-foreground">
-                {footer}
-              </div>
-            )}
-          </Card>
-        ) : (
-          <BentoCard
-            className="h-full"
-            background={
-              // Tall enough that the sweep and the beam have room to read, and
-              // masked out well before the first row (see SettingsReel).
-              <SettingsReel painter={reel} className="pointer-events-none absolute inset-x-0 top-0 h-28" />
-            }
-          >
-            {/* `pt-28` reserves exactly the band's own height: no row is ever
-                laid over moving pixels, so every row keeps the card's contrast
-                whatever the reel is painting. */}
-            <div className="flex flex-1 flex-col divide-y divide-border pt-28">
-              {children}
-              {footer !== undefined && footer !== null && (
-                <div data-slot="settings-section-footer" className="mt-auto px-4 py-2.5 text-xs text-muted-foreground">
-                  {footer}
-                </div>
-              )}
+        <Card className="gap-0 divide-y divide-border py-0 shadow-none">
+          {children}
+          {footer !== undefined && footer !== null && (
+            <div data-slot="settings-section-footer" className="px-5 py-3 text-sm text-muted-foreground">
+              {footer}
             </div>
-          </BentoCard>
-        )}
+          )}
+        </Card>
       </section>
     </SettingsSectionScope>
   );

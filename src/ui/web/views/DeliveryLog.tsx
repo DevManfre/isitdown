@@ -13,6 +13,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { useCountWidth } from "@/hooks/useCountWidth.ts";
 import { ProviderIcon } from "@/components/ProviderIcon.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
@@ -39,6 +40,8 @@ const STATES = [
 
 /** Every channel a send could have gone to, plus the unfiltered option. */
 const ALL_CHANNELS = "";
+/** "Every channel" as the select's own value (Radix refuses an empty one). */
+const ANY_CHANNEL = "*";
 
 const rowKey = (record: SentRecord, index: number): string =>
   `${record.providerId}-${record.channel}-${record.sentAt}-${index}`;
@@ -117,16 +120,8 @@ export function DeliveryLog() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="anim-rise anim-rise-column flex flex-wrap items-end justify-between gap-4" style={{ animationDelay: "0ms" }}>
-        <div className="flex flex-col gap-2">
-          <span className="text-xs uppercase tracking-widest text-primary">{t("delivery.kicker")}</span>
-          <p className="text-sm text-muted-foreground">{t("delivery.subtitle")}</p>
-        </div>
-        <span className="font-mono text-xs text-muted-foreground">
-          {t("delivery.total", { count: counts.all })}
-        </span>
-      </div>
-
+      {/* No eyebrow or subtitle (dashboard-design-direction): the header names
+          the view, and the first tile already counts every send. */}
       {/* The three counts the state filter already carries, read as figures
           rather than as numbers beside a pill: the filter says which rows are
           on screen, these say whether the alerting works at all. The delivered
@@ -166,7 +161,7 @@ export function DeliveryLog() {
         ]}
       />
 
-      <div className="anim-rise flex flex-wrap items-center justify-between gap-3" style={{ animationDelay: "60ms" }}>
+      <div className="anim-rise flex flex-wrap items-center gap-3">
         <ToggleGroup className="max-w-full flex-wrap" type="single" aria-label={t("delivery.filter.state")} value={state} onValueChange={(next) => {
           if (next !== "") pick(next as DeliveryState);
         }}>
@@ -189,22 +184,30 @@ export function DeliveryLog() {
         </ToggleGroup>
 
         {channels.length > 0 && (
-          /* Fifteen channels are wider than any window under 1440px, and the
-             group ships `w-fit`, so it used to push the page sideways at every
-             narrower width. It wraps instead: the joined pill breaks across
-             lines, which is worth more than a segmented outline nobody can
-             reach the right-hand end of. */
-          <ToggleGroup className="max-w-full flex-wrap" type="single" aria-label={t("delivery.filter.channel")} value={channel} onValueChange={(next) => {
-            setChannel(next);
-            setPage(1);
-          }}>
-            <ToggleGroupItem value={ALL_CHANNELS}>{t("delivery.channel.all")}</ToggleGroupItem>
-            {channels.map((entry) => (
-              <ToggleGroupItem key={entry} value={entry}>
-                <span className="font-mono text-xs">{entry}</span>
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          /* A select, not a row of chips (dashboard-design-direction: a
+             segmented filter stops at five). Thirty-one channels as chips took
+             three lines of the page before a single send was on it. */
+          <Select
+            // Radix reads "" as "nothing chosen" and would show a blank
+            // trigger, so "every channel" is "*" here and "" on the wire.
+            value={channel === ALL_CHANNELS ? ANY_CHANNEL : channel}
+            onValueChange={(next) => {
+              setChannel(next === ANY_CHANNEL ? ALL_CHANNELS : next);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger aria-label={t("delivery.filter.channel")} className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY_CHANNEL}>{t("delivery.channel.all")}</SelectItem>
+              {channels.map((entry) => (
+                <SelectItem key={entry} value={entry}>
+                  <span className="font-mono">{entry}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
       </div>
 
@@ -215,11 +218,11 @@ export function DeliveryLog() {
       <Card
         role="region"
         aria-label={t("delivery.rows")}
-        className="anim-rise flex flex-col gap-0 p-0"
-        style={{ animationDelay: "120ms" }}
+        className="anim-rise flex flex-col gap-0 overflow-hidden p-0 shadow-none"
+        style={{ animationDelay: "30ms" }}
       >
         {rows.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">
+          <p className="px-5 py-4 text-sm text-muted-foreground">
             {t(state === "failed" ? "delivery.empty-failed" : "delivery.empty")}
           </p>
         ) : (
@@ -227,14 +230,14 @@ export function DeliveryLog() {
             const key = rowKey(record, index);
             const open = expanded === key;
             return (
-              <div key={key} className={cn("flex flex-col border-t border-border first:border-t-0", !record.ok && "bg-destructive/5")}>
+              <div key={key} className="flex flex-col border-t border-border first:border-t-0">
                 <button
                   type="button"
                   // Wraps below `md`: the two fixed columns plus the timestamp
                   // are already wider than a 358px screen, so the headline —
                   // the only part that can take a line of its own — does.
-                  className="delivery-row anim-rise anim-rise-row flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 text-left lg:flex-nowrap"
-                  style={{ animationDelay: stagger(index, { base: 150, step: 28, cap: 420 }) }}
+                  className="delivery-row anim-rise anim-rise-row flex min-h-14 flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-3 text-left lg:flex-nowrap"
+                  style={{ animationDelay: stagger(index) }}
                   aria-expanded={open}
                   onClick={() => setExpanded(open ? null : key)}
                 >
@@ -243,7 +246,7 @@ export function DeliveryLog() {
                     baseUrl={baseUrlOf(record.providerId)}
                     className="translate-y-0.5"
                   />
-                  <span className="w-28 shrink-0 truncate text-sm">{nameOf(record.providerId)}</span>
+                  <span className="w-28 shrink-0 truncate text-sm font-medium">{nameOf(record.providerId)}</span>
                   <span className="w-20 shrink-0 truncate font-mono text-xs text-muted-foreground">
                     {record.channel}
                   </span>
@@ -265,7 +268,7 @@ export function DeliveryLog() {
                 </button>
 
                 {open && (
-                  <div className="anim-fade flex flex-col gap-2 px-4 pb-3 pl-14">
+                  <div className="anim-fade flex flex-col gap-2 px-5 pb-4 pl-14">
                     {/* The payload as delivered, not a summary of it: this is the
                         text the channel actually carried. */}
                     <pre className="whitespace-pre-wrap rounded-md bg-muted/40 px-3 py-2 font-mono text-xs leading-relaxed text-muted-foreground">
