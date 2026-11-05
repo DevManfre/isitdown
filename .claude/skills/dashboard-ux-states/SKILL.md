@@ -65,7 +65,23 @@ Autosaving settings rows don't need an unsaved-changes guard. Dialog forms do.
 - After a successful save, confirm with a toast or an inline ✓. A silent
   success makes the operator wonder whether it worked.
 
-## 6. Copy
+## 6. Hidden is not gone
+
+The design direction (`dashboard-design-direction`) moves secondary features
+behind tabs, collapsibles and menus instead of deleting them. That only works
+if they stay findable:
+
+- Every feature that moves behind a disclosure stays reachable in two clicks
+  or fewer, and from the command palette.
+- A collapsible section remembers its open/closed state per operator
+  (`localStorage`, wrapped in try/catch), so nobody reopens it on every visit.
+- A collapsed section still shows status that needs attention. A collapsed
+  maintenance list with something in progress shows its count, for example.
+  Hiding must never hide a problem.
+- Don't remove a feature without asking. Ask the operator before deleting
+  anything, even when it seems unused.
+
+## 7. Copy
 
 Every string goes through `t()` (see `i18n-strings`). That includes strings
 inside payloads the operator will see, such as dry-run or test messages.
@@ -80,4 +96,6 @@ everything else.
 - [ ] Stop the API. ViewError appears with Retry.
 - [ ] Every delete or overwrite asks first, or can be undone.
 - [ ] Press Escape on a half-filled dialog. You are asked before the input is lost.
+- [ ] Anything moved behind a disclosure is still reachable in ≤ 2 clicks and
+      from the command palette, and still surfaces a problem while collapsed.
 - [ ] `test:visual` frames you agreed were reviewed as images (CLAUDE.md).

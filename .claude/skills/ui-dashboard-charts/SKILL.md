@@ -93,10 +93,17 @@ component library available to route around them:
   palette per severity state, typography) rather than defaulting to whatever
   a shadcn primitive or Recharts default looks like out of the box — the
   prototype is the source of truth, the library is the implementation detail.
+- **Read `dashboard-design-direction` first.** It turns that direction into
+  numbers: the 4px spacing table, the 12px type floor, one job per view
+  (secondary blocks behind tabs or a disclosure, never deleted), and the
+  chart rules (≤ 3 gridlines, a one-line conclusion, the grow-in on first
+  paint only, `isAnimationActive={false}` on refetch). A new chart or block
+  that doesn't answer the view's one question goes behind disclosure.
 
 Reuse a shadcn primitive under `src/ui/web/components/ui/` before writing a
 new one; see the `shadcn-components` skill for how to add one correctly.
 Entry animation on view change is gated by the React `key` on `#view` in
 `App.tsx` (a changed view/locale/theme remounts it) plus the `anim-*` utility
 classes in `css/motion.css` — don't introduce a second animation system
-(e.g. framer-motion) alongside it.
+(e.g. framer-motion) alongside it. Durations, curves and what is allowed
+to move at all are set in `dashboard-design-direction` § Motion.
