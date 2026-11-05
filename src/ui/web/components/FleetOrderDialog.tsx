@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Reorder, useDragControls } from "motion/react";
 import { ChevronDown, ChevronUp, GripVertical, ListOrdered } from "lucide-react";
@@ -152,7 +152,20 @@ function OrderRow({
  * A draft until Save, like the dashboard editor it opens from: closing a
  * moved list asks first.
  */
-export function FleetOrderDialog() {
+/** What the title's "···" menu and the command palette dispatch to open it. */
+export const FLEET_ORDER_EVENT = "isitdown:open-fleet-order";
+
+/** Opens the fleet order dialog from anywhere in the shell. */
+export function openFleetOrder(): void {
+  window.dispatchEvent(new Event(FLEET_ORDER_EVENT));
+}
+
+/**
+ * `trigger={false}` mounts the dialog with no button of its own: the
+ * Overview's Arrange moved into the "···" menu and the palette
+ * (dashboard-design-direction), which open it through `openFleetOrder`.
+ */
+export function FleetOrderDialog({ trigger = true }: { trigger?: boolean } = {}) {
   const { t } = useTranslation();
   const { data: status } = useStatus();
   const { data: preferences } = usePreferences();
@@ -205,14 +218,26 @@ export function FleetOrderDialog() {
     }
   };
 
+  // The latest `start` is what the event calls: it reads the fleet as it is
+  // drawn at the moment of the request, not when the listener was added.
+  const startRef = useRef(start);
+  startRef.current = start;
+  useEffect(() => {
+    const onRequest = (): void => startRef.current();
+    window.addEventListener(FLEET_ORDER_EVENT, onRequest);
+    return () => window.removeEventListener(FLEET_ORDER_EVENT, onRequest);
+  }, []);
+
   if (fleet.length < 2 && groupIds.length < 2) return null;
 
   return (
     <>
-      <Button type="button" variant="ghost" onClick={start}>
-        <ListOrdered aria-hidden="true" />
-        {t("fleet-order.open")}
-      </Button>
+      {trigger && (
+        <Button type="button" variant="ghost" onClick={start}>
+          <ListOrdered aria-hidden="true" />
+          {t("fleet-order.open")}
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={close}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

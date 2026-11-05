@@ -2645,13 +2645,14 @@ provider form, and `impact` / `owner` on `POST /config/services` and
 ### 3.24 Customising the Overview
 
 UI edition only. Everything under the Overview's headline is a list of widgets
-the operator arranges: **Customise** (beside the headline's actions, or
+the operator arranges: **Customise** (in the **⋯** menu beside the title, or
 **Customise the Overview** in ⌘K) turns the page into its own editor, with live
-data, and nothing is stored until **Save**.
+data, and nothing is stored until **Save**. The same menu's **Arrange
+providers** (also in ⌘K) sets the fleet's own order, which every list follows.
 
-- **Widgets** are the blocks the Overview always drew — fleet rings, map, shared
-  failure, groups, fleet list — plus a catalogue of twenty-four more, each built
-  on data the dashboard already reads:
+- **Widgets**: the built-in layout is the fleet list, shared failure, groups and
+  the map, and a catalogue offers the fleet rings plus twenty-four more, each
+  built on data the dashboard already reads:
 
   | Widget | Shows | Points at |
   |---|---|---|
@@ -2682,6 +2683,11 @@ data, and nothing is stored until **Save**.
 
   Each can appear more than once, and each draws its summary at a third of the
   row rather than a squeezed copy of its full self.
+- **Folding.** The map and upcoming maintenance fold shut, so the page opens on
+  the answer to "is anything down" and not on everything at once. Shut, a fold
+  keeps its count beside its title (two in progress, four upcoming), and the map
+  is not even fetched until it is opened. Open or shut is remembered in this
+  browser, per widget.
 - **Every number is a link** (roadmap 4.3). A count, a duration or an uptime on
   a widget opens the rows behind it, with the filters already applied: an
   incident count opens Incidents on that provider and window, an uptime or a

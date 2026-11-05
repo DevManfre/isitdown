@@ -1413,3 +1413,34 @@ circle[role="button"]:hover {
     transform: none;
   }
 }
+
+/* — widget folds — */
+/* A widget that folds (WidgetCard's `disclosure`): the body opens on a grid
+   track travelling 0fr → 1fr, so it reaches whatever height its content has
+   without a measured keyframe, and fades in a beat behind the travel so the
+   text does not arrive clipped. Transitions, not keyframes: a second click
+   mid-fold turns it round from where it is. The chevron turns with it. */
+.widget-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-base) var(--ease-out);
+}
+.widget-fold[data-open] {
+  grid-template-rows: 1fr;
+}
+.widget-fold-inner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.widget-fold[data-open] .widget-fold-inner {
+  opacity: 1;
+  transition-delay: 40ms;
+}
+.widget-fold-chevron {
+  transition: transform var(--duration-base) var(--ease-out);
+}
+.widget-fold-chevron[data-open] {
+  transform: rotate(90deg);
+}

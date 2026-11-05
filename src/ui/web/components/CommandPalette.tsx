@@ -9,6 +9,7 @@ import {
   FileText,
   Flag,
   LayoutGrid,
+  ListOrdered,
   MessageSquarePlus,
   Keyboard,
   MonitorCog,
@@ -32,6 +33,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command.tsx";
+import { openFleetOrder } from "./FleetOrderDialog.tsx";
 import { NAV_ROUTES, ROUTE_PATHS } from "../../routePaths.ts";
 import {
   useAnnotationEdits,
@@ -507,6 +509,19 @@ export function CommandPalette() {
           >
             <LayoutGrid aria-hidden="true" />
             {t("palette.customise-overview")}
+          </CommandItem>
+          {/* Roadmap 4.24's Arrange, which left the Overview hero for the
+              "···" menu: reachable from here too, like every folded tool. */}
+          <CommandItem
+            value={t("fleet-order.open")}
+            onSelect={run(() => {
+              void navigate(ROUTE_PATHS.overview);
+              // The dialog lives on the Overview: let it mount first.
+              setTimeout(openFleetOrder, 0);
+            })}
+          >
+            <ListOrdered aria-hidden="true" />
+            {t("fleet-order.open")}
           </CommandItem>
           <CommandItem
             value={t("dashboards.new")}

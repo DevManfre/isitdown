@@ -35,7 +35,10 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
   const title = t("dashboard.widget.maintenances.title");
   const horizon = now + HORIZON_DAYS * DAY;
 
-  if (data === undefined) return <WidgetCard title={title} busy />;
+  // Secondary to the Overview's one question, so it folds (dashboard-design-
+  // direction). The summary keeps the count in sight while it is shut.
+  const fold = (summary?: string) => ({ id: "maintenances", summary });
+  if (data === undefined) return <WidgetCard title={title} busy disclosure={fold()} />;
 
   const rows = data.maintenances
     .filter((row) => slice.ids.has(row.providerId) && endOf(row) > now && Date.parse(row.startsAt) < horizon)
@@ -48,10 +51,17 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
   const span = (row: MaintenanceRow) => `${day.format(new Date(row.startsAt))} · ${hours(row)}`;
   const until = (iso: string) => formatDuration(i18n.language, (Date.parse(iso) - now) / MINUTE);
   const meta = `${slice.filtered ? `${filterText} · ` : ""}${t("widget.maintenances.meta", { days: HORIZON_DAYS })}`;
+  const liveCount = rows.filter(live).length;
+  const summary = [
+    liveCount > 0 ? t("widget.maintenances.summary-live", { count: liveCount }) : null,
+    rows.length - liveCount > 0 ? t("widget.maintenances.summary-upcoming", { count: rows.length - liveCount }) : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
 
   if (rows.length === 0) {
     return (
-      <WidgetCard title={title} meta={meta}>
+      <WidgetCard title={title} meta={meta} disclosure={fold()}>
         <p className="text-sm text-muted-foreground">{t("widget.maintenances.none", { days: HORIZON_DAYS })}</p>
       </WidgetCard>
     );
@@ -71,7 +81,7 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
   const ticks = Array.from({ length: 5 }, (_, i) => axisStart + i * ((HORIZON_DAYS + 1) / 4) * DAY);
 
   return (
-    <WidgetCard title={title} meta={meta} className="@container">
+    <WidgetCard title={title} meta={meta} className="@container" disclosure={fold(summary)}>
       {/* A third: the next one, counting down. */}
       <div className="flex flex-col gap-1.5 @md:hidden">
         <span className="text-[0.95rem] font-medium">{name(next.providerId)} · {next.name}</span>

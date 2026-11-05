@@ -2748,13 +2748,15 @@ l'altro).
 ### 3.24 Personalizzare la Panoramica
 
 Solo edizione UI. Tutto ciò che sta sotto il titolo della Panoramica è un elenco
-di widget che l'operatore dispone: **Personalizza** (accanto alle azioni del
+di widget che l'operatore dispone: **Personalizza** (nel menu **⋯** accanto al
 titolo, oppure **Personalizza la Panoramica** in ⌘K) trasforma la pagina nel suo
-stesso editor, con i dati veri, e nulla viene salvato prima di **Salva**.
+stesso editor, con i dati veri, e nulla viene salvato prima di **Salva**. **Ordina
+i provider**, nello stesso menu (e in ⌘K), fissa l'ordine della flotta, che ogni
+elenco segue.
 
-- **Widget** sono i blocchi che la Panoramica ha sempre disegnato — anelli della
-  flotta, mappa, guasto condiviso, gruppi, elenco della flotta — più un catalogo
-  di altri ventiquattro, ognuno costruito su dati che la dashboard legge già:
+- **Widget**: la disposizione predefinita è l'elenco della flotta, il guasto
+  condiviso, i gruppi e la mappa, e un catalogo offre gli anelli della flotta più
+  altri ventiquattro, ognuno costruito su dati che la dashboard legge già:
 
   | Widget | Mostra | Punta a |
   |---|---|---|
@@ -2785,6 +2787,12 @@ stesso editor, con i dati veri, e nulla viene salvato prima di **Salva**.
 
   Ognuno può comparire più volte, e a un terzo della riga disegna la sua
   sintesi invece di una copia schiacciata della versione intera.
+- **Sezioni chiudibili.** La mappa e le manutenzioni in arrivo partono chiuse,
+  così la pagina si apre sulla risposta a "è giù qualcosa" e non su tutto
+  insieme. Da chiusa, una sezione tiene il suo conteggio accanto al titolo (due
+  in corso, quattro in arrivo), e la mappa non viene neppure richiesta finché
+  non la si apre. Aperta o chiusa viene ricordato in questo browser, widget per
+  widget.
 - **Ogni numero è un link** (roadmap 4.3). Un conteggio, una durata o un uptime
   in un widget apre le righe che ci stanno dietro, con i filtri già messi: un
   conteggio di incidenti apre Incidenti su quel provider e quella finestra, un
