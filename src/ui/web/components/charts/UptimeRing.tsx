@@ -8,7 +8,6 @@ import { faviconCandidates } from "@/lib/favicon.ts";
 import { shownStatus } from "@/lib/suspicion.ts";
 import { SuspicionTooltip } from "@/components/SuspicionTooltip.tsx";
 import type { ProviderStatus } from "@/lib/types.ts";
-import { useSpotlight } from "@/components/ui/spotlight-card.tsx";
 import { cn } from "@/lib/utils.ts";
 
 /**
@@ -27,10 +26,6 @@ export function UptimeRing({
   provider, delay, size = 80,
 }: { provider: ProviderStatus; delay?: string; size?: number }) {
   const { t, i18n } = useTranslation();
-  // The tile lights under the pointer rather than only lifting: at six or
-  // fourteen identical tiles the lift alone said "this one moved", not "this
-  // one is under your cursor". See components/ui/spotlight-card.tsx.
-  const { ref, spotlightProps } = useSpotlight<HTMLDivElement>();
   const candidates = faviconCandidates(provider.baseUrl);
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -62,10 +57,8 @@ export function UptimeRing({
       data-slot="uptime-ring"
       {...(shown.hatched ? { "data-suspected": true } : {})}
       {...pulseAttr(pulses, provider.id)}
-      ref={ref}
-      {...spotlightProps}
       className={cn(
-        "ring-tile spotlight tile-lit anim-rise flex flex-col items-center border border-border bg-card/60",
+        "ring-tile tile-lit anim-rise flex flex-col items-center border border-border bg-card/60",
         // A fixed 112px at the hero size (80px ring + p-4 both sides), so a
         // long provider name truncates instead of stretching one tile wider
         // than its neighbours in a wrapping row. In the band the width comes

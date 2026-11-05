@@ -557,16 +557,22 @@
 
 /* — rows, tiles and panels — */
 .incident-row {
-  transition: background var(--duration-fast) ease;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+@media (hover: hover) {
+  button.incident-row:hover {
+    background-color: color-mix(in srgb, var(--color-text) 3%, transparent);
+  }
 }
 .ring-tile {
   transition:
     border-color var(--duration-fast) ease,
     transform var(--duration-fast) var(--ease-out);
 }
+/* Rows and tiles answer the pointer with colour, never by moving
+   (dashboard-design-direction § Motion): only a pressed button travels. */
 .ring-tile:hover {
   border-color: var(--color-accent);
-  transform: translateY(-2px);
 }
 .service-row {
   transition:
@@ -575,7 +581,6 @@
 }
 .service-row:hover {
   background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
-  transform: translateX(3px);
 }
 /* A channel row is a list row now, not a card: there is no border left to
    tint, so the hover lands on the disclosure itself — the part that is
@@ -618,36 +623,6 @@
   animation: channel-fold var(--duration-base) ease;
 }
 
-/* ── roadmap 7.6, the cinematic chrome ──────────────────────────────────────
-   Three effects the redesign leans on, all of them here rather than in markup
-   because each one is a state the operator's pointer (or the poller) drives,
-   and none of them survives as a Tailwind utility.
-
-   The spotlight is the wash under the pointer on a provider tile. The
-   component writes --spot-x/--spot-y on pointermove and drops --spot-opacity
-   to 0 on leave (components/ui/spotlight-card.tsx); everything else is here, so
-   a card that is never hovered costs one unpainted pseudo-element. */
-.spotlight::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  border-radius: inherit;
-  opacity: var(--spot-opacity, 0);
-  transition: opacity var(--duration-fast) var(--ease-out);
-  background: radial-gradient(
-    240px circle at var(--spot-x, 50%) var(--spot-y, 50%),
-    color-mix(in srgb, var(--color-accent) 16%, transparent),
-    transparent 70%
-  );
-}
-.spotlight > * {
-  position: relative;
-  z-index: 1;
-}
-
-
 /* An arc drawing itself on, for the hero's aggregate figure
    (components/charts/UptimeArc.tsx). It cannot use `.anim-ring` above: that
    one animates `transform`, and the arc already carries a `transform`
@@ -680,8 +655,7 @@
     border-color var(--duration-fast) var(--ease-out);
 }
 .tile-lit:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  border-color: var(--color-accent);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1035,7 +1009,6 @@ input[type="file"]:hover::file-selector-button {
 
 .delivery-row:hover {
   background-color: color-mix(in srgb, var(--color-accent) 7%, transparent);
-  translate: 2px;
 }
 
 /* — the map's cells — */
@@ -1116,7 +1089,7 @@ circle[role="button"]:hover {
 }
 
 .history-row:hover {
-  translate: 3px;
+  background-color: color-mix(in srgb, var(--color-accent) 7%, transparent);
 }
 
 /* — the provider drawer — */

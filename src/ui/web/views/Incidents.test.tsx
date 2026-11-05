@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders, stubApi } from "@/test/harness.tsx";
 import type { IncidentRow } from "@/lib/types.ts";
@@ -93,6 +93,12 @@ const pagedIncidents = (rows: IncidentRow[], pageSize = 2) => (path: string) => 
     },
   };
 };
+
+// Timeline and notifications fold shut by default; these cases read them open.
+beforeEach(() => {
+  localStorage.setItem("isitdown.widget-open.incidents-timeline", "1");
+  localStorage.setItem("isitdown.widget-open.incidents-notifications", "1");
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -380,6 +386,30 @@ describe("Incidents", () => {
     expect(await screen.findByText("Delivery 5")).toBeInTheDocument();
     // One CTA only: revealing the rest leaves nothing left to expand.
     expect(screen.queryByRole("button", { name: i18n.t("action.show-more") })).not.toBeInTheDocument();
+  });
+
+  // Shut by default, it still says how many went out: a fold never hides
+  // what the operator came to check.
+  it("folds the sent notifications shut, with their count beside the title", async () => {
+    localStorage.clear();
+    const sent = Array.from({ length: 3 }, (_unused, index) => ({
+      providerId: "github",
+      channel: "webhook",
+      text: `Delivery ${index + 1}`,
+      sentAt: `2026-08-21T09:0${index}:00Z`,
+      ok: true,
+    }));
+    renderWithProviders(<Incidents />, { ...fixtures, notifications: { notifications: sent } });
+    const trigger = await screen.findByRole("button", { name: new RegExp(i18n.t("incidents.notifications-sent")) });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: new RegExp(i18n.t("incidents.notifications-sent")) })).toHaveTextContent(
+        i18n.t("incidents.notifications-summary", { count: 3 }),
+      ),
+    );
+    expect(screen.queryByText("Delivery 1")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: new RegExp(i18n.t("incidents.notifications-sent")) }));
+    expect(await screen.findByText("Delivery 1")).toBeInTheDocument();
   });
 
   // Roadmap 5.19. The search has to travel to the server: the list is one page

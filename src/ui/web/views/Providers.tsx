@@ -38,7 +38,6 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { ComponentRows } from "@/components/ComponentRows.tsx";
-import { ProviderCards } from "@/components/ProviderCards.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { SuspicionTooltip } from "@/components/SuspicionTooltip.tsx";
 import { shownStatus, type ShownStatus } from "@/lib/suspicion.ts";
@@ -69,12 +68,6 @@ import { cn } from "@/lib/utils.ts";
 
 const WINDOW_DAYS = 90;
 
-/**
- * How many providers still get a card grid above the table. Six cards are two
- * rows; at ten they are five rows of chrome between the operator and the table,
- * and the table is what a fleet that size is read through.
- */
-const CARD_GRID_MAX = 6;
 
 /**
  * Above this many providers the density toggle appears — roadmap 13.1. Below
@@ -648,8 +641,17 @@ export function Providers() {
                     <Badge variant="muted">{t("provider.muted.badge")}</Badge>
                   )}
                 </span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {row.original.host}
+                {/* Roadmap 9.1's authority, beside the host: how the row is
+                    read, which the cards above the table used to say alone. */}
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="font-mono">{row.original.host}</span>
+                  <span aria-hidden="true">·</span>
+                  <span
+                    data-authority={row.original.authority}
+                    title={t("authority.badge", { source: t(`authority.source.${row.original.authority}`) })}
+                  >
+                    {t(`authority.source.${row.original.authority}`)}
+                  </span>
                 </span>
               </span>
             </span>
@@ -682,7 +684,15 @@ export function Providers() {
                 </span>
               </span>
             ) : (
-              <span style={{ color: statusColor(row.original.shown.status) }}>
+              <span
+                className="font-medium"
+                style={{
+                  color:
+                    row.original.shown.status === "operational"
+                      ? "var(--muted-foreground)"
+                      : statusColor(row.original.shown.status),
+                }}
+              >
                 {t(statusLabelKey(row.original.shown.status))}
               </span>
             ),
@@ -771,11 +781,10 @@ export function Providers() {
       {status === undefined ? (
         <ViewSkeleton rows={6} />
       ) : (
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <p className="anim-fade text-sm text-muted-foreground">
-            {t("providers.intro")}
-          </p>
+      <div className="flex flex-col gap-6">
+        {/* One toolbar: the filters on the left, the way to change the fleet
+            on the right. The intro sentence it replaces said where that was. */}
+        <div className="flex flex-wrap items-center gap-3">
           {/* providers.js:73-97 (headerRow) — a seg-pills toggle beside the
             intro line. `type="multiple"` (not "single") so Radix leaves the
             plain `aria-pressed` attribute alone instead of swapping in
@@ -803,7 +812,7 @@ export function Providers() {
               nothing to pick is a control that teaches the eye to skip it. */}
           {fleetTags.length > 0 && (
             <Select value={activeTag === "" ? "*" : activeTag} onValueChange={(next) => setTag(next === "*" ? "" : next)}>
-              <SelectTrigger aria-label={t("filter.tag")} className="h-8 w-40">
+              <SelectTrigger aria-label={t("filter.tag")} className="w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -840,14 +849,17 @@ export function Providers() {
               </ToggleGroupItem>
             </ToggleGroup>
           )}
+          <Link
+            to={ROUTE_PATHS.settingsSection.replace(":sectionId", "services")}
+            title={t("providers.intro")}
+            className="ml-auto text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground"
+          >
+            {t("settings.section.services")} <span aria-hidden="true">→</span>
+          </Link>
         </div>
-        {/* The cards, then the table of the same providers — the two readings the
-          one table used to be asked for at once (see ProviderCards). Capped at
-          CARD_GRID_MAX: past that the grid is a wall to scroll past on the way
-          to the table, which is the shape that actually serves a large fleet. */}
-        {data.length > 0 && data.length <= CARD_GRID_MAX && (
-          <ProviderCards providers={data} />
-        )}
+        {/* One reading of the fleet (dashboard-design-direction): the table.
+            The card grid above it drew the same providers a second time; what
+            it alone said — the authority — now sits beside each host. */}
 
         {/* First run and "nothing matches" are different answers, and only
             the second is a line of muted text. */}
@@ -856,6 +868,7 @@ export function Providers() {
         ) : data.length === 0 ? (
           <p className="text-muted-foreground">{t("providers.empty")}</p>
         ) : (
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((group) => (
@@ -959,6 +972,7 @@ export function Providers() {
               )}
             </TableBody>
           </Table>
+          </div>
         )}
       </div>
       )}
