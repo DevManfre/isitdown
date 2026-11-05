@@ -245,6 +245,19 @@ test("with no quiet hours passed, routing behaves exactly as it did before them"
   assert.equal(explain(night, [CATCH_ALL_RULE], ALL).quieted, false);
 });
 
+// Roadmap 5.4. A tag cuts across groups: "everything critical", wherever it sits.
+test("a tag rule covers every provider carrying that tag, and nothing else", () => {
+  const rules = [rule({ provider: "tag:critical", channels: ["telegram"] }), CATCH_ALL_RULE];
+  assert.deepEqual(
+    resolveTargets(change({ providerId: "stripe" }), rules, ALL, { providerTags: ["paid", "critical"] }),
+    ["telegram"],
+  );
+  assert.deepEqual(resolveTargets(change({ providerId: "stripe" }), rules, ALL, { providerTags: ["paid"] }), ALL);
+  assert.deepEqual(resolveTargets(change({ providerId: "stripe" }), rules, ALL), ALL);
+  // `tag:x` is not the group `x`.
+  assert.deepEqual(resolveTargets(change(), rules, ALL, { providerGroup: "critical" }), ALL);
+});
+
 // Roadmap 2.6. A rule that had to name four provider ids to cover one stack
 // went stale the moment the stack gained a fifth.
 test("a group rule covers every provider in that group, and nothing else", () => {

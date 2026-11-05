@@ -1,3 +1,4 @@
+import { runbookHint } from "../core/runbook.ts";
 import { renderMessage, renderParts } from "../notifiers/formatting.ts";
 import type {
   ChannelConfig,
@@ -217,6 +218,8 @@ export function previewChannels(
     // wrote them: the preview is the message this installation would send.
     ...(provider?.impact === undefined ? {} : { impact: provider.impact }),
     ...(provider?.owner === undefined ? {} : { owner: provider.owner }),
+    // And where to start (roadmap 5.1), quoted the way a real message quotes it.
+    ...(runbookHint(provider?.runbook) === null ? {} : { runbook: runbookHint(provider?.runbook)! }),
   };
   const at = now.toISOString();
   const change = fakeChange(kind, service.id, at);

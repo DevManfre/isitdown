@@ -1,3 +1,4 @@
+import { effectiveMutedUntil } from "../../core/mute.ts";
 import { Router } from "express";
 import { listServices, readSettings } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
@@ -156,7 +157,7 @@ export function badgeRoutes(runtime: UiRuntimeCore): Router {
       degraded: statuses.filter((status) => status === "degraded").length,
       down: statuses.filter((status) => status === "partial_outage" || status === "major_outage").length,
       unknown: statuses.filter((status) => status === "unknown").length,
-      muted: services.filter((service) => service.mutedUntil !== undefined).length,
+      muted: services.filter((service) => effectiveMutedUntil(service, new Date().toISOString()) !== null).length,
       incidents,
       lastPollAt: runtime.lastCycleAt(),
       retentionDays,

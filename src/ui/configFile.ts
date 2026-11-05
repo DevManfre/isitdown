@@ -92,6 +92,10 @@ export function exportConfigYaml(db: DatabaseSync, logger: Logger): string {
       ...(service.slaTarget === undefined ? {} : { slaTarget: service.slaTarget }),
       ...(service.impact === undefined ? {} : { impact: service.impact }),
       ...(service.owner === undefined ? {} : { owner: service.owner }),
+      ...(service.runbook === undefined ? {} : { runbook: service.runbook }),
+      ...(service.tags === undefined ? {} : { tags: service.tags }),
+      ...(service.muteSchedules === undefined ? {} : { muteSchedules: service.muteSchedules }),
+      ...(service.maintenanceWindows === undefined ? {} : { maintenanceWindows: service.maintenanceWindows }),
     })),
     notifications,
     routing: listRoutingRules(db, logger).rules,
@@ -279,6 +283,10 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
         slaTarget: service.slaTarget ?? null,
         impact: service.impact ?? null,
         owner: service.owner ?? null,
+        runbook: service.runbook ?? null,
+        tags: service.tags ?? null,
+        muteSchedules: service.muteSchedules ?? null,
+        maintenanceWindows: service.maintenanceWindows ?? null,
         ...(service.options === undefined ? {} : { options: service.options }),
       });
       report.updated.push(service.id);

@@ -71,6 +71,7 @@
   "notification.escalated": "⏫ Personne ne l'a pris en charge après {minutes} min — je le renvoie ici.",
   "notification.impact": "Impact : {impact}",
   "notification.owner": "Responsable : {owner}",
+  "notification.runbook": "Runbook : {runbook}",
 
   "chatops.help": "Commandes IsItDown\n\n/status — tous les fournisseurs, les pires d'abord\n/status <fournisseur> — un seul fournisseur\n/history <fournisseur> [7|30|90] — disponibilité sur une période\n/mute <fournisseur> <30m|2h|1d> — suspendre les alertes un moment\n/unmute <fournisseur> — les réactiver\n/ack <fournisseur> — prendre en charge\n/help — ce message",
   "chatops.status.heading": "{count} fournisseurs sur {total} ne sont pas opérationnels.",

@@ -577,6 +577,23 @@ test("a provider's impact and owner close the default message, and only when set
   assert.doesNotMatch(ownerOnly, /Impatto/);
 });
 
+// Roadmap 5.1.
+test("a provider's runbook hint closes the default message, under the owner", () => {
+  const change: StatusChange = {
+    kind: "status_change",
+    providerId: "github",
+    previousStatus: "operational",
+    currentStatus: "major_outage",
+    at: incident.updatedAt,
+  };
+  const plain = renderMessage(payloadFor(change));
+  const withRunbook = renderMessage({
+    ...payloadFor(change),
+    service: { ...service, owner: "@alice", runbook: "https://wiki.example.com/gh" },
+  });
+  assert.equal(withRunbook, `${plain}\n\nOwner: @alice\nRunbook: https://wiki.example.com/gh`);
+});
+
 test("a template places impact and owner itself, so they are not appended twice", () => {
   const message = renderMessage({
     ...payloadFor({ kind: "status_change", providerId: "github", previousStatus: "operational", currentStatus: "degraded", at: incident.updatedAt }),
