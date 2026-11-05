@@ -434,21 +434,14 @@
    fold, which measures itself. */
 
 /* — rail — */
-/* `SidebarMenuButton` supplies the row's fill and its active state, so the
-   only thing left here is the accent edge the prototype gives the active
-   row, which no shadcn variant draws. Hover answers with the fill alone: the
-   label used to step in on `padding-left`, a layout property animated on
-   every row the pointer crossed. */
+/* The row answers hover and selection with its fill alone (Rail.tsx sets
+   it): the accent edge on the active row and the label stepping in on
+   `padding-left` both went with the calm redesign — the second animated a
+   layout property on every row the pointer crossed. */
 [data-slot="sidebar-menu-button"] {
-  padding-left: var(--space-3);
-  border-left: 2px solid transparent;
   transition:
-    background var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) ease,
-    border-color var(--duration-fast) ease;
-}
-[data-slot="sidebar-menu-button"][data-active="true"] {
-  border-left-color: var(--color-primary);
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
 /* — header controls — */
