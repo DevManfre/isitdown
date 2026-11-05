@@ -93,7 +93,7 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
             style={{ animationDelay: stagger(index, { base: 120, step: 45 }) }}
           >
             {live(row) ? (
-              <span className="widget-now rounded bg-primary/15 px-1.5 font-mono text-[0.68rem] tracking-wider text-primary uppercase">
+              <span className="rounded bg-primary/15 px-1.5 font-mono text-xs tracking-wider text-primary uppercase">
                 {t("widget.maintenances.live-tag")}
               </span>
             ) : (
@@ -112,7 +112,7 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
       <div className="hidden @2xl:block">
         <div className="grid grid-cols-[15rem_minmax(0,1fr)] items-center gap-x-4 gap-y-2.5">
           <span />
-          <div className="relative h-4 font-mono text-[0.68rem] text-muted-foreground">
+          <div className="relative h-4 font-mono text-xs text-muted-foreground">
             {ticks.map((tick, index) => (
               <span
                 key={tick}
@@ -137,7 +137,6 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
                 <span
                   className={cn(
                     "anim-fill absolute inset-y-1 origin-left rounded border border-primary bg-primary/35",
-                    live(row) && "widget-now",
                   )}
                   style={{
                     left: at(Date.parse(row.startsAt)),

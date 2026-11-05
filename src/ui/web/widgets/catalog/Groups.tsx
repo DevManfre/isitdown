@@ -56,7 +56,7 @@ export function Groups() {
               )}
             >
               <span className="truncate text-sm">{g.id}</span>
-              <span className="font-mono text-[0.65rem] tracking-wider uppercase" style={{ color: statusColor(g.status) }}>
+              <span className="font-mono text-xs tracking-wider uppercase" style={{ color: statusColor(g.status) }}>
                 {t(statusLabelKey(g.status))}
               </span>
             </Link>
@@ -73,7 +73,7 @@ export function Groups() {
               style={{ animationDelay: stagger(index, { base: 120, step: 45 }) }}
             >
               <StatusDot status={g.status} />
-              <span className="w-32 shrink-0 font-mono text-[0.68rem] tracking-wider uppercase" style={{ color: statusColor(g.status) }}>
+              <span className="w-32 shrink-0 font-mono text-xs tracking-wider uppercase" style={{ color: statusColor(g.status) }}>
                 {t(statusLabelKey(g.status))}
               </span>
               <span className="w-28 shrink-0 truncate font-medium">{g.id}</span>
@@ -81,7 +81,7 @@ export function Groups() {
                 {g.providers.map((id) => (
                   <span
                     key={id}
-                    className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.7rem]"
+                    className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs"
                     style={{ color: g.affected.includes(id) ? statusColor(g.status) : undefined }}
                   >
                     {name(id)}

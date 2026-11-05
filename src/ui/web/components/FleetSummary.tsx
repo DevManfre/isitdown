@@ -58,13 +58,13 @@ export function FleetSummary({
           </RadialBarChart>
         </ChartContainer>
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="font-mono text-[11.5px] text-primary">
+          <span className="font-mono text-xs text-primary">
             <NumberTicker locale={i18n.language} value={average} decimalPlaces={2} suffix="%" />
           </span>
         </div>
       </div>
       <div className="flex flex-col gap-2">
-        <span className="font-mono text-[10.5px] tracking-widest text-muted-foreground uppercase">
+        <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase">
           {t("overview.summary.window")}
         </span>
         <div className="flex flex-wrap gap-1.5">

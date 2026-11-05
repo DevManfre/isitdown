@@ -43,7 +43,7 @@ export function SettingsNav({ categories, active }: { categories: SettingsCatego
             )}
           >
             {t(category.labelKey)}
-            {count !== undefined && <span className="ml-auto font-mono text-[11px] tabular-nums">{count}</span>}
+            {count !== undefined && <span className="ml-auto font-mono text-xs tabular-nums">{count}</span>}
           </Link>
         );
       })}

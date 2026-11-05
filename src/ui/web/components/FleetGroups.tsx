@@ -85,7 +85,7 @@ function DotStrip({ providers }: { providers: ProviderStatus[] }) {
           </HoverCardTrigger>
           <HoverCardContent className="flex w-auto flex-col gap-1 p-3">
             <span className="text-sm">{provider.name}</span>
-            <span className="font-mono text-[11px] text-muted-foreground">
+            <span className="font-mono text-xs text-muted-foreground">
               <Trans
                 i18nKey="overview.uptime-window"
                 values={{ uptime: provider.uptime90 }}
@@ -95,7 +95,7 @@ function DotStrip({ providers }: { providers: ProviderStatus[] }) {
               />
             </span>
             <span
-              className="font-mono text-[11px]"
+              className="font-mono text-xs"
               style={{ color: statusColor(provider.overallStatus) }}
             >
               {t(statusLabelKey(provider.overallStatus)).toUpperCase()}
@@ -103,7 +103,7 @@ function DotStrip({ providers }: { providers: ProviderStatus[] }) {
           </HoverCardContent>
         </HoverCard>
       ))}
-      <span className="pl-1.5 font-mono text-[11px] text-muted-foreground">
+      <span className="pl-1.5 font-mono text-xs text-muted-foreground">
         {t("overview.dots-hint")}
       </span>
     </div>

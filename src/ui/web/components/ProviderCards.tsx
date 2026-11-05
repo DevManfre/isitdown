@@ -114,7 +114,7 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
               </SuspicionTooltip>
             </div>
 
-            <span className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
               <span className="truncate">{provider.host}</span>
               <span aria-hidden="true">·</span>
               <span>{provider.adapter}</span>
@@ -136,7 +136,7 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
 
             <div className="flex items-center gap-5">
               <span className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">
                   {t("column.uptime")}
                 </span>
                 <span className="font-mono text-xs">
@@ -149,7 +149,7 @@ export function ProviderCards({ providers }: { providers: ProviderCard[] }) {
                 </span>
               </span>
               <span className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">
                   {t("column.incidents")}
                 </span>
                 <span className="font-mono text-xs">

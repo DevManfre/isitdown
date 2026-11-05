@@ -39,7 +39,7 @@ export function StackBand({
                 <StatusDot status={group.status} size={10} label={t(statusLabelKey(group.status))} />
                 {group.id}
               </span>
-              <span className="font-mono text-[11px] uppercase" style={{ color: statusColor(group.status) }}>
+              <span className="font-mono text-xs uppercase" style={{ color: statusColor(group.status) }}>
                 {t(statusLabelKey(group.status))}
               </span>
             </div>

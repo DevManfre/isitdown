@@ -41,7 +41,7 @@ export function SuspicionTooltip({
             {t("suspected.tooltip.title", { status: t(statusLabelKey(suspicion.status)).toLowerCase() })}
           </span>
           <span>{t("suspected.tooltip.unconfirmed")}</span>
-          <span className="font-mono text-[11px] opacity-80">
+          <span className="font-mono text-xs opacity-80">
             {[
               suspicion.probeId,
               suspicion.note,

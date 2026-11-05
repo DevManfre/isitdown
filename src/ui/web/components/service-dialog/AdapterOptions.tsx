@@ -1013,7 +1013,7 @@ function OptionGroup({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center gap-2">
-        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+        <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
           {title}
         </span>
         <span className="h-px flex-1 bg-border" />

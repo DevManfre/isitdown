@@ -77,7 +77,7 @@ export function FromOverviewChip({
       className="inline-flex min-h-8 w-fit items-center gap-2 rounded-full border border-primary/50 bg-primary/10 py-0.5 pr-1 pl-3 text-xs"
     >
       {fromOverview && (
-        <span className="font-mono text-[0.65rem] tracking-wider text-primary uppercase">{t("drill.from-overview")}</span>
+        <span className="font-mono text-xs tracking-wider text-primary uppercase">{t("drill.from-overview")}</span>
       )}
       <span>{summary}</span>
       <button

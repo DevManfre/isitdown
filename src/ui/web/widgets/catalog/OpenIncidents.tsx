@@ -124,7 +124,7 @@ export function OpenIncidents({ props }: { props: { filter: FleetFilter } }) {
               >
                 <span className="flex min-w-0 items-center gap-2 @2xl:col-auto">
                   <StatusDot status={impactStatus(row.impact)} />
-                  <span className="font-mono text-[0.68rem] tracking-wider uppercase" style={{ color: statusColor(impactStatus(row.impact)) }}>
+                  <span className="font-mono text-xs tracking-wider uppercase" style={{ color: statusColor(impactStatus(row.impact)) }}>
                     {t(impactKey(row.impact))}
                   </span>
                   <span className="truncate font-medium @2xl:hidden">{name(row.providerId)}</span>

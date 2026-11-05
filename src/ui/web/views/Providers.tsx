@@ -648,7 +648,7 @@ export function Providers() {
                     <Badge variant="muted">{t("provider.muted.badge")}</Badge>
                   )}
                 </span>
-                <span className="font-mono text-[10px] text-muted-foreground">
+                <span className="font-mono text-xs text-muted-foreground">
                   {row.original.host}
                 </span>
               </span>

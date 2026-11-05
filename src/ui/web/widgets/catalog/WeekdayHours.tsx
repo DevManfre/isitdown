@@ -95,7 +95,7 @@ export function WeekdayHours() {
           <div className="grid grid-cols-[2.25rem_repeat(24,minmax(0,1fr))] gap-[3px]">
             <span />
             {Array.from({ length: 24 }, (_, hour) => (
-              <span key={hour} className="text-center font-mono text-[0.6rem] text-muted-foreground">
+              <span key={hour} className="text-center font-mono text-xs text-muted-foreground">
                 {hour % 3 === 0 ? hour : ""}
               </span>
             ))}

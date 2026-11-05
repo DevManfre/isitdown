@@ -51,7 +51,7 @@ export function YearHeatCalendar({
             sits over the week its month starts in rather than near it. */}
         <div
           aria-hidden="true"
-          className="grid gap-[2px] font-mono text-[10px] text-muted-foreground"
+          className="grid gap-[2px] font-mono text-xs text-muted-foreground"
           style={{ gridTemplateColumns: `repeat(${columns.length}, 10px)` }}
         >
           {months.map((month) => (

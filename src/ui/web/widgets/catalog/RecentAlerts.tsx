@@ -62,10 +62,10 @@ export function RecentAlerts() {
             style={{ animationDelay: stagger(index, { base: 120, step: 40 }) }}
           >
             <span className="w-12 shrink-0 font-mono text-xs text-muted-foreground">{formatTime(i18n.language, row.sentAt)}</span>
-            <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.7rem]">{channelName(row.channel)}</span>
+            <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs">{channelName(row.channel)}</span>
             <span className="min-w-0 truncate">{row.text.split("\n")[0]}</span>
             <span
-              className="ml-auto shrink-0 font-mono text-[0.68rem] tracking-wider uppercase"
+              className="ml-auto shrink-0 font-mono text-xs tracking-wider uppercase"
               style={{ color: row.ok ? "var(--status-operational)" : "var(--status-major-outage)" }}
             >
               {row.ok

@@ -131,7 +131,7 @@ export function ErrorBudget({ props }: { props: { filter: FleetFilter } }) {
               / {formatDuration(i18n.language, b.budgetMinutes)}
             </span>
             <span
-              className="widget-tone hidden text-right font-mono text-[0.68rem] tracking-wider uppercase @2xl:block"
+              className="widget-tone hidden text-right font-mono text-xs tracking-wider uppercase @2xl:block"
               style={{ color: COLOR[standing(b)] }}
             >
               {word(b)}

@@ -74,7 +74,7 @@ export function HeroStats({ providers, average }: { providers: ProviderStatus[];
       <UptimeArc value={average} size={112} />
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">
             {t("overview.summary.window")}
           </span>
           <DrillLink
@@ -91,7 +91,7 @@ export function HeroStats({ providers, average }: { providers: ProviderStatus[];
         </div>
         {rows.map((row) => (
           <div key={row.key} className="flex flex-col gap-0.5 border-t border-border pt-2">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            <span className="text-xs uppercase tracking-widest text-muted-foreground">
               {row.label}
             </span>
             <span className="font-mono text-xs text-muted-foreground">{row.value}</span>

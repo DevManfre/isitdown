@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils.ts";
  * octagon — so the beacon still reads for an operator who cannot separate red
  * from green, and so a screenshot in a chat survives being greyscaled.
  *
- * The motion is graded to the news: `ok` breathes slowly because there is
+ * The motion is graded to the news: `ok` stays still because there is
  * nothing to attend to, `warn` takes the dot's existing 2.4s pulse, `danger`
- * runs it at half that. `unknown` does not move at all — nothing is unfolding,
+ * runs it at half that. `unknown` does not move either — nothing is unfolding,
  * we simply have not looked yet. `prefers-reduced-motion` flattens all of them,
  * which is handled once for the whole dashboard in motion.css.
  *
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils.ts";
  * same verdict in words, so announcing it again would only repeat it.
  */
 const MARK: Record<StatusTier, { Icon: typeof CircleCheck; motion: string }> = {
-  ok: { Icon: CircleCheck, motion: "beacon-breathe" },
+  ok: { Icon: CircleCheck, motion: "" },
   warn: { Icon: TriangleAlert, motion: "beacon-pulse" },
   danger: { Icon: OctagonAlert, motion: "beacon-pulse beacon-urgent" },
   unknown: { Icon: CircleHelp, motion: "" },

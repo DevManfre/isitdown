@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders } from "@/test/harness.tsx";
-import { stagger } from "@/lib/stagger.ts";
+import { stagger, STAGGER_CAP } from "@/lib/stagger.ts";
 import { Providers } from "./Providers.tsx";
 
 const status = {
@@ -285,7 +285,7 @@ describe("Providers", () => {
   // A fleet of fifty must not still be arriving a second and a half after the
   // page: past the cap the tail lands together.
   it("caps the row cascade instead of growing it with the fleet", () => {
-    expect(stagger(200, { base: 90, step: 30, cap: 400 })).toBe("400ms");
+    expect(stagger(200, { base: 90, step: 30, cap: 400 })).toBe(`${STAGGER_CAP}ms`);
   });
 
   // providers.js:119-123 renders hostOf(provider.baseUrl) as a muted mono

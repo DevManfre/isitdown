@@ -134,7 +134,7 @@ export function Delivery() {
       {/* Full: an hour per square. */}
       <div className="hidden grid-cols-[7rem_minmax(0,1fr)_6rem] items-center gap-x-4 gap-y-2.5 @2xl:grid">
         <span />
-        <span className="flex justify-between font-mono text-[0.65rem] text-muted-foreground">
+        <span className="flex justify-between font-mono text-xs text-muted-foreground">
           <span>{t("widget.delivery.hours-ago", { count: HOURS })}</span>
           <span>{t("widget.delivery.hours-ago", { count: HOURS / 2 })}</span>
           <span>{t("widget.delivery.now")}</span>
