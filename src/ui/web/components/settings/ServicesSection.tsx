@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { ServiceDialog } from "@/components/ServiceDialog.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
-import { SECTION_REELS } from "@/components/settings/reels.ts";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
 import { ServiceRow } from "@/components/settings/ServiceRow.tsx";
 import { BulkEditDialog } from "@/components/settings/BulkEditDialog.tsx";
@@ -72,7 +71,6 @@ export function ServicesSection({
   return (
     <SettingsSection
       id="services"
-      reel={SECTION_REELS.services}
       // The services list gives up two columns to "Recently removed" only while
       // something is restorable; on its own it takes the whole row rather
       // than leaving a hole beside itself.
