@@ -210,6 +210,9 @@ test("a routing rule accepts the two targets that are not plain provider ids", (
 
 test("a routing rule refuses a half-written group or component target", () => {
   assert.equal(routingRuleSchema.safeParse({ provider: "group:" }).success, false);
+  // Roadmap 5.4: a tag target is spelled like a group one.
+  assert.equal(routingRuleSchema.safeParse({ provider: "tag:critical" }).success, true);
+  assert.equal(routingRuleSchema.safeParse({ provider: "tag:" }).success, false);
   assert.equal(routingRuleSchema.safeParse({ provider: "github#" }).success, false);
   assert.equal(routingRuleSchema.safeParse({ provider: "#api" }).success, false);
   assert.equal(routingRuleSchema.safeParse({ provider: "GitHub#api" }).success, false);

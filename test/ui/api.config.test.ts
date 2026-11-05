@@ -193,6 +193,104 @@ test("editing a service applies and an unknown id is a 404", async () => {
   }
 });
 
+// Roadmap 5.1–5.4: four provider fields, stored, read back and clearable.
+test("a runbook, tags, planned mutes and declared windows round-trip and clear with null", async () => {
+  const app = await api();
+  try {
+    const fields = {
+      runbook: "## If it is down\nSwitch to the EU mirror.",
+      tags: ["critical", "paid"],
+      muteSchedules: [{ days: ["tue"], start: "02:00", end: "04:00", timeZone: "Europe/Rome" }],
+      maintenanceWindows: [
+        { title: "Deploy", startsAt: "2026-12-01T10:00:00.000Z", endsAt: "2026-12-01T11:00:00.000Z" },
+      ],
+    };
+    assert.equal((await app.request("PATCH", "/config/services/github", fields)).status, 200);
+    const read = async () =>
+      ((await app.request("GET", "/config")).body as { services: Record<string, unknown>[] }).services.find(
+        (service) => service["id"] === "github",
+      );
+    const stored = await read();
+    for (const [key, value] of Object.entries(fields)) assert.deepEqual(stored?.[key], value, key);
+
+    const cleared = { runbook: null, tags: null, muteSchedules: null, maintenanceWindows: null };
+    assert.equal((await app.request("PATCH", "/config/services/github", cleared)).status, 200);
+    const after = await read();
+    for (const key of Object.keys(cleared)) assert.equal(after?.[key], undefined, key);
+
+    // A declared window with no end, or a weekly mute with no days, is refused.
+    assert.equal(
+      (
+        await app.request("PATCH", "/config/services/github", {
+          maintenanceWindows: [{ title: "x", startsAt: "2026-12-01T10:00:00.000Z" }],
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await app.request("PATCH", "/config/services/github", {
+          muteSchedules: [{ days: [], start: "02:00", end: "04:00" }],
+        })
+      ).status,
+      400,
+    );
+  } finally {
+    await app.close();
+  }
+});
+
+// Roadmap 5.5.
+test("a bulk edit changes every selected provider, and adds tags rather than replacing them", async () => {
+  const app = await api();
+  try {
+    await app.request("PATCH", "/config/services/github", { tags: ["paid"] });
+    const response = await app.request("PATCH", "/config/services", {
+      ids: ["github", "cloudflare"],
+      patch: { intervalMinutes: 10, group: "edge" },
+      addTags: ["critical"],
+    });
+    assert.equal(response.status, 200);
+    const services = (await app.request("GET", "/config")).body as {
+      services: { id: string; intervalMinutes?: number; group?: string; tags?: string[] }[];
+    };
+    const byId = new Map(services.services.map((service) => [service.id, service]));
+    assert.deepEqual(byId.get("github")?.tags, ["paid", "critical"]);
+    assert.deepEqual(byId.get("cloudflare")?.tags, ["critical"]);
+    for (const id of ["github", "cloudflare"]) {
+      assert.equal(byId.get(id)?.intervalMinutes, 10);
+      assert.equal(byId.get(id)?.group, "edge");
+    }
+    assert.equal(byId.get("anthropic")?.group, undefined, "an unselected provider is untouched");
+
+    const removed = await app.request("PATCH", "/config/services", { ids: ["github"], removeTags: ["paid"] });
+    assert.equal(removed.status, 200);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a bulk edit with an unknown id, or a field that is not fleet-wide, writes nothing", async () => {
+  const app = await api();
+  try {
+    const unknown = await app.request("PATCH", "/config/services", {
+      ids: ["github", "nope"],
+      patch: { group: "edge" },
+    });
+    assert.equal(unknown.status, 404);
+    const config = (await app.request("GET", "/config")).body as { services: { id: string; group?: string }[] };
+    assert.equal(config.services.find((service) => service.id === "github")?.group, undefined);
+
+    assert.equal(
+      (await app.request("PATCH", "/config/services", { ids: ["github"], patch: { name: "x" } })).status,
+      400,
+    );
+    assert.equal((await app.request("PATCH", "/config/services", { ids: ["github"] })).status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
 test("GET /config/services/:id/impact reports what a removal would take", async () => {
   const app = await api();
   try {

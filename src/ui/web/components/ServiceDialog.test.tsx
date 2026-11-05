@@ -10,6 +10,12 @@ import { Settings } from "@/views/Settings.tsx";
  * switch and nothing else until it is opened. Every test here that edits an
  * existing service opens the row first, the way an operator does.
  */
+const slugifyForTest = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 async function openEdit(name = "GitHub"): Promise<void> {
   const row = (await screen.findByText(name)).closest(
     ".service-row",
@@ -854,6 +860,50 @@ describe("the service dialog's write path", () => {
       // And for why it matters and who owns it (roadmap 3.7).
       impact: null,
       owner: null,
+      // And for the tags and the runbook (roadmap 5.4, 5.1).
+      tags: null,
+      runbook: null,
+    });
+  });
+
+  it("saves tags slugified and deduplicated, and a runbook trimmed (roadmap 5.4, 5.1)", async () => {
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
+    await openEdit();
+    const dialog = await screen.findByRole("dialog");
+    const calls = interceptWrites({ "PATCH /config/services/github": {} });
+
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.tags")), "Critical, Team Backend,critical");
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.runbook")), "  Switch to the EU mirror ");
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.save") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const patchCall = calls.find((call) => call.method === "PATCH" && call.path === "/config/services/github");
+    expect(patchCall?.body).toMatchObject({ tags: ["critical", "team", "backend"], runbook: "Switch to the EU mirror" });
+  });
+
+  it("duplicates a provider as a new one, every field carried and a new id (roadmap 5.6)", async () => {
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
+    const row = (await screen.findByText("GitHub")).closest(".service-row") as HTMLElement;
+    await userEvent.click(within(row).getByText("GitHub"));
+    await userEvent.click(await screen.findByRole("button", { name: i18n.t("action.duplicate") }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: i18n.t("clone.title") })).toBeTruthy();
+    const name = i18n.t("clone.name", { name: "GitHub" });
+    expect((within(dialog).getByLabelText(i18n.t("field.name")) as HTMLInputElement).value).toBe(name);
+
+    const calls = interceptWrites({
+      "POST /config/services": {},
+      [`POST /config/services/${slugifyForTest(name)}/test`]: { ok: true, overallStatus: "operational" },
+    });
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.add") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const post = calls.find((call) => call.method === "POST" && call.path === "/config/services");
+    expect(post?.body).toMatchObject({
+      id: slugifyForTest(name),
+      name,
+      adapter: "statuspage",
+      baseUrl: "https://www.githubstatus.com",
     });
   });
 

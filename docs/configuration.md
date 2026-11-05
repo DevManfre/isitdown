@@ -1634,7 +1634,7 @@ change. Each rule has four parts:
 
 ```yaml
 routing:
-  - provider: "*"            # a service id, `group:<slug>` (§3.10), `<id>#<component>`, or "*" 
+  - provider: "*"            # a service id, `group:<slug>` (§3.10), `tag:<slug>` (§3.26), `<id>#<component>`, or "*" 
     classes: [status, incident]  # any of: status, incident, maintenance, monitoring
     minSeverity: major_outage  # any | degraded | partial_outage | major_outage
     channels: [telegram]       # channel ids, or "*" for every enabled channel; [] mutes
@@ -2061,6 +2061,7 @@ The tokens, which the dashboard also lists under the field:
 | `{{incidentStatus}}` | The provider's own lifecycle word for the incident, translated where known. |
 | `{{impact}}` | What breaks when this provider does, as written on it ([3.23](#323-why-a-provider-matters--impact-and-owner)); empty when not set. |
 | `{{owner}}` | Who answers for this provider; empty when not set. |
+| `{{runbook}}` | Where to start when it is down: the runbook's first link, or its first line ([3.25](#325-runbooks--what-to-do-when-it-is-down)); empty when not set. |
 | `{{url}}` | The provider's public status page. Empty on a channel that renders the link itself (a Discord embed), so it is never printed twice. |
 | `{{at}}` | When it happened, UTC. |
 
@@ -2733,3 +2734,142 @@ regardless of case, and there can be up to twenty.
 **Import from file** creates a new dashboard from one, from this install or
 another. An imported name already in use is numbered, and a provider the file
 names that does not exist here is shown as removed, as above.
+
+### 3.25 Runbooks — what to do when it is down
+
+A provider can carry a runbook: a few lines of Markdown saying what to do when
+it goes down — switch region, turn on the npm mirror, tell the team. It is
+about the provider, not about one incident; an incident's own notes are for
+that.
+
+```yaml
+services:
+  - name: npm
+    id: npm
+    adapter: statuspage
+    baseUrl: https://status.npmjs.org
+    runbook: |              # Markdown, up to 4000 characters
+      ## If npm is down
+      1. Point CI at the mirror: https://wiki.example.com/runbooks/npm-mirror
+      2. Tell #dev in Slack
+```
+
+The UI edition shows it on the provider's page, above its history, with
+headings, lists, emphasis and `http(s)` links rendered — nothing else becomes
+markup, so a runbook can never inject HTML. A message cannot carry a page of
+Markdown, so every alert about the provider ends with **one line** of it,
+under impact and owner ([3.23](#323-why-a-provider-matters--impact-and-owner)):
+the runbook's first link when it has one (most runbooks live in a wiki), or
+otherwise its first line — `Runbook: https://wiki.example.com/runbooks/npm-mirror`.
+A template places it with `{{runbook}}`; public channels (Mastodon, Bluesky)
+leave it out, like impact and owner.
+
+In the UI edition it is the **Runbook** field of the provider form, `runbook`
+on `POST /config/services` and `PATCH /config/services/:id` (`null` clears it).
+
+### 3.26 Tags
+
+A provider sits in at most one group ([3.10](#310-provider-groups--my-stack)),
+but can carry up to 20 **tags** — `paid`, `critical`, `team-backend`, `eu`.
+Each one is a lowercase slug.
+
+```yaml
+services:
+  - name: Stripe
+    id: stripe
+    adapter: statuspage
+    baseUrl: https://status.stripe.com
+    group: payments
+    tags: [paid, critical, eu]
+
+routing:
+  - provider: tag:critical   # every provider tagged critical
+    channels: [pagerduty]
+```
+
+A routing rule names a tag as `tag:<slug>` and covers every provider carrying
+it, wherever its group is. In the UI edition tags are typed into the provider
+form, comma-separated and slugified on save ("Team Backend" becomes
+`team`, `backend` — write `team-backend` to keep one tag); they show under the
+provider's name in **Settings** and on its page, filter both the Settings list
+and the Providers table (a tag picker appears once any provider has a tag),
+and the routing editor offers each one as a target.
+
+### 3.27 Planned mutes
+
+The **Mute** button mutes for a while from now. A planned mute is set ahead:
+
+```yaml
+services:
+  - name: Legacy API
+    id: legacy-api
+    adapter: http
+    baseUrl: https://legacy.example.com/health
+    muteSchedules:
+      # every Tuesday 02:00–04:00 Rome time — undeclared weekly maintenance
+      - { days: [tue], start: "02:00", end: "04:00", timeZone: Europe/Rome }
+      # a window may wrap midnight: Saturday 23:00 to Sunday 01:00
+      - { days: [sat], start: "23:00", end: "01:00", timeZone: auto }
+      # once: from Friday 18:00 to Monday 08:00
+      - { from: "2026-11-06T17:00:00Z", until: "2026-11-09T07:00:00Z" }
+```
+
+Up to 20 per provider. `days` are `mon`…`sun`; `timeZone` is an IANA name, or
+`auto` for the zone the process runs in. While any of them runs the provider is
+muted exactly as the button mutes it — it is still polled and recorded, it
+still shows on the dashboard (as muted, until the schedule's end), and the
+diff engine reports nothing about it. An unknown zone or a malformed time mutes
+nothing: a broken schedule loses to the alert rather than silencing it.
+
+In the UI edition it is the **Schedule** button in a provider's row in
+**Settings** (the planned mutes half), `muteSchedules` on the provider's
+`PATCH` (`null` clears them).
+
+### 3.28 Declared maintenance
+
+Maintenance windows normally come from the provider's own page. When a
+provider publishes none — or the "provider" is your own HTTP probe and you are
+about to deploy — declare one yourself:
+
+```yaml
+services:
+  - name: Our API
+    id: our-api
+    adapter: http
+    baseUrl: https://api.example.com/health
+    maintenanceWindows:
+      - title: Database migration
+        startsAt: "2026-12-01T22:00:00Z"
+        endsAt: "2026-12-01T23:30:00Z"   # always required
+```
+
+It behaves exactly like one the provider published: while it runs, nothing
+else about the provider is news; its start and end are announced
+(`maintenance_started` / `maintenance_ended`, the end carrying the state the
+provider came out in); the heads-up before it opens fires if that is turned on
+([3.8](#38-delivery-policy--quiet-hours-digests-caps)); and the timeline draws
+it. Unlike a provider's own, it must have an end — a window nobody will close
+would silence the provider forever. Up to 50 per provider; one that has ended
+can be left in place or removed.
+
+In the UI edition it is the other half of the **Schedule** dialog,
+`maintenanceWindows` on the provider's `PATCH` (`null` clears them).
+
+### 3.29 Bulk edit and duplicate
+
+UI edition only. With a hundred providers, editing one at a time does not
+scale:
+
+- **Select** above the provider list in **Settings** turns on a checkbox per
+  row; **Edit N** opens one dialog for all of them. Every field starts on
+  *Leave as is*, and only what you change is written: polling on or off, the
+  cadence (a number of minutes, or back to the global one), the group (move
+  to one, or out of it), tags to **add** and tags to **remove** (each
+  provider keeps the rest of its own), and a mute. It is all or nothing — an
+  unknown id, or a cadence a provider's adapter refuses, writes nothing. Over
+  the API it is `PATCH /config/services` ([6](api.md)).
+- **Duplicate** in a provider's row opens the add form on its second step,
+  every field copied — adapter, base URL, options, components, cadence, group,
+  tags, runbook, planned mutes and declared windows — under the name
+  "<name> (copy)", from which the new id is derived. Ten HTTP probes that
+  differ only in their path are one probe and nine duplicates.

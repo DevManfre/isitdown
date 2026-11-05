@@ -6,6 +6,7 @@ import { SettingsSection } from "@/components/SettingsSection.tsx";
 import { SECTION_REELS } from "@/components/settings/reels.ts";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
 import { ServiceRow } from "@/components/settings/ServiceRow.tsx";
+import { BulkEditDialog } from "@/components/settings/BulkEditDialog.tsx";
 import { isMuted } from "@/lib/mute.ts";
 import { stagger } from "@/lib/stagger.ts";
 import type { ServiceDefinition } from "@/lib/types.ts";
@@ -53,10 +54,20 @@ export function ServicesSection({
   const stateFilter = SERVICE_FILTERS.find(
     (entry) => entry.id === serviceFilter,
   );
-  const shownServices =
-    stateFilter === undefined
-      ? services
-      : services.filter(stateFilter.of);
+  // Roadmap 5.4: a tag narrows the list on top of the state chips.
+  const [tagFilter, setTagFilter] = useState<string | undefined>(undefined);
+  const allTags = [...new Set(services.flatMap((service) => service.tags ?? []))].sort();
+  const shownServices = services
+    .filter(stateFilter?.of ?? (() => true))
+    .filter((service) => tagFilter === undefined || (service.tags ?? []).includes(tagFilter));
+  // Roadmap 5.5: a selection for a bulk edit, by id so it survives a refetch.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const selectedShown = selected.filter((id) => services.some((service) => service.id === id));
+  const stopSelecting = (): void => {
+    setSelecting(false);
+    setSelected([]);
+  };
 
   return (
     <SettingsSection
@@ -109,7 +120,65 @@ export function ServicesSection({
                 </span>
               </Button>
             ))}
+            {allTags.map((tag) => (
+              <Button
+                key={tag}
+                type="button"
+                size="sm"
+                variant={tagFilter === tag ? "secondary" : "ghost"}
+                aria-pressed={tagFilter === tag}
+                className="h-7 rounded-full px-3 font-mono text-xs"
+                onClick={() => setTagFilter(tagFilter === tag ? undefined : tag)}
+              >
+                #{tag}
+              </Button>
+            ))}
+            <Button
+              type="button"
+              size="sm"
+              variant={selecting ? "secondary" : "ghost"}
+              aria-pressed={selecting}
+              className="ml-auto h-7 px-3 text-xs"
+              onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+            >
+              {t(selecting ? "bulk.done" : "bulk.start")}
+            </Button>
           </div>
+          {selecting && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-2" role="toolbar" aria-label={t("bulk.toolbar")}>
+              <span className="text-xs text-muted-foreground" aria-live="polite">
+                {t("bulk.selected", { count: selectedShown.length })}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 px-3 text-xs"
+                onClick={() => setSelected(shownServices.map((service) => service.id))}
+              >
+                {t("bulk.select-shown")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 px-3 text-xs"
+                disabled={selectedShown.length === 0}
+                onClick={() => setSelected([])}
+              >
+                {t("bulk.clear")}
+              </Button>
+              <BulkEditDialog
+                ids={selectedShown}
+                onDone={stopSelecting}
+                trigger={
+                  <Button type="button" size="sm" className="ml-auto" disabled={selectedShown.length === 0}>
+                    {t("bulk.edit", { count: selectedShown.length })}
+                  </Button>
+                }
+              />
+            </div>
+          )}
           <div className="flex flex-col divide-y divide-border border-t border-border">
             {shownServices.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">
@@ -124,6 +193,15 @@ export function ServicesSection({
                   onOpenChange={(next) =>
                     setOpenService(next ? service.id : undefined)
                   }
+                  {...(selecting
+                    ? {
+                        selected: selected.includes(service.id),
+                        onSelectedChange: (next: boolean) =>
+                          setSelected((list) =>
+                            next ? [...list, service.id] : list.filter((id) => id !== service.id),
+                          ),
+                      }
+                    : {})}
                 />
               ))
             )}

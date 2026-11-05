@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { IncidentMap } from "@/components/IncidentMap.tsx";
+import { Markdown } from "@/components/Markdown.tsx";
 import { ProviderDetailPanel } from "@/components/ProviderDetailPanel.tsx";
 import { SlaBudgetCard } from "@/components/SlaBudgetCard.tsx";
 import { TrustCard } from "@/components/TrustCard.tsx";
@@ -157,6 +158,35 @@ export function ProviderDetail() {
             </>
           )}
         </dl>
+      )}
+
+      {/* Roadmap 5.4. The provider's tags, each a filter on the Providers list. */}
+      {(provider.tags ?? []).length > 0 && (
+        <ul className="flex flex-wrap gap-1.5" aria-label={t("field.tags")}>
+          {(provider.tags ?? []).map((tag) => (
+            <li key={tag}>
+              <Badge variant="muted" className="font-mono">
+                #{tag}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Roadmap 5.1. What to do now — above the history, because a reader who
+          arrived from an alert came for this first. */}
+      {(provider.runbook ?? "") !== "" && (
+        <section
+          id="runbook"
+          aria-labelledby="runbook-heading"
+          data-testid="provider-runbook"
+          className="flex max-w-3xl flex-col gap-2 rounded-md border border-border p-4"
+        >
+          <h2 id="runbook-heading" className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+            {t("field.runbook")}
+          </h2>
+          <Markdown source={provider.runbook ?? ""} className="flex flex-col gap-2 text-sm" />
+        </section>
       )}
 
       <section aria-label={t("history.list")} className="flex flex-col gap-2">
