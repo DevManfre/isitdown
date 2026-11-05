@@ -6,18 +6,16 @@ import { Trans, useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
-import { FleetSummary } from "@/components/FleetSummary.tsx";
-import { HeroStats } from "@/components/HeroStats.tsx";
 import { DashboardGrid, filterLabel, REORDER_SPRING, type GridEditing } from "@/components/DashboardGrid.tsx";
 import { EmptyFleet } from "@/components/EmptyFleet.tsx";
 import { AwaySummary } from "@/components/AwaySummary.tsx";
 import { FleetOrderDialog } from "@/components/FleetOrderDialog.tsx";
-import { IncidentBand } from "@/components/IncidentBand.tsx";
+import { IncidentBand, incidentProviders } from "@/components/IncidentBand.tsx";
 import { MobileProblems } from "@/components/MobileProblems.tsx";
 import { ViewSkeleton } from "@/components/ViewSkeleton.tsx";
 import { StatusBeacon } from "@/components/charts/StatusBeacon.tsx";
 import { useDashboard, useDashboards, useHistory, useStatus } from "@/hooks/queries.ts";
-import { useCurrentDashboardId } from "@/components/dashboards/DashboardMenu.tsx";
+import { CUSTOMISE_EVENT, useCurrentDashboardId } from "@/components/dashboards/DashboardMenu.tsx";
 import { dashboardPath } from "@/components/dashboards/DashboardActions.tsx";
 import {
   Select,
@@ -33,8 +31,6 @@ import { formatList, formatRelative } from "@/lib/format.ts";
 import { isOffLine, shownStatus, suspectedOf } from "@/lib/suspicion.ts";
 import { suspectedHatchCss } from "@/lib/chartConfig.ts";
 import { OVERVIEW_WINDOW_DAYS } from "@/lib/fleetSlice.ts";
-import { overviewShape } from "@/lib/overviewShape.ts";
-import { cn } from "@/lib/utils.ts";
 import { DEFAULT_LAYOUT, type WidgetConfig } from "../../dashboardLayout.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
 import { Reveal } from "@/widgets/edit/Reveal.tsx";
@@ -46,16 +42,13 @@ import { useLayoutEditor } from "@/widgets/edit/useLayoutEditor.ts";
 const NOTICE_MS = 4000;
 
 /**
- * Design 3a's Overview: the gradient hero with the headline and two calls to
- * action, then the fleet.
+ * The Overview, after the calm redesign (dashboard-design-direction): one
+ * question — is anything down right now, and what — answered by the headline,
+ * then the open incident when there is one, then the operator's own layout
+ * of widgets, whose secondary ones fold shut.
  *
- * How the fleet is drawn is `overviewShape`'s decision, not this view's — it
- * changes at two counts because one layout cannot serve four providers and
- * fifty. Up to six, the 80px rings stay beside the copy; up to fourteen they
- * move to a full-width 56px band and the copy takes the whole width; beyond
- * that the rings go, the hero carries one aggregate figure, and the list groups
- * by severity with the operational fleet shut. The hero's height stops growing
- * with the fleet at the first threshold and never resumes.
+ * Customise and Arrange are not on the page: they are in the title's "···"
+ * menu (DashboardMenu) and in the command palette.
  */
 export function Overview() {
   const { t, i18n } = useTranslation();
@@ -81,8 +74,7 @@ export function Overview() {
   const editing = params.get("edit") === "1";
   const [notice, setNotice] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const customiseRef = useRef<HTMLButtonElement>(null);
-  /** Edit mode just closed: its Save or Cancel is gone, so focus comes back to Customise. */
+  /** Edit mode just closed: its Save or Cancel is gone, so focus comes back to the "···" menu it was opened from. */
   const [returnFocus, setReturnFocus] = useState(false);
   // Only the server's answer may start a draft — never the placeholder a
   // pending query shows (⌘K and a bookmarked `?edit=1` can both get here first).
@@ -103,10 +95,22 @@ export function Overview() {
     openedFromButton,
   );
   useEffect(() => {
-    if (!returnFocus || editing || customiseRef.current === null) return;
-    customiseRef.current.focus();
+    if (!returnFocus || editing) return;
+    document.querySelector<HTMLElement>("[data-dashboard-menu-trigger]")?.focus();
     setReturnFocus(false);
   });
+  // The "···" menu's Customise (DashboardMenu) — the hero's own button
+  // before the calm redesign — opens the editor through this event.
+  const canCustomise = useRef(false);
+  const openRef = useRef(openEditor);
+  openRef.current = openEditor;
+  useEffect(() => {
+    const onRequest = (): void => {
+      if (canCustomise.current) openRef.current();
+    };
+    window.addEventListener(CUSTOMISE_EVENT, onRequest);
+    return () => window.removeEventListener(CUSTOMISE_EVENT, onRequest);
+  }, []);
   useEffect(() => {
     if (notice === null) return;
     const timer = setTimeout(() => setNotice(null), NOTICE_MS);
@@ -127,7 +131,7 @@ export function Overview() {
   const providers = configured.filter((provider) => provider.enabled);
   const allDisabled = configured.length > 0 && providers.length === 0;
   const noneConfigured = configured.length === 0;
-  const shape = overviewShape(providers.length);
+  canCustomise.current = !editing && !noneConfigured && !dashboardPending && !dashboardErrored;
 
   // The headline is chosen by plural rule, never assembled from fragments —
   // "one provider is off the line" and "3 providers are off the line" are
@@ -150,30 +154,20 @@ export function Overview() {
     .sort()
     .at(-1);
   const withIncident = providers.find((p) => p.activeIncidents.length > 0);
-  const average =
-    providers.length === 0
-      ? 0
-      : Math.round(
-          (providers.reduce((sum, p) => sum + p.uptime90, 0) /
-            providers.length) *
-            100,
-        ) / 100;
 
-  // One copy block for all three shapes: the words do not change with the
-  // fleet's size, only where the fleet is drawn does.
   const heroCopy = (
     <div className="hero-copy flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="anim-rise text-xs uppercase tracking-widest text-primary">
-          {t("overview.kicker")}
-        </span>
+      {/* The "upstream status" eyebrow went with the calm redesign: the
+          headline says what the view is about by itself. Edit mode still
+          says the hero is the one fixed part. */}
+      <div className="flex flex-wrap items-center gap-3 empty:hidden">
         <AnimatePresence>
           {editing && (
             <motion.span
               key="hero-fixed"
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1, transition: { duration: 0.22 } }}
-              exit={{ opacity: 0, transition: { duration: 0.18 } }}
+              animate={{ opacity: 1, transition: { duration: 0.2 } }}
+              exit={{ opacity: 0, transition: { duration: 0.15 } }}
               className="rounded-full border border-dashed border-border px-2 py-0 font-mono text-xs leading-[14px] text-muted-foreground"
             >
               {t("dashboard.hero-fixed")}
@@ -189,13 +183,14 @@ export function Overview() {
         style={{ animationDelay: "50ms" }}
       >
         <StatusBeacon
+          size={28}
           tier={worstTier(
             providers.map((p) => (shownStatus(p).hatched ? p.overallStatus : shownStatus(p).status)),
           )}
         />
         {/* 28px on a phone: at `text-4xl` the four-word headline took six
             lines of a 390px screen and pushed the fleet under the fold. */}
-        <h2 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance md:text-3xl lg:text-4xl lg:leading-[1.1]">
+        <h2 className="text-2xl leading-tight font-semibold tracking-tight text-balance md:text-[1.75rem]">
           {allDisabled ? (
             t("overview.title.all-disabled")
           ) : noneConfigured ? (
@@ -222,16 +217,15 @@ export function Overview() {
           )}
         </h2>
       </div>
-      {/* Capped in `ch` rather than by its grid column: in the band shape the
-          copy owns the full width, and a 900px-wide line is unreadable. */}
+      {/* Capped in `ch`: a 900px-wide line is unreadable. */}
       {/* With nothing enabled there is no cycle to report on, so this claim is
           dropped rather than rendered as "All 0 providers responded" — the
           sentence that explains the state is the one in the fleet region, said
           once. The paragraph goes with it, so the gap does not stay behind. */}
       {!allDisabled && !noneConfigured && (
         <p
-          className="anim-rise anim-rise-hero max-w-[68ch] text-muted-foreground"
-          style={{ animationDelay: "100ms" }}
+          className="anim-rise anim-rise-hero max-w-[68ch] text-[0.95rem] text-muted-foreground"
+          style={{ animationDelay: "60ms" }}
         >
           {down.length === 0 && unreadable.length > 0 ? (
             t("overview.body.unreadable", {
@@ -304,10 +298,12 @@ export function Overview() {
         </ul>
       )}
       <div
-        className="anim-rise anim-rise-hero flex flex-wrap items-center gap-2"
-        style={{ animationDelay: "150ms" }}
+        className="anim-rise anim-rise-hero flex flex-wrap items-center gap-x-4 gap-y-2 empty:hidden"
+        style={{ animationDelay: "90ms" }}
       >
-        {withIncident !== undefined && (
+        {/* While a major outage is open the incident card below carries the
+            way in, so the hero does not offer a second primary action. */}
+        {withIncident !== undefined && incidentProviders(providers).length === 0 && (
           <Button
             type="button"
             onClick={() =>
@@ -324,10 +320,12 @@ export function Overview() {
         {!noneConfigured && (
           <Button
             type="button"
-            variant="ghost"
+            variant="link"
+            className="h-auto px-0 text-muted-foreground hover:text-foreground"
             onClick={() => navigate(ROUTE_PATHS.history)}
           >
             {t("action.history-90d")}
+            <span aria-hidden="true">→</span>
           </Button>
         )}
         {/* The layout could not be read: the default stands in, and the
@@ -342,19 +340,9 @@ export function Overview() {
             </Button>
           </span>
         )}
-        {!editing && !noneConfigured && !dashboardPending && !dashboardErrored && (
-          <Button
-            ref={customiseRef}
-            type="button"
-            variant="ghost"
-            onClick={openEditor}
-          >
-            <LayoutGrid aria-hidden="true" />
-            {t("dashboard.customise")}
-          </Button>
-        )}
-        {/* Roadmap 4.24: the fleet's own order, beside the layout's. */}
-        {!editing && !noneConfigured && <FleetOrderDialog />}
+        {/* Customise and Arrange live in the title's "···" menu now
+            (DashboardMenu) and in the command palette; the hero keeps only
+            what answers "is anything down". */}
         <span role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground">
           {notice !== null && (
             <span className="anim-fade flex items-center gap-1.5">
@@ -402,70 +390,17 @@ export function Overview() {
             />
           ),
         };
-  /* The rule sweeps in under the hero, before the rows arrive. */
-  const rule = (
-    <div className="fade-rule anim-sweep col-span-6 h-px bg-border" style={{ animationDelay: "170ms" }} />
-  );
 
   return (
     // Roadmap 10.1: the bar rows below draw the poller's own gaps.
     <CoverageProvider coverage={summary?.dailyCoverage}>
-      {/* The standard view padding is dropped here (there is no `.view` class
-          left to remove — the whole layer moved to Tailwind), so the hero's own
-          light can bleed to the true edges of #view instead of stopping at the
-          console's usual 32px gutter, then restore the same inset for its own
-          content.
-
-          The band is lit rather than washed: the accent bloom the palette
-          always carried, a dot grid under it for texture, a beam along the top
-          edge, and — only while something is actually down — a second bloom in
-          the severity colour and a beam travelling the border. That last pair
-          is the whole point of the redesign's hero: the page says "something is
-          wrong" before a single word of it is read.
-
-          `minmax(0,1fr) auto` where this used to say `grid-cols-2`: the copy is
-          four lines and never grew, so a fixed half handed the right-hand
-          column the other half whatever it held.
-
-          The fleet's rings no longer live in here. They were what made the hero
-          grow with the fleet, and `HeroStats` is the fixed-height column that
-          replaces them — the rings moved below the rule, where a row of tiles
-          can wrap without pushing the headline around. */}
-      <div
-        className="view-hero lit-band relative -mx-4 -mt-6 overflow-hidden border-b border-border px-4 pt-6 pb-7 md:-mx-10 md:-mt-10 md:px-10 md:pt-10"
-        style={{
-          backgroundImage:
-            down.length === 0
-              ? "var(--gradient-hero)"
-              : "var(--gradient-hero-live), var(--gradient-hero)",
-        }}
-      >
-        <div
-          className={cn(
-            "relative grid gap-8",
-            shape === "band"
-              ? "grid-cols-1"
-              : "grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]",
-          )}
-        >
-          {heroCopy}
-          {/* Roadmap 4.29: on a phone the list under the hero says the same
-              thing in rows, so the figures step aside and the problems rise. */}
-          <div className="hidden md:contents">
-            {shape === "dense" ? (
-              <FleetSummary
-                average={average}
-                operational={providers.length - down.length}
-                alarm={down.length}
-              />
-            ) : (
-              providers.length > 0 && (
-                <HeroStats providers={providers} average={average} />
-              )
-            )}
-          </div>
-        </div>
-      </div>
+      {/* The calm hero (dashboard-design-direction): no bleed band, no
+          gradient, no figures column. The 90-day average, the up/alarm count
+          and the last cycle it used to carry live in the provider list below
+          and in History; the headline answers the view's one question. */}
+      <section className="view-hero mb-8 flex flex-col gap-3" aria-label={t("overview.kicker")}>
+        {heroCopy}
+      </section>
 
       {/* Roadmap 4.1: under the rule, the Overview is the operator's own
           layout — the default one being the fixed sequence this view always
@@ -506,7 +441,6 @@ export function Overview() {
         edit={gridEdit}
         header={
           <>
-            {rule}
             {/* Roadmap 4.4. Not while customising: the recap is news, and edit
                 mode is about the grid under it. */}
             {!editing && !dashboardMissing && <AwaySummary />}
@@ -577,6 +511,8 @@ export function Overview() {
         }
       />
       {editor !== null && dashboard !== undefined && <EditMode editor={editor} dashboard={dashboard} />}
+      {/* Roadmap 4.24, opened from the "···" menu and the palette. */}
+      {!noneConfigured && <FleetOrderDialog trigger={false} />}
     </CoverageProvider>
   );
 }

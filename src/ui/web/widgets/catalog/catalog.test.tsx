@@ -7,6 +7,7 @@ import type { DashboardLayout, WidgetConfig } from "../../../dashboardLayout.ts"
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  localStorage.clear();
 });
 
 const t = (key: string, values: Record<string, unknown> = {}) => i18n.t(key, values);
@@ -74,6 +75,8 @@ describe("catalogue widgets", () => {
   });
 
   it("maintenances: the one in progress first, then what is coming", async () => {
+    // Folded shut by default; this case is about the open card.
+    localStorage.setItem("isitdown.widget-open.maintenances", "1");
     show(
       { id: "w", type: "maintenances", width: "half", props: { filter: none } },
       {
@@ -92,7 +95,36 @@ describe("catalogue widgets", () => {
     expect(screen.getAllByText(t("widget.maintenances.live-tag")).length).toBeGreaterThan(0);
   });
 
+  // Shut, it still says what is running and what is coming: a fold never
+  // hides what the operator came to look at.
+  it("maintenances: folds shut by default and keeps the count beside its title", async () => {
+    show(
+      { id: "w", type: "maintenances", width: "full", props: { filter: none } },
+      {
+        maintenances: {
+          maintenances: [
+            { id: "m1", providerId: "github", name: "Packages", status: "in_progress", startsAt: iso(30), endsAt: ahead(45), componentIds: [] },
+            { id: "m2", providerId: "stripe", name: "Dashboard", status: "scheduled", startsAt: ahead(1500), endsAt: ahead(1620), componentIds: [] },
+          ],
+        },
+      },
+    );
+    const trigger = await screen.findByRole("button", { name: new RegExp(t("dashboard.widget.maintenances.title")) });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: new RegExp(t("dashboard.widget.maintenances.title")) }),
+      ).toHaveTextContent(
+        `${t("widget.maintenances.summary-live", { count: 1 })} · ${t("widget.maintenances.summary-upcoming", { count: 1 })}`,
+      ),
+    );
+    expect(screen.queryByText("GitHub · Packages")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t("dashboard.widget.maintenances.title")) }));
+    expect((await screen.findAllByText("GitHub · Packages")).length).toBeGreaterThan(0);
+  });
+
   it("maintenances: an empty fortnight is said in words", async () => {
+    localStorage.setItem("isitdown.widget-open.maintenances", "1");
     show({ id: "w", type: "maintenances", width: "full", props: { filter: none } }, { maintenances: { maintenances: [] } });
     expect(await screen.findByText(t("widget.maintenances.none", { days: 14 }))).toBeInTheDocument();
   });
