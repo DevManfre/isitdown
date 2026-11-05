@@ -432,7 +432,7 @@ export function Overview() {
           replaces them — the rings moved below the rule, where a row of tiles
           can wrap without pushing the headline around. */}
       <div
-        className="view-hero lit-band relative -mx-4 -mt-6 overflow-hidden border-b border-border px-4 pt-6 pb-7 md:-mx-8 md:px-8"
+        className="view-hero lit-band relative -mx-4 -mt-6 overflow-hidden border-b border-border px-4 pt-6 pb-7 md:-mx-10 md:-mt-10 md:px-10 md:pt-10"
         style={{
           backgroundImage:
             down.length === 0

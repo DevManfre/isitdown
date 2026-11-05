@@ -1,11 +1,10 @@
 import { useCallback } from "react";
-import { Contrast, Eye, Menu, Monitor, Moon, MoonStar, Search, Sun } from "lucide-react";
+import { Contrast, Eye, Monitor, Moon, MoonStar, Search, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { isApplePlatform } from "@/lib/shortcut.ts";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler.tsx";
 import { PollIndicator } from "./PollIndicator.tsx";
 import { openCommandPalette } from "./CommandPalette.tsx";
-import { openMoreSheet } from "./MobileNav.tsx";
 import { DashboardMenu } from "./dashboards/DashboardMenu.tsx";
 import { usePreferencesMutation, useStatusChrome } from "@/hooks/queries.ts";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme.tsx";
@@ -62,105 +61,83 @@ export function Header({ view }: { view: string }) {
   const ThemeIcon = THEME_ICONS[mode];
 
   return (
-    /* One grid for both widths, because the desktop header is the same shape
-       as the phone one with the second column merged: title over meta on the
-       left, controls on the right. On a phone the right column splits in two —
-       the two icon buttons above, the poll cluster below — so seven controls
-       stop competing for one 390px line. */
-    <header className="header grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-border px-4 py-2 md:gap-x-4 md:px-8 md:py-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+    /* One line at every width (dashboard-design-direction): the title with
+       how often the estate is read beside it, then search, the poll control
+       and the theme. The phone keeps the same order with the words folded
+       into 44px icons; the views and everything else behind "More" live in
+       the tab bar at the foot of the screen, so the header no longer carries
+       a second door to that sheet. */
+    <header className="header flex h-14 items-center justify-between gap-3 border-b border-border px-4 md:h-16 md:gap-4 md:px-8">
       {/* Roadmap 4.2: on the Overview the title carries which named dashboard
           is open, and the menu of what can be done with it. */}
-      <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
-        <h1 className="header-title truncate text-base font-medium md:text-lg">
+      <div className="flex min-w-0 items-center gap-2">
+        <h1 className="header-title truncate text-base font-semibold">
           {t(TITLE_KEYS[view] ?? "nav.overview")}
         </h1>
         {view === "overview" && <DashboardMenu />}
+        {/* The cadence, and how long ago the last read was. Whether a poll has
+            happened at all is the poll control's to say — it said "not polled
+            yet" here and again beside the countdown. Undefined status is "the
+            read has not answered", so the span stays empty rather than
+            claiming anything. Off on a phone, where the countdown says enough. */}
+        <span className="header-meta hidden min-w-0 truncate text-sm text-muted-foreground md:inline">
+          {status !== undefined && (
+            <>
+              {t("meta.interval", { minutes: status.pollIntervalMinutes })}
+              {lastSeen !== null && ` · ${formatRelative(i18n.language, lastSeen)}`}
+            </>
+          )}
+        </span>
       </div>
 
-      {/* The phone's own pair: search, and everything the desktop header shows
-          inline. Both are 44px targets; the desktop keeps the labelled
-          controls below. */}
-      <div className="header-compact col-start-2 row-start-1 flex items-center justify-end lg:hidden">
+      <div className="header-actions flex shrink-0 items-center gap-2">
+        {/* ⌘K existed before this button did, and nothing on screen said so:
+            the button carries the shortcut so the second use is the keystroke.
+            On a phone it is a 44px icon. */}
         <button
           type="button"
-          className="header-search-compact flex size-11 items-center justify-center rounded-md text-muted-foreground"
+          data-tour="search"
+          className="header-search hidden h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground lg:flex"
+          onClick={openCommandPalette}
+        >
+          <Search className="size-4" strokeWidth={1.8} aria-hidden="true" />
+          {t("palette.open")}
+          <kbd className="font-mono text-xs text-muted-foreground">
+            {t(isApplePlatform() ? "palette.shortcut-mac" : "palette.shortcut-other")}
+          </kbd>
+        </button>
+        <button
+          type="button"
+          className="header-search-compact flex size-11 items-center justify-center rounded-md text-muted-foreground lg:hidden"
           aria-label={t("palette.open")}
           onClick={openCommandPalette}
         >
           <Search className="size-5" strokeWidth={1.8} aria-hidden="true" />
         </button>
-        <button
-          type="button"
-          className="header-more flex size-11 items-center justify-center rounded-md text-muted-foreground"
-          aria-label={t("nav.more")}
-          onClick={openMoreSheet}
-        >
-          <Menu className="size-5" strokeWidth={1.8} aria-hidden="true" />
-        </button>
-      </div>
 
-      <span className="header-meta col-start-1 row-start-2 min-h-4 truncate text-xs text-muted-foreground">
-        {status !== undefined && (
-          <>
-            {lastSeen === null
-              ? t("meta.never-polled")
-              : t("meta.interval", { minutes: status.pollIntervalMinutes })}
-            {lastSeen !== null && ` · ${formatRelative(i18n.language, lastSeen)}`}
-          </>
-        )}
-      </span>
+        <PollIndicator />
 
-      {/* ⌘K existed before this button did, and nothing on screen said so.
-          The button is the palette's only visible surface; it carries the
-          shortcut on it so the second use is the keystroke. Hidden on a phone,
-          where the icon button above says the same thing in 44px.
-
-          It sits in the middle column rather than in the cluster on the right:
-          search is the one control here that is not about the current view, and
-          the header had a hole in the middle of it anyway. */}
-      <button
-        type="button"
-        data-tour="search"
-        className="header-search hidden items-center gap-2 rounded-md border border-border bg-card/60 py-1.5 pl-3 pr-2 text-xs text-muted-foreground lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:justify-self-center"
-        onClick={openCommandPalette}
-      >
-        <Search className="size-3.5" strokeWidth={1.8} aria-hidden="true" />
-        {t("palette.open")}
-        <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
-          {t(isApplePlatform() ? "palette.shortcut-mac" : "palette.shortcut-other")}
-        </kbd>
-      </button>
-
-      <div className="header-actions col-start-2 row-start-2 flex items-center justify-end gap-2 md:row-span-2 md:row-start-1 lg:col-start-3">
         {/* The switch reveals itself: the next theme is wiped over the page
-            through a circle growing out of this button, so the operator sees
-            where the change came from instead of the whole screen flipping at
-            once. Browsers without View Transitions, and operators who asked
-            for reduced motion, get the plain swap. */}
+            through a circle growing out of this button. Browsers without View
+            Transitions, and operators who asked for reduced motion, get the
+            plain swap. On a phone the theme lives in the More sheet. */}
         <AnimatedThemeToggler
-          className="theme-btn hidden rounded-md border border-border bg-card/60 p-1.5 text-primary lg:inline-flex"
+          className="theme-btn hidden size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground lg:inline-flex"
           aria-label={themeTitle}
           title={themeTitle}
           onToggle={onToggleTheme}
         >
           {/* Keyed on the mode so every swap mounts a fresh element and plays
-              the entry animation — two different icons are two different
-              elements, and a transition has nothing to interpolate across
-              that. The button's aria-label already names the mode. */}
+              the entry animation. The button's aria-label names the mode. */}
           <ThemeIcon
             key={mode}
             data-testid="theme-icon"
             data-mode={mode}
             className="theme-icon size-4"
-            strokeWidth={1.6}
+            strokeWidth={1.8}
             aria-hidden="true"
           />
         </AnimatedThemeToggler>
-
-        {/* The separator is gone with the rule that drew it: the poll cluster
-            carries its own outline now, which is a stronger edge than a
-            hairline between two groups of controls ever was. */}
-        <PollIndicator />
       </div>
     </header>
   );

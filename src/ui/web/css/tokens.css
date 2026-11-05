@@ -193,7 +193,7 @@
   --duration-base: 200ms;
   --duration-slow: 280ms;
 
-  --rail-width: 196px;
+  --rail-width: 232px;
 
   --ring-icon-bg: #ffffff;
   --rail-width-collapsed: 30px;
@@ -248,7 +248,7 @@
      declaration outranks every stylesheet — motion.css could never have
      widened the collapsed strip on hover against it. Declared here, the peek
      is one --sidebar-width-icon override on the sidebar element itself. */
-  --sidebar: var(--color-surface);
+  --sidebar: var(--color-bg);
   --sidebar-foreground: var(--color-text);
   --sidebar-accent: var(--accent);
   --sidebar-accent-foreground: var(--accent-foreground);
@@ -379,7 +379,7 @@
   --duration-base: 200ms;
   --duration-slow: 280ms;
 
-  --rail-width: 196px;
+  --rail-width: 232px;
 
   --ring-icon-bg: #ffffff;
   --rail-width-collapsed: 30px;
@@ -432,7 +432,7 @@
      declaration outranks every stylesheet — motion.css could never have
      widened the collapsed strip on hover against it. Declared here, the peek
      is one --sidebar-width-icon override on the sidebar element itself. */
-  --sidebar: var(--color-surface);
+  --sidebar: var(--color-bg);
   --sidebar-foreground: var(--color-text);
   --sidebar-accent: var(--accent);
   --sidebar-accent-foreground: var(--accent-foreground);
@@ -544,7 +544,7 @@
     --duration-base: 200ms;
     --duration-slow: 280ms;
 
-    --rail-width: 196px;
+    --rail-width: 232px;
 
     --ring-icon-bg: #ffffff;
     --rail-width-collapsed: 30px;
@@ -597,7 +597,7 @@
        declaration outranks every stylesheet — motion.css could never have
        widened the collapsed strip on hover against it. Declared here, the peek
        is one --sidebar-width-icon override on the sidebar element itself. */
-    --sidebar: var(--color-surface);
+    --sidebar: var(--color-bg);
     --sidebar-foreground: var(--color-text);
     --sidebar-accent: var(--accent);
     --sidebar-accent-foreground: var(--accent-foreground);
