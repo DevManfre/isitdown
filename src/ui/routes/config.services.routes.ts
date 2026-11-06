@@ -23,6 +23,18 @@ const previewComponentsSchema = serviceDefinitionSchema.pick({
   baseUrl: true,
 });
 
+/**
+ * The fields a read depends on (roadmap 5.10). `id` and `name` are not among
+ * them: the form is still open, and a provider with no name yet can be read.
+ */
+const previewReadSchema = serviceDefinitionSchema.pick({
+  adapter: true,
+  baseUrl: true,
+  options: true,
+  components: true,
+  scopeToComponents: true,
+});
+
 const tagList = serviceDefinitionSchema.shape.tags.unwrap();
 
 /** A bulk edit (roadmap 5.5): which providers, and the fleet-wide fields to set on each. */
@@ -166,6 +178,58 @@ export function configServiceRoutes(runtime: UiRuntimeCore, router: Router): voi
             message: error instanceof Error ? error.message : String(error),
           },
         });
+    }
+  });
+
+  /**
+   * "Here is what I would read right now" for a provider that is not saved yet
+   * (roadmap 5.10): the same single read as the adapter debug panel's probe,
+   * run against the form's own values, so a wrong selector or base url shows
+   * while the operator is still looking at it instead of at the first cycle.
+   *
+   * Read-only upstream like the preview above — it records nothing, notifies
+   * nothing and touches no state. A provider that cannot be read is an answer
+   * (`ok: false` and the adapter's own message), not a failure of the route.
+   */
+  router.post("/config/services/preview-read", async (req, res) => {
+    const parsed = previewReadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+    let adapter;
+    try {
+      adapter = getAdapter(parsed.data.adapter);
+    } catch {
+      res.status(400).json({ error: { message: `unknown adapter: ${parsed.data.adapter}` } });
+      return;
+    }
+    const problems = optionProblems(parsed.data.adapter, parsed.data.options);
+    if (problems.length > 0) {
+      res.status(400).json({ error: { message: problems.join("; ") } });
+      return;
+    }
+    const { requestTimeoutSeconds } = readSettings(db, runtime.logger);
+    const startedAt = Date.now();
+    try {
+      const status = await adapter.fetchStatus(
+        {
+          id: "preview",
+          name: "preview",
+          baseUrl: parsed.data.baseUrl,
+          options: parsed.data.options,
+          components: parsed.data.components,
+          scopeToComponents: parsed.data.scopeToComponents,
+        },
+        { timeoutMs: requestTimeoutSeconds * 1000 },
+      );
+      res.json({ ok: true, durationMs: Date.now() - startedAt, status });
+    } catch (error) {
+      res.json({
+        ok: false,
+        durationMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 

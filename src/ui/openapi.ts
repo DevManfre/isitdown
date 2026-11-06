@@ -918,6 +918,17 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
+  "/config/services/preview-read": {
+    post: {
+      tags: ["Configuration"],
+      summary: "One read of a provider that is not saved yet, from the form's own values.",
+      requestBody: { required: true, ...json({ type: "object" }) },
+      responses: {
+        "200": ok({ type: "object" }, "ok is false, with the adapter's own error, when the page cannot be read."),
+        "400": badRequest,
+      },
+    },
+  },
   "/config/services/{id}": {
     patch: {
       tags: ["Configuration"],
