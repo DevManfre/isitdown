@@ -1,10 +1,16 @@
 import { screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
 import { renderWithProviders } from "@/test/harness.tsx";
 import { IncidentTimelineCard } from "./IncidentTimelineCard.tsx";
 
-afterEach(() => vi.unstubAllGlobals());
+// Folds shut by default (dashboard-design-direction); these cases are about
+// the open card, so they start from an operator who opened it before.
+beforeEach(() => localStorage.setItem("isitdown.widget-open.incidents-timeline", "1"));
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.clear();
+});
 
 const providers = [
   { id: "github", name: "GitHub" },

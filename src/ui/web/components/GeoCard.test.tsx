@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/lib/i18n.ts";
@@ -41,6 +41,16 @@ const point = (lat: number, lon: number, status: MapResponse["points"][number]["
   status,
   source: "iata" as const,
 });
+
+// The card folds shut by default (dashboard-design-direction). The cases
+// below are about what the open card draws, so they start from an operator
+// who has opened it before — the remembered state. The fold itself has its
+// own cases at the foot of the file.
+beforeEach(() => localStorage.setItem("isitdown.widget-open.geo-map", "1"));
+afterEach(() => localStorage.clear());
+
+/** The map's own markers: every button but the fold's trigger. */
+const markers = () => screen.getAllByRole("button").filter((b) => b.getAttribute("aria-expanded") === null);
 
 const prefs = (mapView: Preferences["mapView"]) => ({ data: { mapView } });
 
@@ -215,7 +225,7 @@ describe("GeoCard", () => {
       isError: false,
     });
     const { rerender } = renderCard();
-    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(markers()).toHaveLength(1);
 
     getMap.mockReturnValue({
       data: {
@@ -226,6 +236,23 @@ describe("GeoCard", () => {
       isError: false,
     });
     rerender();
-    expect(screen.getAllByRole("button")).toHaveLength(3);
+    expect(markers()).toHaveLength(3);
+  });
+
+  describe("the fold", () => {
+    it("starts shut and does not ask for the map until it is opened", () => {
+      localStorage.clear();
+      preferences.mockReturnValue(prefs("map"));
+      getMap.mockReturnValue({ data: { points: [point(48.8, 2.3)], unlocated: [], generatedAt: null }, isError: false, isPending: false });
+      getMap.mockClear();
+      renderCard();
+      const trigger = screen.getByRole("button", { name: i18n.t("map.title") });
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+      expect(getMap).not.toHaveBeenCalled();
+      fireEvent.click(trigger);
+      expect(trigger).toHaveAttribute("aria-expanded", "true");
+      expect(getMap).toHaveBeenCalled();
+      expect(localStorage.getItem("isitdown.widget-open.geo-map")).toBe("1");
+    });
   });
 });

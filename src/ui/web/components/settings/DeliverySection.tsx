@@ -15,7 +15,6 @@ import { SettingsSection } from "@/components/SettingsSection.tsx";
 import { DELIVERY_OFF } from "@/components/settings/deliveryDefaults.ts";
 import { NumberSetting } from "@/components/settings/NumberSetting.tsx";
 import { Reveal } from "@/components/settings/Reveal.tsx";
-import { SECTION_REELS } from "@/components/settings/reels.ts";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
 import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useSettingsMutation } from "@/hooks/queries.ts";
@@ -236,7 +235,6 @@ export function DeliverySection({
   return (
     <SettingsSection
       id="delivery"
-      reel={SECTION_REELS.delivery}
       className="lg:col-span-3"
       title={t("settings.section.delivery")}
       note={t("settings.delivery.note")}

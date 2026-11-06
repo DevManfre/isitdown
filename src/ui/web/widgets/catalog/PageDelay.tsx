@@ -63,14 +63,14 @@ export function PageDelay() {
     >
       <div className="flex items-baseline gap-2.5 @md:hidden">
         <span className="font-mono text-4xl leading-none">{t("widget.minutes", { count: fleet })}</span>
-        <span className="font-mono text-xs text-muted-foreground">{t("widget.page-delay.median")}</span>
+        <span className="text-xs text-muted-foreground">{t("widget.page-delay.median")}</span>
       </div>
 
       <div className="hidden grid-cols-[7rem_minmax(0,1fr)_5rem_5rem] items-center gap-x-4 @md:grid">
-        <span className="pb-1.5 font-mono text-xs text-muted-foreground">{t("widget.col.provider")}</span>
-        <span className="pb-1.5 font-mono text-xs text-muted-foreground">{t("widget.page-delay.col-delay")}</span>
-        <span className="pb-1.5 text-right font-mono text-xs text-muted-foreground">{t("widget.page-delay.col-median")}</span>
-        <span className="pb-1.5 text-right font-mono text-xs text-muted-foreground">{t("widget.page-delay.col-p90")}</span>
+        <span className="pb-1.5 text-xs text-muted-foreground">{t("widget.col.provider")}</span>
+        <span className="pb-1.5 text-xs text-muted-foreground">{t("widget.page-delay.col-delay")}</span>
+        <span className="pb-1.5 text-right text-xs text-muted-foreground">{t("widget.page-delay.col-median")}</span>
+        <span className="pb-1.5 text-right text-xs text-muted-foreground">{t("widget.page-delay.col-p90")}</span>
         {rows.map((row, index) => (
           <div key={row.key} className="contents">
             <span className="truncate border-t border-border py-2.5 text-sm">{name(row.pair.pageId)}</span>
@@ -84,7 +84,7 @@ export function PageDelay() {
             <span className="border-t border-border py-2.5 text-right font-mono text-sm">
               {t("widget.minutes", { count: Math.round(row.delay!.medianMinutes) })}
             </span>
-            <span className="border-t border-border py-2.5 text-right font-mono text-sm text-muted-foreground">
+            <span className="border-t border-border py-2.5 text-right text-sm text-muted-foreground">
               {t("widget.minutes", { count: Math.round(row.delay!.p90Minutes) })}
             </span>
           </div>

@@ -42,7 +42,7 @@ export function ReliabilityTable({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <span className="text-xs uppercase tracking-widest text-primary">
+        <span className="text-base font-medium">
           {t("reliability.title")}
         </span>
         <span className="text-xs text-muted-foreground">

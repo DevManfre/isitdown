@@ -235,7 +235,7 @@ export function MobileProblems({ providers }: { providers: ProviderStatus[] }) {
         {pull.distance > 0 && <span>{pullLabel}</span>}
       </div>
 
-      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{t("mobile.attention")}</h3>
+      <h3 className="text-base font-medium">{t("mobile.attention")}</h3>
       {attention.length === 0 ? (
         <p className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-card px-4 text-base">
           <CircleCheck className="size-6 shrink-0" style={{ color: statusFill("operational") }} aria-hidden="true" />
@@ -255,7 +255,7 @@ export function MobileProblems({ providers }: { providers: ProviderStatus[] }) {
       {healthy.length > 0 && (
         <>
           <div className="mt-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <h3 className="text-base font-medium">
               {t("mobile.operational", { count: healthy.length })}
             </h3>
             <Button type="button" variant="ghost" className="min-h-11 text-primary" aria-expanded={showAll} onClick={() => setShowAll((open) => !open)}>

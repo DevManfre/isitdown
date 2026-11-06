@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Card } from "@/components/ui/card.tsx";
+import { WidgetCard } from "@/widgets/catalog/WidgetCard.tsx";
 import { TooltipProvider } from "@/components/ui/tooltip.tsx";
 import { DottedWorld } from "@/components/charts/DottedWorld.tsx";
 import { StatusGlobe } from "@/components/charts/StatusGlobe.tsx";
@@ -24,17 +24,28 @@ import { ROUTE_PATHS } from "../../routePaths.ts";
  * a provider that lists only functional components has no geography to show.
  */
 export function GeoCard() {
+  const { t } = useTranslation();
+  const view = usePreferences().data?.mapView ?? "off";
+  if (view === "off") return null;
+  // Secondary to the Overview's one question, so it folds shut by default
+  // (dashboard-design-direction). The body is only mounted once opened, so
+  // the map is not even asked for until the operator wants it.
+  return (
+    <WidgetCard title={t("map.title")} disclosure={{ id: "geo-map" }}>
+      <GeoMap view={view} />
+    </WidgetCard>
+  );
+}
+
+function GeoMap({ view }: { view: "map" | "globe" }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const view = usePreferences().data?.mapView ?? "off";
-  const { data, isError, isPending } = useMap(view !== "off");
+  const { data, isError, isPending } = useMap(true);
 
   const cells: MapCell[] = useMemo(
     () => binPoints(data?.points ?? [], CELL_DEGREES),
     [data?.points],
   );
-
-  if (view === "off") return null;
 
   const unplaced = (data?.unlocated ?? []).reduce((sum, entry) => sum + entry.count, 0);
   const located = data?.points.length ?? 0;
@@ -48,13 +59,7 @@ export function GeoCard() {
   };
 
   return (
-    <Card className="anim-fade flex flex-col gap-3 p-4" style={{ animationDelay: "200ms" }}>
-      <div className="flex items-baseline justify-between">
-        <h3 className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
-          {t("map.title")}
-        </h3>
-      </div>
-
+    <div className="flex flex-col gap-3">
       {isError ? (
         <p role="alert" className="text-sm text-muted-foreground">
           {t("map.error")}
@@ -94,6 +99,6 @@ export function GeoCard() {
           )}
         </p>
       )}
-    </Card>
+    </div>
   );
 }

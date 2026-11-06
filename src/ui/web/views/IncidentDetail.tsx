@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Trans, useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge.tsx";
-import { BorderBeam } from "@/components/ui/border-beam.tsx";
-import { DotPattern } from "@/components/ui/dot-pattern.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { BentoTile } from "@/components/BentoTile.tsx";
@@ -141,7 +139,7 @@ export function IncidentDetail() {
           beam runs only while the incident is open — a resolved incident is a
           record, and a record does not need to attract the eye. */}
       <div
-        className="incident-band lit-band relative -mx-4 -mt-2 flex flex-wrap items-start justify-between gap-4 overflow-hidden border-b border-border px-4 pt-4 pb-6 md:-mx-8 md:px-8"
+        className="incident-band lit-band relative -mx-4 -mt-2 flex flex-wrap items-start justify-between gap-4 overflow-hidden border-b border-border px-4 pt-4 pb-6 md:-mx-10 md:px-10"
         style={{
           backgroundImage:
             incident.resolvedAt === null
@@ -149,18 +147,9 @@ export function IncidentDetail() {
               : "var(--gradient-hero)",
         }}
       >
-        <DotPattern className="text-foreground/6" />
-        {incident.resolvedAt === null && (
-          <BorderBeam
-            size={150}
-            duration={9}
-            colorFrom="var(--status-major-outage)"
-            colorTo="var(--status-degraded)"
-          />
-        )}
         <div className="flex flex-col gap-2">
           <div className="anim-rise flex items-center gap-2" style={{ animationDelay: "40ms" }}>
-            <span className="text-xs uppercase tracking-widest" style={{ color: impactColor(incident.impact) }}>
+            <span className="text-sm font-medium" style={{ color: impactColor(incident.impact) }}>
               {t("incident.kicker")}
             </span>
             <Badge variant="outline" style={{ color: impactColor(incident.impact), borderColor: impactColor(incident.impact) }}>
@@ -237,7 +226,7 @@ export function IncidentDetail() {
               },
             ].map((stat) => (
               <div key={stat.id} data-stat={stat.id} className="flex flex-col gap-0.5">
-                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   {stat.label}
                 </span>
                 <span
@@ -247,7 +236,7 @@ export function IncidentDetail() {
                   {stat.value}
                 </span>
                 {stat.note !== undefined && (
-                  <span className="text-[11px] text-muted-foreground">{stat.note}</span>
+                  <span className="text-xs text-muted-foreground">{stat.note}</span>
                 )}
               </div>
             ))}
@@ -267,9 +256,9 @@ export function IncidentDetail() {
               >
                 {t(detail.followed === true ? "incident.following" : "incident.follow")}
               </Button>
-              <span className="text-[11px] text-muted-foreground">{t("incident.follow.hint")}</span>
+              <span className="text-xs text-muted-foreground">{t("incident.follow.hint")}</span>
               {follow.isError && (
-                <span role="alert" className="text-[11px] text-destructive">
+                <span role="alert" className="text-xs text-destructive">
                   {t("incident.follow.failed", {
                     reason: follow.error instanceof Error ? follow.error.message : String(follow.error),
                   })}
@@ -304,7 +293,7 @@ export function IncidentDetail() {
             >
               <StatusDot status={active ? impactStatus(incident.impact) : "unknown"} size={9} pulse={stillOpen} />
               <span
-                className={cn("font-mono text-[11px]", isReached ? "font-medium" : "font-normal", !active && "text-muted-foreground")}
+                className={cn("font-mono text-xs", isReached ? "font-medium" : "font-normal", !active && "text-muted-foreground")}
                 style={active ? { color: impactColor(incident.impact) } : undefined}
                 aria-current={isReached ? "step" : undefined}
               >
@@ -362,7 +351,7 @@ export function IncidentDetail() {
                 {formatTime(i18n.language, entry.at)}
               </span>
               <div className="flex flex-col gap-0.5 pb-3">
-                <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   {t(`incident.timeline.${entry.label}`)}
                 </span>
                 {entry.status !== undefined && <span className="text-sm">{t(incidentStatusKey(entry.status))}</span>}
@@ -392,7 +381,7 @@ export function IncidentDetail() {
                 <span className="font-mono text-xs text-muted-foreground">
                   {formatTime(i18n.language, record.sentAt)}
                 </span>
-                <span className="font-mono text-[11px]">
+                <span className="font-mono text-xs">
                   <span>{record.channel}</span>
                   {": "}
                   <span>{record.text.split("\n")[0]}</span>
@@ -579,7 +568,7 @@ export function IncidentDetail() {
                   <StatusDot status={impactStatus(other.impact)} />
                   {other.name}
                 </span>
-                <span className="font-mono text-[10.5px]" style={{ color: impactColor(other.impact) }}>
+                <span className="font-mono text-xs" style={{ color: impactColor(other.impact) }}>
                   {t(incidentStatusKey(other.status))}
                 </span>
               </Link>

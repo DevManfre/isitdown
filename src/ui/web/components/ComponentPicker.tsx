@@ -143,7 +143,7 @@ export function ComponentPicker({
         {[...groups.entries()].map(([label, members]) => (
           <div key={label} className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs uppercase tracking-widest text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 {label}
               </span>
               <Button

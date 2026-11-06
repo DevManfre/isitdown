@@ -80,15 +80,15 @@ export function Rail() {
   };
 
   return (
-    <Sidebar role="navigation" aria-label={t("nav.views")} className="rail">
-      <SidebarHeader className="rail-brand flex-row items-center gap-2 overflow-hidden px-6 py-4">
+    <Sidebar role="navigation" aria-label={t("nav.views")} className="rail border-r border-sidebar-border">
+      <SidebarHeader className="rail-brand flex-row items-center gap-2.5 overflow-hidden px-5 pt-5 pb-6">
         <InstanceMark className="rail-mark size-5" />
-        <span className="rail-name font-medium">{identity.name}</span>
+        <span className="rail-name text-[15px] font-semibold">{identity.name}</span>
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup className="rail-links p-0" data-tour="rail">
-          <SidebarMenu className="gap-0">
+        <SidebarGroup className="rail-links px-3 py-0" data-tour="rail">
+          <SidebarMenu className="gap-0.5">
             {NAV_ROUTES.map(({ name, labelKey }) => {
               const badge = badgeFor(name);
               const Icon = NAV_ICONS[name];
@@ -102,7 +102,7 @@ export function Rail() {
                     // so the state has to be handed in rather than read out of
                     // NavLink's render prop.
                     isActive={matchPath({ path: ROUTE_PATHS[name], end: false }, pathname) !== null}
-                    className="rounded-none"
+                    className="h-9 gap-2.5 rounded-md px-3 text-sm text-muted-foreground hover:bg-foreground/5 hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:font-medium data-[active=true]:text-foreground"
                   >
                     <NavLink to={ROUTE_PATHS[name]}>
                       <Icon className="rail-icon size-4" strokeWidth={1.6} aria-hidden="true" />
@@ -112,10 +112,8 @@ export function Rail() {
                   {badge !== undefined && (
                     <SidebarMenuBadge
                       className={cn(
-                        "rail-badge mr-4",
-                        name === "incidents"
-                          ? "bg-destructive/15 text-destructive"
-                          : "bg-muted text-muted-foreground",
+                        "rail-badge right-3 font-mono peer-data-[size=default]/menu-button:top-1/2 peer-data-[size=default]/menu-button:-translate-y-1/2",
+                        name === "incidents" ? "text-destructive" : "text-muted-foreground",
                       )}
                     >
                       <NumberTicker locale={i18n.language} value={badge} />

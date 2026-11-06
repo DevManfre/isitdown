@@ -4,6 +4,8 @@ import { Trans, useTranslation } from "react-i18next";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Card } from "@/components/ui/card.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { WidgetCard } from "@/widgets/catalog/WidgetCard.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { DeltaChip } from "@/components/DeltaChip.tsx";
@@ -122,6 +124,10 @@ function downloadHistoryJson(summary: HistorySummary, days: number): void {
  * already loaded, so the server stays the only place uptime is computed —
  * changing `days` changes `useHistory`'s own query key.
  */
+/** History's tabs (dashboard-design-direction): one question each. */
+const HISTORY_TABS = ["trend", "reliability", "patterns", "compare", "latency"] as const;
+type HistoryTab = (typeof HISTORY_TABS)[number];
+
 export function History() {
   const { t, i18n } = useTranslation();
   // Roadmap 4.3: a number on the Overview arrives with the window it was counted
@@ -205,6 +211,10 @@ export function History() {
   // the first render, and a comparison the operator did choose must survive a
   // range change that reorders the list under it.
   const [compare, setCompare] = useState<string[] | null>(null);
+  // Which of the five tabs is shown, in the address like the window is.
+  const [tabWord, setTab] = useViewParam<HistoryTab>("history", "tab", "trend", (raw) =>
+    (HISTORY_TABS as readonly string[]).includes(raw) ? (raw as HistoryTab) : null,
+  );
   const { data } = useHistory(window_);
   const { data: status } = useStatus();
   // Roadmap 12.1. Its own query: see `useAnnotations`.
@@ -276,6 +286,12 @@ export function History() {
   const nextToAdd = ordered.find(
     (provider) => !comparedIds.includes(provider.providerId),
   );
+  // A tab that has nothing to show here — a bookmark to Compare on a fleet
+  // of one — falls back to Trend rather than to an empty panel.
+  const tab: HistoryTab =
+    (tabWord === "compare" && compared.length < 2) || (tabWord === "latency" && ordered.length === 0)
+      ? "trend"
+      : tabWord;
 
   const picker = (index: number, value: string) => (
     <div key={value} className="flex items-center gap-2">
@@ -333,16 +349,12 @@ export function History() {
     // liveness, so a day it missed part of reads as hatched rather than as a
     // quiet day.
     <CoverageProvider coverage={summary.dailyCoverage}>
-      <div className="flex flex-col gap-6">
-        <div
-          className="anim-rise anim-rise-column flex flex-col gap-4"
-          style={{ animationDelay: "0ms" }}
-        >
+      <div className="flex flex-col gap-8">
+        {/* The window's headline and its four figures stay above the tabs:
+            they are the answer every tab below is a closer look at. */}
+        <div className="anim-rise anim-rise-column flex flex-col gap-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="flex flex-col gap-2">
-              <span className="text-xs uppercase tracking-widest text-primary">
-                {t("history.kicker")}
-              </span>
               {askedProvider !== null && open === askedProvider && (
                 <FromOverviewChip
                   params={params}
@@ -591,161 +603,151 @@ export function History() {
             />
           )}
 
-          <UptimeTrendChart
-            series={summary.dailyUptime}
-            label={t("history.trend-title")}
-            annotations={annotations?.annotations ?? []}
-            onSelectRange={(from, to) => setRange({ from, to })}
-          />
-          <p className="text-xs text-muted-foreground">{t("history.brush-hint")}</p>
-
-          <AnnotationBar annotations={annotations?.annotations ?? []} />
-
-          {reliability !== undefined && (
-            <>
-              <ReliabilityTable
-                providers={reliability.providers}
-                nameOf={nameOf}
-              />
-              <IncidentHeatmap grid={reliability.byWeekdayHour} />
-            {coincidence !== undefined && (
-                <BreakTogetherCard
-                  pairs={coincidence.pairs}
-                  services={config?.services ?? []}
-                  nameOf={nameOf}
-                />
-              )}
-            </>
-          )}
-
-          <MonthColumns
-            months={summary.months}
-            labelFor={(month) => monthLabel(i18n.language, month)}
-            noDataLabel={t("history.month-no-data")}
-            heading={t("history.months-title")}
-          />
         </div>
 
-        <div
-          className="fade-rule anim-sweep h-px bg-border"
-          style={{ animationDelay: "200ms" }}
-        />
+        {/* Roadmap's eleven stacked sections, as five tabs (dashboard-design-
+            direction: one question per surface). The tab is in the address
+            (`?tab=`), so a link can open the one it means; the provider drawer
+            sits outside them and opens over whichever is shown. */}
+        <Tabs value={tab} onValueChange={(next) => setTab(next as HistoryTab)}>
+          <TabsList aria-label={t("history.tabs")}>
+            <TabsTrigger value="trend">{t("history.tab.trend")}</TabsTrigger>
+            <TabsTrigger value="reliability">{t("history.tab.reliability")}</TabsTrigger>
+            <TabsTrigger value="patterns">{t("history.tab.patterns")}</TabsTrigger>
+            {compared.length >= 2 && <TabsTrigger value="compare">{t("history.tab.compare")}</TabsTrigger>}
+            {ordered.length > 0 && <TabsTrigger value="latency">{t("history.tab.latency")}</TabsTrigger>}
+          </TabsList>
 
-        {/* Two providers side by side is the question a vendor decision asks, and
-          the list of rows — which ranks them but never puts two on the same
-          axes — cannot answer it. A card between the two rules rather than a
-          third full-width band: the headline and the month columns are one
-          reading of the fleet, and this is a tool the operator drives, so it
-          reads better as its own surface than as more of the hero. Only
-          rendered once there are two providers to compare: one drawn against
-          itself is a chart with nothing to say. */}
-        {compared.length >= 2 ? (
-          <>
-            <section
-              aria-label={t("history.compare.title")}
-              className="anim-rise"
-              style={{ animationDelay: "120ms" }}
-            >
-              <Card className="flex flex-col gap-3 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                    {t("history.compare.title")}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {compared.map((provider, index) =>
-                      picker(index, provider.providerId),
-                    )}
-                    {compared.length < COMPARE_CHART.length &&
-                    nextToAdd !== undefined ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setCompare([...comparedIds, nextToAdd.providerId])
-                        }
-                      >
-                        <Plus aria-hidden="true" />
-                        {t("history.compare.add")}
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-                <UptimeCompareChart
-                  rows={alignSeries(compared)}
-                  labels={compared.map((provider) => nameOf(provider.providerId))}
-                  label={t("history.compare.chart", {
-                    providers: formatList(
-                      i18n.language,
-                      compared.map((provider) => nameOf(provider.providerId)),
-                    ),
-                  })}
-                />
-              </Card>
-            </section>
-
-            <div
-              className="fade-rule anim-sweep h-px bg-border"
-              style={{ animationDelay: "240ms" }}
+          <TabsContent value="trend">
+            <div className="flex flex-col gap-3">
+            <UptimeTrendChart
+              series={summary.dailyUptime}
+              label={t("history.trend-title")}
+              annotations={annotations?.annotations ?? []}
+              onSelectRange={(from, to) => setRange({ from, to })}
             />
-          </>
-        ) : null}
-
-        {/* Roadmap 4.14. Under the comparison: both are "one vendor against its own
-            history" questions, and neither is a row of the list below. */}
-        {ordered.length > 0 ? (
-          <LatencyCard
-            providers={ordered.map((provider) => ({
-              id: provider.providerId,
-              name: nameOf(provider.providerId),
-            }))}
-          />
-        ) : null}
-
-        {summary.providers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("empty.no-data")}</p>
-        ) : (
-          // One grid for the whole list, with the header and every row as a
-          // `subgrid` inside it. A grid per row (which is what a `flex-col` list
-          // of self-contained grids gives) sizes its `auto` tracks from its own
-          // content, so every row put its figure at a different x and the header
-          // labelled nothing — the exact defect this list was rebuilt to fix. A
-          // delta cell is also empty whenever a provider has no previous window,
-          // and only shared tracks keep the columns straight through that.
-          // A named region, so a query can be scoped to the list: the stat tiles
-          // at the top of the page name the best and the worst provider, so a
-          // provider's name is deliberately on the page twice.
-          <div
-            role="region"
-            aria-label={t("history.list")}
-            // Five shared tracks from `md` up; a plain column of cards below it,
-            // where five columns would each be 60px wide. The header labels the
-            // tracks, so it goes with them — each mobile card carries its own
-            // figures in a shape that reads without one.
-            className="history-list flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(8rem,1fr)_minmax(6rem,2fr)_auto_auto_auto] lg:items-center lg:gap-x-4"
-          >
-            <div className="col-span-full hidden grid-cols-subgrid items-center px-2 text-xs uppercase tracking-widest text-muted-foreground lg:grid">
-              <span>{t("history.col-provider")}</span>
-              <span>{t("history.col-trend")}</span>
-              <span>{t("history.col-uptime", { days })}</span>
-              <span>{t("history.col-delta")}</span>
-              <span>{t("history.col-incidents")}</span>
+            <p className="text-xs text-muted-foreground">{t("history.brush-hint")}</p>
             </div>
-            {ordered.map((provider, index) => {
-              const live = statusById.get(provider.providerId);
-              return (
-                <ProviderTrendRow
-                  key={provider.providerId}
-                  provider={provider}
-                  name={live?.name ?? provider.providerId}
-                  status={live?.overallStatus ?? "unknown"}
-                  days={days}
-                  delay={stagger(index, { base: 180, step: 36, cap: 420 })}
-                  onOpen={() => setOpen(provider.providerId)}
-                />
-              );
-            })}
-          </div>
-        )}
+          {summary.providers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("empty.no-data")}</p>
+          ) : (
+            // One grid for the whole list, with the header and every row as a
+            // `subgrid` inside it. A grid per row (which is what a `flex-col` list
+            // of self-contained grids gives) sizes its `auto` tracks from its own
+            // content, so every row put its figure at a different x and the header
+            // labelled nothing — the exact defect this list was rebuilt to fix. A
+            // delta cell is also empty whenever a provider has no previous window,
+            // and only shared tracks keep the columns straight through that.
+            // A named region, so a query can be scoped to the list: the stat tiles
+            // at the top of the page name the best and the worst provider, so a
+            // provider's name is deliberately on the page twice.
+            <div
+              role="region"
+              aria-label={t("history.list")}
+              // Five shared tracks from `md` up; a plain column of cards below it,
+              // where five columns would each be 60px wide. The header labels the
+              // tracks, so it goes with them — each mobile card carries its own
+              // figures in a shape that reads without one.
+              className="history-list flex flex-col gap-2 lg:grid lg:grid-cols-[minmax(8rem,1fr)_minmax(6rem,2fr)_auto_auto_auto] lg:items-center lg:gap-x-4"
+            >
+              <div className="col-span-full hidden grid-cols-subgrid items-center px-2 text-sm text-muted-foreground lg:grid">
+                <span>{t("history.col-provider")}</span>
+                <span>{t("history.col-trend")}</span>
+                <span>{t("history.col-uptime", { days })}</span>
+                <span>{t("history.col-delta")}</span>
+                <span>{t("history.col-incidents")}</span>
+              </div>
+              {ordered.map((provider, index) => {
+                const live = statusById.get(provider.providerId);
+                return (
+                  <ProviderTrendRow
+                    key={provider.providerId}
+                    provider={provider}
+                    name={live?.name ?? provider.providerId}
+                    status={live?.overallStatus ?? "unknown"}
+                    days={days}
+                    delay={stagger(index)}
+                    onOpen={() => setOpen(provider.providerId)}
+                  />
+                );
+              })}
+            </div>
+          )}
+            {/* The operator's own markers: a tool, not a reading, so it folds. */}
+            <WidgetCard title={t("annotation.title")} disclosure={{ id: "history-markers" }}>
+              <AnnotationBar annotations={annotations?.annotations ?? []} />
+            </WidgetCard>
+          </TabsContent>
+
+          <TabsContent value="reliability">
+            {reliability !== undefined && (
+              <ReliabilityTable providers={reliability.providers} nameOf={nameOf} />
+            )}
+            <MonthColumns
+              months={summary.months}
+              labelFor={(month) => monthLabel(i18n.language, month)}
+              noDataLabel={t("history.month-no-data")}
+              heading={t("history.months-title")}
+            />
+          </TabsContent>
+
+          <TabsContent value="patterns">
+            {reliability !== undefined && <IncidentHeatmap grid={reliability.byWeekdayHour} />}
+            {coincidence !== undefined && (
+              <BreakTogetherCard pairs={coincidence.pairs} services={config?.services ?? []} nameOf={nameOf} />
+            )}
+          </TabsContent>
+
+          {compared.length >= 2 && (
+            <TabsContent value="compare">
+              <section aria-label={t("history.compare.title")}>
+                <Card className="flex flex-col gap-4 p-5 shadow-none">
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      {compared.map((provider, index) =>
+                        picker(index, provider.providerId),
+                      )}
+                      {compared.length < COMPARE_CHART.length &&
+                      nextToAdd !== undefined ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setCompare([...comparedIds, nextToAdd.providerId])
+                          }
+                        >
+                          <Plus aria-hidden="true" />
+                          {t("history.compare.add")}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <UptimeCompareChart
+                    rows={alignSeries(compared)}
+                    labels={compared.map((provider) => nameOf(provider.providerId))}
+                    label={t("history.compare.chart", {
+                      providers: formatList(
+                        i18n.language,
+                        compared.map((provider) => nameOf(provider.providerId)),
+                      ),
+                    })}
+                  />
+                </Card>
+              </section>
+            </TabsContent>
+          )}
+
+          {ordered.length > 0 && (
+            <TabsContent value="latency">
+              <LatencyCard
+                providers={ordered.map((provider) => ({
+                  id: provider.providerId,
+                  name: nameOf(provider.providerId),
+                }))}
+              />
+            </TabsContent>
+          )}
+        </Tabs>
 
         <ProviderHistoryDrawer
           providerId={open}

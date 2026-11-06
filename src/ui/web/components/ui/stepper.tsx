@@ -115,7 +115,7 @@ function StepIndicator({
       <motion.span
         variants={circle}
         transition={{ duration: reduce ? 0 : 0.3 }}
-        className="flex size-6 items-center justify-center rounded-full text-[11px] font-semibold"
+        className="flex size-6 items-center justify-center rounded-full text-xs font-semibold"
       >
         {status === "complete" ? (
           <CheckMark reduce={reduce} />

@@ -120,7 +120,7 @@ export function YearCalendar({ props }: { props: ProviderPick }) {
           <Grid columns={recent} cell="0.9rem" compact />
         </div>
         <div className="hidden flex-col gap-1.5 @md:flex">
-          <div className="relative h-3.5 font-mono text-[0.65rem] text-muted-foreground" aria-hidden="true">
+          <div className="relative h-3.5 font-mono text-xs text-muted-foreground" aria-hidden="true">
             {monthTicks.slice(1).map((tick) => (
               <span key={tick.day} className="absolute top-0" style={{ left: `${(tick.index / all.length) * 100}%` }}>
                 {new Intl.DateTimeFormat(i18n.language, { month: "short" }).format(new Date(`${tick.day}T12:00:00Z`))}
@@ -130,7 +130,7 @@ export function YearCalendar({ props }: { props: ProviderPick }) {
           <Grid columns={all} cell="0.72rem" />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         {LEGEND.map((status) => (
           <span key={status} className="flex items-center gap-1.5">
             <span aria-hidden="true" className="size-2.5 rounded-[3px]" style={{ background: statusFill(status), opacity: status === "operational" ? 0.55 : 1 }} />

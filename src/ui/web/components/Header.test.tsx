@@ -38,11 +38,15 @@ describe("Header", () => {
     renderWithProviders(<Header view="overview" />, {
       status: { providers: [], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
     });
-    // The countdown beside it says the same words, so the subtitle is asserted
-    // by its own element rather than by a text lookup that matches both.
+    // Said once, by the poll control: the subtitle keeps to the cadence, so
+    // "not polled yet" no longer appears twice in one header.
     await waitFor(() =>
-      expect(document.querySelector(".header-meta")).toHaveTextContent(i18n.t("meta.never-polled")),
+      expect(document.querySelector(".header-meta")).toHaveTextContent(
+        i18n.t("meta.interval", { minutes: 5 }),
+      ),
     );
+    expect(document.querySelector(".header-meta")).not.toHaveTextContent(i18n.t("meta.never-polled"));
+    expect(screen.getAllByText(i18n.t("meta.never-polled"))).toHaveLength(1);
   });
 
   // data-mode on its own would pass even if all three modes mapped to the same

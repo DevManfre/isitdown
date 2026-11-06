@@ -8,8 +8,6 @@ import { FromOverviewChip } from "@/components/DrillLink.tsx";
 import { FROM_PARAM, readDays, snapWindow } from "@/lib/drillDown.ts";
 import { useViewParam } from "@/hooks/useViewParam.ts";
 import { Card } from "@/components/ui/card.tsx";
-import { BorderBeam } from "@/components/ui/border-beam.tsx";
-import { DotPattern } from "@/components/ui/dot-pattern.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { useCountWidth } from "@/hooks/useCountWidth.ts";
@@ -24,6 +22,7 @@ import {
 } from "@/components/ui/pagination.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
+import { WidgetCard } from "@/widgets/catalog/WidgetCard.tsx";
 import { ProviderIcon } from "@/components/ProviderIcon.tsx";
 import { IncidentTimelineCard } from "@/components/IncidentTimelineCard.tsx";
 import { useIncidents, useMaintenances, useNotifications, useStatus } from "@/hooks/queries.ts";
@@ -338,7 +337,7 @@ export function Incidents() {
               run, not just at the end. */}
           <span
             aria-hidden="true"
-            className="ml-1.5 inline-block text-right text-[10px] text-muted-foreground"
+            className="ml-1.5 inline-block text-right text-xs text-muted-foreground"
             style={{ minWidth: countWidth }}
           >
             <NumberTicker locale={i18n.language} value={counts[entry.value]} />
@@ -350,40 +349,22 @@ export function Incidents() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className={cn("grid grid-cols-1 gap-6", showActive && "lg:grid-cols-[2fr_1fr]")}>
+      <div className="flex flex-col gap-4">
         {showActive && (
-          // While an incident is actually open the card is drawn in the
-          // severity it reports, not in the accent: an active outage and a
-          // "nothing open right now" panel used to be the same violet box with
-          // different words in it. With nothing open it keeps the accent, since
-          // there is no severity to take a colour from.
-          <Card
-            className={cn(
-              "anim-rise lit-band relative flex flex-col gap-3 overflow-hidden p-4",
-              current === undefined
-                ? "border-primary/40 bg-primary/5"
-                : "border-destructive/40 bg-destructive/[0.07]",
-            )}
-            style={{ animationDelay: "60ms" }}
-          >
-            <DotPattern className="text-foreground/6" />
-            {current !== undefined && (
-              <BorderBeam
-                size={140}
-                duration={8}
-                colorFrom="var(--status-major-outage)"
-                colorTo="var(--status-degraded)"
-              />
-            )}
-            <div className="relative flex items-center justify-between">
-              <span
+          // The calm card (dashboard-design-direction): the severity is said
+          // by the heading's word and dot, not by tinting the whole card. With
+          // nothing open it is one quiet line.
+          <Card className="anim-rise flex flex-col gap-3 p-5 shadow-none">
+            <div className="flex items-center justify-between gap-3">
+              <h2
                 className={cn(
-                  "text-xs uppercase tracking-widest",
-                  current === undefined ? "text-primary" : "text-destructive",
+                  "flex items-center gap-2 text-sm font-medium",
+                  current === undefined ? "text-muted-foreground" : "text-[var(--status-major-outage)]",
                 )}
               >
+                {current !== undefined && <StatusDot status={impactStatus(current.impact)} pulse />}
                 {t("incidents.active")}
-              </span>
+              </h2>
               {current !== undefined && (
                 <span className="font-mono text-xs text-muted-foreground">
                   {current.incidentId} · {formatRelative(i18n.language, current.startedAt)}
@@ -400,7 +381,7 @@ export function Incidents() {
                     exact incident name (never concatenated with anything
                     else) must find a node whose own text is exactly that
                     name, not "Provider — Name" as one string. */}
-                <span className="relative text-xl font-semibold tracking-tight text-balance">
+                <span className="text-lg font-semibold text-balance">
                   <span>{nameOf(current.providerId)}</span> — <span>{current.name}</span>
                 </span>
                 <span className="text-sm text-muted-foreground">
@@ -435,18 +416,23 @@ export function Incidents() {
           </Card>
         )}
 
-        <Card className="anim-rise panel-channel flex flex-col gap-3 p-4" style={{ animationDelay: "140ms" }}>
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">
-            {t("incidents.notifications-sent")}
-          </span>
+        {/* What was sent about it: secondary, so it folds, with the count
+            beside its title while shut. */}
+        <WidgetCard
+          title={t("incidents.notifications-sent")}
+          className="panel-channel"
+          disclosure={{
+            id: "incidents-notifications",
+            summary: notifications.length === 0 ? undefined : t("incidents.notifications-summary", { count: notifications.length }),
+          }}
+        >
           {notifications.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("incidents.empty-notifications")}</p>
           ) : (
             shownNotifications.map((record, index) => (
               <div
                 key={`${record.providerId}-${record.sentAt}-${index}`}
-                className="anim-fade flex items-baseline gap-2 border-t border-border pt-1"
-                style={{ animationDelay: stagger(index, { base: 150, step: 28, cap: 400 }) }}
+                className="flex items-baseline gap-3 border-t border-border pt-2"
               >
                 <ProviderIcon
                   name={nameOf(record.providerId)}
@@ -457,8 +443,8 @@ export function Incidents() {
                   {/* The stored text is what was actually delivered — the
                       first line only here, same as incidents.js:195, minus the
                       leading status emoji the provider icon now stands in for. */}
-                  <span className="text-xs">{notificationHeadline(record.text)}</span>
-                  <span className="font-mono text-[10.5px] text-muted-foreground">
+                  <span className="text-sm">{notificationHeadline(record.text)}</span>
+                  <span className="font-mono text-xs text-muted-foreground">
                     {record.channel} · {formatDateTime(i18n.language, record.sentAt)} · {nameOf(record.providerId)}
                   </span>
                 </span>
@@ -472,13 +458,13 @@ export function Incidents() {
               type="button"
               variant="ghost"
               size="sm"
-              className="self-start px-0 text-xs text-muted-foreground"
+              className="self-start px-0 text-muted-foreground"
               onClick={() => setFeedExpanded(true)}
             >
               {t("action.show-more")}
             </Button>
           )}
-        </Card>
+        </WidgetCard>
       </div>
 
       {/* Roadmap 4.12. Between the hero and the list: the hero is "now", the
@@ -492,10 +478,10 @@ export function Incidents() {
       {/* A named region, so a row query can be scoped to the list: the open
           incident is deliberately in two places at once — the hero card above
           and a row here, since the list holds every state under `all`. */}
-      <section aria-label={t("incidents.list")} className="flex flex-col gap-2">
+      <section aria-label={t("incidents.list")} className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("incidents.list")}</span>
+            <h2 className="text-base font-medium">{t("incidents.list")}</h2>
             {provider !== null && (
               <FromOverviewChip
                 params={params}
@@ -536,21 +522,24 @@ export function Incidents() {
             {t(searching ? "incidents.empty-search" : "incidents.empty-list")}
           </p>
         ) : (
-          timelineEntries.map((entry, index) =>
+          // One bordered list with dividers, the way the Overview's provider
+          // list reads (dashboard-design-direction) — not a stack of boxes.
+          <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+          {timelineEntries.map((entry, index) =>
             entry.kind === "incident" ? (
               <button
                 key={`${entry.incident.providerId}/${entry.incident.incidentId}`}
                 type="button"
-                className="incident-row anim-rise anim-rise-row flex items-center gap-3 rounded-md border border-border px-3 py-2 text-left"
-                style={{ animationDelay: stagger(index, { base: 170, step: 32, cap: 420 }) }}
+                className="incident-row anim-rise anim-rise-row flex min-h-14 items-center gap-4 px-5 py-3 text-left"
+                style={{ animationDelay: stagger(index) }}
                 onClick={() => goTo(entry.incident)}
               >
-                <span className="font-mono text-xs text-muted-foreground">
+                <span className="w-36 shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
                   {formatDateTime(i18n.language, entry.incident.startedAt)}
                 </span>
                 <StatusDot status={impactStatus(entry.incident.impact)} />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm">
+                  <span className="truncate text-sm font-medium">
                     <span>{nameOf(entry.incident.providerId)}</span> — <span>{entry.incident.name}</span>
                   </span>
                   <span className="text-xs text-muted-foreground">
@@ -560,7 +549,12 @@ export function Incidents() {
                     })}
                   </span>
                 </span>
-                <span className="ml-auto rounded border border-border px-2 py-0.5 font-mono text-xs text-muted-foreground">
+                <span
+                  className={cn(
+                    "ml-auto shrink-0 text-sm",
+                    entry.incident.resolvedAt === null ? "font-medium text-[var(--status-major-outage)]" : "text-muted-foreground",
+                  )}
+                >
                   {t(entry.incident.resolvedAt === null ? "incidents.state.open" : "incidents.state.resolved")}
                 </span>
               </button>
@@ -569,10 +563,10 @@ export function Incidents() {
               // navigate to, unlike an incident row alongside it.
               <div
                 key={`${entry.maintenance.providerId}/${entry.maintenance.id}`}
-                className="incident-row anim-rise anim-rise-row flex items-center gap-3 rounded-md border border-border px-3 py-2 text-left"
-                style={{ animationDelay: stagger(index, { base: 170, step: 32, cap: 420 }) }}
+                className="incident-row anim-rise anim-rise-row flex min-h-14 items-center gap-4 px-5 py-3 text-left"
+                style={{ animationDelay: stagger(index) }}
               >
-                <span className="font-mono text-xs text-muted-foreground">
+                <span className="w-36 shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
                   {formatDateTime(i18n.language, entry.maintenance.startsAt)}
                 </span>
                 <Badge variant="muted">{t("incidents.maintenance.label")}</Badge>
@@ -583,7 +577,8 @@ export function Incidents() {
                 </span>
               </div>
             ),
-          )
+          )}
+          </div>
         )}
 
         {pages > 1 && (

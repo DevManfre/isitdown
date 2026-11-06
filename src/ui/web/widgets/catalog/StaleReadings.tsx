@@ -68,7 +68,7 @@ export function StaleReadings({ props }: { props: { filter: FleetFilter } }) {
               style={{ animationDelay: stagger(index, { base: 120, step: 45 }) }}
             >
               <span
-                className="w-36 shrink-0 font-mono text-[0.68rem] tracking-wider uppercase"
+                className="w-36 shrink-0 text-sm font-medium"
                 style={{ color: p.failureCount > 0 ? "var(--status-major-outage)" : "var(--status-degraded)" }}
               >
                 {detail(p)}

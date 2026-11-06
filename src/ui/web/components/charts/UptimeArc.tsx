@@ -3,12 +3,11 @@ import { useTranslation } from "react-i18next";
 /**
  * The fleet's 90-day average as one arc.
  *
- * Hand-drawn SVG rather than a Recharts `RadialBarChart` like `UptimeRing` and
- * `FleetSummary` use: those two draw a ring per provider and a ring per fleet
- * respectively, where a chart library's axis, tooltip and animation plumbing
- * earns its place. This is a single static arc in the hero, drawn once per
- * render, and a whole polar chart for one number is weight the bundle budget
- * pays for on every view.
+ * Hand-drawn SVG rather than a Recharts `RadialBarChart` like `UptimeRing`
+ * uses: that one draws a ring per provider, where a chart library's axis,
+ * tooltip and animation plumbing earns its place. This is a single static
+ * arc, drawn once per render, and a whole polar chart for one number is
+ * weight the bundle budget pays for on every view.
  *
  * Colour comes from the tokens, never from a literal: the arc is the accent
  * (this is the product's own figure, not a severity verdict) over the neutral

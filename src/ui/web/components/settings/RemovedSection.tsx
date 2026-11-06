@@ -2,7 +2,6 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { SettingRow } from "@/components/SettingRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
-import { SECTION_REELS } from "@/components/settings/reels.ts";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
 import { useSettingsReceipt } from "@/components/settings/useSettingsReceipt.ts";
 import { useServiceMutations } from "@/hooks/queries.ts";
@@ -18,7 +17,6 @@ export function RemovedSection({ removed }: { removed: RemovedService[] }) {
   return (
     <SettingsSection
       id="removed"
-      reel={SECTION_REELS.removed}
       className="lg:col-span-2"
       title={t("settings.section.removed")}
       note={t("settings.removed-note")}

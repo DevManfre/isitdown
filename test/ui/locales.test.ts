@@ -149,7 +149,7 @@ const DYNAMIC_FAMILIES: { prefix: string; reason: string }[] = [
   {
     prefix: "authority.source.",
     reason:
-      "ProviderCards.tsx renders t(`authority.source.${provider.authority}`) for whichever source is the record",
+      "Providers.tsx renders t(`authority.source.${row.original.authority}`) beside each host, for whichever source is the record",
   },
   {
     prefix: "annotation.colour.",

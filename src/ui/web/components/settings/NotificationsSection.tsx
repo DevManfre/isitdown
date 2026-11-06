@@ -11,7 +11,6 @@ import {
 import { MessagePreviewDialog } from "@/components/settings/MessagePreviewDialog.tsx";
 import { RecipientsDialog } from "@/components/settings/RecipientsDialog.tsx";
 import { RoutingRulesDialog } from "@/components/settings/RoutingRulesDialog.tsx";
-import { SECTION_REELS } from "@/components/settings/reels.ts";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
 import {
   useSettingsChrome,
@@ -76,7 +75,6 @@ export function NotificationsSection({
   return (
     <SettingsSection
       id="notifications"
-      reel={SECTION_REELS.notifications}
       className="lg:col-span-3"
       title={t("settings.section.notifications")}
       note={t("settings.secret-note")}
