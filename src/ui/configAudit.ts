@@ -268,7 +268,12 @@ export function revertEntry(db: DatabaseSync, entry: AuditEntry): void {
 export function actorOf(req: Request, headerName: string | undefined): string {
   if (headerName === undefined || headerName === "") return "local";
   const raw = req.header(headerName);
-  const clean = typeof raw === "string" ? raw.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 120) : "";
+  // Control characters dropped by code point: a header value can carry any byte
+  // the proxy let through, and none of them belongs in a log line or a list.
+  const clean =
+    typeof raw === "string"
+      ? [...raw].filter((char) => (char.codePointAt(0) ?? 0) > 0x1f).join("").trim().slice(0, 120)
+      : "";
   return clean === "" ? "local" : clean;
 }
 
