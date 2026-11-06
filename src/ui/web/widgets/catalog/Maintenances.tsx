@@ -71,7 +71,7 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
   const shown = rows.slice(0, SHOWN);
   const hidden = rows.length - shown.length;
   const more = hidden > 0 && (
-    <p className="font-mono text-xs text-muted-foreground">{t("widget.maintenances.hidden", { count: hidden, days: HORIZON_DAYS })}</p>
+    <p className="text-xs text-muted-foreground">{t("widget.maintenances.hidden", { count: hidden, days: HORIZON_DAYS })}</p>
   );
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
@@ -103,7 +103,7 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
             style={{ animationDelay: stagger(index, { base: 120, step: 45 }) }}
           >
             {live(row) ? (
-              <span className="rounded bg-primary/15 px-1.5 font-mono text-xs tracking-wider text-primary uppercase">
+              <span className="rounded bg-primary/10 px-1.5 text-xs font-medium text-primary">
                 {t("widget.maintenances.live-tag")}
               </span>
             ) : (

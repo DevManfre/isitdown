@@ -232,7 +232,7 @@ export function SourceStep({
           {ADAPTER_FAMILIES.map((family) => (
             <div key={family.title} className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                <span className="text-sm font-medium text-muted-foreground">
                   {t(family.title)}
                 </span>
                 <span className="h-px flex-1 bg-border" />

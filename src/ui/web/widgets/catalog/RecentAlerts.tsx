@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useNotifications } from "@/hooks/queries.ts";
-import { formatTime } from "@/lib/format.ts";
+import { formatTime, notificationHeadline } from "@/lib/format.ts";
 import { stagger } from "@/lib/stagger.ts";
 import { ROUTE_PATHS } from "../../../routePaths.ts";
 import { WidgetCard } from "./WidgetCard.tsx";
@@ -46,7 +46,7 @@ export function RecentAlerts() {
       {/* A third: the last message, and where it landed. */}
       <div className="flex flex-col gap-1.5 @md:hidden">
         <span className="font-mono text-xs text-muted-foreground">{formatTime(i18n.language, latest.sentAt)}</span>
-        <span className="line-clamp-2 text-sm">{latest.text.split("\n")[0]}</span>
+        <span className="line-clamp-2 text-sm">{notificationHeadline(latest.text)}</span>
         <span className="font-mono text-xs text-muted-foreground">
           {sameMoment
             .map((r) => `${channelName(r.channel)} ${r.ok ? t("widget.recent-alerts.ok-mark") : t("widget.recent-alerts.ko-mark")}`)
@@ -61,11 +61,11 @@ export function RecentAlerts() {
             className="anim-rise anim-rise-row flex min-w-0 items-center gap-2.5 border-t border-border py-2.5 text-sm"
             style={{ animationDelay: stagger(index, { base: 120, step: 40 }) }}
           >
-            <span className="w-12 shrink-0 font-mono text-xs text-muted-foreground">{formatTime(i18n.language, row.sentAt)}</span>
-            <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs">{channelName(row.channel)}</span>
-            <span className="min-w-0 truncate">{row.text.split("\n")[0]}</span>
+            <span className="shrink-0 font-mono text-xs whitespace-nowrap text-muted-foreground tabular-nums">{formatTime(i18n.language, row.sentAt)}</span>
+            <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-xs">{channelName(row.channel)}</span>
+            <span className="min-w-0 truncate">{notificationHeadline(row.text)}</span>
             <span
-              className="ml-auto shrink-0 font-mono text-xs tracking-wider uppercase"
+              className="ml-auto shrink-0 text-sm font-medium"
               style={{ color: row.ok ? "var(--status-operational)" : "var(--status-major-outage)" }}
             >
               {row.ok

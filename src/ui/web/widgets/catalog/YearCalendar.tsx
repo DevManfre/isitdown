@@ -130,7 +130,7 @@ export function YearCalendar({ props }: { props: ProviderPick }) {
           <Grid columns={all} cell="0.72rem" />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         {LEGEND.map((status) => (
           <span key={status} className="flex items-center gap-1.5">
             <span aria-hidden="true" className="size-2.5 rounded-[3px]" style={{ background: statusFill(status), opacity: status === "operational" ? 0.55 : 1 }} />

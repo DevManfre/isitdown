@@ -92,7 +92,7 @@ export function ErrorBudget({ props }: { props: { filter: FleetFilter } }) {
           label={t("widget.error-budget.ring", { provider: name(worst.providerId), used: pct(used(worst)) })}
         />
         <span className="text-sm">{name(worst.providerId)} · {word(worst)}</span>
-        <span className="font-mono text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {t("widget.error-budget.left", { time: formatDuration(i18n.language, Math.max(0, worst.remainingMinutes)) })}
         </span>
       </div>
@@ -131,7 +131,7 @@ export function ErrorBudget({ props }: { props: { filter: FleetFilter } }) {
               / {formatDuration(i18n.language, b.budgetMinutes)}
             </span>
             <span
-              className="widget-tone hidden text-right font-mono text-xs tracking-wider uppercase @2xl:block"
+              className="widget-tone hidden text-right text-sm @2xl:block font-medium"
               style={{ color: COLOR[standing(b)] }}
             >
               {word(b)}

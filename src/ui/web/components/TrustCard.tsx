@@ -84,7 +84,7 @@ function TrustPairCard({
       className="flex flex-col gap-3 rounded-md border border-border bg-card p-3"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-xs uppercase tracking-widest text-primary">{t("trust.title")}</span>
+        <span className="text-base font-medium">{t("trust.title")}</span>
         <div className="flex gap-1" role="group" aria-label={t("trust.window-label")}>
           {windows.map((window) => (
             <button
@@ -204,7 +204,7 @@ function Axis({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-sm text-muted-foreground">{label}</span>
       <span className="font-mono text-2xl leading-none">{value}</span>
       <span className="text-xs text-muted-foreground">{detail}</span>
       {note === "" ? null : <span className="font-mono text-xs text-muted-foreground">{note}</span>}

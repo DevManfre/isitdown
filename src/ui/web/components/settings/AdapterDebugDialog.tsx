@@ -107,7 +107,7 @@ export function AdapterDebugDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               {t("adapter.debug.recent")}
             </span>
             {probes.length === 0 ? (

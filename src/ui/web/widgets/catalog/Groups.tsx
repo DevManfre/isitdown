@@ -56,7 +56,7 @@ export function Groups() {
               )}
             >
               <span className="truncate text-sm">{g.id}</span>
-              <span className="font-mono text-xs tracking-wider uppercase" style={{ color: statusColor(g.status) }}>
+              <span className="text-sm font-medium" style={{ color: statusColor(g.status) }}>
                 {t(statusLabelKey(g.status))}
               </span>
             </Link>
@@ -73,7 +73,7 @@ export function Groups() {
               style={{ animationDelay: stagger(index, { base: 120, step: 45 }) }}
             >
               <StatusDot status={g.status} />
-              <span className="w-32 shrink-0 font-mono text-xs tracking-wider uppercase" style={{ color: statusColor(g.status) }}>
+              <span className="w-32 shrink-0 text-sm font-medium" style={{ color: statusColor(g.status) }}>
                 {t(statusLabelKey(g.status))}
               </span>
               <span className="w-28 shrink-0 truncate font-medium">{g.id}</span>
@@ -88,7 +88,7 @@ export function Groups() {
                   </span>
                 ))}
               </span>
-              <span className="ml-auto font-mono text-xs text-muted-foreground">
+              <span className="ml-auto text-xs text-muted-foreground">
                 {t("widget.groups.healthy", { up: g.providers.length - g.affected.length, total: g.providers.length })}
               </span>
             </Link>

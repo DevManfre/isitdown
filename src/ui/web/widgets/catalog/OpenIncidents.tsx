@@ -96,7 +96,7 @@ export function OpenIncidents({ props }: { props: { filter: FleetFilter } }) {
           >
             <NumberTicker className="font-mono text-4xl leading-none" locale={i18n.language} value={open.length} />
           </DrillLink>
-          <span className="font-mono text-xs text-muted-foreground">{t("widget.open-incidents.count", { count: open.length })}</span>
+          <span className="text-xs text-muted-foreground">{t("widget.open-incidents.count", { count: open.length })}</span>
         </div>
         <Link to={href(open[0]!)} className="flex min-w-0 items-center gap-2 border-t border-border pt-2.5 text-sm hover:text-primary">
           <StatusDot status={impactStatus(open[0]!.impact)} label={t(impactKey(open[0]!.impact))} />
@@ -124,7 +124,7 @@ export function OpenIncidents({ props }: { props: { filter: FleetFilter } }) {
               >
                 <span className="flex min-w-0 items-center gap-2 @2xl:col-auto">
                   <StatusDot status={impactStatus(row.impact)} />
-                  <span className="font-mono text-xs tracking-wider uppercase" style={{ color: statusColor(impactStatus(row.impact)) }}>
+                  <span className="text-sm font-medium" style={{ color: statusColor(impactStatus(row.impact)) }}>
                     {t(impactKey(row.impact))}
                   </span>
                   <span className="truncate font-medium @2xl:hidden">{name(row.providerId)}</span>
@@ -132,7 +132,7 @@ export function OpenIncidents({ props }: { props: { filter: FleetFilter } }) {
                 <span className="text-right font-mono text-xs text-muted-foreground @2xl:hidden">{age(row)}</span>
                 <span className="hidden truncate @2xl:block">{name(row.providerId)}</span>
                 <span className="col-span-2 truncate text-muted-foreground @2xl:col-span-1 @2xl:text-foreground">{row.name}</span>
-                <span className="hidden truncate font-mono text-xs text-muted-foreground @4xl:block">
+                <span className="hidden truncate text-xs text-muted-foreground @4xl:block">
                   {t(incidentStatusKey(row.status))} · {formatRelative(i18n.language, row.updatedAt)}
                 </span>
                 <span className="hidden text-right font-mono text-xs @2xl:block">{age(row)}</span>

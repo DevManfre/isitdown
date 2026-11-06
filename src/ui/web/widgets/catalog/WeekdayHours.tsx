@@ -65,7 +65,7 @@ export function WeekdayHours() {
         <span className="font-mono text-2xl">
           {weekday(best.day)} {best.hour}–{best.hour + SPAN}
         </span>
-        <span className="font-mono text-xs text-muted-foreground">{t("widget.weekday-hours.share", { count: best.count, total })}</span>
+        <span className="text-xs text-muted-foreground">{t("widget.weekday-hours.share", { count: best.count, total })}</span>
       </div>
 
       {/* Half: one bar per weekday. */}

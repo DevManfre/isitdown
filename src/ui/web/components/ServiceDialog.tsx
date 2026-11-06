@@ -1029,7 +1029,7 @@ export function ServiceDialog({
                             >
                               <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md px-3.5 py-3 text-left">
                                 <span className="flex flex-col gap-1">
-                                  <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                  <span className="text-sm font-medium text-muted-foreground">
                                     {t("add.advanced")}
                                   </span>
                                   <span className="text-xs text-muted-foreground">
@@ -1174,7 +1174,7 @@ function Section({
   return (
     <section className="flex flex-col gap-3 rounded-md border border-border p-3.5">
       <div className="flex min-h-7 items-center justify-between gap-2">
-        <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+        <span className="text-sm font-medium text-muted-foreground">
           {title}
         </span>
         {action}

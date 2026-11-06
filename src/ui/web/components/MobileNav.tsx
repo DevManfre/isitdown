@@ -197,7 +197,7 @@ export function MobileNav() {
 
 
           <div className="flex flex-col gap-2 border-t border-border px-4 py-3">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               {t("nav.theme")}
             </span>
             {/* Three explicit choices rather than the header's cycling button:

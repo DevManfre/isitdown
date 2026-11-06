@@ -95,10 +95,10 @@ function DotStrip({ providers }: { providers: ProviderStatus[] }) {
               />
             </span>
             <span
-              className="font-mono text-xs"
+              className="text-sm font-medium"
               style={{ color: statusColor(provider.overallStatus) }}
             >
-              {t(statusLabelKey(provider.overallStatus)).toUpperCase()}
+              {t(statusLabelKey(provider.overallStatus))}
             </span>
           </HoverCardContent>
         </HoverCard>

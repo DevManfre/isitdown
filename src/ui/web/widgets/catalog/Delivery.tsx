@@ -106,7 +106,7 @@ export function Delivery() {
             {new Intl.NumberFormat(i18n.language, { style: "percent", maximumFractionDigits: 1 }).format(rate)}
           </DrillLink>
         )}
-        <span className="font-mono text-xs text-muted-foreground">{t("widget.delivery.share", { ok: day.length - failed.length, total: day.length })}</span>
+        <span className="text-xs text-muted-foreground">{t("widget.delivery.share", { ok: day.length - failed.length, total: day.length })}</span>
       </div>
 
       {/* Half: per channel, its state in words. */}

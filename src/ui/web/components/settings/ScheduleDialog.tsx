@@ -188,7 +188,7 @@ export function ScheduleDialog({ service, trigger }: { service: ServiceDefinitio
 
         <DialogBody className="flex flex-col gap-4">
           <section className="flex flex-col gap-3 rounded-md border border-border p-3.5" aria-labelledby="schedule-mutes">
-            <h3 id="schedule-mutes" className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            <h3 id="schedule-mutes" className="text-sm font-medium text-muted-foreground">
               {t("schedule.mute.heading")}
             </h3>
             <span className="text-xs text-muted-foreground">{t("schedule.mute.hint")}</span>
@@ -285,7 +285,7 @@ export function ScheduleDialog({ service, trigger }: { service: ServiceDefinitio
           </section>
 
           <section className="flex flex-col gap-3 rounded-md border border-border p-3.5" aria-labelledby="schedule-windows">
-            <h3 id="schedule-windows" className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            <h3 id="schedule-windows" className="text-sm font-medium text-muted-foreground">
               {t("schedule.window.heading")}
             </h3>
             <span className="text-xs text-muted-foreground">{t("schedule.window.hint")}</span>
