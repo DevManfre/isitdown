@@ -72,7 +72,7 @@ export function Noisy({ props }: { props: { filter: FleetFilter } }) {
       <div className="flex items-baseline gap-2.5 @md:hidden">
         <span className="text-lg">{name(top.providerId)}</span>
         <span className="font-mono text-lg">{link(top.providerId, top.incidents, String(top.incidents))}</span>
-        <span className="font-mono text-xs text-muted-foreground">{t("widget.noisy.of", { total })}</span>
+        <span className="text-xs text-muted-foreground">{t("widget.noisy.of", { total })}</span>
       </div>
 
       <div className="hidden grid-cols-[7rem_minmax(0,1fr)_2.5rem] items-center gap-x-4 @md:grid">

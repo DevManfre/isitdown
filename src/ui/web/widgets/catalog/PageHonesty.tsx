@@ -55,16 +55,16 @@ export function PageHonesty() {
     <WidgetCard title={title} meta={t("widget.page-honesty.meta", { days: data.days })} conclusion={conclusion} className="@container">
       <div className="flex flex-col gap-1 @md:hidden">
         <span className="font-mono text-4xl leading-none">{pct(share(worst))}</span>
-        <span className="font-mono text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {t("widget.page-honesty.admitted-by", { provider: name(worst.pair.pageId) })}
         </span>
       </div>
 
       <div className="hidden grid-cols-[7rem_minmax(0,1fr)_4.5rem_4.5rem] items-center gap-x-4 @md:grid">
-        <span className="pb-1.5 font-mono text-xs text-muted-foreground">{t("widget.col.provider")}</span>
-        <span className="pb-1.5 font-mono text-xs text-muted-foreground">{t("widget.page-honesty.col-bar")}</span>
-        <span className="pb-1.5 text-right font-mono text-xs text-muted-foreground">{t("widget.page-honesty.col-admitted")}</span>
-        <span className="pb-1.5 text-right font-mono text-xs text-muted-foreground">{t("widget.page-honesty.col-silent")}</span>
+        <span className="pb-1.5 text-xs text-muted-foreground">{t("widget.col.provider")}</span>
+        <span className="pb-1.5 text-xs text-muted-foreground">{t("widget.page-honesty.col-bar")}</span>
+        <span className="pb-1.5 text-right text-xs text-muted-foreground">{t("widget.page-honesty.col-admitted")}</span>
+        <span className="pb-1.5 text-right text-xs text-muted-foreground">{t("widget.page-honesty.col-silent")}</span>
         {rows.map((row, index) => {
           const admitted = row.counted - (row.never ?? 0);
           return (
@@ -93,7 +93,7 @@ export function PageHonesty() {
           );
         })}
       </div>
-      <p className="hidden font-mono text-xs text-muted-foreground @md:block">{t("widget.page-honesty.legend")}</p>
+      <p className="hidden text-xs text-muted-foreground @md:block">{t("widget.page-honesty.legend")}</p>
     </WidgetCard>
   );
 }

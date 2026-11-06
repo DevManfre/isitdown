@@ -72,7 +72,7 @@ export function Coincidence() {
     <WidgetCard title={title} meta={meta} conclusion={conclusion} className="@container">
       <div className="flex flex-col gap-1 @md:hidden">
         <span className="text-[0.95rem] font-medium">{name(top.providerId)} + {name(top.otherId)}</span>
-        <span className="font-mono text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {t("widget.coincidence.times", { together: top.together, incidents: top.incidents })}
         </span>
       </div>
@@ -86,7 +86,7 @@ export function Coincidence() {
           >
             <span className="flex min-w-0 flex-col">
               <span className="truncate text-sm">{name(pair.providerId)} + {name(pair.otherId)}</span>
-              <span className="font-mono text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {t("widget.coincidence.times", { together: pair.together, incidents: pair.incidents })}
               </span>
             </span>
@@ -127,7 +127,7 @@ export function Coincidence() {
                     </Button>
                   </motion.span>
                 ) : (
-                  <span key="few" className="font-mono text-xs text-muted-foreground">
+                  <span key="few" className="text-xs text-muted-foreground">
                     {t("widget.coincidence.few")}
                   </span>
                 )}

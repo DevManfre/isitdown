@@ -35,7 +35,10 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
   const title = t("dashboard.widget.maintenances.title");
   const horizon = now + HORIZON_DAYS * DAY;
 
-  if (data === undefined) return <WidgetCard title={title} busy />;
+  // Secondary to the Overview's one question, so it folds (dashboard-design-
+  // direction). The summary keeps the count in sight while it is shut.
+  const fold = (summary?: string) => ({ id: "maintenances", summary });
+  if (data === undefined) return <WidgetCard title={title} busy disclosure={fold()} />;
 
   const rows = data.maintenances
     .filter((row) => slice.ids.has(row.providerId) && endOf(row) > now && Date.parse(row.startsAt) < horizon)
@@ -48,10 +51,17 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
   const span = (row: MaintenanceRow) => `${day.format(new Date(row.startsAt))} · ${hours(row)}`;
   const until = (iso: string) => formatDuration(i18n.language, (Date.parse(iso) - now) / MINUTE);
   const meta = `${slice.filtered ? `${filterText} · ` : ""}${t("widget.maintenances.meta", { days: HORIZON_DAYS })}`;
+  const liveCount = rows.filter(live).length;
+  const summary = [
+    liveCount > 0 ? t("widget.maintenances.summary-live", { count: liveCount }) : null,
+    rows.length - liveCount > 0 ? t("widget.maintenances.summary-upcoming", { count: rows.length - liveCount }) : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
 
   if (rows.length === 0) {
     return (
-      <WidgetCard title={title} meta={meta}>
+      <WidgetCard title={title} meta={meta} disclosure={fold()}>
         <p className="text-sm text-muted-foreground">{t("widget.maintenances.none", { days: HORIZON_DAYS })}</p>
       </WidgetCard>
     );
@@ -61,7 +71,7 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
   const shown = rows.slice(0, SHOWN);
   const hidden = rows.length - shown.length;
   const more = hidden > 0 && (
-    <p className="font-mono text-xs text-muted-foreground">{t("widget.maintenances.hidden", { count: hidden, days: HORIZON_DAYS })}</p>
+    <p className="text-xs text-muted-foreground">{t("widget.maintenances.hidden", { count: hidden, days: HORIZON_DAYS })}</p>
   );
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
@@ -71,7 +81,7 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
   const ticks = Array.from({ length: 5 }, (_, i) => axisStart + i * ((HORIZON_DAYS + 1) / 4) * DAY);
 
   return (
-    <WidgetCard title={title} meta={meta} className="@container">
+    <WidgetCard title={title} meta={meta} className="@container" disclosure={fold(summary)}>
       {/* A third: the next one, counting down. */}
       <div className="flex flex-col gap-1.5 @md:hidden">
         <span className="text-[0.95rem] font-medium">{name(next.providerId)} · {next.name}</span>
@@ -93,7 +103,7 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
             style={{ animationDelay: stagger(index, { base: 120, step: 45 }) }}
           >
             {live(row) ? (
-              <span className="widget-now rounded bg-primary/15 px-1.5 font-mono text-[0.68rem] tracking-wider text-primary uppercase">
+              <span className="rounded bg-primary/10 px-1.5 text-xs font-medium text-primary">
                 {t("widget.maintenances.live-tag")}
               </span>
             ) : (
@@ -112,7 +122,7 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
       <div className="hidden @2xl:block">
         <div className="grid grid-cols-[15rem_minmax(0,1fr)] items-center gap-x-4 gap-y-2.5">
           <span />
-          <div className="relative h-4 font-mono text-[0.68rem] text-muted-foreground">
+          <div className="relative h-4 font-mono text-xs text-muted-foreground">
             {ticks.map((tick, index) => (
               <span
                 key={tick}
@@ -137,7 +147,6 @@ export function Maintenances({ props }: { props: { filter: FleetFilter } }) {
                 <span
                   className={cn(
                     "anim-fill absolute inset-y-1 origin-left rounded border border-primary bg-primary/35",
-                    live(row) && "widget-now",
                   )}
                   style={{
                     left: at(Date.parse(row.startsAt)),

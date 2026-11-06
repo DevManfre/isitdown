@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MotionGlobalConfig } from "motion/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { NumberTicker, tickerDuration } from "./number-ticker";
 
 // The suite runs with the reduced-motion preference reported as set
@@ -29,9 +29,10 @@ describe("NumberTicker", () => {
     expect(tickerDuration(7)).toBeLessThan(tickerDuration(0));
   });
 
-  it("keeps even the extremes inside one run of the animation", () => {
-    expect(tickerDuration(0)).toBeCloseTo(1.4);
-    expect(tickerDuration(1_000_000)).toBeCloseTo(0.5);
+  // dashboard-design-direction § Motion: nothing runs past --duration-slow.
+  it("keeps even the extremes inside the design's slowest duration", () => {
+    expect(tickerDuration(0)).toBeCloseTo(0.28);
+    expect(tickerDuration(1_000_000)).toBeCloseTo(0.16);
   });
 
   it("times a negative figure by its size, not its sign", () => {
@@ -44,31 +45,24 @@ describe("NumberTicker", () => {
     expect(screen.getByText("5")).toBeInTheDocument();
   });
 
-  // The one test that lets the spring actually run: an operator opening the
-  // dashboard sees every figure count, including the ones below the fold, so
-  // an observer that never reports the span as visible must not hold it at 0.
-  it("counts on load rather than waiting for the figure to be scrolled into view", async () => {
+  // The design direction rules out numbers ticking up on first paint: with
+  // motion on, the figure an operator opens the dashboard to is already the
+  // real one, not a count from zero.
+  it("paints the real figure on its first frame, with motion on", () => {
     MotionGlobalConfig.skipAnimations = false;
-    vi.stubGlobal(
-      "IntersectionObserver",
-      class {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-        takeRecords() {
-          return [];
-        }
-      },
-    );
-
     render(<NumberTicker locale="en" value={42} />);
+    expect(screen.getByText("42")).toBeInTheDocument();
+  });
 
-    // Longer than the ticker's own run — see `tickerDuration`.
-    expect(await screen.findByText("42", {}, { timeout: 3000 })).toBeInTheDocument();
+  // A change is a state change, so it is the one thing that counts.
+  it("counts to a new figure when the value changes, with motion on", async () => {
+    MotionGlobalConfig.skipAnimations = false;
+    const { rerender } = render(<NumberTicker locale="en" value={42} />);
+    rerender(<NumberTicker locale="en" value={50} />);
+    expect(await screen.findByText("50", {}, { timeout: 1500 })).toBeInTheDocument();
   });
 });
 
 afterEach(() => {
   MotionGlobalConfig.skipAnimations = true;
-  vi.unstubAllGlobals();
 });

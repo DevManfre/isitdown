@@ -106,7 +106,7 @@ export function Delivery() {
             {new Intl.NumberFormat(i18n.language, { style: "percent", maximumFractionDigits: 1 }).format(rate)}
           </DrillLink>
         )}
-        <span className="font-mono text-xs text-muted-foreground">{t("widget.delivery.share", { ok: day.length - failed.length, total: day.length })}</span>
+        <span className="text-xs text-muted-foreground">{t("widget.delivery.share", { ok: day.length - failed.length, total: day.length })}</span>
       </div>
 
       {/* Half: per channel, its state in words. */}
@@ -134,7 +134,7 @@ export function Delivery() {
       {/* Full: an hour per square. */}
       <div className="hidden grid-cols-[7rem_minmax(0,1fr)_6rem] items-center gap-x-4 gap-y-2.5 @2xl:grid">
         <span />
-        <span className="flex justify-between font-mono text-[0.65rem] text-muted-foreground">
+        <span className="flex justify-between font-mono text-xs text-muted-foreground">
           <span>{t("widget.delivery.hours-ago", { count: HOURS })}</span>
           <span>{t("widget.delivery.hours-ago", { count: HOURS / 2 })}</span>
           <span>{t("widget.delivery.now")}</span>

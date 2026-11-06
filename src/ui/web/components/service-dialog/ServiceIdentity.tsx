@@ -29,9 +29,9 @@ export function ServiceIdentity({
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{name === "" ? t("add.unnamed") : name}</span>
-          <Badge variant="outline" className="font-mono text-[10px]">{adapter}</Badge>
+          <Badge variant="outline" className="font-mono text-xs">{adapter}</Badge>
         </div>
-        <span className="truncate font-mono text-[11px] text-muted-foreground">{baseUrl}</span>
+        <span className="truncate font-mono text-xs text-muted-foreground">{baseUrl}</span>
       </div>
       {onChange !== undefined && (
         <Button type="button" variant="outline" size="sm" onClick={onChange}>

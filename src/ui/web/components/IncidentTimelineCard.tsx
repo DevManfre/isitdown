@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link } from "react-router";
 import { cn } from "@/lib/utils.ts";
-import { Card } from "@/components/ui/card.tsx";
+import { WidgetCard } from "@/widgets/catalog/WidgetCard.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { useAnnotations, useIncidentTimeline } from "@/hooks/queries.ts";
@@ -49,9 +49,18 @@ export function IncidentTimelineCard({ providers }: { providers: { id: string; n
   const ticks = Array.from({ length: 7 }, (_, index) => fromMs + (index / 6) * (toMs - fromMs));
 
   return (
-    <Card className="flex flex-col gap-3 p-4" role="region" aria-label={t("timeline.title")}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("timeline.title")}</span>
+    // Secondary to the view's one question — what broke, and is it over — so
+    // it folds (dashboard-design-direction), counting what it holds while shut.
+    <WidgetCard
+      role="region"
+      aria-label={t("timeline.title")}
+      title={t("timeline.title")}
+      disclosure={{
+        id: "incidents-timeline",
+        summary: timeline === undefined ? undefined : t("incidents.total", { count: timeline.incidents.length }),
+      }}
+    >
+      <div className="flex justify-end">
         <ToggleGroup
           type="single"
           value={String(days)}
@@ -171,6 +180,6 @@ export function IncidentTimelineCard({ providers }: { providers: { id: string; n
           </p>
         </>
       )}
-    </Card>
+    </WidgetCard>
   );
 }

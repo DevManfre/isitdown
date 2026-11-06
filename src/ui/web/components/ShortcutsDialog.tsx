@@ -71,7 +71,7 @@ export function ShortcutsDialog() {
           {/* The palette's own chord leads: it is the shortcut every other one
               is a shorter way of reaching. */}
           <section aria-label={t("shortcuts.group.palette")} className="flex flex-col gap-2">
-            <h3 className="text-xs uppercase tracking-widest text-muted-foreground">{t("shortcuts.group.palette")}</h3>
+            <h3 className="text-sm text-muted-foreground">{t("shortcuts.group.palette")}</h3>
             <dl className="flex flex-col gap-1.5 text-sm">
               <div className="flex items-center justify-between gap-4">
                 <dt>{t("shortcuts.palette")}</dt>
@@ -83,7 +83,7 @@ export function ShortcutsDialog() {
           </section>
           {GROUPS.map(({ group, labelKey }) => (
             <section key={group} aria-label={t(labelKey)} className="flex flex-col gap-2">
-              <h3 className="text-xs uppercase tracking-widest text-muted-foreground">{t(labelKey)}</h3>
+              <h3 className="text-sm text-muted-foreground">{t(labelKey)}</h3>
               <dl className="flex flex-col gap-1.5 text-sm">
                 {entries(group).map((entry) => (
                   <div key={entry.keys.join(" ")} className="flex items-center justify-between gap-4">

@@ -31,7 +31,7 @@ export function ProviderPanel({
 
   return (
     <div id={id} data-slot="widget-provider" className="mt-3 flex flex-col gap-3 rounded-lg border border-primary/60 bg-card p-3.5">
-      <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase">{t("dashboard.provider.label")}</span>
+      <span className="text-sm text-muted-foreground">{t("dashboard.provider.label")}</span>
       <div className="max-h-48 overflow-y-auto">
         <ToggleGroup
           type="single"

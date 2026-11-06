@@ -60,23 +60,23 @@ export function PollerPulse() {
         <StatusDot status={stalled ? "major_outage" : "operational"} size={10} pulse={!stalled} />
         <span className="text-sm font-medium">{t(stalled ? "widget.poller-pulse.state-stalled" : "widget.poller-pulse.state-alive")}</span>
         {last !== null && (
-          <span className="ml-auto font-mono text-xs text-muted-foreground">{t("widget.poller-pulse.ago", { time: ago(last) })}</span>
+          <span className="ml-auto text-xs text-muted-foreground">{t("widget.poller-pulse.ago", { time: ago(last) })}</span>
         )}
       </div>
 
       <dl className="hidden grid-cols-3 gap-4 @md:grid">
         <div className="flex flex-col gap-1">
-          <dt className="font-mono text-xs text-muted-foreground uppercase">{t("widget.poller-pulse.last")}</dt>
+          <dt className="text-sm text-muted-foreground">{t("widget.poller-pulse.last")}</dt>
           <dd className="font-mono text-lg">{last === null ? "—" : t("widget.poller-pulse.ago", { time: ago(last) })}</dd>
         </div>
         <div className="flex flex-col gap-1">
-          <dt className="font-mono text-xs text-muted-foreground uppercase">{t("widget.poller-pulse.next")}</dt>
+          <dt className="text-sm text-muted-foreground">{t("widget.poller-pulse.next")}</dt>
           <dd className="font-mono text-lg">
             {next === null ? "—" : next <= now ? t("widget.poller-pulse.due") : t("widget.poller-pulse.in", { time: formatDuration(i18n.language, (next - now) / MINUTE) })}
           </dd>
         </div>
         <div className="flex flex-col gap-1">
-          <dt className="font-mono text-xs text-muted-foreground uppercase">{t("widget.poller-pulse.silent")}</dt>
+          <dt className="text-sm text-muted-foreground">{t("widget.poller-pulse.silent")}</dt>
           <dd className="font-mono text-lg" style={{ color: silent > 0 ? "var(--status-degraded)" : undefined }}>
             {silent > 0 ? (
               <DrillLink

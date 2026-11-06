@@ -34,7 +34,7 @@ export function SlaBudgetCard({ providerId }: { providerId: string }) {
       className="flex flex-col gap-2 rounded-md border border-border bg-card p-3"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-xs uppercase tracking-widest text-primary">{t("sla.title")}</span>
+        <span className="text-base font-medium">{t("sla.title")}</span>
         <span className="font-mono text-xs text-muted-foreground">
           {t("sla.target", { target: formatPercent(i18n.language, budget.target) })}
         </span>

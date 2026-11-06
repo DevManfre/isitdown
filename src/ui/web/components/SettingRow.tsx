@@ -95,7 +95,7 @@ export function SettingRow({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
-        {meta !== undefined && <span className="font-mono text-[11px] text-muted-foreground">{meta}</span>}
+        {meta !== undefined && <span className="font-mono text-xs text-muted-foreground">{meta}</span>}
         {children}
       </div>
     </div>

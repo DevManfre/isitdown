@@ -76,7 +76,7 @@ export function BreakTogetherCard({
       aria-label={t("coincidence.title")}
       className="flex flex-col gap-3 rounded-md border border-border bg-card p-4"
     >
-      <span className="text-xs uppercase tracking-widest text-primary">{t("coincidence.title")}</span>
+      <span className="text-base font-medium">{t("coincidence.title")}</span>
       <p className="max-w-prose text-sm text-muted-foreground">{t("coincidence.hint")}</p>
       <ul className="flex flex-col">
         {shown.map((pair) => (

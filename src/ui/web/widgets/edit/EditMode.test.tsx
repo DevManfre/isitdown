@@ -1,9 +1,28 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders } from "@/test/harness.tsx";
 import { Overview } from "@/views/Overview.tsx";
-import { DEFAULT_LAYOUT, type DashboardLayout } from "../../../dashboardLayout.ts";
+import { DashboardMenu } from "@/components/dashboards/DashboardMenu.tsx";
+import { type DashboardLayout } from "../../../dashboardLayout.ts";
+
+/**
+ * The five-widget layout these cases exercise the editor on — the Overview's
+ * default before the calm redesign moved the rings out of it. Kept here so
+ * the editor's mechanics are tested on a fixed layout, whatever the default
+ * becomes.
+ */
+const FIVE: DashboardLayout = {
+  version: 1,
+  widgets: [
+    { id: "rings", type: "fleet-rings", width: "full", props: { filter: { groups: [], providers: [] } } },
+    { id: "map", type: "geo-map", width: "full", props: {} },
+    { id: "shared", type: "shared-failure", width: "full", props: {} },
+    { id: "stack", type: "stack-band", width: "full", props: { filter: { groups: [], providers: [] } } },
+    { id: "fleet", type: "fleet-list", width: "full", props: { filter: { groups: [], providers: [] } } },
+  ],
+};
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -22,11 +41,11 @@ const status = {
   nextPollAt: null,
 };
 const history = { aggregateUptime: 99.5, months: [], providers: [] };
-const dashboard = (layout: DashboardLayout = DEFAULT_LAYOUT, updatedAt = "2026-10-22T10:00:00.000Z") => ({
+const dashboard = (layout: DashboardLayout = FIVE, updatedAt = "2026-10-22T10:00:00.000Z") => ({
   id: "default",
   name: "Overview",
   layout,
-  isDefault: layout === DEFAULT_LAYOUT,
+  isDefault: layout === FIVE,
   updatedAt,
 });
 
@@ -61,9 +80,22 @@ function stubWrites(answer: (call: Call) => { status: number; body: unknown }): 
 const t = (key: string, values: Record<string, unknown> = {}) => i18n.t(key, values);
 const name = (type: string) => t(`dashboard.widget.${type}.title`);
 
+/** The header's "···" menu beside the view, as the shell mounts them: Customise lives there now. */
+const withMenu = (
+  <>
+    <DashboardMenu />
+    <Overview />
+  </>
+);
+
+const menuTrigger = () => screen.getByRole("button", { name: t("dashboards.menu", { name: "Overview" }) });
+
 async function openEditor(layout?: DashboardLayout) {
-  renderWithProviders(<Overview />, { status, history, dashboard: dashboard(layout) }, "/");
-  fireEvent.click(await screen.findByRole("button", { name: t("dashboard.customise") }));
+  renderWithProviders(withMenu, { status, history, dashboard: dashboard(layout) }, "/");
+  await userEvent.click(await screen.findByRole("button", { name: t("dashboards.menu", { name: "Overview" }) }));
+  const item = await screen.findByRole("menuitem", { name: t("dashboard.customise") });
+  await waitFor(() => expect(item).not.toHaveAttribute("aria-disabled"));
+  await userEvent.click(item);
   const list = await screen.findByRole("list", { name: t("dashboard.edit.list-label") });
   await screen.findAllByRole("button", { name: new RegExp(`^${t("dashboard.move", { widget: "" })}`) });
   return list;
@@ -168,6 +200,7 @@ describe("Overview edit mode", () => {
         observe(target: Element) {
           this.report([{ target, contentRect: { width: 480 } } as ResizeObserverEntry], this as unknown as ResizeObserver);
         }
+        unobserve() {}
         disconnect() {}
       },
     );
@@ -227,7 +260,7 @@ describe("Overview edit mode", () => {
 
   it("offers both copies when someone else saved first, and loads theirs on request", async () => {
     const list = await openEditor();
-    const theirs: DashboardLayout = { version: 1, widgets: [DEFAULT_LAYOUT.widgets[4]!] };
+    const theirs: DashboardLayout = { version: 1, widgets: [FIVE.widgets[4]!] };
     stubWrites(() => ({
       status: 409,
       body: { error: { message: "saved elsewhere" }, current: dashboard(theirs, "2026-10-22T10:30:00.000Z") },
@@ -243,7 +276,7 @@ describe("Overview edit mode", () => {
   });
 
   it("resets to the default only after confirming", async () => {
-    const custom: DashboardLayout = { version: 1, widgets: [DEFAULT_LAYOUT.widgets[4]!] };
+    const custom: DashboardLayout = { version: 1, widgets: [FIVE.widgets[4]!] };
     await openEditor(custom);
     const calls = stubWrites(() => ({ status: 200, body: dashboard() }));
     fireEvent.click(screen.getByRole("button", { name: t("dashboard.reset") }));
@@ -264,7 +297,7 @@ describe("Overview edit mode", () => {
     expect(screen.getByRole("list", { name: t("dashboard.edit.list-label") })).toBeInTheDocument();
   });
 
-  it("hands focus to the first widget on the way in, back to Customise on the way out, and says it is editing", async () => {
+  it("hands focus to the first widget on the way in, back to the menu it came from on the way out, and says it is editing", async () => {
     await openEditor();
     await waitFor(() =>
       expect(document.activeElement).toBe(
@@ -274,13 +307,11 @@ describe("Overview edit mode", () => {
     expect(await screen.findByText(t("dashboard.edit.entered", { count: 5 }))).toBeInTheDocument();
     expect(screen.getByRole("region", { name: t("dashboard.bar.label") })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: t("action.cancel") }));
-    await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByRole("button", { name: t("dashboard.customise") })),
-    );
+    await waitFor(() => expect(document.activeElement).toBe(menuTrigger()));
   });
 
   it("starts a draft from the saved layout, never from the placeholder shown while it loads", async () => {
-    const custom: DashboardLayout = { version: 1, widgets: [DEFAULT_LAYOUT.widgets[4]!, DEFAULT_LAYOUT.widgets[0]!] };
+    const custom: DashboardLayout = { version: 1, widgets: [FIVE.widgets[4]!, FIVE.widgets[0]!] };
     let answer: (value: unknown) => void = () => {};
     const late = new Promise((resolve) => {
       answer = resolve;

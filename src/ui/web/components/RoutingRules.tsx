@@ -243,7 +243,7 @@ function DryRun({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
-      <span className="text-xs font-medium tracking-wide text-muted-foreground">
+      <span className="text-sm font-medium text-muted-foreground">
         {t("routing.dryrun.title")}
       </span>
 

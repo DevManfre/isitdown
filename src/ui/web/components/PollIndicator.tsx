@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button.tsx";
 import { usePollNow, useStatusChrome } from "@/hooks/queries.ts";
@@ -52,62 +52,82 @@ export function PollIndicator() {
             ? t("meta.countdown", { minutes: minutesLeft, seconds: remainderSeconds })
             : t("meta.countdown-seconds", { seconds: remainderSeconds });
 
+  // How much of the cycle is left, for the ring. A spent or unknown deadline
+  // draws it empty: there is nothing left to count down.
+  // "Next poll" only heads a figure: beside "Polling now" or "not polled yet"
+  // it made a sentence of two claims. While the read has not answered it still
+  // holds the cluster's place.
+  const counting = status === undefined || (!polling && secondsLeft !== null);
+  const cycleSeconds = (status?.pollIntervalMinutes ?? 0) * 60;
+  const left = secondsLeft === null || polling || cycleSeconds === 0 ? 0 : Math.min(1, secondsLeft / cycleSeconds);
+
   return (
-    <div className="header-poll flex items-center gap-3 rounded-full border border-border bg-card/60 py-1 pl-3 pr-1">
-      <div className="poll-next flex flex-col leading-tight">
-        {/* The label, and the LIVE chip beside it, are what makes this cluster
-            326px wide — which on a phone is the whole of the header's second
-            line and left the title and the meta line truncated to nothing. The
-            countdown below carries the meaning on its own; the words come back
-            at `lg`, where there is room for them. */}
-        <span className="hidden items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground lg:flex">
-          {t("meta.next-poll-label")}
-          {/* Says where the freshness comes from: with the stream connected the
-              dashboard is told about a cycle, it no longer asks on a timer. */}
-          {live && (
-            <span className="poll-live rounded-full bg-primary px-1.5 text-[10px] uppercase tracking-widest text-primary-foreground">
-              {t("meta.live")}
-            </span>
-          )}
+    /* One control, not five (dashboard-design-direction): the ring says how
+       far the cycle has run, the words say when the next one is, the button
+       starts one now. The LIVE chip became the ring's colour — accent while
+       the stream is connected, grey once it is lost — and its word stayed for
+       screen readers; the sweeping meter beam is gone, because a countdown
+       that moves every second already says the poller is alive. */
+    <div
+      className="header-poll flex h-9 items-center gap-2.5 rounded-lg border border-border bg-card pl-3 pr-1"
+      title={live ? t("meta.live") : undefined}
+    >
+      <PollRing left={left} lost={lost} />
+      <span className="poll-next flex items-center gap-1.5 text-sm text-muted-foreground">
+        {/* The label goes first when the header is short of room: the
+            countdown carries the meaning on its own. */}
+        {counting && <span className="hidden lg:inline">{t("meta.next-poll-label")}</span>}
+        {live && <span className="sr-only">{t("meta.live")}</span>}
+        <span className={cn("poll-next-time min-h-5 text-sm text-foreground", counting && "font-mono tabular-nums")}>
+          {label}
         </span>
-        <span className="flex min-h-5 items-center gap-1.5">
-          <span
-            className={cn(
-              "poll-next-dot size-1.5 rounded-full",
-              lost ? "bg-muted-foreground" : "bg-primary",
-              polling && !lost && "dot-pulse",
-            )}
-          />
-          <span className="poll-next-time font-mono text-xs">{label}</span>
-        </span>
-      </div>
-      {/* The countdown says how long; this says the poller is alive. A number
-          that has not moved for a second and a number that will never move
-          again read identically, and the beam is the difference. It runs only
-          while there is a cycle to wait for — with nothing scheduled the track
-          stays dark rather than animating over a dead poller. */}
-      {/* Decoration, and the first thing to go when the header is short of
-          room: between 768 and 1024 the rail is back but the page is not yet
-          wide, and the cluster was taking the title's space. */}
-      <span
-        aria-hidden="true"
-        className="poll-meter hidden h-1.5 w-9 overflow-hidden rounded-full bg-muted lg:block"
-      >
-        {secondsLeft !== null && (
-          <span className="poll-meter-beam block h-full w-1/3 rounded-full bg-linear-to-r from-transparent via-primary to-transparent" />
-        )}
       </span>
       <Button
         type="button"
         size="sm"
-        className="rounded-full"
+        variant="ghost"
+        className="h-7 rounded-md bg-primary/10 px-2.5 text-foreground hover:bg-primary/15"
         disabled={polling}
         aria-busy={polling}
         onClick={() => poll.mutate()}
       >
-        {polling && <LoaderCircle className="animate-spin" aria-hidden="true" />}
-        {t("action.poll-now")}
+        {polling ? (
+          <LoaderCircle className="animate-spin" aria-hidden="true" />
+        ) : (
+          <RefreshCw className="sm:hidden" aria-hidden="true" />
+        )}
+        {/* A glyph on a phone, where the title needs the width; the words
+            stay for screen readers and come back from `sm`. */}
+        <span className="sr-only sm:not-sr-only">{t("action.poll-now")}</span>
       </Button>
     </div>
+  );
+}
+
+/** Circumference of the ring's r=7.5 circle, which is what the dash runs on. */
+const RING = 2 * Math.PI * 7.5;
+
+/**
+ * The cycle as a ring that empties toward the next poll. It ticks with the
+ * countdown, once a second, rather than gliding: a clock that moves when the
+ * number beside it moves reads as one thing.
+ */
+function PollRing({ left, lost }: { left: number; lost: boolean }) {
+  return (
+    <svg className="poll-ring size-4 shrink-0" viewBox="0 0 20 20" aria-hidden="true">
+      <circle cx="10" cy="10" r="7.5" fill="none" className="stroke-muted" strokeWidth="2.5" />
+      <circle
+        cx="10"
+        cy="10"
+        r="7.5"
+        fill="none"
+        className={cn(lost ? "stroke-muted-foreground" : "stroke-primary")}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray={RING}
+        strokeDashoffset={RING * (1 - left)}
+        transform="rotate(-90 10 10)"
+      />
+    </svg>
   );
 }

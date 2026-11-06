@@ -195,11 +195,11 @@ function ActiveBand({
     <section
       aria-labelledby="incident-band-title"
       data-testid="incident-band"
-      className="anim-rise mt-6 flex flex-col gap-4 rounded-xl border border-[var(--status-major-outage)]/40 bg-[var(--status-major-outage)]/[0.07] p-4 md:p-5"
+      className="anim-rise mb-6 flex flex-col gap-5 rounded-xl border border-border bg-card p-5 md:p-6"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-[1_1_24rem] flex-col gap-1.5">
-          <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--status-major-outage)]">
+          <span className="flex items-center gap-2 text-sm font-medium text-[var(--status-major-outage)]">
             <StatusDot status="major_outage" pulse />
             {incident === undefined ? (
               t("incident-mode.kicker", { provider: primary.name })
@@ -229,10 +229,10 @@ function ActiveBand({
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild size="sm">
+          <Button asChild>
             <Link to={href}>{t("incident-mode.open")}</Link>
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>
+          <Button type="button" variant="ghost" onClick={onDismiss}>
             <X aria-hidden="true" />
             {t("incident-mode.dismiss")}
           </Button>
@@ -309,7 +309,7 @@ function Updates({ providerId, incidentId, href }: { providerId: string; inciden
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <h3 className="text-xs uppercase tracking-widest text-muted-foreground">{t("incident-mode.updates")}</h3>
+      <h3 className="text-sm font-medium text-muted-foreground">{t("incident-mode.updates")}</h3>
       {isError ? (
         <p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           {t("incident-mode.updates-failed")}
@@ -402,7 +402,7 @@ function RecentAnnotations({ providerIds }: { providerIds: string[] }) {
   if (recent.length === 0) return null;
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <h3 className="text-xs uppercase tracking-widest text-muted-foreground">{t("incident-mode.annotations")}</h3>
+      <h3 className="text-sm font-medium text-muted-foreground">{t("incident-mode.annotations")}</h3>
       <ul className="flex flex-col gap-1">
         {recent.map((annotation) => (
           <li key={annotation.id} className="grid grid-cols-[4.75rem_1fr] items-baseline gap-2 text-sm">
@@ -424,7 +424,7 @@ function ResolvedStrip({ ended, onDismiss }: { ended: Ended; onDismiss: () => vo
     <section
       aria-label={t("incident-mode.resolved-label")}
       data-testid="incident-resolved"
-      className="anim-fade mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--status-operational)]/40 bg-[var(--status-operational)]/[0.07] px-4 py-3"
+      className="anim-fade mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-5 py-3"
     >
       <CircleCheck aria-hidden="true" className="size-4 text-[var(--status-operational)]" />
       <span className="min-w-0 flex-1 text-sm">

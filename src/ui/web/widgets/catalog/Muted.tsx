@@ -29,7 +29,7 @@ export function Muted() {
     return (
       <WidgetCard title={title} meta={t("widget.muted.none-meta")}>
         <p className="text-sm">{t("widget.muted.none")}</p>
-        <p className="font-mono text-xs text-muted-foreground">{t("widget.muted.where")}</p>
+        <p className="text-xs text-muted-foreground">{t("widget.muted.where")}</p>
       </WidgetCard>
     );
   }
@@ -49,7 +49,7 @@ export function Muted() {
             <span className="hidden text-muted-foreground @md:inline">
               {t("widget.muted.until", { when: formatDateTime(i18n.language, p.mutedUntil!) })}
             </span>
-            <span className="ml-auto font-mono text-xs text-muted-foreground">
+            <span className="ml-auto text-xs text-muted-foreground">
               {t("widget.muted.left", { time: formatDuration(i18n.language, (Date.parse(p.mutedUntil!) - now) / MINUTE) })}
             </span>
             <Button

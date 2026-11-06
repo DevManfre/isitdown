@@ -11,16 +11,18 @@ function issuePath(input: unknown): string | undefined {
   return result.error?.issues[0]?.path.join(".");
 }
 
+// The calm redesign (dashboard-design-direction): the fleet drawn once, as
+// the list, first; the rings — which repeated it — left the default for the
+// catalogue, and the map, which folds shut, moved to the foot.
 test("the default layout is today's Overview, in order, all full width", () => {
   assert.deepEqual(layoutSchema.parse(DEFAULT_LAYOUT), DEFAULT_LAYOUT);
   assert.deepEqual(
     DEFAULT_LAYOUT.widgets.map((w) => [w.type, w.width]),
     [
-      ["fleet-rings", "full"],
-      ["geo-map", "full"],
+      ["fleet-list", "full"],
       ["shared-failure", "full"],
       ["stack-band", "full"],
-      ["fleet-list", "full"],
+      ["geo-map", "full"],
     ],
   );
 });

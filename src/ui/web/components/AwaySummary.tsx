@@ -128,7 +128,6 @@ function Recap({ since, now, onSeen }: { since: number; now: number; onSeen: (at
   const sinceIso = new Date(since).toISOString();
   const sinceText = formatDateTime(i18n.language, sinceIso);
   const agoText = formatRelative(i18n.language, sinceIso);
-  const alarm = stillOpen.length > 0;
   const toggle = () => {
     setCollapsed(!collapsed);
     rememberCollapsed(!collapsed);
@@ -176,7 +175,7 @@ function Recap({ since, now, onSeen }: { since: number; now: number; onSeen: (at
   ) => (
     <div className="flex min-w-0 flex-col">
       <div className="flex items-baseline justify-between gap-2 pb-1.5">
-        <h3 className="font-mono text-xs tracking-wider uppercase" style={{ color: tone }}>
+        <h3 className="pb-2 text-sm font-medium" style={{ color: tone }}>
           {heading}
         </h3>
         {items.length > SHOWN && (
@@ -195,8 +194,10 @@ function Recap({ since, now, onSeen }: { since: number; now: number; onSeen: (at
       aria-labelledby="away-title"
       role="region"
       className={cn(
-        "anim-rise col-span-6 gap-4 px-5 py-4 shadow-none",
-        alarm ? "border-primary/45 bg-primary/5" : "border-border",
+        "anim-rise col-span-6 gap-4 p-5 shadow-none",
+        // Calm, like every other card: the alarm is said by the open count
+        // in the outage colour, not by tinting the whole card.
+        "border-border",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -237,7 +238,7 @@ function Recap({ since, now, onSeen }: { since: number; now: number; onSeen: (at
             })}
           {ran.length > 0 && (
             <div className="flex min-w-0 flex-col">
-              <h3 className="pb-1.5 font-mono text-xs tracking-wider text-muted-foreground uppercase">
+              <h3 className="pb-2 text-sm font-medium text-muted-foreground">
                 {t("away.maintenance", { count: ran.length })}
               </h3>
               <ul className="flex flex-col">

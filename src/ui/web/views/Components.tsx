@@ -116,17 +116,9 @@ export function Components() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="anim-rise anim-rise-column flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <span className="text-xs uppercase tracking-widest text-primary">{t("components.kicker")}</span>
-          <p className="text-sm text-muted-foreground">{t("components.subtitle")}</p>
-        </div>
-        {rows.length > 0 && (
-          <span className="font-mono text-xs text-muted-foreground">
-            {t("components.total", { count: rows.length, providers: new Set(rows.map((row) => row.providerId)).size })}
-          </span>
-        )}
-      </div>
+      {/* No eyebrow and no subtitle (dashboard-design-direction): the header
+          names the view, the search box says what it filters by. The count
+          stays — it is the one figure the page has — beside the filters. */}
 
       {!configured ? (
         <EmptyFleet />
@@ -142,7 +134,7 @@ export function Components() {
         </Card>
       ) : (
         <>
-          <div className="anim-rise flex flex-wrap items-center gap-3" style={{ animationDelay: "60ms" }}>
+          <div className="anim-rise flex flex-wrap items-center gap-3">
             <div className="relative w-full max-w-xs">
               <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -182,6 +174,9 @@ export function Components() {
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
+            <span className="ml-auto text-sm text-muted-foreground tabular-nums">
+              {t("components.total", { count: rows.length, providers: new Set(rows.map((row) => row.providerId)).size })}
+            </span>
             {/* What a filter left, said: the chips change silently otherwise. */}
             <p role="status" className="sr-only">
               {t("components.shown", { count: shown.length })}
@@ -204,7 +199,7 @@ export function Components() {
               </CardContent>
             </Card>
           ) : (
-            <Card className="anim-rise gap-0 p-0" style={{ animationDelay: "120ms" }}>
+            <Card className="anim-rise gap-0 overflow-hidden p-0 shadow-none" style={{ animationDelay: "30ms" }}>
               <Table aria-label={t("components.table")}>
                 <TableHeader>
                   <TableRow>
