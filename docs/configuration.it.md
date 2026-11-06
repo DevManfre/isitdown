@@ -19,7 +19,7 @@ adaptiveIntervalMinutes: 1  # quella cadenza; mai più lenta dell'intervallo del
 confirmSamples: 1           # poll consecutivi che devono concordare prima di notificare
 correlationThreshold: 0     # provider che devono peggiorare insieme perché un unico avviso di guasto condiviso li sostituisca; 0 è spento
 correlationWindowMinutes: 10 # quanto è larga quella finestra
-locale: en                  # lingua dei messaggi di notifica: en | it
+locale: en                  # lingua dei messaggi di notifica: en | it | de | es | fr | pt
 
 services:
   - name: GitHub
@@ -64,16 +64,16 @@ notifications:
 | `confirmSamples` | `1` | 1–10. Smorzamento dei rimbalzi: quanti poll consecutivi devono concordare su una lettura prima che il cambio venga annunciato. `1` notifica subito; `2` ignora una pagina che si contraddice per un ciclo, al costo di un poll di ritardo. |
 | `correlationThreshold` | `0` | 0–100. Rilevamento dei guasti correlati (roadmap 2.7): quanti provider devono peggiorare entro `correlationWindowMinutes` perché il ciclo mandi un unico avviso "sembra un guasto condiviso" invece di uno per provider. `0` e `1` sono spento, che è il default — è l'unica impostazione qui che *sostituisce* avvisi. |
 | `correlationWindowMinutes` | `10` | 1–1440. Quanto è larga quella finestra. Più larga intercetta un guasto condiviso che attraversa lentamente le status page, e rischia di unire due giornate storte non collegate. |
-| `locale` | `en` | `en` o `it`; qualunque valore sconosciuto ricade su `en`. |
+| `locale` | `en` | Un tag di locale minuscolo; la build include `en`, `it`, `de`, `es`, `fr` e `pt`, e qualunque altro valore ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro e `watchdog` segnala qualunque cambiamento nel testo di una pagina (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `sequence` concatena due o tre richieste per un'API dietro un login, `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto (vedi sotto). |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro e `watchdog` segnala qualunque cambiamento nel testo di una pagina (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `sequence` concatena due o tre richieste per un'API dietro un login, `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto, e `icmp` e `docker` sondano le macchine stesse dell'homelab (vedi sotto); `json` mappa qualunque documento JSON su uno stato, e `isitdown`, `upptime`, `statusio`, `githubactions`, `openstatus`, `sorry`, `cstate` e `registry` sono descritti sotto *Altre piattaforme di stato, altre istanze e segnali da sviluppatore*. |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
 | `services[].intervalSeconds` | — | 10–3600, solo sonde (`http`, `sequence`, `tcp`, `dns`). La stessa cadenza in secondi, per un endpoint che può restare giù meno di un minuto; una pagina di stato resta sul pavimento del minuto e viene rifiutata al caricamento. Mai insieme a `intervalMinutes`. |
 | `services[].crossChecks` | — | Solo su una sonda (`http`, `sequence`, `tcp`, `dns`) o su una lettura di posta (`imap`): l'id del provider di cui questa sonda è un secondo parere — controllo incrociato dei guasti silenziosi (roadmap 1.10). Quando la sonda non raggiunge il servizio e la status page di quel provider dichiara ancora operativo senza incidenti aperti, il disaccordo è esso stesso un avviso. Si può restringere a un singolo componente con la stessa forma `provider#componente` con cui una regola di routing indica il bersaglio (roadmap 2.9); la metà componente serve solo a precisare contro cosa la scheda di fiducia (roadmap 8.1) confronta la sonda, dato che il controllo dei guasti silenziosi riguarda una pagina che dichiara che non c'è proprio nulla che non va. |
 | `services[].authority` | dall'adapter | Quale fonte fa fede per questo provider — `declared` (la sua status page) oppure `observed` (la nostra misura), roadmap 9.1. Ometterlo è il caso normale e non è un valore mancante: una sonda (`http`, `sequence`, `tcp`, `dns`) legge `observed` perché *è* la misura, e tutto ciò che legge la pagina di qualcun altro legge `declared`. Va impostato solo per non essere d'accordo con quel default — una status page di cui hai imparato a diffidare, o una sonda che non vuoi sia trattata come il riferimento. Decide cosa la dashboard stampa accanto all'adapter e come è formulato un avviso di disservizio silenzioso, non quali campioni sostengono una percentuale. Vedi [7.7](how-it-works.it.md#77-quale-fonte-fa-fede). |
 | `services[].mutedUntil` | — | ISO 8601. Finché è nel futuro il provider viene interrogato e registrato come sempre ma non notifica nulla — "lo so, smetti di dirmelo, fino ad allora". Nell'edizione UI è ciò che scrive il comando **Silenzia** della dashboard. |
-| `services[].options` | — | Extra specifici dell'adapter. Oggi ne accettano sei: `html` (`selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`), `watchdog` (`baseline`, più un `selector` facoltativo), `http`, `tcp` e `dns`, e `imap` (vedi le loro sezioni qui sotto). |
+| `services[].options` | — | Extra specifici dell'adapter. `html` accetta `selector`, più le liste di parole opzionali `operational` / `degraded` / `partial_outage` / `major_outage`; `watchdog` accetta `baseline`, più un `selector` facoltativo; `http`, `tcp`, `dns`, `sequence`, `icmp`, `docker`, `imap`, `json` e gli adapter di piattaforma dell'ultima sezione ne accettano di propri — ciascuno è elencato nella sua sezione qui sotto. |
 
 #### L'adapter `html`
 
@@ -485,7 +485,7 @@ ignorato. Tutto vive in SQLite in `/app/data/isitdown.db` e si modifica da
 - la lista dei servizi: aggiungi, modifica, rimuovi
 - quali canali di notifica sono attivi, quale variabile d'ambiente porta ogni
   credenziale e — in sola scrittura — la credenziale stessa
-- tema, lingua della dashboard, lingua delle notifiche, fuso orario
+- tema, lingua della dashboard, fuso orario, la vista geografica della Panoramica
 
 La pagina si apre come un elenco di categorie — Polling, Servizi monitorati,
 Notifiche, Consegna, Dati, Aspetto, e Rimossi di recente finché c'è qualcosa da
@@ -511,6 +511,20 @@ pesa il database ora. L'ordine è voluto — un file le cui pagine sono già
 sbagliate viene segnalato, non riscritto — e non cancella mai nulla: è la
 pulizia giornaliera a rimuovere le righe oltre la finestra di retention, e
 questo è ciò che ne restituisce le pagine.
+
+**Impostazioni → Dati** è anche il posto dove la configurazione si può annullare
+(roadmap 5.7–5.9). Scegliere un `config.yml` da importare mostra prima **cosa
+cambierebbe** — provider aggiunti, rimossi e modificati campo per campo,
+impostazioni e canali che si muovono, e se instradamento e destinatari vengono
+sostituiti — e non applica nulla finché non confermi. **Snapshot** conserva la
+configurazione sotto un nome a tua scelta (*prima-della-migrazione*) e la
+rimette più tardi; un ripristino salva la configurazione che sostituisce come
+snapshot a sé, quindi anche lui si può annullare. Gli snapshot sono l'export
+`config.yml`, quindi contengono riferimenti `${VAR}` e mai una credenziale, e non
+includono mai lo storico. **Cronologia modifiche** elenca ogni scrittura di
+configurazione — chi l'ha fatta (l'header indicato da `AUDIT_ACTOR_HEADER`,
+altrimenti `local`), quale era il valore prima, e un pulsante che lo riscrive. Le
+credenziali compaiono lì solo come «impostata» o «rimossa», mai come valori.
 
 **Settings → Dati → Controllo aggiornamenti** (roadmap 15.11a) è un
 **controllo aggiornamenti**, spento di default. Acceso, legge una volta al
@@ -639,7 +653,7 @@ prova reale (roadmap 4.5).
 | `HEARTBEAT_TOKEN` | UI | — | Attiva l'endpoint dei ping heartbeat ([3.19](#319-heartbeat--il-dead-mans-switch)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
 | `OUTBOUND_BLOCK_PRIVATE` | entrambe | non impostata | `true` fa rifiutare a sonde e letture delle pagine di stato i target loopback e dei range privati (e i redirect verso di essi), oltre agli indirizzi link-local che sono sempre rifiutati. Qualsiasi altro valore lascia consentiti i target privati. |
 | `BIND_HOST` | UI | `127.0.0.1` | L'indirizzo su cui la dashboard è in ascolto. Per impostazione predefinita è il loopback, ciò che mantiene un'istanza senza `API_TOKEN` raggiungibile solo da questa macchina; le immagini container impostano `0.0.0.0` (la mappatura `ports` di compose decide poi chi può raggiungerla, e pubblica solo su `127.0.0.1`). Per raggiungere la dashboard da un'altra macchina, pubblica su `0.0.0.0` (o imposta `BIND_HOST` su bare metal) **e** imposta `API_TOKEN` — vedi [3.12](#312-raggiungere-lapi-da-un-altro-host) per ciò che una richiesta da fuori questa macchina può fare. |
-| `PORT` | UI | `3000` | Porta HTTP. |
+| `PORT` | UI, outpost | `3000` (`8080` per l'outpost) | Porta HTTP. |
 
 I segreti arrivano tramite `env_file` a runtime; nulla viene incorporato in
 un'immagine. `docker history` su entrambe le immagini non mostra alcun layer `ENV`
@@ -2095,7 +2109,8 @@ notifications:
 ```
 
 **La lingua** ricade sulla lingua di notifica dell'installazione (`locale:` in
-cima al file, oppure **Impostazioni → Aspetto** nell'edizione UI), che è ciò che
+cima al file, oppure `notificationLocale` in
+[`/api/preferences`](api.it.md#6-api-http) nell'edizione UI), che è ciò che
 ogni canale faceva prima che questo esistesse. È lo stesso catalogo che usa la
 dashboard, quindi un canale può nominare solo una lingua che IsItDown ha davvero.
 
@@ -2416,13 +2431,14 @@ services:
       OTEL_SERVICE_NAME: isitdown
 ```
 
-Tre span, ed è tutta la strumentazione:
+Quattro span, ed è tutta la strumentazione:
 
 | Span | Che cosa copre |
 | --- | --- |
 | `poll.cycle` | Un ciclo da capo a fondo — il caricamento della configurazione, la lettura di ogni provider e l'invio che ne segue. `isitdown.manual` dice se è partito dal pulsante **Interroga ora**, `isitdown.narrowed` se era un solo provider che rispondeva a un push ([3.15](#315-push-del-provider-invece-del-polling)). |
 | `provider.read` | Un provider, compresa l'attesa di sfasamento prima della sua richiesta — perché una lettura durata quattordici secondi deve rendere conto anche dei secondi passati ad aspettare di proposito. Porta `isitdown.provider` e `isitdown.adapter`. |
 | `notification.send` | Un messaggio verso un canale, ritentativi compresi: "quanto è servito per avvisare qualcuno" è una risposta sola, non tre. Porta `isitdown.channel`, `isitdown.provider` e `isitdown.kind`. |
+| `notifications.dispatch` | Il passo di invio di un ciclo: i cambiamenti trovati dal diff engine, consegnati a ogni canale. Porta `isitdown.changes`, quanti erano. |
 
 Uno span il cui lavoro solleva un'eccezione viene esportato con l'errore sopra e
 l'errore viene rilanciato — così la traccia mostra la lettura fallita e il poller
@@ -2440,7 +2456,7 @@ legge.
 
 La metà onesta del compromesso:
 
-- **Esistono solo i tre span qui sopra.** Non ci sono span HTTP o SQLite
+- **Esistono solo i quattro span qui sopra.** Non ci sono span HTTP o SQLite
   automatici sotto di essi. Sono esattamente la domanda posta dalla riga di
   roadmap — dove sia finito un ciclo lento — e nulla di più.
 - **Nessun segnale di metriche né di log.** `/metrics` è già migliore per il

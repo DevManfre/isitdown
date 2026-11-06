@@ -11,7 +11,7 @@ lo [sviluppo live](development.it.md#93-sviluppo-live) e non viene mai costruito
 
 ```
 builder  node:24-alpine   npm ci (con le devDependencies), tsc, vite build, copia in dist gli asset non-TS
-light    node:24-alpine   dipendenze prod + dist/{core,adapters,notifiers,light}
+light    node:24-alpine   dipendenze prod + dist/{core,adapters,notifiers,light,outpost}
                           VOLUME /app/config /app/data · nessun EXPOSE · nessun server
 dev      FROM builder     mantiene le devDependencies · vite build --watch + node --watch · taggato solo isitdown:dev
 ui       FROM light       + dist/ui (dashboard e cataloghi) · EXPOSE 3000
@@ -262,7 +262,7 @@ OUTPOST_TOKEN=<the token above>
   server, quindi è l'outpost a restare in ascolto. Non tiene nemmeno
   configurazione: ogni richiesta porta con sé l'intera sonda, così un outpost
   può servire più installazioni e un restart non perde nulla.
-- **Solo sonde.** Vengono inviate `http`, `tcp` e `dns`; una pagina di stato si
+- **Solo sonde.** Vengono inviati gli adapter di sonda (`http`, `tcp`, `dns`, …); una pagina di stato si
   legge uguale da qualunque posto, quindi non lo è mai. L'outpost rifiuta ogni
   altro adapter, e questo gli impedisce anche di diventare un fetcher generico
   per chiunque abbia il token.
