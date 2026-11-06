@@ -7,7 +7,10 @@ import type {
   CatalogProvider,
   ComponentHistoryResponse,
   ComponentPreview,
+  ConfigDiff,
   ConfigImportReport,
+  ConfigSnapshot,
+  HistoryEntry,
   DbRestoreReport,
   IncidentNote,
   DbMaintenanceReport,
@@ -364,6 +367,28 @@ export const previewComponents = (body: unknown) =>
  */
 export const importConfig = (yaml: string) =>
   request<ConfigImportReport>("POST", "/config/import", yaml, "text/yaml");
+/** What importing the file would change, without importing it (roadmap 5.9). */
+export const previewConfigImport = (yaml: string) =>
+  request<ConfigDiff>("POST", "/config/import/preview", yaml, "text/yaml");
+/** Named configuration snapshots (roadmap 5.8). */
+export const getSnapshots = () =>
+  request<{ snapshots: ConfigSnapshot[] }>("GET", "/config/snapshots");
+export const saveSnapshot = (name: string) =>
+  request<ConfigSnapshot>("POST", "/config/snapshots", { name });
+export const previewSnapshot = (id: number) =>
+  request<ConfigDiff>("GET", `/config/snapshots/${id}/preview`);
+export const restoreSnapshot = (id: number) =>
+  request<{ report: ConfigImportReport; safety: ConfigSnapshot }>(
+    "POST",
+    `/config/snapshots/${id}/restore`,
+  );
+export const deleteSnapshot = (id: number) =>
+  request<undefined>("DELETE", `/config/snapshots/${id}`);
+/** The configuration history and its one-value restore (roadmap 5.7). */
+export const getConfigHistory = () =>
+  request<{ entries: HistoryEntry[] }>("GET", "/config/history?limit=200");
+export const revertHistoryEntry = (id: number) =>
+  request<{ reverted: HistoryEntry }>("POST", `/config/history/${id}/revert`);
 /**
  * Puts a whole database back (roadmap 4.4). The file's own bytes, as
  * `application/octet-stream` — the validation that matters is the server's, and
