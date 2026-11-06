@@ -14,6 +14,7 @@ import {
   readSettings,
   replaceRecipients,
   replaceRoutingRules,
+  restoreService,
   softDeleteService,
   updateChannel,
   updateService,
@@ -288,32 +289,42 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
     settings: carried.map(([key]) => key),
   };
 
+  const apply = (service: ConfigFile["services"][number]): void => {
+    updateService(db, service.id, {
+      name: service.name,
+      baseUrl: service.baseUrl,
+      enabled: service.enabled,
+      intervalMinutes: service.intervalMinutes ?? null,
+      intervalSeconds: service.intervalSeconds ?? null,
+      components: service.components,
+      scopeToComponents: service.scopeToComponents,
+      // Null rather than omitted: an import is the file's whole fleet, so a
+      // service that no longer carries a group or a cross-check has to lose
+      // the one the database is still holding.
+      group: service.group ?? null,
+      dependsOn: service.dependsOn ?? null,
+      crossChecks: service.crossChecks ?? null,
+      slaTarget: service.slaTarget ?? null,
+      impact: service.impact ?? null,
+      owner: service.owner ?? null,
+      runbook: service.runbook ?? null,
+      tags: service.tags ?? null,
+      muteSchedules: service.muteSchedules ?? null,
+      maintenanceWindows: service.maintenanceWindows ?? null,
+      ...(service.options === undefined ? {} : { options: service.options }),
+    });
+  };
+
   for (const service of file.services) {
     if (existing.has(service.id)) {
-      updateService(db, service.id, {
-        name: service.name,
-        baseUrl: service.baseUrl,
-        enabled: service.enabled,
-        intervalMinutes: service.intervalMinutes ?? null,
-        intervalSeconds: service.intervalSeconds ?? null,
-        components: service.components,
-        scopeToComponents: service.scopeToComponents,
-        // Null rather than omitted: an import is the file's whole fleet, so a
-        // service that no longer carries a group or a cross-check has to lose
-        // the one the database is still holding.
-        group: service.group ?? null,
-        dependsOn: service.dependsOn ?? null,
-        crossChecks: service.crossChecks ?? null,
-        slaTarget: service.slaTarget ?? null,
-        impact: service.impact ?? null,
-        owner: service.owner ?? null,
-        runbook: service.runbook ?? null,
-        tags: service.tags ?? null,
-        muteSchedules: service.muteSchedules ?? null,
-        maintenanceWindows: service.maintenanceWindows ?? null,
-        ...(service.options === undefined ? {} : { options: service.options }),
-      });
+      apply(service);
       report.updated.push(service.id);
+    } else if (restoreService(db, service.id)) {
+      // Removed earlier and still inside its grace period: an insert would
+      // collide with the row, and the history it kept is exactly what a
+      // snapshot or an old file means to bring back.
+      apply(service);
+      report.added.push(service.id);
     } else {
       insertService(db, service);
       report.added.push(service.id);

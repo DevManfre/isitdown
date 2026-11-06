@@ -745,6 +745,47 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
+  "/config/snapshots": {
+    get: {
+      tags: ["Configuration"],
+      summary: "Named configuration snapshots, newest first.",
+      responses: { "200": ok({ type: "object" }) },
+    },
+    post: {
+      tags: ["Configuration"],
+      summary: "Save the configuration as it stands under a name.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { type: "object", required: ["name"], properties: { name: { type: "string", maxLength: 80 } } },
+          },
+        },
+      },
+      responses: { "201": ok({ type: "object" }), "400": badRequest },
+    },
+  },
+  "/config/snapshots/{id}/preview": {
+    get: {
+      tags: ["Configuration"],
+      summary: "What restoring the snapshot would change.",
+      responses: { "200": ok({ type: "object" }) },
+    },
+  },
+  "/config/snapshots/{id}/restore": {
+    post: {
+      tags: ["Configuration"],
+      summary: "Put the snapshot back, saving the configuration it replaces first.",
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
+  "/config/snapshots/{id}": {
+    delete: {
+      tags: ["Configuration"],
+      summary: "Delete a snapshot.",
+      responses: { "204": { description: "Deleted." } },
+    },
+  },
   "/config/backup": {
     get: {
       tags: ["Configuration"],
