@@ -457,6 +457,12 @@ export const probeAdapter = (id: string) =>
     "POST",
     `/debug/adapters/${encodeURIComponent(id)}/probe`,
   );
+/**
+ * One read of a provider that is not saved yet, from the form's own values
+ * (roadmap 5.10). Records nothing and notifies nothing.
+ */
+export const previewRead = (body: unknown) =>
+  request<AdapterProbeResult>("POST", "/config/services/preview-read", body);
 /** Every edit, add, delete and reorder saves the whole ordered list — see RoutingRules.tsx. */
 export const putRouting = (rules: RoutingRule[]) =>
   request<RoutingResponse>("PUT", "/config/routing", { rules });
