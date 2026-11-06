@@ -34,7 +34,7 @@ export function BentoTile({
       {/* `min-h-8` so a header without an action lines up with one that has a
           small Button in it, instead of sitting 8px higher. */}
       <div className="flex min-h-8 items-center justify-between gap-3">
-        <span className="text-xs uppercase tracking-widest text-primary">{title}</span>
+        <span className="text-base font-medium">{title}</span>
         {action}
       </div>
       {children}

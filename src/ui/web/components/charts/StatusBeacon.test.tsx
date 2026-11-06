@@ -30,16 +30,19 @@ describe("StatusBeacon", () => {
     expect(beacon().getAttribute("style")).toContain(`color: ${tierColor("danger")}`);
   });
 
-  // A state that is still unfolding moves; a settled one does not need to
-  // shout, and "never measured" is not an event at all.
-  it("animates the three live tiers and leaves unknown still", () => {
-    for (const tier of ["ok", "warn", "danger"] as const) {
+  // Only a problem moves (dashboard-design-direction § Motion): a settled
+  // estate has nothing to attend to, and "never measured" is not an event.
+  it("pulses warn and danger, and leaves ok and unknown still", () => {
+    for (const tier of ["warn", "danger"] as const) {
       const { unmount } = render(<StatusBeacon tier={tier} />);
-      expect(beacon().className, `${tier} does not move`).toMatch(/beacon-(breathe|pulse)/);
+      expect(beacon().className, `${tier} does not move`).toMatch(/beacon-pulse/);
       unmount();
     }
-    render(<StatusBeacon tier="unknown" />);
-    expect(beacon().className).not.toMatch(/beacon-(breathe|pulse)/);
+    for (const tier of ["ok", "unknown"] as const) {
+      const { unmount } = render(<StatusBeacon tier={tier} />);
+      expect(beacon().className, `${tier} moves`).not.toMatch(/beacon-(breathe|pulse)/);
+      unmount();
+    }
   });
 
   // The headline sits next to it and already says the same thing in words.

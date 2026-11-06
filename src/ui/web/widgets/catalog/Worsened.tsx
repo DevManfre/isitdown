@@ -81,10 +81,10 @@ export function Worsened({ props }: { props: { filter: FleetFilter } }) {
       </div>
 
       <div className="hidden grid-cols-[minmax(0,1fr)_5rem_5rem_6.5rem] items-center gap-x-4 @md:grid">
-        <span className="pb-1.5 font-mono text-xs text-muted-foreground">{t("widget.col.provider")}</span>
-        <span className="pb-1.5 text-right font-mono text-xs text-muted-foreground">{t("widget.worsened.before")}</span>
-        <span className="pb-1.5 text-right font-mono text-xs text-muted-foreground">{t("widget.worsened.now")}</span>
-        <span className="pb-1.5 font-mono text-xs text-muted-foreground">{t("widget.worsened.change")}</span>
+        <span className="pb-1.5 text-xs text-muted-foreground">{t("widget.col.provider")}</span>
+        <span className="pb-1.5 text-right text-xs text-muted-foreground">{t("widget.worsened.before")}</span>
+        <span className="pb-1.5 text-right text-xs text-muted-foreground">{t("widget.worsened.now")}</span>
+        <span className="pb-1.5 text-xs text-muted-foreground">{t("widget.worsened.change")}</span>
         {rows.map((row) => (
           <div key={row.id} className="contents">
             <span className="truncate border-t border-border py-2.5 text-sm">{name(row.id)}</span>

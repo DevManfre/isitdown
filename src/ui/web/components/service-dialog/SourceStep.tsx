@@ -146,7 +146,7 @@ export function SourceStep({
             className="h-auto flex-1 flex-col items-start gap-1 border border-border px-3 py-2.5 text-left data-[state=on]:border-primary data-[state=on]:bg-accent"
           >
             <span className="text-[13px] font-medium">{t(option.label)}</span>
-            <span className="text-[11px] leading-snug font-normal text-muted-foreground">{t(option.hint)}</span>
+            <span className="text-xs leading-snug font-normal text-muted-foreground">{t(option.hint)}</span>
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
@@ -193,7 +193,7 @@ export function SourceStep({
                   <ProviderIcon name={entry.name} baseUrl={entry.baseUrl} size={18} />
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-xs font-medium">{entry.name}</span>
-                    <span className="truncate font-mono text-[10px] text-muted-foreground">
+                    <span className="truncate font-mono text-xs text-muted-foreground">
                       {entry.configured ? t("catalog.added") : entry.adapter}
                     </span>
                   </span>
@@ -232,7 +232,7 @@ export function SourceStep({
           {ADAPTER_FAMILIES.map((family) => (
             <div key={family.title} className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                <span className="text-sm font-medium text-muted-foreground">
                   {t(family.title)}
                 </span>
                 <span className="h-px flex-1 bg-border" />
@@ -258,7 +258,7 @@ export function SourceStep({
                     className="h-auto w-full justify-start gap-2 border border-border px-2.5 py-1.5 data-[state=on]:border-primary data-[state=on]:bg-accent"
                   >
                     <span className="font-mono text-xs">{option.id}</span>
-                    <span className="truncate text-[11px] font-normal text-muted-foreground">{t(option.hint)}</span>
+                    <span className="truncate text-xs font-normal text-muted-foreground">{t(option.hint)}</span>
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>

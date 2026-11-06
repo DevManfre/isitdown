@@ -110,7 +110,7 @@ export function Heartbeats() {
     <WidgetCard title={title} meta={meta} conclusion={conclusion} tone={tone} className="@container">
       <div className="flex items-baseline gap-2.5 @md:hidden">
         <span className="font-mono text-3xl">{fine}/{jobs.length}</span>
-        <span className="font-mono text-xs text-muted-foreground">{t("widget.heartbeats.on-time")}</span>
+        <span className="text-xs text-muted-foreground">{t("widget.heartbeats.on-time")}</span>
       </div>
 
       <ul className="hidden flex-col @md:flex">
@@ -159,7 +159,7 @@ export function Heartbeats() {
                 {job.last === null ? t("widget.heartbeats.never") : formatRelative(i18n.language, job.last)}
               </span>
               <span
-                className={cn("widget-tone hidden text-right font-mono text-[0.68rem] tracking-wider uppercase @2xl:block")}
+                className={cn("widget-tone hidden text-right text-sm @2xl:block font-medium")}
                 style={{ color: COLOR[job.state] }}
               >
                 {word(job)}

@@ -44,14 +44,14 @@ export function YearHeatCalendar({
 
   return (
     <div className="year-heat flex flex-col gap-2">
-      <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">{heading}</span>
+      <span className="text-sm font-medium text-muted-foreground">{heading}</span>
 
       <div className="flex flex-col gap-1 overflow-x-auto">
         {/* The month row and the cell grid share a column count, so a label
             sits over the week its month starts in rather than near it. */}
         <div
           aria-hidden="true"
-          className="grid gap-[2px] font-mono text-[10px] text-muted-foreground"
+          className="grid gap-[2px] font-mono text-xs text-muted-foreground"
           style={{ gridTemplateColumns: `repeat(${columns.length}, 10px)` }}
         >
           {months.map((month) => (

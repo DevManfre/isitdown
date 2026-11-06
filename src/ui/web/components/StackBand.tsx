@@ -30,7 +30,7 @@ export function StackBand({
 
   return (
     <section aria-label={t("stack.title")} className="flex flex-col gap-2">
-      <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("stack.title")}</span>
+      <span className="text-sm text-muted-foreground">{t("stack.title")}</span>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {groups.map((group) => (
           <Card key={group.id} className="anim-rise flex flex-col gap-2 p-3">
@@ -39,7 +39,7 @@ export function StackBand({
                 <StatusDot status={group.status} size={10} label={t(statusLabelKey(group.status))} />
                 {group.id}
               </span>
-              <span className="font-mono text-[11px] uppercase" style={{ color: statusColor(group.status) }}>
+              <span className="text-sm font-medium" style={{ color: statusColor(group.status) }}>
                 {t(statusLabelKey(group.status))}
               </span>
             </div>

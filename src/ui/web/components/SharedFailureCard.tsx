@@ -34,7 +34,7 @@ export function SharedFailureCard({
       className="flex flex-col gap-3 rounded-md border border-border bg-card p-4"
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs uppercase tracking-widest text-primary">
+        <span className="text-base font-medium">
           {t("shared-failure.kicker")}
         </span>
         <span className="rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs text-muted-foreground">

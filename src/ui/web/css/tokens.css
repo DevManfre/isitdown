@@ -166,12 +166,12 @@
   --font-body: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 
-  --space-1: 2.8px;
-  --space-2: 5.6px;
-  --space-3: 8.4px;
-  --space-4: 11.2px;
-  --space-6: 16.8px;
-  --space-8: 22.4px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
 
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -185,8 +185,15 @@
      theme block for the same reason --ease-out is: the palettes are asserted to
      declare exactly the same token names. */
   --ease-entry: cubic-bezier(0.16, 1, 0.3, 1);
+  /* The three durations everything on the dashboard moves at
+     (dashboard-design-direction § Motion): fast for hover, press and colour,
+     base for menus, tooltips, accordions and rows, slow for dialogs, sheets
+     and a view arriving. Nothing runs longer than slow. */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 280ms;
 
-  --rail-width: 196px;
+  --rail-width: 232px;
 
   --ring-icon-bg: #ffffff;
   --rail-width-collapsed: 30px;
@@ -241,7 +248,7 @@
      declaration outranks every stylesheet — motion.css could never have
      widened the collapsed strip on hover against it. Declared here, the peek
      is one --sidebar-width-icon override on the sidebar element itself. */
-  --sidebar: var(--color-surface);
+  --sidebar: var(--color-bg);
   --sidebar-foreground: var(--color-text);
   --sidebar-accent: var(--accent);
   --sidebar-accent-foreground: var(--accent-foreground);
@@ -351,12 +358,12 @@
   --font-body: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 
-  --space-1: 2.8px;
-  --space-2: 5.6px;
-  --space-3: 8.4px;
-  --space-4: 11.2px;
-  --space-6: 16.8px;
-  --space-8: 22.4px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
 
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -364,8 +371,15 @@
 
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-entry: cubic-bezier(0.16, 1, 0.3, 1);
+  /* The three durations everything on the dashboard moves at
+     (dashboard-design-direction § Motion): fast for hover, press and colour,
+     base for menus, tooltips, accordions and rows, slow for dialogs, sheets
+     and a view arriving. Nothing runs longer than slow. */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 280ms;
 
-  --rail-width: 196px;
+  --rail-width: 232px;
 
   --ring-icon-bg: #ffffff;
   --rail-width-collapsed: 30px;
@@ -418,7 +432,7 @@
      declaration outranks every stylesheet — motion.css could never have
      widened the collapsed strip on hover against it. Declared here, the peek
      is one --sidebar-width-icon override on the sidebar element itself. */
-  --sidebar: var(--color-surface);
+  --sidebar: var(--color-bg);
   --sidebar-foreground: var(--color-text);
   --sidebar-accent: var(--accent);
   --sidebar-accent-foreground: var(--accent-foreground);
@@ -509,12 +523,12 @@
     --font-body: "Inter", system-ui, sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 
-    --space-1: 2.8px;
-    --space-2: 5.6px;
-    --space-3: 8.4px;
-    --space-4: 11.2px;
-    --space-6: 16.8px;
-    --space-8: 22.4px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
 
     --radius-sm: 4px;
     --radius-md: 8px;
@@ -522,8 +536,15 @@
 
     --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
     --ease-entry: cubic-bezier(0.16, 1, 0.3, 1);
+    /* The three durations everything on the dashboard moves at
+       (dashboard-design-direction § Motion): fast for hover, press and colour,
+       base for menus, tooltips, accordions and rows, slow for dialogs, sheets
+       and a view arriving. Nothing runs longer than slow. */
+    --duration-fast: 120ms;
+    --duration-base: 200ms;
+    --duration-slow: 280ms;
 
-    --rail-width: 196px;
+    --rail-width: 232px;
 
     --ring-icon-bg: #ffffff;
     --rail-width-collapsed: 30px;
@@ -576,7 +597,7 @@
        declaration outranks every stylesheet — motion.css could never have
        widened the collapsed strip on hover against it. Declared here, the peek
        is one --sidebar-width-icon override on the sidebar element itself. */
-    --sidebar: var(--color-surface);
+    --sidebar: var(--color-bg);
     --sidebar-foreground: var(--color-text);
     --sidebar-accent: var(--accent);
     --sidebar-accent-foreground: var(--accent-foreground);

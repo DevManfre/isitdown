@@ -84,7 +84,7 @@ export function ProviderPushCard({
 
   const guide = (
     <div className="flex flex-col gap-2">
-      <span className="text-xs uppercase tracking-widest text-muted-foreground">
+      <span className="text-sm text-muted-foreground">
         {t("push.guide.title", { host: hostOf(pageUrl) })}
       </span>
       <ol className="flex flex-col gap-2">
@@ -117,7 +117,7 @@ export function ProviderPushCard({
       className="flex flex-col gap-4 rounded-md border border-border bg-card p-3"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs uppercase tracking-widest text-primary">{t("push.title")}</span>
+        <span className="text-base font-medium">{t("push.title")}</span>
         <span
           className={`flex items-center gap-2 rounded-full px-2.5 py-0.5 font-mono text-xs ${
             state === "working"
@@ -149,14 +149,14 @@ export function ProviderPushCard({
           {state === "working" && provider.lastReceivedAt !== null && (
             <dl className="flex flex-wrap gap-8">
               <div className="flex flex-col gap-1">
-                <dt className="text-xs uppercase tracking-widest text-muted-foreground">{t("push.last")}</dt>
+                <dt className="text-sm text-muted-foreground">{t("push.last")}</dt>
                 <dd className="font-mono text-sm">
                   {formatDateTime(i18n.language, provider.lastReceivedAt)} ·{" "}
                   {formatRelative(i18n.language, provider.lastReceivedAt)}
                 </dd>
               </div>
               <div className="flex flex-col gap-1">
-                <dt className="text-xs uppercase tracking-widest text-muted-foreground">{t("push.received")}</dt>
+                <dt className="text-sm text-muted-foreground">{t("push.received")}</dt>
                 <dd className="font-mono text-sm">{t("push.received-count", { count: provider.received })}</dd>
               </div>
             </dl>
@@ -166,7 +166,7 @@ export function ProviderPushCard({
             <div className="flex flex-col gap-2">
               <label
                 htmlFor={`push-url-${providerId}`}
-                className={state === "working" ? "sr-only" : "text-xs uppercase tracking-widest text-muted-foreground"}
+                className={state === "working" ? "sr-only" : "text-sm text-muted-foreground"}
               >
                 {t("push.url")}
               </label>

@@ -1,17 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { ArrowRight } from "lucide-react";
-import { BentoCard, BentoGrid } from "@/components/ui/bento-grid.tsx";
-import { SettingsReel } from "@/components/settings/SettingsReel.tsx";
-import { SECTION_REELS } from "@/components/settings/reels.ts";
+import { ChevronRight } from "lucide-react";
 import { SETTINGS_CATEGORIES, type SettingsCategory } from "@/components/settings/sectionIndex.ts";
-import { stagger } from "@/lib/stagger.ts";
 
 /**
- * The front of Settings: one tile per category, each opening its own route.
+ * The front of Settings: one row per category, each opening its own route.
  *
  * Forty rows on one scrolling page meant every visit started by scrolling past
- * the thirty-nine that were not the reason for the visit. The grid answers
+ * the thirty-nine that were not the reason for the visit. The list answers
  * "where does this live" in one look instead, and the rows are a click away on
  * a page that holds only them.
  *
@@ -27,36 +23,24 @@ const fold = (text: string): string =>
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "");
 
-function CategoryTile({ category, index, count }: { category: SettingsCategory; index: number; count?: number }) {
+function CategoryRow({ category, count }: { category: SettingsCategory; count?: number }) {
   const { t } = useTranslation();
-  const painter = SECTION_REELS[category.id as keyof typeof SECTION_REELS];
-
   return (
-    <BentoCard
-      className="anim-rise focus-within:ring-2 focus-within:ring-ring"
-      style={{ animationDelay: stagger(index) }}
-      background={
-        painter === undefined ? undefined : (
-          <SettingsReel painter={painter} className="pointer-events-none absolute inset-x-0 top-0 h-32" />
-        )
-      }
+    // The whole row is the link: one target, and its accessible name is the
+    // category, not "open" said seven times.
+    <Link
+      to={`/settings/${category.id}`}
+      className="settings-category group flex min-h-16 items-center gap-4 px-5 py-4 transition-colors duration-(--duration-fast) hover:bg-foreground/[0.03] focus-visible:bg-foreground/[0.03] focus-visible:outline-none"
     >
-      {/* `pt-32` reserves the band's own height, so no word is ever laid over
-          moving pixels and the copy keeps the card's own contrast. */}
-      <div className="flex flex-1 flex-col gap-2 p-5 pt-32">
-        <span className="text-xs uppercase tracking-widest text-primary">{t(category.labelKey)}</span>
-        <p className="text-sm leading-relaxed text-muted-foreground">{t(category.blurbKey)}</p>
-        <span className="mt-auto flex items-center gap-1.5 pt-3 text-sm font-medium">
-          {/* The whole tile is the link: one target, and the accessible name is
-              the category, not the word "open" repeated seven times. */}
-          <Link to={`/settings/${category.id}`} className="after:absolute after:inset-0 focus-visible:outline-none">
-            {t(category.labelKey)}
-          </Link>
-          {count !== undefined && <span className="font-mono text-xs text-muted-foreground">({count})</span>}
-          <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex items-baseline gap-2 text-sm font-medium">
+          {t(category.labelKey)}
+          {count !== undefined && <span className="text-xs font-normal text-muted-foreground tabular-nums">{count}</span>}
         </span>
-      </div>
-    </BentoCard>
+        <span className="text-sm text-muted-foreground">{t(category.blurbKey)}</span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </Link>
   );
 }
 
@@ -82,15 +66,18 @@ export function SettingsLauncher({
     );
 
     return (
-      <section className="flex flex-col gap-2" aria-label={t("settings.launcher.results")}>
+      <section
+        className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card"
+        aria-label={t("settings.launcher.results")}
+      >
         {hits.length === 0 ? (
-          <p className="px-1 text-sm text-muted-foreground">{t("settings.filter.empty", { query: query.trim() })}</p>
+          <p className="px-5 py-4 text-sm text-muted-foreground">{t("settings.filter.empty", { query: query.trim() })}</p>
         ) : (
           hits.map(({ key, category }) => (
             <Link
               key={`${category.id}-${key}`}
               to={`/settings/${category.id}`}
-              className="flex items-center justify-between gap-4 rounded-lg border bg-card px-4 py-3 text-sm transition-colors hover:bg-accent"
+              className="flex min-h-12 items-center justify-between gap-4 px-5 py-3 text-sm transition-colors duration-(--duration-fast) hover:bg-foreground/[0.03]"
             >
               <span>{t(key)}</span>
               <span className="text-xs text-muted-foreground">
@@ -104,19 +91,20 @@ export function SettingsLauncher({
   }
 
   return (
-    /* Equal tiles that pack the row, rather than spans of four and three that
-       left a two-column hole after "Notifications" and a lone tile at the
-       foot. Three across on a wide screen is also the width at which the
-       blurbs stop breaking every few words. */
-    <BentoGrid className="items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-      {categories.map((category, index) => (
-        <CategoryTile
+    /* One divided list (dashboard-design-direction): a category is a name and
+       one line of what it holds. The illustrated tiles it replaces painted a
+       looping animation behind every one of them. */
+    <nav
+      aria-label={t("settings.nav.label")}
+      className="anim-rise flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card"
+    >
+      {categories.map((category) => (
+        <CategoryRow
           key={category.id}
           category={category}
-          index={index}
           {...(counts[category.id] === undefined ? {} : { count: counts[category.id] })}
         />
       ))}
-    </BentoGrid>
+    </nav>
   );
 }

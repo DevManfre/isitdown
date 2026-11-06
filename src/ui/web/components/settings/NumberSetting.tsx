@@ -91,7 +91,7 @@ export function NumberSetting({
           }}
         />
         {unit !== undefined && (
-          <span aria-hidden="true" className="font-mono text-[11px] text-muted-foreground">
+          <span aria-hidden="true" className="font-mono text-xs text-muted-foreground">
             {unit}
           </span>
         )}

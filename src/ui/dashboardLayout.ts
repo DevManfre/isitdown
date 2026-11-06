@@ -134,14 +134,18 @@ const wholeFleet = (): { filter: FleetFilter } => ({ filter: { groups: [], provi
  * Today's Overview, block for block. A dashboard that was never customised
  * stores NULL and is served this, so blocks added here by later releases reach
  * every operator who has not chosen otherwise.
+ *
+ * The calm redesign (dashboard-design-direction) drew the fleet once: the
+ * list, with its bars, figure and status word, first — the rings repeated
+ * it, so they left the default and stay in the catalogue. The map, which
+ * folds shut, moved to the foot. A layout an operator saved is untouched.
  */
 export const DEFAULT_LAYOUT: DashboardLayout = {
   version: 1,
   widgets: [
-    { id: "rings", type: "fleet-rings", width: "full", props: wholeFleet() },
-    { id: "map", type: "geo-map", width: "full", props: {} },
+    { id: "fleet", type: "fleet-list", width: "full", props: wholeFleet() },
     { id: "shared", type: "shared-failure", width: "full", props: {} },
     { id: "stack", type: "stack-band", width: "full", props: wholeFleet() },
-    { id: "fleet", type: "fleet-list", width: "full", props: wholeFleet() },
+    { id: "map", type: "geo-map", width: "full", props: {} },
   ],
 };

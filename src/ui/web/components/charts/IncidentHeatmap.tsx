@@ -34,7 +34,7 @@ export function IncidentHeatmap({ grid }: { grid: number[][] }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <span className="text-xs uppercase tracking-widest text-primary">
+        <span className="text-base font-medium">
           {t("heatmap.title")}
         </span>
         <span className="text-xs text-muted-foreground">
@@ -59,7 +59,7 @@ export function IncidentHeatmap({ grid }: { grid: number[][] }) {
         >
           {grid.map((row, weekday) => (
             <div key={weekdays[weekday]} className="flex items-center gap-2">
-              <span className="w-10 shrink-0 font-mono text-[10px] uppercase text-muted-foreground">
+              <span className="w-10 shrink-0 font-mono text-xs text-muted-foreground">
                 {weekdays[weekday]}
               </span>
               <div className="flex flex-1 gap-px">
