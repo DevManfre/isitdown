@@ -814,6 +814,30 @@ describe("the service dialog's write path", () => {
     });
   });
 
+  it("reads the form's own values before saving, and shows what came back (roadmap 5.10)", async () => {
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
+    await openEdit();
+    const dialog = await screen.findByRole("dialog");
+    const calls = interceptWrites({
+      "POST /config/services/preview-read": {
+        ok: true,
+        durationMs: 12,
+        status: { provider: "preview", overallStatus: "operational", activeIncidents: [], components: [], maintenances: [], fetchedAt: "2026-11-06T10:00:00Z" },
+      },
+    });
+
+    const url = within(dialog).getByLabelText(i18n.t("field.base-url"));
+    await userEvent.clear(url);
+    await userEvent.type(url, "https://status.example.com");
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("adapter.debug.probe") }));
+
+    expect(await within(dialog).findByTestId("adapter-probe-result")).toBeTruthy();
+    const call = calls.find((c) => c.path === "/config/services/preview-read");
+    expect(call?.method).toBe("POST");
+    expect(call?.body).toMatchObject({ adapter: "statuspage", baseUrl: "https://status.example.com" });
+    expect(calls.some((c) => c.method === "PATCH"), "reading must not save").toBe(false);
+  });
+
   it("a successful edit submits the patch mutation with the expected body", async () => {
     // Review item 2: the only edit-mode test on record asserts the id field is
     // read-only but never actually submits — patch.mutateAsync and its body

@@ -161,8 +161,23 @@ export function AdapterDebugDialog({
               </Button>
             </div>
 
-            {result !== undefined && (
-              <div data-testid="adapter-probe-result" className="flex flex-col gap-1 text-xs">
+            {result !== undefined && <ProbeResultView result={result} />}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * What one read made of a page: the parsed status and its counts, or the
+ * adapter's own error. Shared with the provider form's "Read now" (roadmap
+ * 5.10), which shows the same answer for a provider that is not saved yet.
+ */
+export function ProbeResultView({ result }: { result: AdapterProbeResult }) {
+  const { t } = useTranslation();
+  return (
+    <div data-testid="adapter-probe-result" className="flex flex-col gap-1 text-xs">
                 {result.ok && result.status !== undefined ? (
                   <>
                     <span>
@@ -186,11 +201,6 @@ export function AdapterDebugDialog({
                     {t("adapter.debug.probe-failed", { error: result.error ?? "" })}
                   </span>
                 )}
-              </div>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }
