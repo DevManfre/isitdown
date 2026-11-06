@@ -44,17 +44,18 @@ docker exec isitdown-light sh -c "ps -o pid,args"            # solo node dist/li
 Conferma che nessun segreto sia finito in un'immagine:
 
 ```bash
-docker history isitdown:ui --no-trunc --format "{{.CreatedBy}}" | grep -iE "TOKEN=|SECRET="
+docker history ghcr.io/devmanfre/isitdown:ui-latest --no-trunc --format "{{.CreatedBy}}" | grep -iE "TOKEN=|SECRET="
 # nessun output
 ```
 
 ### 5.2 La dashboard
 
 Apri **http://localhost:3000** e percorri il rail: Overview · Providers · Componenti ·
-Incidents · History · Log invii · Settings. Poi prova i due controlli a runtime nell'header:
+Incidents · History · Log invii · Settings. Poi prova i due controlli a runtime:
 
-- il pulsante del **tema** cicla chiaro → scuro → sistema e sopravvive a un reload;
-- lo switch **EN / IT** cambia ogni stringa senza ricaricare la pagina, incluso il
+- il pulsante del **tema** nell'header cicla chiaro → scuro → sistema e sopravvive a un reload;
+- la lingua, scelta in **Settings → Appearance** (`en`, `de`, `es`, `fr`, `it`,
+  `pt`), cambia ogni stringa senza ricaricare la pagina, incluso il
   formato dell'ora (`7:36 PM` contro `19:36`) e il separatore decimale (`99.87%`
   contro `99,87%`).
 
@@ -75,10 +76,11 @@ intervallo, due frasi di download e due coppie di formati avevano tutti lo stess
 peso, e niente diceva quali stessero insieme.
 
 **History** tiene in alto il titolo della finestra e le sue quattro cifre, e
-divide il resto in cinque schede, una domanda ciascuna: **Andamento** (il
+divide il resto in fino a cinque schede, una domanda ciascuna: **Andamento** (il
 grafico giornaliero, l'elenco per provider e, chiusi, i tuoi marcatori),
 **Affidabilità** (MTTR, MTBF e i mesi), **Ricorrenze** (quando iniziano gli
-incidenti e quali provider cadono insieme), **Confronta** e **Latenza**. La
+incidenti e quali provider cadono insieme), **Confronta** e **Latenza** (queste due compaiono solo quando ci sono due
+provider da confrontare, o almeno un provider da misurare). La
 scheda viaggia nell'indirizzo — `#/history?tab=reliability` — così un link apre
 quella che intende, e una che qui non ha nulla da mostrare torna su Andamento.
 
@@ -91,7 +93,7 @@ veniva salvato e mai mostrato; il calendario è quell'anno. Un giorno che nessun
 ha campionato è disegnato smorzato e non verde, e passando sopra una cella si
 legge com'è andato quel giorno e quanto è stato attivo.
 
-Sopra la lista, **Confronta** (roadmap 5.7) sovrappone l'uptime giornaliero di
+Nella scheda **Confronta** (roadmap 5.7) il grafico sovrappone l'uptime giornaliero di
 due provider sugli stessi assi — la domanda che pone davvero una scelta tra
 fornitori, e quella a cui la classifica dal peggiore non può rispondere perché
 non mette mai due righe sulla stessa scala. Si apre sui due provider peggiori,
@@ -177,12 +179,12 @@ Conferma che una configurazione non valida venga rifiutata a voce alta invece di
 essere applicata a metà:
 
 ```bash
-docker run --rm isitdown:light
+docker run --rm ghcr.io/devmanfre/isitdown:light-latest
 #   ..."isitdown light failed to start","error":"config file /app/config/config.yml
 #      was not found — mount it or set CONFIG_PATH"   → exit 1
 
 printf 'services: []\n' > /tmp/bad.yml
-docker run --rm -v /tmp/bad.yml:/app/config/config.yml:ro isitdown:light
+docker run --rm -v /tmp/bad.yml:/app/config/config.yml:ro ghcr.io/devmanfre/isitdown:light-latest
 #   ..."error":"config file ... is invalid: services: at least one service is required"
 ```
 

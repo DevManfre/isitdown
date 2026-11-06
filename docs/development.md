@@ -20,11 +20,17 @@ isitdown/
 │   │   ├── diffEngine.ts               the sole authority on whether a notification fires
 │   │   ├── notificationDispatcher.ts   the only caller of Notifier.send
 │   │   ├── scheduler.ts                the loop; re-reads config every cycle
+│   │   ├── http.ts                     the one HTTP read: ETag/Last-Modified revalidation, charset decoding
+│   │   ├── routing.ts · mute.ts · maintenance.ts   who is told, when, and what is silenced (§3.27–3.28)
+│   │   ├── delivery.ts · onCall.ts     the delivery policy and the on-call rotation
+│   │   ├── authority.ts · suspicion.ts · freshness.ts   which reading is the record, and how far to trust it
+│   │   ├── outpost.ts · heartbeat.ts · tracing.ts       outpost consensus, dead-man's switch, traces
+│   │   ├── chatops/                    the bot's commands, parsed and executed edition-agnostically
 │   │   ├── logger.ts
 │   │   └── i18n/                       notification strings, edition-agnostic
 │   │       ├── index.ts                lookup + en fallback + UTC formatting
 │   │       ├── en.json                 source locale
-│   │       └── it.json
+│   │       └── de.json  es.json  fr.json  it.json  pt.json
 │   ├── adapters/                      (shared)
 │   │   ├── catalog.ts                  bundled catalog of well-known providers, read from catalog.json
 │   │   ├── catalog.json                the generated catalog (roadmap 2.1) — written by tools/build-catalog.mjs
@@ -36,6 +42,11 @@ isitdown/
 │   │   ├── aws.adapter.ts              AWS Health's open-events feed, region-scoped
 │   │   ├── gcp.adapter.ts              Google Cloud's incidents.json, current state and history in one
 │   │   ├── azure.adapter.ts            Azure's status feed, with its own closure vocabulary
+│   │   ├── betterstack · instatus · cachet · cstate · openstatus · statusio · upptime · uptimekuma · uptimecom · sorry · githubactions   other hosted status-page products, one `.adapter.ts` each
+│   │   ├── http · tcp · dns · icmp · imap · json · html · docker · registry · sequence · watchdog   probes of things that publish no status page, one `.adapter.ts` each
+│   │   ├── detect.ts                   which adapter reads a given URL (`POST /config/services/detect`)
+│   │   ├── plugins.ts                  adapter plugins loaded from a directory (§3.14)
+│   │   ├── import/                     Uptime Kuma, Gatus, Statping and StatusGator exports → candidate providers (2.4)
 │   │   ├── severity.ts                 severity read from a provider's own wording
 │   │   └── index.ts                    registry keyed by adapter id
 │   ├── notifiers/                     (shared)
@@ -45,6 +56,7 @@ isitdown/
 │   │   ├── webhook.notifier.ts
 │   │   ├── discord.notifier.ts         incoming webhook, one embed per change
 │   │   ├── slack.notifier.ts           incoming webhook, Block Kit section + button
+│   │   ├── …                           ntfy, Gotify, Pushover, Matrix, Teams, PagerDuty, Opsgenie, email, Twilio, MQTT, syslog and the rest — one `<channel>.notifier.ts` each, over thirty in all
 │   │   └── index.ts                    registry keyed by channel id
 │   ├── outpost/                       (outpost only, roadmap 1.7 — rides in the Light image)
 │   │   ├── index.ts                    entrypoint, refuses to start without OUTPOST_TOKEN
@@ -75,28 +87,35 @@ isitdown/
 │       ├── metrics.ts                  the Prometheus scrape surface: gauges from the store, counters in memory
 │       ├── liveEvents.ts               the push hub behind /events: subscribe, publish, nothing transport-specific
 │       ├── configFile.ts             config.yml export / import (§4.3)
+│       ├── configAudit.ts · configSnapshots.ts   the configuration history and named snapshots (roadmap 5.7, 5.8)
+│       ├── dashboardStore.ts · dashboardLayout.ts   named Overview dashboards and their widget layouts
+│       ├── openapi.ts                  the OpenAPI document served at /openapi.json (§6.1)
 │       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
 │       ├── geo/                        resolveLocation.ts + the IATA/cloud-region lookup tables it resolves against
 │       ├── db/                         open.ts, migrate.ts, seed.ts
-│       ├── routes/                     status, events, history, incidents, exports, notifications, config, preferences, map, metrics
+│       ├── routes/                     one `<area>.routes.ts` each: status, events, history, incidents, export, notifications, config.* (services, channels, import/export, history, backup, storage, push), dashboards, maintenances, map, metrics, badge, render, public, openapi …
 │       └── web/                        the dashboard: react, vite, shadcn/ui
 │           ├── index.html              pre-paint theme script, fonts, #root
 │           ├── main.tsx                provider tree: i18n, query, theme, router
 │           ├── App.tsx                 console shell: rail, header, view container
 │           ├── routes.tsx              hash routes
 │           ├── components/ui/          shadcn primitives
-│           ├── components/             rail, header, poll indicator, charts/
-│           ├── views/                  overview, providers, incidents, incident,
-│           │                           history, delivery log, settings
-│           ├── hooks/                  queries, theme, rail, busy, live
-│           ├── lib/                    api, types, chartConfig, format, i18n
+│           ├── components/             rail, header, poll indicator, dialogs, cards; charts/, settings/, service-dialog/, dashboards/
+│           ├── views/                  overview, providers, provider detail, components, incidents,
+│           │                           incident detail, history, delivery log, settings, wallboard
+│           ├── widgets/                the Overview's widget registry, grid drag and layout draft; catalog/ holds one file per widget
+│           ├── hooks/                  queries, theme, live, shortcuts, busy, pull-to-refresh …
+│           ├── lib/                    api, types, chartConfig, format, i18n, shortcuts …
 │           ├── css/base.css            Tailwind entry point: imports tailwindcss, tokens, motion
 │           ├── css/tokens.css          the only file with a colour literal
 │           ├── css/motion.css          keyframes, entry animations, transitions
-│           └── locales/                en.json (source) + it.json
+│           ├── public/                 favicon, PWA manifest, service worker, icons
+│           └── locales/                en.json (source) + de, es, fr, it, pt
 │   └── cli/                            (terminal client only, roadmap 17.7 — `watch` reads the UI edition's API, `discover` and `import` read local files with src/adapters; never imports src/ui)
 │       ├── index.ts                    entrypoint, dispatches to the one subcommand below
+│       ├── discover/run.ts             `isitdown discover`: a project's files → catalog providers (2.3)
+│       ├── import/run.ts               `isitdown import`: another monitor's export → a fleet (2.4)
 │       └── watch/
 │           ├── run.ts                  the one part touching a real terminal, clock and network
 │           ├── args.ts                 --url / --token / --interval
@@ -109,7 +128,10 @@ isitdown/
 ├── tools/
 │   ├── copy-assets.mjs                copies i18n and dashboard-locale catalogs into dist (the
 │   │                                   dashboard bundle itself is Vite's own output, not this script's)
-│   ├── readme-parity.mjs              README.md against every README.<lang>.md (npm run check:readme)
+│   ├── readme-parity.mjs              every English page against its translations (npm run check:readme)
+│   ├── bundle-budget.mjs              the built dashboard against its gzipped budget (npm run check:bundle)
+│   ├── visual-regression.mjs          every view, both themes, every locale against test/visual/baseline (npm run test:visual); helpers in tools/visual/
+│   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   the canary probe, load and mutation tests, fixture recording, release notes, the single-file build, PWA icons
 │   ├── build-catalog.mjs              regenerates the catalog from tools/catalog/seed.json and the public lists (2.1)
 │   └── sign-catalog.mjs               signs catalog/catalog.json with $CATALOG_SIGNING_KEY (2.2)
 ├── catalog/                           the published, signed catalog and the last build's report
@@ -119,6 +141,9 @@ isitdown/
 │   ├── adapters/
 │   ├── notifiers/                     per-channel tests, plus contract.test.ts and golden/ (3.8)
 │   ├── light/
+│   ├── outpost/                       the stateless POST /probe server
+│   ├── tools/                         the catalog builder
+│   ├── visual/                        baseline/ — the agreed dashboard frames
 │   ├── ui/                            store contract, aggregation, every API route, theme and locale guards
 │   ├── cli/                           watch's args, reducers, renderer, and the loop against a fake server
 │   ├── fixtures/<provider>/            payloads recorded from the live pages, never fetched in a test
@@ -260,9 +285,10 @@ npm run build:cli        # tsc + copy assets, src/core/i18n and src/cli only (10
 ```
 
 The bundle budget (roadmap 5.16) weighs what `build:ui` emitted, gzipped,
-because that is what the browser downloads: `410 kB` of JavaScript and `20 kB` of
-CSS, both a little over today's build. It is a ceiling rather than a target —
-when it fails, the answer is to find what grew, not to raise the number.
+because that is what the browser downloads: `731,000` bytes of JavaScript and `23,500` of
+CSS (`BUDGET` in `tools/bundle-budget.mjs`), both a little over today's build. It is
+a ceiling rather than a target — when it fails, find what grew first; it has only
+been raised in a commit that names the roadmap rows that grew it.
 
 The coverage floor (roadmap 7.2) is a floor, not a target to game. Two of them,
 because the two suites cover different halves: the server and the engine must

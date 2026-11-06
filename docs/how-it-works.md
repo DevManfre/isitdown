@@ -29,7 +29,7 @@
                         │   Dispatcher   │  the only caller of Notifier.send
                         └───────┬────────┘
                                 ▼
-                   Telegram · webhook · Discord · Slack
+                   Telegram · webhook · Discord · Slack · …
 
    UI edition only: an Express server in the same process serves the dashboard and
    the API from the same StateStore, and can ask the scheduler for a cycle now.
@@ -50,7 +50,7 @@ in the `ConfigSource` and `StateStore` they inject.
    shortest interval and then asks the poller, which may only ask for *sooner* —
    that is how an open incident tightens the loop without an interval change.
 
-2. **Poller** — staggers providers 250ms apart, then runs them under
+2. **Poller** — staggers providers — each request is offset by a hash of its id, bounded to a tenth of its cadence and 20s — then runs them under
    `Promise.allSettled` so one provider's failure cannot affect another's result.
    Up to `maxRetries` attempts each, exponential backoff plus jitter, every request
    under its own timeout. On exhausted retries it records the failure and leaves the
@@ -97,7 +97,9 @@ in the `ConfigSource` and `StateStore` they inject.
    Notifiers are rebuilt from the configuration every cycle, which is why enabling a
    channel needs no restart.
 
-7. **Notifiers** — Telegram, generic webhook, Discord and Slack. Message assembly is shared
+7. **Notifiers** — one file per channel under `src/notifiers/`: Telegram, generic
+   webhook, Discord, Slack, email, ntfy, PagerDuty and the rest of the
+   channels in [configuration §3](configuration.md#3-configuration). Message assembly is shared
    (`src/notifiers/formatting.ts`), so channels cannot drift apart in what they
    report; only the transport differs. A channel with a structured native format
    asks for the same message in pieces (`renderParts`) rather than composing its

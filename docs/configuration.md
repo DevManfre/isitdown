@@ -18,7 +18,7 @@ adaptiveIntervalMinutes: 1  # that cadence; never slower than the provider's own
 confirmSamples: 1           # consecutive polls that must agree before a change notifies
 correlationThreshold: 0     # providers that must go bad together before one shared-failure alert replaces them; 0 is off
 correlationWindowMinutes: 10 # how wide "together" is
-locale: en                  # language for notification messages: en | it
+locale: en                  # language for notification messages: en | it | de | es | fr | pt
 
 services:
   - name: GitHub
@@ -64,16 +64,16 @@ notifications:
 | `confirmSamples` | `1` | 1–10. Flap damping: how many consecutive polls must agree on a reading before the change is announced. `1` notifies immediately; `2` ignores a page that disagrees with itself for one cycle, at the cost of one poll of delay. |
 | `correlationThreshold` | `0` | 0–100. Correlated-outage detection (roadmap 2.7): how many providers have to go bad inside `correlationWindowMinutes` before the cycle sends one "this looks like a shared failure" alert instead of one per provider. `0` and `1` are off, which is the default — this is the only setting here that *replaces* alerts. |
 | `correlationWindowMinutes` | `10` | 1–1440. How wide that window is. Wider catches a shared failure that rolls across status pages slowly, and risks folding two unrelated bad days into one. |
-| `locale` | `en` | `en` or `it`; anything unknown falls back to `en`. |
+| `locale` | `en` | A lowercase locale tag; the build ships `en`, `it`, `de`, `es`, `fr` and `pt`, and anything else falls back to `en`. |
 | `services[].id` | — | Required. Lowercase slug; it keys the stored state. |
-| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `imap` reads a vendor's notices out of a mailbox (see below); `html` scrapes a page that publishes neither and `watchdog` reports any change to a page's text (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, `sequence` chains two or three requests for an API behind a login, and `tcp` and `dns` probe a port and a name that speak no HTTP at all (see below). |
+| `services[].adapter` | — | Required. `statuspage` covers every Atlassian-hosted page; `instatus`, `betterstack`, `cachet`, `uptimekuma` and `uptimecom` cover those hosted and self-hosted platforms; `rss` reads any RSS or Atom incident feed; `imap` reads a vendor's notices out of a mailbox (see below); `html` scrapes a page that publishes neither and `watchdog` reports any change to a page's text (see below); `slack`, `aws`, `gcp` and `azure` read those providers' own shapes; `http` probes an endpoint of your own rather than a status page, `sequence` chains two or three requests for an API behind a login, and `tcp` and `dns` probe a port and a name that speak no HTTP at all, and `icmp` and `docker` probe the homelab's own boxes (see below); `json` maps any JSON document onto a status, and `isitdown`, `upptime`, `statusio`, `githubactions`, `openstatus`, `sorry`, `cstate` and `registry` are described under *Other status platforms, other instances, and developer signals*. |
 | `services[].enabled` | `true` | `false` keeps the entry but stops polling it. |
 | `services[].intervalMinutes` | — | 1–1440. This provider's own cadence; omit to follow `pollIntervalMinutes`. A cycle runs at the shortest cadence anything asked for, and the slower providers sit the extra cycles out. |
 | `services[].intervalSeconds` | — | 10–3600, probes only (`http`, `sequence`, `tcp`, `dns`). The same cadence in seconds, for an endpoint that can be down for less than a minute; a status page stays on the minute floor and is refused at load. Never together with `intervalMinutes`. |
 | `services[].crossChecks` | — | Only on a probe (`http`, `sequence`, `tcp`, `dns`) or a mailbox reading (`imap`): the id of the provider whose status page this probe is a second opinion on — silent-outage cross-check (roadmap 1.10). When the probe cannot reach the service and that provider's page still reports operational with no open incident, the disagreement is itself an alert. Optionally narrowed to one component with the same `provider#component` form a routing rule targets (roadmap 2.9); the component half only refines what the trust card (roadmap 8.1) compares the probe against, since the silent-outage check itself is about a page claiming nothing at all is wrong. |
 | `services[].authority` | from the adapter | Which source is the record for this provider — `declared` (its own status page) or `observed` (our own reading), roadmap 9.1. Omitted is the normal case and is not a missing value: a probe (`http`, `sequence`, `tcp`, `dns`) reads `observed` because it *is* the reading, and everything that parses somebody's page reads `declared`. Set it only to disagree with that — a status page you have learned to distrust, or a probe you do not want treated as the record. It decides what the dashboard prints beside the adapter and how a silent-outage alert is worded, not which samples back a percentage. See [7.7](how-it-works.md#77-which-source-is-the-record). |
 | `services[].mutedUntil` | — | ISO 8601. While it is in the future the provider is polled and recorded as usual but notifies nothing — "I know, stop telling me, until then". In the UI edition this is what the dashboard's **Mute** control writes. |
-| `services[].options` | — | Adapter-specific extras. Six adapters take any today: `html` (`selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists), `watchdog` (`baseline`, plus an optional `selector`), `http`, `tcp` and `dns`, and `imap` (see their own sections below). |
+| `services[].options` | — | Adapter-specific extras. `html` takes `selector`, plus optional `operational` / `degraded` / `partial_outage` / `major_outage` word lists; `watchdog` takes `baseline`, plus an optional `selector`; `http`, `tcp`, `dns`, `sequence`, `icmp`, `docker`, `imap`, `json` and the platform adapters of the last section take their own — each is listed in its own section below. |
 
 #### The `html` adapter
 
@@ -474,7 +474,7 @@ Everything lives in SQLite at `/app/data/isitdown.db` and is edited from
 - the service list — add, edit, remove
 - which notification channels are enabled, which environment variable carries
   each credential, and — write-only — the credential itself
-- theme, dashboard language, notification language, time zone
+- theme, dashboard language, time zone, the Overview's geographic view
 
 The page opens as a list of categories — Engine, Monitored services,
 Notifications, Delivery, Data, Appearance, and Recently removed while anything
@@ -497,6 +497,19 @@ inside the row. Channels with no environment variable set wait behind a single
 The order is deliberate — a file whose pages are already wrong is reported, not
 rewritten — and nothing is ever deleted: the daily prune is what removes rows
 past the retention window, and this is what gives their pages back.
+
+**Settings → Data** is also where the configuration can be undone (roadmap
+5.7–5.9). Picking a `config.yml` to import first shows **what it would change** —
+providers added, removed and changed field by field, settings and channels that
+move, and whether routing and recipients are replaced — and applies nothing until
+you confirm. **Snapshots** keeps the configuration under a name you choose
+(*before-the-migration*) and puts it back later; a restore saves the
+configuration it replaces as a snapshot of its own, so it can be undone too.
+Snapshots are the `config.yml` export, so they hold `${VAR}` references and never
+a credential, and they never include history. **Change history** lists every
+configuration write — who made it (the header named by `AUDIT_ACTOR_HEADER`,
+otherwise `local`), what the value was before, and a button that writes it back.
+Credentials appear there only as "set" or "cleared", never as values.
 
 **Settings → Data → Check for updates** (roadmap 15.11a) is a **check for
 updates**, off by default. Switched on, it reads GHCR's public tag list for
@@ -622,7 +635,7 @@ notification (roadmap 4.5).
 | `HEARTBEAT_TOKEN` | UI | — | Turns on the heartbeat ping endpoint ([3.19](#319-heartbeats--the-dead-mans-switch)) and is the credential in its URL. Unset, that route answers `404`. |
 | `OUTBOUND_BLOCK_PRIVATE` | both | unset | `true` makes probes and status-page reads refuse loopback and private-range targets (and redirects to them), on top of the link-local addresses that are always refused. Anything else leaves private targets allowed. |
 | `BIND_HOST` | UI | `127.0.0.1` | The address the dashboard listens on. Loopback by default, which is what keeps an instance with no `API_TOKEN` reachable only from this machine; the container images set `0.0.0.0` (the compose `ports` mapping then decides who can reach it, and publishes on `127.0.0.1` only). To reach the dashboard from another machine, publish on `0.0.0.0` (or set `BIND_HOST` on bare metal) **and** set `API_TOKEN` — see [3.12](#312-reaching-the-api-from-another-host) for what a request off this machine may then do. |
-| `PORT` | UI | `3000` | HTTP port. |
+| `PORT` | UI, outpost | `3000` (`8080` for the outpost) | HTTP port. |
 
 Secrets arrive through `env_file` at runtime; nothing is baked into an image.
 `docker history` on either image shows no `ENV` layer carrying a value.
@@ -2018,8 +2031,8 @@ notifications:
 ```
 
 **The locale** falls back to the installation's own notification locale
-(`locale:` at the top of the file, or **Settings → Appearance** in the UI
-edition), which is what every channel did before this existed. It is the same
+(`locale:` at the top of the file, or `notificationLocale` in
+[`/api/preferences`](api.md#6-http-api) in the UI edition), which is what every channel did before this existed. It is the same
 catalog the dashboard uses, so a channel can only name a language IsItDown
 actually ships.
 
@@ -2329,13 +2342,14 @@ services:
       OTEL_SERVICE_NAME: isitdown
 ```
 
-Three spans, which is the whole instrumentation:
+Four spans, which is the whole instrumentation:
 
 | Span | What it covers |
 | --- | --- |
 | `poll.cycle` | One cycle end to end — the configuration load, every provider read, and the dispatch that follows. `isitdown.manual` says whether it came from the **Poll now** button, `isitdown.narrowed` whether it was one provider answering a push ([3.15](#315-provider-push-instead-of-poll)). |
 | `provider.read` | One provider, including the stagger wait it spent before its request — because a read that took fourteen seconds has to account for the seconds it spent deliberately waiting. Carries `isitdown.provider` and `isitdown.adapter`. |
 | `notification.send` | One message to one channel, retries included: "how long did telling somebody take" is one answer, not three. Carries `isitdown.channel`, `isitdown.provider` and `isitdown.kind`. |
+| `notifications.dispatch` | The dispatch step of a cycle: the changes the diff engine found, handed to every channel. Carries `isitdown.changes`, how many there were. |
 
 A span whose work throws is exported with the error on it and the error is
 rethrown — so a trace shows the failed provider read, and the poller still
@@ -2352,7 +2366,7 @@ a hosted one) reads it.
 
 The honest half of that trade:
 
-- **Only the three spans above exist.** There are no automatic HTTP or SQLite
+- **Only the four spans above exist.** There are no automatic HTTP or SQLite
   spans underneath them. They happen to be the question the row asked — where a
   slow cycle went — and nothing more.
 - **No metrics and no logs signal.** `/metrics` is already better at the first
@@ -2692,7 +2706,7 @@ providers** (also in ⌘K) sets the fleet's own order, which every list follows.
   repair time opens History with that provider's drawer, a failed-delivery count
   opens the delivery log on its failures. The filters travel in the address
   (`#/incidents?provider=github&days=30`), so the link is a bookmark too; the
-  destination shows a **From the Overview** chip saying what it was narrowed to,
+  destination shows a **From Overview** chip saying what it was narrowed to,
   and its ✕ goes back to the whole list.
 - **Width** is one of full, two thirds, half or a third of the row; height is the
   widget's own. Below 768px every widget takes the full width.
