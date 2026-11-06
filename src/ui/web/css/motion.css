@@ -25,7 +25,7 @@
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -35,7 +35,7 @@
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -95,7 +95,7 @@
 @keyframes ring-in {
   from {
     opacity: 0;
-    transform: rotate(-70deg) scale(0.86);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
@@ -105,7 +105,7 @@
 @keyframes modal-in {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.975);
+    transform: translateY(8px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -128,7 +128,7 @@
   }
   to {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
 }
 @keyframes modal-out {
@@ -138,7 +138,7 @@
   }
   to {
     opacity: 0;
-    transform: translateY(10px) scale(0.985);
+    transform: translateY(6px) scale(0.98);
   }
 }
 /* The ring expands in the dot's own colour: currentColor, set beside background. */
@@ -345,7 +345,7 @@
 @keyframes step-in-next {
   from {
     opacity: 0;
-    transform: translateX(16px);
+    transform: translateX(8px);
   }
   to {
     opacity: 1;
@@ -355,7 +355,7 @@
 @keyframes step-in-back {
   from {
     opacity: 0;
-    transform: translateX(-16px);
+    transform: translateX(-8px);
   }
   to {
     opacity: 1;
@@ -516,7 +516,6 @@
 }
 .back-link:hover {
   color: var(--color-accent);
-  transform: translateX(-3px);
 }
 
 /* — segmented controls, badges and table rows — */
@@ -646,8 +645,8 @@
 
 
 
-/* A tile that lifts under the pointer. Same travel as .ring-tile so the two
-   fleet shapes do not hover differently. */
+/* A tile that answers the pointer with its edge, the way .ring-tile does,
+   so the two fleet shapes do not hover differently. */
 .tile-lit {
   transition:
     transform var(--duration-fast) var(--ease-out),
@@ -671,13 +670,13 @@
    no travel, a switch flipped with no press.
 
    So the same vocabulary is spelled out for the rest of them, one gesture per
-   kind of control:
+   kind of control (dashboard-design-direction § Motion):
 
-     - a button-shaped thing lifts 1px under the pointer and settles on press
-       (the press scale already lives on [data-slot="button"] above),
-     - a surface that opens near its trigger pops from its own corner,
-     - a row inside such a surface nudges 2px along the reading direction,
-       the way .service-row and .history-row do on the page itself,
+     - a button-shaped thing answers the pointer with its fill or edge, and
+       travels only when pressed (the press scale lives on
+       [data-slot="button"] above);
+     - a surface that opens near its trigger pops from its own corner;
+     - a row answers with its fill, never by moving;
      - a field transitions its border and ring instead of snapping.
 
    Travel stays small on purpose: these are controls an operator uses in runs
@@ -687,40 +686,11 @@
 
 /* — buttons, the variants the bloom above does not cover — */
 
-/* `default` gets the accent bloom and `destructive` its red one. The quieter
-   variants carry no fill worth glowing, so they lift instead: enough to say
-   the pointer landed, not enough to move the text under it. Ghost included —
-   a sort header and a row's chevron are ghost buttons, and they were the two
-   controls on the page with no hover state of their own at all. */
-/* `asChild` is why this is a list rather than [data-slot="button"]: a Button
+/* Hover is colour only: the outline, secondary and ghost variants keep
+   shadcn's own fill on hover, and travel only when pressed. `asChild` is why
+   the outline rule below is a list rather than [data-slot="button"]: a Button
    handed to DialogTrigger, DropdownMenuTrigger or CollapsibleTrigger is merged
-   into the trigger and the trigger's own data-slot wins — so "Add service" and
-   "Edit rules" on Settings kept the Button's look and none of its motion.
-   `data-variant` is what still says a Button drew it, and it appears on the
-   Radix menu item and the badge too, hence the slot list around it. */
-:is(
-  [data-slot="button"],
-    [data-slot="dialog-trigger"],
-    [data-slot="dropdown-menu-trigger"],
-    [data-slot="collapsible-trigger"],
-    [data-slot="sheet-trigger"]
-  )[data-variant="outline"]:hover,
-:is(
-  [data-slot="button"],
-    [data-slot="dialog-trigger"],
-    [data-slot="dropdown-menu-trigger"],
-    [data-slot="collapsible-trigger"],
-    [data-slot="sheet-trigger"]
-  )[data-variant="secondary"]:hover,
-:is(
-  [data-slot="button"],
-    [data-slot="dialog-trigger"],
-    [data-slot="dropdown-menu-trigger"],
-    [data-slot="collapsible-trigger"],
-    [data-slot="sheet-trigger"]
-  )[data-variant="ghost"]:hover {
-  transform: translateY(-1px);
-}
+   into the trigger and the trigger's own data-slot wins. */
 
 :is(
   [data-slot="button"],
@@ -732,14 +702,9 @@
   border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
 }
 
-/* A link-shaped button has no box to lift, so it travels the way .back-link
-   does — along the line, in the direction it sends you. */
-[data-slot="button"][data-variant="link"]:hover {
-  transform: translateX(2px);
-}
 
-/* The press scale is inherited from [data-slot="button"], but a button that
-   lifted first has to land back on the baseline, not 1px above it. */
+/* The press scale is inherited from [data-slot="button"]; restated here so
+   these variants keep it whatever their own hover rule sets. */
 [data-slot="button"][data-variant="outline"]:active,
 [data-slot="button"][data-variant="secondary"]:active,
 [data-slot="button"][data-variant="ghost"]:active,
@@ -814,9 +779,11 @@
 
 /* — the rows inside them — */
 
-/* One nudge for every menu row, whichever primitive drew it: Radix marks the
-   row under the pointer (or the arrow keys) with `data-highlighted`, cmdk with
-   `aria-selected`, and both mean the same thing to the operator. */
+/* Every menu row, whichever primitive drew it, answers being highlighted with
+   its fill alone: Radix marks the row under the pointer (or the arrow keys)
+   with `data-highlighted`, cmdk with `aria-selected`. No travel — arrowing
+   through a list is a run of keystrokes, and a row that moved on each one
+   made the list shimmer (dashboard-design-direction § Motion). */
 [data-slot="select-item"],
 [data-slot="dropdown-menu-item"],
 [data-slot="dropdown-menu-checkbox-item"],
@@ -825,17 +792,7 @@
 [data-slot="command-item"] {
   transition:
     background-color var(--duration-fast) ease,
-    color var(--duration-fast) ease,
-    transform var(--duration-fast) var(--ease-out);
-}
-
-[data-slot="select-item"][data-highlighted],
-[data-slot="dropdown-menu-item"][data-highlighted],
-[data-slot="dropdown-menu-checkbox-item"][data-highlighted],
-[data-slot="dropdown-menu-radio-item"][data-highlighted],
-[data-slot="dropdown-menu-sub-trigger"][data-highlighted],
-[data-slot="command-item"][aria-selected="true"] {
-  transform: translateX(2px);
+    color var(--duration-fast) ease;
 }
 
 /* — the triggers that open them — */
@@ -854,7 +811,6 @@
 
 [data-slot="select-trigger"]:hover {
   border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
-  transform: translateY(-1px);
 }
 
 [data-slot="select-trigger"]:active {
@@ -947,7 +903,7 @@ input[type="file"]:hover::file-selector-button {
 /* — pagination — */
 
 /* Built from `buttonVariants` but stamped `pagination-link`, so none of the
-   button rules above reach it. Same lift, same press. */
+   button rules above reach it. Same fill, same press. */
 [data-slot="pagination-link"] {
   transition:
     background-color var(--duration-fast) ease,
@@ -957,7 +913,7 @@ input[type="file"]:hover::file-selector-button {
 }
 
 [data-slot="pagination-link"]:hover {
-  transform: translateY(-1px);
+  background-color: color-mix(in srgb, var(--color-text) 5%, transparent);
 }
 
 [data-slot="pagination-link"]:active {
@@ -1101,7 +1057,7 @@ circle[role="button"]:hover {
 @keyframes drawer-in {
   from {
     opacity: 0;
-    transform: translateX(24px);
+    transform: translateX(8px);
   }
   to {
     opacity: 1;
@@ -1116,7 +1072,7 @@ circle[role="button"]:hover {
   }
   to {
     opacity: 0;
-    transform: translateX(24px);
+    transform: translateX(8px);
   }
 }
 
@@ -1342,10 +1298,6 @@ circle[role="button"]:hover {
   .anim-stem {
     animation-delay: 0s !important;
   }
-  .tile-lit:hover,
-  .ring-tile:hover,
-  .service-row:hover,
-  .back-link:hover,
   [data-slot="button"]:active,
   [data-slot="badge"]:active {
     transform: none;
@@ -1353,33 +1305,17 @@ circle[role="button"]:hover {
   /* The rest of the calls to action: the tint, the ring and the chevron's
      turn all survive — they say what the control is doing — and only the
      travel goes. */
-  [data-slot="button"][data-variant="outline"]:hover,
-  [data-slot="button"][data-variant="secondary"]:hover,
-  [data-slot="button"][data-variant="ghost"]:hover,
-  [data-slot="button"][data-variant="link"]:hover,
   [data-slot="button"][data-variant="outline"]:active,
   [data-slot="button"][data-variant="secondary"]:active,
   [data-slot="button"][data-variant="ghost"]:active,
   [data-slot="button"][data-variant="link"]:active,
-  [data-slot="select-trigger"]:hover,
   [data-slot="select-trigger"]:active,
-  [data-slot="select-item"][data-highlighted],
-  [data-slot="dropdown-menu-item"][data-highlighted],
-  [data-slot="dropdown-menu-checkbox-item"][data-highlighted],
-  [data-slot="dropdown-menu-radio-item"][data-highlighted],
-  [data-slot="dropdown-menu-sub-trigger"][data-highlighted],
-  [data-slot="command-item"][aria-selected="true"],
   [data-slot="toggle-group-item"]:active,
   [data-slot="toggle"]:active,
   [data-slot="switch"]:active,
-  [data-slot="pagination-link"]:hover,
   [data-slot="pagination-link"]:active,
   [data-slot="number-stepper"]:active svg {
     transform: none;
-  }
-  .history-row:hover,
-  .delivery-row:hover {
-    translate: none;
   }
   circle[role="button"]:hover,
   .theme-btn:active svg {

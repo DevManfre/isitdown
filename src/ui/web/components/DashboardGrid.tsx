@@ -139,7 +139,7 @@ export interface GridEditing {
  * landing past its slot and coming back reads as a mistake), and a spring
  * because a second press mid-glide must carry on from where the widget is.
  */
-export const REORDER_SPRING = { type: "spring", duration: 0.32, bounce: 0 } as const;
+export const REORDER_SPRING = { type: "spring", duration: 0.28, bounce: 0 } as const;
 
 function GridCell({
   widget,
@@ -199,7 +199,7 @@ function GridCell({
       // Drag and layout both drive this element's transform, so it is moved by
       // motion's own channels rather than a transform string that would
       // overwrite theirs.
-      initial={entering ? { opacity: 0, y: 12, scale: 0.98 } : false}
+      initial={entering ? { opacity: 0, y: 8, scale: 0.98 } : false}
       animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.26, ease: [0.16, 1, 0.3, 1] } }}
       exit={{ opacity: 0, scale: reduce ? 1 : 0.97, transition: { duration: 0.18, ease: [0.22, 0.61, 0.36, 1] } }}
       drag={editing}
