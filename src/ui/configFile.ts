@@ -48,7 +48,7 @@ export function exportConfigYaml(db: DatabaseSync, logger: Logger): string {
 }
 
 /** The configuration as the plain object the file format serialises. */
-function buildConfigDocument(db: DatabaseSync, logger: Logger): Record<string, unknown> {
+export function buildConfigDocument(db: DatabaseSync, logger: Logger): Record<string, unknown> {
   const settings = readSettings(db, logger);
   const delivery = deliveryOf(settings);
 

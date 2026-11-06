@@ -786,6 +786,25 @@ const paths: Json = {
       responses: { "204": { description: "Deleted." } },
     },
   },
+  "/config/history": {
+    get: {
+      tags: ["Configuration"],
+      summary: "The configuration history: every value a write moved, newest first.",
+      parameters: [
+        { name: "kind", in: "query", schema: { type: "string", enum: ["service", "setting", "channel", "routing", "recipients", "credential"] } },
+        { name: "target", in: "query", schema: { type: "string" } },
+        { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 500, default: 100 } },
+      ],
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
+  "/config/history/{id}/revert": {
+    post: {
+      tags: ["Configuration"],
+      summary: "Write a history entry's old value back.",
+      responses: { "200": ok({ type: "object" }), "404": notFound, "409": { description: "The old value can no longer be written." } },
+    },
+  },
   "/config/backup": {
     get: {
       tags: ["Configuration"],

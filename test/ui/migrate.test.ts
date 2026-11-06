@@ -28,6 +28,7 @@ test("migrate creates every table the dashboard reads", async () => {
     "annotations",
     "channels",
     "component_samples",
+    "config_audit",
     "config_snapshots",
     "dashboards",
     "heartbeats",

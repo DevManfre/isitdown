@@ -48,6 +48,7 @@ const TABLES = [
   "map_geo_state",
   "dashboards",
   "config_snapshots",
+  "config_audit",
 ] as const;
 
 /**
