@@ -125,15 +125,21 @@ entry's duration.
 - **Animate only `transform` and `opacity`.** The exception is accordion
   height through Radix's `--radix-*-content-height`. Don't animate `width`,
   `top`, `margin` or `box-shadow` on large surfaces (see `animation-performance`).
-- **Keep travel small.** Translate 8px at most. Scale starts at `0.96`, never
-  `0`. A popover grows from its trigger (`transform-origin` from Radix).
+- **Keep travel small.** Translate 8px at most, drawers included. Scale starts
+  at `0.96`, never `0`, and nothing rotates on entry. A popover grows from its
+  trigger (`transform-origin` from Radix). The exception is a chart's bar or
+  fill growing out of its baseline (`scaleX`/`scaleY` from 0).
+  `css/motion.test.ts` checks every keyframe against these limits.
 - **Make it interruptible.** Toggles and hovers use CSS `transition`, so they
   reverse mid-flight. Use `@keyframes` only for mount and unmount.
 - **Stagger once.** Only on a view's first paint, 30ms step, 6 items at most,
   under 200ms in total. A refetch or poll never replays an entrance, and
   neither does a chart's grow-in.
-- **Hover effects go inside `@media (hover: hover)`.** Use press feedback
-  (`scale(0.97)`) on buttons only, not on rows or cards.
+- **Hover is colour only.** A control, row, tile or menu item answers the
+  pointer with its fill or edge, never by moving. Lifts, nudges and slides on
+  hover are retired. Use press feedback (`scale(0.96)`) on buttons and toggles
+  only, not on rows or cards. Hand-written hover rules in `motion.css` go
+  inside `@media (hover: hover)`; Tailwind's `hover:` already is.
 - **Keyboard-repeated actions don't animate.** That covers command palette
   arrow navigation, tab key focus and shortcut toggles.
 - **Respect `prefers-reduced-motion: reduce`.** Drop every translate and scale,

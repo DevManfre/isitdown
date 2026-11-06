@@ -86,6 +86,26 @@ describe("motion.css after the react port", () => {
     expect(literals, "a duration written as a literal").toEqual([]);
   });
 
+  // dashboard-design-direction § Motion: an entry travels 8px at most and
+  // starts no smaller than 0.96. A chart's bars and fills grow out of their
+  // baseline (scaleX/scaleY), which is the one shape a size of zero is right for.
+  it("keeps every keyframe's travel inside 8px and its scale at 0.96 or more", () => {
+    const frames = [...code.matchAll(/@keyframes ([\w-]+) \{([\s\S]*?)\n\}/g)];
+    const offenders: string[] = [];
+    for (const [, name, body] of frames) {
+      for (const [, px] of body!.matchAll(/translate[XY]?\((-?[\d.]+)px/g)) {
+        if (Math.abs(Number(px)) > 8) offenders.push(`${name}: ${px}px`);
+      }
+      for (const [, factor] of body!.matchAll(/(?<![XY])scale\(([\d.]+)\)/g)) {
+        if (Number(factor) < 0.96) offenders.push(`${name}: scale(${factor})`);
+      }
+      for (const [, deg] of body!.matchAll(/rotate\((-?[\d.]+)deg\)/g)) {
+        offenders.push(`${name}: rotate(${deg}deg)`);
+      }
+    }
+    expect(offenders, "an entry that travels or shrinks past the direction").toEqual([]);
+  });
+
   it("drops the vanilla repaint hack", () => {
     expect(code).not.toContain("anim-quiet");
   });
