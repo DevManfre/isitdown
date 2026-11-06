@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
 import { providerFixture, renderWithProviders, sentence } from "@/test/harness.tsx";
@@ -12,6 +12,21 @@ const history = {
 };
 
 afterEach(() => vi.unstubAllGlobals());
+
+/** The rings left the default layout with the calm redesign; these cases put them back in. */
+const withRings = {
+  id: "default",
+  name: "Overview",
+  isDefault: false,
+  updatedAt: "2026-08-21T10:00:00.000Z",
+  layout: {
+    version: 1 as const,
+    widgets: [
+      { id: "rings", type: "fleet-rings" as const, width: "full" as const, props: { filter: { groups: [], providers: [] } } },
+      { id: "fleet", type: "fleet-list" as const, width: "full" as const, props: { filter: { groups: [], providers: [] } } },
+    ],
+  },
+};
 
 describe("Overview", () => {
   it("headlines all-operational when nothing is down", async () => {
@@ -133,12 +148,15 @@ describe("Overview", () => {
     expect(screen.queryByRole("button", { name: i18n.t("action.incident-details") })).toBeNull();
   });
 
+  // While a major outage is open the incident card carries the way in, so the
+  // hero's own button is for any other incident (dashboard-design-direction:
+  // one primary action per view).
   it("links the incident-details action to the provider's first active incident", async () => {
     renderWithProviders(<Overview />, {
       status: {
         providers: [
           providerFixture({
-            overallStatus: "major_outage",
+            overallStatus: "degraded",
             activeIncidents: [
               { id: "i1", name: "Outage", impact: "major", status: "investigating", updatedAt: "2026-08-21T00:00:00Z" },
               { id: "i2", name: "Second", impact: "minor", status: "investigating", updatedAt: "2026-08-21T00:00:00Z" },
@@ -253,28 +271,28 @@ describe("Overview's fleet shapes", () => {
   const ringBox = () => rings()[0]?.querySelector("div")?.getAttribute("style") ?? "";
 
   it("draws an 80px ring per provider while the fleet fits beside the copy", async () => {
-    renderWithProviders(<Overview />, { status: statusOf(fleet(6)), history });
+    renderWithProviders(<Overview />, { status: statusOf(fleet(6)), history, dashboard: withRings });
     // Two matches per name while the rings are drawn — the ring's label and
     // the row's, as the other suites' `findAllByText` already accounts for.
-    await screen.findAllByText("Provider 1");
-    expect(rings()).toHaveLength(6);
+    await waitFor(() => expect(rings()).toHaveLength(6));
     expect(ringBox()).toContain("width: 80px");
-    expect(screen.queryByText(i18n.t("overview.group.operational"))).toBeNull();
+    // No "Operational" group: the flat list, not the dense shape's groups.
+    // (The word itself is on every healthy row now, in sentence case.)
+    expect(screen.queryByRole("button", { name: new RegExp(`^${i18n.t("overview.group.operational")}`) })).toBeNull();
   });
 
   it("keeps every ring but halves it into the band past six providers", async () => {
-    renderWithProviders(<Overview />, { status: statusOf(fleet(10)), history });
-    await screen.findAllByText("Provider 1");
-    expect(rings()).toHaveLength(10);
+    renderWithProviders(<Overview />, { status: statusOf(fleet(10)), history, dashboard: withRings });
+    await waitFor(() => expect(rings()).toHaveLength(10));
     expect(ringBox()).toContain("width: 56px");
   });
 
-  it("stops drawing rings past fourteen and shows the aggregate figure instead", async () => {
+  it("stops drawing rings past fourteen", async () => {
     renderWithProviders(<Overview />, { status: statusOf(fleet(15)), history });
     await screen.findByText(i18n.t("overview.group.operational"));
     expect(rings()).toHaveLength(0);
-    expect(document.querySelector('[data-slot="fleet-summary"]')).not.toBeNull();
-    expect(screen.getByText(i18n.t("overview.summary.window"))).toBeInTheDocument();
+    // The calm hero carries no figures column: the aggregate lives in History.
+    expect(document.querySelector('[data-slot="fleet-summary"]')).toBeNull();
   });
 
   it("opens the group of providers in trouble and leaves the operational one shut", async () => {
@@ -321,10 +339,10 @@ describe("Overview with a disabled provider", () => {
         providerFixture({ id: "cf", name: "Cloudflare", enabled: false }),
       ]),
       history,
+      dashboard: withRings,
     });
-    await screen.findAllByText("GitHub");
+    await waitFor(() => expect(document.querySelectorAll('[data-slot="uptime-ring"]')).toHaveLength(1));
     expect(screen.queryByText("Cloudflare")).toBeNull();
-    expect(document.querySelectorAll('[data-slot="uptime-ring"]')).toHaveLength(1);
   });
 
   it("keeps its uptime out of the fleet average", async () => {
@@ -465,7 +483,7 @@ describe("Overview's status beacon", () => {
       },
       history,
     });
-    await screen.findByTestId("hero-stats");
+    await screen.findByTestId("status-beacon");
     expect(screen.queryByText(i18n.t("shared-failure.kicker"))).toBeNull();
   });
 });

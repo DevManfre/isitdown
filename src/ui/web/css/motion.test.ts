@@ -34,8 +34,8 @@ describe("motion.css after the react port", () => {
   it("transitions a table row on `translate`, and still on background", () => {
     const rule = /\[data-slot="table-row"\]\s*\{([^}]*)\}/.exec(code);
     expect(rule, "no transition rule for table rows").not.toBeNull();
-    expect(rule?.[1]).toMatch(/\btranslate\s+[\d.]+s/);
-    expect(rule?.[1], "the row's own background fade must survive it").toMatch(/\bbackground\s+[\d.]+s/);
+    expect(rule?.[1]).toMatch(/\btranslate\s+var\(--duration-(?:fast|base|slow)\)/);
+    expect(rule?.[1], "the row's own background fade must survive it").toMatch(/\bbackground\s+var\(--duration-(?:fast|base|slow)\)/);
   });
 
   // ViewFrame withholds `data-animate` until the view's first data has landed,
@@ -69,9 +69,41 @@ describe("motion.css after the react port", () => {
   // hover and press keep --ease-out, where a long tail feels unresponsive.
   it("runs every entry animation on the entry curve", () => {
     for (const frame of ["view-in", "rise", "fade", "sweep", "ring-in", "bar-grow"]) {
-      const rule = new RegExp(`animation: ${frame} [\\d.]+s var\\(--ease-entry\\)`);
+      const rule = new RegExp(`animation: ${frame} var\\(--duration-(?:fast|base|slow)\\) var\\(--ease-entry\\)`);
       expect(code, `${frame} is an entry animation`).toMatch(rule);
     }
+  });
+
+  // dashboard-design-direction § Motion: everything moves at one of three
+  // durations. A literal is allowed only for what the direction names as an
+  // exception — the problem pulse, the status-change ring, the tour's glide,
+  // the heartbeat's linear clock — and for reduced motion's near-zero.
+  it("keeps every duration on the design's three tokens", () => {
+    const allowed = new Set(["2.4s", "1.2s", "30s", "0.001ms", "0s", "40ms"]);
+    const literals = [...code.matchAll(/(?:animation|transition)(?:-duration)?\s*:[^;]*/g)]
+      .flatMap((m) => [...m[0].matchAll(/(?<![\w.-])\d*\.?\d+m?s\b/g)].map((t) => t[0]))
+      .filter((t) => !allowed.has(t));
+    expect(literals, "a duration written as a literal").toEqual([]);
+  });
+
+  // dashboard-design-direction § Motion: an entry travels 8px at most and
+  // starts no smaller than 0.96. A chart's bars and fills grow out of their
+  // baseline (scaleX/scaleY), which is the one shape a size of zero is right for.
+  it("keeps every keyframe's travel inside 8px and its scale at 0.96 or more", () => {
+    const frames = [...code.matchAll(/@keyframes ([\w-]+) \{([\s\S]*?)\n\}/g)];
+    const offenders: string[] = [];
+    for (const [, name, body] of frames) {
+      for (const [, px] of body!.matchAll(/translate[XY]?\((-?[\d.]+)px/g)) {
+        if (Math.abs(Number(px)) > 8) offenders.push(`${name}: ${px}px`);
+      }
+      for (const [, factor] of body!.matchAll(/(?<![XY])scale\(([\d.]+)\)/g)) {
+        if (Number(factor) < 0.96) offenders.push(`${name}: scale(${factor})`);
+      }
+      for (const [, deg] of body!.matchAll(/rotate\((-?[\d.]+)deg\)/g)) {
+        offenders.push(`${name}: rotate(${deg}deg)`);
+      }
+    }
+    expect(offenders, "an entry that travels or shrinks past the direction").toEqual([]);
   });
 
   it("drops the vanilla repaint hack", () => {

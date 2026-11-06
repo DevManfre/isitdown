@@ -80,11 +80,11 @@ export function Reliability({ props }: { props: { filter: FleetFilter } }) {
       <div className="grid grid-cols-2 gap-3 @md:hidden">
         <div className="flex flex-col">
           <span className="font-mono text-2xl">{duration(total.mttr)}</span>
-          <span className="font-mono text-xs text-muted-foreground">{t("widget.reliability.mttr")}</span>
+          <span className="text-xs text-muted-foreground">{t("widget.reliability.mttr")}</span>
         </div>
         <div className="flex flex-col">
           <span className="font-mono text-2xl">{duration(total.mtbf)}</span>
-          <span className="font-mono text-xs text-muted-foreground">{t("widget.reliability.mtbf")}</span>
+          <span className="text-xs text-muted-foreground">{t("widget.reliability.mtbf")}</span>
         </div>
         <span className="col-span-2 text-sm text-muted-foreground">
           <NumberTicker locale={i18n.language} value={total.incidents} /> {t("widget.reliability.incidents-word", { count: total.incidents })}
@@ -93,11 +93,11 @@ export function Reliability({ props }: { props: { filter: FleetFilter } }) {
       </div>
 
       <div className="hidden grid-cols-[7rem_minmax(0,1fr)_minmax(0,1fr)_4rem] items-center gap-x-4 gap-y-0 @md:grid @2xl:grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)_5rem_7rem]">
-        <span className="pb-1.5 font-mono text-xs text-muted-foreground">{t("widget.reliability.provider")}</span>
-        <span className="pb-1.5 font-mono text-xs text-muted-foreground">{t("widget.reliability.mttr")}</span>
-        <span className="pb-1.5 font-mono text-xs text-muted-foreground">{t("widget.reliability.mtbf")}</span>
-        <span className="pb-1.5 font-mono text-xs text-muted-foreground">{t("widget.reliability.incidents")}</span>
-        <span className="hidden pb-1.5 text-right font-mono text-xs text-muted-foreground @2xl:block">{t("widget.reliability.versus")}</span>
+        <span className="pb-1.5 text-xs text-muted-foreground">{t("widget.reliability.provider")}</span>
+        <span className="pb-1.5 text-xs text-muted-foreground">{t("widget.reliability.mttr")}</span>
+        <span className="pb-1.5 text-xs text-muted-foreground">{t("widget.reliability.mtbf")}</span>
+        <span className="pb-1.5 text-xs text-muted-foreground">{t("widget.reliability.incidents")}</span>
+        <span className="hidden pb-1.5 text-right text-xs text-muted-foreground @2xl:block">{t("widget.reliability.versus")}</span>
         {rows.map((row, index) => {
           const change = trend(row);
           const delay = stagger(index, { base: 200, step: 60 });

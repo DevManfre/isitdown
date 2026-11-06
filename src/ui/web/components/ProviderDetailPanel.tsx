@@ -57,7 +57,7 @@ export function ProviderDetailPanel({
           <dl className="flex flex-wrap gap-6">
             {([7, 30, 90] as const).map((range) => (
               <div key={range} className="flex flex-col gap-1">
-                <dt className="text-xs uppercase tracking-widest text-muted-foreground">
+                <dt className="text-sm text-muted-foreground">
                   {t("column.range", { days: range })}
                 </dt>
                 <dd className="font-mono text-sm">
@@ -76,7 +76,7 @@ export function ProviderDetailPanel({
             {provider.detectionDelay !== null && (
               <>
                 <div className="flex flex-col gap-1">
-                  <dt className="text-xs uppercase tracking-widest text-muted-foreground">
+                  <dt className="text-sm text-muted-foreground">
                     {t("history.detection.median")}
                   </dt>
                   <dd className="font-mono text-sm">
@@ -87,7 +87,7 @@ export function ProviderDetailPanel({
                   </dd>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <dt className="text-xs uppercase tracking-widest text-muted-foreground">
+                  <dt className="text-sm text-muted-foreground">
                     {t("history.detection.worst")}
                   </dt>
                   <dd className="font-mono text-sm">
@@ -107,7 +107,7 @@ export function ProviderDetailPanel({
           {nextMaintenance !== undefined && (
             <div className="flex flex-col gap-1 rounded-md border border-border p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs uppercase tracking-widest text-primary">
+                <span className="text-base font-medium">
                   {t("history.next-maintenance.kicker")}
                 </span>
                 <Badge variant="muted">{t("history.next-maintenance.badge")}</Badge>
@@ -121,7 +121,7 @@ export function ProviderDetailPanel({
           )}
 
           <div className="flex flex-col gap-2">
-            <span className="text-xs uppercase tracking-widest text-primary">
+            <span className="text-base font-medium">
               {t("history.drawer-bars")}
             </span>
             <UptimeBarRow buckets={provider.buckets} scale="row" showAxis />

@@ -163,7 +163,7 @@ export function UptimeTrendChart({
               value: annotation.label,
               position: "insideTopLeft",
               fill: annotationColour(annotation.colour),
-              fontSize: 10,
+              fontSize: 12,
             }}
           />
         ))}

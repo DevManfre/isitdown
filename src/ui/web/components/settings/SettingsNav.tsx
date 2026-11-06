@@ -37,13 +37,13 @@ export function SettingsNav({ categories, active }: { categories: SettingsCatego
             data-slot="settings-nav-link"
             aria-current={category.id === active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-2 rounded-md pr-2.5 py-1.5 text-sm text-muted-foreground",
-              "hover:bg-accent hover:text-foreground",
-              category.id === active && "bg-accent font-medium text-foreground shadow-[inset_2px_0_0_var(--primary)]",
+              "flex h-9 items-center gap-2 rounded-md pr-3 text-sm text-muted-foreground",
+              "hover:bg-foreground/5 hover:text-foreground",
+              category.id === active && "bg-primary/10 font-medium text-foreground",
             )}
           >
             {t(category.labelKey)}
-            {count !== undefined && <span className="ml-auto font-mono text-[11px] tabular-nums">{count}</span>}
+            {count !== undefined && <span className="ml-auto font-mono text-xs tabular-nums">{count}</span>}
           </Link>
         );
       })}
@@ -51,8 +51,8 @@ export function SettingsNav({ categories, active }: { categories: SettingsCatego
       {/* The one sentence that governs every control on the page: it answers
           "will this restart anything" once, where it stays in view for the
           whole scroll. */}
-      <p className="mt-3 rounded-lg border border-primary/25 bg-primary/8 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-        <span className="mb-1 block font-medium text-primary">{t("settings.applied-live")}</span>
+      <p className="mt-4 px-3 text-xs leading-relaxed text-muted-foreground">
+        <span className="block font-medium text-foreground">{t("settings.applied-live")}</span>
         {t("settings.subtitle")}
       </p>
     </nav>

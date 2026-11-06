@@ -85,7 +85,7 @@ function DotStrip({ providers }: { providers: ProviderStatus[] }) {
           </HoverCardTrigger>
           <HoverCardContent className="flex w-auto flex-col gap-1 p-3">
             <span className="text-sm">{provider.name}</span>
-            <span className="font-mono text-[11px] text-muted-foreground">
+            <span className="font-mono text-xs text-muted-foreground">
               <Trans
                 i18nKey="overview.uptime-window"
                 values={{ uptime: provider.uptime90 }}
@@ -95,15 +95,15 @@ function DotStrip({ providers }: { providers: ProviderStatus[] }) {
               />
             </span>
             <span
-              className="font-mono text-[11px]"
+              className="text-sm font-medium"
               style={{ color: statusColor(provider.overallStatus) }}
             >
-              {t(statusLabelKey(provider.overallStatus)).toUpperCase()}
+              {t(statusLabelKey(provider.overallStatus))}
             </span>
           </HoverCardContent>
         </HoverCard>
       ))}
-      <span className="pl-1.5 font-mono text-[11px] text-muted-foreground">
+      <span className="pl-1.5 font-mono text-xs text-muted-foreground">
         {t("overview.dots-hint")}
       </span>
     </div>
@@ -146,7 +146,7 @@ export function FleetGroups({
           />
           <CollapsibleContent>
             <div className="anim-unfold pt-2.5">
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
                 {problems.map((provider, index) => (
                   <ProviderRow
                     key={provider.id}
@@ -170,7 +170,7 @@ export function FleetGroups({
         />
         <CollapsibleContent>
           <div className="anim-unfold pt-2.5">
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
               {healthy.map((provider, index) => (
                 <ProviderRow
                   key={provider.id}

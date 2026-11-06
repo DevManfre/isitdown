@@ -51,7 +51,7 @@ export function LatencyChart({ latency, label }: { latency: LatencyResponse; lab
             y={latency.slowMs}
             stroke={LATENCY_CHART.slow}
             strokeDasharray="6 4"
-            label={{ value: t("latency.threshold", { ms: formatNumber(i18n.language, latency.slowMs) }), position: "insideTopRight", fill: LATENCY_CHART.slow, fontSize: 11 }}
+            label={{ value: t("latency.threshold", { ms: formatNumber(i18n.language, latency.slowMs) }), position: "insideTopRight", fill: LATENCY_CHART.slow, fontSize: 12 }}
           />
         )}
         <ChartTooltip

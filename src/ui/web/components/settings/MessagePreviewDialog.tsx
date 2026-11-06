@@ -66,7 +66,7 @@ export function MessagePreviewDialog() {
         </DialogHeader>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             {t("preview.kind")}
           </span>
           <Select value={kind} onValueChange={setKind}>

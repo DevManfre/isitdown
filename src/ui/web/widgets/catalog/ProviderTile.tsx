@@ -54,8 +54,9 @@ export function ProviderTile({ props }: { props: ProviderPick }) {
     <WidgetCard
       title={props.provider === null ? t("widget.provider-tile.worst") : title}
       tone={tone}
+      // Its edge says it is in trouble (`tone`); the wash it used to carry
+      // behind the figures went with the calm redesign.
       className="widget-tone @container"
-      style={bad ? { backgroundImage: `linear-gradient(90deg, color-mix(in srgb, ${statusColor(shown.status)} 10%, transparent), transparent 45%)` } : undefined}
     >
       <div className="flex min-w-0 items-center gap-3.5">
         <ProviderIcon name={provider.name} baseUrl={provider.baseUrl} size={36} className="shrink-0" />
@@ -68,7 +69,7 @@ export function ProviderTile({ props }: { props: ProviderPick }) {
         <span className="flex shrink-0 items-center gap-2">
           <StatusDot status={shown.status} hatched={shown.hatched} pulse={bad} />
           <span
-            className="widget-tone font-mono text-xs tracking-wider uppercase"
+            className="widget-tone text-sm font-medium"
             style={{ color: statusColor(shown.status) }}
           >
             {shown.hatched ? t("widget.provider-tile.suspected", { status: statusWord }) : statusWord}
@@ -86,7 +87,7 @@ export function ProviderTile({ props }: { props: ProviderPick }) {
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
         <div className="flex flex-col">
           <NumberTicker className="font-mono text-2xl" locale={i18n.language} value={provider.uptime90} decimalPlaces={2} suffix="%" />
-          <span className="font-mono text-xs text-muted-foreground">{t("widget.provider-tile.uptime")}</span>
+          <span className="text-xs text-muted-foreground">{t("widget.provider-tile.uptime")}</span>
         </div>
         <div className="hidden flex-col @md:flex">
           {summary === undefined ? (
@@ -94,15 +95,15 @@ export function ProviderTile({ props }: { props: ProviderPick }) {
           ) : (
             <NumberTicker className="font-mono text-2xl" locale={i18n.language} value={history?.incidentCount ?? 0} />
           )}
-          <span className="font-mono text-xs text-muted-foreground">{t("widget.provider-tile.incidents")}</span>
+          <span className="text-xs text-muted-foreground">{t("widget.provider-tile.incidents")}</span>
         </div>
         <div className="hidden flex-col @md:flex">
           <span className="font-mono text-2xl">{reliability === undefined ? "…" : mttr === null ? "—" : formatDuration(i18n.language, mttr)}</span>
-          <span className="font-mono text-xs text-muted-foreground">{t("widget.provider-tile.mttr")}</span>
+          <span className="text-xs text-muted-foreground">{t("widget.provider-tile.mttr")}</span>
         </div>
         {days.length > 0 && (
           <div className="hidden min-w-48 flex-1 flex-col gap-1.5 @2xl:flex">
-            <span className="font-mono text-xs text-muted-foreground">{t("widget.provider-tile.days", { count: days.length })}</span>
+            <span className="text-xs text-muted-foreground">{t("widget.provider-tile.days", { count: days.length })}</span>
             <div className="flex h-6 gap-0.5" aria-hidden="true">
               {days.map((day, index) => (
                 <span
@@ -120,7 +121,7 @@ export function ProviderTile({ props }: { props: ProviderPick }) {
         <div className="flex min-w-0 items-center gap-3 border-t border-border pt-3 text-sm">
           <span className="min-w-0 flex-1 truncate">
             {incident.name}
-            <span className="font-mono text-xs text-muted-foreground"> · {t(incidentStatusKey(incident.status))}</span>
+            <span className="text-xs text-muted-foreground"> · {t(incidentStatusKey(incident.status))}</span>
           </span>
           <Link
             className="shrink-0 text-primary hover:underline"

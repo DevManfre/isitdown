@@ -55,8 +55,7 @@ const log = (rows: SentRecord[], counts = { all: 2, sent: 1, failed: 1 }) => (pa
 const outcomes = () => within(screen.getByRole("radiogroup", { name: i18n.t("delivery.filter.state") }));
 // The channel filter appears once the configuration lands: an installation with
 // no channels gets no filter at all.
-const channelFilter = async () =>
-  within(await screen.findByRole("radiogroup", { name: i18n.t("delivery.filter.channel") }));
+const channelFilter = () => screen.findByRole("combobox", { name: i18n.t("delivery.filter.channel") });
 
 /** The row list, so a badge query cannot match the state pill of the same word. */
 const rows = () => within(screen.getByRole("region", { name: i18n.t("delivery.rows") }));
@@ -106,10 +105,19 @@ describe("DeliveryLog", () => {
     expect(fetchMock.mock.calls.some(([path]) => String(path).includes("state=sent"))).toBe(true);
   });
 
+  // A blank trigger once said nothing about what was being shown: the select
+  // names "every channel" until one is picked.
+  it("names the whole log in the channel filter until a channel is picked", async () => {
+    render();
+    expect(await channelFilter()).toHaveTextContent(i18n.t("delivery.channel.all"));
+  });
+
   it("narrows to one channel through the query too", async () => {
     render();
 
-    await userEvent.click((await channelFilter()).getByRole("radio", radioNamed("telegram")));
+    // A select (dashboard-design-direction: a segmented filter stops at five).
+    await userEvent.click(await channelFilter());
+    await userEvent.click(await screen.findByRole("option", { name: "telegram" }));
 
     const fetchMock = globalThis.fetch as unknown as { mock: { calls: [string][] } };
     expect(fetchMock.mock.calls.some(([path]) => String(path).includes("channel=telegram"))).toBe(true);

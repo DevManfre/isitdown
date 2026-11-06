@@ -9,7 +9,6 @@ import { SettingRow } from "@/components/SettingRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
 import { CatalogUpdatesRow } from "@/components/settings/CatalogUpdatesRow.tsx";
 import { NumberSetting } from "@/components/settings/NumberSetting.tsx";
-import { SECTION_REELS } from "@/components/settings/reels.ts";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
 import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import {
@@ -217,7 +216,6 @@ export function DataSection({
   return (
     <SettingsSection
       id="data"
-      reel={SECTION_REELS.data}
       className="lg:col-span-3"
       title={t("settings.section.data")}
       delay={stagger(4, SECTION_CASCADE)}

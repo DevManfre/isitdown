@@ -1,9 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LAYOUT, MAX_WIDGETS, type DashboardLayout } from "../../dashboardLayout.ts";
+import { MAX_WIDGETS, type DashboardLayout } from "../../dashboardLayout.ts";
 import { applyDraft, isDirty, startDraft, type DraftAction } from "./layoutDraft.ts";
 
+/**
+ * The five-widget layout these cases exercise the editor on — the Overview's
+ * default before the calm redesign moved the rings out of it. Kept here so
+ * the editor's mechanics are tested on a fixed layout, whatever the default
+ * becomes.
+ */
+const FIVE: DashboardLayout = {
+  version: 1,
+  widgets: [
+    { id: "rings", type: "fleet-rings", width: "full", props: { filter: { groups: [], providers: [] } } },
+    { id: "map", type: "geo-map", width: "full", props: {} },
+    { id: "shared", type: "shared-failure", width: "full", props: {} },
+    { id: "stack", type: "stack-band", width: "full", props: { filter: { groups: [], providers: [] } } },
+    { id: "fleet", type: "fleet-list", width: "full", props: { filter: { groups: [], providers: [] } } },
+  ],
+};
+
 const ids = (layout: DashboardLayout) => layout.widgets.map((w) => w.id);
-const start = () => startDraft(DEFAULT_LAYOUT);
+const start = () => startDraft(FIVE);
 
 describe("applyDraft", () => {
   const moves: { name: string; action: Extract<DraftAction, { type: "move" | "moveTo" }>; order: string[]; position: number }[] = [
@@ -24,7 +41,7 @@ describe("applyDraft", () => {
 
   it("does nothing, and says nothing, when a move would leave the list", () => {
     const result = applyDraft(start(), { type: "move", id: "rings", delta: -1 });
-    expect(ids(result.state.layout)).toEqual(ids(DEFAULT_LAYOUT));
+    expect(ids(result.state.layout)).toEqual(ids(FIVE));
     expect(result.announcement).toBeNull();
     expect(result.state.revision).toBe(0);
   });
@@ -48,7 +65,7 @@ describe("applyDraft", () => {
 
   it("hands focus to the previous widget when the last one goes, and to Add when none is left", () => {
     expect(applyDraft(start(), { type: "remove", id: "fleet" }).focus).toEqual({ grip: "stack" });
-    let state = startDraft({ version: 1, widgets: [DEFAULT_LAYOUT.widgets[1]!] });
+    let state = startDraft({ version: 1, widgets: [FIVE.widgets[1]!] });
     const result = applyDraft(state, { type: "remove", id: "map" });
     state = result.state;
     expect(state.layout.widgets).toEqual([]);
@@ -112,8 +129,8 @@ describe("applyDraft", () => {
 
   it("replaces the whole draft — Load theirs, or the default on reset", () => {
     const moved = applyDraft(start(), { type: "move", id: "rings", delta: 1 }).state;
-    const result = applyDraft(moved, { type: "replace", layout: DEFAULT_LAYOUT });
-    expect(ids(result.state.layout)).toEqual(ids(DEFAULT_LAYOUT));
+    const result = applyDraft(moved, { type: "replace", layout: FIVE });
+    expect(ids(result.state.layout)).toEqual(ids(FIVE));
     expect(result.state.revision).toBe(2);
   });
 
@@ -130,8 +147,8 @@ describe("isDirty", () => {
   it("is false for an untouched draft and for one moved back where it was", () => {
     const there = applyDraft(start(), { type: "move", id: "rings", delta: 1 }).state;
     const back = applyDraft(there, { type: "move", id: "rings", delta: -1 }).state;
-    expect(isDirty(DEFAULT_LAYOUT, start().layout)).toBe(false);
-    expect(isDirty(DEFAULT_LAYOUT, there.layout)).toBe(true);
-    expect(isDirty(DEFAULT_LAYOUT, back.layout)).toBe(false);
+    expect(isDirty(FIVE, start().layout)).toBe(false);
+    expect(isDirty(FIVE, there.layout)).toBe(true);
+    expect(isDirty(FIVE, back.layout)).toBe(false);
   });
 });

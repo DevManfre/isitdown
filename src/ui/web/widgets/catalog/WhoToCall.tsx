@@ -63,7 +63,7 @@ export function WhoToCall({ props }: { props: { filter: FleetFilter } }) {
               <StatusDot status={shownStatus(p).status} />
               <span className="truncate">{p.name}</span>
             </Link>
-            <span className={filled(p.owner) ? "font-mono text-xs @2xl:order-last" : "font-mono text-xs text-muted-foreground @2xl:order-last"}>
+            <span className={filled(p.owner) ? "text-xs @2xl:order-last" : "text-xs text-muted-foreground @2xl:order-last"}>
               {filled(p.owner) ? p.owner : t("widget.who-to-call.no-owner")}
             </span>
             <span className={filled(p.impact) ? "col-span-2 @2xl:col-span-1" : "col-span-2 text-muted-foreground @2xl:col-span-1"}>

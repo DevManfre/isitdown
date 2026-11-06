@@ -476,16 +476,13 @@ Everything lives in SQLite at `/app/data/isitdown.db` and is edited from
   each credential, and — write-only — the credential itself
 - theme, dashboard language, notification language, time zone
 
-The page opens as a bento of category tiles — Engine, Monitored services,
+The page opens as a list of categories — Engine, Monitored services,
 Notifications, Delivery, Data, Appearance, and Recently removed while anything
-is restorable. Each tile carries a short motion band showing what that category
-does (the engine sweeping its providers, the beam leaving for each delivery
-channel, retention pruning its oldest day), drawn from the theme's own colours
-and held still for anyone whose system asks for reduced motion. Clicking a tile
+is restorable — each with one line saying what it holds. Clicking a row
 opens that category on its own page — `#/settings/engine`, so it can be linked
 to and left with the browser's back button — with its rows, a rail listing the
-other categories, and **All settings** back to the grid. Three controls go with
-them: a **filter** over the grid that finds a single setting by name and says
+other categories, and **All settings** back to the list. Three controls go with
+them: a **filter** over the list that finds a single setting by name and says
 which category holds it (on a category page the same field narrows that
 category's rows), a **Detailed / Compact** switch that folds every hint away once they
 have been read, and — over the provider list — **All / Polling / Paused /
@@ -2645,13 +2642,14 @@ provider form, and `impact` / `owner` on `POST /config/services` and
 ### 3.24 Customising the Overview
 
 UI edition only. Everything under the Overview's headline is a list of widgets
-the operator arranges: **Customise** (beside the headline's actions, or
+the operator arranges: **Customise** (in the **⋯** menu beside the title, or
 **Customise the Overview** in ⌘K) turns the page into its own editor, with live
-data, and nothing is stored until **Save**.
+data, and nothing is stored until **Save**. The same menu's **Arrange
+providers** (also in ⌘K) sets the fleet's own order, which every list follows.
 
-- **Widgets** are the blocks the Overview always drew — fleet rings, map, shared
-  failure, groups, fleet list — plus a catalogue of twenty-four more, each built
-  on data the dashboard already reads:
+- **Widgets**: the built-in layout is the fleet list, shared failure, groups and
+  the map, and a catalogue offers the fleet rings plus twenty-four more, each
+  built on data the dashboard already reads:
 
   | Widget | Shows | Points at |
   |---|---|---|
@@ -2682,6 +2680,11 @@ data, and nothing is stored until **Save**.
 
   Each can appear more than once, and each draws its summary at a third of the
   row rather than a squeezed copy of its full self.
+- **Folding.** The map and upcoming maintenance fold shut, so the page opens on
+  the answer to "is anything down" and not on everything at once. Shut, a fold
+  keeps its count beside its title (two in progress, four upcoming), and the map
+  is not even fetched until it is opened. Open or shut is remembered in this
+  browser, per widget.
 - **Every number is a link** (roadmap 4.3). A count, a duration or an uptime on
   a widget opens the rows behind it, with the filters already applied: an
   incident count opens Incidents on that provider and window, an uptime or a
