@@ -263,3 +263,70 @@ recipients:
     await app.close();
   }
 });
+
+test("the preview of the file the dashboard just exported is empty", async () => {
+  const app = await api();
+  try {
+    const exported = (await app.get("/config/export")).text;
+    const { status, body } = await app.postYaml("/config/import/preview", exported);
+
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal((body as { empty: boolean }).empty, true, JSON.stringify(body));
+  } finally {
+    await app.close();
+  }
+});
+
+test("the preview says what an import would do, and writes nothing", async () => {
+  const app = await api();
+  try {
+    const before = app.runtime.listAllServices().map((service) => service.id);
+    const kept = before[0] as string;
+    const keptName = app.runtime.listAllServices()[0]?.name;
+
+    const { status, body } = await app.postYaml(
+      "/config/import/preview",
+      `pollIntervalMinutes: 9\nservices:\n  - id: ${kept}\n    name: Renamed\n    adapter: statuspage\n    baseUrl: https://status.kept.test\n  - id: newcomer\n    name: Newcomer\n    adapter: statuspage\n    baseUrl: https://status.newcomer.test\n`,
+    );
+
+    assert.equal(status, 200, JSON.stringify(body));
+    const diff = body as {
+      empty: boolean;
+      services: { added: string[]; removed: string[]; changed: { id: string; changes: { path: string; to: unknown }[] }[] };
+      settings: { path: string; to: unknown }[];
+      routing: unknown;
+    };
+    assert.equal(diff.empty, false);
+    assert.deepEqual(diff.services.added, ["newcomer"]);
+    assert.deepEqual(diff.services.removed.sort(), before.slice(1).sort());
+    const change = diff.services.changed.find((entry) => entry.id === kept);
+    assert.equal(change?.changes.find((c) => c.path === "name")?.to, "Renamed");
+    assert.equal(diff.settings.find((c) => c.path === "pollIntervalMinutes")?.to, 9);
+    assert.equal(diff.routing, null, "no routing block means the rules stay");
+
+    assert.deepEqual(
+      app.runtime.listAllServices().map((service) => service.id),
+      before,
+      "a preview must not add or remove anything",
+    );
+    assert.equal(app.runtime.listAllServices()[0]?.name, keptName);
+  } finally {
+    await app.close();
+  }
+});
+
+test("the preview refuses what the import refuses", async () => {
+  const app = await api();
+  try {
+    const literal = await app.postYaml(
+      "/config/import/preview",
+      `services:\n  - id: only\n    name: Only\n    adapter: statuspage\n    baseUrl: https://status.only.test\nnotifications:\n  telegram:\n    enabled: true\n    botToken: "123:ABC-real-secret"\n`,
+    );
+    assert.equal(literal.status, 400);
+    assert.match((literal.body as { error: { message: string } }).error.message, /never a literal value/);
+
+    assert.equal((await app.postYaml("/config/import/preview", "   ")).status, 400);
+  } finally {
+    await app.close();
+  }
+});

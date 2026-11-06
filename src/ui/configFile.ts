@@ -1,4 +1,5 @@
 import { parse, stringify } from "yaml";
+import { z } from "zod";
 import { type DatabaseSync } from "node:sqlite";
 import { cadenceProblems } from "../adapters/index.ts";
 import type { Logger } from "../core/logger.ts";
@@ -42,6 +43,11 @@ const ENV_REFERENCE = /^\$\{([A-Z0-9_]+)\}$/;
 const ENV_SUFFIX = "Env";
 
 export function exportConfigYaml(db: DatabaseSync, logger: Logger): string {
+  return `${HEADER}${stringify(buildConfigDocument(db, logger), { lineWidth: 0 })}`;
+}
+
+/** The configuration as the plain object the file format serialises. */
+function buildConfigDocument(db: DatabaseSync, logger: Logger): Record<string, unknown> {
   const settings = readSettings(db, logger);
   const delivery = deliveryOf(settings);
 
@@ -110,7 +116,7 @@ export function exportConfigYaml(db: DatabaseSync, logger: Logger): string {
       .filter((recipient) => recipient.channels.length >= 2),
   };
 
-  return `${HEADER}${stringify(document, { lineWidth: 0 })}`;
+  return document;
 }
 
 const HEADER = `# IsItDown configuration, exported from the UI edition (see README §4.3).
@@ -120,30 +126,19 @@ const HEADER = `# IsItDown configuration, exported from the UI edition (see READ
 # values — every \${VAR} has to exist in the environment the edition runs in.
 `;
 
-export interface ImportReport {
-  /** Service ids, by what the import did with each. */
-  added: string[];
-  updated: string[];
-  /** Present in the database, absent from the file: removed the same way the dashboard removes. */
-  removed: string[];
-  /** Channel ids whose enablement or references the file changed. */
-  channels: string[];
-  routingRules: number;
-  /** Settings the file carried, so a report can say what it moved. */
-  settings: string[];
+type ConfigFile = z.infer<typeof fileConfigSchema>;
+
+interface ValidatedConfig {
+  file: ConfigFile;
+  channelWrites: { id: string; enabled: boolean; fields: Record<string, string> }[];
 }
 
 /**
- * Reads a `config.yml` back into the dashboard's database.
- *
- * A service the file does not mention is removed the way the dashboard's own
- * remove works — soft, restorable, history intact — rather than purged: an
- * import is a configuration statement, and it must not be a data-loss event.
- *
- * Throws on anything the file schema rejects, and on a literal credential,
- * before writing anything.
+ * Everything an import checks before its first write, as one function so the
+ * preview (roadmap 5.9) refuses exactly what the import refuses: YAML, the
+ * file schema, duplicate ids, cadences, literal credentials, unknown channels.
  */
-export function importConfigYaml(db: DatabaseSync, source: string, logger: Logger): ImportReport {
+function validateConfigSource(db: DatabaseSync, source: string): ValidatedConfig {
   let document: unknown;
   try {
     document = parse(source);
@@ -202,6 +197,35 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
     const unknown = recipient.channels.find((channel) => !known.has(channel));
     if (unknown !== undefined) throw new Error(`recipient ${recipient.id}: unknown notification channel: ${unknown}`);
   }
+
+  return { file, channelWrites };
+}
+
+export interface ImportReport {
+  /** Service ids, by what the import did with each. */
+  added: string[];
+  updated: string[];
+  /** Present in the database, absent from the file: removed the same way the dashboard removes. */
+  removed: string[];
+  /** Channel ids whose enablement or references the file changed. */
+  channels: string[];
+  routingRules: number;
+  /** Settings the file carried, so a report can say what it moved. */
+  settings: string[];
+}
+
+/**
+ * Reads a `config.yml` back into the dashboard's database.
+ *
+ * A service the file does not mention is removed the way the dashboard's own
+ * remove works — soft, restorable, history intact — rather than purged: an
+ * import is a configuration statement, and it must not be a data-loss event.
+ *
+ * Throws on anything the file schema rejects, and on a literal credential,
+ * before writing anything.
+ */
+export function importConfigYaml(db: DatabaseSync, source: string, logger: Logger): ImportReport {
+  const { file, channelWrites } = validateConfigSource(db, source);
 
   const settings = {
     pollIntervalMinutes: file.pollIntervalMinutes,
@@ -326,4 +350,125 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
     removed: report.removed.length,
   });
   return report;
+}
+
+/** One value that would move, as dotted path plus both sides. */
+export interface ConfigChange {
+  path: string;
+  from: unknown;
+  to: unknown;
+}
+
+export interface ConfigDiff {
+  services: {
+    added: string[];
+    removed: string[];
+    changed: { id: string; changes: ConfigChange[] }[];
+  };
+  /** Polling, delivery and locale: every top-level setting the file would move. */
+  settings: ConfigChange[];
+  channels: { id: string; changes: ConfigChange[] }[];
+  /** Null when the file leaves the rules alone (no `routing` block) or they are identical. */
+  routing: { from: number; to: number } | null;
+  recipients: { from: number; to: number } | null;
+  /** True when importing the file would change nothing. */
+  empty: boolean;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Leaves of a nested object by dotted path; arrays are atoms, compared whole. */
+function flatten(value: unknown, prefix = ""): Map<string, unknown> {
+  const out = new Map<string, unknown>();
+  if (!isPlainObject(value)) {
+    if (prefix !== "") out.set(prefix, value);
+    return out;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    const path = prefix === "" ? key : `${prefix}.${key}`;
+    if (isPlainObject(child)) for (const [k, v] of flatten(child, path)) out.set(k, v);
+    else out.set(path, child);
+  }
+  return out;
+}
+
+function changesBetween(before: unknown, after: unknown, skip: (path: string) => boolean = () => false): ConfigChange[] {
+  const a = flatten(before);
+  const b = flatten(after);
+  const out: ConfigChange[] = [];
+  for (const path of new Set([...a.keys(), ...b.keys()])) {
+    if (skip(path)) continue;
+    const from = a.get(path);
+    const to = b.get(path);
+    if (JSON.stringify(from) !== JSON.stringify(to)) out.push({ path, from, to });
+  }
+  return out.sort((x, y) => x.path.localeCompare(y.path));
+}
+
+/**
+ * What importing `source` would do, without doing it (roadmap 5.9).
+ *
+ * Both sides go through the file schema, so a default the file leaves out and
+ * the database holds explicitly is not reported as a change. The comparison
+ * follows what the import writes: a service field the file omits is cleared
+ * (except `options`, which an import leaves alone), a channel the file does not
+ * mention is untouched, and an absent `routing` or `recipients` block leaves
+ * the rules and the people alone.
+ *
+ * Throws what `importConfigYaml` throws on a file it would refuse.
+ */
+export function diffConfigYaml(db: DatabaseSync, source: string, logger: Logger): ConfigDiff {
+  const { file } = validateConfigSource(db, source);
+  const current = fileConfigSchema.parse(buildConfigDocument(db, logger));
+
+  const before = new Map(current.services.map((service) => [service.id, service]));
+  const incoming = new Set(file.services.map((service) => service.id));
+  const added: string[] = [];
+  const changed: ConfigDiff["services"]["changed"] = [];
+  for (const service of file.services) {
+    const existing = before.get(service.id);
+    if (existing === undefined) {
+      added.push(service.id);
+      continue;
+    }
+    const changes = changesBetween(existing, service, (path) => service.options === undefined && path.startsWith("options"));
+    if (changes.length > 0) changed.push({ id: service.id, changes });
+  }
+  const removed = current.services.map((service) => service.id).filter((id) => !incoming.has(id));
+
+  const { services: _a, notifications: _b, routing: _c, recipients: _d, ...currentSettings } = current;
+  const { services: _e, notifications: _f, routing: _g, recipients: _h, ...fileSettings } = file;
+  const settings = changesBetween(currentSettings, fileSettings);
+
+  const channels: ConfigDiff["channels"] = [];
+  for (const [id, raw] of Object.entries(file.notifications)) {
+    if (raw === undefined) continue;
+    const changes = changesBetween(current.notifications[id as keyof typeof current.notifications] ?? {}, raw);
+    if (changes.length > 0) channels.push({ id, changes });
+  }
+
+  const listDiff = (from: unknown[] | undefined, to: unknown[] | undefined) =>
+    to === undefined || JSON.stringify(from ?? []) === JSON.stringify(to)
+      ? null
+      : { from: (from ?? []).length, to: to.length };
+  const routing = listDiff(current.routing, file.routing);
+  const recipients = listDiff(current.recipients, file.recipients);
+
+  return {
+    services: { added, removed, changed },
+    settings,
+    channels,
+    routing,
+    recipients,
+    empty:
+      added.length === 0 &&
+      removed.length === 0 &&
+      changed.length === 0 &&
+      settings.length === 0 &&
+      channels.length === 0 &&
+      routing === null &&
+      recipients === null,
+  };
 }

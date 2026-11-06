@@ -725,6 +725,26 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
+  "/config/import/preview": {
+    post: {
+      tags: ["Configuration"],
+      summary: "What importing the same file would do, without doing it.",
+      requestBody: {
+        required: true,
+        content: {
+          "text/yaml": { schema: { type: "string" } },
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["yaml"],
+              properties: { yaml: { type: "string" } },
+            },
+          },
+        },
+      },
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
   "/config/backup": {
     get: {
       tags: ["Configuration"],
