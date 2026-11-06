@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 36;
+export const SCHEMA_VERSION = 37;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -832,6 +832,20 @@ function upgrade(db: DatabaseSync, from: number): void {
     for (const column of ["runbook", "tags", "mute_schedules", "maintenance_windows"]) {
       if (!serviceColumns.includes(column)) db.exec(`ALTER TABLE services ADD COLUMN ${column} TEXT`);
     }
+  }
+
+  if (from < 37) {
+    // Named configuration snapshots — roadmap 5.8. The `config.yml` export as
+    // text, kept under a name the operator chose; credentials are `${VAR}`
+    // references in it, so nothing secret is stored.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS config_snapshots (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT NOT NULL UNIQUE,
+        yaml       TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
