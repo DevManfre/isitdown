@@ -4,7 +4,7 @@ import { discover } from "../../adapters/discover.ts";
 import { IMPORT_TOOLS, importMonitors, type ImportTool } from "../../adapters/import/index.ts";
 import { listServices } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
-import { exportConfigYaml, importConfigYaml } from "../configFile.ts";
+import { diffConfigYaml, exportConfigYaml, importConfigYaml } from "../configFile.ts";
 import { issues } from "./config.shared.ts";
 
 const discoverRequestSchema = z.object({
@@ -112,22 +112,40 @@ export function configImportExportRoutes(runtime: UiRuntimeCore, router: Router)
    * intact — because an import is a configuration statement and must not be a
    * data-loss event.
    */
-  router.post("/config/import", (req, res) => {
-    const body = req.body;
+  const yamlOf = (body: unknown): string | null => {
     const source =
       typeof body === "string"
         ? body
         : typeof (body as { yaml?: unknown } | undefined)?.yaml === "string"
           ? (body as { yaml: string }).yaml
           : null;
-    if (source === null || source.trim() === "") {
-      res
-        .status(400)
-        .json({
-          error: {
-            message: "send the config.yml as the request body, or as { yaml }",
-          },
-        });
+    return source === null || source.trim() === "" ? null : source;
+  };
+  const NO_YAML = "send the config.yml as the request body, or as { yaml }";
+
+  /**
+   * What `POST /config/import` would do with the same body, without doing it
+   * (roadmap 5.9): services added, removed and changed field by field, settings
+   * and channels that would move, and whether routing and recipients would be
+   * replaced. Refuses exactly what the import refuses.
+   */
+  router.post("/config/import/preview", (req, res) => {
+    const source = yamlOf(req.body);
+    if (source === null) {
+      res.status(400).json({ error: { message: NO_YAML } });
+      return;
+    }
+    try {
+      res.json(diffConfigYaml(db, source, runtime.logger));
+    } catch (error) {
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+    }
+  });
+
+  router.post("/config/import", (req, res) => {
+    const source = yamlOf(req.body);
+    if (source === null) {
+      res.status(400).json({ error: { message: NO_YAML } });
       return;
     }
 
