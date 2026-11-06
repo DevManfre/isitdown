@@ -41,7 +41,7 @@ export function ComponentRows({
   return (
     <div className="component-rows flex flex-col gap-2 border-t border-border pt-3">
       {heading !== undefined && (
-        <span className="text-xs uppercase tracking-widest text-primary">{heading}</span>
+        <span className="text-base font-medium">{heading}</span>
       )}
       {data.components.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("components.unsupported")}</p>

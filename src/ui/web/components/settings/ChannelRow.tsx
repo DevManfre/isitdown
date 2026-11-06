@@ -141,7 +141,7 @@ function PushDevices({
           labels, so the two read as one flat list. Kicker styling plus a
           bordered list gives the rows something to sit inside. */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("push.devices")}</span>
+        <span className="text-sm text-muted-foreground">{t("push.devices")}</span>
         {registered.length === 0 ? (
           <span className="text-xs text-muted-foreground">{t("push.no-devices")}</span>
         ) : (
@@ -210,7 +210,7 @@ function ChannelMessage({ channel }: { channel: DescribedChannel }) {
 
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-3">
-      <span className="text-xs uppercase tracking-widest text-muted-foreground">{t("channel.message")}</span>
+      <span className="text-sm text-muted-foreground">{t("channel.message")}</span>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={localeId}>{t("channel.locale")}</Label>

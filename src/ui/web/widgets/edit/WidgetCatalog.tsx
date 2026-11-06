@@ -136,7 +136,7 @@ export function WidgetCatalog({
                   <span className="flex items-baseline justify-between gap-2">
                     <span className="text-sm font-medium">{t(def.titleKey)}</span>
                     {present > 0 && (
-                      <span className="font-mono text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         {t("dashboard.catalog.present", { count: present })}
                       </span>
                     )}

@@ -58,7 +58,7 @@ export function DegradedComponents({ props }: { props: { filter: FleetFilter } }
     >
       <div className="flex flex-col gap-1 @md:hidden">
         <span className="font-mono text-4xl leading-none">{rows.length}</span>
-        <span className="font-mono text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {t("widget.degraded-components.of", { total: all.length })}
         </span>
         <span className="text-sm text-muted-foreground">
@@ -76,7 +76,7 @@ export function DegradedComponents({ props }: { props: { filter: FleetFilter } }
             >
               <StatusDot status={component.status} />
               <span
-                className="hidden w-40 shrink-0 truncate font-mono text-xs tracking-wider uppercase @2xl:inline"
+                className="hidden w-40 shrink-0 truncate text-sm @2xl:inline font-medium"
                 style={{ color: statusColor(component.status) }}
               >
                 {t(statusLabelKey(component.status))}
@@ -84,7 +84,7 @@ export function DegradedComponents({ props }: { props: { filter: FleetFilter } }
               <span className="w-24 shrink-0 truncate text-muted-foreground">{provider.name}</span>
               <span className="min-w-0 truncate">{component.name}</span>
               {provider.overallStatus === "operational" ? (
-                <span className="ml-auto shrink-0 font-mono text-xs text-muted-foreground">
+                <span className="ml-auto shrink-0 text-xs text-muted-foreground">
                   {t("widget.degraded-components.provider-fine")}
                 </span>
               ) : selected(provider, component) ? (

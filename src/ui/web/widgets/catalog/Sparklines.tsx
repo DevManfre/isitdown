@@ -176,7 +176,7 @@ export function Sparklines({ props }: { props: { filter: FleetFilter } }) {
         ))}
       </ul>
       {young.length > 0 && (
-        <p className="hidden font-mono text-xs text-muted-foreground @md:block">
+        <p className="hidden text-xs text-muted-foreground @md:block">
           {t("widget.sparklines.young", { count: young.length, providers: young.map((r) => name(r.id)).join(", ") })}
         </p>
       )}

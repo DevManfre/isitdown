@@ -89,7 +89,7 @@ export function FilterPanel({
       data-slot="widget-filter"
       className="mt-3 flex flex-col gap-3 rounded-lg border border-primary/60 bg-card p-3.5"
     >
-      <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase">
+      <span className="text-sm text-muted-foreground">
         {t("dashboard.filter.groups")}
       </span>
       {groups.length === 0 ? (
@@ -97,7 +97,7 @@ export function FilterPanel({
       ) : (
         chips("groups", groups, "dashboard.filter.groups")
       )}
-      <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase">
+      <span className="text-sm text-muted-foreground">
         {t("dashboard.filter.providers")}
       </span>
       <div className="max-h-48 overflow-y-auto">{chips("providers", providers, "dashboard.filter.providers")}</div>

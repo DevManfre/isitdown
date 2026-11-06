@@ -149,7 +149,7 @@ export function IncidentDetail() {
       >
         <div className="flex flex-col gap-2">
           <div className="anim-rise flex items-center gap-2" style={{ animationDelay: "40ms" }}>
-            <span className="text-xs uppercase tracking-widest" style={{ color: impactColor(incident.impact) }}>
+            <span className="text-sm font-medium" style={{ color: impactColor(incident.impact) }}>
               {t("incident.kicker")}
             </span>
             <Badge variant="outline" style={{ color: impactColor(incident.impact), borderColor: impactColor(incident.impact) }}>
@@ -226,7 +226,7 @@ export function IncidentDetail() {
               },
             ].map((stat) => (
               <div key={stat.id} data-stat={stat.id} className="flex flex-col gap-0.5">
-                <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   {stat.label}
                 </span>
                 <span
@@ -351,7 +351,7 @@ export function IncidentDetail() {
                 {formatTime(i18n.language, entry.at)}
               </span>
               <div className="flex flex-col gap-0.5 pb-3">
-                <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   {t(`incident.timeline.${entry.label}`)}
                 </span>
                 {entry.status !== undefined && <span className="text-sm">{t(incidentStatusKey(entry.status))}</span>}

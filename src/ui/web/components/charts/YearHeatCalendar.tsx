@@ -44,7 +44,7 @@ export function YearHeatCalendar({
 
   return (
     <div className="year-heat flex flex-col gap-2">
-      <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">{heading}</span>
+      <span className="text-sm font-medium text-muted-foreground">{heading}</span>
 
       <div className="flex flex-col gap-1 overflow-x-auto">
         {/* The month row and the cell grid share a column count, so a label

@@ -103,7 +103,7 @@ export function RemoveServiceDialog({ service, trigger }: { service: ServiceDefi
               <p className="text-xs text-muted-foreground">{t("providers.remove-impact.empty")}</p>
             ) : (
               <>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   {t("providers.remove-impact.lead")}
                 </p>
                 <ul className="space-y-1">
