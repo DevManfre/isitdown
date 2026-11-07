@@ -190,6 +190,7 @@
   "providers.remove-impact.rules_other": "{count} règles de routage qui le nomment",
   "provider.back": "Retour aux fournisseurs",
   "provider.muted": "En sourdine",
+  "provider.favorite.label": "Favori : {name}",
   "provider.unknown": "Aucun fournisseur nommé {provider} n'est surveillé.",
   "provider.maintenance.badge": "Maintenance",
   "provider.muted.badge": "En sourdine",

@@ -74,6 +74,35 @@ function fakeServices(providers: ReturnType<typeof provider>[]) {
   return { asked, deps: { history, sla } as never };
 }
 
+// Roadmap 5.14.
+test("a starred provider is always in the report, at 100% or never measured, and a paused one is not", async () => {
+  // The real history is asked only for the enabled ids; the fake answers just as it would.
+  const { deps } = fakeServices([provider("calm", 100), provider("quiet", null), provider("weak", 90)]);
+  const change = await createReportService(deps).build(
+    [
+      service("calm", { favorite: true }),
+      service("quiet", { favorite: true }),
+      service("weak"),
+      service("paused", { favorite: true, enabled: false }),
+    ],
+    "weekly",
+    3,
+    new Date("2026-10-21T12:00:00Z"),
+  );
+
+  assert.deepEqual(change?.report?.favorites, [
+    { providerId: "calm", uptime: 100 },
+    { providerId: "quiet", uptime: null },
+  ]);
+  assert.deepEqual(change?.report?.worst, [{ providerId: "weak", uptime: 90 }], "the weakest list is unchanged");
+});
+
+test("with no star anywhere the report carries an empty favorites list", async () => {
+  const { deps } = fakeServices([provider("a", 99)]);
+  const change = await createReportService(deps).build([service("a")], "weekly", 3, new Date("2026-10-21T12:00:00Z"));
+  assert.deepEqual(change?.report?.favorites, []);
+});
+
 test("the report names the three weakest measured providers below 100%, worst first", async () => {
   const { deps, asked } = fakeServices([
     provider("a", 100),

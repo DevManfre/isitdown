@@ -190,6 +190,7 @@
   "providers.remove-impact.rules_other": "{count} reglas de enrutado que lo nombran",
   "provider.back": "Volver a proveedores",
   "provider.muted": "Silenciado",
+  "provider.favorite.label": "Favorito: {name}",
   "provider.unknown": "No se está vigilando ningún proveedor llamado {provider}.",
   "provider.maintenance.badge": "Mantenimiento",
   "provider.muted.badge": "Silenciado",

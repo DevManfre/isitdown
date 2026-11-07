@@ -305,6 +305,7 @@ const serviceRowSchema = z.object({
   enabled: z.number(),
   components: z.string().nullable(),
   scope_to_components: z.number(),
+  favorite: z.number(),
   interval_minutes: z.number().nullable(),
   interval_seconds: z.number().nullable(),
   muted_until: z.string().nullable(),
@@ -499,7 +500,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner, runbook, tags, mute_schedules, maintenance_windows
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, favorite, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner, runbook, tags, mute_schedules, maintenance_windows
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -517,6 +518,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
               .catch([])
               .parse(JSON.parse(row.components)),
       scopeToComponents: row.scope_to_components === 1,
+      ...(row.favorite === 1 ? { favorite: true } : {}),
       // Left off rather than passed as null: absent is what the poller reads as
       // "follow the global cadence".
       ...(row.interval_minutes === null
@@ -592,7 +594,7 @@ export function insertService(
 ): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner, runbook, tags, mute_schedules, maintenance_windows, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, favorite, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner, runbook, tags, mute_schedules, maintenance_windows, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -602,6 +604,7 @@ export function insertService(
     parsed.enabled ? 1 : 0,
     parsed.components.length === 0 ? null : JSON.stringify(parsed.components),
     parsed.scopeToComponents ? 1 : 0,
+    parsed.favorite === true ? 1 : 0,
     parsed.intervalMinutes ?? null,
     parsed.intervalSeconds ?? null,
     parsed.mutedUntil ?? null,
@@ -700,6 +703,7 @@ export function updateService(
   if (parsed.scopeToComponents !== undefined) {
     columns["scope_to_components"] = parsed.scopeToComponents ? 1 : 0;
   }
+  if (parsed.favorite !== undefined) columns["favorite"] = parsed.favorite ? 1 : 0;
   if (parsed.intervalMinutes !== undefined)
     columns["interval_minutes"] = parsed.intervalMinutes;
   if (parsed.intervalSeconds !== undefined)

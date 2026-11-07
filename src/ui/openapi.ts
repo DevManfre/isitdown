@@ -1512,6 +1512,10 @@ const schemas: Json = {
       options: { type: "object", additionalProperties: { type: "string" } },
       components: { type: "array", items: { type: "object" } },
       scopeToComponents: { type: "boolean" },
+      favorite: {
+        type: "boolean",
+        description: "A star (roadmap 5.14): listed first, always on the wallboard, always in the weekly summary.",
+      },
       authority: {
         type: "string",
         enum: [...AUTHORITIES],

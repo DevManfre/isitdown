@@ -242,6 +242,13 @@ export interface StatusChange {
         incidentCount: number;
         /** The worst measured providers below 100%, worst first, at most three. */
         worst: { providerId: string; uptime: number }[];
+        /**
+         * Every enabled provider the operator starred (roadmap 5.14), whatever it
+         * measured — `worst` only ever names the ones below 100%, so a starred
+         * provider that had a quiet week would be the one missing. Null uptime
+         * means nothing was measured. Absent on a report built before stars.
+         */
+        favorites?: { providerId: string; uptime: number | null }[] | undefined;
         /** Error budget per provider that has a target; empty when none has. */
         sla: { providerId: string; target: number; spentMinutes: number; budgetMinutes: number }[];
       }

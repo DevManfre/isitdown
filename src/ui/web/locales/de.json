@@ -190,6 +190,7 @@
   "providers.remove-impact.rules_other": "{count} Routing-Regeln, die ihn nennen",
   "provider.back": "Zurück zu den Anbietern",
   "provider.muted": "Stumm",
+  "provider.favorite.label": "Favorit: {name}",
   "provider.unknown": "Es wird kein Anbieter namens {provider} überwacht.",
   "provider.maintenance.badge": "Wartung",
   "provider.muted.badge": "Stumm",

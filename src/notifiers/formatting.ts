@@ -455,6 +455,17 @@ function reportText(change: StatusChange, locale: string): string {
       );
     }
   }
+  if (report.favorites !== undefined && report.favorites.length > 0) {
+    lines.push(
+      "",
+      t(locale, "notification.report.favorites-heading"),
+      ...report.favorites.map((entry) =>
+        entry.uptime === null
+          ? t(locale, "notification.report.favorite-unmeasured", { provider: entry.providerId })
+          : t(locale, "notification.report.worst-line", { provider: entry.providerId, uptime: entry.uptime.toFixed(2) }),
+      ),
+    );
+  }
   if (report.sla.length > 0) {
     lines.push(
       "",

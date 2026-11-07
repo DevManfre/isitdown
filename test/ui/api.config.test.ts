@@ -1694,6 +1694,36 @@ test("a provider's impact and owner are stored, served, and cleared with null", 
   }
 });
 
+// Roadmap 5.14.
+test("a provider's star is stored, served on /config and /status, and cleared with false", async () => {
+  const app = await api();
+  try {
+    const [first] = ((await app.request("GET", "/config")).body as { services: { id: string }[] }).services;
+    const id = first?.id as string;
+    const favorite = async () =>
+      ((await app.request("GET", "/config")).body as { services: { id: string; favorite?: boolean }[] }).services.find(
+        (service) => service.id === id,
+      )?.favorite;
+    const shown = async () =>
+      ((await app.request("GET", "/status")).body as { providers: { id: string; favorite?: boolean }[] }).providers.find(
+        (provider) => provider.id === id,
+      )?.favorite;
+
+    assert.notEqual(await favorite(), true, "a provider nobody starred is not starred");
+    assert.equal(await shown(), false, "the dashboard is always told, so it never has to guess");
+    assert.equal((await app.request("PATCH", `/config/services/${id}`, { favorite: true })).status, 200);
+    assert.equal(await favorite(), true);
+    assert.equal(await shown(), true);
+
+    await app.request("PATCH", `/config/services/${id}`, { favorite: false });
+    assert.notEqual(await favorite(), true);
+    assert.equal(await shown(), false);
+    assert.equal((await app.request("PATCH", `/config/services/${id}`, { favorite: "yes" })).status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
 // Roadmap 3.15 and 3.16.
 test("PATCH /config/settings stores the on-call rotation and the routine test, and GET reads them back", async () => {
   const app = await api();

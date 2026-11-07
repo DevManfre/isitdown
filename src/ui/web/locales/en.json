@@ -190,6 +190,7 @@
   "providers.remove-impact.rules_other": "{count} routing rules naming it",
   "provider.back": "Back to providers",
   "provider.muted": "Muted",
+  "provider.favorite.label": "Favorite: {name}",
   "provider.unknown": "No provider called {provider} is being watched.",
   "provider.maintenance.badge": "Maintenance",
   "provider.muted.badge": "Muted",

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 38;
+export const SCHEMA_VERSION = 39;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -867,6 +867,18 @@ function upgrade(db: DatabaseSync, from: number): void {
       );
       CREATE INDEX IF NOT EXISTS config_audit_at ON config_audit (at DESC, id DESC);
     `);
+  }
+
+  if (from < 39) {
+    // A star on a provider — roadmap 5.14. On the row like `scope_to_components`: the
+    // Light edition writes it as a field of the provider, so a side table would
+    // describe one thing two ways.
+    const starColumns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!starColumns.includes("favorite")) {
+      db.exec("ALTER TABLE services ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

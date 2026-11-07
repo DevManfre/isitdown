@@ -190,6 +190,7 @@
   "providers.remove-impact.rules_other": "{count} regras de encaminhamento que o nomeiam",
   "provider.back": "Voltar aos fornecedores",
   "provider.muted": "Silenciado",
+  "provider.favorite.label": "Favorito: {name}",
   "provider.unknown": "Não está a ser vigiado nenhum fornecedor com o nome {provider}.",
   "provider.maintenance.badge": "Manutenção",
   "provider.muted.badge": "Silenciado",
