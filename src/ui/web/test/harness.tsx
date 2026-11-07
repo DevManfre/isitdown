@@ -202,6 +202,10 @@ export function stubApi(fixtures: Fixtures): void {
           ),
         },
         coincidence: { days: 90, pairs: [] },
+        // The provider drawer reads the routing rules to show a component's
+        // silence (roadmap 5.13); a config with no `routing` is not a body the
+        // server sends.
+        config: { routing: { rules: [], invalidRules: 0 } },
         trust: { days: 90, windows: [30, 90, 365], cards: [] },
         annotations: { annotations: [] },
         providerPush: { enabled: false, tokenRevealed: false, providers: [] },

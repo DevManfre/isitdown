@@ -1675,6 +1675,13 @@ so a provider-level status change never matches one. The component id is the
 provider's own — the same id the component picker stores — and removing a
 provider deletes its components' rules along with its own.
 
+The UI edition makes the mute a button (roadmap 5.13): on a provider's page, and
+in its drawer, each component row has a bell. Clicking it saves a
+`<id>#<component>` rule with `channels: []` at the **top** of the table — the
+first matching rule decides, so behind a catch-all it would never be reached —
+and the row says **Silenced**. Clicking again removes that rule, and only that
+one: a rule for the same component that routes somewhere is yours, and stays.
+
 The Light edition configures the table as the `routing` list in `config.yml`,
 shown above; the UI edition edits it from **Settings**, where the provider
 column lists each provider's selected components beneath it and a routing rules
