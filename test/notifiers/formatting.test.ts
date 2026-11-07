@@ -458,6 +458,40 @@ test("a periodic report reads as figures, and leaves out the sections it has not
   assert.ok(!blank.includes("Fleet uptime"), blank);
 });
 
+// Roadmap 5.14.
+test("a periodic report lists the starred providers under their own heading, measured or not", () => {
+  const withStars = (favorites: NonNullable<StatusChange["report"]>["favorites"]): string =>
+    renderMessage(
+      payloadFor({
+        kind: "periodic_report",
+        providerId: "github",
+        currentStatus: "unknown",
+        report: {
+          frequency: "weekly",
+          from: "2026-10-12",
+          to: "2026-10-18",
+          fleetUptime: 99.5,
+          incidentCount: 1,
+          worst: [],
+          favorites,
+          sla: [],
+        },
+        at: "2026-10-19T00:05:00.000Z",
+      }),
+    );
+
+  const text = withStars([
+    { providerId: "github", uptime: 100 },
+    { providerId: "linear", uptime: null },
+  ]);
+  assert.ok(text.includes("Starred providers:"), text);
+  assert.ok(text.includes("• github — 100.00%"), text);
+  assert.ok(text.includes("• linear — not measured"), text);
+
+  assert.ok(!withStars([]).includes("Starred providers"), "no star, no heading");
+  assert.ok(!withStars(undefined).includes("Starred providers"), "a report from before stars has none either");
+});
+
 test("a periodic report ignores the channel's template and carries no provider context", () => {
   const message = renderMessage({
     ...payloadFor({

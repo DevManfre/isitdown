@@ -75,6 +75,8 @@ export interface ProviderStatus {
   components: ComponentStatus[];
   componentSelection: { id: string; name: string }[];
   scopeToComponents: boolean;
+  /** Starred by the operator (roadmap 5.14); `/status` always says. */
+  favorite?: boolean;
   fetchedAt: string | null;
   failureCount: number;
   /** ISO 8601 while the provider is muted; null when it is not. */

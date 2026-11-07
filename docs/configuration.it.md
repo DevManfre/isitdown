@@ -3015,3 +3015,40 @@ Solo edizione UI. Con cento provider, modificarne uno alla volta non scala:
   cadenza, gruppo, tag, runbook, silenziamenti pianificati e finestre
   dichiarate — con il nome "<nome> (copia)", da cui deriva il nuovo id. Dieci
   sonde HTTP che differiscono solo per il path sono una sonda e nove duplicati.
+
+### 3.30 Provider preferiti
+
+Una stella (roadmap 5.14) segna i provider che contano di più. È un solo campo
+del provider, `favorite: true`; se manca, il provider non è tra i preferiti,
+quindi un `config.yml` che non ne sa nulla si comporta esattamente come prima.
+L'export lo scrive solo dove è acceso.
+
+```yaml
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    favorite: true
+```
+
+Nell'edizione UI la stella è un pulsante prima del nome del provider, nell'elenco
+Provider e in cima alla sua pagina, ed è un interruttore: l'etichetta resta
+"Preferito: <nome>" e lo stato si legge da `aria-pressed`. Via API è
+`PATCH /config/services/:id` con `{ "favorite": true }` ([6](api.it.md)).
+Cosa cambia una stella, e nient'altro:
+
+- **Provider** elenca prima i provider con la stella. Solo nell'ordine di
+  default — appena ordini per una colonna, decide la colonna.
+- **Wallboard** mostra un provider con la stella in ogni pagina; gli altri ruotano
+  nei posti rimasti. Se le sole stelle riempissero una pagina non resta posto in
+  cui ruotare, quindi il wallboard sfoglia tutti, i preferiti per primi, invece di
+  nascondere gli altri per sempre.
+- **Il report periodico** (3.13) ottiene un elenco *Provider preferiti* con
+  l'uptime del periodo di ciascuno, **anche al 100% o senza misure** — la lista
+  dei "più deboli" nomina solo provider sotto il 100%, quindi proprio un preferito
+  con una settimana tranquilla sarebbe quello mancante. Un provider in pausa non
+  entra nel report, con la stella o senza.
+
+Una stella non cambia il polling, l'instradamento né cosa viene notificato: un
+alert per un provider con la stella va esattamente dove andava prima.

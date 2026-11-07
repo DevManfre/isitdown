@@ -2898,3 +2898,40 @@ scale:
   tags, runbook, planned mutes and declared windows — under the name
   "<name> (copy)", from which the new id is derived. Ten HTTP probes that
   differ only in their path are one probe and nine duplicates.
+
+### 3.30 Starred providers
+
+A star (roadmap 5.14) marks the providers that matter most. It is one field on
+the provider, `favorite: true`; left out, a provider is not starred, so a
+`config.yml` that never heard of it behaves exactly as before. The export writes
+it only where it is on.
+
+```yaml
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    favorite: true
+```
+
+In the UI edition the star is a button before the provider's name, on the
+Providers list and at the top of its page, and the button is a toggle: its label
+stays "Favorite: <name>" and the state is read from `aria-pressed`. Over the API
+it is `PATCH /config/services/:id` with `{ "favorite": true }` ([6](api.md)).
+What a star changes, and nothing else:
+
+- **Providers** lists starred providers first. That is the default order only —
+  once you sort by a column, the column decides.
+- **Wallboard** shows a starred provider on every page; the others rotate
+  through the places left. If the stars alone would fill a page there is no place
+  left to rotate into, so the wallboard pages through everyone, starred first,
+  rather than hide the rest for good.
+- **The periodic report** (3.13) gains a *Starred providers* list with each
+  one's uptime for the period, **at 100% or with nothing measured too** — the
+  "weakest" list only ever names providers below 100%, so a starred provider with
+  a quiet week would be the one missing. A paused provider is not reported on,
+  starred or not.
+
+A star does not change polling, routing or what is notified: an alert for a
+starred provider goes exactly where it went before.

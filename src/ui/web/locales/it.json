@@ -190,6 +190,7 @@
   "providers.remove-impact.rules_other": "{count} regole di instradamento che lo nominano",
   "provider.back": "Torna ai provider",
   "provider.muted": "Silenziato",
+  "provider.favorite.label": "Preferito: {name}",
   "provider.unknown": "Nessun provider chiamato {provider} è sotto osservazione.",
   "provider.maintenance.badge": "Manutenzione",
   "provider.muted.badge": "Silenziato",

@@ -10,6 +10,7 @@ import {
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { EmptyFleet } from "@/components/EmptyFleet.tsx";
+import { FavoriteStar } from "@/components/FavoriteStar.tsx";
 import { ViewSkeleton } from "@/components/ViewSkeleton.tsx";
 import {
   createColumnHelper,
@@ -139,6 +140,8 @@ const NO_PROVIDERS: ProviderStatus[] = [];
 interface ProviderRow {
   id: string;
   name: string;
+  /** Starred by the operator (roadmap 5.14). */
+  favorite: boolean;
   host: string;
   adapter: string;
   status: OverallStatus;
@@ -534,6 +537,7 @@ export function Providers() {
           return {
             id: provider.id,
             name: provider.name,
+            favorite: provider.favorite === true,
             host: hostOf(provider.baseUrl),
             adapter: provider.adapter,
             status: provider.overallStatus,
@@ -560,8 +564,13 @@ export function Providers() {
         // Alphabetical order is fine at eight providers and useless at a hundred:
         // it buries the two rows the view is being opened for under ninety-eight
         // that are fine.
+        //
+        // Roadmap 5.14: a star outranks severity, so the providers the operator
+        // said matter are the first rows whatever else is going on. Only in this
+        // default order — a column the operator picked is their say, not ours.
         .sort(
           (left, right) =>
+            Number(right.favorite) - Number(left.favorite) ||
             right.severity - left.severity ||
             left.name.localeCompare(right.name),
         )
@@ -615,6 +624,11 @@ export function Providers() {
               </SuspicionTooltip>
               <span className="flex flex-col">
                 <span className="flex items-center gap-1.5">
+                  <FavoriteStar
+                    providerId={row.original.id}
+                    name={row.original.name}
+                    favorite={row.original.favorite}
+                  />
                   {/* The name is the way into the provider's own page (roadmap
                       5.6). A link rather than a row click: the row already
                       expands its components, and one gesture cannot mean two

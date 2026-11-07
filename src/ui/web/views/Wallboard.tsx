@@ -12,6 +12,7 @@ import { ROUTE_PATHS } from "../../routePaths.ts";
 import { isOffLine, shownStatus } from "@/lib/suspicion.ts";
 import { QrCode } from "@/components/QrCode.tsx";
 import { useStatusFeedback } from "@/hooks/useStatusFeedback.ts";
+import { wallboardPage } from "@/lib/favorites.ts";
 import { statusRank } from "@/lib/statusChanges.ts";
 import { pulseAttr, usePulses } from "@/lib/statusPulse.ts";
 
@@ -70,7 +71,8 @@ export function Wallboard() {
   const [page, setPage] = useState(0);
 
   const providers = (status?.providers ?? []).filter((provider) => provider.enabled);
-  const pages = Math.max(1, Math.ceil(providers.length / PER_PAGE));
+  // Roadmap 5.14: the starred stay on every page, the rest rotate through what is left.
+  const { shown, pages } = wallboardPage(providers, page, PER_PAGE);
 
   // Rotation is an effect of the page count, so a fleet that shrinks below one
   // page stops rotating rather than cycling through a single page forever.
@@ -86,7 +88,6 @@ export function Wallboard() {
     if (page >= pages) setPage(0);
   }, [page, pages]);
 
-  const shown = providers.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
   // Roadmap 1.3: the same rule as the Overview's headline.
   const alarm = providers.filter(isOffLine);
 
