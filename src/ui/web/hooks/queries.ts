@@ -771,6 +771,45 @@ export function useConfigImport() {
   return useMutation({ mutationFn: api.importConfig, onSuccess: invalidate });
 }
 
+/** The diff an import file would make — a mutation: two clicks, two reads. */
+export function useConfigImportPreview() {
+  return useMutation({ mutationFn: api.previewConfigImport });
+}
+
+/** Named configuration snapshots (roadmap 5.8), read only while their dialog is open. */
+export function useSnapshots(enabled: boolean) {
+  return useQuery({ queryKey: ["config", "snapshots"], queryFn: api.getSnapshots, enabled });
+}
+
+export function useSnapshotMutations() {
+  const queryClient = useQueryClient();
+  const invalidateAll = useInvalidateAll();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["config", "snapshots"] });
+  return {
+    save: useMutation({ mutationFn: api.saveSnapshot, onSuccess: refresh }),
+    remove: useMutation({ mutationFn: api.deleteSnapshot, onSuccess: refresh }),
+    preview: useMutation({ mutationFn: api.previewSnapshot }),
+    // A restore replaces configuration everywhere, and adds a safety snapshot.
+    restore: useMutation({
+      mutationFn: api.restoreSnapshot,
+      onSuccess: () => {
+        invalidateAll();
+        void refresh();
+      },
+    }),
+  };
+}
+
+/** The configuration history (roadmap 5.7), read only while its dialog is open. */
+export function useConfigHistory(enabled: boolean) {
+  return useQuery({ queryKey: ["config", "history"], queryFn: api.getConfigHistory, enabled });
+}
+
+export function useRevertHistoryEntry() {
+  const invalidate = useInvalidateAll();
+  return useMutation({ mutationFn: api.revertHistoryEntry, onSuccess: invalidate });
+}
+
 /**
  * A whole database put back from a file (roadmap 4.4). Invalidates everything a
  * write does, because everything a write touches has just been replaced.

@@ -7,12 +7,16 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { SettingRow } from "@/components/SettingRow.tsx";
 import { SettingsSection } from "@/components/SettingsSection.tsx";
+import { ChangesDialog } from "@/components/settings/ChangesDialog.tsx";
+import { HistoryDialog } from "@/components/settings/HistoryDialog.tsx";
+import { SnapshotsDialog } from "@/components/settings/SnapshotsDialog.tsx";
 import { CatalogUpdatesRow } from "@/components/settings/CatalogUpdatesRow.tsx";
 import { NumberSetting } from "@/components/settings/NumberSetting.tsx";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
 import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import {
   useConfigImport,
+  useConfigImportPreview,
   useRestoreBackup,
   useSettingsMutation,
   useStorageMaintenance,
@@ -46,6 +50,18 @@ export function DataSection({
   // Apart from the file, so the dialog keeps its text while it animates out.
   const [restoreOpen, setRestoreOpen] = useState(false);
   const configImport = useConfigImport();
+  // Roadmap 5.9: a picked file is read into a diff first, and applied only on
+  // the operator's say-so.
+  const importPreview = useConfigImportPreview();
+  const [pendingImport, setPendingImport] = useState<File | undefined>(undefined);
+  const [importOpen, setImportOpen] = useState(false);
+  const reviewImport = async (file: File): Promise<void> => {
+    toast("data", undefined);
+    importPreview.reset();
+    setPendingImport(file);
+    setImportOpen(true);
+    importPreview.mutate(await file.text());
+  };
   const fieldProps = useFieldProps();
   const toast = useSettingsToastReport();
   const [retentionDays_, setRetentionDays] = useState<number | undefined>(
@@ -318,12 +334,45 @@ export function DataSection({
           className="h-8 w-56 cursor-pointer py-1 text-xs"
           onChange={(event) => {
             const file = event.target.files?.[0];
-            if (file !== undefined) void runImport(file);
+            if (file !== undefined) void reviewImport(file);
             // Cleared so picking the same file twice fires twice: a retry
             // after fixing the file is the common second pick.
             event.target.value = "";
           }}
         />
+      </SettingRow>
+
+      <ChangesDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title={t("config.import.preview.title", { file: pendingImport?.name ?? "" })}
+        description={t("config.import.preview.description")}
+        diff={importPreview.data}
+        error={importPreview.isError ? (importPreview.error instanceof Error ? importPreview.error.message : String(importPreview.error)) : undefined}
+        confirmLabel={t("config.import.preview.confirm")}
+        busy={configImport.isPending}
+        onConfirm={() => {
+          if (pendingImport !== undefined) void runImport(pendingImport);
+          setImportOpen(false);
+        }}
+      />
+
+      {/* Roadmap 5.8 and 5.7. Beside the file export because they answer the
+      same worry — "can I get back to what I had" — one with a name the
+      operator chose, the other with whatever the last write replaced. */}
+      <SettingRow
+        label={t("config.snapshots.label")}
+        description={t("config.snapshots.hint")}
+        align="top"
+      >
+        <SnapshotsDialog />
+      </SettingRow>
+      <SettingRow
+        label={t("config.history.label")}
+        description={t("config.history.hint")}
+        align="top"
+      >
+        <HistoryDialog />
       </SettingRow>
 
       {/* Roadmap 4.4. The row above carries the configuration; this one

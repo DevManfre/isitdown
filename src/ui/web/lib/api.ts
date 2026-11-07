@@ -7,7 +7,10 @@ import type {
   CatalogProvider,
   ComponentHistoryResponse,
   ComponentPreview,
+  ConfigDiff,
   ConfigImportReport,
+  ConfigSnapshot,
+  HistoryEntry,
   DbRestoreReport,
   IncidentNote,
   DbMaintenanceReport,
@@ -364,6 +367,28 @@ export const previewComponents = (body: unknown) =>
  */
 export const importConfig = (yaml: string) =>
   request<ConfigImportReport>("POST", "/config/import", yaml, "text/yaml");
+/** What importing the file would change, without importing it (roadmap 5.9). */
+export const previewConfigImport = (yaml: string) =>
+  request<ConfigDiff>("POST", "/config/import/preview", yaml, "text/yaml");
+/** Named configuration snapshots (roadmap 5.8). */
+export const getSnapshots = () =>
+  request<{ snapshots: ConfigSnapshot[] }>("GET", "/config/snapshots");
+export const saveSnapshot = (name: string) =>
+  request<ConfigSnapshot>("POST", "/config/snapshots", { name });
+export const previewSnapshot = (id: number) =>
+  request<ConfigDiff>("GET", `/config/snapshots/${id}/preview`);
+export const restoreSnapshot = (id: number) =>
+  request<{ report: ConfigImportReport; safety: ConfigSnapshot }>(
+    "POST",
+    `/config/snapshots/${id}/restore`,
+  );
+export const deleteSnapshot = (id: number) =>
+  request<undefined>("DELETE", `/config/snapshots/${id}`);
+/** The configuration history and its one-value restore (roadmap 5.7). */
+export const getConfigHistory = () =>
+  request<{ entries: HistoryEntry[] }>("GET", "/config/history?limit=200");
+export const revertHistoryEntry = (id: number) =>
+  request<{ reverted: HistoryEntry }>("POST", `/config/history/${id}/revert`);
 /**
  * Puts a whole database back (roadmap 4.4). The file's own bytes, as
  * `application/octet-stream` — the validation that matters is the server's, and
@@ -457,6 +482,12 @@ export const probeAdapter = (id: string) =>
     "POST",
     `/debug/adapters/${encodeURIComponent(id)}/probe`,
   );
+/**
+ * One read of a provider that is not saved yet, from the form's own values
+ * (roadmap 5.10). Records nothing and notifies nothing.
+ */
+export const previewRead = (body: unknown) =>
+  request<AdapterProbeResult>("POST", "/config/services/preview-read", body);
 /** Every edit, add, delete and reorder saves the whole ordered list — see RoutingRules.tsx. */
 export const putRouting = (rules: RoutingRule[]) =>
   request<RoutingResponse>("PUT", "/config/routing", { rules });

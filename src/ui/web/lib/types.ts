@@ -884,6 +884,51 @@ export interface ConfigImportReport {
   settings: string[];
 }
 
+/** One value an import or a restore would move — roadmap 5.9. */
+export interface ConfigChange {
+  path: string;
+  from: unknown;
+  to: unknown;
+}
+
+/** What importing a file, or restoring a snapshot, would change — roadmap 5.9. */
+export interface ConfigDiff {
+  services: {
+    added: string[];
+    removed: string[];
+    changed: { id: string; changes: ConfigChange[] }[];
+  };
+  settings: ConfigChange[];
+  channels: { id: string; changes: ConfigChange[] }[];
+  routing: { from: number; to: number } | null;
+  recipients: { from: number; to: number } | null;
+  empty: boolean;
+}
+
+/** A named configuration snapshot — roadmap 5.8. */
+export interface ConfigSnapshot {
+  id: number;
+  name: string;
+  createdAt: string;
+  services: number;
+}
+
+/** One value a configuration write moved — roadmap 5.7. */
+export interface HistoryEntry {
+  id: number;
+  at: string;
+  actor: string;
+  method: string;
+  route: string;
+  kind: "service" | "setting" | "channel" | "routing" | "recipients" | "credential";
+  target: string;
+  /** `*` for a provider added or removed as a whole. */
+  field: string;
+  before: unknown;
+  after: unknown;
+  revertible: boolean;
+}
+
 /** What `POST /config/restore` reports it put back (roadmap 4.4). */
 export interface DbRestoreReport {
   /** Rows written per table, so the operator sees what actually came back. */

@@ -711,6 +711,58 @@ test("preview-components reports an unreachable provider as 502", async () => {
   }
 });
 
+test("preview-read reads an unsaved provider and reports the parsed reading", async () => {
+  const provider = await fakeComponentsProvider();
+  const app = await api();
+  try {
+    const before = app.runtime.listAllServices().length;
+    const { status, body } = await app.request("POST", "/config/services/preview-read", {
+      adapter: "statuspage",
+      baseUrl: provider.baseUrl,
+    });
+    assert.equal(status, 200, JSON.stringify(body));
+    const result = body as { ok: boolean; durationMs: number; status: { overallStatus: string; components: unknown[] } };
+    assert.equal(result.ok, true, JSON.stringify(body));
+    assert.equal(typeof result.durationMs, "number");
+    assert.equal(typeof result.status.overallStatus, "string", "the whole reading comes back, not just a verdict");
+    assert.equal(result.status.components.length, 0, "no components selected, none read");
+
+    const scoped = await app.request("POST", "/config/services/preview-read", {
+      adapter: "statuspage",
+      baseUrl: provider.baseUrl,
+      components: [{ id: "cmp1", name: "API" }],
+      scopeToComponents: false,
+    });
+    assert.ok(
+      (scoped.body as { status: { components: unknown[] } }).status.components.length > 0,
+      "the form's own selection is what is read",
+    );
+    assert.equal(app.runtime.listAllServices().length, before, "a preview adds nothing");
+  } finally {
+    await app.close();
+    await provider.close();
+  }
+});
+
+test("preview-read answers an unreadable provider with ok: false, and refuses a bad form with 400", async () => {
+  const app = await api();
+  try {
+    const down = await app.request("POST", "/config/services/preview-read", {
+      adapter: "statuspage",
+      baseUrl: "http://127.0.0.1:1",
+    });
+    assert.equal(down.status, 200);
+    const result = down.body as { ok: boolean; error: string };
+    assert.equal(result.ok, false);
+    assert.ok(result.error.length > 0);
+
+    assert.equal((await app.request("POST", "/config/services/preview-read", { adapter: "nope", baseUrl: "https://x.test" })).status, 400);
+    assert.equal((await app.request("POST", "/config/services/preview-read", { adapter: "statuspage" })).status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
 test("lowering the interval leaves the armed countdown alone rather than pushing it into the past", async () => {
   const app = await api();
   try {

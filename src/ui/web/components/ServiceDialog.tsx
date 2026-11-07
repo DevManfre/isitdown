@@ -53,11 +53,12 @@ import { ServiceIdentity } from "@/components/service-dialog/ServiceIdentity.tsx
 import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
 import { useCatalog, useConfig, useServiceMutations } from "@/hooks/queries.ts";
 import { useBusyControls, useFieldProps } from "@/hooks/useBusy.tsx";
-import { detectAdapter, previewComponents } from "@/lib/api.ts";
+import { detectAdapter, previewComponents, previewRead } from "@/lib/api.ts";
+import { ProbeResultView } from "@/components/settings/AdapterDebugDialog.tsx";
 import { DependsOnField } from "@/components/DependsOnField.tsx";
 import { ConfirmDialog } from "@/components/ConfirmDialog.tsx";
 import { slugify } from "@/lib/slugify.ts";
-import type { CatalogProvider, ServiceDefinition } from "@/lib/types.ts";
+import type { AdapterProbeResult, CatalogProvider, ServiceDefinition } from "@/lib/types.ts";
 
 /** The stored interval as a form value; empty when the provider follows the global cadence. */
 const intervalValue = (service: ServiceDefinition | undefined): string =>
@@ -209,6 +210,9 @@ export function ServiceDialog({
     { supported: boolean; components: ComponentPickerEntry[] } | undefined
   >(undefined);
   const [previewLoading, setPreviewLoading] = useState(false);
+  // Roadmap 5.10: what the form's own values would read right now.
+  const [reading, setReading] = useState(false);
+  const [reads, setReads] = useState<AdapterProbeResult | undefined>(undefined);
   const [detecting, setDetecting] = useState(false);
   const [message, setMessage] = useState<
     { text: string; tone: "error" | "info" } | undefined
@@ -329,6 +333,7 @@ export function ServiceDialog({
   // now), so a fresh open needs its own reset — otherwise a cancelled edit's
   // half-typed field would still be sitting there next time.
   const resetForm = (): void => {
+    setReads(undefined);
     const cloning = mode === "clone" && service !== undefined;
     // A clone opens on the second step: where its status comes from is the
     // one thing it already knows.
@@ -388,6 +393,33 @@ export function ServiceDialog({
   const requestClose = (): void => {
     if (formState !== pristine && !saving) setConfirmDiscard(true);
     else close();
+  };
+
+  /**
+   * "Here is what I would read right now", before saving: the same single read
+   * as the provider's Diagnose panel, run on the form's current values, so a
+   * wrong selector or base URL shows here and not at the first cycle.
+   */
+  const readNow = async (): Promise<void> => {
+    setReading(true);
+    setReads(undefined);
+    try {
+      setReads(
+        await previewRead({
+          adapter: activeAdapter,
+          baseUrl: baseUrl.trim(),
+          components: selection,
+          scopeToComponents,
+          ...savedOptions(),
+        }),
+      );
+    } catch (error) {
+      // A refused form (400) is not a read outcome: say it where the rest of
+      // this dialog says its failures.
+      setMessage({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+    } finally {
+      setReading(false);
+    }
   };
 
   const loadPreview = async (): Promise<void> => {
@@ -1101,6 +1133,14 @@ export function ServiceDialog({
             onConfirm={close}
           />
 
+          {/* Above the footer, where the operator is already looking after
+              pressing the button; cleared on the next read. */}
+          {reads !== undefined && !onSource && (
+            <div className="px-1 pt-3" aria-live="polite">
+              <ProbeResultView result={reads} />
+            </div>
+          )}
+
           <DialogFooter className="sm:justify-between">
             <div className="flex items-center gap-2">
               {mode === "edit" && (
@@ -1112,6 +1152,17 @@ export function ServiceDialog({
                   onClick={() => void runConnectionTest()}
                 >
                   {t("action.test-connection")}
+                </Button>
+              )}
+              {!onSource && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={reading || baseUrl.trim() === ""}
+                  onClick={() => void readNow()}
+                >
+                  {t(reading ? "adapter.debug.probing" : "adapter.debug.probe")}
                 </Button>
               )}
               {adding && (

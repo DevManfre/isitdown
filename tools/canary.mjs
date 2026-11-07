@@ -181,7 +181,11 @@ export function loadFixtures(root, adapter) {
  * @returns {CanaryResult}
  */
 export function judge(entry, { captured, error, fixtures }) {
-  const failedHttp = captured.find((response) => response.status < 200 || response.status >= 300);
+  // A 3xx is a hop the adapter followed, not an answer: judge the page by where
+  // the redirect landed, or a provider that merely moved domain reads as down.
+  const failedHttp = captured.find(
+    (response) => (response.status < 200 || response.status >= 300) && !(response.status >= 300 && response.status < 400),
+  );
   if (failedHttp !== undefined || (error !== undefined && captured.length === 0)) {
     const detail =
       failedHttp !== undefined
