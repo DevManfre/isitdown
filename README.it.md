@@ -39,7 +39,7 @@ Il manuale, un file per sezione:
 - [5. Verificare un deployment](docs/verifying.it.md) — controlli rapidi, la dashboard, una notifica end-to-end, risoluzione dei problemi
 - [6. API HTTP](docs/api.it.md) — ogni route, le metriche, gli aggiornamenti live, i badge
 - [7. Come funziona](docs/how-it-works.it.md) — flusso dei dati, componenti, quando scatta una notifica, resilienza, consenso degli outpost
-- [8. Tema e localizzazione](docs/theming.it.md) — temi, `en`/`it`, accessibilità
+- [8. Tema e localizzazione](docs/theming.it.md) — temi, le sei lingue della dashboard, accessibilità
 - [9. Sviluppo](docs/development.it.md) — struttura, stack tecnico, sviluppo live, test, rilasci
 - [10. Client da terminale](docs/cli.it.md) — `isitdown watch`, una vista di sola lettura della flotta per il terminale, `isitdown discover`, una prima flotta letta dai file di un progetto, e `isitdown import`, una flotta portata da Uptime Kuma, Gatus, Statping o StatusGator
 
@@ -92,6 +92,27 @@ Anthropic       operational    ████████████████�
 
 Entrambe le edizioni eseguono lo stesso core. Differiscono solo per ciò che viene
 iniettato: da dove arriva la configurazione e dove viene tenuto lo stato.
+
+### La dashboard
+
+La dashboard dell'edizione UI è una single-page app React servita dallo stesso
+processo dell'API, su `http://localhost:3000`. Le sue viste, tutte raggiungibili
+dalla rail, dalla command palette (`⌘K` / `Ctrl+K`) e dalle scorciatoie da tastiera:
+
+| Vista | A cosa risponde |
+|---|---|
+| **Overview** | Qualcosa è giù adesso? Un titolo calmo, la lista dei provider e una griglia componibile di widget che puoi disporre e salvare come dashboard con nome. |
+| **Providers** · **Components** | La flotta, una riga per provider, e la stessa flotta vista componente per componente; ogni provider ha una pagina propria con uptime, calendario annuale, latenza, incidenti, una mappa e il suo runbook. |
+| **Incidents** | Ogni incidente come lista sotto una timeline Gantt, ciascuno con la propria pagina. |
+| **History** | Uptime su 7, 30 o 90 giorni, in al massimo cinque tab: trend, affidabilità, pattern, confronto e latenza. |
+| **Delivery log** | Cosa è stato inviato, a quale canale, e cosa diceva o perché è fallito. |
+| **Settings** | Provider, canali, instradamento, politica di consegna, aspetto e dati, applicati al ciclo successivo senza restart. |
+| **Wallboard** | Una vista a schermo intero, senza cornice, per uno schermo libero, con un QR code verso il provider nei guai peggiori. |
+
+È chiara, scura o di sistema, con varianti ad alto contrasto, per daltonici e OLED,
+e tradotta in sei lingue. Ogni route che ci sta dietro è documentata nell'
+[API HTTP](docs/api.it.md); il percorso guidato è in
+[Verificare un deployment](docs/verifying.it.md).
 
 ---
 
@@ -173,8 +194,8 @@ Consegnato:
   `design/claude-design-prototypes/`. L'opzione `3a`, la console navigabile, è il
   riferimento per l'implementazione; la palette scura e le etichette italiane più
   lunghe sono state validate lì invece di essere scoperte dopo.
-- **v1.2 — edizione UI**: quel design come dashboard Express + moduli ES vanilla su
-  SQLite, con la configurazione gestita a runtime e applicata al ciclo successivo senza
+- **v1.2 — edizione UI**: quel design come dashboard Express (scritta all'inizio come moduli ES
+  semplici, poi sostituita da quella React qui sotto) su SQLite, con la configurazione gestita a runtime e applicata al ciclo successivo senza
   restart. `ghcr.io/devmanfre/isitdown:ui-latest`, costruita `FROM` l'immagine Light.
 - **v1.3 — cronologia**: uptime e cronologia incidenti per provider con le barre
   giornaliere in stile status page e le viste 7/30/90 giorni, aggregate lato server e
@@ -182,8 +203,12 @@ Consegnato:
 - **v1.4 — tema scuro e i18n**: tema chiaro/scuro/sistema basato su token con
   preferenza persistita, e dashboard localizzata (`en`, `it`) sopra i messaggi di
   notifica localizzati che entrambe le edizioni già condividevano.
+- **v1.5 — la dashboard React**: la dashboard vanilla portata su React 19, Vite,
+  Tailwind v4 e shadcn/ui, compilata in `dist/ui/public` e servita dallo stesso server
+  Express; il client legge gli aggregati del server tramite TanStack Query e non
+  ricalcola mai una percentuale.
 
-Dopo la v1.4 (su `dev`): adapter per AWS, Google Cloud e Azure, richieste
+Dopo la v1.5 (su `dev`): adapter per AWS, Google Cloud e Azure, richieste
 condizionali così che la maggior parte dei cicli sia un `304`, una cadenza di
 polling per provider, la vista del log invii, una rimozione di provider
 annullabile entro una finestra di ripristino, ntfy e Gotify accanto agli altri
@@ -213,6 +238,17 @@ Grafana committata, poi:
   che silenziano e vengono disegnate come quelle del provider; modifica in blocco
   di cadenza, gruppo, tag, silenziamento e interrogazione su una selezione; e
   Duplica su ogni provider ([3.25–3.29](docs/configuration.it.md#325-runbook--cosa-fare-se-è-giù)).
+- **Redesign calmo**: un compito per vista — una Overview che risponde a «c'è
+  qualcosa di giù?» e ripiega il resto, una sola lista di provider invece di due,
+  History divisa in cinque tab, Settings elencato per categoria, un'intestazione su
+  una riga, spaziature e movimento su token di design, e gli effetti decorativi
+  ritirati. Nulla è stato eliminato; le funzioni secondarie sono passate dietro tab,
+  disclosure e menu.
+- **Rete di sicurezza della configurazione**: ogni scrittura di configurazione
+  registrata in una cronologia da cui ripristinare un valore, snapshot con nome
+  dell'intera configurazione, un'anteprima in diff prima di applicare l'import di un
+  `config.yml`, e un provider letto da un form non salvato prima di salvarlo
+  ([6. API HTTP](docs/api.it.md#6-api-http)).
 - **Hardening**: la dashboard ascolta di default solo sul loopback, rifiuta
   scritture cross-origin e con host rebound, limita le dimensioni delle risposte e
   rifiuta i target link-local.

@@ -26,6 +26,8 @@ import {
   writeSettings,
 } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
+import { auditWrites } from "../configAudit.ts";
+import { configHistoryRoutes } from "./config.history.routes.ts";
 import { configImportExportRoutes } from "./config.importexport.routes.ts";
 import { configPushRoutes } from "./config.push.routes.ts";
 import { configStorageRoutes } from "./config.storage.routes.ts";
@@ -151,6 +153,14 @@ function deliveryPatch(
 export function configRoutes(runtime: UiRuntimeCore): Router {
   const router = Router();
   const db = runtime.db;
+
+  // Roadmap 5.7: before any route below, so every write is read before and
+  // after and what it moved is recorded.
+  router.use(
+    "/config",
+    auditWrites({ db, logger: runtime.logger, actorHeader: runtime.env["AUDIT_ACTOR_HEADER"] }),
+  );
+  configHistoryRoutes(runtime, router);
 
   router.get("/config", (_req, res) => {
     const settings = readSettings(db, runtime.logger);

@@ -1845,6 +1845,22 @@ describe("backup and migration", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (target: string, init?: RequestInit) => {
+        // Roadmap 5.9: the file is read into a diff first.
+        if (String(target) === "/config/import/preview") {
+          return {
+            ok: true,
+            status: 200,
+            text: async () =>
+              JSON.stringify({
+                services: { added: ["vercel"], removed: [], changed: [] },
+                settings: [],
+                channels: [],
+                routing: null,
+                recipients: null,
+                empty: false,
+              }),
+          };
+        }
         if (String(target) === "/config/import") {
           sent.push({
             body: String(init?.body),
@@ -1871,6 +1887,13 @@ describe("backup and migration", () => {
     const yaml = "services:\n  - id: vercel\n    name: Vercel\n";
     await userEvent.upload(input, new File([yaml], "config.yml", { type: "text/yaml" }));
 
+    // Nothing is applied until the operator has read the diff and said yes.
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByTestId("config-diff")).toBeInTheDocument();
+    expect(within(dialog).getByText("vercel")).toBeInTheDocument();
+    expect(sent).toHaveLength(0);
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("config.import.preview.confirm") }));
+
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]?.body).toBe(yaml);
     expect(sent[0]?.contentType).toBe("text/yaml");
@@ -1887,7 +1910,7 @@ describe("backup and migration", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (target: string, init?: RequestInit) => {
-        if (String(target) === "/config/import") {
+        if (String(target) === "/config/import/preview") {
           return {
             ok: false,
             status: 400,

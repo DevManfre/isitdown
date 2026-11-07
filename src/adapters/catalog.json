@@ -266,12 +266,6 @@
       "baseUrl": "https://status.airtable.com"
     },
     {
-      "id": "amplitude",
-      "name": "Amplitude",
-      "adapter": "statuspage",
-      "baseUrl": "https://status.amplitude.com"
-    },
-    {
       "id": "asana",
       "name": "Asana",
       "adapter": "statuspage",
