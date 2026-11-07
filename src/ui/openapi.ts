@@ -1169,6 +1169,17 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }) },
     },
   },
+  "/debug/adapters/{id}/explain": {
+    get: {
+      tags: ["Diagnostics"],
+      summary:
+        "Why that provider shows the status it shows: last reading, components, rule, what you were last told, flap damping.",
+      description:
+        "Read off the state the poller already keeps (roadmap 5.11). It never polls.",
+      parameters: [path("id", "Service id.")],
+      responses: { "200": ok({ type: "object" }), "404": notFound },
+    },
+  },
   "/debug/adapters/{id}/probe": {
     post: {
       tags: ["Diagnostics"],

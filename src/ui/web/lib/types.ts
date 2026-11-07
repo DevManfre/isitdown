@@ -870,6 +870,22 @@ export interface AdapterDebugProvider {
   probes: AdapterProbe[];
 }
 
+/**
+ * Why a provider shows the status it shows — roadmap 5.11. Read off the state the
+ * poller already keeps, never a fresh poll: `reading` is null for a provider
+ * nothing has read yet, and `told` is what the operator was last told, which
+ * differs from the reading while flap damping holds a change back.
+ */
+export interface ProviderExplanation {
+  id: string;
+  reading: { fetchedAt: string; overallStatus: OverallStatus; activeIncidents: number } | null;
+  components: { id: string; name: string; status: OverallStatus }[];
+  /** `scoped`: folded from the selected components; `overall`: the provider's own figure. */
+  rule: "scoped" | "overall";
+  told: OverallStatus | null;
+  damping: { confirmSamples: number; count: number; held: boolean };
+}
+
 export interface AdapterDebugResponse {
   providers: AdapterDebugProvider[];
 }

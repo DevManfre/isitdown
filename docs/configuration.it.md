@@ -504,6 +504,18 @@ dentro la riga. I canali senza variabile d'ambiente impostata restano dietro
 un'unica riga "mostra quelli non configurati", a meno che il filtro non li
 stia cercando.
 
+**Diagnostica** si apre con **Perché questo stato** (roadmap 5.11): cinque passi
+nell'ordine in cui li fa il poller — cosa è stato letto per ultimo e quando, i
+componenti che portava (nominando quelli non operativi), la regola che li ha
+riuniti (il peggiore dei componenti selezionati se hai limitato il provider a una
+selezione, altrimenti il dato complessivo del provider), lo stato che ti è stato
+*comunicato* per ultimo, e il flap damping. Gli ultimi due rendono spiegabile una
+dashboard silenziosa: con `confirmSamples` sopra 1, un cambiamento che la pagina
+già mostra viene trattenuto finché non è stato letto altrettante volte di fila, e
+il pannello dice a che punto è ("2 campioni su 3 concordano") invece di lasciarlo
+da dedurre dalle letture recenti qui sotto. Si aggiorna mentre è aperto, quindi
+il conteggio sale a vista.
+
 **Settings → Dati** porta anche l'unico lavoro di manutenzione che un file
 SQLite richiede (roadmap 6.13): **Verifica e compatta** esegue `PRAGMA
 integrity_check` e poi `VACUUM`, e riporta i byte restituiti accanto a quanto

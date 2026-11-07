@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button.tsx";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog.tsx";
-import { useAdapterDebug, useAdapterProbe } from "@/hooks/queries.ts";
+import { useAdapterDebug, useAdapterProbe, useProviderExplanation } from "@/hooks/queries.ts";
 import { useBusyControls } from "@/hooks/useBusy.tsx";
 import { formatDateTime } from "@/lib/format.ts";
 import { statusLabelKey } from "@/lib/chartConfig.ts";
-import type { AdapterProbeResult, ServiceDefinition } from "@/lib/types.ts";
+import type { AdapterProbeResult, ProviderExplanation, ServiceDefinition } from "@/lib/types.ts";
 
 /**
  * Why a provider's page is not being read the way it should be — roadmap 5.18.
@@ -56,6 +56,7 @@ export function AdapterDebugDialog({
   // business on the polling interval.
   const { data } = useAdapterDebug(open);
   const probe = useAdapterProbe();
+  const { data: explanation } = useProviderExplanation(service.id, open);
 
   useEffect(() => {
     return () => {
@@ -105,6 +106,8 @@ export function AdapterDebugDialog({
                 : options.map(([key, value]) => `${key}=${value}`).join(" · ")}
             </span>
           </div>
+
+          {explanation !== undefined && <ExplanationChain explanation={explanation} />}
 
           <div className="flex flex-col gap-2">
             <span className="text-sm text-muted-foreground">
@@ -166,6 +169,72 @@ export function AdapterDebugDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Why the provider shows the status it shows — roadmap 5.11. Five steps in the
+ * order the poller takes them: what was read, the components it carried, the
+ * rule that folded them, what the operator was last told, and whether flap
+ * damping is holding something back. Until this existed the chain had to be
+ * deduced from the recent reads, the components list and the settings page.
+ *
+ * An ordered list, because the order is the explanation; and every status is a
+ * word, never a colour alone.
+ */
+function ExplanationChain({ explanation }: { explanation: ProviderExplanation }) {
+  const { t, i18n } = useTranslation();
+  const { reading, components, rule, told, damping } = explanation;
+  const status = (value: ProviderExplanation["told"]): string => (value === null ? "" : t(statusLabelKey(value)));
+  const notOperational = components.filter((component) => component.status !== "operational");
+
+  const steps: [string, string][] = [
+    [
+      "reading",
+      reading === null
+      ? t("adapter.explain.reading-none")
+      : t("adapter.explain.reading", {
+          count: reading.activeIncidents,
+          status: status(reading.overallStatus),
+          when: formatDateTime(i18n.language, reading.fetchedAt),
+        }),
+    ],
+    [
+      "components",
+      components.length === 0
+      ? t("adapter.explain.components-none")
+      : notOperational.length === 0
+        ? t("adapter.explain.components-ok", { count: components.length })
+        : t("adapter.explain.components-bad", {
+            count: notOperational.length,
+            total: components.length,
+            list: notOperational.map((component) => `${component.name} (${status(component.status)})`).join(", "),
+          }),
+    ],
+    ["rule", t(rule === "scoped" ? "adapter.explain.rule-scoped" : "adapter.explain.rule-overall")],
+    ["told", told === null ? t("adapter.explain.told-none") : t("adapter.explain.told", { status: status(told) })],
+    [
+      "damping",
+      damping.confirmSamples <= 1
+      ? t("adapter.explain.damping-off")
+      : damping.held
+        ? t("adapter.explain.damping-held", { count: damping.count, required: damping.confirmSamples })
+        : t("adapter.explain.damping-idle", { required: damping.confirmSamples }),
+    ],
+  ];
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-sm text-muted-foreground">{t("adapter.explain.title")}</span>
+      <ol
+        aria-label={t("adapter.explain.title")}
+        className="flex list-decimal flex-col gap-1.5 pl-5 text-sm marker:text-muted-foreground"
+      >
+        {steps.map(([key, text]) => (
+          <li key={key}>{text}</li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
