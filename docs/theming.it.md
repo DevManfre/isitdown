@@ -70,16 +70,12 @@ varianti scelte in **Impostazioni → Aspetto** (roadmap 4.18): **alto contrasto
   stesse rampe tonali dall'altro capo — nessun colore è stato inventato, comprese le
   cinque tinte di severità, che hanno un valore proprio per tema.
 
-- **Chrome illuminata** (roadmap 7.6). Ogni vista si apre su una fascia illuminata
-  e non solo velata: il bagliore dell'accento che la palette ha sempre avuto, una
-  griglia di punti sotto, un fascio lungo il bordo superiore e — solo mentre
-  qualcosa è davvero giù — un secondo bagliore nel colore della severità e un
-  fascio che percorre il bordo della card. Le tile dei provider si illuminano
-  sotto il puntatore invece di limitarsi a sollevarsi. È tutto token
-  (`--gradient-primary`, `--gradient-hero-live`, `--shadow-glow`) più tre regole
-  CSS in `motion.css`; il fascio è un'animazione CSS su `offset-path`, non un
-  componente motion, ed è questo che lo tiene fuori dal budget del bundle.
-  `prefers-reduced-motion` ferma il fascio e il misuratore di poll nell'header.
+- **Chrome illuminata** (roadmap 7.6), ridimensionata dal redesign calmo: niente
+  si anima più in modo ambientale, quindi la griglia di punti e il fascio che
+  percorre il bordo non ci sono più. Restano i token (`--gradient-primary`,
+  `--gradient-hero-live`, `--shadow-glow`) — la fascia della pagina dell'incidente
+  prende il bagliore di severità finché l'incidente è aperto — e le tile dei
+  provider il cui bordo risponde al puntatore (`.tile-lit` in `motion.css`).
 
 ### 8.2 Localizzazione
 
@@ -256,8 +252,7 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   sola casella di ricerca sopra la console (roadmap 5.4): ogni vista che elenca
   la rail, ogni provider abilitato — cercabile con il nome a schermo o con l'id
   con cui è stato configurato — più **Poll now** e il tema. Un provider apre il
-  drawer della vista History, che è dove vive il dettaglio di un provider finché
-  la 5.6 non gli darà una pagina sua. È montata nella shell e non in una vista,
+  drawer della vista History (un provider ha anche una pagina sua, `#/providers/<id>`). È montata nella shell e non in una vista,
   così la scorciatoia risponde ovunque, e si apre con le sue viste e le sue
   azioni anche quando la lettura dello stato è fallita.
 - **Schermi stretti.** Due soglie, perché la fascia tablet non è un desktop
@@ -267,9 +262,10 @@ una tastiera, uno screen reader, un'impostazione di contrasto alto, o tutti e tr
   pagina scende da 32px a 16px; ogni dialog si ancora al bordo inferiore come
   foglio invece che al centro dello schermo; le voci dei menu sono alte 44px.
   **Sotto i 1024px** — quindi anche su tablet, dove il rail c'è di nuovo ma la
-  pagina non è ancora larga — l'header tiene solo titolo, countdown del poll e
-  due pulsanti a icona, mentre campo di ricerca, coppia delle lingue, tema,
-  Impostazioni e log invii stanno dietro **Altro**; l'hero è a una colonna
+  pagina non è ancora larga — l'header tiene una riga sola: titolo, pulsante
+  a icona della ricerca e controllo del poll, e il pulsante del tema non c'è (il
+  tema si sceglie in Settings → Appearance, e su telefono anche nel foglio
+  **Altro**, che contiene Impostazioni, log invii e ricerca); l'hero è a una colonna
   invece che testo accanto all'anello di uptime; le righe della flotta, la
   lista della cronologia e le righe degli invii restano una carta o una riga
   impilata invece delle colonne condivise del desktop. Erano quelle colonne a

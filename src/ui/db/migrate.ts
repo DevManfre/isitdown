@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 36;
+export const SCHEMA_VERSION = 38;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -832,6 +832,41 @@ function upgrade(db: DatabaseSync, from: number): void {
     for (const column of ["runbook", "tags", "mute_schedules", "maintenance_windows"]) {
       if (!serviceColumns.includes(column)) db.exec(`ALTER TABLE services ADD COLUMN ${column} TEXT`);
     }
+  }
+
+  if (from < 37) {
+    // Named configuration snapshots — roadmap 5.8. The `config.yml` export as
+    // text, kept under a name the operator chose; credentials are `${VAR}`
+    // references in it, so nothing secret is stored.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS config_snapshots (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT NOT NULL UNIQUE,
+        yaml       TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
+  }
+
+  if (from < 38) {
+    // Configuration history — roadmap 5.7. One row per value a write moved:
+    // when, who (a configurable header, `local` by default), what it was and
+    // what it became. Credentials appear as events only, never as values.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS config_audit (
+        id     INTEGER PRIMARY KEY AUTOINCREMENT,
+        at     TEXT NOT NULL,
+        actor  TEXT NOT NULL,
+        method TEXT NOT NULL,
+        route  TEXT NOT NULL,
+        kind   TEXT NOT NULL,
+        target TEXT NOT NULL,
+        field  TEXT NOT NULL,
+        before TEXT,
+        after  TEXT
+      );
+      CREATE INDEX IF NOT EXISTS config_audit_at ON config_audit (at DESC, id DESC);
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

@@ -64,15 +64,12 @@ contrast**, **colour-blind safe** and **OLED black**.
   same tonal ramps from the other end — no colour was invented, including the five
   severity colours, which have their own value per theme.
 
-- **Lit chrome** (roadmap 7.6). Every view opens on a band that is lit rather than
-  washed: the accent bloom the palette always carried, a dot grid under it, a beam
-  along the top edge, and — only while something is actually down — a second bloom
-  in the severity colour and a beam travelling the card's border. Provider tiles
-  light under the pointer instead of only lifting. All of it is tokens
-  (`--gradient-primary`, `--gradient-hero-live`, `--shadow-glow`) plus three CSS
-  rules in `motion.css`; the beam is a CSS `offset-path` animation, not a motion
-  component, which is what keeps it off the bundle budget. `prefers-reduced-motion`
-  stops the beam and the header's poll meter dead.
+- **Lit chrome** (roadmap 7.6), pared back by the calm redesign: nothing animates
+  ambiently any more, so the dot grid and the travelling beam are gone. What is
+  left is tokens (`--gradient-primary`, `--gradient-hero-live`, `--shadow-glow`) —
+  the incident page's band takes the severity bloom while the incident is open —
+  and provider tiles whose border answers the pointer (`.tile-lit` in
+  `motion.css`).
 
 ### 8.2 Localisation
 
@@ -237,8 +234,7 @@ What is guaranteed, and checked:
   keystroke — opens one search box over the console (roadmap 5.4): every view the rail lists, every enabled
   provider — searchable by the name on screen or the id it was configured with
   — plus **Poll now** and the theme. A provider opens the History view's
-  drawer, which is where a provider's detail lives until 5.6 gives it a page of
-  its own. It is mounted in the shell rather than in a view, so the keystroke
+  drawer (a provider also has a page of its own, `#/providers/<id>`). It is mounted in the shell rather than in a view, so the keystroke
   answers everywhere, and it opens with its views and actions even when the
   status read has failed.
 - **Narrow screens.** Two thresholds, because the tablet range is not a small
@@ -248,9 +244,10 @@ What is guaranteed, and checked:
   every dialog anchors to the bottom edge as a sheet instead of the middle of
   the screen; and menu items are 44px tall. **Below 1024px** — so on a tablet
   too, where the rail is back but the page is not yet wide — the header keeps
-  only the title, the poll countdown and two icon buttons, with the search
-  field, the language pair, the theme toggle, Settings and the delivery log
-  behind **More**; the hero is one column rather than copy beside the uptime
+  one line: the title, a search icon button and the poll control, and the
+  theme toggle is not shown (the theme is picked in Settings → Appearance, and
+  on a phone also in the **More** sheet, which holds Settings, the delivery log
+  and search); the hero is one column rather than copy beside the uptime
   arc; and the fleet rows, the history list and the delivery rows stay one card
   or one stacked row each instead of the desktop's shared columns. Those columns
   were what made a tablet drop text: five tracks in 464px left the headline

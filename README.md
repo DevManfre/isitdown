@@ -39,7 +39,7 @@ The manual, one file per section:
 - [5. Verifying a deployment](docs/verifying.md) — smoke checks, the dashboard, an end-to-end notification, troubleshooting
 - [6. HTTP API](docs/api.md) — every route, the metrics, live updates, badges
 - [7. How it works](docs/how-it-works.md) — data flow, components, when a notification fires, resilience, outpost consensus
-- [8. Theming and localisation](docs/theming.md) — themes, `en`/`it`, accessibility
+- [8. Theming and localisation](docs/theming.md) — themes, the six dashboard languages, accessibility
 - [9. Development](docs/development.md) — layout, tech stack, live development, tests, releases
 - [10. Terminal client](docs/cli.md) — `isitdown watch`, a read-only fleet view for a terminal, `isitdown discover`, a first fleet read from a project's own files, and `isitdown import`, a fleet carried over from Uptime Kuma, Gatus, Statping or StatusGator
 
@@ -92,6 +92,27 @@ Anthropic       operational    ████████████████�
 Both editions run the same core engine. They differ only in what gets injected
 into it: where configuration comes from, and where state is kept.
 
+### The dashboard
+
+The UI edition's dashboard is a React single-page app served from the same
+process as the API, at `http://localhost:3000`. Its views, all reachable from the
+rail, the command palette (`⌘K` / `Ctrl+K`) and the keyboard shortcuts:
+
+| View | What it answers |
+|---|---|
+| **Overview** | Is anything down right now? A calm headline, the provider list, and a composable grid of widgets you can arrange and save as named dashboards. |
+| **Providers** · **Components** | The fleet, one row per provider, and the same fleet seen component by component; each provider has its own page with uptime, a year heat calendar, latency, incidents, a map and its runbook. |
+| **Incidents** | Every incident as a list under a Gantt timeline, each with its own page. |
+| **History** | Uptime over 7, 30 or 90 days, in up to five tabs: trend, reliability, patterns, compare and latency. |
+| **Delivery log** | What was sent, to which channel, and what it said or why it failed. |
+| **Settings** | Providers, channels, routing, delivery policy, appearance and data, applied on the next cycle without a restart. |
+| **Wallboard** | A full-screen, chrome-less view for a spare display, with a QR code to the provider in the worst trouble. |
+
+It is light, dark or system, with high-contrast, colour-blind and OLED variants,
+and translated into six languages. Every route behind it is documented in
+[the HTTP API](docs/api.md); the walkthrough is in
+[Verifying a deployment](docs/verifying.md).
+
 ---
 
 ## 2. Quick start
@@ -109,7 +130,7 @@ docker compose --profile ui up -d
 ```
 
 Everything the UI edition needs is configured in the dashboard, credentials
-included: **Settings → a channel → Value → Salva** applies at once. Put them in a
+included: **Settings → a channel → Value → Save** applies at once. Put them in a
 `.env` next to the compose file instead if you would rather the container own
 them — it is optional, and read if present:
 
@@ -172,16 +193,20 @@ Delivered:
   `design/claude-design-prototypes/`. Option `3a`, the navigable console, is the
   implementation reference; the dark palette and the longer Italian label lengths were
   validated there rather than discovered later.
-- **v1.2 — UI edition**: that design as an Express + vanilla-ES-module dashboard over
-  SQLite, with configuration managed at runtime and applied on the next cycle without
+- **v1.2 — UI edition**: that design as an Express dashboard (first written as plain
+  ES modules, since replaced by the React one below) over SQLite, with configuration managed at runtime and applied on the next cycle without
   a restart. `ghcr.io/devmanfre/isitdown:ui-latest`, built `FROM` the Light image.
 - **v1.3 — history**: per-provider uptime and incident history with status-page daily
   bars and 7/30/90-day views, aggregated server-side and served from `/history`.
 - **v1.4 — dark mode and i18n**: token-based light/dark/system theming with a
   persisted preference, and a localised dashboard (`en`, `it`) on top of the localised
   notification messages both editions already share.
+- **v1.5 — the React dashboard**: the vanilla dashboard ported to React 19, Vite,
+  Tailwind v4 and shadcn/ui, bundled into `dist/ui/public` and served by the same
+  Express server; the client reads the server's aggregates through TanStack Query
+  and never re-derives a percentage.
 
-Since v1.4 (on `dev`): adapters for AWS, Google Cloud and Azure, conditional
+Since v1.5 (on `dev`): adapters for AWS, Google Cloud and Azure, conditional
 requests so most cycles are a `304`, a per-provider poll cadence, the delivery log
 view, a provider removal that can be undone inside a restore window, ntfy and
 Gotify alongside the other channels, a year heat calendar per provider,
@@ -207,6 +232,15 @@ committed Grafana dashboard, then:
   operator declares, silencing and drawn like a provider's own; bulk edit of
   cadence, group, tags, mute and polling across a selection; and Duplicate on
   any provider ([3.25–3.29](docs/configuration.md#325-runbooks--what-to-do-when-it-is-down)).
+- **Calm redesign**: one job per view — an Overview that answers "is anything
+  down?" and folds the rest away, one provider list instead of two, History split
+  into five tabs, Settings listed by category, a one-line header, spacing and motion
+  on design tokens, and the decorative effects retired. Nothing was deleted; the
+  secondary features moved behind tabs, disclosures and menus.
+- **Configuration safety net**: every configuration write recorded in a history you
+  can restore a value from, named snapshots of the whole configuration, a diff
+  preview before a `config.yml` import is applied, and a provider read from an
+  unsaved form before it is saved ([6. HTTP API](docs/api.md#6-http-api)).
 - **Hardening**: the dashboard binds to loopback by default, refuses cross-origin
   and rebound-host writes, caps response bodies and refuses link-local targets.
 - **Catalogue and tooling**: a provider catalogue of 205 entries, the `isitdown
