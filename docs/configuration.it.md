@@ -3064,3 +3064,48 @@ Cosa cambia una stella, e nient'altro:
 
 Una stella non cambia il polling, l'instradamento né cosa viene notificato: un
 alert per un provider con la stella va esattamente dove andava prima.
+
+### 3.31 Perché ho ricevuto questo avviso?
+
+**Log invii → espandi una riga → Perché l'ho ricevuto?** (roadmap 5.12) risponde
+alla domanda a cui la prova a secco dell'instradamento non può rispondere. La
+prova a secco dice cosa *succederebbe* a un cambiamento; questa dice cosa è
+*successo*. Prende le letture salvate del provider e le rifà passare dallo stesso
+diff engine, dallo stesso flap damping, dallo stesso instradamento e dalle stesse
+ore di silenzio del percorso vero, e stampa le decisioni nell'ordine in cui sono
+state prese:
+
+1. la lettura che è cambiata, e quella prima;
+2. il flap damping — quante letture uguali serviva, e quando sono state trattenute
+   quelle precedenti;
+3. la regola di instradamento che ha deciso, il suo bersaglio, i canali a cui
+   invia e la soglia di gravità con cui è stata confrontata;
+4. se il canale a cui è andato il messaggio è uno di quelli;
+5. le ore di silenzio — fuori dalla finestra, dentro ma sopra la soglia, o
+   trattenuto;
+6. il limite di avvisi, come lo mostra il log.
+
+Si chiede solo con un clic: il log si legge molto più spesso di quanto si
+interroghi una singola riga.
+
+Ciò che non può sapere, lo dice invece di tirare a indovinare:
+
+- **Rifà con le impostazioni di oggi.** Non può conoscere le regole del giorno in
+  cui l'avviso è stato inviato. Se quelle impostazioni non produrrebbero l'avviso,
+  lo dice — è cambiata una regola, un silenziamento o il flap damping — e si
+  ferma al diff, invece di inventare un percorso che torni.
+- **Un canale può esserci per un altro motivo.** Un incidente seguito, il
+  reperibile e un'escalation aggiungono canali che le regole non nominano mai.
+  Quando il canale non è tra quelli della regola, il pannello nomina queste
+  possibilità.
+- **Il limite è contato dal log.** Il conteggio del dispatcher vive in memoria ed
+  è sparito quando qualcuno lo chiede.
+- **Si tengono solo le letture recenti**: le ultime 100 per provider, nella
+  tabella `status_readings`, che fa parte del backup. Più vecchie di così, il
+  pannello dice che le letture non ci sono più.
+- **Alcuni messaggi non riguardano una lettura** — un report periodico, un canale
+  che fallisce, un'interruzione correlata — e non c'è nulla da rifare.
+
+Ciò che si conserva è la lettura *normalizzata*, quella che ha visto il diff
+engine, non la risposta grezza del provider: un riepilogo di Cloudflare pesa
+cento kilobyte a ogni poll.

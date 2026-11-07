@@ -2946,3 +2946,43 @@ What a star changes, and nothing else:
 
 A star does not change polling, routing or what is notified: an alert for a
 starred provider goes exactly where it went before.
+
+### 3.31 Why did I get this alert?
+
+**Delivery log → expand a row → Why did I get this?** (roadmap 5.12) answers the
+question the routing dry run cannot. The dry run says what *would* happen to a
+change; this says what *did*. It takes the provider's saved readings and plays
+them back through the same diff engine, flap damping, routing and quiet hours the
+live path uses, and prints the decisions in the order they were made:
+
+1. the reading that changed, and the one before it;
+2. flap damping — how many matching readings it needed, and when the earlier ones
+   were held back;
+3. the routing rule that decided, its target, the channels it sends to and the
+   severity floor it was checked against;
+4. whether the channel the message went to is one of them;
+5. quiet hours — outside the window, inside it but over its floor, or held back;
+6. the alert cap, as the log shows it.
+
+It is asked only when you click: the log is read far more often than any one row
+is questioned.
+
+What it cannot know, it says rather than guesses:
+
+- **It replays with today's settings.** It cannot know the rules of the day the
+  alert was sent. If those settings would not produce the alert, it says so — a
+  rule, a mute or flap damping has changed — and stops at the diff, instead of
+  inventing a path that fits.
+- **A channel can be there for another reason.** A followed incident, the person
+  on call and an escalation add channels the rules never named. When the channel
+  is not among the rule's, the panel names those possibilities.
+- **The cap is counted from the log.** The dispatcher's own count lives in memory
+  and is gone by the time anyone asks.
+- **Only recent readings are kept**: the last 100 per provider, in the
+  `status_readings` table, which is part of the backup. Older than that, the panel
+  says the readings are gone.
+- **Some messages are not about a reading** — a periodic report, a failing
+  channel, a correlated outage — and have nothing to replay.
+
+What is kept is the *normalised* reading, the one the diff engine saw, not the
+provider's raw response: a Cloudflare summary is a hundred kilobytes a poll.

@@ -1169,6 +1169,16 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }) },
     },
   },
+  "/notifications/{id}/replay": {
+    get: {
+      tags: ["Notifications"],
+      summary: "Why did I get this alert? Replays the saved readings through the live diff, damping, routing and quiet hours.",
+      description:
+        "Roadmap 5.12. Replays with the settings in force now (`replayedWith`), and says `reproduced: false` when they would not produce the alert. `available: false` once the readings behind it have been trimmed.",
+      parameters: [path("id", "Delivery log row id.")],
+      responses: { "200": ok({ type: "object" }), "400": badRequest, "404": notFound },
+    },
+  },
   "/debug/adapters/{id}/explain": {
     get: {
       tags: ["Diagnostics"],

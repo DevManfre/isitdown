@@ -34,6 +34,7 @@ type FixtureKey =
   | "serviceImpact"
   | "adapterDebug"
   | "adapterExplain"
+  | "replay"
   | "catalog"
   | "dashboard"
   | "dashboards"
@@ -75,6 +76,8 @@ export interface Fixtures {
   adapterDebug?: unknown;
   /** `/debug/adapters/:id/explain`, matched before `adapterDebug` — roadmap 5.11's chain. */
   adapterExplain?: unknown;
+  /** `/notifications/:id/replay`, matched before the rest of `/notifications` — roadmap 5.12. */
+  replay?: unknown;
   /** `/config/catalog`, matched before `/config` — the bundled provider menu. */
   catalog?: unknown;
   /** `/config/provider-push`, matched before `/config` — roadmap 1.2's subscription card. */
@@ -118,7 +121,9 @@ export function stubApi(fixtures: Fixtures): void {
     "fetch",
     vi.fn(async (input: string) => {
       const path = String(input);
-      const key: FixtureKey = path.startsWith("/notifications/preview")
+      const key: FixtureKey = path.endsWith("/replay")
+        ? "replay"
+        : path.startsWith("/notifications/preview")
         ? "messagePreview"
         : path.startsWith("/coincidence")
         ? "coincidence"

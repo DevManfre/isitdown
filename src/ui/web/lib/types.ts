@@ -422,6 +422,8 @@ export type StatusChangeKind =
  * `delivered`), and the rendered message is `text` (not `title`).
  */
 export interface SentRecord {
+  /** The row's id, which the replay is asked by (roadmap 5.12). */
+  id?: number;
   providerId: string;
   channel: string;
   kind: StatusChangeKind;
@@ -884,6 +886,32 @@ export interface ProviderExplanation {
   rule: "scoped" | "overall";
   told: OverallStatus | null;
   damping: { confirmSamples: number; count: number; held: boolean };
+}
+
+/**
+ * Why an alert was sent — roadmap 5.12. The saved readings played back through
+ * the live diff, damping, routing and quiet hours. `detail` is plain data the
+ * panel words itself, never a sentence, so it can be translated.
+ */
+export interface ReplayStep {
+  step: "diff" | "damping" | "routing" | "channel" | "quiet-hours" | "cap";
+  outcome: string;
+  detail: Record<string, unknown>;
+}
+
+export interface NotificationReplay {
+  notification: { id: number; providerId: string; channel: string; kind: string; sentAt: string; ok: boolean };
+  /** Always `current-settings`: the replay cannot know the rules of the day the alert was sent. */
+  replayedWith: "current-settings";
+  /** False for a report or a failing channel, which no pair of readings produces. */
+  replayable: boolean;
+  /** False once the readings behind the alert have been trimmed. */
+  available: boolean;
+  /** Whether today's settings produce this alert at all. */
+  reproduced: boolean;
+  previous: { fetchedAt: string; overallStatus: OverallStatus } | null;
+  trigger: { fetchedAt: string; overallStatus: OverallStatus } | null;
+  path: ReplayStep[];
 }
 
 export interface AdapterDebugResponse {
