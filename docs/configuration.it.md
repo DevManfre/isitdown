@@ -1736,6 +1736,14 @@ incontra mai. L'id del componente è quello del provider — lo stesso che salva
 selettore dei componenti — e rimuovere un provider elimina anche le regole dei
 suoi componenti.
 
+L'edizione UI trasforma il silenzio in un pulsante (roadmap 5.13): nella pagina
+di un provider, e nel suo drawer, ogni riga di componente ha una campanella. Il
+clic salva una regola `<id>#<componente>` con `channels: []` in **cima** alla
+tabella — decide la prima regola che corrisponde, quindi dietro una regola
+catch-all non verrebbe mai raggiunta — e la riga dice **Silenziato**. Un secondo
+clic rimuove quella regola, e solo quella: una regola per lo stesso componente
+che instrada da qualche parte è tua, e resta.
+
 L'edizione Light configura la tabella come l'elenco `routing` in
 `config.yml`, mostrato sopra; l'edizione UI la modifica da **Impostazioni**,
 dove la colonna del provider elenca sotto ciascuno i componenti selezionati e
