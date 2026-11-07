@@ -4,6 +4,7 @@ import type {
   AdapterDetection,
   AdapterProbeResult,
   ProviderExplanation,
+  NotificationReplay,
   CatalogProposal,
   CatalogProvider,
   ComponentHistoryResponse,
@@ -477,6 +478,9 @@ export const runStorageMaintenance = () =>
 /** The adapter debug panel's two halves — roadmap 5.18. */
 export const getAdapterDebug = () =>
   request<AdapterDebugResponse>("GET", "/debug/adapters");
+/** Why an alert was sent — roadmap 5.12. Replays saved readings; sends and records nothing. */
+export const getNotificationReplay = (id: number) =>
+  request<NotificationReplay>("GET", `/notifications/${id}/replay`);
 /** Why a provider shows the status it shows — roadmap 5.11. Reads nothing new. */
 export const getProviderExplanation = (id: string) =>
   request<ProviderExplanation>("GET", `/debug/adapters/${encodeURIComponent(id)}/explain`);

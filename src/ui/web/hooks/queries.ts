@@ -727,6 +727,21 @@ export function useAdapterDebug(enabled: boolean) {
 }
 
 /**
+ * Why one alert was sent (roadmap 5.12). Asked only once the operator clicks, and
+ * never polled: the same row replayed a minute later answers the same, and the
+ * saved readings it reads are bounded, so it is not worth a request per refresh.
+ */
+export function useNotificationReplay(id: number | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ["notification-replay", id],
+    queryFn: () => api.getNotificationReplay(id as number),
+    enabled: enabled && id !== undefined,
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+/**
  * The chain behind one provider's status (roadmap 5.11). Keyed per provider and
  * fetched only while the panel is open, on the same cadence as the recent reads
  * beside it, so a held change visibly counts up without reopening the dialog.
