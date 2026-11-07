@@ -491,6 +491,17 @@ the line; **Mute**, **Diagnose**, **Edit** and **Remove** are one click away
 inside the row. Channels with no environment variable set wait behind a single
 "show the ones that are not set up" row, unless the filter is asking for them.
 
+**Diagnose** opens with **Why this status** (roadmap 5.11): five steps in the
+order the poller takes them — what was last read and when, the components it
+carried (naming the ones that are not operational), the rule that folded them
+(the worst of the selected components if you scoped the provider to a selection,
+otherwise the provider's own figure), the status you were last *told*, and flap
+damping. The last two are what make a quiet dashboard explicable: with
+`confirmSamples` above 1, a change the page already shows is held back until it
+has been read that many times in a row, and the panel says how far along it is
+("2 of 3 samples agree") instead of leaving it to be deduced from the recent
+reads below it. It refreshes while open, so the count visibly climbs.
+
 **Settings → Data** also carries the one maintenance job a SQLite file needs
 (roadmap 6.13): **Check and compact** runs `PRAGMA integrity_check` and then
 `VACUUM`, and reports the bytes it returned beside what the database weighs now.

@@ -3,6 +3,7 @@ import type {
   Annotation,
   AdapterDetection,
   AdapterProbeResult,
+  ProviderExplanation,
   CatalogProposal,
   CatalogProvider,
   ComponentHistoryResponse,
@@ -476,6 +477,9 @@ export const runStorageMaintenance = () =>
 /** The adapter debug panel's two halves — roadmap 5.18. */
 export const getAdapterDebug = () =>
   request<AdapterDebugResponse>("GET", "/debug/adapters");
+/** Why a provider shows the status it shows — roadmap 5.11. Reads nothing new. */
+export const getProviderExplanation = (id: string) =>
+  request<ProviderExplanation>("GET", `/debug/adapters/${encodeURIComponent(id)}/explain`);
 /** One read, right now. Records nothing and notifies nothing, like the connection test. */
 export const probeAdapter = (id: string) =>
   request<AdapterProbeResult>(

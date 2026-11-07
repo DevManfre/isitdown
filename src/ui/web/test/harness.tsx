@@ -33,6 +33,7 @@ type FixtureKey =
   | "maintenances"
   | "serviceImpact"
   | "adapterDebug"
+  | "adapterExplain"
   | "catalog"
   | "dashboard"
   | "dashboards"
@@ -72,6 +73,8 @@ export interface Fixtures {
   storage?: unknown;
   /** `/debug/adapters` — the adapter diagnostics panel's recent reads. */
   adapterDebug?: unknown;
+  /** `/debug/adapters/:id/explain`, matched before `adapterDebug` — roadmap 5.11's chain. */
+  adapterExplain?: unknown;
   /** `/config/catalog`, matched before `/config` — the bundled provider menu. */
   catalog?: unknown;
   /** `/config/provider-push`, matched before `/config` — roadmap 1.2's subscription card. */
@@ -161,6 +164,8 @@ export function stubApi(fixtures: Fixtures): void {
                                   ? "trust"
                                 : path.startsWith("/config")
                                   ? "config"
+                                  : path.startsWith("/debug/adapters") && path.endsWith("/explain")
+                                    ? "adapterExplain"
                                   : path.startsWith("/debug/adapters")
                                     ? "adapterDebug"
                                     : path === "/dashboards"
@@ -206,6 +211,15 @@ export function stubApi(fixtures: Fixtures): void {
         // silence (roadmap 5.13); a config with no `routing` is not a body the
         // server sends.
         config: { routing: { rules: [], invalidRules: 0 } },
+        // A provider nothing has read yet, which is the honest default for the panel.
+        adapterExplain: {
+          id: "acme",
+          reading: null,
+          components: [],
+          rule: "overall",
+          told: null,
+          damping: { confirmSamples: 1, count: 0, held: false },
+        },
         trust: { days: 90, windows: [30, 90, 365], cards: [] },
         annotations: { annotations: [] },
         providerPush: { enabled: false, tokenRevealed: false, providers: [] },

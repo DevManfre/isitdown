@@ -727,6 +727,22 @@ export function useAdapterDebug(enabled: boolean) {
 }
 
 /**
+ * The chain behind one provider's status (roadmap 5.11). Keyed per provider and
+ * fetched only while the panel is open, on the same cadence as the recent reads
+ * beside it, so a held change visibly counts up without reopening the dialog.
+ */
+export function useProviderExplanation(id: string, enabled: boolean) {
+  const busy = useBusy();
+  const live = useLive();
+  return useQuery({
+    queryKey: ["adapter-explain", id],
+    queryFn: () => api.getProviderExplanation(id),
+    refetchInterval: idleInterval(busy, live),
+    enabled,
+  });
+}
+
+/**
  * The bundled provider catalog (roadmap 5.11). Fetched when the add dialog
  * opens and then left alone: the list ships with the image, so it cannot go
  * stale between two opens, and it has no polling interval for the same reason.
