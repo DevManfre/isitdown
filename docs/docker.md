@@ -11,7 +11,7 @@ One `Dockerfile`, four stages. `builder` compiles everything once; `light` and
 
 ```
 builder  node:24-alpine   npm ci (incl. devDependencies), tsc, vite build, copy non-TS assets into dist
-light    node:24-alpine   prod deps + dist/{core,adapters,notifiers,light}
+light    node:24-alpine   prod deps + dist/{core,adapters,notifiers,light,outpost}
                           VOLUME /app/config /app/data · no EXPOSE · no server
 dev      FROM builder     keeps devDependencies · vite build --watch + node --watch · tagged isitdown:dev only
 ui       FROM light       + dist/ui (dashboard and locales) · EXPOSE 3000
@@ -254,7 +254,7 @@ OUTPOST_TOKEN=<the token above>
   outpost is the one that listens. It keeps no configuration either: every
   request carries the whole probe, so one outpost can serve several
   installations and a restart loses nothing.
-- **Probes only.** `http`, `tcp` and `dns` are sent; a status page reads the same
+- **Probes only.** Probe adapters (`http`, `tcp`, `dns`, …) are sent; a status page reads the same
   from anywhere, so it never is. The outpost refuses any other adapter, which
   also keeps it from being a general-purpose fetcher for whoever holds the token.
 - **Put TLS in front of it.** The token travels in an `Authorization` header and

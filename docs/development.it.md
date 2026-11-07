@@ -21,11 +21,16 @@ isitdown/
 │   │   ├── notificationDispatcher.ts  l'unico chiamante di Notifier.send
 │   │   ├── scheduler.ts               il loop; rilegge la configurazione a ogni ciclo
 │   │   ├── http.ts                    l'unica lettura HTTP: rivalidazione ETag/Last-Modified, decodifica del charset
+│   │   ├── routing.ts · mute.ts · maintenance.ts   chi viene avvisato, quando, e cosa è silenziato (§3.27–3.28)
+│   │   ├── delivery.ts · onCall.ts    la politica di consegna e la rotazione di reperibilità
+│   │   ├── authority.ts · suspicion.ts · freshness.ts   quale lettura fa fede, e quanto fidarsene
+│   │   ├── outpost.ts · heartbeat.ts · tracing.ts       consenso degli outpost, dead-man's switch, trace
+│   │   ├── chatops/                   i comandi del bot, analizzati ed eseguiti indipendentemente dall'edizione
 │   │   ├── logger.ts
 │   │   └── i18n/                      stringhe delle notifiche, indipendenti dall'edizione
 │   │       ├── index.ts               lookup + fallback su en + formattazione UTC
 │   │       ├── en.json                lingua di partenza
-│   │       └── it.json
+│   │       └── de.json  es.json  fr.json  it.json  pt.json
 │   ├── adapters/                      (condiviso)
 │   │   ├── catalog.ts                 catalogo di provider noti incluso, letto da catalog.json
 │   │   ├── catalog.json               il catalogo generato (roadmap 2.1) — scritto da tools/build-catalog.mjs
@@ -37,12 +42,18 @@ isitdown/
 │   │   ├── aws.adapter.ts             il feed degli eventi aperti di AWS Health, per regione
 │   │   ├── gcp.adapter.ts             incidents.json di Google Cloud: stato e cronologia in uno
 │   │   ├── azure.adapter.ts           il feed di stato di Azure, col suo vocabolario di chiusura
+│   │   ├── betterstack · instatus · cachet · cstate · openstatus · statusio · upptime · uptimekuma · uptimecom · sorry · githubactions   altri prodotti di status page ospitati, un `.adapter.ts` ciascuno
+│   │   ├── http · tcp · dns · icmp · imap · json · html · docker · registry · sequence · watchdog   sonde per ciò che non pubblica una status page, un `.adapter.ts` ciascuno
+│   │   ├── detect.ts                  quale adapter legge un dato URL (`POST /config/services/detect`)
+│   │   ├── plugins.ts                 plugin di adapter caricati da una directory (§3.14)
+│   │   ├── import/                    export di Uptime Kuma, Gatus, Statping e StatusGator → provider candidati (2.4)
 │   │   └── index.ts                   registro per id di adapter
 │   ├── notifiers/                     (condiviso)
 │   │   ├── formatting.ts              emoji, colori, etichette di severità, composizione del messaggio
 │   │   ├── settings.ts                validazione condivisa per i canali configurati con un solo URL
 │   │   ├── telegram.notifier.ts
 │   │   ├── webhook.notifier.ts
+│   │   ├── …                          ntfy, Gotify, Pushover, Matrix, Teams, PagerDuty, Opsgenie, email, Twilio, MQTT, syslog e gli altri — un `<canale>.notifier.ts` ciascuno, più di trenta in tutto
 │   │   └── index.ts                   registro per id di canale
 │   ├── outpost/                       (solo outpost, roadmap 1.7 — viaggia nell'immagine Light)
 │   │   ├── index.ts                   entrypoint, non parte senza OUTPOST_TOKEN
@@ -72,25 +83,32 @@ isitdown/
 │       ├── secretsFile.ts             credenziali salvate dalla dashboard: file 0600 accanto al database, applicate all'ambiente
 │       ├── metrics.ts                  la superficie di scrape Prometheus: gauge dallo store, counter in memoria
 │       ├── configFile.ts             export / import di config.yml (§4.3)
+│       ├── configAudit.ts · configSnapshots.ts   la cronologia della configurazione e gli snapshot con nome (roadmap 5.7, 5.8)
+│       ├── dashboardStore.ts · dashboardLayout.ts   le dashboard Overview con nome e i layout dei loro widget
+│       ├── openapi.ts                 il documento OpenAPI servito su /openapi.json (§6.1)
 │       ├── db/                        open.ts, migrate.ts, seed.ts
-│       ├── routes/                    status, history, incidents, export, notifications, config, preferences, metrics
+│       ├── routes/                    un `<area>.routes.ts` ciascuno: status, events, history, incidents, export, notifications, config.* (services, channels, import/export, history, backup, storage, push), dashboards, maintenances, map, metrics, badge, render, public, openapi …
 │       └── web/                       la dashboard: react, vite, shadcn/ui
 │           ├── index.html             script del tema pre-paint, font, #root
 │           ├── main.tsx               albero dei provider: i18n, query, tema, router
 │           ├── App.tsx                shell della console: rail, header, contenitore delle viste
 │           ├── routes.tsx             route con hash
 │           ├── components/ui/         primitive shadcn
-│           ├── components/            rail, header, indicatore di polling, charts/
-│           ├── views/                 overview, providers, incidents, incident,
-│           │                          history, log invii, settings
-│           ├── hooks/                 queries, theme, rail, busy
-│           ├── lib/                   api, types, chartConfig, format, i18n
+│           ├── components/            rail, header, indicatore di polling, dialog, card; charts/, settings/, service-dialog/, dashboards/
+│           ├── views/                 overview, providers, dettaglio provider, components, incidents,
+│           │                          dettaglio incidente, history, log invii, settings, wallboard
+│           ├── widgets/               il registro dei widget dell'Overview, drag della griglia e bozza del layout; catalog/ ha un file per widget
+│           ├── hooks/                 queries, theme, live, shortcuts, busy, pull-to-refresh …
+│           ├── lib/                   api, types, chartConfig, format, i18n, shortcuts …
 │           ├── css/base.css            punto di ingresso Tailwind: importa tailwindcss, tokens, motion
 │           ├── css/tokens.css         l'unico file con un colore letterale
 │           ├── css/motion.css         keyframes, animazioni d'ingresso, transizioni
-│           └── locales/               en.json (sorgente) + it.json
+│           ├── public/                favicon, manifest PWA, service worker, icone
+│           └── locales/               en.json (sorgente) + de, es, fr, it, pt
 │   └── cli/                            (solo client da terminale, roadmap 17.7 — `watch` legge l'API dell'edizione UI, `discover` e `import` leggono file locali con src/adapters; non importa mai src/ui)
 │       ├── index.ts                    entrypoint, smista verso l'unico sottocomando qui sotto
+│       ├── discover/run.ts             `isitdown discover`: i file di un progetto → provider del catalogo (2.3)
+│       ├── import/run.ts               `isitdown import`: l'export di un altro monitor → una flotta (2.4)
 │       └── watch/
 │           ├── run.ts                  l'unica parte che tocca un terminale, un orologio e una rete veri
 │           ├── args.ts                 --url / --token / --interval
@@ -103,7 +121,10 @@ isitdown/
 ├── tools/
 │   ├── copy-assets.mjs                copia in dist i cataloghi i18n e delle lingue della dashboard (il
 │   │                                   bundle della dashboard è già output di Vite, non di questo script)
-│   ├── readme-parity.mjs              README.md contro ogni README.<lang>.md (npm run check:readme)
+│   ├── readme-parity.mjs              ogni pagina inglese contro le sue traduzioni (npm run check:readme)
+│   ├── bundle-budget.mjs              la dashboard compilata contro il suo budget gzip (npm run check:bundle)
+│   ├── visual-regression.mjs          ogni vista, entrambi i temi, ogni lingua contro test/visual/baseline (npm run test:visual); helper in tools/visual/
+│   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   la sonda canary, test di carico e di mutazione, registrazione dei fixture, note di rilascio, la build a file singolo, icone PWA
 │   ├── build-catalog.mjs              rigenera il catalogo da tools/catalog/seed.json e dalle liste pubbliche (2.1)
 │   └── sign-catalog.mjs               firma catalog/catalog.json con $CATALOG_SIGNING_KEY (2.2)
 ├── catalog/                           il catalogo pubblicato e firmato, e il report dell'ultima generazione
@@ -113,6 +134,9 @@ isitdown/
 │   ├── adapters/
 │   ├── notifiers/                     test per canale, più contract.test.ts e golden/ (3.8)
 │   ├── light/
+│   ├── outpost/                       il server POST /probe senza stato
+│   ├── tools/                         il generatore del catalogo
+│   ├── visual/                        baseline/ — i frame della dashboard concordati
 │   ├── ui/                            contratto dello store, aggregazione, ogni route API, guardie tema e lingue
 │   ├── cli/                           args, riduttori e renderer di watch, e il ciclo contro un server finto
 │   ├── fixtures/statuspage/           payload registrati dalle pagine vere, mai scaricati in un test
@@ -257,9 +281,10 @@ npm run build:cli        # tsc + copia asset, solo src/core/i18n e src/cli (10.1
 ```
 
 Il budget del bundle (roadmap 5.16) pesa ciò che `build:ui` ha prodotto, in
-gzip, perché è quello che il browser scarica: `410 kB` di JavaScript e `20 kB` di
-CSS, entrambi poco sopra la build di oggi. È un tetto, non un obiettivo — quando
-fallisce la risposta è trovare cosa è cresciuto, non alzare il numero.
+gzip, perché è quello che il browser scarica: `731,000` byte di JavaScript e `23,500` di
+CSS (`BUDGET` in `tools/bundle-budget.mjs`), entrambi poco sopra la build di oggi. È
+un tetto, non un obiettivo — quando fallisce, prima si trova cosa è cresciuto; è stato
+alzato solo in un commit che nomina le righe di roadmap che l'hanno fatto crescere.
 
 La soglia di copertura (roadmap 7.2) è un minimo garantito, non un obiettivo da
 rincorrere. Sono due, perché le due suite coprono metà diverse: il server e il

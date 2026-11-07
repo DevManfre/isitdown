@@ -725,6 +725,86 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
+  "/config/import/preview": {
+    post: {
+      tags: ["Configuration"],
+      summary: "What importing the same file would do, without doing it.",
+      requestBody: {
+        required: true,
+        content: {
+          "text/yaml": { schema: { type: "string" } },
+          "application/json": {
+            schema: {
+              type: "object",
+              required: ["yaml"],
+              properties: { yaml: { type: "string" } },
+            },
+          },
+        },
+      },
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
+  "/config/snapshots": {
+    get: {
+      tags: ["Configuration"],
+      summary: "Named configuration snapshots, newest first.",
+      responses: { "200": ok({ type: "object" }) },
+    },
+    post: {
+      tags: ["Configuration"],
+      summary: "Save the configuration as it stands under a name.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { type: "object", required: ["name"], properties: { name: { type: "string", maxLength: 80 } } },
+          },
+        },
+      },
+      responses: { "201": ok({ type: "object" }), "400": badRequest },
+    },
+  },
+  "/config/snapshots/{id}/preview": {
+    get: {
+      tags: ["Configuration"],
+      summary: "What restoring the snapshot would change.",
+      responses: { "200": ok({ type: "object" }) },
+    },
+  },
+  "/config/snapshots/{id}/restore": {
+    post: {
+      tags: ["Configuration"],
+      summary: "Put the snapshot back, saving the configuration it replaces first.",
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
+  "/config/snapshots/{id}": {
+    delete: {
+      tags: ["Configuration"],
+      summary: "Delete a snapshot.",
+      responses: { "204": { description: "Deleted." } },
+    },
+  },
+  "/config/history": {
+    get: {
+      tags: ["Configuration"],
+      summary: "The configuration history: every value a write moved, newest first.",
+      parameters: [
+        { name: "kind", in: "query", schema: { type: "string", enum: ["service", "setting", "channel", "routing", "recipients", "credential"] } },
+        { name: "target", in: "query", schema: { type: "string" } },
+        { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 500, default: 100 } },
+      ],
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
+  "/config/history/{id}/revert": {
+    post: {
+      tags: ["Configuration"],
+      summary: "Write a history entry's old value back.",
+      responses: { "200": ok({ type: "object" }), "404": notFound, "409": { description: "The old value can no longer be written." } },
+    },
+  },
   "/config/backup": {
     get: {
       tags: ["Configuration"],
@@ -855,6 +935,17 @@ const paths: Json = {
       summary: "The components a provider exposes, for the selection picker.",
       requestBody: { required: true, ...json({ type: "object" }) },
       responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
+  "/config/services/preview-read": {
+    post: {
+      tags: ["Configuration"],
+      summary: "One read of a provider that is not saved yet, from the form's own values.",
+      requestBody: { required: true, ...json({ type: "object" }) },
+      responses: {
+        "200": ok({ type: "object" }, "ok is false, with the adapter's own error, when the page cannot be read."),
+        "400": badRequest,
+      },
     },
   },
   "/config/services/{id}": {

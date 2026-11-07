@@ -80,6 +80,12 @@ test("a page that answers an error is unreachable, not broken", () => {
   assert.match(result.detail ?? "", /HTTP 403/);
 });
 
+test("a redirect the adapter followed is not an unreachable page", () => {
+  const hop = { url: "https://x/api/v2/summary.json", status: 302, body: "", contentType: "text/html" };
+  const result = judge(entry, { captured: [hop, json("https://y/api/v2/summary.json", {})], fixtures });
+  assert.notEqual(result.outcome, "unreachable");
+});
+
 test("a page that never answered is unreachable", () => {
   assert.equal(judge(entry, { captured: [], error: new Error("timeout"), fixtures }).outcome, "unreachable");
 });

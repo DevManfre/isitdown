@@ -44,19 +44,19 @@ docker exec isitdown-light sh -c "ps -o pid,args"            # only node dist/li
 Confirm nothing secret was baked into an image:
 
 ```bash
-docker history isitdown:ui --no-trunc --format "{{.CreatedBy}}" | grep -iE "TOKEN=|SECRET="
+docker history ghcr.io/devmanfre/isitdown:ui-latest --no-trunc --format "{{.CreatedBy}}" | grep -iE "TOKEN=|SECRET="
 # no output
 ```
 
 ### 5.2 The dashboard
 
 Open **http://localhost:3000** and walk the rail: Overview · Providers ·
-Components · Incidents · History · Delivery log · Settings. Then check the two runtime controls
-in the header:
+Components · Incidents · History · Delivery log · Settings. Then check the two runtime controls:
 
-- the **theme** button cycles light → dark → system and survives a reload;
-- the **EN / IT** switch changes every string with no page reload, including the
-  time format (`7:36 PM` vs `19:36`) and decimal separator (`99.87%` vs `99,87%`).
+- the header's **theme** button cycles light → dark → system and survives a reload;
+- the language, picked in **Settings → Appearance** (`en`, `de`, `es`, `fr`, `it`,
+  `pt`), changes every string with no page reload, including the time format
+  (`7:36 PM` vs `19:36`) and decimal separator (`99.87%` vs `99,87%`).
 
 The browser tab answers the same question without being looked at: while
 something is wrong, the title counts the providers in trouble (`2 providers in
@@ -74,10 +74,11 @@ sentences and two format pairs were all ghost buttons of the same weight, and
 nothing said which of them belonged together.
 
 **History** keeps the window's headline and its four figures at the top, and
-splits the rest into five tabs, one question each: **Trend** (the daily chart,
-the per-provider list and, folded shut, your own markers), **Reliability**
+splits the rest into up to five tabs, one question each: **Trend** (the daily
+chart, the per-provider list and, folded shut, your own markers), **Reliability**
 (MTTR, MTBF and the months), **Patterns** (when incidents start, and which
-providers break together), **Compare** and **Latency**. The tab travels in the
+providers break together), **Compare** and **Latency** (these two appear only when
+there are two providers to compare, or any provider to measure). The tab travels in the
 address — `#/history?tab=reliability` — so a link opens the one it means, and
 one that has nothing to show here falls back to Trend.
 
@@ -89,7 +90,7 @@ older was stored and never shown; the calendar is that year. A day nobody
 sampled is drawn muted rather than green, and hovering a cell says what the day
 was and how much of it was up.
 
-Above the list, **Compare** (roadmap 5.7) overlays two providers' daily uptime on
+In the **Compare** tab (roadmap 5.7), the chart overlays two providers' daily uptime on
 one pair of axes — the question a vendor decision actually asks, and the one the
 worst-first ranking cannot answer because it never puts two rows on the same
 scale. It opens on the two worst providers, either picker changes a side, and
@@ -172,12 +173,12 @@ curl -s localhost:3000/status | jq .pollIntervalMinutes    # 10
 Confirm invalid configuration is refused loudly rather than half-applied:
 
 ```bash
-docker run --rm isitdown:light
+docker run --rm ghcr.io/devmanfre/isitdown:light-latest
 #   ..."isitdown light failed to start","error":"config file /app/config/config.yml
 #      was not found — mount it or set CONFIG_PATH"   → exit 1
 
 printf 'services: []\n' > /tmp/bad.yml
-docker run --rm -v /tmp/bad.yml:/app/config/config.yml:ro isitdown:light
+docker run --rm -v /tmp/bad.yml:/app/config/config.yml:ro ghcr.io/devmanfre/isitdown:light-latest
 #   ..."error":"config file ... is invalid: services: at least one service is required"
 ```
 

@@ -4,7 +4,16 @@ import { discover } from "../../adapters/discover.ts";
 import { IMPORT_TOOLS, importMonitors, type ImportTool } from "../../adapters/import/index.ts";
 import { listServices } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
-import { exportConfigYaml, importConfigYaml } from "../configFile.ts";
+import { diffConfigYaml, exportConfigYaml, importConfigYaml } from "../configFile.ts";
+import {
+  deleteSnapshot,
+  listSnapshots,
+  previewSnapshot,
+  restoreSnapshot,
+  saveSnapshot,
+  snapshotNameSchema,
+  SnapshotNameTaken,
+} from "../configSnapshots.ts";
 import { issues } from "./config.shared.ts";
 
 const discoverRequestSchema = z.object({
@@ -112,22 +121,40 @@ export function configImportExportRoutes(runtime: UiRuntimeCore, router: Router)
    * intact — because an import is a configuration statement and must not be a
    * data-loss event.
    */
-  router.post("/config/import", (req, res) => {
-    const body = req.body;
+  const yamlOf = (body: unknown): string | null => {
     const source =
       typeof body === "string"
         ? body
         : typeof (body as { yaml?: unknown } | undefined)?.yaml === "string"
           ? (body as { yaml: string }).yaml
           : null;
-    if (source === null || source.trim() === "") {
-      res
-        .status(400)
-        .json({
-          error: {
-            message: "send the config.yml as the request body, or as { yaml }",
-          },
-        });
+    return source === null || source.trim() === "" ? null : source;
+  };
+  const NO_YAML = "send the config.yml as the request body, or as { yaml }";
+
+  /**
+   * What `POST /config/import` would do with the same body, without doing it
+   * (roadmap 5.9): services added, removed and changed field by field, settings
+   * and channels that would move, and whether routing and recipients would be
+   * replaced. Refuses exactly what the import refuses.
+   */
+  router.post("/config/import/preview", (req, res) => {
+    const source = yamlOf(req.body);
+    if (source === null) {
+      res.status(400).json({ error: { message: NO_YAML } });
+      return;
+    }
+    try {
+      res.json(diffConfigYaml(db, source, runtime.logger));
+    } catch (error) {
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+    }
+  });
+
+  router.post("/config/import", (req, res) => {
+    const source = yamlOf(req.body);
+    if (source === null) {
+      res.status(400).json({ error: { message: NO_YAML } });
       return;
     }
 
@@ -148,5 +175,75 @@ export function configImportExportRoutes(runtime: UiRuntimeCore, router: Router)
     // Every provider the import added starts with no history, exactly as if it
     // had been added through the form.
     for (const id of report.added) void runtime.backfill.backfillOne(id);
+  });
+
+  const snapshotId = (raw: string | undefined): number | null => {
+    const id = Number(raw);
+    return Number.isInteger(id) && id > 0 ? id : null;
+  };
+  const NO_SNAPSHOT = { error: { message: "no such snapshot" } };
+
+  /** Named configuration snapshots — roadmap 5.8. Newest first. */
+  router.get("/config/snapshots", (_req, res) => {
+    res.json({ snapshots: listSnapshots(db) });
+  });
+
+  /** Saves the configuration as it stands under `{ name }`. 409 when the name is taken. */
+  router.post("/config/snapshots", (req, res) => {
+    const parsed = snapshotNameSchema.safeParse((req.body as { name?: unknown } | undefined)?.name);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: `name: ${issues(parsed.error)}` } });
+      return;
+    }
+    try {
+      res.status(201).json(saveSnapshot(db, parsed.data, runtime.logger));
+    } catch (error) {
+      if (error instanceof SnapshotNameTaken) {
+        res.status(409).json({ error: { message: error.message } });
+        return;
+      }
+      throw error;
+    }
+  });
+
+  /** What restoring the snapshot would change — the same diff as the import preview. */
+  router.get("/config/snapshots/:id/preview", (req, res) => {
+    const id = snapshotId(req.params["id"]);
+    const diff = id === null ? undefined : previewSnapshot(db, id, runtime.logger);
+    if (diff === undefined) {
+      res.status(404).json(NO_SNAPSHOT);
+      return;
+    }
+    res.json(diff);
+  });
+
+  /**
+   * Puts the snapshot back through the file import. The configuration it
+   * replaces is saved first as a snapshot of its own, so this is undoable.
+   */
+  router.post("/config/snapshots/:id/restore", (req, res) => {
+    const id = snapshotId(req.params["id"]);
+    let restored;
+    try {
+      restored = id === null ? undefined : restoreSnapshot(db, id, runtime.logger);
+    } catch (error) {
+      res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+      return;
+    }
+    if (restored === undefined) {
+      res.status(404).json(NO_SNAPSHOT);
+      return;
+    }
+    res.json(restored);
+    for (const added of restored.report.added) void runtime.backfill.backfillOne(added);
+  });
+
+  router.delete("/config/snapshots/:id", (req, res) => {
+    const id = snapshotId(req.params["id"]);
+    if (id === null || !deleteSnapshot(db, id)) {
+      res.status(404).json(NO_SNAPSHOT);
+      return;
+    }
+    res.status(204).end();
   });
 }
