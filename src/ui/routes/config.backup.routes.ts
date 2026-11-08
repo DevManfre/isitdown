@@ -3,6 +3,7 @@ import type { Router } from "express";
 import { resetValidators } from "../../core/http.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { createBackup, restoreBackup } from "../dbBackup.ts";
+import { noteInstallEvent } from "../installHealth.ts";
 
 export function configBackupRoutes(runtime: UiRuntimeCore, router: Router): void {
   const db = runtime.db;
@@ -21,6 +22,7 @@ export function configBackupRoutes(runtime: UiRuntimeCore, router: Router): void
    */
   router.get("/config/backup", (_req, res) => {
     const snapshot = createBackup(db);
+    noteInstallEvent(db, "backup");
     res.setHeader("content-type", "application/octet-stream");
     res.setHeader(
       "content-disposition",

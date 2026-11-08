@@ -659,6 +659,9 @@ const WRITE_KEYS = [
   // A poll interval or a provider added changes how many samples a day the
   // retention cost is projected from.
   ["storage"],
+  // A provider switched back on, a channel tested or retention changed each
+  // move a line of the installation checklist (roadmap 5.15, 5.16).
+  ["install-health"],
   // Accepting a catalog proposal is a service edit (roadmap 2.2).
   ["catalog-proposals"],
 ];
@@ -707,6 +710,15 @@ export function useServiceMutations() {
  */
 export function useStorage() {
   return useQuery({ queryKey: ["storage"], queryFn: api.getStorage });
+}
+
+/**
+ * Roadmap 5.15 and 5.16: the providers that look forgotten and the
+ * installation's housekeeping checklist. Refetched after any write (see
+ * `WRITE_KEYS`) rather than on a timer — it moves when the operator acts.
+ */
+export function useInstallHealth() {
+  return useQuery({ queryKey: ["install-health"], queryFn: api.getInstallHealth });
 }
 
 /**

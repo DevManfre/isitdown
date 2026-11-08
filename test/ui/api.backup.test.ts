@@ -95,6 +95,21 @@ test("the backup is a downloadable SQLite file, dated, and says what it leaves b
   }
 });
 
+test("downloading a backup is what turns the backup health check green (roadmap 5.16)", async () => {
+  const app = await api();
+  try {
+    const backupCheck = async () => {
+      const { body } = await app.getJson("/config/health");
+      return (body as { checks: { id: string; state: string }[] }).checks.find((check) => check.id === "backup")?.state;
+    };
+    assert.equal(await backupCheck(), "warn");
+    await app.getBytes("/config/backup");
+    assert.equal(await backupCheck(), "ok");
+  } finally {
+    await app.close();
+  }
+});
+
 test("a backup taken now, restored later, brings the fleet back as it was", async () => {
   const app = await api();
   try {

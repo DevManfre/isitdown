@@ -2025,5 +2025,21 @@
   "config.history.restore-label": "Vorherigen Wert von {target} {field} wiederherstellen",
   "config.history.restored": "Wert wiederhergestellt.",
   "config.history.loading": "Verlauf wird geladen…",
-  "config.snapshots.loading": "Snapshots werden geladen…"
+  "config.snapshots.loading": "Snapshots werden geladen…",
+  "install-health.title": "Zustand der Installation",
+  "install-health.summary": "{ok} von {total} Pr\u00fcfungen in Ordnung",
+  "install-health.all-good": "Alles auf der Checkliste der Installation ist in Ordnung.",
+  "install-health.fix": "Beheben",
+  "install-health.error": "Die Checkliste der Installation konnte nicht geladen werden.",
+  "install-health.channels.warn": "Kein Benachrichtigungskanal ist aktiviert und konfiguriert, daher erreicht dich keine Meldung.",
+  "install-health.channel-test.never": "Es wurde noch kein Benachrichtigungskanal getestet.",
+  "install-health.channel-test.stale": "Seit {days} Tagen wurde kein Benachrichtigungskanal getestet.",
+  "install-health.backup.warn": "Von dieser Installation wurde noch nie ein Backup heruntergeladen.",
+  "install-health.retention.warn": "Die Aufbewahrung des Verlaufs steht auf dem Minimum, die Diagramme reichen daher nur eine Woche zur\u00fcck.",
+  "install-health.version.warn": "Eine neuere Version ist verf\u00fcgbar.",
+  "install-health.version.unknown": "Es wird nicht gepr\u00fcft, ob eine neuere Version existiert. Aktiviere die Update-Pr\u00fcfung, um es zu erfahren.",
+  "install-health.token.warn": "Die \u00f6ffentliche Statusseite ist aktiv und es ist kein API-Token gesetzt.",
+  "install-health.abandoned.disabled": "{name} ist seit {when} ausgeschaltet",
+  "install-health.abandoned.failing": "{name} wurde seit {when} nicht mehr erfolgreich abgefragt",
+  "install-health.abandoned.review": "In Dienste pr\u00fcfen"
 }

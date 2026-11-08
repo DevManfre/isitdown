@@ -51,6 +51,7 @@ import type {
   ServiceImpact,
   StatusResponse,
   StorageReport,
+  InstallHealth,
 } from "./types.ts";
 import type { PushSubscriptionBody } from "./push.ts";
 import type { DashboardLayout } from "../../dashboardLayout.ts";
@@ -472,6 +473,9 @@ export const patchSettings = (patch: unknown) =>
   request<unknown>("PATCH", "/config/settings", patch);
 export const getStorage = () =>
   request<StorageReport>("GET", "/config/storage");
+/** Forgotten providers and the housekeeping checklist — roadmap 5.15, 5.16. */
+export const getInstallHealth = () =>
+  request<InstallHealth>("GET", "/config/health");
 /** Integrity check then vacuum, on demand — roadmap 6.13. */
 export const runStorageMaintenance = () =>
   request<DbMaintenanceReport>("POST", "/config/storage/maintenance");
