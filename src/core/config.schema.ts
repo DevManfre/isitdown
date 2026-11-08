@@ -199,6 +199,12 @@ export const serviceDefinitionSchema = z.object({
   components: componentSelectionSchema.default([]),
   scopeToComponents: z.boolean().default(false),
   /**
+   * A star (roadmap 5.14): listed first, always on the wallboard, always in the
+   * weekly summary. Absent reads as not starred, so a file that never heard of
+   * it behaves exactly as before.
+   */
+  favorite: z.boolean().optional(),
+  /**
    * The monthly uptime this provider is supposed to deliver, as a percentage —
    * `99.9` (roadmap 4.13). Optional rather than defaulted: most providers are
    * watched without anybody having promised anything, and a default would

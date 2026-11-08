@@ -170,8 +170,17 @@ const ASSETS = "dist/ui/public/assets";
  * of it some eighty strings in six catalogs (the schedule and bulk-edit
  * dialogs are mostly labels). The rest is those two dialogs and the runbook's
  * Markdown renderer, which is a few regular expressions rather than a library.
+ *
+ * It moved 731,000 -> 742,000 (713.9 -> 724.6 kB) for roadmaps 5.11 to 5.14.
+ * Measured: 713.6 kB before (v2.37.0), 722.9 kB after (740,257 bytes) — 9.3 kB
+ * gzipped, 30 kB raw. By feature, each measured with the ones before it in:
+ * 5.13's silence button +0.6, 5.14's star and the wallboard's paging +0.7, 5.11's
+ * explanation chain +2.3, 5.12's replay panel +5.7. The replay is the large one
+ * because it words six kinds of step, each with its own outcomes, and that is
+ * most of the forty-six strings (276 lines) this lot added to six catalogs.
+ * No dependency was added; the CSS did not move.
  */
-export const BUDGET = { js: 731_000, css: 23_500 };
+export const BUDGET = { js: 742_000, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

@@ -80,6 +80,7 @@ export function statusRoutes(runtime: UiRuntimeCore): Router {
           components: state.last?.components ?? [],
           componentSelection: service.components,
           scopeToComponents: service.scopeToComponents,
+          favorite: service.favorite === true,
           fetchedAt: state.last?.fetchedAt ?? null,
           failureCount: state.failureCount,
           // Only ever a live mute: `listServices` drops one that has expired,

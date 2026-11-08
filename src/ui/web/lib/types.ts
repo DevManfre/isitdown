@@ -75,6 +75,8 @@ export interface ProviderStatus {
   components: ComponentStatus[];
   componentSelection: { id: string; name: string }[];
   scopeToComponents: boolean;
+  /** Starred by the operator (roadmap 5.14); `/status` always says. */
+  favorite?: boolean;
   fetchedAt: string | null;
   failureCount: number;
   /** ISO 8601 while the provider is muted; null when it is not. */
@@ -420,6 +422,8 @@ export type StatusChangeKind =
  * `delivered`), and the rendered message is `text` (not `title`).
  */
 export interface SentRecord {
+  /** The row's id, which the replay is asked by (roadmap 5.12). */
+  id?: number;
   providerId: string;
   channel: string;
   kind: StatusChangeKind;
@@ -866,6 +870,48 @@ export interface AdapterDebugProvider {
   options: Record<string, string>;
   /** Newest first, capped server-side. */
   probes: AdapterProbe[];
+}
+
+/**
+ * Why a provider shows the status it shows — roadmap 5.11. Read off the state the
+ * poller already keeps, never a fresh poll: `reading` is null for a provider
+ * nothing has read yet, and `told` is what the operator was last told, which
+ * differs from the reading while flap damping holds a change back.
+ */
+export interface ProviderExplanation {
+  id: string;
+  reading: { fetchedAt: string; overallStatus: OverallStatus; activeIncidents: number } | null;
+  components: { id: string; name: string; status: OverallStatus }[];
+  /** `scoped`: folded from the selected components; `overall`: the provider's own figure. */
+  rule: "scoped" | "overall";
+  told: OverallStatus | null;
+  damping: { confirmSamples: number; count: number; held: boolean };
+}
+
+/**
+ * Why an alert was sent — roadmap 5.12. The saved readings played back through
+ * the live diff, damping, routing and quiet hours. `detail` is plain data the
+ * panel words itself, never a sentence, so it can be translated.
+ */
+export interface ReplayStep {
+  step: "diff" | "damping" | "routing" | "channel" | "quiet-hours" | "cap";
+  outcome: string;
+  detail: Record<string, unknown>;
+}
+
+export interface NotificationReplay {
+  notification: { id: number; providerId: string; channel: string; kind: string; sentAt: string; ok: boolean };
+  /** Always `current-settings`: the replay cannot know the rules of the day the alert was sent. */
+  replayedWith: "current-settings";
+  /** False for a report or a failing channel, which no pair of readings produces. */
+  replayable: boolean;
+  /** False once the readings behind the alert have been trimmed. */
+  available: boolean;
+  /** Whether today's settings produce this alert at all. */
+  reproduced: boolean;
+  previous: { fetchedAt: string; overallStatus: OverallStatus } | null;
+  trigger: { fetchedAt: string; overallStatus: OverallStatus } | null;
+  path: ReplayStep[];
 }
 
 export interface AdapterDebugResponse {
