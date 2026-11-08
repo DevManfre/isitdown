@@ -17,6 +17,7 @@ type FixtureKey =
   | "config"
   | "providerPush"
   | "storage"
+  | "installHealth"
   | "history"
   | "incidents"
   | "incident"
@@ -72,6 +73,8 @@ export interface Fixtures {
   serviceImpact?: unknown;
   /** `/config/storage`, matched before `/config` — the retention cost report. */
   storage?: unknown;
+  /** `/config/health`, matched before `/config` — roadmap 5.15 and 5.16. */
+  installHealth?: unknown;
   /** `/debug/adapters` — the adapter diagnostics panel's recent reads. */
   adapterDebug?: unknown;
   /** `/debug/adapters/:id/explain`, matched before `adapterDebug` — roadmap 5.11's chain. */
@@ -167,6 +170,8 @@ export function stubApi(fixtures: Fixtures): void {
                                   ? "sla"
                                 : path.startsWith("/trust")
                                   ? "trust"
+                                : path.startsWith("/config/health")
+                                  ? "installHealth"
                                 : path.startsWith("/config")
                                   ? "config"
                                   : path.startsWith("/debug/adapters") && path.endsWith("/explain")
@@ -212,6 +217,9 @@ export function stubApi(fixtures: Fixtures): void {
           ),
         },
         coincidence: { days: 90, pairs: [] },
+        // Nothing to suggest: the launcher renders the checklist for every
+        // visit, and a body with no `checks` is a shape no server sends.
+        installHealth: { abandoned: [], checks: [] },
         // The provider drawer reads the routing rules to show a component's
         // silence (roadmap 5.13); a config with no `routing` is not a body the
         // server sends.

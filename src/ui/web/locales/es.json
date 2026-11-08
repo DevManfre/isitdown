@@ -2025,5 +2025,21 @@
   "config.history.restore-label": "Restaurar el valor anterior de {target} {field}",
   "config.history.restored": "Valor restaurado.",
   "config.history.loading": "Cargando historial…",
-  "config.snapshots.loading": "Cargando instantáneas…"
+  "config.snapshots.loading": "Cargando instantáneas…",
+  "install-health.title": "Estado de la instalaci\u00f3n",
+  "install-health.summary": "{ok} de {total} comprobaciones en orden",
+  "install-health.all-good": "Todo lo de la lista de comprobaci\u00f3n de la instalaci\u00f3n est\u00e1 en orden.",
+  "install-health.fix": "Corregir",
+  "install-health.error": "No se pudo cargar la lista de comprobaci\u00f3n de la instalaci\u00f3n.",
+  "install-health.channels.warn": "Ning\u00fan canal de notificaci\u00f3n est\u00e1 activado y configurado, as\u00ed que ning\u00fan aviso puede llegarte.",
+  "install-health.channel-test.never": "Todav\u00eda no se ha probado ning\u00fan canal de notificaci\u00f3n.",
+  "install-health.channel-test.stale": "Ning\u00fan canal de notificaci\u00f3n se ha probado en {days} d\u00edas.",
+  "install-health.backup.warn": "Nunca se ha descargado una copia de seguridad de esta instalaci\u00f3n.",
+  "install-health.retention.warn": "La retenci\u00f3n del historial est\u00e1 al m\u00ednimo, as\u00ed que los gr\u00e1ficos solo miran una semana atr\u00e1s.",
+  "install-health.version.warn": "Hay una versi\u00f3n m\u00e1s reciente disponible.",
+  "install-health.version.unknown": "No se comprueba si existe una versi\u00f3n m\u00e1s reciente. Activa la comprobaci\u00f3n de actualizaciones para saberlo.",
+  "install-health.token.warn": "La p\u00e1gina de estado p\u00fablica est\u00e1 activa y no hay ning\u00fan token de API configurado.",
+  "install-health.abandoned.disabled": "{name} est\u00e1 desactivado desde {when}",
+  "install-health.abandoned.failing": "{name} no se lee correctamente desde {when}",
+  "install-health.abandoned.review": "Revisar en Servicios"
 }

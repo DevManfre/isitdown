@@ -2025,5 +2025,21 @@
   "config.history.restore-label": "Restaurer la valeur précédente de {target} {field}",
   "config.history.restored": "Valeur restaurée.",
   "config.history.loading": "Chargement de l'historique…",
-  "config.snapshots.loading": "Chargement des instantanés…"
+  "config.snapshots.loading": "Chargement des instantanés…",
+  "install-health.title": "\u00c9tat de l'installation",
+  "install-health.summary": "{ok} v\u00e9rifications sur {total} en ordre",
+  "install-health.all-good": "Tout ce qui figure sur la liste de contr\u00f4le de l'installation est en ordre.",
+  "install-health.fix": "Corriger",
+  "install-health.error": "Impossible de charger la liste de contr\u00f4le de l'installation.",
+  "install-health.channels.warn": "Aucun canal de notification n'est activ\u00e9 et configur\u00e9, donc aucune alerte ne peut vous parvenir.",
+  "install-health.channel-test.never": "Aucun canal de notification n'a encore \u00e9t\u00e9 test\u00e9.",
+  "install-health.channel-test.stale": "Aucun canal de notification n'a \u00e9t\u00e9 test\u00e9 depuis {days} jours.",
+  "install-health.backup.warn": "Aucune sauvegarde n'a jamais \u00e9t\u00e9 t\u00e9l\u00e9charg\u00e9e depuis cette installation.",
+  "install-health.retention.warn": "La r\u00e9tention de l'historique est au minimum, les graphiques ne remontent donc que d'une semaine.",
+  "install-health.version.warn": "Une version plus r\u00e9cente est disponible.",
+  "install-health.version.unknown": "On ne v\u00e9rifie pas s'il existe une version plus r\u00e9cente. Activez la v\u00e9rification des mises \u00e0 jour pour le savoir.",
+  "install-health.token.warn": "La page d'\u00e9tat publique est activ\u00e9e et aucun jeton d'API n'est d\u00e9fini.",
+  "install-health.abandoned.disabled": "{name} est d\u00e9sactiv\u00e9 depuis {when}",
+  "install-health.abandoned.failing": "{name} n'a pas \u00e9t\u00e9 lu avec succ\u00e8s depuis {when}",
+  "install-health.abandoned.review": "Examiner dans Services"
 }

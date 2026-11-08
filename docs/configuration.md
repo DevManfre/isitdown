@@ -502,6 +502,27 @@ has been read that many times in a row, and the panel says how far along it is
 ("2 of 3 samples agree") instead of leaving it to be deduced from the recent
 reads below it. It refreshes while open, so the count visibly climbs.
 
+The **Settings** launcher opens with **Installation health** (roadmap 5.15 and
+5.16), a short list of what the installation would like looked at, each line
+with a button to the place that fixes it. It lists only what needs attention and
+counts the rest ("4 of 6 checks in order"); when nothing does it says so in one
+sentence. The checks: a notification channel is switched on *and* has its
+credentials; a channel has been tested within 90 days (only asked when a channel
+exists, and only a test that got through counts); a backup has been downloaded at
+least once; retention is above its 7-day floor; the running version is the newest
+(shown as unknown, and not counted as in order, while **Check for updates** is
+off); and, when `PUBLIC_PAGE` is on, `API_TOKEN` is set. The last two timestamps —
+the latest channel test and the latest backup download — are kept in two
+`settings` rows, since nothing else records them; restoring a backup brings back
+the ones it carried.
+
+The same list names **providers that look forgotten**: one switched off for 30
+days (read from the configuration history, so a provider whose switch-off was
+never recorded is not guessed at), or one enabled but never read successfully for
+30 days while its samples reach back that far, so a provider added last week and
+already unreachable is not flagged. Each row opens **Settings → Services**, where
+**Remove** asks for its usual confirmation; nothing is removed from here.
+
 **Settings → Data** also carries the one maintenance job a SQLite file needs
 (roadmap 6.13): **Check and compact** runs `PRAGMA integrity_check` and then
 `VACUUM`, and reports the bytes it returned beside what the database weighs now.
