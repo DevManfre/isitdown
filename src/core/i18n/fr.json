@@ -42,6 +42,8 @@
   "notification.report.worst-heading": "Fournisseurs les plus faibles :",
   "notification.report.worst-line": "• {provider} — {uptime} %",
   "notification.report.worst-none": "Aucun fournisseur n’a eu d’indisponibilité.",
+  "notification.report.favorites-heading": "Fournisseurs favoris :",
+  "notification.report.favorite-unmeasured": "• {provider} — non mesuré",
   "notification.report.budget-heading": "Budget d’erreur consommé :",
   "notification.report.budget-line": "• {provider} — {spent} sur {budget} min ({percent} %)",
 

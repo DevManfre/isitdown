@@ -151,3 +151,74 @@ test("a probe of a provider that does not exist is a 404", async () => {
     await it.close();
   }
 });
+
+// Roadmap 5.11.
+interface Explanation {
+  id: string;
+  reading: { fetchedAt: string; overallStatus: string; activeIncidents: number } | null;
+  components: { id: string; name: string; status: string }[];
+  rule: "scoped" | "overall";
+  told: string | null;
+  damping: { confirmSamples: number; count: number; held: boolean };
+}
+
+test("the explanation of a provider never read says so, rather than inventing a reading", async () => {
+  const it = await api();
+  try {
+    const { status, body } = await it.request("GET", "/debug/adapters/github/explain");
+    assert.equal(status, 200);
+    const explained = body as Explanation;
+    assert.equal(explained.reading, null);
+    assert.deepEqual(explained.components, []);
+    assert.equal(explained.told, null);
+    assert.deepEqual(explained.damping, { confirmSamples: 1, count: 0, held: false });
+  } finally {
+    await it.close();
+  }
+});
+
+test("the explanation of a provider that does not exist is a 404", async () => {
+  const it = await api();
+  try {
+    assert.equal((await it.request("GET", "/debug/adapters/nope/explain")).status, 404);
+  } finally {
+    await it.close();
+  }
+});
+
+test("a reading held by flap damping shows what was read, what you were last told, and how many samples agree", async () => {
+  const it = await api();
+  let indicator = "none";
+  const provider = await fakeProvider(() => ({
+    status: 200,
+    body: JSON.stringify({ status: { indicator }, incidents: [] }),
+  }));
+  try {
+    it.runtime.db.prepare("DELETE FROM services WHERE id != 'github'").run();
+    it.runtime.db.prepare("UPDATE services SET base_url = ? WHERE id = 'github'").run(provider.baseUrl);
+    it.runtime.db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('confirmSamples', '3')").run();
+    const explain = async () => (await it.request("GET", "/debug/adapters/github/explain")).body as Explanation;
+
+    await it.runtime.scheduler.triggerNow();
+    assert.equal((await explain()).told, "operational");
+
+    indicator = "major";
+    await it.runtime.scheduler.triggerNow();
+    const held = await explain();
+    assert.equal(held.reading?.overallStatus, "partial_outage", "the latest sample is what the page says now");
+    assert.equal(held.told, "operational", "the operator has not been told yet");
+    assert.deepEqual(held.damping, { confirmSamples: 3, count: 1, held: true });
+    assert.equal(held.rule, "overall");
+
+    await it.runtime.scheduler.triggerNow();
+    assert.equal((await explain()).damping.count, 2);
+
+    await it.runtime.scheduler.triggerNow();
+    const confirmed = await explain();
+    assert.deepEqual(confirmed.damping, { confirmSamples: 3, count: 0, held: false });
+    assert.equal(confirmed.told, "partial_outage", "confirmed: the operator now knows what the page says");
+  } finally {
+    await provider.close();
+    await it.close();
+  }
+});

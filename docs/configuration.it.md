@@ -504,6 +504,18 @@ dentro la riga. I canali senza variabile d'ambiente impostata restano dietro
 un'unica riga "mostra quelli non configurati", a meno che il filtro non li
 stia cercando.
 
+**Diagnostica** si apre con **Perché questo stato** (roadmap 5.11): cinque passi
+nell'ordine in cui li fa il poller — cosa è stato letto per ultimo e quando, i
+componenti che portava (nominando quelli non operativi), la regola che li ha
+riuniti (il peggiore dei componenti selezionati se hai limitato il provider a una
+selezione, altrimenti il dato complessivo del provider), lo stato che ti è stato
+*comunicato* per ultimo, e il flap damping. Gli ultimi due rendono spiegabile una
+dashboard silenziosa: con `confirmSamples` sopra 1, un cambiamento che la pagina
+già mostra viene trattenuto finché non è stato letto altrettante volte di fila, e
+il pannello dice a che punto è ("2 campioni su 3 concordano") invece di lasciarlo
+da dedurre dalle letture recenti qui sotto. Si aggiorna mentre è aperto, quindi
+il conteggio sale a vista.
+
 **Settings → Dati** porta anche l'unico lavoro di manutenzione che un file
 SQLite richiede (roadmap 6.13): **Verifica e compatta** esegue `PRAGMA
 integrity_check` e poi `VACUUM`, e riporta i byte restituiti accanto a quanto
@@ -1735,6 +1747,14 @@ transizioni di quel componente, quindi un cambio di stato del provider non lo
 incontra mai. L'id del componente è quello del provider — lo stesso che salva il
 selettore dei componenti — e rimuovere un provider elimina anche le regole dei
 suoi componenti.
+
+L'edizione UI trasforma il silenzio in un pulsante (roadmap 5.13): nella pagina
+di un provider, e nel suo drawer, ogni riga di componente ha una campanella. Il
+clic salva una regola `<id>#<componente>` con `channels: []` in **cima** alla
+tabella — decide la prima regola che corrisponde, quindi dietro una regola
+catch-all non verrebbe mai raggiunta — e la riga dice **Silenziato**. Un secondo
+clic rimuove quella regola, e solo quella: una regola per lo stesso componente
+che instrada da qualche parte è tua, e resta.
 
 L'edizione Light configura la tabella come l'elenco `routing` in
 `config.yml`, mostrato sopra; l'edizione UI la modifica da **Impostazioni**,
@@ -3007,3 +3027,85 @@ Solo edizione UI. Con cento provider, modificarne uno alla volta non scala:
   cadenza, gruppo, tag, runbook, silenziamenti pianificati e finestre
   dichiarate — con il nome "<nome> (copia)", da cui deriva il nuovo id. Dieci
   sonde HTTP che differiscono solo per il path sono una sonda e nove duplicati.
+
+### 3.30 Provider preferiti
+
+Una stella (roadmap 5.14) segna i provider che contano di più. È un solo campo
+del provider, `favorite: true`; se manca, il provider non è tra i preferiti,
+quindi un `config.yml` che non ne sa nulla si comporta esattamente come prima.
+L'export lo scrive solo dove è acceso.
+
+```yaml
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    favorite: true
+```
+
+Nell'edizione UI la stella è un pulsante prima del nome del provider, nell'elenco
+Provider e in cima alla sua pagina, ed è un interruttore: l'etichetta resta
+"Preferito: <nome>" e lo stato si legge da `aria-pressed`. Via API è
+`PATCH /config/services/:id` con `{ "favorite": true }` ([6](api.it.md)).
+Cosa cambia una stella, e nient'altro:
+
+- **Provider** elenca prima i provider con la stella. Solo nell'ordine di
+  default — appena ordini per una colonna, decide la colonna.
+- **Wallboard** mostra un provider con la stella in ogni pagina; gli altri ruotano
+  nei posti rimasti. Se le sole stelle riempissero una pagina non resta posto in
+  cui ruotare, quindi il wallboard sfoglia tutti, i preferiti per primi, invece di
+  nascondere gli altri per sempre.
+- **Il report periodico** (3.13) ottiene un elenco *Provider preferiti* con
+  l'uptime del periodo di ciascuno, **anche al 100% o senza misure** — la lista
+  dei "più deboli" nomina solo provider sotto il 100%, quindi proprio un preferito
+  con una settimana tranquilla sarebbe quello mancante. Un provider in pausa non
+  entra nel report, con la stella o senza.
+
+Una stella non cambia il polling, l'instradamento né cosa viene notificato: un
+alert per un provider con la stella va esattamente dove andava prima.
+
+### 3.31 Perché ho ricevuto questo avviso?
+
+**Log invii → espandi una riga → Perché l'ho ricevuto?** (roadmap 5.12) risponde
+alla domanda a cui la prova a secco dell'instradamento non può rispondere. La
+prova a secco dice cosa *succederebbe* a un cambiamento; questa dice cosa è
+*successo*. Prende le letture salvate del provider e le rifà passare dallo stesso
+diff engine, dallo stesso flap damping, dallo stesso instradamento e dalle stesse
+ore di silenzio del percorso vero, e stampa le decisioni nell'ordine in cui sono
+state prese:
+
+1. la lettura che è cambiata, e quella prima;
+2. il flap damping — quante letture uguali serviva, e quando sono state trattenute
+   quelle precedenti;
+3. la regola di instradamento che ha deciso, il suo bersaglio, i canali a cui
+   invia e la soglia di gravità con cui è stata confrontata;
+4. se il canale a cui è andato il messaggio è uno di quelli;
+5. le ore di silenzio — fuori dalla finestra, dentro ma sopra la soglia, o
+   trattenuto;
+6. il limite di avvisi, come lo mostra il log.
+
+Si chiede solo con un clic: il log si legge molto più spesso di quanto si
+interroghi una singola riga.
+
+Ciò che non può sapere, lo dice invece di tirare a indovinare:
+
+- **Rifà con le impostazioni di oggi.** Non può conoscere le regole del giorno in
+  cui l'avviso è stato inviato. Se quelle impostazioni non produrrebbero l'avviso,
+  lo dice — è cambiata una regola, un silenziamento o il flap damping — e si
+  ferma al diff, invece di inventare un percorso che torni.
+- **Un canale può esserci per un altro motivo.** Un incidente seguito, il
+  reperibile e un'escalation aggiungono canali che le regole non nominano mai.
+  Quando il canale non è tra quelli della regola, il pannello nomina queste
+  possibilità.
+- **Il limite è contato dal log.** Il conteggio del dispatcher vive in memoria ed
+  è sparito quando qualcuno lo chiede.
+- **Si tengono solo le letture recenti**: le ultime 100 per provider, nella
+  tabella `status_readings`, che fa parte del backup. Più vecchie di così, il
+  pannello dice che le letture non ci sono più.
+- **Alcuni messaggi non riguardano una lettura** — un report periodico, un canale
+  che fallisce, un'interruzione correlata — e non c'è nulla da rifare.
+
+Ciò che si conserva è la lettura *normalizzata*, quella che ha visto il diff
+engine, non la risposta grezza del provider: un riepilogo di Cloudflare pesa
+cento kilobyte a ogni poll.

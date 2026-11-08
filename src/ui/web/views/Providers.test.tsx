@@ -54,6 +54,36 @@ const inTable = async () => within(await screen.findByRole("table"));
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Providers", () => {
+  // Roadmap 5.14: in the default order a star outranks severity.
+  describe("the star (roadmap 5.14)", () => {
+    const names = async () =>
+      (await inTable())
+        .getAllByRole("row")
+        .slice(1)
+        .map((row) => within(row).getByRole("link").textContent);
+
+    it("keeps the problems-first order while nothing is starred", async () => {
+      renderWithProviders(<Providers />, { status, history });
+      await (await inTable()).findByText("GitHub");
+      expect((await names())[0]).toBe("Discord");
+    });
+
+    it("lists a starred provider first, ahead of one that is down, and says it is starred", async () => {
+      const starred = {
+        ...status,
+        providers: status.providers.map((provider) =>
+          provider.id === "cf" ? { ...provider, favorite: true } : provider,
+        ),
+      };
+      renderWithProviders(<Providers />, { status: starred, history });
+
+      await (await inTable()).findByText("Cloudflare");
+      expect((await names())[0]).toBe("Cloudflare");
+      expect(screen.getByRole("button", { name: "Favorite: Cloudflare" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("button", { name: "Favorite: Discord" })).toHaveAttribute("aria-pressed", "false");
+    });
+  });
+
   it("renders one row per configured provider", async () => {
     renderWithProviders(<Providers />, { status, history });
     expect(await (await inTable()).findByText("GitHub")).toBeInTheDocument();
@@ -487,7 +517,10 @@ describe("Providers", () => {
 
       const github = (await inTable()).getByText("GitHub").closest("tr");
       if (github === null) throw new Error("expected a table row");
-      expect(within(github).queryByRole("button")).toBeNull();
+      // The row has a button — the star (roadmap 5.14) — just not an expand control.
+      expect(
+        within(github).queryByRole("button", { name: i18n.t("providers.components-toggle") }),
+      ).toBeNull();
     });
 
     it("expands the row into its monitored components and how each is doing", async () => {
