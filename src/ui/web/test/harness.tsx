@@ -33,6 +33,8 @@ type FixtureKey =
   | "maintenances"
   | "serviceImpact"
   | "adapterDebug"
+  | "adapterExplain"
+  | "replay"
   | "catalog"
   | "dashboard"
   | "dashboards"
@@ -72,6 +74,10 @@ export interface Fixtures {
   storage?: unknown;
   /** `/debug/adapters` — the adapter diagnostics panel's recent reads. */
   adapterDebug?: unknown;
+  /** `/debug/adapters/:id/explain`, matched before `adapterDebug` — roadmap 5.11's chain. */
+  adapterExplain?: unknown;
+  /** `/notifications/:id/replay`, matched before the rest of `/notifications` — roadmap 5.12. */
+  replay?: unknown;
   /** `/config/catalog`, matched before `/config` — the bundled provider menu. */
   catalog?: unknown;
   /** `/config/provider-push`, matched before `/config` — roadmap 1.2's subscription card. */
@@ -115,7 +121,9 @@ export function stubApi(fixtures: Fixtures): void {
     "fetch",
     vi.fn(async (input: string) => {
       const path = String(input);
-      const key: FixtureKey = path.startsWith("/notifications/preview")
+      const key: FixtureKey = path.endsWith("/replay")
+        ? "replay"
+        : path.startsWith("/notifications/preview")
         ? "messagePreview"
         : path.startsWith("/coincidence")
         ? "coincidence"
@@ -161,6 +169,8 @@ export function stubApi(fixtures: Fixtures): void {
                                   ? "trust"
                                 : path.startsWith("/config")
                                   ? "config"
+                                  : path.startsWith("/debug/adapters") && path.endsWith("/explain")
+                                    ? "adapterExplain"
                                   : path.startsWith("/debug/adapters")
                                     ? "adapterDebug"
                                     : path === "/dashboards"
@@ -202,6 +212,19 @@ export function stubApi(fixtures: Fixtures): void {
           ),
         },
         coincidence: { days: 90, pairs: [] },
+        // The provider drawer reads the routing rules to show a component's
+        // silence (roadmap 5.13); a config with no `routing` is not a body the
+        // server sends.
+        config: { routing: { rules: [], invalidRules: 0 } },
+        // A provider nothing has read yet, which is the honest default for the panel.
+        adapterExplain: {
+          id: "acme",
+          reading: null,
+          components: [],
+          rule: "overall",
+          told: null,
+          damping: { confirmSamples: 1, count: 0, held: false },
+        },
         trust: { days: 90, windows: [30, 90, 365], cards: [] },
         annotations: { annotations: [] },
         providerPush: { enabled: false, tokenRevealed: false, providers: [] },

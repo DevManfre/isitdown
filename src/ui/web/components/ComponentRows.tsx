@@ -1,13 +1,65 @@
+import { Bell, BellOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
-import { useComponentHistory } from "@/hooks/queries.ts";
+import { useComponentHistory, useConfigChrome, useRoutingMutations } from "@/hooks/queries.ts";
 import type { ComponentHistory, ComponentStatus } from "@/lib/types.ts";
 import { statusLabelKey } from "@/lib/chartConfig.ts";
+import {
+  componentMuteTarget,
+  isComponentSilenced,
+  withComponentSilenced,
+  withoutComponentSilence,
+} from "@/lib/componentMute.ts";
 
 const uptimeFor = (component: ComponentHistory, days: number) =>
   (days <= 7 ? component.uptime7 : days <= 30 ? component.uptime30 : component.uptime90);
+
+/**
+ * Roadmap 5.13. Writes the same `provider#component` rule the routing editor
+ * does, so a silence made here shows up there and the other way round. Reads
+ * the config through the chrome hook, which never throws: a failed config
+ * request costs this row its button, not the page its render.
+ *
+ * Feedback is the row itself — a badge that says the word, never a colour
+ * alone — and a failed save reads inline, since these toasts belong to Settings.
+ */
+function SilenceButton({ providerId, componentId, name }: { providerId: string; componentId: string; name: string }) {
+  const { t } = useTranslation();
+  const { data: config } = useConfigChrome();
+  const { save } = useRoutingMutations();
+  if (config === undefined) return null;
+
+  const target = componentMuteTarget(providerId, componentId);
+  const rules = config.routing.rules;
+  const silenced = isComponentSilenced(rules, target);
+  const label = t(silenced ? "component.silence.lift" : "component.silence.action", { name });
+
+  return (
+    <span className="flex shrink-0 items-center gap-2">
+      {silenced && <Badge variant="muted">{t("component.silence.badge")}</Badge>}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={label}
+        title={label}
+        disabled={save.isPending}
+        onClick={() => save.mutate((silenced ? withoutComponentSilence : withComponentSilenced)(rules, target))}
+      >
+        {silenced ? <Bell aria-hidden="true" /> : <BellOff aria-hidden="true" />}
+      </Button>
+      {save.isError && (
+        <span role="alert" className="text-xs text-destructive">
+          {t("toast.failed", { error: save.error instanceof Error ? save.error.message : String(save.error) })}
+        </span>
+      )}
+    </span>
+  );
+}
 
 /**
  * Per-component breakdown under a provider's own row. Mounted only when that
@@ -25,12 +77,14 @@ const uptimeFor = (component: ComponentHistory, days: number) =>
  * heading inside an accordion panel is a label for a label.
  */
 export function ComponentRows({
-  providerId, days, current, heading,
+  providerId, days, current, heading, silenceable = false,
 }: {
   providerId: string;
   days: number;
   current: ComponentStatus[];
   heading?: string;
+  /** A button per row that silences that component's alerts — roadmap 5.13. */
+  silenceable?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { data } = useComponentHistory(providerId, days);
@@ -74,6 +128,13 @@ export function ComponentRows({
                   />
                 )}
               </span>
+              {silenceable && (
+                <SilenceButton
+                  providerId={providerId}
+                  componentId={component.componentId}
+                  name={live?.name ?? component.name}
+                />
+              )}
             </div>
           );
         })

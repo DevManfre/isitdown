@@ -1169,6 +1169,27 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }) },
     },
   },
+  "/notifications/{id}/replay": {
+    get: {
+      tags: ["Notifications"],
+      summary: "Why did I get this alert? Replays the saved readings through the live diff, damping, routing and quiet hours.",
+      description:
+        "Roadmap 5.12. Replays with the settings in force now (`replayedWith`), and says `reproduced: false` when they would not produce the alert. `available: false` once the readings behind it have been trimmed.",
+      parameters: [path("id", "Delivery log row id.")],
+      responses: { "200": ok({ type: "object" }), "400": badRequest, "404": notFound },
+    },
+  },
+  "/debug/adapters/{id}/explain": {
+    get: {
+      tags: ["Diagnostics"],
+      summary:
+        "Why that provider shows the status it shows: last reading, components, rule, what you were last told, flap damping.",
+      description:
+        "Read off the state the poller already keeps (roadmap 5.11). It never polls.",
+      parameters: [path("id", "Service id.")],
+      responses: { "200": ok({ type: "object" }), "404": notFound },
+    },
+  },
   "/debug/adapters/{id}/probe": {
     post: {
       tags: ["Diagnostics"],
@@ -1512,6 +1533,10 @@ const schemas: Json = {
       options: { type: "object", additionalProperties: { type: "string" } },
       components: { type: "array", items: { type: "object" } },
       scopeToComponents: { type: "boolean" },
+      favorite: {
+        type: "boolean",
+        description: "A star (roadmap 5.14): listed first, always on the wallboard, always in the weekly summary.",
+      },
       authority: {
         type: "string",
         enum: [...AUTHORITIES],

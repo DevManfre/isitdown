@@ -491,6 +491,17 @@ the line; **Mute**, **Diagnose**, **Edit** and **Remove** are one click away
 inside the row. Channels with no environment variable set wait behind a single
 "show the ones that are not set up" row, unless the filter is asking for them.
 
+**Diagnose** opens with **Why this status** (roadmap 5.11): five steps in the
+order the poller takes them — what was last read and when, the components it
+carried (naming the ones that are not operational), the rule that folded them
+(the worst of the selected components if you scoped the provider to a selection,
+otherwise the provider's own figure), the status you were last *told*, and flap
+damping. The last two are what make a quiet dashboard explicable: with
+`confirmSamples` above 1, a change the page already shows is held back until it
+has been read that many times in a row, and the panel says how far along it is
+("2 of 3 samples agree") instead of leaving it to be deduced from the recent
+reads below it. It refreshes while open, so the count visibly climbs.
+
 **Settings → Data** also carries the one maintenance job a SQLite file needs
 (roadmap 6.13): **Check and compact** runs `PRAGMA integrity_check` and then
 `VACUUM`, and reports the bytes it returned beside what the database weighs now.
@@ -1674,6 +1685,13 @@ the provider. A component target matches only that component's own transitions,
 so a provider-level status change never matches one. The component id is the
 provider's own — the same id the component picker stores — and removing a
 provider deletes its components' rules along with its own.
+
+The UI edition makes the mute a button (roadmap 5.13): on a provider's page, and
+in its drawer, each component row has a bell. Clicking it saves a
+`<id>#<component>` rule with `channels: []` at the **top** of the table — the
+first matching rule decides, so behind a catch-all it would never be reached —
+and the row says **Silenced**. Clicking again removes that rule, and only that
+one: a rule for the same component that routes somewhere is yours, and stays.
 
 The Light edition configures the table as the `routing` list in `config.yml`,
 shown above; the UI edition edits it from **Settings**, where the provider
@@ -2891,3 +2909,80 @@ scale:
   tags, runbook, planned mutes and declared windows — under the name
   "<name> (copy)", from which the new id is derived. Ten HTTP probes that
   differ only in their path are one probe and nine duplicates.
+
+### 3.30 Starred providers
+
+A star (roadmap 5.14) marks the providers that matter most. It is one field on
+the provider, `favorite: true`; left out, a provider is not starred, so a
+`config.yml` that never heard of it behaves exactly as before. The export writes
+it only where it is on.
+
+```yaml
+services:
+  - id: github
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    favorite: true
+```
+
+In the UI edition the star is a button before the provider's name, on the
+Providers list and at the top of its page, and the button is a toggle: its label
+stays "Favorite: <name>" and the state is read from `aria-pressed`. Over the API
+it is `PATCH /config/services/:id` with `{ "favorite": true }` ([6](api.md)).
+What a star changes, and nothing else:
+
+- **Providers** lists starred providers first. That is the default order only —
+  once you sort by a column, the column decides.
+- **Wallboard** shows a starred provider on every page; the others rotate
+  through the places left. If the stars alone would fill a page there is no place
+  left to rotate into, so the wallboard pages through everyone, starred first,
+  rather than hide the rest for good.
+- **The periodic report** (3.13) gains a *Starred providers* list with each
+  one's uptime for the period, **at 100% or with nothing measured too** — the
+  "weakest" list only ever names providers below 100%, so a starred provider with
+  a quiet week would be the one missing. A paused provider is not reported on,
+  starred or not.
+
+A star does not change polling, routing or what is notified: an alert for a
+starred provider goes exactly where it went before.
+
+### 3.31 Why did I get this alert?
+
+**Delivery log → expand a row → Why did I get this?** (roadmap 5.12) answers the
+question the routing dry run cannot. The dry run says what *would* happen to a
+change; this says what *did*. It takes the provider's saved readings and plays
+them back through the same diff engine, flap damping, routing and quiet hours the
+live path uses, and prints the decisions in the order they were made:
+
+1. the reading that changed, and the one before it;
+2. flap damping — how many matching readings it needed, and when the earlier ones
+   were held back;
+3. the routing rule that decided, its target, the channels it sends to and the
+   severity floor it was checked against;
+4. whether the channel the message went to is one of them;
+5. quiet hours — outside the window, inside it but over its floor, or held back;
+6. the alert cap, as the log shows it.
+
+It is asked only when you click: the log is read far more often than any one row
+is questioned.
+
+What it cannot know, it says rather than guesses:
+
+- **It replays with today's settings.** It cannot know the rules of the day the
+  alert was sent. If those settings would not produce the alert, it says so — a
+  rule, a mute or flap damping has changed — and stops at the diff, instead of
+  inventing a path that fits.
+- **A channel can be there for another reason.** A followed incident, the person
+  on call and an escalation add channels the rules never named. When the channel
+  is not among the rule's, the panel names those possibilities.
+- **The cap is counted from the log.** The dispatcher's own count lives in memory
+  and is gone by the time anyone asks.
+- **Only recent readings are kept**: the last 100 per provider, in the
+  `status_readings` table, which is part of the backup. Older than that, the panel
+  says the readings are gone.
+- **Some messages are not about a reading** — a periodic report, a failing
+  channel, a correlated outage — and have nothing to replay.
+
+What is kept is the *normalised* reading, the one the diff engine saw, not the
+provider's raw response: a Cloudflare summary is a hundred kilobytes a poll.

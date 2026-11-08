@@ -37,6 +37,7 @@ const TABLES = [
   "recipients",
   "provider_state",
   "status_samples",
+  "status_readings",
   "component_samples",
   "incidents",
   "maintenances",

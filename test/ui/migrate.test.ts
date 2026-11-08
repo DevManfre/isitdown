@@ -51,6 +51,7 @@ test("migrate creates every table the dashboard reads", async () => {
     "services",
     "settings",
     "sla_notices",
+    "status_readings",
     "status_samples",
     "trust_episodes",
   ]);

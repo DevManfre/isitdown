@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { FavoriteStar } from "@/components/FavoriteStar.tsx";
 import { IncidentMap } from "@/components/IncidentMap.tsx";
 import { Markdown } from "@/components/Markdown.tsx";
 import { ProviderDetailPanel } from "@/components/ProviderDetailPanel.tsx";
@@ -84,6 +85,7 @@ export function ProviderDetail() {
         <div className="flex flex-wrap items-center gap-3">
           <StatusDot status={headerStatus} label={t(statusLabelKey(headerStatus))} />
           <h1 className="text-xl font-semibold">{provider.name}</h1>
+          <FavoriteStar providerId={provider.id} name={provider.name} favorite={provider.favorite === true} />
           {provider.mutedUntil !== undefined && provider.mutedUntil !== null && (
             <Badge variant="muted">{t("provider.muted")}</Badge>
           )}

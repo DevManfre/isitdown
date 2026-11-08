@@ -16,6 +16,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { useCountWidth } from "@/hooks/useCountWidth.ts";
 import { ProviderIcon } from "@/components/ProviderIcon.tsx";
+import { ReplayPanel } from "@/components/ReplayPanel.tsx";
 import { NumberTicker } from "@/components/ui/number-ticker.tsx";
 import { StatTiles } from "@/components/StatTiles.tsx";
 import { useConfig, useDeliveryLog, useStatus } from "@/hooks/queries.ts";
@@ -286,6 +287,9 @@ export function DeliveryLog() {
                     {record.error !== undefined && (
                       <span className="font-mono text-xs text-destructive">{record.error}</span>
                     )}
+                    {/* Roadmap 5.12: why this one was sent. Behind the row's own
+                        disclosure, so the log stays one line per alert. */}
+                    <ReplayPanel notificationId={record.id} />
                   </div>
                 )}
               </div>

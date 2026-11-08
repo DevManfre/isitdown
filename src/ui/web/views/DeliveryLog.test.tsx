@@ -136,6 +136,35 @@ describe("DeliveryLog", () => {
     expect(row).toHaveAttribute("aria-expanded", "true");
   });
 
+  // Roadmap 5.12.
+  it("offers 'why did I get this?' only inside an expanded row, and answers it from the replay", async () => {
+    renderWithProviders(<DeliveryLog />, {
+      status,
+      config,
+      // The view opens on the failed sends, so that is the row that is on screen.
+      deliveryLog: log([{ ...failed, id: 7 }], { all: 1, sent: 0, failed: 1 }),
+      replay: {
+        notification: { id: 7, providerId: "github", channel: "webhook", kind: "status_change", sentAt: failed.sentAt, ok: false },
+        replayedWith: "current-settings",
+        replayable: true,
+        available: false,
+        reproduced: false,
+        previous: null,
+        trigger: null,
+        path: [],
+      },
+    });
+
+    const row = await rows().findByRole("button", { name: (name) => name.includes("GitHub") });
+    const action = i18n.t("replay.action");
+    expect(screen.queryByRole("button", { name: action })).not.toBeInTheDocument();
+
+    await userEvent.click(row);
+    await userEvent.click(await screen.findByRole("button", { name: action }));
+
+    expect(await screen.findByText(i18n.t("replay.unavailable"))).toBeInTheDocument();
+  });
+
   it("names a retried failure a dead letter, with what it cost", async () => {
     // "Failed" reads like something that might still arrive; a spent retry
     // budget is a lost alert, and the badge has to say so.

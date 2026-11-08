@@ -202,6 +202,33 @@ test("routing survives a round trip, and an absent routing block leaves the rule
   }
 });
 
+// Roadmap 5.14: a star is part of the file, and an unstarred provider adds no noise to it.
+test("a provider's star survives a round trip and is left out of the file when off", async () => {
+  const app = await api();
+  try {
+    const yaml = `services:
+  - id: starred
+    name: Starred
+    adapter: statuspage
+    baseUrl: https://status.starred.test
+    favorite: true
+  - id: plain
+    name: Plain
+    adapter: statuspage
+    baseUrl: https://status.plain.test
+`;
+    assert.equal((await app.postYaml("/config/import", yaml)).status, 200);
+
+    const exported = parse((await app.get("/config/export")).text) as {
+      services: { id: string; favorite?: boolean }[];
+    };
+    assert.equal(exported.services.find((service) => service.id === "starred")?.favorite, true);
+    assert.equal("favorite" in (exported.services.find((service) => service.id === "plain") ?? {}), false);
+  } finally {
+    await app.close();
+  }
+});
+
 // Roadmap 3.5 and 3.7: recipients and a provider's handover note travel both ways.
 test("recipients and a provider's impact and owner survive a round trip", async () => {
   const app = await api();
