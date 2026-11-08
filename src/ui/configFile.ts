@@ -91,6 +91,7 @@ export function buildConfigDocument(db: DatabaseSync, logger: Logger): Record<st
       ...(service.mutedUntil === undefined ? {} : { mutedUntil: service.mutedUntil }),
       ...(service.components.length === 0 ? {} : { components: service.components }),
       ...(service.scopeToComponents ? { scopeToComponents: true } : {}),
+      ...(service.favorite === true ? { favorite: true } : {}),
       ...(service.group === undefined ? {} : { group: service.group }),
       ...(service.dependsOn === undefined
         ? {}
@@ -298,6 +299,7 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
       intervalSeconds: service.intervalSeconds ?? null,
       components: service.components,
       scopeToComponents: service.scopeToComponents,
+      favorite: service.favorite === true,
       // Null rather than omitted: an import is the file's whole fleet, so a
       // service that no longer carries a group or a cross-check has to lose
       // the one the database is still holding.

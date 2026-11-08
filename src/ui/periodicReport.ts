@@ -89,6 +89,15 @@ export function createReportService(deps: ReportDeps) {
       .slice(0, WORST_SHOWN)
       .map((provider) => ({ providerId: provider.providerId, uptime: provider.uptime }));
 
+    // A star is a promise to be told, so these are listed even at 100% or with
+    // nothing measured. A paused provider is not reported on at all, starred or not.
+    const favorites = enabled
+      .filter((service) => service.favorite === true)
+      .map((service) => ({
+        providerId: service.id,
+        uptime: range.providers.find((provider) => provider.providerId === service.id)?.uptime ?? null,
+      }));
+
     const targets = enabled.filter(
       (service): service is ServiceDefinition & { slaTarget: number } => service.slaTarget !== undefined,
     );
@@ -125,6 +134,7 @@ export function createReportService(deps: ReportDeps) {
         fleetUptime: range.fleetUptime,
         incidentCount: range.incidents.length,
         worst,
+        favorites,
         sla,
       },
       at: at.toISOString(),

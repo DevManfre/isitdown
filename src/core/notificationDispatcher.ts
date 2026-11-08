@@ -12,6 +12,8 @@ import { tracer } from "./tracing.ts";
 import { renderMessage } from "../notifiers/formatting.ts";
 
 export interface SentRecord {
+  /** The row's id, present only on a record read back from the store (roadmap 5.12). */
+  id?: number | undefined;
   providerId: string;
   channel: string;
   kind: StatusChangeKind;

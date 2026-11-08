@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 38;
+export const SCHEMA_VERSION = 40;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -866,6 +866,36 @@ function upgrade(db: DatabaseSync, from: number): void {
         after  TEXT
       );
       CREATE INDEX IF NOT EXISTS config_audit_at ON config_audit (at DESC, id DESC);
+    `);
+  }
+
+  if (from < 39) {
+    // A star on a provider — roadmap 5.14. On the row like `scope_to_components`: the
+    // Light edition writes it as a field of the provider, so a side table would
+    // describe one thing two ways.
+    const starColumns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!starColumns.includes("favorite")) {
+      db.exec("ALTER TABLE services ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0");
+    }
+  }
+
+  if (from < 40) {
+    // The last readings a provider gave, whole — roadmap 5.12. `status_samples`
+    // keeps one number per poll, enough to draw a bar but not to say why an alert
+    // was sent; replaying the diff needs the incidents and components the
+    // reading carried. Normalized rather than the provider's raw JSON: the diff
+    // engine never saw the raw body, and a Cloudflare summary is a hundred
+    // kilobytes a poll. Bounded per provider in the store, not here.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS status_readings (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider_id TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        observed_at TEXT NOT NULL,
+        reading     TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS status_readings_provider ON status_readings (provider_id, observed_at);
     `);
   }
 

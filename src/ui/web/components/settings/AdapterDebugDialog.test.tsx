@@ -179,3 +179,62 @@ describe("AdapterDebugDialog", () => {
     expect(document.activeElement).toBe(trigger);
   });
 });
+
+// Roadmap 5.11: the chain from what was read to what you were told.
+describe("AdapterDebugDialog — why this status", () => {
+  const explanation = {
+    id: "acme",
+    reading: { fetchedAt: "2026-09-08T12:00:00.000Z", overallStatus: "partial_outage", activeIncidents: 1 },
+    components: [
+      { id: "api", name: "API", status: "partial_outage" },
+      { id: "web", name: "Web", status: "operational" },
+    ],
+    rule: "scoped",
+    told: "operational",
+    damping: { confirmSamples: 3, count: 2, held: true },
+  };
+
+  /** The five steps, in the order a reader follows them. */
+  const steps = (dialog: HTMLElement) =>
+    within(within(dialog).getByRole("list", { name: i18n.t("adapter.explain.title") }))
+      .getAllByRole("listitem")
+      .map((item) => item.textContent ?? "");
+
+  it("walks reading, components, rule, what you were told and the damping, in that order", async () => {
+    const dialog = await open({ adapterDebug, adapterExplain: explanation });
+    await within(dialog).findByText(/2 of 3/);
+
+    const [reading, components, rule, told, damping] = steps(dialog);
+    expect(reading).toContain(i18n.t("status.partial-outage"));
+    expect(reading).toContain("1");
+    expect(components).toContain("API");
+    expect(components).toContain(i18n.t("status.partial-outage"));
+    expect(components).not.toContain("Web");
+    expect(rule).toContain(i18n.t("adapter.explain.rule-scoped"));
+    expect(told).toContain(i18n.t("status.operational"));
+    expect(damping).toContain("2 of 3");
+  });
+
+  it("says nothing is being held while damping is on but idle", async () => {
+    const dialog = await open({
+      adapterDebug,
+      adapterExplain: { ...explanation, damping: { confirmSamples: 3, count: 0, held: false } },
+    });
+    expect(await within(dialog).findByText(i18n.t("adapter.explain.damping-idle", { required: 3 }))).toBeTruthy();
+  });
+
+  it("says damping is off when one sample is enough, rather than showing a count out of one", async () => {
+    const dialog = await open({
+      adapterDebug,
+      adapterExplain: { ...explanation, damping: { confirmSamples: 1, count: 0, held: false } },
+    });
+    expect(await within(dialog).findByText(i18n.t("adapter.explain.damping-off"))).toBeTruthy();
+    expect(within(dialog).queryByText(/of 1/)).toBeNull();
+  });
+
+  it("does not invent a reading for a provider nothing has read yet", async () => {
+    const dialog = await open({ adapterDebug });
+    expect(await within(dialog).findByText(i18n.t("adapter.explain.reading-none"))).toBeTruthy();
+    expect(within(dialog).getByText(i18n.t("adapter.explain.told-none"))).toBeTruthy();
+  });
+});

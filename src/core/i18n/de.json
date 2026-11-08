@@ -42,6 +42,8 @@
   "notification.report.worst-heading": "Schwächste Anbieter:",
   "notification.report.worst-line": "• {provider} — {uptime}%",
   "notification.report.worst-none": "Kein Anbieter hatte Ausfallzeit.",
+  "notification.report.favorites-heading": "Markierte Anbieter:",
+  "notification.report.favorite-unmeasured": "• {provider} — nicht gemessen",
   "notification.report.budget-heading": "Verbrauchtes Fehlerbudget:",
   "notification.report.budget-line": "• {provider} — {spent} von {budget} Min. ({percent}%)",
 

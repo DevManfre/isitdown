@@ -136,6 +136,7 @@ const notificationCountsSchema = z.object({
 });
 
 const notificationRowSchema = z.object({
+  id: z.number(),
   provider_id: z.string(),
   channel: z.string(),
   // Built from the same tuple StatusChangeKind is derived from, not
@@ -300,8 +301,12 @@ const toMaintenanceRow = (row: MaintenanceDbRow): MaintenanceRow => ({
  * through to all of them.
  */
 /** One `notifications` row as the dispatcher's own record. */
+/** How many whole readings are kept per provider for the replay (roadmap 5.12). */
+export const READINGS_KEPT = 100;
+
 function toSentRecord(row: z.infer<typeof notificationRowSchema>): SentRecord {
   return {
+    id: row.id,
     providerId: row.provider_id,
     channel: row.channel,
     kind: row.kind,
@@ -404,6 +409,14 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
   `);
   const insertSample = db.prepare(
     "INSERT INTO status_samples (provider_id, observed_at, overall_status, ok, latency_ms, adapter_version) VALUES (?, ?, ?, ?, ?, ?)",
+  );
+  const insertReading = db.prepare(
+    "INSERT INTO status_readings (provider_id, observed_at, reading) VALUES (?, ?, ?)",
+  );
+  // Newest ids win: a poll never writes an older reading than the last, so id
+  // order is time order and the trim needs no timestamp comparison.
+  const trimReadings = db.prepare(
+    "DELETE FROM status_readings WHERE provider_id = ? AND id NOT IN (SELECT id FROM status_readings WHERE provider_id = ? ORDER BY id DESC LIMIT ?)",
   );
   const insertComponentSample = db.prepare(
     "INSERT INTO component_samples (provider_id, component_id, observed_at, status, ok, adapter_version) VALUES (?, ?, ?, ?, ?, ?)",
@@ -534,6 +547,12 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
           meta?.latencyMs ?? null,
           meta?.adapterVersion ?? null,
         );
+
+        // The whole reading, for the replay (roadmap 5.12). Kept to the last few
+        // dozen per provider: it answers "why did I get that alert", which is a
+        // question about the last few hours, not history.
+        insertReading.run(status.provider, status.fetchedAt, JSON.stringify(status));
+        trimReadings.run(status.provider, status.provider, READINGS_KEPT);
 
         // `unknown` writes no sample: an unmeasured component must not read as
         // downtime, and a gap-filled day already renders as unknown in the bars.
@@ -675,7 +694,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       const where = scope === null ? "" : `WHERE ${scope.clause}`;
       const rows = db
         .prepare(
-          `SELECT provider_id, channel, kind, text, sent_at, ok, error, attempts
+          `SELECT id, provider_id, channel, kind, text, sent_at, ok, error, attempts
            FROM notifications ${where} ORDER BY sent_at DESC, id DESC LIMIT ?`,
         )
         .all(...(scope?.params ?? []), limit)
@@ -707,7 +726,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
 
       return db
         .prepare(
-          `SELECT provider_id, channel, kind, text, sent_at, ok, error, attempts
+          `SELECT id, provider_id, channel, kind, text, sent_at, ok, error, attempts
            FROM notifications ${where} ORDER BY sent_at DESC, id DESC ${window}`,
         )
         .all(...params)

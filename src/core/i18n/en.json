@@ -42,6 +42,8 @@
   "notification.report.worst-heading": "Weakest providers:",
   "notification.report.worst-line": "• {provider} — {uptime}%",
   "notification.report.worst-none": "No provider had any downtime.",
+  "notification.report.favorites-heading": "Starred providers:",
+  "notification.report.favorite-unmeasured": "• {provider} — not measured",
   "notification.report.budget-heading": "Error budget spent:",
   "notification.report.budget-line": "• {provider} — {spent} of {budget} min ({percent}%)",
 

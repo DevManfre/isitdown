@@ -166,6 +166,7 @@ export function ProviderDetailPanel({
               days={days}
               current={components}
               heading={t("components.rows-title")}
+              silenceable
             />
           )}
         </div>

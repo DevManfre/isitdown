@@ -66,6 +66,8 @@ export interface ServiceDefinition {
   components: { id: string; name: string }[];
   /** Report only what the selection covers. Meaningless with no selection. */
   scopeToComponents: boolean;
+  /** Starred by the operator (roadmap 5.14). Absent means not starred. */
+  favorite?: boolean | undefined;
   /**
    * ISO 8601, UTC. While a reading is taken before it, nothing about this
    * provider notifies. Absent means the provider is not muted.
