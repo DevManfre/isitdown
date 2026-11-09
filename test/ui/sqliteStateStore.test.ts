@@ -376,8 +376,8 @@ test("getRecentSamples returns the newest samples up to the limit", async () => 
 
 test("pruneOlderThan drops old samples and keeps recent ones", async () => {
   const { db, store } = await harness();
-  const old = new Date(Date.now() - 200 * 24 * 3600 * 1000).toISOString();
-  const recent = new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString();
+  const old = new Date(NOW.getTime() - 200 * 24 * 3600 * 1000).toISOString();
+  const recent = new Date(NOW.getTime() - 2 * 24 * 3600 * 1000).toISOString();
   await store.saveStatus({ ...snap(), fetchedAt: old });
   await store.saveStatus({ ...snap(), fetchedAt: recent });
 
@@ -395,7 +395,7 @@ test("pruneOlderThan forgets message references nobody will edit again", async (
   const { db, store } = await harness();
   await store.saveRef("telegram", "github", "old-incident", "ref-old");
   await store.saveRef("telegram", "github", "new-incident", "ref-new");
-  const old = new Date(Date.now() - 200 * 24 * 3600 * 1000).toISOString();
+  const old = new Date(NOW.getTime() - 200 * 24 * 3600 * 1000).toISOString();
   db.prepare("UPDATE message_refs SET updated_at = ? WHERE incident_id = ?").run(old, "old-incident");
 
   await store.pruneOlderThan(120);

@@ -1760,3 +1760,49 @@ test("PATCH /config/settings refuses a rotation that names an unknown recipient,
     await app.close();
   }
 });
+
+// Roadmap 5.15 and 5.16.
+interface Health {
+  abandoned: { id: string }[];
+  checks: { id: string; state: string }[];
+}
+
+const healthState = (health: Health, id: string): string | undefined =>
+  health.checks.find((check) => check.id === id)?.state;
+
+test("a fresh installation's health lists no abandoned provider and warns about the housekeeping it has not done", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.request("GET", "/config/health");
+    assert.equal(status, 200);
+    const health = body as Health;
+    assert.deepEqual(health.abandoned, []);
+    assert.equal(healthState(health, "backup"), "warn");
+    assert.equal(healthState(health, "retention"), "ok");
+  } finally {
+    await app.close();
+  }
+});
+
+test("a channel test that got through turns the channel-test health check green", async () => {
+  const receiver = createServer((_req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end("{}");
+  });
+  await new Promise<void>((resolve) => receiver.listen(0, "127.0.0.1", resolve));
+  const { port } = receiver.address() as AddressInfo;
+  const app = await api({ WEBHOOK_URL: `http://127.0.0.1:${port}/hook` });
+  try {
+    await app.request("PATCH", "/config/channels/webhook", { enabled: true });
+    let health = (await app.request("GET", "/config/health")).body as Health;
+    assert.equal(healthState(health, "channel-test"), "warn");
+
+    await app.request("POST", "/config/channels/webhook/test");
+    health = (await app.request("GET", "/config/health")).body as Health;
+    assert.equal(healthState(health, "channels"), "ok");
+    assert.equal(healthState(health, "channel-test"), "ok");
+  } finally {
+    await app.close();
+    await new Promise<void>((resolve) => receiver.close(() => resolve()));
+  }
+});

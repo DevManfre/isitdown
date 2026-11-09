@@ -516,6 +516,29 @@ il pannello dice a che punto è ("2 campioni su 3 concordano") invece di lasciar
 da dedurre dalle letture recenti qui sotto. Si aggiorna mentre è aperto, quindi
 il conteggio sale a vista.
 
+La schermata **Impostazioni** si apre con **Salute dell'installazione** (roadmap
+5.15 e 5.16), un breve elenco di ciò che l'installazione vorrebbe far guardare,
+ogni riga con un pulsante verso il punto in cui si sistema. Elenca solo ciò che
+richiede attenzione e conta il resto ("4 controlli su 6 in ordine"); quando non
+c'è nulla lo dice in una frase. I controlli: un canale di notifica è attivo *e*
+ha le credenziali; un canale è stato provato negli ultimi 90 giorni (chiesto solo
+se esiste un canale, e conta solo una prova andata a buon fine); un backup è stato
+scaricato almeno una volta; la retention è sopra il minimo di 7 giorni; la
+versione in esecuzione è la più recente (mostrata come sconosciuta, e non contata
+come in ordine, finché **Controlla gli aggiornamenti** è spento); e, con
+`PUBLIC_PAGE` attivo, `API_TOKEN` è impostato. Le ultime due date — l'ultima prova
+di un canale e l'ultimo download di un backup — stanno in due righe di `settings`,
+perché nient'altro le registra; ripristinare un backup riporta quelle che
+conteneva.
+
+Lo stesso elenco indica i **provider che sembrano dimenticati**: uno disattivato
+da 30 giorni (letto dallo storico della configurazione, quindi un provider la cui
+disattivazione non è mai stata registrata non viene indovinato), oppure uno attivo
+ma mai letto con successo da 30 giorni mentre i suoi campioni arrivano così
+indietro, così un provider aggiunto la settimana scorsa e già irraggiungibile non
+viene segnalato. Ogni riga apre **Impostazioni → Servizi**, dove **Rimuovi** chiede
+la sua solita conferma; da qui non si rimuove nulla.
+
 **Settings → Dati** porta anche l'unico lavoro di manutenzione che un file
 SQLite richiede (roadmap 6.13): **Verifica e compatta** esegue `PRAGMA
 integrity_check` e poi `VACUUM`, e riporta i byte restituiti accanto a quanto
