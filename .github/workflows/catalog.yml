@@ -64,8 +64,8 @@ jobs:
 
       - name: Commit to dev
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "Alessio Manfredini"
+          git config user.email "alessio.manfredini.work@gmail.com"
           # The report changes every run (its failures are tonight's); only a
           # changed list is worth a commit.
           if git diff --quiet -- src/adapters/catalog.json; then
