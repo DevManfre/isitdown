@@ -1149,6 +1149,30 @@ export interface StorageReport {
   samplesPerDay: number;
 }
 
+/** One provider `GET /config/health` thinks was forgotten — roadmap 5.15. */
+export interface AbandonedProvider {
+  id: string;
+  name: string;
+  reason: "disabled" | "failing";
+  /** When it was switched off, or when it last read successfully. */
+  since: string;
+}
+
+/** One line of the installation checklist — roadmap 5.16. */
+export interface InstallCheck {
+  id: "channels" | "channel-test" | "backup" | "retention" | "version" | "token";
+  state: "ok" | "warn" | "unknown";
+  /** A dashboard route, or an https link to the manual. */
+  fix: string;
+  days?: number;
+}
+
+/** What `GET /config/health` answers — roadmap 5.15 and 5.16. */
+export interface InstallHealth {
+  abandoned: AbandonedProvider[];
+  checks: InstallCheck[];
+}
+
 /** One cell of the year heat calendar — roadmap 5.20. */
 export interface CalendarDay {
   day: string;

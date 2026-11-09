@@ -2025,5 +2025,21 @@
   "config.history.restore-label": "Repor o valor anterior de {target} {field}",
   "config.history.restored": "Valor reposto.",
   "config.history.loading": "A carregar o histórico…",
-  "config.snapshots.loading": "A carregar instantâneos…"
+  "config.snapshots.loading": "A carregar instantâneos…",
+  "install-health.title": "Sa\u00fade da instala\u00e7\u00e3o",
+  "install-health.summary": "{ok} de {total} verifica\u00e7\u00f5es em ordem",
+  "install-health.all-good": "Tudo na lista de verifica\u00e7\u00e3o da instala\u00e7\u00e3o est\u00e1 em ordem.",
+  "install-health.fix": "Corrigir",
+  "install-health.error": "N\u00e3o foi poss\u00edvel carregar a lista de verifica\u00e7\u00e3o da instala\u00e7\u00e3o.",
+  "install-health.channels.warn": "Nenhum canal de notifica\u00e7\u00e3o est\u00e1 ativo e configurado, ent\u00e3o nenhum alerta pode chegar at\u00e9 voc\u00ea.",
+  "install-health.channel-test.never": "Nenhum canal de notifica\u00e7\u00e3o foi testado ainda.",
+  "install-health.channel-test.stale": "Nenhum canal de notifica\u00e7\u00e3o \u00e9 testado h\u00e1 {days} dias.",
+  "install-health.backup.warn": "Nunca foi baixado um backup desta instala\u00e7\u00e3o.",
+  "install-health.retention.warn": "A reten\u00e7\u00e3o do hist\u00f3rico est\u00e1 no m\u00ednimo, ent\u00e3o os gr\u00e1ficos olham s\u00f3 uma semana para tr\u00e1s.",
+  "install-health.version.warn": "H\u00e1 uma vers\u00e3o mais recente dispon\u00edvel.",
+  "install-health.version.unknown": "N\u00e3o se verifica se existe uma vers\u00e3o mais recente. Ative a verifica\u00e7\u00e3o de atualiza\u00e7\u00f5es para descobrir.",
+  "install-health.token.warn": "A p\u00e1gina de status p\u00fablica est\u00e1 ativa e nenhum token de API est\u00e1 definido.",
+  "install-health.abandoned.disabled": "{name} est\u00e1 desativado desde {when}",
+  "install-health.abandoned.failing": "{name} n\u00e3o \u00e9 lido com sucesso desde {when}",
+  "install-health.abandoned.review": "Revisar em Servi\u00e7os"
 }

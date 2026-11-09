@@ -2025,5 +2025,21 @@
   "config.history.restore-label": "Ripristina il valore precedente di {target} {field}",
   "config.history.restored": "Valore ripristinato.",
   "config.history.loading": "Caricamento cronologia…",
-  "config.snapshots.loading": "Caricamento snapshot…"
+  "config.snapshots.loading": "Caricamento snapshot…",
+  "install-health.title": "Salute dell'installazione",
+  "install-health.summary": "{ok} controlli su {total} in ordine",
+  "install-health.all-good": "Tutto ci\u00f2 che \u00e8 nella checklist dell'installazione \u00e8 in ordine.",
+  "install-health.fix": "Sistema",
+  "install-health.error": "Impossibile caricare la checklist dell'installazione.",
+  "install-health.channels.warn": "Nessun canale di notifica \u00e8 attivo e configurato, quindi nessun avviso pu\u00f2 raggiungerti.",
+  "install-health.channel-test.never": "Nessun canale di notifica \u00e8 stato ancora provato.",
+  "install-health.channel-test.stale": "Nessun canale di notifica \u00e8 stato provato da {days} giorni.",
+  "install-health.backup.warn": "Da questa installazione non \u00e8 mai stato scaricato un backup.",
+  "install-health.retention.warn": "La retention dello storico \u00e8 al minimo, quindi i grafici guardano indietro solo una settimana.",
+  "install-health.version.warn": "\u00c8 disponibile una versione pi\u00f9 recente.",
+  "install-health.version.unknown": "Non si controlla se esista una versione pi\u00f9 recente. Attiva il controllo degli aggiornamenti per scoprirlo.",
+  "install-health.token.warn": "La pagina di stato pubblica \u00e8 attiva e non \u00e8 impostato nessun token API.",
+  "install-health.abandoned.disabled": "{name} \u00e8 disattivato da {when}",
+  "install-health.abandoned.failing": "{name} non viene letto con successo da {when}",
+  "install-health.abandoned.review": "Rivedi in Servizi"
 }

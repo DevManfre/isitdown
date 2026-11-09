@@ -2025,5 +2025,21 @@
   "config.history.restore-label": "Restore the previous value of {target} {field}",
   "config.history.restored": "Value restored.",
   "config.history.loading": "Loading history…",
-  "config.snapshots.loading": "Loading snapshots…"
+  "config.snapshots.loading": "Loading snapshots…",
+  "install-health.title": "Installation health",
+  "install-health.summary": "{ok} of {total} checks in order",
+  "install-health.all-good": "Everything on the installation checklist is in order.",
+  "install-health.fix": "Fix",
+  "install-health.error": "Couldn't load the installation checklist.",
+  "install-health.channels.warn": "No notification channel is switched on and configured, so no alert can reach you.",
+  "install-health.channel-test.never": "No notification channel has been tested yet.",
+  "install-health.channel-test.stale": "No notification channel has been tested for {days} days.",
+  "install-health.backup.warn": "No backup has been downloaded from this installation.",
+  "install-health.retention.warn": "History retention is at its minimum, so charts only look back a week.",
+  "install-health.version.warn": "A newer version is available.",
+  "install-health.version.unknown": "Whether a newer version exists isn't being checked. Turn on update checks to find out.",
+  "install-health.token.warn": "The public status page is on and no API token is set.",
+  "install-health.abandoned.disabled": "{name} has been switched off since {when}",
+  "install-health.abandoned.failing": "{name} hasn't been read successfully since {when}",
+  "install-health.abandoned.review": "Review in Services"
 }
