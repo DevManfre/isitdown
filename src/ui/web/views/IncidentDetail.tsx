@@ -1,73 +1,38 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-import { Trans, useTranslation } from "react-i18next";
-import { Badge } from "@/components/ui/badge.tsx";
-import { Button } from "@/components/ui/button.tsx";
-import { NumberTicker } from "@/components/ui/number-ticker.tsx";
-import { BentoTile } from "@/components/BentoTile.tsx";
+import { useTranslation } from "react-i18next";
+import { ChevronDown } from "lucide-react";
 import { IncidentMap } from "@/components/IncidentMap.tsx";
+import { IncidentHero } from "@/components/incident/IncidentHero.tsx";
+import { IncidentTimeline } from "@/components/incident/IncidentTimeline.tsx";
 import { PollStrip } from "@/components/charts/PollStrip.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
-import { Textarea } from "@/components/ui/textarea.tsx";
-import { useIncident, useIncidentFollow, useIncidentNotes, useStatus } from "@/hooks/queries.ts";
-import { formatDateTime, formatDuration, formatTime } from "@/lib/format.ts";
-import {
-  impactColor, impactKey, impactStatus, incidentStatusKey, INCIDENT_STEPS,
-} from "@/lib/incidents.ts";
-import { stagger } from "@/lib/stagger.ts";
-import { cn } from "@/lib/utils.ts";
-import type { IncidentRevision } from "@/lib/types.ts";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
+import { ViewSkeleton } from "@/components/ViewSkeleton.tsx";
+import { useIncident, useIncidentFollow, useIncidentNotes, usePreferences, useStatus } from "@/hooks/queries.ts";
+import { formatDateTime, formatDuration } from "@/lib/format.ts";
+import { impactColor, impactStatus, incidentStatusKey } from "@/lib/incidents.ts";
+import { buildEvents, lifeline, verdictOf } from "@/lib/incidentStory.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
 
-/** The lifecycle words, widened for `.indexOf` against the incident's own (plain string) status. */
-const STEPS: readonly string[] = INCIDENT_STEPS;
-
-/** How long the copy-payload confirmation stays up — incident.js:238. */
+/** How long the copy-payload confirmation stays up. */
 const TOAST_MS = 2500;
 
 /**
- * How many action-log rows show before the operator asks for the rest. A
- * long-running incident logs dozens of deliveries, and every one of them used
- * to set this tile's height — and the page's with it — before anyone asked to
- * read them.
- */
-const ACTION_LOG_COLLAPSED = 6;
-
-/**
- * One sentence per field a provider can edit after the fact (roadmap 1.11).
- * Written out rather than built from the field name, so the catalog check can
- * see every key that is rendered.
- */
-const REVISION_KEYS: Record<IncidentRevision["field"], string> = {
-  impact: "incident.revisions.impact",
-  started_at: "incident.revisions.started_at",
-  resolved_at: "incident.revisions.resolved_at",
-};
-
-/** The tiles enter in reading order, after the hero and the stepper have landed. */
-const TILE_CASCADE = { base: 240, step: 60 };
-
-const durationSince = (locale: string, from: string): string =>
-  formatDuration(locale, (Date.now() - Date.parse(from)) / 60_000);
-
-const durationBetween = (locale: string, from: string, to: string): string =>
-  formatDuration(locale, (Date.parse(to) - Date.parse(from)) / 60_000);
-
-/**
- * Design 3a's incident detail: the status stepper, the timeline of what
- * IsItDown observed, the action log of what it actually sent, the
- * provider's other open incidents, the strip of recent polls, and where the
- * provider physically runs.
+ * The incident page, read in three levels.
  *
- * Laid out as a bento of uniform tiles on the same `BentoTile` IncidentMap
- * uses — the blocks below used to be bare labelled stacks in a `2fr_1fr` split, which
- * gave the page two competing column rhythms and no shared tile shape. The hero
- * and the stepper stay full-width bands above the grid: both are read left to
- * right across the whole page, and boxing them would break that.
+ * 1. The verdict (`IncidentHero`): one sentence saying whether it is over and
+ *    still matters, the figures behind it, and the incident drawn over time.
+ *    Most visits stop there.
+ * 2. What happened (`IncidentTimeline`): one list of our observations, what we
+ *    sent, the provider's later edits and the operator's notes.
+ * 3. Context, in a quiet column: how the provider reads right now, the facts,
+ *    its other open incidents, and — behind a disclosure — the map. Anything
+ *    empty is absent rather than drawn as an empty card.
  *
  * The timeline is our own observations, not the provider's update feed — the
  * adapter does not normalise those, and inventing them would be worse than
- * showing less. Straight port of src/ui/public/js/views/incident.js.
+ * showing less.
  */
 export function IncidentDetail() {
   const { t, i18n } = useTranslation();
@@ -76,14 +41,15 @@ export function IncidentDetail() {
   const incidentId = params["incidentId"] ?? "";
   const { data: detail } = useIncident(providerId, incidentId);
   const { data: status } = useStatus();
+  const mapOn = (usePreferences().data?.mapView ?? "off") !== "off";
 
   const [copiedMessage, setCopiedMessage] = useState<string | undefined>(undefined);
-  // Roadmap 5.3. Held here rather than in the tile: the tile is rendered from
+  // Roadmap 5.3. Held here rather than in the timeline: it is rendered from
   // the detail query, and a draft must survive the refetch an added note causes.
   const [draft, setDraft] = useState("");
+  const [mapOpen, setMapOpen] = useState(false);
   const notesMutations = useIncidentNotes(providerId, incidentId);
   const follow = useIncidentFollow(providerId, incidentId);
-  const [actionLogExpanded, setActionLogExpanded] = useState(false);
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => {
     if (toastTimeout.current !== undefined) clearTimeout(toastTimeout.current);
@@ -91,19 +57,27 @@ export function IncidentDetail() {
 
   const nameOf = (id: string): string => status?.providers.find((provider) => provider.id === id)?.name ?? id;
 
-  // useIncident throws on an initial-load failure (routes.tsx's errorElement
-  // catches it); while it is still in flight there is nothing to render yet.
-  if (detail === undefined) return null;
+  // The server stamps `now` into nothing, so the figures that depend on it are
+  // computed here, once per payload rather than on every render.
+  const story = useMemo(() => {
+    if (detail === undefined) return undefined;
+    const nowMs = Date.now();
+    const { incident, polls, actionLog, notes, timeline } = detail;
+    return {
+      verdict: verdictOf({ incident, polls, actionLog, nowMs }),
+      line: lifeline({ incident, polls, actionLog, notes, nowMs }),
+      events: buildEvents({ incident, timeline, actionLog, notes, revisions: detail.revisions ?? [] }),
+    };
+  }, [detail]);
 
-  const { incident, timeline, actionLog, polls, otherActiveIncidents, notes } = detail;
-  const revisions = detail.revisions ?? [];
-  // An impact word the catalog knows reads translated; one it does not is the
-  // provider's own, shown as written rather than as "Unknown → Unknown".
-  const impactLabel = (word: string): string =>
-    impactKey(word) === "status.unknown" ? word : t(impactKey(word));
-  const shownActionLog = actionLogExpanded ? actionLog : actionLog.slice(0, ACTION_LOG_COLLAPSED);
-  const reached = incident.resolvedAt === null ? STEPS.indexOf(incident.status) : STEPS.length - 1;
-  const failedSends = actionLog.filter((record) => !record.ok).length;
+  // useIncident throws on an initial-load failure (routes.tsx's errorElement
+  // catches it); while it is still in flight the page's own shape stands in.
+  if (detail === undefined || story === undefined) return <ViewSkeleton hero rows={4} />;
+
+  const { incident, polls, otherActiveIncidents } = detail;
+  const providerName = nameOf(incident.providerId);
+  const open = incident.resolvedAt === null;
+  const spansDays = Date.parse(story.line.toIso) - Date.parse(story.line.fromIso) > 24 * 3_600_000;
 
   const copyPayload = async (): Promise<void> => {
     await navigator.clipboard.writeText(JSON.stringify(detail, null, 2));
@@ -118,13 +92,20 @@ export function IncidentDetail() {
     notesMutations.add.mutate(body, { onSuccess: () => setDraft("") });
   };
 
-  const first = polls.at(-1);
-  const last = polls[0];
+  const facts: [string, string][] = [
+    [t("incident.stat.started"), formatDateTime(i18n.language, incident.startedAt)],
+    ...(incident.declaredAt === undefined
+      ? []
+      : ([[t("incident.facts.declared"), formatDateTime(i18n.language, incident.declaredAt)]] as [string, string][])),
+    ...(open
+      ? ([[t("column.status"), t(incidentStatusKey(incident.status))]] as [string, string][])
+      : ([[t("incident.facts.resolved"), formatDateTime(i18n.language, incident.resolvedAt ?? "")]] as [string, string][])),
+  ];
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* incident.js:36-43 — navigates to #/overview, not #/incidents: the
-          catalog string itself is "Back to overview". */}
+    <div className="flex flex-col gap-10">
+      {/* Navigates to the overview, not the incident list: the catalog string
+          itself is "Back to overview". */}
       <Link
         to={ROUTE_PATHS.overview}
         className="back-link mono flex w-fit items-center gap-1 text-sm text-muted-foreground"
@@ -133,465 +114,112 @@ export function IncidentDetail() {
         {t("action.back")}
       </Link>
 
-      {/* The detail page opens on the same lit band the Overview does, in the
-          incident's own impact colour: the two pages are the same claim at two
-          zoom levels, and one of them used to be a headline on bare ground. The
-          beam runs only while the incident is open — a resolved incident is a
-          record, and a record does not need to attract the eye. */}
-      <div
-        className="incident-band lit-band relative -mx-4 -mt-2 flex flex-wrap items-start justify-between gap-4 overflow-hidden border-b border-border px-4 pt-4 pb-6 md:-mx-10 md:px-10"
-        style={{
-          backgroundImage:
-            incident.resolvedAt === null
-              ? "var(--gradient-hero-live), var(--gradient-hero)"
-              : "var(--gradient-hero)",
+      <IncidentHero
+        detail={detail}
+        providerName={providerName}
+        verdict={story.verdict}
+        line={story.line}
+        follow={{
+          pending: follow.isPending,
+          error: follow.isError ? (follow.error instanceof Error ? follow.error.message : String(follow.error)) : undefined,
+          onToggle: () => follow.mutate(detail.followed !== true),
         }}
-      >
-        <div className="flex flex-col gap-2">
-          <div className="anim-rise flex items-center gap-2" style={{ animationDelay: "40ms" }}>
-            <span className="text-sm font-medium" style={{ color: impactColor(incident.impact) }}>
-              {t("incident.kicker")}
-            </span>
-            <Badge variant="outline" style={{ color: impactColor(incident.impact), borderColor: impactColor(incident.impact) }}>
-              {t(impactKey(incident.impact))}
-            </Badge>
-            <span className="font-mono text-xs text-muted-foreground">{incident.incidentId}</span>
-          </div>
+        onCopyPayload={() => void copyPayload()}
+        copied={copiedMessage}
+      />
 
-          <h2
-            className="anim-rise anim-rise-hero max-w-[26ch] text-3xl font-medium tracking-tight"
-            style={{ animationDelay: "100ms" }}
-          >
-            {incident.name}
-          </h2>
-
-          <span
-            className="anim-rise anim-rise-hero font-mono text-sm text-muted-foreground"
-            style={{ animationDelay: "160ms" }}
-          >
-            {nameOf(incident.providerId)}
-          </span>
-        </div>
-
-        {/* The three figures the page used to leave to be pieced together: when
-            it started, how long it has run, and how many sends went out on it.
-            Two of them were a single mono line under the headline and one was
-            only implied by the length of a list further down. Same grammar as
-            the Overview's hero, so the two lit bands read as one page. */}
-        <div
-          className="anim-rise anim-rise-column flex flex-col items-end gap-4"
-          style={{ animationDelay: "200ms" }}
-        >
-          <div
-            data-slot="incident-stats"
-            data-testid="incident-stats"
-            className="flex flex-wrap gap-6"
-          >
-            {[
-              {
-                id: "started",
-                label: t("incident.stat.started"),
-                value: formatDateTime(i18n.language, incident.startedAt),
-              },
-              ...(incident.declaredAt !== undefined && incident.firstSeenAt !== undefined
-                ? [
-                    {
-                      // Roadmap 1.1: how long the page said it before we read it.
-                      id: "detected",
-                      label: t("incident.stat.detected"),
-                      value: formatDuration(
-                        i18n.language,
-                        Math.max(0, Date.parse(incident.firstSeenAt) - Date.parse(incident.declaredAt)) / 60_000,
-                      ),
-                      note: t("incident.stat.detected-note"),
-                    },
-                  ]
-                : []),
-              {
-                id: "elapsed",
-                label: t(
-                  incident.resolvedAt === null ? "incident.stat.open-for" : "incident.stat.closed-in",
-                ),
-                value:
-                  incident.resolvedAt === null
-                    ? durationSince(i18n.language, incident.startedAt)
-                    : durationBetween(i18n.language, incident.startedAt, incident.resolvedAt),
-                accent: incident.resolvedAt === null,
-              },
-              {
-                id: "notified",
-                label: t("incident.stat.notified"),
-                value: String(actionLog.length),
-                note: t("incident.stat.notified-note", { count: failedSends }),
-              },
-            ].map((stat) => (
-              <div key={stat.id} data-stat={stat.id} className="flex flex-col gap-0.5">
-                <span className="text-sm text-muted-foreground">
-                  {stat.label}
-                </span>
-                <span
-                  className="font-mono text-base"
-                  style={stat.accent === true ? { color: impactColor(incident.impact) } : undefined}
-                >
-                  {stat.value}
-                </span>
-                {stat.note !== undefined && (
-                  <span className="text-xs text-muted-foreground">{stat.note}</span>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Roadmap 3.6. Only on an open incident: a resolved one has no update
-              left to send, and the server refuses to follow it. */}
-          {incident.resolvedAt === null && (
-            <div className="flex max-w-[30ch] flex-col items-end gap-1 text-right">
-              <Button
-                type="button"
-                variant={detail.followed === true ? "secondary" : "outline"}
-                size="sm"
-                aria-pressed={detail.followed === true}
-                disabled={follow.isPending}
-                onClick={() => follow.mutate(detail.followed !== true)}
-              >
-                {t(detail.followed === true ? "incident.following" : "incident.follow")}
-              </Button>
-              <span className="text-xs text-muted-foreground">{t("incident.follow.hint")}</span>
-              {follow.isError && (
-                <span role="alert" className="text-xs text-destructive">
-                  {t("incident.follow.failed", {
-                    reason: follow.error instanceof Error ? follow.error.message : String(follow.error),
-                  })}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Roadmap 6.4. A plain download, same as the export links: the server writes the document. */}
-          <Button asChild variant="ghost">
-            <a
-              href={`/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/postmortem.md`}
-              download
-            >
-              {t("action.download-postmortem")}
-            </a>
-          </Button>
-
-          <div className="flex flex-col items-end gap-1">
-            <Button type="button" variant="ghost" className="mono" onClick={() => void copyPayload()}>
-              {t("action.copy-payload")}
-            </Button>
-            {copiedMessage !== undefined && (
-              <span role="status" className="text-xs text-muted-foreground">
-                {copiedMessage}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="stepper flex flex-wrap items-center gap-6">
-        {INCIDENT_STEPS.map((step, index) => {
-          const active = index <= reached;
-          const isReached = index === reached;
-          const stillOpen = isReached && incident.resolvedAt === null;
-          return (
-            <div
-              key={step}
-              className="anim-fade flex items-center gap-2"
-              style={{ animationDelay: `${index * 90}ms` }}
-            >
-              <StatusDot status={active ? impactStatus(incident.impact) : "unknown"} size={9} pulse={stillOpen} />
-              <span
-                className={cn("font-mono text-xs", isReached ? "font-medium" : "font-normal", !active && "text-muted-foreground")}
-                style={active ? { color: impactColor(incident.impact) } : undefined}
-                aria-current={isReached ? "step" : undefined}
-              >
-                {t(incidentStatusKey(step))}
-              </span>
-              <span
-                className="anim-sweep anim-sweep-step h-px w-10 bg-border"
-                style={{ animationDelay: `${index * 90}ms` }}
-              />
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Six columns, same grid as Settings: what IsItDown observed and what it
-          sent share the top row, the poll strip and the current status the
-          middle one, the provider's other incidents and its geography the last.
-          The map is the only tile that can be absent (the operator's `mapView`
-          preference is off by default), which is why it is placed last — its
-          absence leaves the trailing edge of the grid short rather than a hole
-          in the middle of the page. */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
-        <BentoTile
-          title={t("incident.timeline")}
-          delay={stagger(0, TILE_CASCADE)}
-          className="md:col-span-2"
-        >
-          {/* A rail, not two columns of text: the entries are one sequence and
-              the line between the dots is what says so. The connector stops at
-              the last entry rather than running off the end of an incident that
-              is still open — a line into nothing reads as a missing entry. */}
-          {timeline.map((entry, index) => {
-            // Re-checks after the fact are secondary: shown, but greyed out so
-            // the opened/resolved milestones carry the story.
-            const secondary = entry.label === "observed";
-            return (
-            <div
-              key={`${entry.at}-${entry.label}`}
-              className={`anim-rise grid grid-cols-[14px_62px_1fr] gap-3${secondary ? " opacity-50" : ""}`}
-              style={{ animationDelay: stagger(index, { base: 170, step: 38, cap: 420 }) }}
-            >
-              <span className="flex flex-col items-center">
-                <StatusDot
-                  status={
-                    secondary ? "unknown" : entry.label === "resolved" ? "operational" : impactStatus(incident.impact)
-                  }
-                  size={9}
-                  pulse={index === timeline.length - 1 && incident.resolvedAt === null && !secondary}
-                />
-                {index < timeline.length - 1 && (
-                  <span aria-hidden="true" className="mt-1 w-px flex-1 bg-border" />
-                )}
-              </span>
-              <span className="font-mono text-xs text-muted-foreground">
-                {formatTime(i18n.language, entry.at)}
-              </span>
-              <div className="flex flex-col gap-0.5 pb-3">
-                <span className="text-sm text-muted-foreground">
-                  {t(`incident.timeline.${entry.label}`)}
-                </span>
-                {entry.status !== undefined && <span className="text-sm">{t(incidentStatusKey(entry.status))}</span>}
-              </div>
-            </div>
-            );
-          })}
-        </BentoTile>
-
-        {/* The one tinted tile: what IsItDown *did* is the only block on this
-            page that is about us rather than the provider, and the tint is what
-            told them apart before every block became a tile. */}
-        <BentoTile
-          title={t("incident.what-we-did")}
-          delay={stagger(1, TILE_CASCADE)}
-          className="border-primary/40 bg-primary/5 md:col-span-4"
-        >
-          {actionLog.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("incidents.empty-notifications")}</p>
-          ) : (
-            shownActionLog.map((record, index) => (
-              <div
-                key={`${record.providerId}-${record.sentAt}-${index}`}
-                className="anim-fade grid grid-cols-[70px_1fr] items-baseline gap-3"
-                style={{ animationDelay: stagger(index, { base: 200, step: 30, cap: 420 }) }}
-              >
-                <span className="font-mono text-xs text-muted-foreground">
-                  {formatTime(i18n.language, record.sentAt)}
-                </span>
-                <span className="font-mono text-xs">
-                  <span>{record.channel}</span>
-                  {": "}
-                  <span>{record.text.split("\n")[0]}</span>
-                  {!record.ok && record.error !== undefined && (
-                    <span className="text-destructive"> — {record.error}</span>
-                  )}
-                </span>
-              </div>
-            ))
-          )}
-          {/* One control, and only while it has something left to reveal:
-              expanding is one-way, same as the Incidents feed panel. */}
-          {!actionLogExpanded && actionLog.length > ACTION_LOG_COLLAPSED && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="self-start px-0 text-xs text-muted-foreground"
-              onClick={() => setActionLogExpanded(true)}
-            >
-              {t("action.show-more")}
-            </Button>
-          )}
-        </BentoTile>
-
-        {/* Roadmap 1.11. Only when there is something to show: an incident the
-            provider never touched again is the normal case, and an empty tile
-            saying so on every incident would be noise. Full width and above the
-            notes, because it changes how the rest of the page should be read. */}
-        {revisions.length > 0 && (
-          <BentoTile
-            title={t("incident.revisions")}
-            note={t("incident.revisions.note")}
-            delay={stagger(2, TILE_CASCADE)}
-            className="md:col-span-6"
-          >
-            {revisions.map((revision, index) => (
-              <div
-                key={`${revision.field}-${revision.after}`}
-                data-revision={revision.field}
-                className="anim-rise grid grid-cols-[140px_1fr] items-baseline gap-3"
-                style={{ animationDelay: stagger(index, { base: 170, step: 38, cap: 420 }) }}
-              >
-                <span className="font-mono text-xs text-muted-foreground">
-                  {t("incident.revisions.noticed", { at: formatDateTime(i18n.language, revision.observedAt) })}
-                </span>
-                <span className="text-sm">
-                  {t(REVISION_KEYS[revision.field], {
-                    before:
-                      revision.field === "impact"
-                        ? impactLabel(revision.before)
-                        : formatDateTime(i18n.language, revision.before),
-                    after:
-                      revision.field === "impact"
-                        ? impactLabel(revision.after)
-                        : formatDateTime(i18n.language, revision.after),
-                  })}
-                </span>
-              </div>
-            ))}
-          </BentoTile>
-        )}
-
-        {/* Roadmap 5.3. Full width, under what IsItDown observed and what it
-            sent, because it is the third account of the same incident and the
-            only one a person writes: why it mattered here. */}
-        <BentoTile title={t("incident.notes")} delay={stagger(2, TILE_CASCADE)} className="md:col-span-6">
-          {notes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("incident.notes.empty")}</p>
-          ) : (
-            notes.map((note, index) => (
-              <div
-                key={note.id}
-                className="anim-rise grid grid-cols-[70px_1fr_auto] items-baseline gap-3"
-                style={{ animationDelay: stagger(index, { base: 170, step: 38, cap: 420 }) }}
-              >
-                <span className="font-mono text-xs text-muted-foreground">
-                  {formatTime(i18n.language, note.createdAt)}
-                </span>
-                {/* Whitespace kept: a note is written as sentences and often as
-                    two of them, and collapsing the newlines would rewrite it. */}
-                <span className="whitespace-pre-wrap text-sm">{note.body}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="px-1 text-xs text-muted-foreground"
-                  aria-label={t("incident.notes.remove")}
-                  disabled={notesMutations.remove.isPending}
-                  onClick={() => notesMutations.remove.mutate(note.id)}
-                >
-                  {t("action.remove")}
-                </Button>
-              </div>
-            ))
-          )}
-          <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-end">
-            <Textarea
-              id="incident-note"
-              value={draft}
-              maxLength={2000}
-              rows={2}
-              aria-label={t("incident.notes.add")}
-              placeholder={t("incident.notes.placeholder")}
-              className="text-sm"
-              onChange={(event) => setDraft(event.target.value)}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={draft.trim() === "" || notesMutations.add.isPending}
-              onClick={saveNote}
-            >
-              {t("incident.notes.add")}
-            </Button>
-          </div>
-        </BentoTile>
-
-        <BentoTile
-          title={
-            <Trans
-              i18nKey="incident.last-polls"
-              count={polls.length}
-              values={{ count: polls.length }}
-              components={[<NumberTicker locale={i18n.language} value={polls.length} />]}
-            />
-          }
-          note={
-            first !== undefined && last !== undefined ? (
-              <span className="font-mono">
-                {formatTime(i18n.language, first.observedAt)} → {formatTime(i18n.language, last.observedAt)} ·{" "}
-                {nameOf(incident.providerId)}
-              </span>
-            ) : undefined
-          }
-          delay={stagger(3, TILE_CASCADE)}
-          className="md:col-span-4"
-        >
-          <PollStrip samples={polls} />
-        </BentoTile>
-
-        <BentoTile
-          title={t("column.status")}
-          delay={stagger(4, TILE_CASCADE)}
-          className="md:col-span-2"
-        >
-          {/* incident.js:214-221 — .service-row with exactly two children:
-              a bare status span and a "mono muted" timestamp span. Kept
-              verbatim; a Testing Library query that collided with the
-              stepper's own label is a defect in the query, not a reason
-              to reshape this row (see IncidentDetail.test.tsx). */}
-          <div
-            className="service-row anim-rise anim-rise-row flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-            style={{ animationDelay: "200ms" }}
-          >
-            <span className="text-sm">{t(incidentStatusKey(incident.status))}</span>
-            <span className="font-mono text-xs text-muted-foreground">
-              {formatDateTime(i18n.language, incident.updatedAt)}
-            </span>
-          </div>
-        </BentoTile>
-
-        {/* `self-start`, alone on this page: this is the one tile whose row
-            partner is the map, which is as tall as its own 2:1 aspect makes it.
-            Stretching a two-word empty state ("None.") to 430px is the hole the
-            grid was supposed to remove. */}
-        <BentoTile
-          title={t("incident.other-active")}
-          delay={stagger(5, TILE_CASCADE)}
-          className="md:col-span-3 md:self-start"
-        >
-          {otherActiveIncidents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("incident.no-other-active")}</p>
-          ) : (
-            otherActiveIncidents.map((other, index) => (
-              <Link
-                key={`${other.providerId}/${other.incidentId}`}
-                to={`/incidents/${other.providerId}/${other.incidentId}`}
-                className="service-row anim-rise anim-rise-row flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-                style={{ animationDelay: stagger(index, { base: 160, step: 32, cap: 420 }) }}
-              >
-                <span className="flex items-center gap-2 text-sm">
-                  <StatusDot status={impactStatus(other.impact)} />
-                  {other.name}
-                </span>
-                <span className="font-mono text-xs" style={{ color: impactColor(other.impact) }}>
-                  {t(incidentStatusKey(other.status))}
-                </span>
-              </Link>
-            ))
-          )}
-        </BentoTile>
-
-        <IncidentMap
-          providerId={incident.providerId}
-          providerName={nameOf(incident.providerId)}
-          delay={stagger(6, TILE_CASCADE)}
-          className="md:col-span-3"
+      <div className="grid grid-cols-1 gap-10 md:grid-cols-[minmax(0,1fr)_300px] md:gap-12">
+        <IncidentTimeline
+          events={story.events}
+          incident={incident}
+          spansDays={spansDays}
+          draft={draft}
+          onDraft={setDraft}
+          onSave={saveNote}
+          saving={notesMutations.add.isPending}
+          onRemoveNote={(id) => notesMutations.remove.mutate(id)}
+          removing={notesMutations.remove.isPending}
         />
+
+        <aside aria-label={t("incident.facts.title")} className="flex flex-col gap-8 md:pt-[52px]">
+          <section className="flex flex-col gap-3">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              {t("incident.now.title", { provider: providerName })}
+            </h3>
+            <PollStrip samples={polls} />
+            <p className="text-sm text-muted-foreground">{t("incident.now.caption", { count: Math.min(polls.length, 24) })}</p>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h3 className="text-sm font-medium text-muted-foreground">{t("incident.facts.title")}</h3>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 text-sm">
+              {facts.map(([label, value]) => (
+                <div key={label} className="contents">
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className="text-right font-mono">{value}</dd>
+                </div>
+              ))}
+            </dl>
+            {incident.cost !== undefined && incident.cost !== null && (
+              <p className="text-sm text-muted-foreground">
+                {t("incident.facts.cost-note", {
+                  duration: formatDuration(
+                    i18n.language,
+                    (Date.parse(story.line.toIso) - Date.parse(incident.startedAt)) / 60_000,
+                  ),
+                  provider: providerName,
+                })}
+              </p>
+            )}
+          </section>
+
+          {/* Only when there is something to list: an empty "none" on every
+              incident is noise, and a provider with no other open incident is
+              the normal case. */}
+          {otherActiveIncidents.length > 0 && (
+            <section className="flex flex-col gap-3">
+              <h3 className="text-sm font-medium text-muted-foreground">{t("incident.other-active")}</h3>
+              <ul className="flex flex-col gap-2">
+                {otherActiveIncidents.map((other) => (
+                  <li key={`${other.providerId}/${other.incidentId}`}>
+                    <Link
+                      to={`/incidents/${other.providerId}/${other.incidentId}`}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 text-sm hover:bg-muted"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <StatusDot status={impactStatus(other.impact)} />
+                        <span className="truncate">{other.name}</span>
+                      </span>
+                      <span className="shrink-0 font-mono text-xs" style={{ color: impactColor(other.impact) }}>
+                        {t(incidentStatusKey(other.status))}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* The map is the one block behind a disclosure, and is only offered
+              while the operator's `mapView` preference is on. Closed, it asks
+              the server for nothing: Radix leaves the content unmounted. */}
+          {mapOn && (
+            <Collapsible open={mapOpen} onOpenChange={setMapOpen}>
+              <CollapsibleTrigger className="flex min-h-11 w-full items-center justify-between border-y border-border text-sm text-muted-foreground hover:text-foreground">
+                {t("incident.map.show")}
+                <ChevronDown aria-hidden="true" className="size-4 transition-transform data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4">
+                <IncidentMap
+                  providerId={incident.providerId}
+                  providerName={providerName}
+                  delay="0ms"
+                  className=""
+                />
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+        </aside>
       </div>
     </div>
   );

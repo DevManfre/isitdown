@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/lib/i18n.ts";
@@ -44,165 +44,198 @@ const mountWithMap = () =>
     preferences: { theme: "dark", uiLocale: "en", notificationLocale: "en", mapView: "map", density: "comfortable" },
   }, "/incidents/:providerId/:incidentId");
 
-/** Same fixture, with actionLog swapped out — for the empty-state case. */
-const mountWithActionLog = (actionLog: typeof detail.actionLog) =>
-  renderWithProviders(<IncidentDetail />, {
-    incident: { ...detail, actionLog },
-    status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
-  }, "/incidents/:providerId/:incidentId");
+
+const STATUS = { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null };
+const mountWith = (over: Record<string, unknown>) =>
+  renderWithProviders(<IncidentDetail />, { incident: { ...detail, ...over }, status: STATUS },
+    "/incidents/:providerId/:incidentId");
+const okPoll = (minute: number) => ({
+  observedAt: `2026-08-21T09:${String(minute).padStart(2, "0")}:00Z`, overallStatus: "operational" as const, ok: true,
+});
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("IncidentDetail", () => {
   it("titles the incident and names its provider", async () => {
     mount();
-    expect(await screen.findByText("API errors")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "API errors" })).toBeInTheDocument();
     expect(await screen.findAllByText(/GitHub/)).not.toHaveLength(0);
   });
 
-  // Roadmap 6.4: the postmortem is the server's document, reached by a plain link.
-  it("offers the incident as a downloadable postmortem", async () => {
+  it("offers a way back to the overview", async () => {
     mount();
-    const link = await screen.findByRole("link", { name: i18n.t("action.download-postmortem") });
+    const link = await screen.findByRole("link", { name: new RegExp(i18n.t("action.back")) });
+    // The dashboard routes on the hash.
+    expect(link).toHaveAttribute("href", "#/overview");
+  });
+
+  // Roadmap 6.4: the postmortem is the server's document, reached by a plain link —
+  // behind the menu, since it is not what most visits are for.
+  it("offers the incident as a downloadable postmortem, in the menu", async () => {
+    mount();
+    expect(screen.queryByRole("menuitem")).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: i18n.t("incident.menu.label") }));
+    const link = await screen.findByRole("menuitem", { name: i18n.t("action.download-postmortem") });
     expect(link).toHaveAttribute("href", expect.stringMatching(/^\/incidents\/[^/]+\/[^/]+\/postmortem\.md$/));
+    expect(screen.getByRole("menuitem", { name: i18n.t("action.copy-payload") })).toBeInTheDocument();
+  });
+});
+
+describe("the verdict", () => {
+  it("says an open incident is still affecting the provider, and what was sent", async () => {
+    mount();
+    expect(await screen.findByText(i18n.t("incident.verdict.active.title", { provider: "GitHub" }))).toBeInTheDocument();
+  });
+
+  it("says when an alert failed to send, rather than leaving it in a count", async () => {
+    mountWith({ actionLog: [{ ...detail.actionLog[0], ok: false, error: "403" }] });
+    expect(await screen.findByText(i18n.t("incident.verdict.detail.failed", { count: 1 }))).toBeInTheDocument();
+  });
+
+  it("explains an open incident the provider reads fine on, instead of leaving green beside 'Investigating'", async () => {
+    mountWith({ polls: [okPoll(30), okPoll(27), okPoll(24), okPoll(21)] });
+    expect(await screen.findByText(i18n.t("incident.verdict.recovered.title", { provider: "GitHub" }))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("incident.verdict.recovered.detail", { count: 4, provider: "GitHub" }))).toBeInTheDocument();
+  });
+
+  it("reports a resolved incident with how long it lasted", async () => {
+    mountWith({ incident: { ...detail.incident, status: "resolved", resolvedAt: "2026-08-21T10:30:00Z" } });
+    expect(await screen.findByText(/Resolved after/)).toBeInTheDocument();
+  });
+});
+
+describe("the incident's own figures", () => {
+  it("says how long it has run and how many sends went out", async () => {
+    mount();
+    const stats = await screen.findByTestId("incident-stats");
+    expect(stats.textContent).toContain(i18n.t("incident.stat.open-for"));
+    expect(stats.textContent).not.toContain(i18n.t("incident.stat.closed-in"));
+    expect(stats.querySelector("[data-stat='notified']")?.textContent).toContain("1");
+    expect(stats.textContent).toContain(i18n.t("incident.stat.notified-note", { count: 0 }));
+  });
+
+  it("switches to the closed figure once the incident is resolved", async () => {
+    mountWith({ incident: { ...detail.incident, status: "resolved", resolvedAt: "2026-08-21T10:00:00Z" } });
+    const stats = await screen.findByTestId("incident-stats");
+    expect(stats.textContent).toContain(i18n.t("incident.stat.closed-in"));
+    expect(stats.textContent).not.toContain(i18n.t("incident.stat.open-for"));
   });
 
   // Roadmap 1.1: only an incident whose page published a creation time, and that
   // arrived while somebody was watching, has a detection delay to show.
   it("says how long after the provider's announcement the incident was detected", async () => {
-    renderWithProviders(<IncidentDetail />, {
-      incident: {
-        ...detail,
-        incident: { ...detail.incident, declaredAt: "2026-08-21T09:00:00Z", firstSeenAt: "2026-08-21T09:04:00Z" },
-      },
-      status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
-    }, "/incidents/:providerId/:incidentId");
-    const stats = await screen.findByTestId("incident-stats");
-    const detected = stats.querySelector('[data-stat="detected"]');
+    mountWith({ incident: { ...detail.incident, declaredAt: "2026-08-21T09:00:00Z", firstSeenAt: "2026-08-21T09:04:00Z" } });
+    const detected = (await screen.findByTestId("incident-stats")).querySelector('[data-stat="detected"]');
     expect(detected).toHaveTextContent(i18n.t("incident.stat.detected"));
     expect(detected).toHaveTextContent("4 min");
   });
 
   it("shows no detection delay for an incident that cannot be measured", async () => {
     mount();
-    const stats = await screen.findByTestId("incident-stats");
-    expect(stats.querySelector('[data-stat="detected"]')).toBeNull();
+    expect((await screen.findByTestId("incident-stats")).querySelector('[data-stat="detected"]')).toBeNull();
   });
 
-  it("marks the stepper at the incident's current lifecycle word", async () => {
+  // Roadmap 6.3: an undeclared rate is not a free outage.
+  it("shows no cost without a declared rate", async () => {
     mount();
-    // Scoped to the element that actually carries aria-current: the status
-    // meta row below (incident.js:214-221) renders the identical catalog
-    // word in its own span, so an unscoped text query would find both and
-    // throw "multiple elements". Scoping by selector is the fix, not
-    // reshaping the row to avoid the collision.
-    const step = await screen.findByText(i18n.t("incident.status.monitoring"), {
-      selector: '[aria-current="step"]',
-    });
-    expect(step).toHaveAttribute("aria-current", "step");
+    expect((await screen.findByTestId("incident-stats")).querySelector('[data-stat="cost"]')).toBeNull();
   });
 
-  it("renders the status meta row as two elements, matching vanilla's service-row", async () => {
+  it("shows the cost, once, when the provider has a declared rate", async () => {
+    mountWith({ incident: { ...detail.incident, cost: 1800 } });
+    const cost = (await screen.findByTestId("incident-stats")).querySelector('[data-stat="cost"]');
+    expect(cost).toHaveTextContent("1,800.00");
+    expect(cost).toHaveTextContent(i18n.t("incident.stat.cost"));
+  });
+});
+
+describe("the incident over time", () => {
+  it("draws the incident as one image, with a legend that names only what is drawn", async () => {
     mount();
-    const kicker = await screen.findByText(i18n.t("column.status"));
-    // Located through the tile that carries the kicker, not by DOM adjacency
-    // to it: the bento wraps every kicker in the tile's own header row
-    // (BentoTile.tsx), so `nextElementSibling` is that header's end, not the
-    // row. What this test is about is the row's *shape*, below — the way it is
-    // found is scaffolding.
-    const tile = kicker.closest('[data-slot="card"]');
-    const row = tile?.querySelector(".service-row");
-    if (!(row instanceof HTMLElement)) throw new Error("expected a status row inside the status tile");
-    // Exactly two children: a bare status span and a "mono muted" timestamp
-    // span (incident.js:217-220) — not one span carrying both, whatever
-    // separator joins them.
-    expect(row.children).toHaveLength(2);
-    const status = row.children.item(0);
-    const timestamp = row.children.item(1);
-    if (status === null || timestamp === null) throw new Error("expected two children in the status row");
-    expect(status).toHaveTextContent(i18n.t("incident.status.monitoring"));
-    expect(timestamp).not.toHaveTextContent(i18n.t("incident.status.monitoring"));
-    expect(timestamp).not.toBe(status);
+    const line = await screen.findByTestId("incident-lifeline");
+    expect(within(line).getByRole("img")).toHaveAccessibleName(new RegExp(i18n.t("incident.life.label")));
+    expect(within(line).getByText(i18n.t("incident.life.down"))).toBeInTheDocument();
+    expect(within(line).queryByText(i18n.t("incident.life.failed"))).toBeNull();
   });
 
-  it("labels every timeline entry from the catalog, in the active language, not a raw label", async () => {
-    // en.json's incident.timeline.opened/observed are coincidentally
-    // identical to the raw internal label ("opened"/"observed"), so an
-    // English-only assertion here cannot tell t() apart from an unwired
-    // literal. it.json differs ("aperto"/"osservato") — switch to it for
-    // this one assertion so the catalog value and the raw label diverge and
-    // the assertion has something to detect.
+  it("names a failed alert in the legend once one is on the line", async () => {
+    mountWith({ actionLog: [{ ...detail.actionLog[0], ok: false }] });
+    const line = await screen.findByTestId("incident-lifeline");
+    expect(within(line).getByText(i18n.t("incident.life.failed"))).toBeInTheDocument();
+  });
+});
+
+describe("what happened", () => {
+  it("labels every entry from the catalog, in the active language", async () => {
     await i18n.changeLanguage("it");
     try {
       mount();
-      expect(await screen.findByText(i18n.getFixedT("it")("incident.timeline.opened"))).toBeInTheDocument();
-      expect(await screen.findByText(i18n.getFixedT("it")("incident.timeline.observed"))).toBeInTheDocument();
+      expect(await screen.findByText(i18n.getFixedT("it")("incident.event.opened"))).toBeInTheDocument();
+      expect(screen.getByText(i18n.getFixedT("it")("incident.events.title"))).toBeInTheDocument();
     } finally {
       await i18n.changeLanguage("en");
     }
   });
 
-  it("shows what was actually sent, per channel", async () => {
+  it("puts what was sent, our observations and the notes in one list, newest first", async () => {
     mount();
-    expect(await screen.findByText("GitHub — MAJOR OUTAGE")).toBeInTheDocument();
-    expect(await screen.findByText(/telegram/)).toBeInTheDocument();
+    const list = (await screen.findByText(i18n.t("incident.events.title"))).closest("section")!;
+    const text = within(list).getAllByRole("listitem").map((item) => item.textContent ?? "");
+    const at = (needle: string) => text.findIndex((entry) => entry.includes(needle));
+    // 09:15 observed, 09:05 note, 09:01 sent, 09:00 opened.
+    expect(at(i18n.t("incident.event.observed"))).toBeLessThan(at(i18n.t("incident.event.note")));
+    expect(at(i18n.t("incident.event.note"))).toBeLessThan(at(i18n.t("incident.event.sends", { count: 1 })));
+    expect(at(i18n.t("incident.event.sends", { count: 1 }))).toBeLessThan(at(i18n.t("incident.event.opened")));
   });
 
-  it("shows a first batch of deliveries, then the rest behind the one CTA", async () => {
-    // A long-running incident's action log is the tallest thing on this page —
-    // 30 rows of it used to set the tile's height before the operator asked
-    // for any of them.
-    mountWithActionLog(
-      Array.from({ length: 12 }, (_unused, index) => ({
-        providerId: "github",
-        channel: "webhook" as const,
-        kind: "incident_opened" as const,
-        text: `Delivery ${index + 1}`,
-        sentAt: `2026-08-21T09:${String(index).padStart(2, "0")}:00Z`,
-        ok: true,
-      })) as unknown as typeof detail.actionLog,
-    );
-
-    expect(await screen.findByText("Delivery 1")).toBeInTheDocument();
-    expect(screen.getByText("Delivery 6")).toBeInTheDocument();
-    expect(screen.queryByText("Delivery 7")).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: i18n.t("action.show-more") }));
-
-    expect(await screen.findByText("Delivery 12")).toBeInTheDocument();
-    // One CTA only: revealing the rest leaves nothing left to expand.
-    expect(screen.queryByRole("button", { name: i18n.t("action.show-more") })).not.toBeInTheDocument();
+  it("folds sends into one row per burst and lists the channels behind a disclosure", async () => {
+    mountWith({
+      actionLog: [
+        { ...detail.actionLog[0], channel: "telegram", sentAt: "2026-08-21T09:01:00Z" },
+        { ...detail.actionLog[0], channel: "slack", sentAt: "2026-08-21T09:02:00Z", ok: false },
+      ],
+    });
+    expect(await screen.findByText(i18n.t("incident.event.sends", { count: 2 }))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t("incident.event.sends-detail", { delivered: 1, failed: 1 }))).toBeInTheDocument();
+    expect(screen.getAllByText(i18n.t("incident.event.failed")).length).toBeGreaterThan(0);
+    expect(screen.getByText(i18n.t("incident.event.channels"))).toBeInTheDocument();
+    expect(screen.getByText("slack")).toBeInTheDocument();
   });
 
-  it("keeps a keyed empty state when nothing has been sent for this incident yet", async () => {
-    mountWithActionLog([]);
-    expect(await screen.findByText(i18n.t("incidents.empty-notifications"))).toBeInTheDocument();
-    expect(screen.queryByText("GitHub — MAJOR OUTAGE")).toBeNull();
+  it("leaves out the sends entry when nothing was sent, rather than drawing an empty one", async () => {
+    mountWith({ actionLog: [] });
+    await screen.findByRole("heading", { name: "API errors" });
+    expect(screen.queryByText(i18n.t("incident.event.channels"))).toBeNull();
   });
+});
 
-  it("keeps a keyed empty state for the provider's other open incidents", async () => {
+describe("the context column", () => {
+  it("leaves out the provider's other open incidents when there are none", async () => {
     mount();
-    expect(await screen.findByText(i18n.t("incident.no-other-active"))).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "API errors" });
+    expect(screen.queryByText(i18n.t("incident.other-active"))).toBeNull();
   });
 
-  it("offers a way back to the list", async () => {
-    mount();
-    expect(await screen.findByRole("link", { name: i18n.t("action.back") })).toBeInTheDocument();
+  it("lists the provider's other open incidents, each a link to its own page", async () => {
+    mountWith({
+      otherActiveIncidents: [{ ...detail.incident, incidentId: "i2", name: "Slow pushes", status: "identified" }],
+    });
+    const link = await screen.findByRole("link", { name: /Slow pushes/ });
+    expect(link).toHaveAttribute("href", "#/incidents/github/i2");
   });
 
-  it("gives the incident's provider a map tile once the operator has turned the map on", async () => {
+  it("offers the provider's map behind a disclosure once the operator has turned the map on", async () => {
     mountWithMap();
-    expect(
-      await screen.findByText(i18n.t("incident.map.title", { name: "GitHub" })),
-    ).toBeInTheDocument();
+    const trigger = await screen.findByRole("button", { name: i18n.t("incident.map.show") });
+    expect(screen.queryByText(i18n.t("incident.map.title", { name: "GitHub" }))).toBeNull();
+    await userEvent.click(trigger);
+    expect(await screen.findByText(i18n.t("incident.map.title", { name: "GitHub" }))).toBeInTheDocument();
   });
 
-  it("leaves the map tile out entirely while the preference is off", async () => {
+  it("offers no map at all while the preference is off", async () => {
     mount();
-    // Awaited on something the view always renders, so the absence below is
-    // read after the view has actually rendered rather than before it.
-    await screen.findByText("API errors");
-    expect(screen.queryByText(i18n.t("incident.map.title", { name: "GitHub" }))).toBeNull();
+    await screen.findByRole("heading", { name: "API errors" });
+    expect(screen.queryByRole("button", { name: i18n.t("incident.map.show") })).toBeNull();
   });
 });
 
@@ -285,68 +318,30 @@ describe("operator notes", () => {
   });
 });
 
-describe("the incident's own figures", () => {
-  it("says when it started, how long it has run and how many sends went out", async () => {
-    mount();
-
-    const stats = await screen.findByTestId("incident-stats");
-    expect(stats.textContent).toContain(i18n.t("incident.stat.started"));
-    // Still open in the fixture, so the label is the running one — never
-    // "Resolved in", which would claim the incident had closed.
-    expect(stats.textContent).toContain(i18n.t("incident.stat.open-for"));
-    expect(stats.textContent).not.toContain(i18n.t("incident.stat.closed-in"));
-    // One send in the action log, none of them failed.
-    expect(stats.querySelector("[data-stat='notified']")?.textContent).toContain("1");
-    expect(stats.textContent).toContain(i18n.t("incident.stat.notified-note", { count: 0 }));
-  });
-
-  it("switches to the closed figure once the incident is resolved", async () => {
-    renderWithProviders(
-      <IncidentDetail />,
-      {
-        incident: {
-          ...detail,
-          incident: { ...detail.incident, status: "resolved", resolvedAt: "2026-08-21T10:00:00Z" },
-        },
-        status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
-      },
-      "/incidents/:providerId/:incidentId",
-    );
-
-    const stats = await screen.findByTestId("incident-stats");
-    expect(stats.textContent).toContain(i18n.t("incident.stat.closed-in"));
-    expect(stats.textContent).not.toContain(i18n.t("incident.stat.open-for"));
-  });
-});
-
-// Roadmap 1.11: what the provider changed about an incident after resolving it.
+// Roadmap 1.11: what the provider changed about the incident after resolving it
+// is one more entry on the timeline, absent for the nearly every incident nobody touched.
 describe("edits made after resolution", () => {
-  const mountWith = (revisions: unknown[]) =>
-    renderWithProviders(<IncidentDetail />, {
-      incident: { ...detail, revisions },
-      status: { providers: [providerFixture()], pollIntervalMinutes: 5, lastPollAt: null, nextPollAt: null },
-    }, "/incidents/:providerId/:incidentId");
-
-  it("leaves the tile out for an incident nobody touched again", async () => {
-    mountWith([]);
-    await screen.findByText("API errors");
-    expect(screen.queryByText(i18n.t("incident.revisions"))).not.toBeInTheDocument();
+  it("adds nothing to the timeline for an incident nobody touched again", async () => {
+    mountWith({ revisions: [] });
+    await screen.findByRole("heading", { name: "API errors" });
+    expect(document.querySelector("[data-revision]")).toBeNull();
   });
 
   it("says which field moved, from what to what, in the catalog's words", async () => {
-    mountWith([
-      { field: "impact", before: "major", after: "minor", observedAt: "2026-08-22T09:00:00Z" },
-      { field: "resolved_at", before: "2026-08-21T12:00:00Z", after: "2026-08-21T10:00:00Z", observedAt: "2026-08-22T09:00:00Z" },
-    ]);
-    expect(await screen.findByText(i18n.t("incident.revisions"))).toBeInTheDocument();
+    mountWith({
+      revisions: [
+        { field: "impact", before: "major", after: "minor", observedAt: "2026-08-22T09:00:00Z" },
+        { field: "resolved_at", before: "2026-08-21T12:00:00Z", after: "2026-08-21T10:00:00Z", observedAt: "2026-08-22T09:00:00Z" },
+      ],
+    });
     expect(
-      screen.getByText(i18n.t("incident.revisions.impact", { before: i18n.t("impact.major"), after: i18n.t("impact.minor") })),
+      await screen.findByText(i18n.t("incident.revisions.impact", { before: i18n.t("impact.major"), after: i18n.t("impact.minor") })),
     ).toBeInTheDocument();
     expect(document.querySelector('[data-revision="resolved_at"]')).toHaveTextContent(/End moved/);
   });
 
   it("shows an impact word the catalog does not know as the provider wrote it", async () => {
-    mountWith([{ field: "impact", before: "sev1", after: "sev3", observedAt: "2026-08-22T09:00:00Z" }]);
+    mountWith({ revisions: [{ field: "impact", before: "sev1", after: "sev3", observedAt: "2026-08-22T09:00:00Z" }] });
     expect(await screen.findByText(i18n.t("incident.revisions.impact", { before: "sev1", after: "sev3" }))).toBeInTheDocument();
   });
 });

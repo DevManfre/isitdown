@@ -73,8 +73,8 @@ varianti scelte in **Impostazioni → Aspetto** (roadmap 4.18): **alto contrasto
 - **Chrome illuminata** (roadmap 7.6), ridimensionata dal redesign calmo: niente
   si anima più in modo ambientale, quindi la griglia di punti e il fascio che
   percorre il bordo non ci sono più. Restano i token (`--gradient-primary`,
-  `--gradient-hero-live`, `--shadow-glow`) — la fascia della pagina dell'incidente
-  prende il bagliore di severità finché l'incidente è aperto — e le tile dei
+  `--gradient-hero-live`, `--shadow-glow`) — la scheda in cima alla pagina dell'incidente
+  prende una tinta della severità dell'incidente (di «operativo» una volta risolto) — e le tile dei
   provider il cui bordo risponde al puntatore (`.tile-lit` in `motion.css`).
 
 ### 8.2 Localizzazione

@@ -24,13 +24,31 @@ const withCost = (runtime: UiRuntimeCore) => {
   return (row: IncidentRow) => ({ ...row, cost: incidentCost(rates, row, nowMs) });
 };
 
-/** How many recent polls the incident view's strip shows. */
-const POLL_STRIP_SIZE = 24;
-const ACTION_LOG_LIMIT = 50;
-/** A postmortem reaches further back than the strip: it needs every poll the incident spanned. */
-const POSTMORTEM_POLL_LIMIT = 2000;
-const POSTMORTEM_NOTIFICATION_LIMIT = 500;
+/**
+ * How many recent polls an incident's page and postmortem read. The page draws
+ * its strip from the newest 24 and the incident's shape over time from all of
+ * them, so this bounds how far back a long incident can be drawn.
+ */
+const INCIDENT_POLL_LIMIT = 500;
+const NOTIFICATION_LIMIT = 500;
+/** The resolution message goes out a moment after the row is closed. */
 const NOTIFICATION_GRACE_MS = 10 * 60_000;
+
+/**
+ * What was sent about this incident: the provider's sends from its start until
+ * a moment after its end. Windowed rather than "the latest 50 of the fleet":
+ * the page counts these, and an earlier incident's alerts are not this one's.
+ */
+async function sendsDuring(runtime: UiRuntimeCore, incident: IncidentRow) {
+  const until = new Date(
+    Date.parse(incident.resolvedAt ?? new Date().toISOString()) + NOTIFICATION_GRACE_MS,
+  ).toISOString();
+  const rows = await runtime.store.queryNotifications({
+    providerIds: [incident.providerId],
+    limit: NOTIFICATION_LIMIT,
+  });
+  return rows.filter((record) => record.sentAt >= incident.startedAt && record.sentAt <= until);
+}
 
 /**
  * One note. Capped at a paragraph or two: this is "why our deploy failed on
@@ -146,8 +164,8 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
     }
 
     const [polls, notifications, active, notes, followed] = await Promise.all([
-      runtime.store.getRecentSamples(providerId, POLL_STRIP_SIZE),
-      runtime.store.listNotifications(ACTION_LOG_LIMIT),
+      runtime.store.getRecentSamples(providerId, INCIDENT_POLL_LIMIT),
+      sendsDuring(runtime, incident),
       runtime.store.listIncidents({ providerId, state: "active" }),
       runtime.store.listIncidentNotes(providerId, incidentId),
       runtime.store.isIncidentFollowed(providerId, incidentId),
@@ -156,7 +174,7 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
     res.json({
       incident: withCost(runtime)(incident),
       timeline: buildTimeline(incident, polls),
-      actionLog: notifications.filter((record) => record.providerId === providerId),
+      actionLog: notifications,
       polls,
       otherActiveIncidents: active.filter((row) => row.incidentId !== incidentId),
       // Roadmap 5.3. Part of the detail payload rather than a fetch of its own:
@@ -186,14 +204,12 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
     const end = incident.resolvedAt ?? now.toISOString();
     const services = runtime.listAllServices();
     const nameOf = (id: string): string => services.find((service) => service.id === id)?.name ?? id;
-    // The resolution message goes out a moment after the row is closed, so the
-    // window is padded: a postmortem that stopped at resolvedAt would drop it.
     const notifiedUntil = new Date(Date.parse(end) + NOTIFICATION_GRACE_MS).toISOString();
 
     const others = runtime.enabledProviderIds().filter((id) => id !== providerId);
     const [polls, notifications, notes, annotations, nearby] = await Promise.all([
-      runtime.store.getRecentSamples(providerId, POSTMORTEM_POLL_LIMIT),
-      runtime.store.queryNotifications({ providerIds: [providerId], limit: POSTMORTEM_NOTIFICATION_LIMIT }),
+      runtime.store.getRecentSamples(providerId, INCIDENT_POLL_LIMIT),
+      sendsDuring(runtime, incident),
       runtime.store.listIncidentNotes(providerId, incidentId),
       runtime.store.listAnnotations(incident.startedAt, notifiedUntil, providerId),
       runtime.store.listIncidents({
@@ -209,9 +225,7 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       cost: withCost(runtime)(incident).cost,
       timeline: buildTimeline(incident, polls),
       revisions: runtime.revisions.revisions(providerId, incidentId),
-      notifications: notifications.filter(
-        (record) => record.sentAt >= incident.startedAt && record.sentAt <= notifiedUntil,
-      ),
+      notifications,
       notes,
       annotations,
       overlapping: nearby

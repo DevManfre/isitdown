@@ -389,17 +389,17 @@ test("incidents can be filtered by provider", async () => {
 test("an incident detail carries the timeline, the action log and the recent polls", async () => {
   const app = await api();
   try {
-    await save(app.runtime, "github", "operational", at(0, 8));
-    await save(app.runtime, "github", "degraded", at(0, 9), [incident()]);
-    await save(app.runtime, "github", "major_outage", at(0, 10), [
-      incident({ status: "identified", updatedAt: at(0, 10) }),
+    await save(app.runtime, "github", "operational", at(1, 8));
+    await save(app.runtime, "github", "degraded", at(1, 9), [incident()]);
+    await save(app.runtime, "github", "major_outage", at(1, 10), [
+      incident({ status: "identified", updatedAt: at(1, 10) }),
     ]);
     await app.runtime.store.recordNotification({
       providerId: "github",
       channel: "telegram",
       kind: "incident_opened",
       text: "🔴 GitHub — MAJOR OUTAGE",
-      sentAt: at(0, 10),
+      sentAt: at(1, 10),
       ok: true,
       attempts: 1,
     });
@@ -419,7 +419,7 @@ test("an incident detail carries the timeline, the action log and the recent pol
     assert.ok(detail.timeline.length >= 2, "observed status transitions belong on the timeline");
     assert.equal(detail.actionLog.length, 1);
     assert.equal(detail.actionLog[0]?.channel, "telegram");
-    assert.ok(detail.polls.length > 0 && detail.polls.length <= 24);
+    assert.ok(detail.polls.length > 0 && detail.polls.length <= 500);
     assert.deepEqual(detail.otherActiveIncidents, []);
   } finally {
     await app.close();
@@ -523,7 +523,7 @@ test("no response body anywhere leaks a value from the environment", async () =>
 test("an incident's action log shows only that provider's notifications", async () => {
   const app = await api();
   try {
-    await save(app.runtime, "github", "degraded", at(0, 9), [incident()]);
+    await save(app.runtime, "github", "degraded", at(1, 9), [incident()]);
     for (const [providerId, text] of [
       ["github", "for github"],
       ["cloudflare", "for cloudflare"],
@@ -533,7 +533,7 @@ test("an incident's action log shows only that provider's notifications", async 
         channel: "telegram",
         kind: "incident_opened",
         text,
-        sentAt: at(0, 10),
+        sentAt: at(1, 10),
         ok: true,
         attempts: 1,
       });
