@@ -1,6 +1,6 @@
 # Catalog build
 
-Generated 2026-11-02T12:52:31.271Z: 206 providers in the catalog, 108 candidates left out.
+Generated 2026-11-09T13:21:12.204Z: 206 providers in the catalog, 108 candidates left out.
 
 ## Kept although they failed this run
 
@@ -13,6 +13,7 @@ Already in the catalog, so a single failed read does not remove them.
 ## Left out
 
 - Algolia — https://status.algolia.com: no adapter recognises the page
+- Amplitude — https://status.amplitude.com: no adapter recognises the page
 - Auth0 — https://status.auth0.com: no adapter recognises the page
 - Backblaze — https://status.backblaze.com: no adapter recognises the page
 - Basecamp — https://www.basecampstatus.com: no adapter recognises the page
@@ -30,7 +31,6 @@ Already in the catalog, so a single failed read does not remove them.
 - JetBrains — https://status.jetbrains.com: no adapter recognises the page
 - Mailchimp — https://status.mailchimp.com: no adapter recognises the page
 - Neon — https://neonstatus.com: no adapter recognises the page
-- OpenRouter — https://status.openrouter.ai: no adapter recognises the page
 - PagerDuty — https://status.pagerduty.com: no adapter recognises the page
 - PayPal — https://www.paypal-status.com: no adapter recognises the page
 - PostHog — https://status.posthog.com: no adapter recognises the page

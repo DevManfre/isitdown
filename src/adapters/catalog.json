@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-02T12:52:31.271Z",
+  "generatedAt": "2026-11-09T13:21:12.204Z",
   "entries": [
     {
       "id": "github",
@@ -536,6 +536,12 @@
       "baseUrl": "https://status.ngrok.com"
     },
     {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "adapter": "rss",
+      "baseUrl": "https://status.openrouter.ai/history.rss"
+    },
+    {
       "id": "optimizely",
       "name": "Optimizely",
       "adapter": "statuspage",
@@ -1024,8 +1030,8 @@
     {
       "id": "stytch",
       "name": "Stytch",
-      "adapter": "instatus",
-      "baseUrl": "https://status.stytch.com"
+      "adapter": "rss",
+      "baseUrl": "https://status.stytch.com/history.rss"
     },
     {
       "id": "telnyx",
