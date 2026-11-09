@@ -768,3 +768,23 @@ test("a provider's markers include the fleet-wide ones, and a bad colour is refu
     await app.close();
   }
 });
+
+test("history/compare answers a period beside the year before, and refuses a missing basis", async () => {
+  const app = await api();
+  try {
+    await save(app.runtime, "github", "operational", at(1));
+    const day = new Date(Date.now() - DAY_MS).toISOString().slice(0, 10);
+    const { status, body } = await app.get(`/history/compare?from=${day}&to=${day}&basis=date&provider=github`);
+    assert.equal(status, 200);
+    const report = body as { basis: string; fleetDelta: number | null; previous: { from: string } };
+    assert.equal(report.basis, "date");
+    assert.equal(report.fleetDelta, null);
+    assert.equal(report.previous.from, `${Number(day.slice(0, 4)) - 1}${day.slice(4)}`);
+
+    assert.equal((await app.get(`/history/compare?from=${day}&to=${day}`)).status, 400);
+    assert.equal((await app.get(`/history/compare?from=${day}&basis=date`)).status, 400);
+    assert.equal((await app.get(`/history/compare?from=${day}&to=${day}&basis=date&provider=nope`)).status, 404);
+  } finally {
+    await app.close();
+  }
+});

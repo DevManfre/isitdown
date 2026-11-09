@@ -150,7 +150,7 @@ function revertibleChange(change: AuditChange): boolean {
 /** Provider fields a null clears — the same ones the service patch takes null for. */
 const NULLABLE_SERVICE_FIELDS = new Set([
   "intervalMinutes", "intervalSeconds", "mutedUntil", "group", "dependsOn", "crossChecks",
-  "slaTarget", "impact", "owner", "runbook", "tags", "muteSchedules", "maintenanceWindows",
+  "slaTarget", "outageCostPerHour", "impact", "owner", "runbook", "tags", "muteSchedules", "maintenanceWindows",
 ]);
 
 const rowSchema = z.object({

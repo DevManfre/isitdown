@@ -217,6 +217,14 @@ export const serviceDefinitionSchema = z.object({
    */
   slaTarget: z.number().min(50).max(100).optional(),
   /**
+   * What an hour of this provider being down costs the operator, in whatever
+   * currency they think in — roadmap 6.3. Optional rather than defaulted for the
+   * same reason as `slaTarget`: a default would put an invented figure beside
+   * every incident. A bare number, no currency code: the figure is the
+   * operator's own estimate and nothing here converts or sums across currencies.
+   */
+  outageCostPerHour: z.number().positive().max(1_000_000_000).optional(),
+  /**
    * Which source is the record for this provider — roadmap 9.1. `declared` is
    * the provider's own page, `observed` is our own reading.
    *

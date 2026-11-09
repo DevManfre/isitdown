@@ -9,6 +9,7 @@ const provider = (over: Partial<MonthlyProviderReport> = {}): MonthlyProviderRep
   measuredDays: 31,
   sampleCount: 14_880,
   downtimeMinutes: 0,
+  downtimeCost: null,
   incidentCount: 0,
   worstDay: { day: "2026-08-04", uptime: 100, status: "operational" },
   ...over,
@@ -114,4 +115,22 @@ test("a partial month says it is partial, and how far it got", () => {
   const rendered = renderMonthlyReport(report({ partial: true, to: "2026-08-19" }), names);
 
   assert.match(rendered, /\*\*This month is still running\*\*.*2026-08-19/);
+});
+
+test("a cost column appears only when somebody declared a price", () => {
+  const unpriced = renderMonthlyReport(report(), names);
+  assert.ok(!unpriced.includes("Downtime cost"));
+
+  const priced = renderMonthlyReport(
+    report({
+      providers: [
+        provider({ downtimeMinutes: 90, downtimeCost: 1800 }),
+        provider({ providerId: "cloudflare", downtimeCost: null }),
+      ],
+    }),
+    names,
+  );
+  assert.ok(priced.includes("| Provider | Uptime | Downtime | Downtime cost | Incidents |"));
+  assert.ok(priced.includes("| 1800.00 |"));
+  assert.ok(priced.includes("| — |"));
 });

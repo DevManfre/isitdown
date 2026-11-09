@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { IncidentRow } from "../historyStore.interface.ts";
+import { costRatesOf, incidentCost } from "../outageCost.ts";
+import { renderPostmortem } from "../postmortem.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { ALLOWED_DAYS, parseDays } from "./historyWindow.ts";
 import { pageSchema, pageSizeSchema, readIncidentQuery } from "./incidentQuery.ts";
@@ -11,9 +13,24 @@ const TIMELINE_DEFAULT_DAYS = 30;
 const TIMELINE_MAX_ROWS = 5000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/**
+ * An incident row with what it cost — roadmap 6.3. `cost` is `null` when the
+ * operator declared no hourly rate for the provider, and an open incident is
+ * priced up to now, so the figure grows while it runs.
+ */
+const withCost = (runtime: UiRuntimeCore) => {
+  const rates = costRatesOf(runtime.listAllServices());
+  const nowMs = Date.now();
+  return (row: IncidentRow) => ({ ...row, cost: incidentCost(rates, row, nowMs) });
+};
+
 /** How many recent polls the incident view's strip shows. */
 const POLL_STRIP_SIZE = 24;
 const ACTION_LOG_LIMIT = 50;
+/** A postmortem reaches further back than the strip: it needs every poll the incident spanned. */
+const POSTMORTEM_POLL_LIMIT = 2000;
+const POSTMORTEM_NOTIFICATION_LIMIT = 500;
+const NOTIFICATION_GRACE_MS = 10 * 60_000;
 
 /**
  * One note. Capped at a paragraph or two: this is "why our deploy failed on
@@ -77,7 +94,12 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       runtime.store.countIncidents(filter),
     ]);
 
-    res.json({ active, page: { items, page, pageSize, total: counts[state] }, counts });
+    const priced = withCost(runtime);
+    res.json({
+      active: active.map(priced),
+      page: { items: items.map(priced), page, pageSize, total: counts[state] },
+      counts,
+    });
   });
 
   /**
@@ -132,7 +154,7 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
     ]);
 
     res.json({
-      incident,
+      incident: withCost(runtime)(incident),
       timeline: buildTimeline(incident, polls),
       actionLog: notifications.filter((record) => record.providerId === providerId),
       polls,
@@ -146,6 +168,69 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       // Roadmap 3.6: whether every update of this incident reaches every channel.
       followed,
     });
+  });
+
+  /**
+   * The incident as a Markdown postmortem — roadmap 6.4. Read-only and built on
+   * request from rows already stored, so it can be fetched mid-incident and again
+   * after it resolves; an open one is flagged as such inside the document.
+   */
+  router.get("/incidents/:providerId/:incidentId/postmortem.md", async (req, res) => {
+    const { providerId, incidentId } = req.params;
+    const incident = await runtime.store.getIncident(providerId, incidentId);
+    if (incident === null) {
+      res.status(404).json({ error: { message: `unknown incident: ${providerId}/${incidentId}` } });
+      return;
+    }
+    const now = new Date();
+    const end = incident.resolvedAt ?? now.toISOString();
+    const services = runtime.listAllServices();
+    const nameOf = (id: string): string => services.find((service) => service.id === id)?.name ?? id;
+    // The resolution message goes out a moment after the row is closed, so the
+    // window is padded: a postmortem that stopped at resolvedAt would drop it.
+    const notifiedUntil = new Date(Date.parse(end) + NOTIFICATION_GRACE_MS).toISOString();
+
+    const others = runtime.enabledProviderIds().filter((id) => id !== providerId);
+    const [polls, notifications, notes, annotations, nearby] = await Promise.all([
+      runtime.store.getRecentSamples(providerId, POSTMORTEM_POLL_LIMIT),
+      runtime.store.queryNotifications({ providerIds: [providerId], limit: POSTMORTEM_NOTIFICATION_LIMIT }),
+      runtime.store.listIncidentNotes(providerId, incidentId),
+      runtime.store.listAnnotations(incident.startedAt, notifiedUntil, providerId),
+      runtime.store.listIncidents({
+        providerIds: others,
+        openFrom: incident.startedAt.slice(0, 10),
+        openTo: end.slice(0, 10),
+      }),
+    ]);
+
+    const body = renderPostmortem({
+      providerName: nameOf(providerId),
+      incident,
+      cost: withCost(runtime)(incident).cost,
+      timeline: buildTimeline(incident, polls),
+      revisions: runtime.revisions.revisions(providerId, incidentId),
+      notifications: notifications.filter(
+        (record) => record.sentAt >= incident.startedAt && record.sentAt <= notifiedUntil,
+      ),
+      notes,
+      annotations,
+      overlapping: nearby
+        .filter((other) => other.startedAt < end && (other.resolvedAt ?? "9999") > incident.startedAt)
+        .map((other) => ({
+          providerName: nameOf(other.providerId),
+          name: other.name,
+          startedAt: other.startedAt,
+          resolvedAt: other.resolvedAt,
+        })),
+      generatedAt: now.toISOString(),
+    });
+
+    res.setHeader("content-type", "text/markdown; charset=utf-8");
+    res.setHeader(
+      "content-disposition",
+      `attachment; filename="isitdown-postmortem-${providerId}-${now.toISOString().slice(0, 10)}.md"`,
+    );
+    res.send(body);
   });
 
   /**

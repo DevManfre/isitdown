@@ -391,6 +391,25 @@ test("pruneOlderThan drops old samples and keeps recent ones", async () => {
   await store.close();
 });
 
+test("pruneOlderThan rolls old samples up into daily buckets instead of forgetting the days", async () => {
+  const { store } = await harness();
+  const oldDay = new Date(NOW.getTime() - 200 * 24 * 3600 * 1000);
+  const first = oldDay.toISOString();
+  const second = new Date(oldDay.getTime() + 60_000).toISOString();
+  await store.saveStatus({ ...snap({ overallStatus: "operational", activeIncidents: [] }), fetchedAt: first });
+  await store.saveStatus({ ...snap(), fetchedAt: second });
+  await store.pruneOlderThan(120);
+  // A second prune must not count the same day twice.
+  await store.pruneOlderThan(120);
+  const buckets = await store.getDailyBuckets("github", segmentsEndingOn(NOW.toISOString().slice(0, 10), 365, "UTC"));
+  assert.equal(buckets.length, 1);
+  assert.equal(buckets[0]?.day, first.slice(0, 10));
+  assert.equal(buckets[0]?.totalSamples, 2);
+  assert.equal(buckets[0]?.okSamples, 1);
+  assert.equal(buckets[0]?.worstStatus, "degraded");
+  await store.close();
+});
+
 test("pruneOlderThan forgets message references nobody will edit again", async () => {
   const { db, store } = await harness();
   await store.saveRef("telegram", "github", "old-incident", "ref-old");

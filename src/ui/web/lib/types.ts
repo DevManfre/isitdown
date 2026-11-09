@@ -530,6 +530,7 @@ export interface ServiceDefinition {
    * sent, on a patch, to drop the promise.
    */
   slaTarget?: number | null;
+  outageCostPerHour?: number | null;
   /**
    * Which source is the record for this provider — roadmap 9.1. Absent means
    * "whatever this adapter implies", which is how most providers are left.

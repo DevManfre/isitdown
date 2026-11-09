@@ -267,6 +267,16 @@ export function IncidentDetail() {
             </div>
           )}
 
+          {/* Roadmap 6.4. A plain download, same as the export links: the server writes the document. */}
+          <Button asChild variant="ghost">
+            <a
+              href={`/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/postmortem.md`}
+              download
+            >
+              {t("action.download-postmortem")}
+            </a>
+          </Button>
+
           <div className="flex flex-col items-end gap-1">
             <Button type="button" variant="ghost" className="mono" onClick={() => void copyPayload()}>
               {t("action.copy-payload")}

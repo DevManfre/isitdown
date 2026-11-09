@@ -14,6 +14,7 @@ const silent = createLogger("error", () => {});
 
 interface Api {
   runtime: UiRuntime;
+  base: string;
   get: (path: string) => Promise<{ status: number; body: unknown }>;
   send: (method: string, path: string, body?: unknown) => Promise<{ status: number; body: unknown }>;
   close: () => Promise<void>;
@@ -28,6 +29,7 @@ async function api(): Promise<Api> {
 
   return {
     runtime,
+    base: `http://127.0.0.1:${port}`,
     get: async (path) => {
       const response = await fetch(`http://127.0.0.1:${port}${path}`);
       const text = await response.text();
@@ -451,6 +453,48 @@ test("a resolved incident, or one that does not exist, cannot be followed", asyn
     });
     const refused = await app.send("PUT", `/incidents/${providerId}/${providerId}-1/follow`);
     assert.equal(refused.status, 409);
+  } finally {
+    await app.close();
+  }
+});
+
+test("incidents carry what they cost once the provider has an hourly rate", async () => {
+  const app = await api();
+  try {
+    const [priced, free] = await openIncidents(app.runtime);
+    updateService(app.runtime.db, priced as string, { outageCostPerHour: 600 });
+
+    const { body } = await app.get("/incidents");
+    const items = (body as { page: { items: { providerId: string; cost: number | null }[] } }).page.items;
+    assert.ok((items.find((row) => row.providerId === priced)?.cost ?? -1) >= 0);
+    assert.equal(items.find((row) => row.providerId === free)?.cost, null);
+
+    const detail = await app.get(`/incidents/${priced}/${priced}-1`);
+    assert.equal(detail.status, 200);
+    assert.ok(((detail.body as { incident: { cost: number | null } }).incident.cost ?? -1) >= 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a postmortem downloads as Markdown with the incident, its cost and a note on it", async () => {
+  const app = await api();
+  try {
+    const [id] = await openIncidents(app.runtime);
+    updateService(app.runtime.db, id as string, { outageCostPerHour: 600 });
+    await app.runtime.store.addIncidentNote(id as string, `${id}-1`, "Rolled back the deploy");
+
+    const response = await fetch(`${app.base}/incidents/${id}/${id}-1/postmortem.md`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", /text\/markdown/);
+    assert.match(response.headers.get("content-disposition") ?? "", /attachment; filename="isitdown-postmortem-/);
+    const md = await response.text();
+    assert.ok(md.startsWith("# Postmortem — "));
+    assert.ok(md.includes("**Estimated cost:**"));
+    assert.ok(md.includes("Rolled back the deploy"));
+
+    const missing = await fetch(`${app.base}/incidents/${id}/nope/postmortem.md`);
+    assert.equal(missing.status, 404);
   } finally {
     await app.close();
   }

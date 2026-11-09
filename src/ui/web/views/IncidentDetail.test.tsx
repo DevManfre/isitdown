@@ -60,6 +60,13 @@ describe("IncidentDetail", () => {
     expect(await screen.findAllByText(/GitHub/)).not.toHaveLength(0);
   });
 
+  // Roadmap 6.4: the postmortem is the server's document, reached by a plain link.
+  it("offers the incident as a downloadable postmortem", async () => {
+    mount();
+    const link = await screen.findByRole("link", { name: i18n.t("action.download-postmortem") });
+    expect(link).toHaveAttribute("href", expect.stringMatching(/^\/incidents\/[^/]+\/[^/]+\/postmortem\.md$/));
+  });
+
   // Roadmap 1.1: only an incident whose page published a creation time, and that
   // arrived while somebody was watching, has a detection delay to show.
   it("says how long after the provider's announcement the incident was detected", async () => {

@@ -1,5 +1,6 @@
 import { resolveZone, shiftDay, zonedDayKey } from "./calendarDays.ts";
 import type { HistoryStore, IncidentRow } from "./historyStore.interface.ts";
+import { downtimeCost, type CostRates } from "./outageCost.ts";
 
 /**
  * What the incident table already knows, asked two new questions — roadmap 12.2
@@ -50,6 +51,8 @@ export interface ProviderReliability {
   longestOutageMinutes: number | null;
   /** Total resolved downtime, which is what the ranking sorts on. */
   downtimeMinutes: number;
+  /** `downtimeMinutes` at the declared hourly cost — roadmap 6.3. `null` when none was declared. */
+  downtimeCost: number | null;
   /**
    * Incidents in the window of equal length before this one, so the table can
    * say "worse than last month" rather than only "bad".
@@ -114,6 +117,8 @@ const durationOf = (incident: IncidentRow): number | null =>
 export interface ReliabilityDeps {
   now?: (() => Date) | undefined;
   timeZone?: (() => Promise<string> | string) | undefined;
+  /** The declared hourly outage cost per provider — roadmap 6.3. */
+  costRates?: (() => CostRates) | undefined;
 }
 
 export function createReliabilityService(
@@ -148,6 +153,7 @@ export function createReliabilityService(
         Array.from({ length: 24 }, () => 0),
       );
       const providers: ProviderReliability[] = [];
+      const rates = deps.costRates?.() ?? new Map<string, number>();
 
       for (const providerId of providerIds) {
         // Started inside the window, not merely open during it: every figure
@@ -199,6 +205,11 @@ export function createReliabilityService(
           longestOutageMinutes:
             durations.length === 0 ? null : Math.max(...durations),
           downtimeMinutes: durations.reduce((sum, minutes) => sum + minutes, 0),
+          downtimeCost: downtimeCost(
+            rates,
+            providerId,
+            durations.reduce((sum, minutes) => sum + minutes, 0),
+          ),
           previousIncidents: previous.filter(
             (incident) =>
               incident.startedAt.slice(0, 10) >= previousFrom &&
