@@ -179,8 +179,13 @@ const ASSETS = "dist/ui/public/assets";
  * because it words six kinds of step, each with its own outcomes, and that is
  * most of the forty-six strings (276 lines) this lot added to six catalogs.
  * No dependency was added; the CSS did not move.
+ *
+ * It moved 742,000 -> 745,000 (724.6 -> 727.5 kB) for roadmaps 5.15 and 5.16.
+ * Measured: 740,257 bytes before, 743,193 after — 2.9 kB gzipped. The
+ * installation-health card is one component with no dependency, and most of
+ * the weight is its sixteen strings in six catalogs. The CSS did not move.
  */
-export const BUDGET = { js: 742_000, css: 23_500 };
+export const BUDGET = { js: 745_000, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

@@ -30,6 +30,7 @@ import { auditWrites } from "../configAudit.ts";
 import { configHistoryRoutes } from "./config.history.routes.ts";
 import { configImportExportRoutes } from "./config.importexport.routes.ts";
 import { configPushRoutes } from "./config.push.routes.ts";
+import { configHealthRoutes } from "./config.health.routes.ts";
 import { configStorageRoutes } from "./config.storage.routes.ts";
 import { configChannelRoutes } from "./config.channels.routes.ts";
 import { configServiceRoutes } from "./config.services.routes.ts";
@@ -285,6 +286,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
   });
 
   configStorageRoutes(runtime, router);
+  configHealthRoutes(runtime, router);
 
   configBackupRoutes(runtime, router);
 

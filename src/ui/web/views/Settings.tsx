@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { AppearanceSection } from "@/components/settings/AppearanceSection.tsx";
+import { InstallHealth } from "@/components/settings/InstallHealth.tsx";
 import { SettingsLauncher } from "@/components/settings/SettingsLauncher.tsx";
 import {
   openCategory,
@@ -103,6 +104,8 @@ function SettingsView() {
             </div>
           )}
         </div>
+
+        {open === undefined && query.trim() === "" && <InstallHealth />}
 
         {open === undefined && (
           <SettingsLauncher

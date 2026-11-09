@@ -16,6 +16,7 @@ import {
   updateChannel,
 } from "../dbConfigSource.ts";
 import { TEMPLATE_MAX_LENGTH } from "../../notifiers/template.ts";
+import { noteInstallEvent } from "../installHealth.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { issues } from "./config.shared.ts";
 
@@ -252,6 +253,8 @@ export function configChannelRoutes(runtime: UiRuntimeCore, router: Router): voi
           : { template: resolved.template }),
       },
     );
+    // Only a test that got through counts: one that failed proves the opposite.
+    if (record.ok) noteInstallEvent(db, "channelTest");
     res.json(record.ok ? { ok: true } : { ok: false, error: record.error });
   });
 

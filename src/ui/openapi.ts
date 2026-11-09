@@ -1025,6 +1025,14 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }) },
     },
   },
+  "/config/health": {
+    get: {
+      tags: ["Configuration"],
+      summary:
+        "Roadmap 5.15 and 5.16. `{ abandoned: [{ id, name, reason, since }], checks: [{ id, state, fix, days? }] }`. `abandoned` lists providers switched off, or never read successfully, for 30 days (`reason` is `disabled` or `failing`). `checks` is the installation checklist — channels, channel test, backup, retention, version, API token — each `ok`, `warn` or `unknown`, with where to fix it. Read-only.",
+      responses: { "200": ok({ type: "object" }) },
+    },
+  },
   "/config/storage/maintenance": {
     post: {
       tags: ["Configuration"],
