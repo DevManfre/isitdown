@@ -2206,6 +2206,16 @@ stored samples the History view is drawn from:
 It shows as an **Error budget** card on the provider's own page, and the whole
 fleet's is `GET /sla`.
 
+**Claiming a credit.** When the month is below target, the card says the
+provider may owe a service credit and links **Download the evidence** —
+`GET /export/sla-evidence.md?provider=<id>&month=YYYY-MM` (roadmap 6.5). The
+file is what a vendor's support desk asks for: the committed and measured
+uptime, the downtime allowed against the downtime measured, every downtime
+window to the poll with the provider's own incident references beside it, and
+the provider's incidents for the month. Any month can be asked for, not only
+the running one — a claim is usually filed once the month has closed. See the
+[API](api.md) for the JSON form.
+
 **The alert.** When the projection first drops below the target, the provider
 gets one `sla_burn` notification — through the diff engine and the dispatcher
 like every other alert, so routing rules, quiet hours, the digest window and the

@@ -686,6 +686,46 @@ const paths: Json = {
       responses: { "200": media("text/markdown", "The report.") },
     },
   },
+  "/export/monthly.html": {
+    get: {
+      tags: ["Export"],
+      summary: "The same month as a self-contained page with its charts, to print or save as PDF.",
+      parameters: [query("month", "YYYY-MM; defaults to the current month.")],
+      responses: { "200": media("text/html", "The report, served inline.") },
+    },
+  },
+  "/export/sla-evidence.md": {
+    get: {
+      tags: ["Export"],
+      summary: "One provider's month as evidence for an SLA credit claim.",
+      parameters: [
+        query("provider", "Provider id; it must have an SLA target."),
+        query("month", "YYYY-MM; defaults to the current month."),
+      ],
+      responses: {
+        "200": media("text/markdown", "Target, measured uptime, downtime windows and the provider's incidents."),
+        "400": badRequest,
+        "404": notFound,
+        "409": { description: "The provider has no SLA target.", ...json(ref("Error")) },
+      },
+    },
+  },
+  "/export/sla-evidence.json": {
+    get: {
+      tags: ["Export"],
+      summary: "The same evidence as JSON.",
+      parameters: [
+        query("provider", "Provider id; it must have an SLA target."),
+        query("month", "YYYY-MM; defaults to the current month."),
+      ],
+      responses: {
+        "200": ok({ type: "object" }),
+        "400": badRequest,
+        "404": notFound,
+        "409": { description: "The provider has no SLA target.", ...json(ref("Error")) },
+      },
+    },
+  },
   "/export/gatus.yaml": {
     get: {
       tags: ["Export"],

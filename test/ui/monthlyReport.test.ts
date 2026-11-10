@@ -12,6 +12,7 @@ const provider = (over: Partial<MonthlyProviderReport> = {}): MonthlyProviderRep
   downtimeCost: null,
   incidentCount: 0,
   worstDay: { day: "2026-08-04", uptime: 100, status: "operational" },
+  days: [],
   ...over,
 });
 

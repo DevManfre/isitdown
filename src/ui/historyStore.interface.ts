@@ -279,6 +279,13 @@ export interface HistoryStore extends StateStore, MessageRefStore, AckStore {
   /** Newest first, for the incident view's poll strip. */
   getRecentSamples(providerId: string, limit: number): Promise<SampleRow[]>;
   /**
+   * Every raw poll in `[fromIso, toIso)`, oldest first — roadmap 6.5. The SLA
+   * evidence rebuilds its downtime windows from these, poll by poll; a stretch
+   * retention already folded into daily rollups is simply absent, and the
+   * caller says so rather than reading the gap as uptime.
+   */
+  getSamplesBetween(providerId: string, fromIso: string, toIso: string): Promise<SampleRow[]>;
+  /**
    * Every response time recorded for the provider since `sinceIso`, oldest
    * first — roadmap 4.14. Samples with no reading (a failed poll, a row from
    * before the column existed) are left out: an absent latency is not 0 ms.

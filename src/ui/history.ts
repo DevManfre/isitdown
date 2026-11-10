@@ -220,6 +220,11 @@ export interface MonthlyProviderReport {
    * questions, and the second is answered by the number rather than by absence.
    */
   worstDay: { day: string; uptime: number; status: OverallStatus } | null;
+  /**
+   * Every measured day, oldest first — what the printable report draws its
+   * daily strip from (roadmap 6.6). A day with no samples is absent, never 0%.
+   */
+  days: { day: string; uptime: number; status: OverallStatus }[];
 }
 
 export interface MonthlyReport {
@@ -584,12 +589,14 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
       let total = 0;
       let measuredDays = 0;
       let worstDay: MonthlyProviderReport["worstDay"] = null;
+      const days: MonthlyProviderReport["days"] = [];
       for (const bucket of buckets) {
         ok += bucket.okSamples;
         total += bucket.totalSamples;
         if (bucket.totalSamples === 0) continue;
         measuredDays += 1;
         const uptime = round2((bucket.okSamples / bucket.totalSamples) * 100);
+        days.push({ day: bucket.day, uptime, status: bucket.worstStatus });
         // Strictly less, so a tie keeps the earlier day: "the worst day" should
         // be stable between two runs of the same report.
         if (worstDay === null || uptime < worstDay.uptime) {
@@ -615,6 +622,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
         downtimeCost: downtimeCost(rates, providerId, (total - ok) * intervalMinutes),
         incidentCount: open.length + rolled,
         worstDay,
+        days,
       });
     }
 

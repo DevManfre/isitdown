@@ -307,3 +307,58 @@ test("a month long past reports itself as complete and measures nothing", async 
     await app.close();
   }
 });
+
+test("the printable month is a page opened in the browser, not a download (roadmap 6.6)", async () => {
+  const app = await api();
+  try {
+    await seed(app.runtime);
+
+    const { status, headers, text } = await app.get("/export/monthly.html");
+
+    assert.equal(status, 200);
+    assert.match(headers.get("content-type") ?? "", /^text\/html/);
+    assert.equal(headers.get("content-disposition"), null);
+    assert.match(text, /^<!doctype html>/);
+    assert.match(text, /<svg /);
+  } finally {
+    await app.close();
+  }
+});
+
+test("SLA evidence is refused for a provider nobody set a target on, and for one that does not exist", async () => {
+  const app = await api();
+  try {
+    const [id] = await seed(app.runtime);
+
+    assert.equal((await app.get(`/export/sla-evidence.md?provider=${id}`)).status, 409);
+    assert.equal((await app.get("/export/sla-evidence.md?provider=nope")).status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
+test("SLA evidence lists the provider's downtime windows against its target (roadmap 6.5)", async () => {
+  const app = await api();
+  try {
+    const id = (await seed(app.runtime))[0] as string;
+    updateService(app.runtime.db, id, { slaTarget: 99.9 });
+    const month = new Date().toISOString().slice(0, 7);
+
+    const md = await app.get(`/export/sla-evidence.md?provider=${id}&month=${month}`);
+    assert.equal(md.status, 200, md.text);
+    assert.match(
+      md.headers.get("content-disposition") ?? "",
+      new RegExp(`filename="isitdown-sla-evidence-${id}-${month}-\\d{4}-\\d{2}-\\d{2}\\.md"`),
+    );
+    assert.match(md.text, /below the committed 99\.90%/);
+
+    const json = await app.get(`/export/sla-evidence.json?provider=${id}&month=${month}`);
+    const evidence = JSON.parse(json.text) as { belowTarget: boolean; windows: { endedAt: string | null; incidentIds: string[] }[] };
+    assert.equal(evidence.belowTarget, true);
+    assert.equal(evidence.windows.length, 1);
+    assert.equal(evidence.windows[0]?.endedAt, null);
+    assert.deepEqual(evidence.windows[0]?.incidentIds, [`${id}-1`]);
+  } finally {
+    await app.close();
+  }
+});
