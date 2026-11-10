@@ -838,6 +838,20 @@ describe("the service dialog's write path", () => {
     expect(calls.some((c) => c.method === "PATCH"), "reading must not save").toBe(false);
   });
 
+  it("a declared outage cost is sent as a number with the patch", async () => {
+    renderWithProviders(<Settings />, fixtures, "/settings/services");
+    await openEdit();
+    const dialog = await screen.findByRole("dialog");
+    const calls = interceptWrites({ "PATCH /config/services/github": {} });
+
+    await userEvent.type(within(dialog).getByLabelText(i18n.t("field.outage-cost")), "1200");
+    await userEvent.click(within(dialog).getByRole("button", { name: i18n.t("action.save") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const patch = calls.find((call) => call.method === "PATCH" && call.path === "/config/services/github");
+    expect(patch?.body).toMatchObject({ outageCostPerHour: 1200 });
+  });
+
   it("a successful edit submits the patch mutation with the expected body", async () => {
     // Review item 2: the only edit-mode test on record asserts the id field is
     // read-only but never actually submits — patch.mutateAsync and its body
@@ -878,6 +892,8 @@ describe("the service dialog's write path", () => {
       // And for the SLA target (roadmap 4.13): an empty field means nobody is
       // promising anything about this provider any more.
       slaTarget: null,
+    // Outage cost (roadmap 6.3): an empty field drops the declared price.
+    outageCostPerHour: null,
       // And for the authority (roadmap 9.1): "from the adapter" is the absence
       // of an answer, not an answer of its own, so clearing it needs a null.
       authority: null,

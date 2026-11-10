@@ -28,6 +28,7 @@ import { openDatabase } from "./db/open.ts";
 import { seedDefaults } from "./db/seed.ts";
 import { loadGeoTables } from "./geo/resolveLocation.ts";
 import { createHistoryService } from "./history.ts";
+import { costRatesOf } from "./outageCost.ts";
 import { createReliabilityService } from "./reliability.ts";
 import { createCoincidenceService } from "./coincidence.ts";
 import { createLiveEvents, type LiveEvents } from "./liveEvents.ts";
@@ -210,10 +211,11 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
    */
   const timeZone = (): string => readSettings(db, logger).timeZone;
 
-  const history = createHistoryService(store, { timeZone });
+  const costRates = () => costRatesOf(listServices(db));
+  const history = createHistoryService(store, { timeZone, costRates });
   // Roadmap 12.2 and 12.3: the incident table, asked two questions it already
   // holds the answers to.
-  const reliability = createReliabilityService(store, { timeZone });
+  const reliability = createReliabilityService(store, { timeZone, costRates });
   // Roadmap 2.10: the same rows, asked which providers break together.
   const coincidence = createCoincidenceService(store, { timeZone });
   // Roadmap 4.13. Reads the same monthly report the export and the History view

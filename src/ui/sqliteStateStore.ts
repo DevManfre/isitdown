@@ -989,8 +989,10 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
     },
 
     async getDailyBuckets(providerId: string, segments: readonly DaySegment[]): Promise<DailyBucket[]> {
-      return bucketsOver(segments, (segment) =>
-        db
+      const first = segments[0];
+      const last = segments[segments.length - 1];
+      return bucketsOver(segments, (segment) => {
+        const rows: unknown[] = db
           .prepare(
             `SELECT date(observed_at, ?) AS day,
                     MAX(${RANK_CASE}) AS worst,
@@ -1000,8 +1002,22 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
              WHERE provider_id = ? AND observed_at >= ? AND observed_at < ?
              GROUP BY day`,
           )
-          .all(shiftOf(segment), providerId, segment.fromIso, segment.toIso),
-      );
+          .all(shiftOf(segment), providerId, segment.fromIso, segment.toIso);
+        // Roadmap 6.1: the days retention already rolled up, read once for the
+        // whole window and folded in with the raw rows — a day pruned half way
+        // has both, and bucketsOver sums them.
+        if (segment === first && last !== undefined) {
+          rows.push(
+            ...db
+              .prepare(
+                `SELECT day, worst, ok_samples, total_samples FROM daily_rollups
+                 WHERE provider_id = ? AND total_samples > 0 AND day >= date(?, ?) AND day < date(?, ?)`,
+              )
+              .all(providerId, segment.fromIso, shiftOf(segment), last.toIso, shiftOf(last)),
+          );
+        }
+        return rows;
+      });
     },
 
     async getComponentDailyBuckets(
@@ -1122,13 +1138,38 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
 
     async pruneOlderThan(days: number): Promise<void> {
       const cutoff = new Date(now().getTime() - days * 24 * 3600 * 1000).toISOString();
-      db.prepare("DELETE FROM status_samples WHERE observed_at < ?").run(cutoff);
+      // Roadmap 6.1: retention is a resolution policy. What is about to go is
+      // folded into its UTC day first, in the same transaction as the delete,
+      // so a crash between the two can neither lose a day nor count it twice.
+      db.exec("BEGIN");
+      try {
+        db.prepare(
+          `INSERT INTO daily_rollups (provider_id, day, worst, ok_samples, total_samples, incidents)
+           SELECT provider_id, date(observed_at), MAX(${RANK_CASE}), SUM(ok), COUNT(*), 0
+           FROM status_samples WHERE observed_at < ? GROUP BY provider_id, date(observed_at)
+           ON CONFLICT (provider_id, day) DO UPDATE SET
+             worst = MAX(worst, excluded.worst),
+             ok_samples = ok_samples + excluded.ok_samples,
+             total_samples = total_samples + excluded.total_samples`,
+        ).run(cutoff);
+        db.prepare(
+          `INSERT INTO daily_rollups (provider_id, day, worst, ok_samples, total_samples, incidents)
+           SELECT provider_id, date(started_at), 0, 0, 0, COUNT(*)
+           FROM incidents WHERE resolved_at IS NOT NULL AND resolved_at < ? GROUP BY provider_id, date(started_at)
+           ON CONFLICT (provider_id, day) DO UPDATE SET incidents = incidents + excluded.incidents`,
+        ).run(cutoff);
+        db.prepare("DELETE FROM incidents WHERE resolved_at IS NOT NULL AND resolved_at < ?").run(cutoff);
+        db.prepare("DELETE FROM status_samples WHERE observed_at < ?").run(cutoff);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
       db.prepare("DELETE FROM component_samples WHERE observed_at < ?").run(cutoff);
       db.prepare("DELETE FROM notifications WHERE sent_at < ?").run(cutoff);
       // On the same cutoff as the samples: a day whose samples are gone has no
       // chart left to hatch, and keeping its liveness would only grow.
       db.prepare("DELETE FROM poll_cycles WHERE started_at < ?").run(cutoff);
-      db.prepare("DELETE FROM incidents WHERE resolved_at IS NOT NULL AND resolved_at < ?").run(cutoff);
       db.prepare("DELETE FROM maintenances WHERE ends_at IS NOT NULL AND ends_at < ?").run(cutoff);
       // A chat message reference nobody has touched since the cutoff will not
       // be edited again: its resolution was swallowed (quiet hours, cap, mute).
@@ -1142,6 +1183,15 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
            SELECT 1 FROM incident_versions v
            WHERE v.provider_id = incident_revisions.provider_id AND v.incident_id = incident_revisions.incident_id)`,
       ).run();
+    },
+
+    async countRolledIncidents(providerId: string, fromDay: string, toDay: string): Promise<number> {
+      const raw = db
+        .prepare(
+          "SELECT COALESCE(SUM(incidents), 0) AS total FROM daily_rollups WHERE provider_id = ? AND day >= ? AND day <= ?",
+        )
+        .get(providerId, fromDay, toDay);
+      return z.object({ total: z.number() }).parse(raw).total;
     },
 
     async getEarliestSampleTime(providerId: string): Promise<string | null> {

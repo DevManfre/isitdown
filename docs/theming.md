@@ -67,7 +67,7 @@ contrast**, **colour-blind safe** and **OLED black**.
 - **Lit chrome** (roadmap 7.6), pared back by the calm redesign: nothing animates
   ambiently any more, so the dot grid and the travelling beam are gone. What is
   left is tokens (`--gradient-primary`, `--gradient-hero-live`, `--shadow-glow`) —
-  the incident page's band takes the severity bloom while the incident is open —
+  the incident page's top card takes a tint of the incident's severity (of "operational" once it is resolved) —
   and provider tiles whose border answers the pointer (`.tile-lit` in
   `motion.css`).
 

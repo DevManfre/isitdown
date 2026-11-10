@@ -182,6 +182,9 @@ export function ServiceDialog({
   const [slaTarget, setSlaTarget] = useState(
     service?.slaTarget == null ? "" : String(service.slaTarget),
   );
+  const [outageCost, setOutageCost] = useState(
+    service?.outageCostPerHour == null ? "" : String(service.outageCostPerHour),
+  );
   // Roadmap 9.1. Empty string is "from the adapter", which is what nearly every
   // provider is left on: it keeps the rule a rule instead of freezing today's
   // answer onto this row.
@@ -224,7 +227,7 @@ export function ServiceDialog({
   // opened, so a close with anything changed asks first.
   const formState = JSON.stringify([
     picked, name, adapter, baseUrl, selection, scopeToComponents, intervalMinutes,
-    intervalUnit, group, slaTarget, authority, dependsOn, impact, owner, tags, runbook, options, header,
+    intervalUnit, group, slaTarget, outageCost, authority, dependsOn, impact, owner, tags, runbook, options, header,
   ]);
   const [pristine, setPristine] = useState(formState);
   const [capturePristine, setCapturePristine] = useState(false);
@@ -352,6 +355,7 @@ export function ServiceDialog({
     setIntervalUnit(intervalUnitOf(service));
     setGroup(service?.group ?? "");
     setSlaTarget(service?.slaTarget == null ? "" : String(service.slaTarget));
+    setOutageCost(service?.outageCostPerHour == null ? "" : String(service.outageCostPerHour));
     setAuthority(service?.authority ?? "");
     setDependsOn(service?.dependsOn ?? []);
     setImpact(service?.impact ?? "");
@@ -591,6 +595,7 @@ export function ServiceDialog({
           // Omitted rather than null, like the interval: absent means nobody
           // promised anything about this provider (roadmap 4.13).
           ...(slaTarget.trim() === "" ? {} : { slaTarget: Number(slaTarget) }),
+          ...(outageCost.trim() === "" ? {} : { outageCostPerHour: Number(outageCost) }),
           ...(authority === ""
             ? {}
             : { authority: authority as "declared" | "observed" }),
@@ -645,6 +650,7 @@ export function ServiceDialog({
             // And null again for the target: cleared means the promise is off,
             // which only null can say.
             slaTarget: slaTarget.trim() === "" ? null : Number(slaTarget),
+            outageCostPerHour: outageCost.trim() === "" ? null : Number(outageCost),
             authority:
               authority === "" ? null : (authority as "declared" | "observed"),
           // Null, not omitted, like the rest: an emptied list must travel.
@@ -811,6 +817,24 @@ export function ServiceDialog({
           />
           <span className="text-xs text-muted-foreground">
             {t("field.sla-target-hint")}
+          </span>
+        </div>
+
+        {/* Roadmap 6.3. Empty is the normal state, for the same reason as the target above: a default would invent a price and print it beside every incident. */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="service-outage-cost">{t("field.outage-cost")}</Label>
+          <Input
+            id="service-outage-cost"
+            type="number"
+            min={0}
+            step="any"
+            placeholder={t("field.outage-cost-placeholder")}
+            value={outageCost}
+            onChange={(event) => setOutageCost(event.target.value)}
+            {...fieldProps}
+          />
+          <span className="text-xs text-muted-foreground">
+            {t("field.outage-cost-hint")}
           </span>
         </div>
 

@@ -313,6 +313,7 @@ const serviceRowSchema = z.object({
   depends_on: z.string().nullable(),
   cross_checks: z.string().nullable(),
   sla_target: z.number().nullable(),
+  outage_cost_per_hour: z.number().nullable(),
   authority: z.enum(["declared", "observed"]).nullable(),
   impact: z.string().nullable(),
   owner: z.string().nullable(),
@@ -500,7 +501,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // A removed provider is invisible to everything that reads this: it stops
       // being polled, drops off the dashboard and out of every count, while its
       // history waits out the grace period.
-      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, favorite, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner, runbook, tags, mute_schedules, maintenance_windows
+      `SELECT id, name, adapter, base_url, options, enabled, components, scope_to_components, favorite, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, outage_cost_per_hour, authority, impact, owner, runbook, tags, mute_schedules, maintenance_windows
        FROM services WHERE deleted_at IS NULL ORDER BY id`,
     )
     .all()
@@ -553,6 +554,7 @@ export function listServices(db: DatabaseSync): ServiceDefinition[] {
       // anything about this provider" has to stay distinguishable from a
       // target that happens to be 100 (roadmap 4.13).
       ...(row.sla_target === null ? {} : { slaTarget: row.sla_target }),
+      ...(row.outage_cost_per_hour === null ? {} : { outageCostPerHour: row.outage_cost_per_hour }),
       ...(row.authority === null ? {} : { authority: row.authority }),
       // Absent rather than null, like every optional above (roadmap 3.7).
       ...(row.impact === null ? {} : { impact: row.impact }),
@@ -594,7 +596,7 @@ export function insertService(
 ): void {
   const parsed = serviceDefinitionSchema.parse(definition);
   db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, favorite, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, authority, impact, owner, runbook, tags, mute_schedules, maintenance_windows, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, favorite, interval_minutes, interval_seconds, muted_until, group_name, depends_on, cross_checks, sla_target, outage_cost_per_hour, authority, impact, owner, runbook, tags, mute_schedules, maintenance_windows, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     parsed.id,
     parsed.name,
@@ -612,6 +614,7 @@ export function insertService(
     parsed.dependsOn === undefined ? null : JSON.stringify(parsed.dependsOn),
     parsed.crossChecks ?? null,
     parsed.slaTarget ?? null,
+    parsed.outageCostPerHour ?? null,
     parsed.authority ?? null,
     parsed.impact ?? null,
     parsed.owner ?? null,
@@ -661,6 +664,11 @@ export const servicePatchSchema = serviceDefinitionSchema
       .optional(),
     /** Null means nobody is promising anything about this provider any more (roadmap 4.13). */
     slaTarget: serviceDefinitionSchema.shape.slaTarget
+      .unwrap()
+      .nullable()
+      .optional(),
+    /** Null drops the declared cost of an hour of downtime (roadmap 6.3). */
+    outageCostPerHour: serviceDefinitionSchema.shape.outageCostPerHour
       .unwrap()
       .nullable()
       .optional(),
@@ -718,6 +726,7 @@ export function updateService(
   if (parsed.mutedUntil !== undefined)
     columns["muted_until"] = parsed.mutedUntil;
   if (parsed.slaTarget !== undefined) columns["sla_target"] = parsed.slaTarget;
+  if (parsed.outageCostPerHour !== undefined) columns["outage_cost_per_hour"] = parsed.outageCostPerHour;
   if (parsed.authority !== undefined) columns["authority"] = parsed.authority;
   if (parsed.impact !== undefined) columns["impact"] = parsed.impact;
   if (parsed.owner !== undefined) columns["owner"] = parsed.owner;
