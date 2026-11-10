@@ -151,6 +151,42 @@ export function historyRoutes(runtime: UiRuntimeCore): Router {
   });
 
   /**
+   * A period beside the same one a year earlier — roadmap 6.2. `basis` says how
+   * the match is made and has no default: `date` and `weekday` give different
+   * answers, and the one picked for the caller would be a choice nobody saw.
+   */
+  router.get("/history/compare", async (req, res) => {
+    const { from, to, basis, provider } = req.query;
+    if (basis !== "date" && basis !== "weekday") {
+      res.status(400).json({ error: { message: "basis must be date or weekday" } });
+      return;
+    }
+    const window = parseWindow({ from, to });
+    if ("error" in window) {
+      res.status(400).json({ error: { message: window.error } });
+      return;
+    }
+    if (provider !== undefined && typeof provider !== "string") {
+      res.status(400).json({ error: { message: "provider must be a single value" } });
+      return;
+    }
+    if (provider !== undefined && !runtime.listAllServices().some((service) => service.id === provider)) {
+      res.status(404).json({ error: { message: `unknown provider: ${provider}` } });
+      return;
+    }
+    const { intervalMinutes } = (await runtime.configSource.load()).polling;
+    res.json(
+      await runtime.history.getYearOverYear(
+        String(from),
+        String(to),
+        basis,
+        intervalMinutes,
+        provider === undefined || provider === "" ? runtime.enabledProviderIds() : [provider],
+      ),
+    );
+  });
+
+  /**
    * The operator's own markers — roadmap 12.1.
    *
    * On the history router rather than a router of its own because a marker is

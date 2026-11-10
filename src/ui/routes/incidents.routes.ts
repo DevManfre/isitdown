@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { IncidentRow } from "../historyStore.interface.ts";
+import { costRatesOf, incidentCost } from "../outageCost.ts";
+import { renderPostmortem } from "../postmortem.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { ALLOWED_DAYS, parseDays } from "./historyWindow.ts";
 import { pageSchema, pageSizeSchema, readIncidentQuery } from "./incidentQuery.ts";
@@ -11,9 +13,42 @@ const TIMELINE_DEFAULT_DAYS = 30;
 const TIMELINE_MAX_ROWS = 5000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** How many recent polls the incident view's strip shows. */
-const POLL_STRIP_SIZE = 24;
-const ACTION_LOG_LIMIT = 50;
+/**
+ * An incident row with what it cost — roadmap 6.3. `cost` is `null` when the
+ * operator declared no hourly rate for the provider, and an open incident is
+ * priced up to now, so the figure grows while it runs.
+ */
+const withCost = (runtime: UiRuntimeCore) => {
+  const rates = costRatesOf(runtime.listAllServices());
+  const nowMs = Date.now();
+  return (row: IncidentRow) => ({ ...row, cost: incidentCost(rates, row, nowMs) });
+};
+
+/**
+ * How many recent polls an incident's page and postmortem read. The page draws
+ * its strip from the newest 24 and the incident's shape over time from all of
+ * them, so this bounds how far back a long incident can be drawn.
+ */
+const INCIDENT_POLL_LIMIT = 500;
+const NOTIFICATION_LIMIT = 500;
+/** The resolution message goes out a moment after the row is closed. */
+const NOTIFICATION_GRACE_MS = 10 * 60_000;
+
+/**
+ * What was sent about this incident: the provider's sends from its start until
+ * a moment after its end. Windowed rather than "the latest 50 of the fleet":
+ * the page counts these, and an earlier incident's alerts are not this one's.
+ */
+async function sendsDuring(runtime: UiRuntimeCore, incident: IncidentRow) {
+  const until = new Date(
+    Date.parse(incident.resolvedAt ?? new Date().toISOString()) + NOTIFICATION_GRACE_MS,
+  ).toISOString();
+  const rows = await runtime.store.queryNotifications({
+    providerIds: [incident.providerId],
+    limit: NOTIFICATION_LIMIT,
+  });
+  return rows.filter((record) => record.sentAt >= incident.startedAt && record.sentAt <= until);
+}
 
 /**
  * One note. Capped at a paragraph or two: this is "why our deploy failed on
@@ -77,7 +112,12 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       runtime.store.countIncidents(filter),
     ]);
 
-    res.json({ active, page: { items, page, pageSize, total: counts[state] }, counts });
+    const priced = withCost(runtime);
+    res.json({
+      active: active.map(priced),
+      page: { items: items.map(priced), page, pageSize, total: counts[state] },
+      counts,
+    });
   });
 
   /**
@@ -124,17 +164,17 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
     }
 
     const [polls, notifications, active, notes, followed] = await Promise.all([
-      runtime.store.getRecentSamples(providerId, POLL_STRIP_SIZE),
-      runtime.store.listNotifications(ACTION_LOG_LIMIT),
+      runtime.store.getRecentSamples(providerId, INCIDENT_POLL_LIMIT),
+      sendsDuring(runtime, incident),
       runtime.store.listIncidents({ providerId, state: "active" }),
       runtime.store.listIncidentNotes(providerId, incidentId),
       runtime.store.isIncidentFollowed(providerId, incidentId),
     ]);
 
     res.json({
-      incident,
+      incident: withCost(runtime)(incident),
       timeline: buildTimeline(incident, polls),
-      actionLog: notifications.filter((record) => record.providerId === providerId),
+      actionLog: notifications,
       polls,
       otherActiveIncidents: active.filter((row) => row.incidentId !== incidentId),
       // Roadmap 5.3. Part of the detail payload rather than a fetch of its own:
@@ -146,6 +186,65 @@ export function incidentsRoutes(runtime: UiRuntimeCore): Router {
       // Roadmap 3.6: whether every update of this incident reaches every channel.
       followed,
     });
+  });
+
+  /**
+   * The incident as a Markdown postmortem — roadmap 6.4. Read-only and built on
+   * request from rows already stored, so it can be fetched mid-incident and again
+   * after it resolves; an open one is flagged as such inside the document.
+   */
+  router.get("/incidents/:providerId/:incidentId/postmortem.md", async (req, res) => {
+    const { providerId, incidentId } = req.params;
+    const incident = await runtime.store.getIncident(providerId, incidentId);
+    if (incident === null) {
+      res.status(404).json({ error: { message: `unknown incident: ${providerId}/${incidentId}` } });
+      return;
+    }
+    const now = new Date();
+    const end = incident.resolvedAt ?? now.toISOString();
+    const services = runtime.listAllServices();
+    const nameOf = (id: string): string => services.find((service) => service.id === id)?.name ?? id;
+    const notifiedUntil = new Date(Date.parse(end) + NOTIFICATION_GRACE_MS).toISOString();
+
+    const others = runtime.enabledProviderIds().filter((id) => id !== providerId);
+    const [polls, notifications, notes, annotations, nearby] = await Promise.all([
+      runtime.store.getRecentSamples(providerId, INCIDENT_POLL_LIMIT),
+      sendsDuring(runtime, incident),
+      runtime.store.listIncidentNotes(providerId, incidentId),
+      runtime.store.listAnnotations(incident.startedAt, notifiedUntil, providerId),
+      runtime.store.listIncidents({
+        providerIds: others,
+        openFrom: incident.startedAt.slice(0, 10),
+        openTo: end.slice(0, 10),
+      }),
+    ]);
+
+    const body = renderPostmortem({
+      providerName: nameOf(providerId),
+      incident,
+      cost: withCost(runtime)(incident).cost,
+      timeline: buildTimeline(incident, polls),
+      revisions: runtime.revisions.revisions(providerId, incidentId),
+      notifications,
+      notes,
+      annotations,
+      overlapping: nearby
+        .filter((other) => other.startedAt < end && (other.resolvedAt ?? "9999") > incident.startedAt)
+        .map((other) => ({
+          providerName: nameOf(other.providerId),
+          name: other.name,
+          startedAt: other.startedAt,
+          resolvedAt: other.resolvedAt,
+        })),
+      generatedAt: now.toISOString(),
+    });
+
+    res.setHeader("content-type", "text/markdown; charset=utf-8");
+    res.setHeader(
+      "content-disposition",
+      `attachment; filename="isitdown-postmortem-${providerId}-${now.toISOString().slice(0, 10)}.md"`,
+    );
+    res.send(body);
   });
 
   /**

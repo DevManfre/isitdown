@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { openDatabase } from "../../src/ui/db/open.ts";
 import { migrate } from "../../src/ui/db/migrate.ts";
 import { createSqliteStateStore } from "../../src/ui/sqliteStateStore.ts";
-import { createHistoryService } from "../../src/ui/history.ts";
+import { createHistoryService, previousYearRange } from "../../src/ui/history.ts";
 import type { HistoryStore } from "../../src/ui/historyStore.interface.ts";
 import type { OverallStatus } from "../../src/core/types.ts";
 
@@ -590,5 +590,39 @@ test("the report covers the providers it was given, and nothing else", async () 
     ["github"],
   );
   assert.equal(report.fleetUptime, 100);
+  await store.close();
+});
+
+/** year on year — roadmap 6.2. */
+test("previousYearRange compares date with date, or weekday with weekday", () => {
+  assert.deepEqual(previousYearRange("2026-08-01", "2026-08-19", "date"), { from: "2025-08-01", to: "2025-08-19" });
+  // 29 February has no twin the year before: it reads against the 28th.
+  assert.deepEqual(previousYearRange("2024-02-29", "2024-03-02", "date"), { from: "2023-02-28", to: "2023-03-02" });
+  // 52 weeks back, so a Monday is read against a Monday.
+  assert.deepEqual(previousYearRange("2026-08-17", "2026-08-19", "weekday"), { from: "2025-08-18", to: "2025-08-20" });
+});
+
+test("year over year reads the same period a year back, from the rollups once retention has pruned it", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", "2025-08-10T12:00:00.000Z", "major_outage");
+  await sample(store, "github", "2025-08-11T12:00:00.000Z", "operational");
+  await sample(store, "github", daysAgo(1), "operational");
+  await store.pruneOlderThan(120);
+
+  const report = await history.getYearOverYear("2026-08-01", "2026-08-19", "date", 3);
+  assert.equal(report.previous.from, "2025-08-01");
+  assert.equal(report.current.providers[0]?.uptime, 100);
+  assert.equal(report.previous.providers[0]?.uptime, 50);
+  assert.equal(report.previous.providers[0]?.downtimeMinutes, 3);
+  assert.equal(report.fleetDelta, 50);
+  await store.close();
+});
+
+test("year over year has no delta when the year before measured nothing", async () => {
+  const { store, history } = await harness();
+  await sample(store, "github", daysAgo(1), "operational");
+  const report = await history.getYearOverYear("2026-08-01", "2026-08-19", "date", 3);
+  assert.equal(report.previous.fleetUptime, null);
+  assert.equal(report.fleetDelta, null);
   await store.close();
 });

@@ -184,8 +184,14 @@ const ASSETS = "dist/ui/public/assets";
  * Measured: 740,257 bytes before, 743,193 after — 2.9 kB gzipped. The
  * installation-health card is one component with no dependency, and most of
  * the weight is its sixteen strings in six catalogs. The CSS did not move.
+ *
+ * It moved 745,000 -> 751,000 (727.5 -> 733.4 kB) for the incident page's redesign.
+ * Measured: 726.5 kB gzipped before, 731.8 kB after — 5.3 kB. Most of it is
+ * the forty-odd strings the page now words (the verdict, the timeline's entries,
+ * the lifeline's legend) in six catalogs; the rest is four components, one of
+ * them the pure module that groups the story. No dependency was added.
  */
-export const BUDGET = { js: 745_000, css: 23_500 };
+export const BUDGET = { js: 751_000, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

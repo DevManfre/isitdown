@@ -3007,3 +3007,88 @@ What it cannot know, it says rather than guesses:
 
 What is kept is the *normalised* reading, the one the diff engine saw, not the
 provider's raw response: a Cloudflare summary is a hundred kilobytes a poll.
+
+### 3.32 Daily rollups — what retention keeps
+
+Retention used to delete. Since roadmap 6.1 it is a policy about *resolution*: when
+the prune pass removes samples and resolved incidents older than `retentionDays`,
+it first folds them into one row per provider per UTC day — the worst status of the
+day, how many samples there were, how many were operational, and how many incidents
+started on it — and keeps that row forever. A day costs a few dozen bytes, so a
+year of it is smaller than an hour of raw samples.
+
+What it changes:
+
+- **Old bars are still there.** A History range or the year calendar that reaches
+  past the retention window draws the days from the rollups. They carry the
+  day's totals, not its samples, so what is lost is the poll-by-poll detail
+  (the response-time chart, per-component bars and the poll strip stay within
+  retention).
+- **Days are UTC.** A rolled-up day is a UTC day. Inside the window a bar follows
+  the zone you chose in Settings; past it, the day is the UTC one, so a bar at the
+  edge of a zone far from UTC can be off by the hours between them.
+- **The prune is atomic.** Rolling up and deleting happen in one transaction, so a
+  crash between the two neither loses a day nor counts it twice.
+
+#### Year over year
+
+Because the days survive, a period can be read beside the same one a year earlier
+(roadmap 6.2): `GET /history/compare?from=&to=&basis=date|weekday`. `basis` has no
+default, because the two answer different questions:
+
+- `date` compares calendar dates — 1–19 August against 1–19 August of last year,
+  and 29 February against the 28th.
+- `weekday` goes back 52 weeks, so a Monday is read against a Monday. Pick it for a
+  service whose load follows the working week; it drifts one day a year against
+  the calendar.
+
+The answer holds both periods as range reports (uptime, downtime, incident count
+per provider and the fleet figure) and `fleetDelta`, in percentage points —
+`null` when either year measured nothing, because a year in which a provider did
+not exist is not a year it was perfect.
+
+### 3.33 What an outage costs
+
+`outageCostPerHour` is a number on the provider (roadmap 6.3), in `config.yml` or in
+the **Cost of an hour of downtime** field of the add/edit dialog:
+
+```yaml
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    outageCostPerHour: 1200
+```
+
+Optional and absent by default, for the same reason as `slaTarget`: a default would
+invent a price and print it beside every incident. It is a bare number in your own
+currency; nothing converts or adds across currencies. Where it shows up, once set:
+
+- `cost` on every incident of `GET /incidents` and `GET /incidents/:providerId/:incidentId`
+  — the duration at that rate, and for an open incident up to now, so it grows
+  while it runs. `null` when the provider has no rate.
+- `downtimeCost` per provider in `GET /reliability`, as the window's resolved
+  downtime at the rate.
+- A **Downtime cost** column in `/export/monthly.md`, only when at least one
+  provider has a rate.
+
+An undeclared rate is `null`, never `0`: an unpriced outage is not a free one.
+
+### 3.34 The postmortem export
+
+`GET /incidents/:providerId/:incidentId/postmortem.md` (roadmap 6.4), or **Download
+postmortem** on the incident's page, is the document somebody writes by hand the
+morning after — as one Markdown file:
+
+- the duration, the impact and, with a rate ([3.33](#333-what-an-outage-costs)), the cost;
+- one timeline in UTC: what IsItDown observed, the edits the provider made
+  afterwards, every notification sent about it and whether it was delivered, the
+  operator's notes, and the annotations of the period;
+- the providers whose incidents overlapped this one, as a table and a Mermaid
+  Gantt chart (GitHub and most wikis render it).
+
+It is built on request from stored rows, so it can be downloaded while the
+incident is still open and again after it resolves. The timeline is what IsItDown
+saw and sent, not the provider's own update feed; the cause and the actions that
+follow are the part only the people involved can write.

@@ -41,6 +41,11 @@ services:
     # month has spent of it, and sends one alert when the rate says the month
     # will miss. Omit it when nobody promised anything — most providers.
     slaTarget: 99.9
+    # Optional: what an hour of this provider being down costs you, in your own
+    # currency. Shown beside each incident, in the reliability table and in the
+    # monthly report. Omit it and no figure is shown — an unpriced outage is not
+    # a free one.
+    outageCostPerHour: 1200
     # Optional: what breaks here when this provider does, and who answers for
     # it. Both are added under every message about it, so an alert at 3 a.m.
     # reads as a handover note.

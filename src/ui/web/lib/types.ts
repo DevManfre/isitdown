@@ -293,6 +293,12 @@ export interface IncidentRow {
   declaredAt?: string;
   /** The poll that first carried it; absent when it was open on the first reading. */
   firstSeenAt?: string;
+  /**
+   * Roadmap 6.3. What the incident cost at the provider's declared hourly rate;
+   * `null` when no rate was declared, which is not the same as free. Only the
+   * incident endpoints carry it.
+   */
+  cost?: number | null;
 }
 
 /** One provider's row in `GET /config/provider-push` — roadmap 1.2. */
@@ -530,6 +536,7 @@ export interface ServiceDefinition {
    * sent, on a patch, to drop the promise.
    */
   slaTarget?: number | null;
+  outageCostPerHour?: number | null;
   /**
    * Which source is the record for this provider — roadmap 9.1. Absent means
    * "whatever this adapter implies", which is how most providers are left.

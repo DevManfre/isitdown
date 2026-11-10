@@ -80,6 +80,8 @@ export interface ServiceDefinition {
    * 100%.
    */
   slaTarget?: number | undefined;
+  /** What an hour of downtime costs the operator — roadmap 6.3. Absent means no figure was declared. */
+  outageCostPerHour?: number | undefined;
   /**
    * Which source is the record for this provider — roadmap 9.1. Absent means
    * "whatever this adapter implies", which `authorityOf` resolves: a probe is

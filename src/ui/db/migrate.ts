@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 40;
+export const SCHEMA_VERSION = 41;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -897,6 +897,32 @@ function upgrade(db: DatabaseSync, from: number): void {
       );
       CREATE INDEX IF NOT EXISTS status_readings_provider ON status_readings (provider_id, observed_at);
     `);
+  }
+
+  if (from < 41) {
+    // What retention keeps of a day it deletes — roadmap 6.1. One row per
+    // provider per UTC day: the worst severity rank, the sample counts and the
+    // incidents that started that day. Kept forever, a few dozen bytes a day,
+    // so a year-old bar and a year-on-year comparison have something to read.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS daily_rollups (
+        provider_id   TEXT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+        day           TEXT NOT NULL,
+        worst         INTEGER NOT NULL DEFAULT 0,
+        ok_samples    INTEGER NOT NULL DEFAULT 0,
+        total_samples INTEGER NOT NULL DEFAULT 0,
+        incidents     INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (provider_id, day)
+      );
+    `);
+    // The operator's own price of an hour of this provider being down —
+    // roadmap 6.3. NULL means no figure was declared.
+    const costColumns = (db.prepare("PRAGMA table_info(services)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!costColumns.includes("outage_cost_per_hour")) {
+      db.exec("ALTER TABLE services ADD COLUMN outage_cost_per_hour REAL");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

@@ -284,7 +284,19 @@ export interface HistoryStore extends StateStore, MessageRefStore, AckStore {
    * before the column existed) are left out: an absent latency is not 0 ms.
    */
   getLatencySamples(providerId: string, sinceIso: string): Promise<{ observedAt: string; latencyMs: number }[]>;
+  /**
+   * Retention, as a resolution policy — roadmap 6.1. Raw samples and resolved
+   * incidents older than `days` are deleted, but first folded into one
+   * `daily_rollups` row per provider and UTC day, which `getDailyBuckets`
+   * keeps reading and which is never pruned.
+   */
   pruneOlderThan(days: number): Promise<void>;
+  /**
+   * Incidents that started between two UTC days (inclusive, `YYYY-MM-DD`) and
+   * have since been rolled up and deleted by retention — roadmap 6.1. The live
+   * incident rows are not counted here: they are listed by `listIncidents`.
+   */
+  countRolledIncidents(providerId: string, fromDay: string, toDay: string): Promise<number>;
   /** MIN(observed_at) for the provider, or null when it has no samples yet. */
   getEarliestSampleTime(providerId: string): Promise<string | null>;
   /**

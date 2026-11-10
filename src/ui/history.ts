@@ -2,6 +2,7 @@ import type { DailyBucket, HistoryStore, IncidentRow } from "./historyStore.inte
 import { offsetSegments, resolveZone, shiftDay, zonedDayKey } from "./calendarDays.ts";
 import { coverageByDay, coverageOver, type DayCoverage } from "./coverage.ts";
 import type { OverallStatus } from "../core/types.ts";
+import { downtimeCost, type CostRates } from "./outageCost.ts";
 
 /**
  * Enough days to cover a 90-day view, the 90-day window it is compared
@@ -205,6 +206,11 @@ export interface MonthlyProviderReport {
   measuredDays: number;
   sampleCount: number;
   downtimeMinutes: number;
+  /**
+   * `downtimeMinutes` at the provider's declared hourly cost — roadmap 6.3.
+   * `null` when no cost was declared, which is not the same as free.
+   */
+  downtimeCost: number | null;
   /** Incidents open at any point in the month, not only those that started in it. */
   incidentCount: number;
   /**
@@ -236,6 +242,43 @@ export interface MonthlyReport {
   incidents: IncidentRow[];
 }
 
+/** How a period is matched to the year before it — roadmap 6.2. */
+export type YearOverYearBasis = "date" | "weekday";
+
+export interface YearOverYearReport {
+  basis: YearOverYearBasis;
+  current: Omit<MonthlyReport, "month" | "partial">;
+  /** The same shape, over the matched period a year earlier. */
+  previous: Omit<MonthlyReport, "month" | "partial">;
+  /**
+   * Current fleet uptime minus the previous one, in percentage points. `null`
+   * when either period measured nothing: a year in which the provider did not
+   * exist is not a year it was perfect.
+   */
+  fleetDelta: number | null;
+}
+
+/**
+ * The period a year before `from`..`to`. `date` keeps the calendar dates, so
+ * "August" is read against August, and 29 February against the 28th.
+ * `weekday` goes back 52 weeks instead, so a Monday is read against a Monday —
+ * the right basis for a service whose load follows the working week, and the
+ * one that drifts a day a year against the calendar.
+ */
+export function previousYearRange(
+  from: string,
+  to: string,
+  basis: YearOverYearBasis,
+): { from: string; to: string } {
+  if (basis === "weekday") return { from: shiftDay(from, -364), to: shiftDay(to, -364) };
+  const back = (day: string): string => {
+    const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+    const lastOfMonth = new Date(Date.UTC(year - 1, month, 0)).getUTCDate();
+    return `${year - 1}-${String(month).padStart(2, "0")}-${String(Math.min(date, lastOfMonth)).padStart(2, "0")}`;
+  };
+  return { from: back(from), to: back(to) };
+}
+
 export interface HistoryServiceDeps {
   /** Injected so day bucketing does not depend on when a test runs. */
   now?: (() => Date) | undefined;
@@ -249,6 +292,11 @@ export interface HistoryServiceDeps {
    * preference reached it.
    */
   timeZone?: (() => Promise<string> | string) | undefined;
+  /**
+   * The operator's declared hourly outage cost per provider — roadmap 6.3. A
+   * function for the same reason `timeZone` is: it is edited without a restart.
+   */
+  costRates?: (() => CostRates) | undefined;
 }
 
 /**
@@ -525,6 +573,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     const segments = offsetSegments(from, to, zone);
 
     const providerIds = only ?? (await store.listProviderIds());
+    const rates = deps.costRates?.() ?? new Map<string, number>();
     const providers: MonthlyProviderReport[] = [];
     const incidents: IncidentRow[] = [];
 
@@ -553,6 +602,9 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
       // a report that dropped it would show downtime with nothing causing it.
       const open = await store.listIncidents({ providerId, openFrom: from, openTo: to });
       incidents.push(...open);
+      // Roadmap 6.1: incidents retention already deleted survive as a count per
+      // day. Their rows are gone, so none is counted twice.
+      const rolled = await store.countRolledIncidents(providerId, from, to);
 
       providers.push({
         providerId,
@@ -560,7 +612,8 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
         measuredDays,
         sampleCount: total,
         downtimeMinutes: (total - ok) * intervalMinutes,
-        incidentCount: open.length,
+        downtimeCost: downtimeCost(rates, providerId, (total - ok) * intervalMinutes),
+        incidentCount: open.length + rolled,
         worstDay,
       });
     }
@@ -581,6 +634,33 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
           : round2(measured.reduce((sum, provider) => sum + provider.uptime, 0) / measured.length),
       providers,
       incidents: incidents.sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
+    };
+  }
+
+  /**
+   * A period beside the same one a year earlier — roadmap 6.2. Both halves are
+   * range reports, so uptime, downtime and incident counts mean here what they
+   * mean everywhere else; what a year-old half reads from is the daily rollups
+   * retention keeps (roadmap 6.1).
+   */
+  async function getYearOverYear(
+    from: string,
+    to: string,
+    basis: YearOverYearBasis,
+    intervalMinutes: number,
+    only?: string[] | undefined,
+  ): Promise<YearOverYearReport> {
+    const before = previousYearRange(from, to, basis);
+    const current = await getRangeReport(from, to, intervalMinutes, only);
+    const previous = await getRangeReport(before.from, before.to, intervalMinutes, only);
+    return {
+      basis,
+      current,
+      previous,
+      fleetDelta:
+        current.fleetUptime === null || previous.fleetUptime === null
+          ? null
+          : round2(current.fleetUptime - previous.fleetUptime),
     };
   }
 
@@ -702,6 +782,7 @@ export function createHistoryService(store: HistoryStore, deps: HistoryServiceDe
     getSummary,
     getMonthlyReport,
     getRangeReport,
+    getYearOverYear,
   };
 }
 

@@ -84,8 +84,11 @@ export function renderMonthlyReport(report: MonthlyReport, names: ProviderNames)
 
   lines.push("## Uptime by provider");
   lines.push("");
-  lines.push("| Provider | Uptime | Downtime | Incidents | Worst day | Days measured |");
-  lines.push("|---|---|---|---|---|---|");
+  // Roadmap 6.3: a column only when somebody declared a price. Without one it
+  // would be a column of dashes, in a document whose reader never set a rate.
+  const priced = report.providers.some((provider) => provider.downtimeCost !== null);
+  lines.push(`| Provider | Uptime | Downtime |${priced ? " Downtime cost |" : ""} Incidents | Worst day | Days measured |`);
+  lines.push(`|---|---|---|${priced ? "---|" : ""}---|---|---|`);
 
   // Worst first: a report is read from the top, and the row somebody needs is
   // the one that had the worst month. A provider nothing measured sorts last —
@@ -100,7 +103,7 @@ export function renderMonthlyReport(report: MonthlyReport, names: ProviderNames)
     lines.push(
       `| ${cell(name(provider.providerId))} | ${percent(provider.uptime)} | ${duration(
         provider.downtimeMinutes,
-      )} | ${provider.incidentCount} | ${worstDayCell(provider)} | ${provider.measuredDays} |`,
+      )} |${priced ? ` ${provider.downtimeCost === null ? "—" : provider.downtimeCost.toFixed(2)} |` : ""} ${provider.incidentCount} | ${worstDayCell(provider)} | ${provider.measuredDays} |`,
     );
   }
   lines.push("");

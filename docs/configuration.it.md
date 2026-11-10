@@ -3132,3 +3132,94 @@ Ciò che non può sapere, lo dice invece di tirare a indovinare:
 Ciò che si conserva è la lettura *normalizzata*, quella che ha visto il diff
 engine, non la risposta grezza del provider: un riepilogo di Cloudflare pesa
 cento kilobyte a ogni poll.
+
+### 3.32 Riepiloghi giornalieri — ciò che la retention conserva
+
+La retention una volta cancellava. Dalla roadmap 6.1 è una politica sulla
+*risoluzione*: quando il passaggio di pulizia elimina campioni e incidenti risolti
+più vecchi di `retentionDays`, li riassume prima in una riga per provider e per
+giorno UTC — lo stato peggiore del giorno, quanti campioni c'erano, quanti
+operativi e quanti incidenti sono iniziati in quel giorno — e tiene quella riga
+per sempre. Un giorno costa poche decine di byte, quindi un anno è più piccolo di
+un'ora di campioni grezzi.
+
+Cosa cambia:
+
+- **Le barre vecchie ci sono ancora.** Un intervallo della Cronologia o il
+  calendario annuale che supera la finestra di retention disegna i giorni dai
+  riepiloghi. Portano i totali del giorno, non i campioni: si perde il dettaglio
+  poll per poll (il grafico dei tempi di risposta, le barre per componente e la
+  striscia dei poll restano entro la retention).
+- **I giorni sono UTC.** Un giorno riassunto è un giorno UTC. Dentro la finestra
+  una barra segue il fuso scelto in Impostazioni; oltre, il giorno è quello UTC,
+  quindi una barra al confine, con un fuso lontano da UTC, può slittare delle ore
+  che li separano.
+- **La pulizia è atomica.** Riassumere e cancellare avvengono in una sola
+  transazione: un arresto tra le due non perde un giorno e non lo conta due volte.
+
+#### Anno su anno
+
+Poiché i giorni sopravvivono, un periodo si può leggere accanto allo stesso di un
+anno prima (roadmap 6.2): `GET /history/compare?from=&to=&basis=date|weekday`.
+`basis` non ha un valore predefinito, perché i due rispondono a domande diverse:
+
+- `date` confronta le date di calendario — dall'1 al 19 agosto contro l'1–19
+  agosto dell'anno scorso, e il 29 febbraio contro il 28.
+- `weekday` torna indietro di 52 settimane, così un lunedì si legge contro un
+  lunedì. Va scelto per un servizio il cui carico segue la settimana lavorativa;
+  slitta di un giorno all'anno rispetto al calendario.
+
+La risposta contiene i due periodi come report di intervallo (uptime, downtime,
+numero di incidenti per provider e cifra della flotta) e `fleetDelta`, in punti
+percentuali — `null` se uno dei due anni non ha misurato nulla, perché un anno in
+cui un provider non esisteva non è un anno in cui era perfetto.
+
+### 3.33 Quanto costa un outage
+
+`outageCostPerHour` è un numero sul provider (roadmap 6.3), in `config.yml` o nel
+campo **Costo di un'ora di disservizio** del modulo di aggiunta/modifica:
+
+```yaml
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+    outageCostPerHour: 1200
+```
+
+Facoltativo e assente per impostazione predefinita, per la stessa ragione di
+`slaTarget`: un valore predefinito inventerebbe un prezzo e lo stamperebbe accanto
+a ogni incidente. È un numero nudo nella tua valuta; nulla converte o somma tra
+valute. Dove compare, una volta impostato:
+
+- `cost` su ogni incidente di `GET /incidents` e
+  `GET /incidents/:providerId/:incidentId` — la durata a quella tariffa, e per un
+  incidente aperto fino ad ora, quindi cresce mentre dura. `null` se il provider
+  non ha una tariffa.
+- `downtimeCost` per provider in `GET /reliability`, come il downtime risolto
+  della finestra alla tariffa.
+- Una colonna **Downtime cost** in `/export/monthly.md`, solo se almeno un provider
+  ha una tariffa.
+
+Una tariffa non dichiarata è `null`, mai `0`: un outage senza prezzo non è un
+outage gratuito.
+
+### 3.34 L'esportazione postmortem
+
+`GET /incidents/:providerId/:incidentId/postmortem.md` (roadmap 6.4), o
+**Scarica il postmortem** nella pagina dell'incidente, è il documento che qualcuno
+scrive a mano la mattina dopo — in un solo file Markdown:
+
+- la durata, l'impatto e, con una tariffa ([3.33](#333-quanto-costa-un-outage)), il costo;
+- una sola timeline in UTC: ciò che IsItDown ha osservato, le modifiche fatte poi
+  dal provider, ogni notifica inviata e se è stata consegnata, le note
+  dell'operatore e le annotazioni del periodo;
+- i provider i cui incidenti si sono sovrapposti a questo, come tabella e come
+  grafico di Gantt Mermaid (GitHub e la maggior parte dei wiki lo mostrano).
+
+Si costruisce a richiesta dalle righe salvate, quindi si può scaricare mentre
+l'incidente è ancora aperto e di nuovo dopo la risoluzione. La timeline è ciò che
+IsItDown ha visto e inviato, non il feed di aggiornamenti del provider; la causa e
+le azioni che ne seguono sono la parte che possono scrivere solo le persone
+coinvolte.

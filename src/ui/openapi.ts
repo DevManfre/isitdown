@@ -178,6 +178,21 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }) },
     },
   },
+  "/history/compare": {
+    get: {
+      tags: ["History"],
+      summary: "A period beside the same one a year earlier.",
+      description:
+        "Roadmap 6.2. Uptime, downtime and incident counts for from..to and for the matched period a year before, with the fleet delta in percentage points (null when either side measured nothing). basis=date matches calendar dates (29 February reads against the 28th); basis=weekday goes back 52 weeks so a Monday is read against a Monday. A year-old period reads from the daily rollups retention keeps (roadmap 6.1).",
+      parameters: [
+        query("from", "First day, YYYY-MM-DD. Required, with to."),
+        query("to", "Last day, YYYY-MM-DD, inclusive."),
+        query("basis", "date or weekday. Required.", { type: "string", enum: ["date", "weekday"] }),
+        query("provider", "Provider id. Omitted: every enabled provider."),
+      ],
+      responses: { "200": ok({ type: "object" }), "400": badRequest, "404": notFound },
+    },
+  },
   "/history/calendar": {
     get: {
       tags: ["History"],
@@ -331,6 +346,19 @@ const paths: Json = {
         path("incidentId", "The provider's own incident id."),
       ],
       responses: { "200": ok({ type: "object" }), "404": notFound },
+    },
+  },
+  "/incidents/{providerId}/{incidentId}/postmortem.md": {
+    get: {
+      tags: ["Incidents"],
+      summary: "One incident written up as a Markdown postmortem.",
+      description:
+        "Roadmap 6.4. Duration and estimated cost, one timeline merging what IsItDown observed, the provider's later edits, what was sent to which channel, the operator's notes and the markers of the period, and the providers down at the same time with a Mermaid chart. Works on an open incident too, flagged as such inside the document.",
+      parameters: [
+        path("providerId", "Provider id."),
+        path("incidentId", "The provider's own incident id."),
+      ],
+      responses: { "200": media("text/markdown", "The postmortem."), "404": notFound },
     },
   },
   "/incidents/{providerId}/{incidentId}/follow": {
