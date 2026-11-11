@@ -220,6 +220,13 @@ export interface ProviderReliability {
   longestOutageMinutes: number | null;
   downtimeMinutes: number;
   previousIncidents: number;
+  /** Chance of an incident in the next 7 days from the last 90 days' rate — roadmap 6.7. null before 90 days of watching. */
+  forecast: {
+    basisDays: number;
+    incidents: number;
+    perWeek: number;
+    probability: number;
+  } | null;
 }
 
 export interface ReliabilityReport {

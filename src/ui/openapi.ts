@@ -257,7 +257,7 @@ const paths: Json = {
       summary:
         "Per-provider MTTR, MTBF and the longest outage, plus incidents by weekday and hour.",
       description:
-        "Roadmap 12.2 and 12.3, over rows the poller already wrote. `mttrMinutes` counts only incidents that have been resolved, `mtbfMinutes` needs at least two, and both are null rather than 0 when the window cannot answer. `byWeekdayHour` is [weekday][hour] in the operator's zone, Monday first, counted by when an incident started.",
+        "Roadmap 12.2 and 12.3, over rows the poller already wrote. `mttrMinutes` counts only incidents that have been resolved, `mtbfMinutes` needs at least two, and both are null rather than 0 when the window cannot answer. `byWeekdayHour` is [weekday][hour] in the operator's zone, Monday first, counted by when an incident started. `forecast` (roadmap 6.7) is the chance of at least one incident in the next 7 days, `1 - e^(-rate × 7)` with the rate taken over the last 90 days whatever window is asked, and null until the provider has been watched for 90 days.",
       parameters: [query("days", "Window in days.", { type: "integer" })],
       responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
