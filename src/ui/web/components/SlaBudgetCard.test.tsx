@@ -60,6 +60,25 @@ describe("the error budget card", () => {
     expect(screen.getByText(new RegExp(i18n.t("sla.will-miss", { projected: "90.00%" })))).toBeInTheDocument();
   });
 
+  it("below target, says a credit may be owed and links the evidence for that month (roadmap 6.5)", () => {
+    sla.mockReturnValue({
+      data: { month: "2026-08", providers: [budget({ uptime: 99.5, projectedUptime: 99.5, willMiss: true })] },
+    });
+    show();
+    expect(screen.getByText(i18n.t("sla.credit"))).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: i18n.t("sla.evidence-label", { month: "2026-08" }) })).toHaveAttribute(
+      "href",
+      "/export/sla-evidence.md?provider=github&month=2026-08",
+    );
+  });
+
+  it("on target, mentions no credit", () => {
+    sla.mockReturnValue({ data: { month: "2026-08", providers: [budget()] } });
+    show();
+    expect(screen.queryByText(i18n.t("sla.credit"))).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
   it("does not report an unmeasured month as a perfect one, or as a failed one", () => {
     sla.mockReturnValue({
       data: {

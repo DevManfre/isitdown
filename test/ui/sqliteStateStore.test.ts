@@ -891,3 +891,23 @@ test("an acknowledgement goes with its provider", async () => {
     db.close();
   }
 });
+
+test("getSamplesBetween returns the polls in a half-open window, oldest first", async () => {
+  const { store } = await harness();
+  for (const [at, overallStatus] of [
+    ["2026-07-31T23:55:00.000Z", "operational"],
+    ["2026-08-01T00:00:00.000Z", "major_outage"],
+    ["2026-08-15T12:00:00.000Z", "operational"],
+    ["2026-09-01T00:00:00.000Z", "operational"],
+  ] as const) {
+    await store.saveStatus({ ...snap({ overallStatus }), fetchedAt: at });
+  }
+
+  const rows = await store.getSamplesBetween("github", "2026-08-01T00:00:00.000Z", "2026-09-01T00:00:00.000Z");
+
+  assert.deepEqual(rows, [
+    { observedAt: "2026-08-01T00:00:00.000Z", overallStatus: "major_outage", ok: false },
+    { observedAt: "2026-08-15T12:00:00.000Z", overallStatus: "operational", ok: true },
+  ]);
+  await store.close();
+});
