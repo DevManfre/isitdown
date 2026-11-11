@@ -26,6 +26,7 @@ type FixtureKey =
   | "componentHistory"
   | "providerCalendar"
   | "reliability"
+  | "reliabilityWords"
   | "coincidence"
   | "messagePreview"
   | "annotations"
@@ -60,6 +61,8 @@ export interface Fixtures {
   providerCalendar?: unknown;
   /** `/reliability` — MTTR, MTBF and the weekday-hour grid (roadmap 12.2, 12.3). */
   reliability?: unknown;
+  /** `/reliability/words`, matched before `/reliability` — what keeps breaking (roadmap 6.9). */
+  reliabilityWords?: unknown;
   /** `/coincidence` — providers that break together (roadmap 2.10). */
   coincidence?: unknown;
   /** `/notifications/preview` — what each channel would say (roadmap 14.1). */
@@ -130,6 +133,8 @@ export function stubApi(fixtures: Fixtures): void {
         ? "messagePreview"
         : path.startsWith("/coincidence")
         ? "coincidence"
+        : path.startsWith("/reliability/words")
+        ? "reliabilityWords"
         : path.startsWith("/reliability")
         ? "reliability"
         : path.startsWith("/annotations")
@@ -217,6 +222,7 @@ export function stubApi(fixtures: Fixtures): void {
           ),
         },
         coincidence: { days: 90, pairs: [] },
+        reliabilityWords: { days: 90, incidents: 0, words: [], phrases: [], components: [] },
         // Nothing to suggest: the launcher renders the checklist for every
         // visit, and a body with no `checks` is a shape no server sends.
         installHealth: { abandoned: [], checks: [] },

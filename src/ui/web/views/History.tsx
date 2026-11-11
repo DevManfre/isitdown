@@ -31,6 +31,7 @@ import {
   useAnnotations,
   useHistory,
   useCoincidence,
+  useIncidentWords,
   useConfigChrome,
   useReliability,
   useStatus,
@@ -39,6 +40,7 @@ import { AnnotationBar } from "@/components/AnnotationBar.tsx";
 import { BreakTogetherCard } from "@/components/BreakTogetherCard.tsx";
 import { ReliabilityTable } from "@/components/ReliabilityTable.tsx";
 import { IncidentHeatmap } from "@/components/charts/IncidentHeatmap.tsx";
+import { IncidentWordsCard } from "@/components/IncidentWordsCard.tsx";
 import { CoverageProvider } from "@/lib/coverage.tsx";
 import {
   Tooltip,
@@ -232,6 +234,7 @@ export function History() {
   const { data: reliability } = useReliability(nearestFixed(window_.days));
   // Roadmap 2.10. Same fixed window, for the same reason.
   const { data: coincidence } = useCoincidence(nearestFixed(window_.days));
+  const words = useIncidentWords(nearestFixed(window_.days));
   const { data: config } = useConfigChrome();
 
   // useHistory throws on an initial-load failure (routes.tsx's errorElement
@@ -726,6 +729,13 @@ export function History() {
             {coincidence !== undefined && (
               <BreakTogetherCard pairs={coincidence.pairs} services={config?.services ?? []} nameOf={nameOf} />
             )}
+            <IncidentWordsCard
+              data={words.data}
+              isPending={words.isPending}
+              isError={words.isError}
+              onRetry={() => void words.refetch()}
+              nameOf={nameOf}
+            />
           </TabsContent>
 
           {compared.length >= 2 && (

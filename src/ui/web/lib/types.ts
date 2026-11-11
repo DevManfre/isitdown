@@ -236,6 +236,22 @@ export interface ReliabilityReport {
   byWeekdayHour: number[][];
 }
 
+/** A word or phrase from incident titles, counted once per incident — roadmap 6.9. */
+export interface IncidentTerm {
+  term: string;
+  incidents: number;
+  providers: string[];
+}
+
+/** What keeps breaking over a window — roadmap 6.9. */
+export interface IncidentWords {
+  days: number;
+  incidents: number;
+  words: IncidentTerm[];
+  phrases: IncidentTerm[];
+  components: { providerId: string; componentId: string; name: string; badDays: number }[];
+}
+
 /** One marker the operator put on the timeline — roadmap 12.1. */
 export interface Annotation {
   id: number;

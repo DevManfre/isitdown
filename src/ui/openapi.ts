@@ -262,6 +262,16 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
+  "/reliability/words": {
+    get: {
+      tags: ["History"],
+      summary: "Recurring words and phrases in incident titles, and the components most often not operational.",
+      description:
+        "Roadmap 6.9. Counted once per incident, over titles of incidents that started inside the window (update bodies are not stored). `phrases` holds runs of two or three words seen in at least two incidents; `components` ranks selected components by days spent not operational.",
+      parameters: [query("days", "Window in days.", { type: "integer" })],
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
   "/annotations": {
     get: {
       tags: ["History"],
