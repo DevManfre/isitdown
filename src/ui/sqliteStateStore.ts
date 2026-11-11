@@ -1124,6 +1124,18 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       }));
     },
 
+    async getSamplesBetween(providerId: string, fromIso: string, toIso: string): Promise<SampleRow[]> {
+      return db
+        .prepare(
+          `SELECT observed_at, overall_status, ok FROM status_samples
+           WHERE provider_id = ? AND observed_at >= ? AND observed_at < ?
+           ORDER BY observed_at, id`,
+        )
+        .all(providerId, fromIso, toIso)
+        .map((raw) => sampleRowSchema.parse(raw))
+        .map((row) => ({ observedAt: row.observed_at, overallStatus: row.overall_status, ok: row.ok === 1 }));
+    },
+
     async getLatencySamples(providerId: string, sinceIso: string): Promise<{ observedAt: string; latencyMs: number }[]> {
       return db
         .prepare(

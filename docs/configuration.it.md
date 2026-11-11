@@ -2293,6 +2293,16 @@ stessi campioni salvati da cui è disegnata la vista Cronologia:
 Compare come scheda **Budget di errore** nella pagina del provider, e per tutta
 la flotta è `GET /sla`.
 
+**Chiedere un credito.** Quando il mese è sotto l'obiettivo, la scheda dice che
+il provider potrebbe dovere un credito e collega **Scarica le prove** —
+`GET /export/sla-evidence.md?provider=<id>&month=YYYY-MM` (roadmap 6.5). Il file
+è ciò che chiede il supporto di un fornitore: uptime promesso e misurato, il
+downtime consentito contro quello misurato, ogni finestra di downtime al singolo
+poll con accanto i riferimenti agli incidenti del provider, e gli incidenti del
+provider nel mese. Si può chiedere qualsiasi mese, non solo quello in corso — di
+solito una richiesta si presenta a mese chiuso. Vedi l'[API](api.it.md) per la
+forma JSON.
+
 **L'avviso.** Quando la proiezione scende sotto l'obiettivo per la prima volta,
 il provider riceve una notifica `sla_burn` — attraverso il motore di diff e il
 dispatcher come ogni altro avviso, quindi valgono le regole di instradamento, le

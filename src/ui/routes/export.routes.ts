@@ -2,6 +2,9 @@ import { Router, type Request, type Response } from "express";
 import { toCsv } from "../csv.ts";
 import { exportGatusYaml } from "../exportNeighbour.ts";
 import { renderMonthlyReport } from "../monthlyReport.ts";
+import { renderMonthlyReportHtml } from "../monthlyReportHtml.ts";
+import { monthMinutes } from "../sla.ts";
+import { buildSlaEvidence, renderSlaEvidence } from "../slaEvidence.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { ALLOWED_DAYS, parseDays } from "./historyWindow.ts";
 import { readIncidentQuery } from "./incidentQuery.ts";
@@ -160,13 +163,9 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
    * common ask is "how are we doing this month", and a month still running is
    * flagged inside the document rather than refused.
    */
-  const monthly = async (req: Request, res: Response): Promise<void> => {
-    const asked = req.query["month"];
-    const month = typeof asked === "string" && asked !== "" ? asked : new Date().toISOString().slice(0, 7);
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
-      res.status(400).json({ error: { message: `month must be YYYY-MM, e.g. ${new Date().toISOString().slice(0, 7)}` } });
-      return;
-    }
+  const monthly = (format: "md" | "html") => async (req: Request, res: Response): Promise<void> => {
+    const month = readMonth(req, res);
+    if (month === null) return;
 
     const { intervalMinutes } = (await runtime.configSource.load()).polling;
     // The fleet as the dashboard shows it: a disabled provider is left out
@@ -175,7 +174,70 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
     const report = await runtime.history.getMonthlyReport(month, intervalMinutes, runtime.enabledProviderIds());
     const names = new Map(runtime.listAllServices().map((service) => [service.id, service.name]));
 
-    send(res, "md", `uptime-${month}`, "text/markdown; charset=utf-8", renderMonthlyReport(report, names));
+    if (format === "md") {
+      send(res, "md", `uptime-${month}`, "text/markdown; charset=utf-8", renderMonthlyReport(report, names));
+      return;
+    }
+    // Roadmap 6.6: the same month as a page that prints to PDF. Served inline
+    // rather than as an attachment — the point is to open it and print it, and
+    // a browser saving it to disk first is one step in the way.
+    res.setHeader("content-type", "text/html; charset=utf-8");
+    res.send(renderMonthlyReportHtml(report, names, new Date().toISOString()));
+  };
+
+  /**
+   * One provider's month as evidence for an SLA credit — roadmap 6.5. Any
+   * month, not just the running one: a claim is filed once the month has
+   * closed, which is exactly when the budget card has moved on to the next.
+   */
+  const slaEvidence = (format: "md" | "json") => async (req: Request, res: Response): Promise<void> => {
+    const month = readMonth(req, res);
+    if (month === null) return;
+    const providerId = req.query["provider"];
+    const service = runtime.listAllServices().find((entry) => entry.id === providerId);
+    if (service === undefined) {
+      res.status(404).json({ error: { message: `unknown provider: ${String(providerId ?? "")}` } });
+      return;
+    }
+    if (service.slaTarget === undefined) {
+      res.status(409).json({ error: { message: `${service.id} has no SLA target — set one to export evidence against it` } });
+      return;
+    }
+
+    const { intervalMinutes } = (await runtime.configSource.load()).polling;
+    const report = await runtime.history.getMonthlyReport(month, intervalMinutes, [service.id]);
+    const measured = report.providers[0];
+    if (measured === undefined) {
+      res.status(404).json({ error: { message: `unknown provider: ${service.id}` } });
+      return;
+    }
+    const start = new Date(`${month}-01T00:00:00.000Z`);
+    const next = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+    const samples = await runtime.store.getSamplesBetween(service.id, start.toISOString(), next.toISOString());
+
+    const evidence = buildSlaEvidence({
+      providerId: service.id,
+      providerName: service.name,
+      statusPage: service.baseUrl,
+      target: service.slaTarget,
+      month,
+      from: report.from,
+      to: report.to,
+      partial: report.partial,
+      monthMinutes: monthMinutes(start),
+      intervalMinutes,
+      report: measured,
+      samples,
+      incidents: report.incidents,
+      generatedAt: new Date().toISOString(),
+    });
+
+    const name = `sla-evidence-${service.id}-${month}`;
+    if (format === "md") {
+      send(res, "md", name, "text/markdown; charset=utf-8", renderSlaEvidence(evidence));
+      return;
+    }
+    send(res, "json", name, "application/json; charset=utf-8", `${JSON.stringify(evidence, null, 2)}\n`);
   };
 
   /**
@@ -199,10 +261,27 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
   router.get("/export/history.json", history("json"));
   router.get("/export/trust.csv", trust("csv"));
   router.get("/export/trust.json", trust("json"));
-  router.get("/export/monthly.md", monthly);
+  router.get("/export/monthly.md", monthly("md"));
+  router.get("/export/monthly.html", monthly("html"));
+  router.get("/export/sla-evidence.md", slaEvidence("md"));
+  router.get("/export/sla-evidence.json", slaEvidence("json"));
   router.get("/export/gatus.yaml", gatus);
 
   return router;
+}
+
+/**
+ * `month` as `YYYY-MM`, defaulting to the current one. The current rather than
+ * the last complete month: the common ask is "how are we doing this month", and
+ * a month still running is flagged inside the document rather than refused.
+ * Answers the 400 itself and returns `null` when the value is malformed.
+ */
+function readMonth(req: Request, res: Response): string | null {
+  const asked = req.query["month"];
+  const month = typeof asked === "string" && asked !== "" ? asked : new Date().toISOString().slice(0, 7);
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return month;
+  res.status(400).json({ error: { message: `month must be YYYY-MM, e.g. ${new Date().toISOString().slice(0, 7)}` } });
+  return null;
 }
 
 /** `isitdown-incidents-2026-09-09.csv`: dated, so two exports never collide in a downloads folder. */

@@ -15,6 +15,7 @@ import {
   MonitorCog,
   Plus,
   RefreshCw,
+  Printer,
   Send,
   Server,
   Stethoscope,
@@ -593,6 +594,13 @@ export function CommandPalette() {
           >
             <FileText aria-hidden="true" />
             {t("palette.export-month")}
+          </CommandItem>
+          <CommandItem
+            value={t("palette.print-month")}
+            onSelect={run(() => window.location.assign("/export/monthly.html"))}
+          >
+            <Printer aria-hidden="true" />
+            {t("palette.print-month")}
           </CommandItem>
         </CommandGroup>
         </>)}

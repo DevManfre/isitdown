@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button.tsx";
 import { useSla } from "@/hooks/queries.ts";
 import { formatPercent } from "@/lib/format.ts";
 
@@ -70,6 +71,23 @@ export function SlaBudgetCard({ providerId }: { providerId: string }) {
               : t("sla.on-track", { projected: formatPercent(i18n.language, budget.projectedUptime ?? 0) })}
             {budget.burnRate !== null && ` · ${t("sla.burn-rate", { rate: budget.burnRate.toFixed(2) })}`}
           </p>
+          {/* Roadmap 6.5: a month under target is a month somebody may claim
+              a credit for, and the claim needs the windows, not this bar. Only
+              when the month is actually below — a hint of money on a vendor
+              that is meeting its promise would be noise. */}
+          {budget.uptime < budget.target && (
+            <p className="flex flex-wrap items-baseline gap-x-2 text-xs">
+              <span>{t("sla.credit")}</span>
+              <Button asChild variant="link" size="sm" className="h-auto p-0 text-xs">
+                <a
+                  href={`/export/sla-evidence.md?provider=${encodeURIComponent(providerId)}&month=${budget.month}`}
+                  aria-label={t("sla.evidence-label", { month: budget.month })}
+                >
+                  {t("sla.evidence")}
+                </a>
+              </Button>
+            </p>
+          )}
         </>
       )}
     </section>

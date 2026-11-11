@@ -23,7 +23,8 @@ const CELL_WIDTH = 10;
 const CELL_GAP = 2;
 const HEIGHT = 40;
 
-const FILL: Record<OverallStatus | "none", string> = {
+/** Shared with the printable monthly report, so one status is one colour in every picture IsItDown hands out. */
+export const FILL: Record<OverallStatus | "none", string> = {
   operational: "#2e9e5b",
   degraded: "#d9a31a",
   partial_outage: "#e07b1f",
@@ -40,7 +41,7 @@ const RANK: Record<OverallStatus, number> = {
   major_outage: 3,
 };
 
-const escape = (text: string): string =>
+export const escape = (text: string): string =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** The worst reading in each half hour of the 24 ending at `now`, oldest cell first. */

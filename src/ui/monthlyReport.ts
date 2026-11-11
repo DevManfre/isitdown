@@ -44,8 +44,22 @@ export function monthTitle(month: string): string {
   return name === undefined || year === undefined ? month : `${name} ${year}`;
 }
 
+/**
+ * Worst first: a report is read from the top, and the row somebody needs is
+ * the one that had the worst month. A provider nothing measured sorts last —
+ * it has no month to compare. Shared with the printable HTML (roadmap 6.6), so
+ * both documents list the month in the same order.
+ */
+export function ranked(providers: readonly MonthlyProviderReport[]): MonthlyProviderReport[] {
+  return [...providers].sort((a, b) => {
+    if (a.uptime === null) return b.uptime === null ? a.providerId.localeCompare(b.providerId) : 1;
+    if (b.uptime === null) return -1;
+    return a.uptime - b.uptime || a.providerId.localeCompare(b.providerId);
+  });
+}
+
 /** Two decimals and a sign, or an em dash for a figure nothing measured. */
-const percent = (value: number | null): string => (value === null ? "—" : `${value.toFixed(2)}%`);
+export const percent =(value: number | null): string => (value === null ? "—" : `${value.toFixed(2)}%`);
 
 /**
  * Minutes as the sentence somebody reads rather than as a number they convert:
@@ -90,16 +104,7 @@ export function renderMonthlyReport(report: MonthlyReport, names: ProviderNames)
   lines.push(`| Provider | Uptime | Downtime |${priced ? " Downtime cost |" : ""} Incidents | Worst day | Days measured |`);
   lines.push(`|---|---|---|${priced ? "---|" : ""}---|---|---|`);
 
-  // Worst first: a report is read from the top, and the row somebody needs is
-  // the one that had the worst month. A provider nothing measured sorts last —
-  // it has no month to compare.
-  const ranked = [...report.providers].sort((a, b) => {
-    if (a.uptime === null) return b.uptime === null ? a.providerId.localeCompare(b.providerId) : 1;
-    if (b.uptime === null) return -1;
-    return a.uptime - b.uptime || a.providerId.localeCompare(b.providerId);
-  });
-
-  for (const provider of ranked) {
+  for (const provider of ranked(report.providers)) {
     lines.push(
       `| ${cell(name(provider.providerId))} | ${percent(provider.uptime)} | ${duration(
         provider.downtimeMinutes,

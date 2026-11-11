@@ -552,6 +552,19 @@ export function History() {
                       href: `/export/monthly.md?month=${month.month}`,
                     })),
                   },
+                  {
+                    // Roadmap 6.6: the same month as a page with its charts,
+                    // for whoever has to attach it to a mail — the browser's
+                    // print dialog turns it into the PDF.
+                    label: t("history.print-title"),
+                    items: summary.months.map((month) => ({
+                      format: monthLabel(i18n.language, month.month),
+                      description: t("history.print-open", {
+                        month: monthLabel(i18n.language, month.month),
+                      }),
+                      href: `/export/monthly.html?month=${month.month}`,
+                    })),
+                  },
                 ]}
               />
             </div>
