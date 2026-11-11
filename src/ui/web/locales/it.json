@@ -325,6 +325,8 @@
   "history.report-download": "Scarica il report di uptime di {month}, in Markdown",
   "history.print-title": "Report stampabile",
   "history.print-open": "Apri il report di uptime di {month} come pagina da stampare o salvare in PDF",
+  "history.report-card-title": "Pagella dei fornitori",
+  "history.report-card-download": "Scarica la pagella del {quarter}, un voto per asse per provider, in Markdown",
   "history.month-no-data": "—",
   "history.trend-title": "Uptime giornaliero",
   "history.compare.title": "Confronta",

@@ -325,6 +325,8 @@
   "history.report-download": "Verfügbarkeitsbericht für {month} als Markdown herunterladen",
   "history.print-title": "Druckbarer Bericht",
   "history.print-open": "Verfügbarkeitsbericht für {month} als Seite zum Drucken oder Speichern als PDF öffnen",
+  "history.report-card-title": "Anbieter-Zeugnis",
+  "history.report-card-download": "Das Zeugnis für {quarter} herunterladen, eine Note pro Achse und Anbieter, als Markdown",
   "history.month-no-data": "—",
   "history.trend-title": "Tägliche Verfügbarkeit",
   "history.compare.title": "Vergleichen",

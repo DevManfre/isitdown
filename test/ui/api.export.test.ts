@@ -362,3 +362,39 @@ test("SLA evidence lists the provider's downtime windows against its target (roa
     await app.close();
   }
 });
+
+test("the quarterly report card is a dated download with one grade per axis (roadmap 6.8)", async () => {
+  const app = await api();
+  try {
+    const [id] = await seed(app.runtime);
+    const today = new Date().toISOString().slice(0, 10);
+    const quarter = `${today.slice(0, 4)}-Q${Math.floor((Number(today.slice(5, 7)) - 1) / 3) + 1}`;
+
+    const md = await app.get("/export/report-card.md");
+    assert.equal(md.status, 200, md.text);
+    assert.match(
+      md.headers.get("content-disposition") ?? "",
+      new RegExp(`filename="isitdown-report-card-${quarter}-\\d{4}-\\d{2}-\\d{2}\\.md"`),
+    );
+    assert.match(md.text, /still running/);
+    assert.match(md.text, /\| Provider \| Availability \| Admission \| MTTR \| Incidents \|/);
+
+    const json = await app.get(`/export/report-card.json?quarter=${quarter}`);
+    assert.equal(json.status, 200, json.text);
+    const card = JSON.parse(json.text) as { quarter: string; providers: { providerId: string; incidents: { count: number } }[] };
+    assert.equal(card.quarter, quarter);
+    assert.equal(card.providers.find((provider) => provider.providerId === id)?.incidents.count, 1);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a malformed or future quarter is refused rather than reported empty", async () => {
+  const app = await api();
+  try {
+    assert.equal((await app.get("/export/report-card.md?quarter=2026-Q5")).status, 400);
+    assert.equal((await app.get("/export/report-card.json?quarter=2999-Q1")).status, 400);
+  } finally {
+    await app.close();
+  }
+});

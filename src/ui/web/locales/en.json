@@ -325,6 +325,8 @@
   "history.report-download": "Download the uptime report for {month}, as Markdown",
   "history.print-title": "Printable report",
   "history.print-open": "Open the uptime report for {month} as a page to print or save as PDF",
+  "history.report-card-title": "Vendor report card",
+  "history.report-card-download": "Download the {quarter} report card, one grade per axis per provider, as Markdown",
   "history.month-no-data": "—",
   "history.trend-title": "Daily uptime",
   "history.compare.title": "Compare",

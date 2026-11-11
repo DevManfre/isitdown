@@ -325,6 +325,8 @@
   "history.report-download": "Transferir o relatório de disponibilidade de {month}, em Markdown",
   "history.print-title": "Relatório para imprimir",
   "history.print-open": "Abrir o relatório de disponibilidade de {month} como página para imprimir ou guardar em PDF",
+  "history.report-card-title": "Boletim dos fornecedores",
+  "history.report-card-download": "Baixar o boletim de {quarter}, uma nota por eixo por provedor, em Markdown",
   "history.month-no-data": "—",
   "history.trend-title": "Disponibilidade diária",
   "history.compare.title": "Comparar",

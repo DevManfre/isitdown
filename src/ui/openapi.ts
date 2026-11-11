@@ -726,6 +726,27 @@ const paths: Json = {
       },
     },
   },
+  "/export/report-card.md": {
+    get: {
+      tags: ["Export"],
+      summary: "The quarterly vendor report card: one grade per axis per provider.",
+      description:
+        "Roadmap 6.8. Availability, admission delay (from the trust card, needs a cross-checking probe and ten outages), MTTR and incident count, each graded A–E on the fixed scale printed in the document, never combined into one grade. A running quarter is covered up to today and flagged.",
+      parameters: [query("quarter", "YYYY-Qn; defaults to the current quarter.")],
+      responses: {
+        "200": media("text/markdown", "One table row per provider, then the scale."),
+        "400": badRequest,
+      },
+    },
+  },
+  "/export/report-card.json": {
+    get: {
+      tags: ["Export"],
+      summary: "The same report card as JSON, with the scale it was graded on.",
+      parameters: [query("quarter", "YYYY-Qn; defaults to the current quarter.")],
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
   "/export/gatus.yaml": {
     get: {
       tags: ["Export"],

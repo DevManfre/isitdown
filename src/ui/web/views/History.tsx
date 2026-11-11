@@ -85,6 +85,13 @@ const rangeEndingToday = (days: number): { from: string; to: string } => {
 const nearestFixed = (days: number): number =>
   RANGES.find((range) => days <= range) ?? 90;
 
+/** The current quarter and the three before it, newest first, as `YYYY-Qn` — roadmap 6.8. */
+const recentQuarters = (): string[] => {
+  const now = new Date();
+  const index = now.getUTCFullYear() * 4 + Math.floor(now.getUTCMonth() / 3);
+  return [0, 1, 2, 3].map((back) => `${Math.floor((index - back) / 4)}-Q${((index - back) % 4) + 1}`);
+};
+
 const monthLabel = (locale: string, month: string) =>
   new Intl.DateTimeFormat(locale, { month: "short" }).format(
     new Date(`${month}-01T00:00:00Z`),
@@ -563,6 +570,16 @@ export function History() {
                         month: monthLabel(i18n.language, month.month),
                       }),
                       href: `/export/monthly.html?month=${month.month}`,
+                    })),
+                  },
+                  {
+                    // Roadmap 6.8: a grade per axis per vendor, for the
+                    // quarterly review — written up server-side like the month.
+                    label: t("history.report-card-title"),
+                    items: recentQuarters().map((quarter) => ({
+                      format: quarter.replace("-", " "),
+                      description: t("history.report-card-download", { quarter: quarter.replace("-", " ") }),
+                      href: `/export/report-card.md?quarter=${quarter}`,
                     })),
                   },
                 ]}

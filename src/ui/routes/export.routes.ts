@@ -3,6 +3,7 @@ import { toCsv } from "../csv.ts";
 import { exportGatusYaml } from "../exportNeighbour.ts";
 import { renderMonthlyReport } from "../monthlyReport.ts";
 import { renderMonthlyReportHtml } from "../monthlyReportHtml.ts";
+import { admissionOf, buildReportCard, quarterOf, quarterRange, renderReportCard } from "../reportCard.ts";
 import { monthMinutes } from "../sla.ts";
 import { buildSlaEvidence, renderSlaEvidence } from "../slaEvidence.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
@@ -241,6 +242,60 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
   };
 
   /**
+   * The quarterly vendor report card — roadmap 6.8: one grade per axis per
+   * provider, built from the same range report the monthly one reads and the
+   * same episodes the trust card reads, so no figure on it can disagree with
+   * the screen it came from.
+   */
+  const reportCard = (format: "md" | "json") => async (req: Request, res: Response): Promise<void> => {
+    const today = new Date().toISOString().slice(0, 10);
+    const asked = req.query["quarter"];
+    const quarter = typeof asked === "string" && asked !== "" ? asked : quarterOf(today);
+    const range = quarterRange(quarter);
+    if (range === null || range.from > today) {
+      res.status(400).json({ error: { message: `quarter must be YYYY-Qn and already started, e.g. ${quarterOf(today)}` } });
+      return;
+    }
+    const to = range.to > today ? today : range.to;
+
+    const { intervalMinutes } = (await runtime.configSource.load()).polling;
+    const report = await runtime.history.getRangeReport(range.from, to, intervalMinutes, runtime.enabledProviderIds());
+    const names = new Map(runtime.listAllServices().map((service) => [service.id, service.name]));
+    const pairs = runtime.trustPairs();
+    // Episodes are listed back from now, so the window reaches the quarter's start.
+    const sinceStart = Math.ceil((Date.now() - Date.parse(`${range.from}T00:00:00.000Z`)) / 86_400_000) + 1;
+
+    const card = buildReportCard({
+      quarter,
+      from: range.from,
+      to,
+      partial: range.to > today,
+      generatedAt: new Date().toISOString(),
+      providers: report.providers.map((provider) => {
+        // The whole-page pair speaks for the provider when there is one; a
+        // component pair is the next best reading of the same page.
+        const pair =
+          pairs.find((entry) => entry.pageId === provider.providerId && entry.componentId === "") ??
+          pairs.find((entry) => entry.pageId === provider.providerId);
+        return {
+          providerId: provider.providerId,
+          name: names.get(provider.providerId) ?? provider.providerId,
+          uptime: provider.uptime,
+          admission: pair === undefined ? null : admissionOf(runtime.trust.episodes(pair, sinceStart), range.from, to),
+        };
+      }),
+      incidents: report.incidents,
+    });
+
+    const name = `report-card-${quarter}`;
+    if (format === "md") {
+      send(res, "md", name, "text/markdown; charset=utf-8", renderReportCard(card));
+      return;
+    }
+    send(res, "json", name, "application/json; charset=utf-8", `${JSON.stringify(card, null, 2)}\n`);
+  };
+
+  /**
    * The fleet as a Gatus `config.yaml` endpoint list (roadmap 17.4) — one file
    * a neighbour reads natively, built the same way `/config/export` builds a
    * Light `config.yml`: a pure translation over the same database, nothing
@@ -265,6 +320,8 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
   router.get("/export/monthly.html", monthly("html"));
   router.get("/export/sla-evidence.md", slaEvidence("md"));
   router.get("/export/sla-evidence.json", slaEvidence("json"));
+  router.get("/export/report-card.md", reportCard("md"));
+  router.get("/export/report-card.json", reportCard("json"));
   router.get("/export/gatus.yaml", gatus);
 
   return router;
