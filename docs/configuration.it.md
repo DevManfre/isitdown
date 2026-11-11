@@ -3233,3 +3233,45 @@ l'incidente è ancora aperto e di nuovo dopo la risoluzione. La timeline è ciò
 IsItDown ha visto e inviato, non il feed di aggiornamenti del provider; la causa e
 le azioni che ne seguono sono la parte che possono scrivere solo le persone
 coinvolte.
+
+### 3.35 Previsione, pagelle e cosa continua a rompersi
+
+Tre letture dello storico degli incidenti, senza nulla da configurare (roadmap 6.7–6.9).
+
+**Prossimi 7 giorni.** La scheda **Affidabilità** di Storico ha una colonna con la
+probabilità di almeno un incidente del provider nella settimana a venire. Il
+modello è il più semplice possibile: gli incidenti del provider negli ultimi 90
+giorni, qualunque finestra mostri la pagina, presi come ritmo costante —
+`1 − e^(−ritmo × 7)`. Il conteggio e i 90 giorni sono stampati accanto alla
+percentuale, così chiunque può rifare il calcolo, e si ferma al 99%: nessun tasso di base può dichiarare una certezza. Un provider osservato da meno
+di 90 giorni mostra un trattino invece di una previsione costruita su uno storico
+breve. È un tasso di base, non una previsione: non sa nulla di cosa sta cambiando
+il provider. Lo stesso valore è `forecast` in `GET /reliability`.
+
+**Pagella dei fornitori.** **Scarica → Pagella dei fornitori** in Storico, oppure
+`GET /export/report-card.md?quarter=YYYY-Qn`, dà a ogni provider un voto su un
+trimestre per quattro assi, da A (migliore) a E:
+
+| Asse | Misurato come | A | B | C | D |
+| --- | --- | --- | --- | --- | --- |
+| Disponibilità | uptime sui poll del trimestre | ≥ 99,95% | ≥ 99,9% | ≥ 99,5% | ≥ 99% |
+| Ammissione | minuti mediani tra un outage visto da una sonda e l'ammissione della pagina (la trust card: serve una sonda con `crossChecks` sul provider) | ≤ 5 | ≤ 15 | ≤ 30 | ≤ 60 |
+| MTTR | minuti medi per risolvere gli incidenti del trimestre | ≤ 30 | ≤ 60 | ≤ 120 | ≤ 240 |
+| Incidenti | incidenti iniziati nel trimestre | 0 | ≤ 2 | ≤ 5 | ≤ 10 |
+
+Tutto ciò che è peggio è E. I quattro voti non vengono mai fusi in uno: un
+fornitore giù due volte l'anno per un giorno e uno che sobbalza ogni settimana
+possono avere lo stesso uptime e meritano conversazioni diverse. Un asse a cui il
+trimestre non può rispondere — nessun poll, nulla di risolto, nessuna sonda che
+verifichi la pagina, o meno di dieci outage per l'Ammissione — è un trattino, non
+un voto. L'Ammissione conta un outage mai ammesso dalla pagina come l'ammissione
+più tardiva possibile, così il silenzio non migliora il voto. Il trimestre in
+corso è coperto fino a oggi e lo dichiara.
+
+**Cosa continua a rompersi.** Una scheda chiusa nella tab **Pattern** di Storico
+elenca le parole e le frasi che ricorrono nei titoli degli incidenti della
+finestra — contate una volta per incidente, escludendo le parole vuote e le
+formule di rito come "investigating issues with", e mostrando una frase intera
+invece delle sue parole — e i componenti selezionati per i giorni passati non
+operativi. Si leggono solo i titoli: il testo degli aggiornamenti dei provider
+non viene salvato. `GET /reliability/words?days=` serve gli stessi elenchi.
