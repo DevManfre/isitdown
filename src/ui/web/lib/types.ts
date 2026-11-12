@@ -1286,3 +1286,32 @@ export interface IncidentSummary {
   updates: number;
   generatedAt: string;
 }
+
+/** One of the operator's own metrics — roadmap 6.11. */
+export interface OperatorSeries {
+  id: number;
+  name: string;
+  unit: string;
+  source: "prometheus" | "csv";
+  url: string | null;
+  query: string | null;
+  points: number;
+  createdAt: string;
+}
+
+export interface SeriesPoint {
+  at: string;
+  value: number;
+}
+
+/** `GET /series/:id` — one series over a window, already thinned. */
+export interface SeriesReading {
+  series: OperatorSeries;
+  from: string;
+  to: string;
+  points: SeriesPoint[];
+}
+
+export type NewOperatorSeries =
+  | { source: "prometheus"; name: string; unit: string; url: string; query: string }
+  | { source: "csv"; name: string; unit: string; csv: string };

@@ -1,4 +1,7 @@
 import type {
+  OperatorSeries,
+  NewOperatorSeries,
+  SeriesReading,
   AiSettingsResponse,
   AiModelList,
   IncidentSummary,
@@ -621,3 +624,10 @@ export const summarizeIncident = (providerId: string, incidentId: string, locale
     `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/summary`,
     { locale },
   );
+
+/** The operator's own metrics — roadmap 6.11. */
+export const getOperatorSeries = () => request<{ series: OperatorSeries[] }>("GET", "/config/series");
+export const addOperatorSeries = (series: NewOperatorSeries) => request<OperatorSeries>("POST", "/config/series", series);
+export const deleteOperatorSeries = (id: number) => request<undefined>("DELETE", `/config/series/${id}`);
+export const getSeriesReading = (id: number, from: string, to: string) =>
+  request<SeriesReading>("GET", `/series/${id}?${new URLSearchParams({ from, to }).toString()}`);

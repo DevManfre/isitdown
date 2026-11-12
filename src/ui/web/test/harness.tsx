@@ -16,6 +16,8 @@ type FixtureKey =
   | "status"
   | "config"
   | "ai"
+  | "operatorSeries"
+  | "seriesReading"
   | "aiModels"
   | "summary"
   | "providerPush"
@@ -109,6 +111,10 @@ export interface Fixtures {
   trust?: unknown;
   /** `/config/ai`, matched before `/config` — Settings → AI implementation (roadmap 6.10). */
   ai?: unknown;
+  /** `/config/series`, matched before `/config` — the operator's metrics (roadmap 6.11). */
+  operatorSeries?: unknown;
+  /** `/series/:id` — one metric over a window (roadmap 6.11). */
+  seriesReading?: unknown;
   /** `/config/ai/models`, matched before `/config/ai` — the model menu's choices. */
   aiModels?: unknown;
   /** `/incidents/:p/:i/summary`, matched before `/incidents/` — one written summary (roadmap 6.10). */
@@ -140,6 +146,10 @@ export function stubApi(fixtures: Fixtures): void {
         ? "replay"
         : path.startsWith("/incidents/") && path.endsWith("/summary")
         ? "summary"
+        : path.startsWith("/config/series")
+        ? "operatorSeries"
+        : path.startsWith("/series/")
+        ? "seriesReading"
         : path.startsWith("/config/ai/models")
         ? "aiModels"
         : path.startsWith("/config/ai")
@@ -256,6 +266,8 @@ export function stubApi(fixtures: Fixtures): void {
         },
         trust: { days: 90, windows: [30, 90, 365], cards: [] },
         aiModels: { models: [] },
+        // No metric declared: the timeline draws no metric lane.
+        operatorSeries: { series: [] },
         // Off, as every install starts: the incident page offers no summary.
         ai: {
           provider: "off",

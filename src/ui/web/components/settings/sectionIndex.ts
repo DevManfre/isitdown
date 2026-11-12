@@ -80,6 +80,8 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       "settings.restore.label",
       "field.update-check",
       "field.catalog-feed",
+      "series.settings.label",
+      "series.add.label",
     ],
   },
   {

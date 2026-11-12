@@ -1000,3 +1000,31 @@ export function useAiMutations() {
 /** One summary on request; held in the mutation, not the cache — it is never stored. */
 export const useIncidentSummary = (providerId: string, incidentId: string) =>
   useMutation({ mutationFn: (locale: string) => api.summarizeIncident(providerId, incidentId, locale) });
+
+/** The operator's declared metrics (roadmap 6.11); cheap, local, no timer of its own beyond the idle one. */
+export const useOperatorSeries = () =>
+  useQuery({ queryKey: ["operator-series"], queryFn: api.getOperatorSeries, throwOnError: false });
+
+/**
+ * One series over the timeline's window. `to` is rounded to the minute by the
+ * caller so the key holds still between renders; a Prometheus read may fail,
+ * which the lane shows in place rather than taking the card down.
+ */
+export const useSeriesReading = (id: number | undefined, from: string, to: string) =>
+  useQuery({
+    queryKey: ["series", id, from, to],
+    queryFn: () => api.getSeriesReading(id as number, from, to),
+    enabled: id !== undefined,
+    throwOnError: false,
+    retry: false,
+    staleTime: 60_000,
+  });
+
+export function useOperatorSeriesMutations() {
+  const client = useQueryClient();
+  const refresh = () => client.invalidateQueries({ queryKey: ["operator-series"] });
+  return {
+    add: useMutation({ mutationFn: api.addOperatorSeries, onSuccess: refresh }),
+    remove: useMutation({ mutationFn: api.deleteOperatorSeries, onSuccess: refresh }),
+  };
+}
