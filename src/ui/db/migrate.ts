@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 41;
+export const SCHEMA_VERSION = 42;
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -923,6 +923,29 @@ function upgrade(db: DatabaseSync, from: number): void {
     if (!costColumns.includes("outage_cost_per_hour")) {
       db.exec("ALTER TABLE services ADD COLUMN outage_cost_per_hour REAL");
     }
+  }
+
+  if (from < 42) {
+    // The operator's own metric, drawn under the incidents — roadmap 6.11.
+    // A Prometheus series stores only where to ask; a CSV one stores its points,
+    // because nowhere else has them. Deleting a series takes its points along.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS operator_series (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT NOT NULL,
+        unit       TEXT NOT NULL DEFAULT '',
+        source     TEXT NOT NULL CHECK (source IN ('prometheus', 'csv')),
+        url        TEXT,
+        query      TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS operator_points (
+        series_id INTEGER NOT NULL REFERENCES operator_series(id) ON DELETE CASCADE,
+        at        TEXT NOT NULL,
+        value     REAL NOT NULL,
+        PRIMARY KEY (series_id, at)
+      );
+    `);
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

@@ -12,6 +12,7 @@ import { feedsRoutes } from "./routes/feeds.routes.ts";
 import { historyRoutes } from "./routes/history.routes.ts";
 import { incidentsRoutes } from "./routes/incidents.routes.ts";
 import { aiRoutes } from "./routes/ai.routes.ts";
+import { operatorSeriesRoutes } from "./routes/operatorSeries.routes.ts";
 import { searchRoutes } from "./routes/search.routes.ts";
 import { mapRoutes } from "./routes/map.routes.ts";
 import { dashboardsRoutes } from "./routes/dashboards.routes.ts";
@@ -73,6 +74,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   app.use(configRoutes(runtime));
   // After the config router, whose audit middleware records the AI key writes.
   app.use(aiRoutes(runtime));
+  app.use(operatorSeriesRoutes(runtime));
   app.use(preferencesRoutes(runtime));
   app.use(exportRoutes(runtime));
   app.use(feedsRoutes(runtime));

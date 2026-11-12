@@ -1181,6 +1181,48 @@ const paths: Json = {
       responses: { "200": ok({ type: "object" }), "404": notFound, "409": { description: "Not saved here.", ...json({ type: "object" }) } },
     },
   },
+  "/config/series": {
+    get: {
+      tags: ["Configuration"],
+      summary: "The operator's own metrics (roadmap 6.11): `{ series: [{ id, name, unit, source, url, query, points, createdAt }] }`.",
+      responses: { "200": ok({ type: "object" }) },
+    },
+    post: {
+      tags: ["Configuration"],
+      summary: "Declare a series: `{ source: \"prometheus\", name, unit?, url, query }` or `{ source: \"csv\", name, unit?, csv }`.",
+      description:
+        "A Prometheus series stores only where to ask; it is read with `query_range` each time. A CSV one stores its rows: `timestamp,value` per line, ISO 8601 or Unix seconds, a header row allowed, up to 50,000 rows. An unreadable row is a 400 naming its line. At most 10 series.",
+      requestBody: { required: true, ...json({ type: "object" }) },
+      responses: { "201": ok({ type: "object" }, "The stored series."), "400": badRequest },
+    },
+  },
+  "/config/series/{id}": {
+    delete: {
+      tags: ["Configuration"],
+      summary: "Remove a series, and its points with it.",
+      parameters: [path("id", "Series id.")],
+      responses: { "204": { description: "Removed." }, "404": notFound },
+    },
+  },
+  "/series/{id}": {
+    get: {
+      tags: ["History"],
+      summary: "One of the operator's series over a window, thinned to about 300 points, for drawing under the incidents.",
+      description:
+        "Roadmap 6.11. Thinning keeps the largest value in each bucket, so a spike survives. A Prometheus query must return exactly one series (wrap it in `sum(...)`); a bearer token comes from `PROMETHEUS_TOKEN`. 502 when Prometheus refuses or cannot be reached.",
+      parameters: [
+        path("id", "Series id."),
+        query("from", "Window start, ISO 8601."),
+        query("to", "Window end, ISO 8601. At most 400 days after `from`."),
+      ],
+      responses: {
+        "200": ok({ type: "object" }, "`{ series, from, to, points: [{ at, value }] }`."),
+        "400": badRequest,
+        "404": notFound,
+        "502": { description: "Prometheus refused the query or could not be reached.", ...json({ type: "object" }) },
+      },
+    },
+  },
   "/config/storage": {
     get: {
       tags: ["Configuration"],
