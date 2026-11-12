@@ -75,6 +75,19 @@ export interface IncidentHistoryResult {
   coverageStart: string | null;
 }
 
+/**
+ * One update a provider posted on an incident, in its own words — roadmap 6.10.
+ * Read live when somebody asks for it, never stored: the bodies are the
+ * provider's prose, and the history tables keep only what the diff engine saw.
+ */
+export interface IncidentUpdate {
+  /** ISO 8601, UTC. */
+  at: string;
+  /** Provider's own lifecycle word for this update, e.g. "monitoring". */
+  status: string;
+  body: string;
+}
+
 /** What the UI's picker shows before any component is selected. */
 export interface ComponentPreview {
   id: string;
@@ -173,4 +186,15 @@ export interface Adapter {
     service: ServiceRef,
     ctx: FetchContext,
   ): Promise<ComponentPreview[]>;
+  /**
+   * The updates the provider posted on one incident, oldest first — roadmap
+   * 6.10. Optional: an adapter whose page carries no update prose simply has
+   * none, and an incident it no longer lists answers an empty array. Throws
+   * like `fetchStatus` does.
+   */
+  fetchIncidentUpdates?(
+    service: ServiceRef,
+    incidentId: string,
+    ctx: FetchContext,
+  ): Promise<IncidentUpdate[]>;
 }
