@@ -196,8 +196,16 @@ const ASSETS = "dist/ui/public/assets";
  * seventeen strings in six catalogs, two of them the paragraphs that say what
  * the 7-day forecast is and what the incident words are counted from; the
  * rest is the words card. No dependency was added.
+ *
+ * It moved 756,000 -> 765,000 (738.3 -> 747.1 kB) for roadmap 6.10.
+ * Measured: 735.9 kB gzipped before, 744.4 kB after — 8.5 kB. About 6 kB is
+ * forty strings in six catalogs, several of them paragraphs (why there is no
+ * "sign in with Claude", where the Claude Code token comes from, what an
+ * OpenAI-compatible base URL is); the rest is the AI settings section and the
+ * incident summary block. The Anthropic SDK the server added is not in the
+ * dashboard bundle.
  */
-export const BUDGET = { js: 756_000, css: 23_500 };
+export const BUDGET = { js: 765_000, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
