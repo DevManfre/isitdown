@@ -134,6 +134,7 @@ export const AUTH_ADAPTERS = new Set([
   "openstatus",
   "sorry",
   "cstate",
+  "datadog",
 ]);
 
 /** Whether an adapter has any of the blocks below at all. */

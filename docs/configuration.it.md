@@ -66,7 +66,7 @@ notifications:
 | `correlationWindowMinutes` | `10` | 1–1440. Quanto è larga quella finestra. Più larga intercetta un guasto condiviso che attraversa lentamente le status page, e rischia di unire due giornate storte non collegate. |
 | `locale` | `en` | Un tag di locale minuscolo; la build include `en`, `it`, `de`, `es`, `fr` e `pt`, e qualunque altro valore ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro e `watchdog` segnala qualunque cambiamento nel testo di una pagina (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `sequence` concatena due o tre richieste per un'API dietro un login, `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto, e `icmp` e `docker` sondano le macchine stesse dell'homelab (vedi sotto); `json` mappa qualunque documento JSON su uno stato, e `isitdown`, `upptime`, `statusio`, `githubactions`, `openstatus`, `sorry`, `cstate` e `registry` sono descritti sotto *Altre piattaforme di stato, altre istanze e segnali da sviluppatore*. |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro e `watchdog` segnala qualunque cambiamento nel testo di una pagina (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `sequence` concatena due o tre richieste per un'API dietro un login, `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto, e `icmp` e `docker` sondano le macchine stesse dell'homelab (vedi sotto); `json` mappa qualunque documento JSON su uno stato, e `isitdown`, `upptime`, `statusio`, `githubactions`, `openstatus`, `sorry`, `cstate`, `datadog` e `registry` sono descritti sotto *Altre piattaforme di stato, altre istanze e segnali da sviluppatore*. |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
 | `services[].intervalSeconds` | — | 10–3600, solo sonde (`http`, `sequence`, `tcp`, `dns`). La stessa cadenza in secondi, per un endpoint che può restare giù meno di un minuto; una pagina di stato resta sul pavimento del minuto e viene rifiutata al caricamento. Mai insieme a `intervalMinutes`. |
@@ -1275,6 +1275,7 @@ con lo stesso percorso a richieste condizionali di una pagina di stato, quindi
 | `openstatus` | La pagina, `https://acme.openstatus.dev` | `slug` (default: la prima etichetta dell'host), `apiBase` | `GET /public/status/<slug>`: solo la parola complessiva |
 | `sorry` | La pagina, `https://status.example.com` | — | `/api/v1/status`, `/components`, `/notices` |
 | `cstate` | La pagina, `https://status.example.com` | — | `index.json` (API v2.0 di cState) |
+| `datadog` | La pagina, `https://status.datadoghq.com` | — | `/config.json`: componenti, incidenti con la loro cronologia, manutenzioni |
 | `registry` | L'origine API: `https://registry.npmjs.org`, `https://pypi.org`, `https://hub.docker.com`, `https://crates.io`, `https://data.jsdelivr.com`, `https://api.cdnjs.com`, `https://unpkg.com` | `registry` (`npm`, `pypi`, `dockerhub`, `crates`, `jsdelivr`, `cdnjs`, `unpkg`) e `package`, entrambi obbligatori; `pinned` | I metadati di un pacchetto reale |
 
 **`isitdown` — federazione.** Nessun protocollo nuovo: un'istanza pubblica già
@@ -1307,6 +1308,19 @@ sono annunci e si ignorano.
 **`cstate`** legge l'`index.json` della pagina costruita con Hugo: `ok`,
 `disrupted`, `down` per sistema e per pagina. I sistemi sono i componenti, indicati
 con il nome, e le issue che elencano come non risolte sono gli incidenti.
+
+**`datadog`** legge una Datadog Status Page (ci girano la pagina di Datadog stessa
+e quella di DNSimple, che hanno lasciato Atlassian Statuspage). La pagina è
+un'app statica che disegna un unico documento pubblico, `/config.json`, con
+l'albero dei componenti, ogni incidente pubblicato e ogni finestra di
+manutenzione. I componenti si mappano parola per parola (`operational`,
+`degraded`, `partial_outage`, `major_outage`; `maintenance` si astiene) e i gruppi
+diventano i gruppi del selettore. Non c'è una parola per l'intera pagina, quindi
+la lettura è il componente peggiore, e un incidente aperto porta a degradato una
+pagina tutta verde. Gli incidenti indicano i componenti colpiti, quindi
+`scopeToComponents` scarta quelli su componenti non selezionati, come su
+Statuspage. Lo stesso documento riempie lo storico degli incidenti e gli
+aggiornamenti di un incidente.
 
 **incident.io** non ha bisogno di un adapter: le sue pagine servono
 `/api/v2/summary.json` nel formato di Statuspage, quindi le legge `statuspage`

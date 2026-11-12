@@ -50,6 +50,7 @@ const ADAPTER_FAMILIES: { title: string; adapters: { id: string; hint: string; n
       { id: "openstatus", hint: "adapter.hint.openstatus", note: "add.note.openstatus" },
       { id: "sorry", hint: "adapter.hint.sorry", note: "add.note.sorry" },
       { id: "cstate", hint: "adapter.hint.cstate", note: "add.note.cstate" },
+      { id: "datadog", hint: "adapter.hint.datadog", note: "add.note.datadog" },
       { id: "rss", hint: "adapter.hint.rss", note: "add.note.rss" },
       { id: "imap", hint: "adapter.hint.imap", note: "add.note.imap" },
       { id: "html", hint: "adapter.hint.html", note: "add.note.html" },

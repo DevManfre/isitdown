@@ -178,7 +178,7 @@
     {
       "id": "datadog",
       "name": "Datadog",
-      "adapter": "statuspage",
+      "adapter": "datadog",
       "baseUrl": "https://status.datadoghq.com"
     },
     {
@@ -838,8 +838,8 @@
     {
       "id": "dnsimple",
       "name": "DNSimple",
-      "adapter": "statuspage",
-      "baseUrl": "https://dnsimplestatus.com"
+      "adapter": "datadog",
+      "baseUrl": "https://status.dnsimplestatus.com"
     },
     {
       "id": "flagsmith",
@@ -857,7 +857,7 @@
       "id": "gemfury",
       "name": "Gemfury",
       "adapter": "statuspage",
-      "baseUrl": "https://status.gemfury.com"
+      "baseUrl": "https://status.fury.co"
     },
     {
       "id": "gocardless",

@@ -179,7 +179,7 @@
       "id": "datadog",
       "name": "Datadog",
       "url": "https://status.datadoghq.com",
-      "adapter": "statuspage"
+      "adapter": "datadog"
     },
     {
       "id": "sentry",
@@ -825,7 +825,7 @@
     },
     {
       "name": "DNSimple",
-      "url": "https://dnsimplestatus.com"
+      "url": "https://status.dnsimplestatus.com"
     },
     {
       "name": "Docusign",
@@ -857,7 +857,7 @@
     },
     {
       "name": "Gemfury",
-      "url": "https://status.gemfury.com"
+      "url": "https://status.fury.co"
     },
     {
       "name": "GoCardless",

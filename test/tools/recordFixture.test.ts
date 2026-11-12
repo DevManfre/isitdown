@@ -24,6 +24,15 @@ test("a non-JSON body is stored verbatim under the extension its type implies", 
   assert.equal(formatBody("<rss/>", "application/rss+xml").extension, "xml");
 });
 
+test("a JSON document served as plain text is still stored as JSON", () => {
+  // Datadog Status Pages serves `/config.json` as text/plain; the canary
+  // compares only `.json` fixtures, so a `.txt` one would never be judged.
+  assert.deepEqual(formatBody('{"components":[]}', "text/plain; charset=utf-8"), {
+    text: '{\n  "components": []\n}\n',
+    extension: "json",
+  });
+});
+
 test("a body typed as JSON but not parseable is kept verbatim rather than lost", () => {
   assert.deepEqual(formatBody("<html>login</html>", "application/json"), {
     text: "<html>login</html>",
