@@ -204,8 +204,14 @@ const ASSETS = "dist/ui/public/assets";
  * OpenAI-compatible base URL is); the rest is the AI settings section and the
  * incident summary block. The Anthropic SDK the server added is not in the
  * dashboard bundle.
+ *
+ * It moved 765,000 -> 772,000 (747.1 -> 753.9 kB) for roadmap 6.11.
+ * Measured: 744.4 kB gzipped before, 750.0 kB after — 5.6 kB. Most of it is
+ * thirty strings in six catalogs (the metric lane's peak sentences, the add
+ * form and its hints); the rest is the lane, the Settings rows and the pure
+ * module that draws the line. No dependency was added.
  */
-export const BUDGET = { js: 765_000, css: 23_500 };
+export const BUDGET = { js: 772_000, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
