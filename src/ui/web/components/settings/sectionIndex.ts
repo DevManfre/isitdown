@@ -83,6 +83,12 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     ],
   },
   {
+    id: "ai",
+    labelKey: "settings.section.ai",
+    blurbKey: "settings.section.ai.blurb",
+    rowKeys: ["ai.provider.label", "ai.model.label", "ai.base-url.label", "ai.key.label"],
+  },
+  {
     id: "appearance",
     labelKey: "settings.section.appearance",
     blurbKey: "settings.section.appearance.blurb",

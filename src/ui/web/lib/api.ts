@@ -1,4 +1,7 @@
 import type {
+  AiSettingsResponse,
+  AiModelList,
+  IncidentSummary,
   AdapterDebugResponse,
   Annotation,
   AdapterDetection,
@@ -600,4 +603,21 @@ export const removePushDevice = (id: string) =>
   request<unknown>(
     "DELETE",
     `/config/push/subscriptions/${encodeURIComponent(id)}`,
+  );
+
+/** Settings → AI implementation — roadmap 6.10. The key goes out and never comes back. */
+export const getAiSettings = () => request<AiSettingsResponse>("GET", "/config/ai");
+export const patchAiSettings = (patch: Partial<Pick<AiSettingsResponse, "provider" | "model" | "baseUrl">>) =>
+  request<AiSettingsResponse>("PATCH", "/config/ai", patch);
+export const getAiModels = () => request<AiModelList>("GET", "/config/ai/models");
+export type AiCredentialId = "key" | "cli-token";
+export const saveAiCredential = (id: AiCredentialId, value: string) =>
+  request<AiSettingsResponse>("PUT", `/config/ai/${id}`, { value });
+export const clearAiCredential = (id: AiCredentialId) => request<AiSettingsResponse>("DELETE", `/config/ai/${id}`);
+/** Written on request by the operator's chosen model, never stored. */
+export const summarizeIncident = (providerId: string, incidentId: string, locale: string) =>
+  request<IncidentSummary>(
+    "POST",
+    `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/summary`,
+    { locale },
   );

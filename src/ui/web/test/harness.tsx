@@ -15,6 +15,9 @@ import { DEFAULT_LAYOUT } from "../../dashboardLayout.ts";
 type FixtureKey =
   | "status"
   | "config"
+  | "ai"
+  | "aiModels"
+  | "summary"
   | "providerPush"
   | "storage"
   | "installHealth"
@@ -104,6 +107,12 @@ export interface Fixtures {
   heartbeats?: unknown;
   /** `/trust` — how each status page tracked its probe (roadmap 8.1). */
   trust?: unknown;
+  /** `/config/ai`, matched before `/config` — Settings → AI implementation (roadmap 6.10). */
+  ai?: unknown;
+  /** `/config/ai/models`, matched before `/config/ai` — the model menu's choices. */
+  aiModels?: unknown;
+  /** `/incidents/:p/:i/summary`, matched before `/incidents/` — one written summary (roadmap 6.10). */
+  summary?: unknown;
   /**
    * Make one endpoint's fetch fail with this HTTP status instead of
    * returning its fixture body — for exercising the `errorElement` path
@@ -129,6 +138,12 @@ export function stubApi(fixtures: Fixtures): void {
       const path = String(input);
       const key: FixtureKey = path.endsWith("/replay")
         ? "replay"
+        : path.startsWith("/incidents/") && path.endsWith("/summary")
+        ? "summary"
+        : path.startsWith("/config/ai/models")
+        ? "aiModels"
+        : path.startsWith("/config/ai")
+        ? "ai"
         : path.startsWith("/notifications/preview")
         ? "messagePreview"
         : path.startsWith("/coincidence")
@@ -240,6 +255,17 @@ export function stubApi(fixtures: Fixtures): void {
           damping: { confirmSamples: 1, count: 0, held: false },
         },
         trust: { days: 90, windows: [30, 90, 365], cards: [] },
+        aiModels: { models: [] },
+        // Off, as every install starts: the incident page offers no summary.
+        ai: {
+          provider: "off",
+          model: "",
+          baseUrl: "",
+          defaults: { anthropic: "claude-opus-5-5", openai: "", "claude-cli": "" },
+          key: { envVar: "AI_API_KEY", set: false, saved: false },
+          cliToken: { envVar: "CLAUDE_CODE_OAUTH_TOKEN", set: false, saved: false },
+          claudeCli: false,
+        },
         annotations: { annotations: [] },
         providerPush: { enabled: false, tokenRevealed: false, providers: [] },
         messagePreview: { kind: "status_change", provider: "GitHub", channels: [] },

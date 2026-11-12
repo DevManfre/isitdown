@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { IncidentMap } from "@/components/IncidentMap.tsx";
 import { IncidentHero } from "@/components/incident/IncidentHero.tsx";
 import { IncidentTimeline } from "@/components/incident/IncidentTimeline.tsx";
+import { IncidentSummaryBlock } from "@/components/incident/IncidentSummaryBlock.tsx";
 import { PollStrip } from "@/components/charts/PollStrip.tsx";
 import { StatusDot } from "@/components/charts/StatusDot.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible.tsx";
@@ -172,6 +173,11 @@ export function IncidentDetail() {
               </p>
             )}
           </section>
+
+          {/* Roadmap 6.10. After the facts, not before: the observed state and
+              the numbers are the page's job, and the model's sentence is a
+              reading of them — opt-in, absent while AI is off. */}
+          <IncidentSummaryBlock providerId={incident.providerId} incidentId={incident.incidentId} />
 
           {/* Only when there is something to list: an empty "none" on every
               incident is noise, and a provider with no other open incident is

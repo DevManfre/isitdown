@@ -956,3 +956,47 @@ export function usePushMutations() {
     }),
   };
 }
+
+/**
+ * Settings → AI implementation (roadmap 6.10). Never throws: the incident page
+ * reads it only to decide whether to offer a summary, and a server from before
+ * the feature must leave that page standing.
+ */
+export const useAiSettings = () =>
+  useQuery({ queryKey: ["ai-settings"], queryFn: api.getAiSettings, throwOnError: false, retry: false });
+
+/**
+ * The model menu's choices. Keyed by provider and base URL, so switching either
+ * asks again; the answer may come from the provider, so it is not refetched on
+ * a timer.
+ */
+export const useAiModels = (provider: string, baseUrl: string) =>
+  useQuery({
+    queryKey: ["ai-models", provider, baseUrl],
+    queryFn: api.getAiModels,
+    enabled: provider !== "off",
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
+/** The three writes behind the AI section; each answers with the fresh settings. */
+export function useAiMutations() {
+  const client = useQueryClient();
+  const store = (next: Awaited<ReturnType<typeof api.getAiSettings>>) => {
+    client.setQueryData(["ai-settings"], next);
+    // A new key can change what the provider lists (Anthropic's live list).
+    void client.invalidateQueries({ queryKey: ["ai-models"] });
+  };
+  return {
+    patch: useMutation({ mutationFn: api.patchAiSettings, onSuccess: store }),
+    saveCredential: useMutation({
+      mutationFn: ({ id, value }: { id: api.AiCredentialId; value: string }) => api.saveAiCredential(id, value),
+      onSuccess: store,
+    }),
+    clearCredential: useMutation({ mutationFn: api.clearAiCredential, onSuccess: store }),
+  };
+}
+
+/** One summary on request; held in the mutation, not the cache — it is never stored. */
+export const useIncidentSummary = (providerId: string, incidentId: string) =>
+  useMutation({ mutationFn: (locale: string) => api.summarizeIncident(providerId, incidentId, locale) });

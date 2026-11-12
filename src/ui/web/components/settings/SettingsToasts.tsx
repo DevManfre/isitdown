@@ -1,6 +1,6 @@
 import { createContext, use, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Bell, Database, Gauge, Palette, Send, Server, TriangleAlert, X } from "lucide-react";
+import { Bell, Database, Gauge, Palette, Send, Server, Sparkles, TriangleAlert, X } from "lucide-react";
 
 import { AnimatedList } from "@/components/ui/animated-list.tsx";
 import { cn } from "@/lib/utils.ts";
@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils.ts";
  * one. An error swaps the icon for the warning, because the tone matters more
  * than the origin when something failed.
  */
-export type SettingsToastKind = "engine" | "services" | "notifications" | "delivery" | "data" | "appearance";
+export type SettingsToastKind = "engine" | "services" | "notifications" | "delivery" | "data" | "appearance" | "ai";
 
 export interface SettingsToastStatus {
   text: string;
@@ -65,6 +65,7 @@ const KIND_ICON: Record<SettingsToastKind, typeof Gauge> = {
   delivery: Send,
   data: Database,
   appearance: Palette,
+  ai: Sparkles,
 };
 
 export type SettingsToastReport = (kind: SettingsToastKind, status: SettingsToastStatus | undefined) => void;

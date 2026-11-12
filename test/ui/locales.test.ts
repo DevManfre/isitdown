@@ -134,6 +134,10 @@ test("template keys built from a prefix resolve for every value they can take", 
  */
 const DYNAMIC_FAMILIES: { prefix: string; reason: string }[] = [
   {
+    prefix: "ai.provider.",
+    reason: "AiSection.tsx renders t(`ai.provider.${id}`) for each provider in its menu (roadmap 6.10)",
+  },
+  {
     prefix: "theme.",
     reason: "Header.tsx renders t(`theme.${mode}`) for the three modes it cycles through",
   },
