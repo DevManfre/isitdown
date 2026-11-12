@@ -37,6 +37,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "express": "^5.2.1",
     "qrcode-generator": "^2.0.4",
     "web-push": "^3.6.7",
