@@ -135,3 +135,51 @@ test("the weekday-hour grid counts onsets in the operator's zone, Monday first",
   assert.equal(inNz.byWeekdayHour[3]?.[10], 1, "Thursday 10:00 in Auckland");
   await nz.store.close();
 });
+
+/** One sample far enough back that the provider has been watched for `daysAgo` days. */
+function watchedSince(store: HistoryStore, providerId: string, daysAgo: number): Promise<void> {
+  const at = new Date(NOW.getTime() - daysAgo * 86_400_000).toISOString();
+  return store.applyBackfill(providerId, {
+    samples: [{ observedAt: at, overallStatus: "operational", ok: true }],
+    incidents: [],
+  });
+}
+
+test("the 7-day forecast is a Poisson rate over the last 90 days, whatever window is shown", async () => {
+  const { store, reliability } = await harness();
+  await watchedSince(store, "alpha", 120);
+  // Nine incidents in 90 days: a rate of 0.7 a week, so 1 - e^-0.7 ≈ 50%.
+  for (let index = 0; index < 9; index += 1) {
+    const start = new Date(NOW.getTime() - (5 + index * 9) * 86_400_000).toISOString();
+    await incident(store, "alpha", `f${index}`, start, start);
+  }
+  // Outside the 90 days: ignored by the forecast.
+  await incident(store, "alpha", "old", "2026-04-01T00:00:00.000Z", "2026-04-01T01:00:00.000Z");
+
+  const report = await reliability.getReport(7);
+  const alpha = report.providers.find((entry) => entry.providerId === "alpha");
+  assert.deepEqual(alpha?.forecast, { basisDays: 90, incidents: 9, perWeek: 0.7, probability: 50 });
+  await store.close();
+});
+
+test("no forecast before 90 days of watching — a short history is not a base rate", async () => {
+  const { store, reliability } = await harness();
+  await watchedSince(store, "alpha", 30);
+  await incident(store, "alpha", "i1", "2026-08-19T00:00:00.000Z", "2026-08-19T01:00:00.000Z");
+
+  const report = await reliability.getReport(30);
+  assert.equal(report.providers.find((entry) => entry.providerId === "alpha")?.forecast, null);
+  await store.close();
+});
+
+test("the forecast never rounds up to a certainty", async () => {
+  const { store, reliability } = await harness();
+  await watchedSince(store, "alpha", 120);
+  for (let index = 0; index < 120; index += 1) {
+    const start = new Date(NOW.getTime() - (1 + (index % 85)) * 86_400_000 - index * 60_000).toISOString();
+    await incident(store, "alpha", `busy${index}`, start, start);
+  }
+  const report = await reliability.getReport(30);
+  assert.equal(report.providers.find((entry) => entry.providerId === "alpha")?.forecast?.probability, 99);
+  await store.close();
+});

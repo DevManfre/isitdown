@@ -3102,3 +3102,42 @@ It is built on request from stored rows, so it can be downloaded while the
 incident is still open and again after it resolves. The timeline is what IsItDown
 saw and sent, not the provider's own update feed; the cause and the actions that
 follow are the part only the people involved can write.
+
+### 3.35 Forecast, report cards and what keeps breaking
+
+Three readings of the incident history, with nothing to configure (roadmap 6.7–6.9).
+
+**Next 7 days.** The **Reliability** tab of History has a column with the chance
+of at least one incident from the provider in the coming week. The model is the
+plainest one: the provider's incidents over the last 90 days, whatever window the
+page shows, taken as a steady rate — `1 − e^(−rate × 7)`. The count and the 90
+days are printed beside the percentage so anyone can redo the sum, and it stops at 99%: no base rate is entitled to certainty. A provider
+watched for less than 90 days shows a dash rather than a forecast built on a
+short history. It is a base rate, not a prediction: it knows nothing about what
+the provider is changing. The same figure is `forecast` in `GET /reliability`.
+
+**Vendor report card.** **Download → Vendor report card** on History, or
+`GET /export/report-card.md?quarter=YYYY-Qn`, grades each provider over a
+quarter on four axes, A (best) to E:
+
+| Axis | Measured as | A | B | C | D |
+| --- | --- | --- | --- | --- | --- |
+| Availability | uptime over the quarter's polls | ≥ 99.95% | ≥ 99.9% | ≥ 99.5% | ≥ 99% |
+| Admission | median minutes from an outage a probe saw to the page admitting it (the trust card: needs a probe with `crossChecks` on the provider) | ≤ 5 | ≤ 15 | ≤ 30 | ≤ 60 |
+| MTTR | mean minutes to resolve the quarter's incidents | ≤ 30 | ≤ 60 | ≤ 120 | ≤ 240 |
+| Incidents | incidents started in the quarter | 0 | ≤ 2 | ≤ 5 | ≤ 10 |
+
+Anything worse is E. The four grades are never combined into one: a vendor down
+twice a year for a day and one that blips every week can share an uptime figure
+and deserve different conversations. An axis the quarter cannot answer — no
+polls, nothing resolved, no probe cross-checking the page, or fewer than ten
+outages for Admission — is a dash, not a grade. Admission counts an outage the
+page never admitted as the latest possible, so silence does not improve the
+grade. The running quarter is covered up to today and says so.
+
+**What keeps breaking.** A folded card on History's **Patterns** tab lists the
+words and phrases that recur in the window's incident titles — counted once per
+incident, with filler and boilerplate like "investigating issues with" left out,
+and a phrase shown whole rather than as its words — and the selected components
+by the days they spent not operational. Only titles are read: the providers'
+update text is not stored. `GET /reliability/words?days=` serves the same lists.

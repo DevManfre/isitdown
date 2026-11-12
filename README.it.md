@@ -249,6 +249,12 @@ Grafana committata, poi:
   dell'intera configurazione, un'anteprima in diff prima di applicare l'import di un
   `config.yml`, e un provider letto da un form non salvato prima di salvarlo
   ([6. API HTTP](docs/api.it.md#6-api-http)).
+- **Analisi e reportistica**: i giorni vecchi riassunti invece che cancellati, il
+  confronto anno su anno, il costo di un outage, le esportazioni postmortem e per i
+  crediti SLA, un report mensile stampabile, una previsione degli incidenti a 7 giorni
+  dal ritmo degli ultimi 90, una pagella trimestrale dei fornitori con un voto per
+  asse, e le parole e i componenti che continuano a rompersi
+  ([3.32–3.35](docs/configuration.it.md#332-riepiloghi-giornalieri--ciò-che-la-retention-conserva)).
 - **Hardening**: la dashboard ascolta di default solo sul loopback, rifiuta
   scritture cross-origin e con host rebound, limita le dimensioni delle risposte e
   rifiuta i target link-local.

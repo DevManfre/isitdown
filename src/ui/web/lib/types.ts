@@ -220,6 +220,13 @@ export interface ProviderReliability {
   longestOutageMinutes: number | null;
   downtimeMinutes: number;
   previousIncidents: number;
+  /** Chance of an incident in the next 7 days from the last 90 days' rate — roadmap 6.7. null before 90 days of watching. */
+  forecast: {
+    basisDays: number;
+    incidents: number;
+    perWeek: number;
+    probability: number;
+  } | null;
 }
 
 export interface ReliabilityReport {
@@ -227,6 +234,22 @@ export interface ReliabilityReport {
   providers: ProviderReliability[];
   /** [weekday][hour] in the operator's zone, Monday first — roadmap 12.3. */
   byWeekdayHour: number[][];
+}
+
+/** A word or phrase from incident titles, counted once per incident — roadmap 6.9. */
+export interface IncidentTerm {
+  term: string;
+  incidents: number;
+  providers: string[];
+}
+
+/** What keeps breaking over a window — roadmap 6.9. */
+export interface IncidentWords {
+  days: number;
+  incidents: number;
+  words: IncidentTerm[];
+  phrases: IncidentTerm[];
+  components: { providerId: string; componentId: string; name: string; badDays: number }[];
 }
 
 /** One marker the operator put on the timeline — roadmap 12.1. */

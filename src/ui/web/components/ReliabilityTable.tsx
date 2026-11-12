@@ -63,6 +63,7 @@ export function ReliabilityTable({
               <TableHead>{t("reliability.mttr")}</TableHead>
               <TableHead>{t("reliability.mtbf")}</TableHead>
               <TableHead>{t("reliability.longest")}</TableHead>
+              <TableHead>{t("reliability.forecast")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -103,11 +104,41 @@ export function ReliabilityTable({
                   <TableCell className="font-mono text-xs">
                     {minutes(provider.longestOutageMinutes)}
                   </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {provider.forecast === null ? (
+                      <span title={t("reliability.forecast-too-new")}>
+                        {t("reliability.no-answer")}
+                      </span>
+                    ) : (
+                      <>
+                        {t("reliability.forecast-value", {
+                          probability: provider.forecast.probability,
+                        })}
+                        {/* The inputs beside the answer, so the sum can be
+                            redone by whoever it is quoted to — roadmap 6.7. */}
+                        <span className="ml-2 text-muted-foreground">
+                          {t("reliability.forecast-basis", {
+                            count: provider.forecast.incidents,
+                            days: provider.forecast.basisDays,
+                          })}
+                        </span>
+                      </>
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+      )}
+
+      {/* A forecast about a vendor is the number most likely to be quoted
+          out of context, so what it is travels with it rather than in a
+          tooltip. */}
+      {withIncidents.some((provider) => provider.forecast !== null) && (
+        <span className="text-xs text-muted-foreground">
+          {t("reliability.forecast-caveat")}
+        </span>
       )}
     </div>
   );

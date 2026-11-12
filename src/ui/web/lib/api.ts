@@ -39,6 +39,7 @@ import type {
   HeartbeatsResponse,
   Recipient,
   ReliabilityReport,
+  IncidentWords,
   SlaResponse,
   ProviderPushConfig,
   TrustResponse,
@@ -213,6 +214,9 @@ export const getCoincidence = (days: number) =>
   request<CoincidenceReport>("GET", `/coincidence?days=${days}`);
 export const getReliability = (days: number) =>
   request<ReliabilityReport>("GET", `/reliability?days=${days}`);
+
+export const getIncidentWords = (days: number) =>
+  request<IncidentWords>("GET", `/reliability/words?days=${days}`);
 
 /** Monthly targets and what the month has spent of them — roadmap 4.13. */
 export const getSla = () => request<SlaResponse>("GET", "/sla");
