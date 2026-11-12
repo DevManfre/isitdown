@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { THEME_MODES, type ThemeMode } from "./themeModes.ts";
+import { AI_PROVIDERS } from "./aiSettings.ts";
 import {
   componentSelectionSchema,
   deliverySchema,
@@ -284,6 +285,15 @@ const settingsSchema = z.object({
    * default for the update check's reason: a request to a host nobody chose.
    */
   catalogFeedEnabled: booleanSetting.catch(false),
+  /**
+   * Which model writes incident summaries (roadmap 6.10). `off` by default:
+   * the one setting that would send a provider's words to a third party, so
+   * nothing does until the operator names one. The key is not here — it lives
+   * in `AI_API_KEY`, like every other credential.
+   */
+  aiProvider: z.enum(AI_PROVIDERS).catch("off"),
+  aiModel: z.string().max(200).catch(""),
+  aiBaseUrl: z.string().max(2048).catch(""),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
