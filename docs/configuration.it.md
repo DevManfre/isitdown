@@ -3344,3 +3344,29 @@ Statuspage; per l'incidente di un altro provider la risposta è che non ci sono
 aggiornamenti da riassumere. Come ogni indirizzo digitato nella dashboard, l'URL
 base compatibile OpenAI viene rifiutato se punta a un indirizzo link-local, e a
 uno privato quando `OUTBOUND_BLOCK_PRIVATE=true`.
+
+### 3.37 La tua metrica sotto gli incidenti
+
+"È colpa nostra o di Cloudflare?" si capisce a occhio quando il tuo tasso di
+errore è disegnato sullo stesso asse dei tempi degli incidenti dei provider
+(roadmap 6.11). Dichiara una serie in **Impostazioni → Dati → Le tue
+metriche**; **Incidenti → Cronologia** la disegna allora come una corsia in più
+sotto il Gantt, con la finestra di ogni incidente riportata al suo interno come
+una fascia tenue. Una frase sotto il grafico dice dove la serie ha toccato il
+massimo e se in quel momento era in corso un incidente di un provider — oppure
+che non ce n'era nessuno. Con più serie dichiarate, un menu sul grafico ne
+sceglie una; **Nessuna metrica** nasconde la corsia.
+
+Due sorgenti:
+
+- **Prometheus** — un URL (Prometheus, Thanos, VictoriaMetrics, Mimir) e una
+  query PromQL, letta con `query_range` ogni volta che si disegna il grafico,
+  quindi non si copia nulla. La query deve restituire una sola serie: avvolgila
+  in `sum(...)`. Un token bearer, se il server lo chiede, va in
+  `PROMETHEUS_TOKEN`. L'indirizzo segue le stesse regole in uscita di ogni altro.
+- **File CSV** — `timestamp,valore` per riga, ISO 8601 o secondi Unix,
+  un'intestazione ammessa, fino a 50.000 righe, salvato nel database. Una riga
+  illeggibile viene rifiutata con il suo numero invece di essere saltata.
+
+Al massimo dieci serie. La serie non arriva mai a un notifier né al diff engine:
+è un'immagine con cui confrontarsi, non un segnale.

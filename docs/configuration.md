@@ -3205,3 +3205,28 @@ summarized — Statuspage pages today; another provider's incident answers that 
 has no updates to summarize. Like any address you type into the dashboard, the
 OpenAI-compatible base URL is refused when it points at a link-local address,
 and at a private one when `OUTBOUND_BLOCK_PRIVATE=true`.
+
+### 3.37 Your metric under the incidents
+
+"Is it us or Cloudflare?" is answered by eye when your own error rate is drawn
+on the same time axis as the providers' incidents (roadmap 6.11). Declare a
+series in **Settings → Data → Your metrics**; **Incidents → Timeline** then
+draws it as one more lane under the Gantt, with each incident's window carried
+down into it as a faint band. A sentence under the chart says where the series
+peaked and whether a provider incident was running then — or that none was.
+With several series declared, a menu on the chart picks one; **No metric**
+hides the lane.
+
+Two sources:
+
+- **Prometheus** — a URL (Prometheus, Thanos, VictoriaMetrics, Mimir) and a
+  PromQL query, read with `query_range` each time the chart is drawn, so
+  nothing is copied. The query must return exactly one series: wrap it in
+  `sum(...)`. A bearer token, if the server wants one, goes in
+  `PROMETHEUS_TOKEN`. The address follows the same outbound rules as any other.
+- **CSV file** — `timestamp,value` per line, ISO 8601 or Unix seconds, a header
+  row allowed, up to 50,000 rows, stored in the database. A row that cannot be
+  read is refused with its line number rather than skipped.
+
+At most ten series. The series never reaches a notifier or the diff engine: it
+is a picture to compare against, not a signal.

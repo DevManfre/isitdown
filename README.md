@@ -249,7 +249,9 @@ committed Grafana dashboard, then:
   breaking ([3.32–3.35](docs/configuration.md#332-daily-rollups--what-retention-keeps)),
   and an opt-in plain-language summary of an incident's updates, written by the
   Anthropic API, an OpenAI-compatible server or your own Claude Code
-  ([3.36](docs/configuration.md#336-incident-summaries--settings--ai-implementation)).
+  ([3.36](docs/configuration.md#336-incident-summaries--settings--ai-implementation)),
+  and your own metric — from Prometheus or a CSV — drawn under the incident
+  timeline ([3.37](docs/configuration.md#337-your-metric-under-the-incidents)).
 - **Hardening**: the dashboard binds to loopback by default, refuses cross-origin
   and rebound-host writes, caps response bodies and refuses link-local targets.
 - **Catalogue and tooling**: a provider catalogue of 205 entries, the `isitdown

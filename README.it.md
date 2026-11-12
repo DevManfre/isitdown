@@ -259,7 +259,9 @@ Grafana committata, poi:
   ([3.32–3.35](docs/configuration.it.md#332-riepiloghi-giornalieri--ciò-che-la-retention-conserva)),
   e un riassunto facoltativo in parole semplici degli aggiornamenti di un
   incidente, scritto dall'API Anthropic, da un server compatibile OpenAI o dal tuo
-  Claude Code ([3.36](docs/configuration.it.md#336-riassunti-degli-incidenti--impostazioni--implementazione-ai)).
+  Claude Code ([3.36](docs/configuration.it.md#336-riassunti-degli-incidenti--impostazioni--implementazione-ai)),
+  e la tua metrica — da Prometheus o da un CSV — disegnata sotto la cronologia
+  degli incidenti ([3.37](docs/configuration.it.md#337-la-tua-metrica-sotto-gli-incidenti)).
 - **Hardening**: la dashboard ascolta di default solo sul loopback, rifiuta
   scritture cross-origin e con host rebound, limita le dimensioni delle risposte e
   rifiuta i target link-local.
