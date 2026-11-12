@@ -190,8 +190,14 @@ const ASSETS = "dist/ui/public/assets";
  * the forty-odd strings the page now words (the verdict, the timeline's entries,
  * the lifeline's legend) in six catalogs; the rest is four components, one of
  * them the pure module that groups the story. No dependency was added.
+ *
+ * It moved 751,000 -> 756,000 (733.4 -> 738.3 kB) for roadmap 6.7-6.9.
+ * Measured: 732.5 kB gzipped before, 735.9 kB after — 3.4 kB. Most of it is
+ * seventeen strings in six catalogs, two of them the paragraphs that say what
+ * the 7-day forecast is and what the incident words are counted from; the
+ * rest is the words card. No dependency was added.
  */
-export const BUDGET = { js: 751_000, css: 23_500 };
+export const BUDGET = { js: 756_000, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

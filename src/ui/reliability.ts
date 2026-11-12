@@ -58,7 +58,36 @@ export interface ProviderReliability {
    * say "worse than last month" rather than only "bad".
    */
   previousIncidents: number;
+  /** The base rate for the coming week — roadmap 6.7. `null` before 90 days of watching. */
+  forecast: IncidentForecast | null;
 }
+
+/**
+ * "How likely is at least one incident in the next seven days", from nothing
+ * but how often this provider has had one lately — roadmap 6.7.
+ *
+ * Deliberately the plainest model there is: incidents are taken to arrive at a
+ * steady rate, measured over the last 90 days, and the chance of at least one
+ * in a week is `1 - e^(-rate × 7)`. No seasonality, no trend, no weighting of
+ * recent weeks — every one of those would be a knob, and a forecast whose knobs
+ * nobody can see is worse than none when it gets quoted at a vendor. The inputs
+ * travel with the answer so that anyone reading it can redo the sum.
+ *
+ * Fixed at 90 days whatever window the table shows: a seven-day window would
+ * turn one bad Tuesday into a 100% forecast.
+ */
+export interface IncidentForecast {
+  basisDays: number;
+  /** Incidents that started inside the basis. */
+  incidents: number;
+  /** The rate the probability is built from, incidents per week, two decimals. */
+  perWeek: number;
+  /** Chance of at least one incident in the next 7 days, whole percent. */
+  probability: number;
+}
+
+const FORECAST_BASIS_DAYS = 90;
+const FORECAST_HORIZON_DAYS = 7;
 
 export interface ReliabilityReport {
   days: number;
@@ -129,6 +158,37 @@ export function createReliabilityService(
   const zoneOf = async (): Promise<string> =>
     resolveZone((await deps.timeZone?.()) ?? "UTC");
 
+  /**
+   * `null` until the provider has been watched for the whole basis: a provider
+   * added last week with one incident would otherwise forecast a rate measured
+   * over seven days as though it were ninety.
+   */
+  async function forecastFor(
+    providerId: string,
+    today: string,
+  ): Promise<IncidentForecast | null> {
+    const earliest = await store.getEarliestSampleTime(providerId);
+    const basisStart = now().getTime() - FORECAST_BASIS_DAYS * 86_400_000;
+    if (earliest === null || Date.parse(earliest) > basisStart) return null;
+
+    const from = shiftDay(today, -(FORECAST_BASIS_DAYS - 1));
+    const incidents = (
+      await store.listIncidents({ providerId, openFrom: from, openTo: today })
+    ).filter((incident) => incident.startedAt.slice(0, 10) >= from).length;
+    const perDay = incidents / FORECAST_BASIS_DAYS;
+    return {
+      basisDays: FORECAST_BASIS_DAYS,
+      incidents,
+      perWeek: Math.round(perDay * 7 * 100) / 100,
+      // Capped below certainty: at ten incidents a week the sum rounds to 100,
+      // and "certain" is a claim no base rate is entitled to make.
+      probability: Math.min(
+        99,
+        Math.round((1 - Math.exp(-perDay * FORECAST_HORIZON_DAYS)) * 100),
+      ),
+    };
+  }
+
   return {
     /**
      * `only` narrows to a caller-supplied set the way the history summary does,
@@ -190,6 +250,8 @@ export function createReliabilityService(
             row[hourIn(at, zone)] = (row[hourIn(at, zone)] ?? 0) + 1;
         }
 
+        const forecast = await forecastFor(providerId, today);
+
         const previous = await store.listIncidents({
           providerId,
           openFrom: previousFrom,
@@ -215,6 +277,7 @@ export function createReliabilityService(
               incident.startedAt.slice(0, 10) >= previousFrom &&
               incident.startedAt.slice(0, 10) <= previousTo,
           ).length,
+          forecast,
         });
       }
 

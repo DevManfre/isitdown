@@ -257,7 +257,17 @@ const paths: Json = {
       summary:
         "Per-provider MTTR, MTBF and the longest outage, plus incidents by weekday and hour.",
       description:
-        "Roadmap 12.2 and 12.3, over rows the poller already wrote. `mttrMinutes` counts only incidents that have been resolved, `mtbfMinutes` needs at least two, and both are null rather than 0 when the window cannot answer. `byWeekdayHour` is [weekday][hour] in the operator's zone, Monday first, counted by when an incident started.",
+        "Roadmap 12.2 and 12.3, over rows the poller already wrote. `mttrMinutes` counts only incidents that have been resolved, `mtbfMinutes` needs at least two, and both are null rather than 0 when the window cannot answer. `byWeekdayHour` is [weekday][hour] in the operator's zone, Monday first, counted by when an incident started. `forecast` (roadmap 6.7) is the chance of at least one incident in the next 7 days, `1 - e^(-rate × 7)` with the rate taken over the last 90 days whatever window is asked, and null until the provider has been watched for 90 days.",
+      parameters: [query("days", "Window in days.", { type: "integer" })],
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
+    },
+  },
+  "/reliability/words": {
+    get: {
+      tags: ["History"],
+      summary: "Recurring words and phrases in incident titles, and the components most often not operational.",
+      description:
+        "Roadmap 6.9. Counted once per incident, over titles of incidents that started inside the window (update bodies are not stored). `phrases` holds runs of two or three words seen in at least two incidents; `components` ranks selected components by days spent not operational.",
       parameters: [query("days", "Window in days.", { type: "integer" })],
       responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
@@ -724,6 +734,27 @@ const paths: Json = {
         "404": notFound,
         "409": { description: "The provider has no SLA target.", ...json(ref("Error")) },
       },
+    },
+  },
+  "/export/report-card.md": {
+    get: {
+      tags: ["Export"],
+      summary: "The quarterly vendor report card: one grade per axis per provider.",
+      description:
+        "Roadmap 6.8. Availability, admission delay (from the trust card, needs a cross-checking probe and ten outages), MTTR and incident count, each graded A–E on the fixed scale printed in the document, never combined into one grade. A running quarter is covered up to today and flagged.",
+      parameters: [query("quarter", "YYYY-Qn; defaults to the current quarter.")],
+      responses: {
+        "200": media("text/markdown", "One table row per provider, then the scale."),
+        "400": badRequest,
+      },
+    },
+  },
+  "/export/report-card.json": {
+    get: {
+      tags: ["Export"],
+      summary: "The same report card as JSON, with the scale it was graded on.",
+      parameters: [query("quarter", "YYYY-Qn; defaults to the current quarter.")],
+      responses: { "200": ok({ type: "object" }), "400": badRequest },
     },
   },
   "/export/gatus.yaml": {

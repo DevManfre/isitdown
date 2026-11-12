@@ -788,3 +788,40 @@ test("history/compare answers a period beside the year before, and refuses a mis
     await app.close();
   }
 });
+
+test("the incident words read titles and rank the components that went red (roadmap 6.9)", async () => {
+  const app = await api();
+  try {
+    updateService(app.runtime.db, "github", { components: [{ id: "c1", name: "Actions" }] });
+    await save(app.runtime, "github", "major_outage", at(1), [
+      incident({ id: "a", name: "Elevated error rates for Actions", updatedAt: at(1) }),
+    ]);
+    await save(app.runtime, "github", "major_outage", at(0), [
+      incident({ id: "a", name: "Elevated error rates for Actions", updatedAt: at(1) }),
+      incident({ id: "b", name: "Elevated error rates on the API", updatedAt: at(0) }),
+    ]);
+    await app.runtime.store.saveStatus({
+      provider: "github",
+      overallStatus: "degraded",
+      activeIncidents: [],
+      components: [{ id: "c1", name: "Actions", status: "degraded" }],
+      maintenances: [],
+      fetchedAt: at(0, 11),
+    });
+
+    const { status, body } = await app.get("/reliability/words?days=30");
+    assert.equal(status, 200);
+    const words = body as {
+      incidents: number;
+      phrases: { term: string; incidents: number }[];
+      components: { componentId: string; badDays: number }[];
+    };
+    assert.equal(words.incidents, 2);
+    assert.deepEqual(words.phrases[0], { term: "elevated error rates", incidents: 2, providers: ["github"] });
+    assert.deepEqual(words.components.map((component) => component.componentId), ["c1"]);
+
+    assert.equal((await app.get("/reliability/words?days=3")).status, 400);
+  } finally {
+    await app.close();
+  }
+});

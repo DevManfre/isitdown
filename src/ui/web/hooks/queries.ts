@@ -365,6 +365,12 @@ export const useReliability = (days: number) =>
     queryFn: () => api.getReliability(days),
   });
 
+export const useIncidentWords = (days: number) =>
+  useQuery({
+    queryKey: ["reliability-words", days],
+    queryFn: () => api.getIncidentWords(days),
+  });
+
 /**
  * The operator's own timeline markers over a window — roadmap 12.1.
  *

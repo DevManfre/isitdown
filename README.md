@@ -241,6 +241,11 @@ committed Grafana dashboard, then:
   can restore a value from, named snapshots of the whole configuration, a diff
   preview before a `config.yml` import is applied, and a provider read from an
   unsaved form before it is saved ([6. HTTP API](docs/api.md#6-http-api)).
+- **Analysis and reporting**: old days rolled up instead of deleted, year-on-year
+  comparison, the cost of an outage, postmortem and SLA-credit exports, a printable
+  monthly report, a 7-day incident forecast from the last 90 days' rate, a quarterly
+  vendor report card graded per axis, and the words and components that keep
+  breaking ([3.32–3.35](docs/configuration.md#332-daily-rollups--what-retention-keeps)).
 - **Hardening**: the dashboard binds to loopback by default, refuses cross-origin
   and rebound-host writes, caps response bodies and refuses link-local targets.
 - **Catalogue and tooling**: a provider catalogue of 205 entries, the `isitdown

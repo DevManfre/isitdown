@@ -31,6 +31,7 @@ import {
   useAnnotations,
   useHistory,
   useCoincidence,
+  useIncidentWords,
   useConfigChrome,
   useReliability,
   useStatus,
@@ -39,6 +40,7 @@ import { AnnotationBar } from "@/components/AnnotationBar.tsx";
 import { BreakTogetherCard } from "@/components/BreakTogetherCard.tsx";
 import { ReliabilityTable } from "@/components/ReliabilityTable.tsx";
 import { IncidentHeatmap } from "@/components/charts/IncidentHeatmap.tsx";
+import { IncidentWordsCard } from "@/components/IncidentWordsCard.tsx";
 import { CoverageProvider } from "@/lib/coverage.tsx";
 import {
   Tooltip,
@@ -84,6 +86,13 @@ const rangeEndingToday = (days: number): { from: string; to: string } => {
 /** The widest fixed window a picked range fits inside, for the CSV link. */
 const nearestFixed = (days: number): number =>
   RANGES.find((range) => days <= range) ?? 90;
+
+/** The current quarter and the three before it, newest first, as `YYYY-Qn` — roadmap 6.8. */
+const recentQuarters = (): string[] => {
+  const now = new Date();
+  const index = now.getUTCFullYear() * 4 + Math.floor(now.getUTCMonth() / 3);
+  return [0, 1, 2, 3].map((back) => `${Math.floor((index - back) / 4)}-Q${((index - back) % 4) + 1}`);
+};
 
 const monthLabel = (locale: string, month: string) =>
   new Intl.DateTimeFormat(locale, { month: "short" }).format(
@@ -225,6 +234,7 @@ export function History() {
   const { data: reliability } = useReliability(nearestFixed(window_.days));
   // Roadmap 2.10. Same fixed window, for the same reason.
   const { data: coincidence } = useCoincidence(nearestFixed(window_.days));
+  const words = useIncidentWords(nearestFixed(window_.days));
   const { data: config } = useConfigChrome();
 
   // useHistory throws on an initial-load failure (routes.tsx's errorElement
@@ -565,6 +575,16 @@ export function History() {
                       href: `/export/monthly.html?month=${month.month}`,
                     })),
                   },
+                  {
+                    // Roadmap 6.8: a grade per axis per vendor, for the
+                    // quarterly review — written up server-side like the month.
+                    label: t("history.report-card-title"),
+                    items: recentQuarters().map((quarter) => ({
+                      format: quarter.replace("-", " "),
+                      description: t("history.report-card-download", { quarter: quarter.replace("-", " ") }),
+                      href: `/export/report-card.md?quarter=${quarter}`,
+                    })),
+                  },
                 ]}
               />
             </div>
@@ -709,6 +729,13 @@ export function History() {
             {coincidence !== undefined && (
               <BreakTogetherCard pairs={coincidence.pairs} services={config?.services ?? []} nameOf={nameOf} />
             )}
+            <IncidentWordsCard
+              data={words.data}
+              isPending={words.isPending}
+              isError={words.isError}
+              onRetry={() => void words.refetch()}
+              nameOf={nameOf}
+            />
           </TabsContent>
 
           {compared.length >= 2 && (
