@@ -3275,3 +3275,58 @@ formule di rito come "investigating issues with", e mostrando una frase intera
 invece delle sue parole — e i componenti selezionati per i giorni passati non
 operativi. Si leggono solo i titoli: il testo degli aggiornamenti dei provider
 non viene salvato. `GET /reliability/words?days=` serve gli stessi elenchi.
+
+### 3.36 Riassunti degli incidenti — Impostazioni → Implementazione AI
+
+Un incidente con una dozzina di aggiornamenti laconici del provider si può
+leggere in una frase (roadmap 6.10). Nella pagina di un incidente,
+**Riassumi gli aggiornamenti del provider** chiede a un modello di scrivere una
+o due frasi semplici: cosa si è rotto, cosa ha fatto il provider, a che punto
+è. È **spento di default**, non si scrive nulla finché non si preme il pulsante,
+e né gli aggiornamenti né il riassunto vengono salvati: gli aggiornamenti si
+leggono ogni volta dalla pagina del provider, quindi un riassunto non è mai più
+vecchio del clic che l'ha prodotto. Il riassunto è scritto nella lingua della
+dashboard; controlla la cronologia prima di agire.
+
+**Impostazioni → Implementazione AI** sceglie chi lo scrive:
+
+| Provider | Serve | Note |
+| --- | --- | --- |
+| Spento | — | Il default. Il pulsante non compare e nulla esce dal server. |
+| API Anthropic | una chiave API | Tramite l'SDK ufficiale. Il menu dei modelli elenca quelli dell'API una volta salvata la chiave; **Predefinito** significa `claude-opus-5-5`. |
+| Compatibile OpenAI | un URL base e un modello; una chiave solo se il server la chiede | OpenAI stesso, o un server nella tua rete che parla la stessa API: Ollama (`http://<host>:11434/v1`), llama.cpp, vLLM, LM Studio, o un proxy locale. Il menu dei modelli è quello che il server elenca a `/models`. |
+| CLI locale (Claude Code) | `claude` nel PATH del server, con l'accesso fatto | Il menu dei modelli offre il predefinito di Claude Code e gli alias `opus`, `sonnet` e `haiku`. Esegue `claude -p` con il prompt su stdin, senza strumenti, senza server MCP e senza sessione salvata. Paga l'accesso già configurato in quell'installazione — una chiave API o un abbonamento Claude; IsItDown non vede mai una credenziale. |
+
+La chiave si salva come la credenziale di un canale: digitata una volta nella
+casella, scritta nel file dei segreti accanto al database come `AI_API_KEY`, mai
+più mostrata. Funziona anche impostare `AI_API_KEY` nell'ambiente del container;
+la dashboard la indica allora come impostata dal container e non può
+cancellarla.
+
+Non c'è "accedi con Claude" né "accedi con ChatGPT": nessuno dei due offre un
+accesso utilizzabile da altre app. **CLI locale** è il modo di usare un
+abbonamento Claude: è il tuo Claude Code, con il tuo accesso.
+
+Le immagini Docker pubblicate non contengono `claude`. Per averlo nel container
+UI, costruisci l'immagine tu stesso includendolo:
+
+```bash
+WITH_CLAUDE_CODE=true docker compose --profile ui up -d --build
+```
+
+(oppure metti `WITH_CLAUDE_CODE=true` in `.env`). Dentro un container nessuno
+può fare l'accesso interattivo, quindi esegui `claude setup-token` sul tuo
+computer e incolla il token che stampa in **Token di Claude Code**, nella stessa
+sezione: viene salvato accanto al database come `CLAUDE_CODE_OAUTH_TOKEN` e
+Claude Code lo legge da lì. Dove IsItDown gira direttamente con Node
+(`node dist/ui/server.js`) si usa il `claude` già presente nel PATH di quella
+macchina, con il suo accesso, e il token non serve.
+
+Il modello legge titolo, impatto e stato dell'incidente e gli aggiornamenti del
+provider, tenendo i più recenti quando sono lunghi, dentro un blocco che gli si
+dice di trattare come dati e non come istruzioni. Si possono riassumere solo gli
+adapter che pubblicano il testo degli aggiornamenti — oggi le pagine
+Statuspage; per l'incidente di un altro provider la risposta è che non ci sono
+aggiornamenti da riassumere. Come ogni indirizzo digitato nella dashboard, l'URL
+base compatibile OpenAI viene rifiutato se punta a un indirizzo link-local, e a
+uno privato quando `OUTBOUND_BLOCK_PRIVATE=true`.

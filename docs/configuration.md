@@ -3141,3 +3141,55 @@ incident, with filler and boilerplate like "investigating issues with" left out,
 and a phrase shown whole rather than as its words — and the selected components
 by the days they spent not operational. Only titles are read: the providers'
 update text is not stored. `GET /reliability/words?days=` serves the same lists.
+
+### 3.36 Incident summaries — Settings → AI implementation
+
+An incident with a dozen terse provider updates can be read in a sentence
+(roadmap 6.10). On an incident's page, **Summarize the provider's updates**
+asks a model to write one or two plain sentences: what broke, what the provider
+did, where it stands. It is **off by default**, nothing is written until the
+button is pressed, and neither the updates nor the summary are stored — the
+provider's updates are read live from its page each time, so a summary is never
+older than the click that made it. The summary is written in the dashboard's
+language; check the timeline before acting on it.
+
+**Settings → AI implementation** picks who writes it:
+
+| Provider | Needs | Notes |
+| --- | --- | --- |
+| Off | — | The default. The button is not shown and nothing leaves the server. |
+| Anthropic API | an API key | Through the official SDK. The model menu lists the API's own models once the key is saved; **Default** means `claude-opus-5-5`. |
+| OpenAI-compatible | a base URL and a model; a key only if the server wants one | OpenAI itself, or a server on your network that speaks the same API: Ollama (`http://<host>:11434/v1`), llama.cpp, vLLM, LM Studio, or a local proxy. The model menu is whatever the server lists at `/models`. |
+| Local CLI (Claude Code) | `claude` on the server's PATH, signed in | The model menu offers Claude Code's default and the `opus`, `sonnet` and `haiku` aliases. Runs `claude -p` with the prompt on stdin, no tools, no MCP servers and no saved session. Whatever that install is signed into — an API key or a Claude subscription — is what pays; IsItDown never sees a credential. |
+
+The key is saved like a channel credential: typed once into the box, written to
+the secrets file beside the database as `AI_API_KEY`, never shown again. Setting
+`AI_API_KEY` in the container's environment works too; the dashboard then
+reports it as set by the container and cannot clear it.
+
+There is no "sign in with Claude" or "sign in with ChatGPT": neither offers a
+sign-in that other apps may use. **Local CLI** is the way to use a Claude
+subscription — it is your own Claude Code, signed in as you.
+
+The published Docker images do not contain `claude`. To have it in the UI
+container, build the image yourself with it:
+
+```bash
+WITH_CLAUDE_CODE=true docker compose --profile ui up -d --build
+```
+
+(or put `WITH_CLAUDE_CODE=true` in `.env`). Nobody can sign in interactively
+inside a container, so run `claude setup-token` on your own machine and paste
+the token it prints into **Claude Code token**, in the same section: it is saved
+beside the database as `CLAUDE_CODE_OAUTH_TOKEN` and Claude Code reads it from
+there. Where IsItDown runs straight from Node (`node dist/ui/server.js`), the
+`claude` already on that machine's PATH, with its existing sign-in, is used and
+no token is needed.
+
+What the model reads is the incident's title, impact and status and the
+provider's updates, newest kept when they are long, inside a block it is told to
+treat as data, not instructions. Only adapters that publish update text can be
+summarized — Statuspage pages today; another provider's incident answers that it
+has no updates to summarize. Like any address you type into the dashboard, the
+OpenAI-compatible base URL is refused when it points at a link-local address,
+and at a private one when `OUTBOUND_BLOCK_PRIVATE=true`.
