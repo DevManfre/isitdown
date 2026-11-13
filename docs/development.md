@@ -298,6 +298,17 @@ passes and a new subsystem landing with no test of its own drags the total under
 and fails CI. Raise a floor when the suite has genuinely climbed; never lower one
 to make a red run green.
 
+The **diff engine's property test** (roadmap 13.1,
+`test/core/diffEngine.property.test.ts`) runs beside its transition table:
+500 seeded random sequences of readings — incidents opening and closing,
+components, maintenance windows, mutes, unreadable pages — through the same
+`confirmedChanges` gate the poller calls, checking at every step that nothing
+is notified twice, nothing leaks out of a window or a mute, an unchanged page
+says nothing, `unknown` is never a transition, and a recovered page resolves
+every incident. A failure prints its seed and a shrunk sequence;
+`PBT_SEED=<n>` replays it and `PBT_RUNS=<n>` changes how many sequences one run
+tries. A bug it finds also becomes a row in the table.
+
 The **accessibility pass** (roadmap 4.20) rides the visual harness: after each view
 settles, `tools/visual-regression.mjs` injects axe-core and checks WCAG 2.0 and
 2.1 A and AA plus 2.2 AA (best-practice rules are left out on purpose). Unlike a

@@ -295,6 +295,18 @@ senza test propri trascina il totale sotto la soglia e fa fallire la CI. Alza un
 soglia quando la suite è davvero salita; non abbassarne mai una per far tornare
 verde una run rossa.
 
+Il **test property-based del diff engine** (roadmap 13.1,
+`test/core/diffEngine.property.test.ts`) affianca la sua tabella di
+transizioni: 500 sequenze casuali seedate di letture — incidenti che si aprono
+e si chiudono, componenti, finestre di manutenzione, mute, pagine illeggibili —
+attraverso lo stesso cancello `confirmedChanges` che chiama il poller,
+verificando a ogni passo che niente venga notificato due volte, niente esca da
+una finestra o da un mute, una pagina invariata non dica nulla, `unknown` non
+sia mai una transizione e una pagina tornata operativa chiuda ogni incidente.
+Un fallimento stampa il seme e una sequenza ridotta; `PBT_SEED=<n>` la
+riproduce e `PBT_RUNS=<n>` cambia quante sequenze prova un run. Un bug trovato
+così diventa anche una riga della tabella.
+
 Il **passaggio sull'accessibilità** (roadmap 4.20) viaggia sull'harness visivo: dopo
 che ogni vista si è assestata, `tools/visual-regression.mjs` inietta axe-core e
 controlla WCAG 2.0 e 2.1 A e AA più 2.2 AA (le regole di best practice sono escluse
