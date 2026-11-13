@@ -1,3 +1,4 @@
+import { manualClock, type ManualClock } from "../helpers/manualClock.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -11,7 +12,7 @@ import { getAdapter } from "../../src/adapters/index.ts";
 import { createFileStateStore } from "../../src/light/fileStateStore.ts";
 import type { RuntimeConfig, ServiceDefinition } from "../../src/core/configSource.interface.ts";
 import type { StateStore } from "../../src/core/stateStore.interface.ts";
-import type { ServiceRef } from "../../src/core/adapter.interface.ts";
+import type { Adapter, ServiceRef } from "../../src/core/adapter.interface.ts";
 import { CATCH_ALL_RULE } from "../../src/core/routing.ts";
 import { DELIVERY_DEFAULTS } from "../../src/core/delivery.ts";
 
@@ -84,32 +85,10 @@ const config = (services: ServiceDefinition[], over: Partial<RuntimeConfig["poll
  * one when the provider named none — so a test that runs two cycles has to
  * advance time the way the scheduler's own tick does between them.
  */
-function fakeClock(start = Date.parse("2026-09-01T10:00:00.000Z")): {
-  now: () => number;
-  advance: (ms: number) => void;
-} {
-  let at = start;
-  return {
-    now: () => at,
-    advance: (ms: number) => {
-      at += ms;
-    },
-  };
-}
+const fakeClock = (start = Date.parse("2026-09-01T10:00:00.000Z")): ManualClock => manualClock(start);
 
 /** One global cadence, the amount a test advances by between two cycles. */
 const ONE_INTERVAL_MS = 3 * 60_000;
-
-/** Records requested delays instead of waiting, so backoff is asserted not endured. */
-function fakeSleep(): { sleep: (ms: number) => Promise<void>; delays: number[] } {
-  const delays: number[] = [];
-  return {
-    delays,
-    sleep: async (ms: number) => {
-      delays.push(ms);
-    },
-  };
-}
 
 test("a first cycle stores the status and reports no change", async () => {
   const provider = await fakeProvider((_req, res) => {
@@ -117,8 +96,8 @@ test("a first cycle stores the status and reports no change", async () => {
     res.end(summary("none"));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
 
   try {
     const cycle = await poller.runCycle(config([service("github", provider.baseUrl)]));
@@ -141,9 +120,8 @@ test("a second cycle over a changed provider reports exactly one status change",
     res.end(summary(indicator));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([service("github", provider.baseUrl)]);
 
   try {
@@ -169,9 +147,8 @@ test("an unchanged second cycle reports nothing", async () => {
     res.end(summary("minor", [{ id: "i1", status: "investigating", impact: "minor", name: "x", updated_at: "2026-08-19T14:00:00.000Z" }]));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([service("github", provider.baseUrl)]);
 
   try {
@@ -191,8 +168,8 @@ test("a failing provider is retried exactly maxRetries times with growing backof
     res.end("boom");
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
 
   try {
     const cycle = await poller.runCycle(config([service("github", provider.baseUrl)], { maxRetries: 3 }));
@@ -222,9 +199,8 @@ test("a failed cycle leaves the last known status untouched", async () => {
     res.end(summary("minor"));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([service("github", provider.baseUrl)], { maxRetries: 1 });
 
   try {
@@ -250,8 +226,8 @@ test("one hanging provider does not stop a healthy one", async () => {
     res.end(summary("none"));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
 
   try {
     const cycle = await poller.runCycle(
@@ -277,8 +253,8 @@ test("an unknown adapter fails only its own provider", async () => {
     res.end(summary("none"));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
 
   try {
     const cycle = await poller.runCycle(
@@ -303,9 +279,8 @@ test("the monitoring warning fires once at the threshold, not before and not aga
     res.end();
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([service("github", provider.baseUrl)], { maxRetries: 1, failureThreshold: 3 });
   /** One cycle a cadence apart, the way the scheduler's tick delivers them. */
   const nextCycle = async () => {
@@ -343,9 +318,8 @@ test("a recovery clears the warning so a later streak can warn again", async () 
     res.end();
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([service("github", provider.baseUrl)], { maxRetries: 1, failureThreshold: 2 });
   const nextCycle = async () => {
     clock.advance(ONE_INTERVAL_MS);
@@ -384,8 +358,8 @@ test("a disabled service is never requested", async () => {
     res.end(summary("none"));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
 
   try {
     const cycle = await poller.runCycle(
@@ -413,8 +387,8 @@ test("providers are staggered rather than fired at the same instant", async () =
     res.end(summary("none"));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
 
   try {
     await poller.runCycle(
@@ -462,8 +436,8 @@ test("a manual poll is not staggered: the operator is watching", async () => {
     res.end(summary("none"));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
 
   try {
     await poller.runCycle(config([service("a", provider.baseUrl), service("b", provider.baseUrl)]), {
@@ -483,13 +457,11 @@ test("a provider answering 429 is left alone for the window it stated", async ()
   });
   const store = await freshStore();
   const clock = fakeClock();
-  const timer = fakeSleep();
   const poller = createPoller({
     getAdapter,
     store,
     logger: silent,
-    sleep: timer.sleep,
-    now: clock.now,
+    clock,
   });
 
   try {
@@ -520,13 +492,11 @@ test("a 429 that states no window is still held off, for a default one", async (
   });
   const store = await freshStore();
   const clock = fakeClock();
-  const timer = fakeSleep();
   const poller = createPoller({
     getAdapter,
     store,
     logger: silent,
-    sleep: timer.sleep,
-    now: clock.now,
+    clock,
   });
 
   try {
@@ -555,13 +525,11 @@ test("one provider's hold is its own: the rest of the fleet is polled", async ()
   });
   const store = await freshStore();
   const clock = fakeClock();
-  const timer = fakeSleep();
   const poller = createPoller({
     getAdapter,
     store,
     logger: silent,
-    sleep: timer.sleep,
-    now: clock.now,
+    clock,
   });
 
   try {
@@ -587,8 +555,8 @@ test("a manual poll asks a held provider anyway: the operator overrode the sched
     res.end("slow down");
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
 
   try {
     await poller.runCycle(config([service("a", provider.baseUrl)]));
@@ -607,9 +575,8 @@ test("an incident opening and the status moving are reported as separate changes
     res.end(body);
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([service("github", provider.baseUrl)]);
 
   try {
@@ -632,7 +599,7 @@ test("an incident opening and the status moving are reported as separate changes
 test("the poller hands the component selection to the adapter", async () => {
   let seen: ServiceRef | undefined;
   const store = await freshStore();
-  const timer = fakeSleep();
+  const timer = manualClock();
   const poller = createPoller({
     getAdapter: () => ({
       id: "stub",
@@ -649,7 +616,7 @@ test("the poller hands the component selection to the adapter", async () => {
     }),
     store,
     logger: silent,
-    sleep: timer.sleep,
+    clock: timer,
   });
   const cfg = config([
     service("github", "http://127.0.0.1:1", {
@@ -676,8 +643,8 @@ test("every result carries how long its fetch took, success or failure", async (
     res.end("nope");
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
 
   try {
     const cycle = await poller.runCycle(
@@ -706,13 +673,12 @@ test("a provider with its own interval is left alone until that interval has ela
     res.end(summary("none"));
   });
   const store = await freshStore();
-  let clock = Date.parse("2026-09-01T10:00:00.000Z");
+  const clock = manualClock(Date.parse("2026-09-01T10:00:00.000Z"));
   const poller = createPoller({
     getAdapter,
     store,
     logger: silent,
-    sleep: fakeSleep().sleep,
-    now: () => clock,
+    clock,
   });
   // The global cadence is what the fast provider follows; the slow one has
   // asked for an hour.
@@ -728,7 +694,7 @@ test("a provider with its own interval is left alone until that interval has ela
     "a provider never polled before is due",
   );
 
-  clock += 3 * 60_000;
+  clock.advance(3 * 60_000);
   const second = await poller.runCycle(config(services, { intervalMinutes: 3 }));
   assert.deepEqual(
     second.results.map((result) => result.providerId),
@@ -736,7 +702,7 @@ test("a provider with its own interval is left alone until that interval has ela
     "the slow provider is not due three minutes in",
   );
 
-  clock += 57 * 60_000;
+  clock.advance(57 * 60_000);
   const third = await poller.runCycle(config(services, { intervalMinutes: 3 }));
   assert.deepEqual(
     third.results.map((result) => result.providerId).sort(),
@@ -753,15 +719,15 @@ test("a probe on a cadence in seconds is polled between the minute ticks", async
     res.end(summary("none"));
   });
   const store = await freshStore();
-  let clock = Date.parse("2026-09-01T10:00:00.000Z");
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: fakeSleep().sleep, now: () => clock });
+  const clock = manualClock(Date.parse("2026-09-01T10:00:00.000Z"));
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const services = [
     service("page", provider.baseUrl),
     service("probe", provider.baseUrl, { intervalSeconds: 15 }),
   ];
 
   await poller.runCycle(config(services, { intervalMinutes: 1 }));
-  clock += 15_000;
+  clock.advance(15_000);
   const next = await poller.runCycle(config(services, { intervalMinutes: 1 }));
 
   assert.deepEqual(
@@ -779,8 +745,8 @@ test("a cycle asked to ignore the schedule polls every provider", async () => {
     res.end(summary("none"));
   });
   const store = await freshStore();
-  const clock = Date.parse("2026-09-01T10:00:00.000Z");
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: fakeSleep().sleep, now: () => clock });
+  const clock = manualClock("2026-09-01T10:00:00.000Z");
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const services = [service("slow", provider.baseUrl, { intervalMinutes: 60 })];
 
   await poller.runCycle(config(services));
@@ -800,13 +766,12 @@ test("the jitter the scheduler arms with never costs a due provider its cycle", 
     res.end(summary("none"));
   });
   const store = await freshStore();
-  let clock = Date.parse("2026-09-01T10:00:00.000Z");
+  const clock = manualClock(Date.parse("2026-09-01T10:00:00.000Z"));
   const poller = createPoller({
     getAdapter,
     store,
     logger: silent,
-    sleep: fakeSleep().sleep,
-    now: () => clock,
+    clock,
   });
   const services = [service("github", provider.baseUrl, { intervalMinutes: 10 })];
 
@@ -814,7 +779,7 @@ test("the jitter the scheduler arms with never costs a due provider its cycle", 
   // The scheduler's arming jitter is up to a tenth of an interval either way,
   // so an early tick must still count as due — otherwise the provider silently
   // polls every second cycle.
-  clock += Math.round(10 * 60_000 * 0.9);
+  clock.advance(Math.round(10 * 60_000 * 0.9));
   const early = await poller.runCycle(config(services, { intervalMinutes: 10 }));
 
   assert.deepEqual(
@@ -827,7 +792,7 @@ test("the jitter the scheduler arms with never costs a due provider its cycle", 
 test("the latency of the read behind a status reaches the store", async () => {
   const store = await freshStore();
   const saved: (number | undefined)[] = [];
-  const timer = fakeSleep();
+  const timer = manualClock();
   // A stub adapter reports the read itself, the way every real one forwards
   // `onRead` to the conditional-fetch helper.
   const poller = createPoller({
@@ -852,7 +817,7 @@ test("the latency of the read behind a status reaches the store", async () => {
       },
     },
     logger: silent,
-    sleep: timer.sleep,
+    clock: timer,
   });
 
   try {
@@ -866,7 +831,7 @@ test("the latency of the read behind a status reaches the store", async () => {
 test("a read that measured nothing saves no latency rather than a zero", async () => {
   const store = await freshStore();
   const saved: (number | undefined)[] = [];
-  const timer = fakeSleep();
+  const timer = manualClock();
   const poller = createPoller({
     getAdapter: () => ({
       id: "stub",
@@ -886,7 +851,7 @@ test("a read that measured nothing saves no latency rather than a zero", async (
       },
     },
     logger: silent,
-    sleep: timer.sleep,
+    clock: timer,
   });
 
   try {
@@ -909,8 +874,7 @@ test("a provider with an open incident is polled on the adaptive cadence, not it
     getAdapter,
     store,
     logger: silent,
-    sleep: fakeSleep().sleep,
-    now: clock.now,
+    clock,
   });
   // An hourly provider: exactly the case where the configured cadence is far
   // too slow to follow an incident it is in the middle of.
@@ -959,8 +923,7 @@ test("a provider whose incident cleared goes back to its configured cadence", as
     getAdapter,
     store,
     logger: silent,
-    sleep: fakeSleep().sleep,
-    now: clock.now,
+    clock,
   });
   const services = [service("github", provider.baseUrl, { intervalMinutes: 30 })];
   const cfg = config(services, { intervalMinutes: 30, adaptiveIntervalMinutes: 1 });
@@ -1001,8 +964,7 @@ test("adaptive polling switched off leaves a provider in trouble on its own cade
     getAdapter,
     store,
     logger: silent,
-    sleep: fakeSleep().sleep,
-    now: clock.now,
+    clock,
   });
   const services = [service("github", provider.baseUrl, { intervalMinutes: 30 })];
   const cfg = config(services, { intervalMinutes: 30, adaptivePolling: false, adaptiveIntervalMinutes: 1 });
@@ -1038,8 +1000,7 @@ test("one provider in trouble does not drag the rest of the fleet onto its caden
     getAdapter,
     store,
     logger: silent,
-    sleep: fakeSleep().sleep,
-    now: clock.now,
+    clock,
   });
   // Neither provider names an interval, so both follow the global cadence —
   // which is the case the tick dropping to a minute would otherwise sweep up.
@@ -1084,8 +1045,7 @@ test("a provider that has never answered is not polled every minute for it", asy
     getAdapter,
     store,
     logger: silent,
-    sleep: fakeSleep().sleep,
-    now: clock.now,
+    clock,
   });
   const cfg = config([service("github", provider.baseUrl, { intervalMinutes: 30 })], {
     intervalMinutes: 30,
@@ -1103,7 +1063,7 @@ test("a provider that has never answered is not polled every minute for it", asy
 
 test("a disabled provider's incident asks for nothing: it is not being polled", async () => {
   const store = await freshStore();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: fakeSleep().sleep });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: manualClock() });
   await store.saveStatus({
     provider: "github",
     overallStatus: "major_outage",
@@ -1132,14 +1092,12 @@ test("with flap damping on, a provider that changes its mind for one cycle notif
     res.end(summary(indicator));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
   const poller = createPoller({
     getAdapter,
     store,
     logger: silent,
-    sleep: timer.sleep,
-    now: clock.now,
+    clock,
   });
   const damped = config([service("github", provider.baseUrl)], { confirmSamples: 2 });
 
@@ -1171,9 +1129,8 @@ test("with flap damping on, a change that persists is announced one cycle later"
     res.end(summary(indicator));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const damped = config([service("github", provider.baseUrl)], { confirmSamples: 2 });
 
   try {
@@ -1204,9 +1161,8 @@ test("a muted provider is polled and recorded, and reports nothing", async () =>
     res.end(summary(indicator));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const muted = {
     ...service("github", provider.baseUrl),
     mutedUntil: new Date(Date.now() + 3_600_000).toISOString(),
@@ -1235,9 +1191,8 @@ test("a planned mute running now reports nothing, like a pressed one", async () 
     res.end(summary(indicator));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const planned = service("github", provider.baseUrl, {
     muteSchedules: [
       { from: new Date(Date.now() - 3_600_000).toISOString(), until: new Date(Date.now() + 3_600_000).toISOString() },
@@ -1263,9 +1218,8 @@ test("a maintenance window the operator declares silences the provider and is an
     res.end(summary(indicator));
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const plain = service("github", provider.baseUrl);
   const declared = {
     ...plain,
@@ -1356,9 +1310,10 @@ test("three providers going bad in one window are reported once, not three times
   const b = await fakeProvider(respond);
   const c = await fakeProvider(respond);
   const store = await freshStore();
-  const timer = fakeSleep();
-  const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  // From the wall clock: the adapter stamps each reading with it, and the
+  // correlation window is measured between those stamps and the cycle's end.
+  const clock = fakeClock(Date.now());
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config(
     [service("github", a.baseUrl), service("cloudflare", b.baseUrl), service("anthropic", c.baseUrl)],
     { correlationThreshold: 3, correlationWindowMinutes: 10 },
@@ -1402,9 +1357,10 @@ test("a shared failure names the upstream its members declare they run on", asyn
   const b = await fakeProvider(respond);
   const c = await fakeProvider(respond);
   const store = await freshStore();
-  const timer = fakeSleep();
-  const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  // From the wall clock: the adapter stamps each reading with it, and the
+  // correlation window is measured between those stamps and the cycle's end.
+  const clock = fakeClock(Date.now());
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config(
     [
       service("vercel", a.baseUrl, { dependsOn: ["cloudflare"] }),
@@ -1435,9 +1391,8 @@ test("the same shared failure is not re-announced on every cycle", async () => {
   const b = await fakeProvider(respond);
   const c = await fakeProvider(respond);
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config(
     [service("github", a.baseUrl), service("cloudflare", b.baseUrl), service("anthropic", c.baseUrl)],
     { correlationThreshold: 3, correlationWindowMinutes: 60 },
@@ -1466,9 +1421,8 @@ test("below the threshold every provider still gets its own alert", async () => 
   const a = await fakeProvider(respond);
   const b = await fakeProvider(respond);
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([service("github", a.baseUrl), service("cloudflare", b.baseUrl)], {
     correlationThreshold: 3,
   });
@@ -1504,8 +1458,10 @@ async function threeProviders(): Promise<{
     });
   const [a, b, c] = await Promise.all([serve("github"), serve("cloudflare"), serve("anthropic")]);
   const store = await freshStore();
-  const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: fakeSleep().sleep, now: clock.now });
+  // From the wall clock: the adapter stamps each reading with it, and the
+  // correlation window is measured between those stamps and the cycle's end.
+  const clock = fakeClock(Date.now());
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   return {
     indicators,
     poller,
@@ -1613,9 +1569,8 @@ test("correlation is off unless the operator asks for it", async () => {
   const b = await fakeProvider(respond);
   const c = await fakeProvider(respond);
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([
     service("github", a.baseUrl),
     service("cloudflare", b.baseUrl),
@@ -1646,8 +1601,8 @@ test("a page claiming to be operational while its probe cannot reach the service
     res.end("busy");
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
   const cfg = config([
     service("github", page.baseUrl),
     service("github-api", api.baseUrl, { adapter: "http", crossChecks: "github" }),
@@ -1679,9 +1634,8 @@ test("the accusation is made once, not on every cycle the page stays wrong", asy
     res.end("busy");
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([
     service("github", page.baseUrl),
     service("github-api", api.baseUrl, { adapter: "http", crossChecks: "github" }),
@@ -1715,9 +1669,8 @@ test("an accusation is stored as a suspicion on the page, and cleared when the p
     res.end("x");
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([
     service("github", page.baseUrl),
     service("github-api", api.baseUrl, { adapter: "http", crossChecks: "github" }),
@@ -1755,7 +1708,6 @@ test("a restarted poller does not accuse the same page a second time", async () 
     res.end("busy");
   });
   const store = await freshStore();
-  const timer = fakeSleep();
   const clock = fakeClock();
   const cfg = config([
     service("github", page.baseUrl),
@@ -1763,10 +1715,10 @@ test("a restarted poller does not accuse the same page a second time", async () 
   ]);
 
   try {
-    await createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now }).runCycle(cfg);
+    await createPoller({ getAdapter, store, logger: silent, clock }).runCycle(cfg);
     clock.advance(ONE_INTERVAL_MS);
     // A fresh poller over the same store is what a container restart looks like.
-    const again = await createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep, now: clock.now }).runCycle(cfg);
+    const again = await createPoller({ getAdapter, store, logger: silent, clock }).runCycle(cfg);
     assert.equal(again.changes.filter((change) => change.kind === "silent_outage").length, 0);
   } finally {
     await store.close();
@@ -1784,8 +1736,8 @@ test("a provider that admits the outage is never accused of hiding it", async ()
     res.end("busy");
   });
   const store = await freshStore();
-  const timer = fakeSleep();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const poller = createPoller({ getAdapter, store, logger: silent, clock: timer });
   const cfg = config([
     service("github", page.baseUrl),
     service("github-api", api.baseUrl, { adapter: "http", crossChecks: "github" }),
@@ -1835,7 +1787,7 @@ test("a probe down from here but up from two outposts is kept up, and the note s
     getAdapter,
     store,
     logger: silent,
-    sleep: fakeSleep().sleep,
+    clock: manualClock(),
     outposts: [
       { id: "one", url: one.baseUrl, token: "t" },
       { id: "two", url: two.baseUrl, token: "t" },
@@ -1866,7 +1818,7 @@ test("a status page is never sent to an outpost", async () => {
     getAdapter,
     store,
     logger: silent,
-    sleep: fakeSleep().sleep,
+    clock: manualClock(),
     outposts: [{ id: "one", url: outpost.baseUrl, token: "t" }],
   });
 
@@ -1903,7 +1855,7 @@ test("a page reading records its freshness, a probe's does not, and an unchanged
     },
   };
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger: silent, sleep: fakeSleep().sleep, now: clock.now });
+  const poller = createPoller({ getAdapter, store, logger: silent, clock });
   const cfg = config([service("github", page.baseUrl), service("github-api", api.baseUrl, { adapter: "http" })]);
 
   try {
@@ -1932,7 +1884,19 @@ test("a reading that stops looking alive is said once in the log", async () => {
   const lines: string[] = [];
   const logger = createLogger("warn", (line) => lines.push(line));
   const clock = fakeClock();
-  const poller = createPoller({ getAdapter, store, logger, sleep: fakeSleep().sleep, now: clock.now });
+  // Readings stamped on the test's clock rather than the adapter's wall clock,
+  // so a week of stillness is crossed by advancing time, not by waiting for it.
+  const onClock = (id: string): Adapter => {
+    const adapter = getAdapter(id);
+    return {
+      ...adapter,
+      fetchStatus: async (service, ctx) => ({
+        ...(await adapter.fetchStatus(service, ctx)),
+        fetchedAt: new Date(clock.now()).toISOString(),
+      }),
+    };
+  };
+  const poller = createPoller({ getAdapter: onClock, store, logger, clock });
   const cfg = config([service("github", page.baseUrl)]);
   const stale = (): string[] => lines.filter((line) => line.includes("stopped looking alive"));
 
@@ -1944,7 +1908,6 @@ test("a reading that stops looking alive is said once in the log", async () => {
     const lastRead = Date.parse(state.last!.fetchedAt);
     const since = new Date(lastRead - 7 * 24 * 60 * 60_000 + 1).toISOString();
     await store.setFreshness("github", { ...state.freshness!, since, changes: 5, longestStillMs: 60 * 60_000 });
-    await new Promise((resolve) => setTimeout(resolve, 5));
 
     clock.advance(ONE_INTERVAL_MS);
     await poller.runCycle(cfg);
@@ -1999,7 +1962,7 @@ async function cycles(
 test("a status page answering far slower than usual is announced once, on its second slow reading", async () => {
   const store = await freshStore();
   const latency = new Map([["github", 200]]);
-  const poller = createPoller({ getAdapter: timedPages(latency), store, logger: silent, sleep: fakeSleep().sleep });
+  const poller = createPoller({ getAdapter: timedPages(latency), store, logger: silent, clock: manualClock() });
   const runtime = config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]);
   try {
     assert.deepEqual(await cycles(poller, runtime, 25), [], "building the band says nothing");
@@ -2019,7 +1982,7 @@ test("a status page answering far slower than usual is announced once, on its se
 test("every page slow in the same cycle is our network, and nobody is accused", async () => {
   const store = await freshStore();
   const latency = new Map([["github", 200], ["slack", 200]]);
-  const poller = createPoller({ getAdapter: timedPages(latency), store, logger: silent, sleep: fakeSleep().sleep });
+  const poller = createPoller({ getAdapter: timedPages(latency), store, logger: silent, clock: manualClock() });
   const runtime = config([
     service("github", "http://127.0.0.1:1", { adapter: "stub" }),
     service("slack", "http://127.0.0.1:1", { adapter: "stub" }),
@@ -2044,7 +2007,7 @@ test("a probe's answer time is never judged as a slow status page", async () => 
     getAdapter: timedPages(latency, { kind: "probe" }),
     store,
     logger: silent,
-    sleep: fakeSleep().sleep,
+    clock: manualClock(),
   });
   const runtime = config([service("api", "http://127.0.0.1:1", { adapter: "stub" })]);
   try {
@@ -2059,7 +2022,7 @@ test("a probe's answer time is never judged as a slow status page", async () => 
 test("a muted provider's slow page stays quiet", async () => {
   const store = await freshStore();
   const latency = new Map([["github", 200]]);
-  const poller = createPoller({ getAdapter: timedPages(latency), store, logger: silent, sleep: fakeSleep().sleep });
+  const poller = createPoller({ getAdapter: timedPages(latency), store, logger: silent, clock: manualClock() });
   const runtime = config([
     service("github", "http://127.0.0.1:1", { adapter: "stub", mutedUntil: "2999-01-01T00:00:00.000Z" }),
   ]);
@@ -2118,7 +2081,7 @@ const withNotice = (runtime: RuntimeConfig, over: { enabled?: boolean; leadMinut
 test("a maintenance window inside the lead is announced once, however many cycles see it", async () => {
   const store = await freshStore();
   const window = { current: { id: "mw1", startsInMinutes: 90 } };
-  const poller = createPoller({ getAdapter: pagesWithWindow(window), store, logger: silent, sleep: fakeSleep().sleep });
+  const poller = createPoller({ getAdapter: pagesWithWindow(window), store, logger: silent, clock: manualClock() });
   const runtime = withNotice(config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]));
   try {
     assert.deepEqual(await cycles(poller, runtime, 1), ["maintenance_upcoming:github"]);
@@ -2133,7 +2096,7 @@ test("a maintenance window inside the lead is announced once, however many cycle
 test("a window further away than the lead waits, and is announced when it comes inside", async () => {
   const store = await freshStore();
   const window = { current: { id: "mw1", startsInMinutes: 600 } };
-  const poller = createPoller({ getAdapter: pagesWithWindow(window), store, logger: silent, sleep: fakeSleep().sleep });
+  const poller = createPoller({ getAdapter: pagesWithWindow(window), store, logger: silent, clock: manualClock() });
   const runtime = withNotice(config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]));
   try {
     assert.deepEqual(await cycles(poller, runtime, 2), []);
@@ -2147,7 +2110,7 @@ test("a window further away than the lead waits, and is announced when it comes 
 test("the heads-up is off unless the operator asked for it, and a mute covers it", async () => {
   const store = await freshStore();
   const window = { current: { id: "mw1", startsInMinutes: 30 } };
-  const poller = createPoller({ getAdapter: pagesWithWindow(window), store, logger: silent, sleep: fakeSleep().sleep });
+  const poller = createPoller({ getAdapter: pagesWithWindow(window), store, logger: silent, clock: manualClock() });
   const plain = config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]);
   try {
     assert.deepEqual(await cycles(poller, plain, 2), [], "no delivery block at all means off");
@@ -2193,7 +2156,7 @@ test("an acknowledgement lasts exactly as long as the trouble it was given for",
     clearAck: async (id: string) => void acks.delete(id),
   };
   const state = { status: "major_outage" as "operational" | "major_outage", incidents: 1 };
-  const poller = createPoller({ getAdapter: pagesInState(state), store, logger: silent, sleep: fakeSleep().sleep, acks: ackStore });
+  const poller = createPoller({ getAdapter: pagesInState(state), store, logger: silent, clock: manualClock(), acks: ackStore });
   const runtime = config([service("github", "http://127.0.0.1:1", { adapter: "stub" })]);
   try {
     await cycles(poller, runtime, 1);
@@ -2223,7 +2186,7 @@ test("an acknowledgement is also let go while the provider is muted, where no al
     clearAck: async (id: string) => void acks.delete(id),
   };
   const state = { status: "operational" as "operational" | "major_outage", incidents: 0 };
-  const poller = createPoller({ getAdapter: pagesInState(state), store, logger: silent, sleep: fakeSleep().sleep, acks: ackStore });
+  const poller = createPoller({ getAdapter: pagesInState(state), store, logger: silent, clock: manualClock(), acks: ackStore });
   const runtime = config([
     service("github", "http://127.0.0.1:1", { adapter: "stub", mutedUntil: "2999-01-01T00:00:00.000Z" }),
   ]);

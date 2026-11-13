@@ -20,6 +20,7 @@ isitdown/
 │   │   ├── diffEngine.ts              l'unica autorità su se una notifica scatta
 │   │   ├── notificationDispatcher.ts  l'unico chiamante di Notifier.send
 │   │   ├── scheduler.ts               il loop; rilegge la configurazione a ogni ciclo
+│   │   ├── clock.ts                   l'unico modo in cui il motore legge l'ora e aspetta (13.2)
 │   │   ├── http.ts                    l'unica lettura HTTP: rivalidazione ETag/Last-Modified, decodifica del charset
 │   │   ├── routing.ts · mute.ts · maintenance.ts   chi viene avvisato, quando, e cosa è silenziato (§3.27–3.28)
 │   │   ├── delivery.ts · onCall.ts    la politica di consegna e la rotazione di reperibilità
@@ -306,6 +307,15 @@ sia mai una transizione e una pagina tornata operativa chiuda ogni incidente.
 Un fallimento stampa il seme e una sequenza ridotta; `PBT_SEED=<n>` la
 riproduce e `PBT_RUNS=<n>` cambia quante sequenze prova un run. Un bug trovato
 così diventa anche una riga della tabella.
+
+**Il tempo nei test** (roadmap 13.2) passa dal `Clock` in `src/core/clock.ts`:
+scheduler, poller e dispatcher ne ricevono uno come `clock`, e un test passa
+`manualClock()` da `test/helpers/manualClock.ts` — `advance(ms)` e
+`setNow(date)` fanno scattare in ordine i timer scaduti, `sleep` sposta il
+clock e registra l'attesa in `delays`. Una guardia in
+`test/core/boundaries.test.ts` fa fallire ogni test del core che usi un
+`setTimeout` reale, `t.mock.timers` o un `Date` sostituito, e ogni `Date.now()`
+o timer diretto che torni in quei tre moduli.
 
 Il **passaggio sull'accessibilità** (roadmap 4.20) viaggia sull'harness visivo: dopo
 che ogni vista si è assestata, `tools/visual-regression.mjs` inietta axe-core e

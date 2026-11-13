@@ -4,6 +4,7 @@ import {
   type ConfigSource,
   type RuntimeConfig,
 } from "./configSource.interface.ts";
+import { systemClock, type Clock, type ClockTimer } from "./clock.ts";
 import type { Logger } from "./logger.ts";
 import type { DispatchContext, Dispatcher } from "./notificationDispatcher.ts";
 import type { Notifier } from "./notifier.interface.ts";
@@ -63,6 +64,8 @@ export interface SchedulerDeps {
   onCycle?: ((result: CycleResult) => void | Promise<void>) | undefined;
   /** Injected so tests get an exact arming delay. */
   random?: (() => number) | undefined;
+  /** Injected so a test steps from one cycle to the next instead of waiting. The wall clock when absent. */
+  clock?: Clock | undefined;
 }
 
 
@@ -122,8 +125,9 @@ export function dispatchContextOf(
 export function createScheduler(deps: SchedulerDeps): Scheduler {
   const { configSource, poller, dispatcher, buildNotifiers, logger, onCycle } = deps;
   const random = deps.random ?? Math.random;
+  const clock = deps.clock ?? systemClock;
 
-  let timer: NodeJS.Timeout | undefined;
+  let timer: ClockTimer | undefined;
   let armedFor: number | undefined;
   let stopped = false;
   let inFlight: Promise<CycleResult> | undefined;
@@ -212,7 +216,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
    * down to, which is the countdown lying in the other direction.
    */
   function arm(): void {
-    if (timer !== undefined) clearTimeout(timer);
+    if (timer !== undefined) clock.clearTimeout(timer);
     timer = undefined;
     armedFor = undefined;
     if (stopped) return;
@@ -223,8 +227,8 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     // Deliberately referenced: this timer is the only thing keeping the Light
     // edition's event loop alive between cycles, and unref'ing it made the
     // container exit after its first poll.
-    armedFor = Date.now() + delay;
-    timer = setTimeout(() => {
+    armedFor = clock.now() + delay;
+    timer = clock.setTimeout(() => {
       void tick();
     }, delay);
   }
@@ -275,7 +279,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       stopped = true;
       armedFor = undefined;
       if (timer !== undefined) {
-        clearTimeout(timer);
+        clock.clearTimeout(timer);
         timer = undefined;
       }
     },

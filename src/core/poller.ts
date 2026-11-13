@@ -1,4 +1,5 @@
 import type { AckStore } from "./ackStore.interface.ts";
+import { systemClock, type Clock } from "./clock.ts";
 import type { Adapter, ReadingNote } from "./adapter.interface.ts";
 import {
   configuredIntervalMinutes,
@@ -200,10 +201,11 @@ export interface PollerDeps {
   getAdapter: (id: string) => Adapter;
   store: StateStore;
   logger: Logger;
-  /** Injected so tests assert the backoff schedule instead of waiting it out. */
-  sleep?: ((ms: number) => Promise<void>) | undefined;
-  /** Injected so a test can move a provider's interval along without waiting it out. */
-  now?: (() => number) | undefined;
+  /**
+   * Injected so a test asserts the backoff schedule and moves a provider's
+   * interval along instead of waiting either out. The wall clock when absent.
+   */
+  clock?: Clock | undefined;
   /**
    * Second points of view for probes — roadmap 1.7. Empty or absent means a
    * probe's reading is this container's alone, which is how it always was.
@@ -217,11 +219,6 @@ export interface PollerDeps {
   acks?: AckStore | undefined;
 }
 
-const realSleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
 /**
  * One polling cycle over every enabled provider.
  *
@@ -232,8 +229,9 @@ const realSleep = (ms: number): Promise<void> =>
  */
 export function createPoller(deps: PollerDeps): Poller {
   const { getAdapter, store, logger } = deps;
-  const sleep = deps.sleep ?? realSleep;
-  const now = deps.now ?? Date.now;
+  const clock = deps.clock ?? systemClock;
+  const sleep = (ms: number) => clock.sleep(ms);
+  const now = () => clock.now();
   const outposts = deps.outposts ?? [];
   const acks = deps.acks;
 
@@ -556,7 +554,7 @@ export function createPoller(deps: PollerDeps): Poller {
 
     const before = await store.getState(service.id);
 
-    const startedAt = Date.now();
+    const startedAt = now();
     // Asked alongside the local read rather than after it, so an outpost costs
     // a provider no time of its own. Never rejects: a silent outpost abstains.
     const remote = askOutposts(service, config);
@@ -612,7 +610,7 @@ export function createPoller(deps: PollerDeps): Poller {
           providerId: service.id,
           currentStatus: before.last?.overallStatus ?? "unknown",
           failureCount,
-          at: new Date().toISOString(),
+          at: new Date(now()).toISOString(),
         });
         await store.setDegradedNotified(service.id, true);
       }
@@ -622,7 +620,7 @@ export function createPoller(deps: PollerDeps): Poller {
           providerId: service.id,
           ok: false,
           attempts: config.polling.maxRetries,
-          durationMs: Date.now() - startedAt,
+          durationMs: now() - startedAt,
           error: message,
         },
         changes,
@@ -673,7 +671,7 @@ export function createPoller(deps: PollerDeps): Poller {
         ok: true,
         status: outcome.status,
         attempts: outcome.attempts,
-        durationMs: Date.now() - startedAt,
+        durationMs: now() - startedAt,
         ...(outcome.notModified === undefined
           ? {}
           : { notModified: outcome.notModified }),
@@ -1082,7 +1080,7 @@ export function createPoller(deps: PollerDeps): Poller {
       config: RuntimeConfig,
       options: CycleOptions = {},
     ): Promise<CycleResult> {
-      const startedAt = new Date().toISOString();
+      const startedAt = new Date(now()).toISOString();
       const at = now();
       // A loop rather than `filter`: whether a provider is due now depends on
       // its stored state, and reading that is asynchronous.
@@ -1178,7 +1176,7 @@ export function createPoller(deps: PollerDeps): Poller {
         }
       }
 
-      const finishedAt = new Date().toISOString();
+      const finishedAt = new Date(now()).toISOString();
 
       // Before the fold: a page caught claiming to be fine is not a worsening
       // the correlation window should count. Skipped entirely when the cycle
