@@ -11,6 +11,7 @@ import { ChangesDialog } from "@/components/settings/ChangesDialog.tsx";
 import { HistoryDialog } from "@/components/settings/HistoryDialog.tsx";
 import { SnapshotsDialog } from "@/components/settings/SnapshotsDialog.tsx";
 import { CatalogUpdatesRow } from "@/components/settings/CatalogUpdatesRow.tsx";
+import { OperatorSeriesRows } from "@/components/settings/OperatorSeriesRows.tsx";
 import { NumberSetting } from "@/components/settings/NumberSetting.tsx";
 import { SECTION_CASCADE } from "@/components/settings/sectionCascade.ts";
 import { useSettingsToastReport } from "@/components/settings/SettingsToasts.tsx";
@@ -464,6 +465,8 @@ export function DataSection({
       </SettingRow>
 
       <CatalogUpdatesRow status={config.catalogFeed} onToggle={commitCatalogFeed} />
+      {/* Roadmap 6.11: the operator's own metric, drawn on Incidents → Timeline. */}
+      <OperatorSeriesRows />
     </SettingsSection>
   );
 }

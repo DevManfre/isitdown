@@ -5,6 +5,7 @@ import {
   parseSummary,
   parseIncidentHistory,
   parseComponentList,
+  parseIncidentUpdates,
   statuspageAdapter,
 } from "../../src/adapters/statuspage.adapter.ts";
 import { getAdapter } from "../../src/adapters/index.ts";
@@ -585,4 +586,41 @@ test("a window whose declared end cannot be parsed as a clock time is dropped", 
   };
 
   assert.deepEqual(parseSummary(raw, service).maintenances, []);
+});
+
+// Roadmap 6.10: the prose a provider posted on one incident, for the summary.
+test("incident updates come back oldest first, blank bodies dropped, display time preferred", () => {
+  const updates = parseIncidentUpdates(fixture("incidents-with-updates"), service, "inc-api");
+  assert.deepEqual(updates, [
+    { at: "2026-11-01T10:00:00.000Z", status: "investigating", body: "We are investigating elevated error rates on the API." },
+    { at: "2026-11-01T10:45:00.000Z", status: "monitoring", body: "A fix has been deployed and we are monitoring the results." },
+    { at: "2026-11-01T11:30:00.000Z", status: "resolved", body: "This incident has been resolved." },
+  ]);
+});
+
+test("an incident without updates, or no longer in the feed, has none", () => {
+  assert.deepEqual(parseIncidentUpdates(fixture("incidents-with-updates"), service, "inc-no-updates"), []);
+  assert.deepEqual(parseIncidentUpdates(fixture("incidents-with-updates"), service, "gone"), []);
+});
+
+test("a malformed update list loses only the updates", () => {
+  const body = { incidents: [{ id: "inc-api", incident_updates: "nonsense" }] };
+  assert.deepEqual(parseIncidentUpdates(body, service, "inc-api"), []);
+  assert.throws(() => parseIncidentUpdates([], service, "inc-api"));
+});
+
+test("fetchIncidentUpdates reads the incidents feed", async () => {
+  const seen: string[] = [];
+  await withServer(
+    (req, res) => {
+      seen.push(req.url ?? "");
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(fixtureText("incidents-with-updates"));
+    },
+    async (baseUrl) => {
+      const updates = await statuspageAdapter.fetchIncidentUpdates?.({ ...service, baseUrl }, "inc-api", { timeoutMs: 2000 });
+      assert.equal(updates?.length, 3);
+      assert.deepEqual(seen, ["/api/v2/incidents.json"]);
+    },
+  );
 });

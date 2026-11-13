@@ -61,9 +61,10 @@ Anthropic       operational    ████████████████�
 
 - **No external dependencies at runtime.** No database server, no message broker,
   no cloud account. A JSON file or an embedded SQLite file is enough at this scale.
-  The one exception is opt-in: outposts ([Docker §4.7](docs/docker.md#47-outposts--a-second-point-of-view-for-probes))
-  are containers you run yourself for a second reading of your probes, and with
-  none configured nothing reaches for one.
+  The exceptions are opt-in: outposts ([Docker §4.7](docs/docker.md#47-outposts--a-second-point-of-view-for-probes))
+  are containers you run yourself for a second reading of your probes, and
+  incident summaries ([3.36](docs/configuration.md#336-incident-summaries--settings--ai-implementation))
+  call a model you name. With neither configured, nothing reaches for one.
 - **Config-driven.** Adding a provider never means touching code — an entry in
   `config.yml` (Light) or a dialog in the dashboard (UI).
 - **Idempotent notifications.** Only state *transitions* notify: operational →
@@ -244,8 +245,13 @@ committed Grafana dashboard, then:
 - **Analysis and reporting**: old days rolled up instead of deleted, year-on-year
   comparison, the cost of an outage, postmortem and SLA-credit exports, a printable
   monthly report, a 7-day incident forecast from the last 90 days' rate, a quarterly
-  vendor report card graded per axis, and the words and components that keep
-  breaking ([3.32–3.35](docs/configuration.md#332-daily-rollups--what-retention-keeps)).
+  vendor report card graded per axis, the words and components that keep
+  breaking ([3.32–3.35](docs/configuration.md#332-daily-rollups--what-retention-keeps)),
+  and an opt-in plain-language summary of an incident's updates, written by the
+  Anthropic API, an OpenAI-compatible server or your own Claude Code
+  ([3.36](docs/configuration.md#336-incident-summaries--settings--ai-implementation)),
+  and your own metric — from Prometheus or a CSV — drawn under the incident
+  timeline ([3.37](docs/configuration.md#337-your-metric-under-the-incidents)).
 - **Hardening**: the dashboard binds to loopback by default, refuses cross-origin
   and rebound-host writes, caps response bodies and refuses link-local targets.
 - **Catalogue and tooling**: a provider catalogue of 205 entries, the `isitdown

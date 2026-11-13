@@ -5,7 +5,9 @@ import { cn } from "@/lib/utils.ts";
 import { WidgetCard } from "@/widgets/catalog/WidgetCard.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
-import { useAnnotations, useIncidentTimeline } from "@/hooks/queries.ts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { OperatorMetricLane } from "@/components/OperatorMetricLane.tsx";
+import { useAnnotations, useIncidentTimeline, useOperatorSeries } from "@/hooks/queries.ts";
 import { impactColor, impactKey } from "@/lib/incidents.ts";
 import { formatDay, formatDuration, formatList } from "@/lib/format.ts";
 import { overlaps, timelineLanes } from "@/lib/incidentTimeline.ts";
@@ -28,6 +30,14 @@ export function IncidentTimelineCard({ providers }: { providers: { id: string; n
   const [days, setDays] = useState<number>(30);
   const { data: timeline } = useIncidentTimeline(days);
   const { data: annotations } = useAnnotations({ days });
+  // Roadmap 6.11: the operator's own metric, one at a time — two y-axes on one
+  // lane is a chart nobody reads. The first declared series is shown until
+  // another, or none, is picked.
+  const { data: seriesList } = useOperatorSeries();
+  const [pickedSeries, setPickedSeries] = useState<string | undefined>(undefined);
+  const allSeries = seriesList?.series ?? [];
+  const seriesChoice = pickedSeries ?? (allSeries[0] === undefined ? "none" : String(allSeries[0].id));
+  const metric = allSeries.find((entry) => String(entry.id) === seriesChoice);
 
   const toMs = Date.now();
   const fromMs = toMs - days * DAY_MS;
@@ -47,6 +57,12 @@ export function IncidentTimelineCard({ providers }: { providers: { id: string; n
   const percentAt = (ms: number) => ((ms - fromMs) / (toMs - fromMs)) * 100;
   const day = (ms: number) => formatDay(i18n.language, new Date(ms).toISOString().slice(0, 10));
   const ticks = Array.from({ length: 7 }, (_, index) => fromMs + (index / 6) * (toMs - fromMs));
+  const windows = (timeline?.incidents ?? []).map((incident) => ({
+    startMs: Math.max(Date.parse(incident.startedAt), fromMs),
+    endMs: incident.resolvedAt === null ? toMs : Math.min(Date.parse(incident.resolvedAt), toMs),
+    providerId: incident.providerId,
+    name: incident.name,
+  }));
 
   return (
     // Secondary to the view's one question — what broke, and is it over — so
@@ -60,7 +76,22 @@ export function IncidentTimelineCard({ providers }: { providers: { id: string; n
         summary: timeline === undefined ? undefined : t("incidents.total", { count: timeline.incidents.length }),
       }}
     >
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {allSeries.length > 0 && (
+          <Select value={seriesChoice} onValueChange={setPickedSeries}>
+            <SelectTrigger className="w-56" aria-label={t("series.picker")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{t("series.picker.none")}</SelectItem>
+              {allSeries.map((entry) => (
+                <SelectItem key={entry.id} value={String(entry.id)}>
+                  {entry.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <ToggleGroup
           type="single"
           value={String(days)}
@@ -78,10 +109,11 @@ export function IncidentTimelineCard({ providers }: { providers: { id: string; n
 
       {timeline === undefined ? (
         <Skeleton className="h-32 w-full" />
-      ) : lanes.length === 0 ? (
+      ) : lanes.length === 0 && metric === undefined ? (
         <p className="py-6 text-sm text-muted-foreground">{t("timeline.empty", { days })}</p>
       ) : (
         <>
+          {lanes.length === 0 && <p className="py-2 text-sm text-muted-foreground">{t("timeline.empty", { days })}</p>}
           <div className="grid grid-cols-[8rem_1fr] text-xs text-muted-foreground" aria-hidden="true">
             <span />
             <div className="relative h-4">
@@ -166,6 +198,9 @@ export function IncidentTimelineCard({ providers }: { providers: { id: string; n
                 </div>
               </div>
             ))}
+            {metric !== undefined && (
+              <OperatorMetricLane series={metric} fromMs={fromMs} toMs={toMs} windows={windows} nameOf={nameOf} />
+            )}
           </div>
           <p className="text-xs text-muted-foreground">
             {together.length === 0

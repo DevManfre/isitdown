@@ -172,6 +172,21 @@ const CANDIDATES: Candidate[] = [
     // cState announces itself: `is: "index"` and a `systems` list.
     matches: jsonShaped((body) => body["is"] === "index" && Array.isArray(body["systems"])),
   },
+  {
+    adapter: "datadog",
+    path: "/config.json",
+    accept: JSON_ACCEPT,
+    baseUrl: (origin) => origin,
+    // `/config.json` is a common name; `domainPrefix` and `sourceDatacenter`
+    // are what make it a Datadog status page's own document.
+    matches: jsonShaped(
+      (body) =>
+        Array.isArray(body["components"]) &&
+        typeof body["domainPrefix"] === "string" &&
+        typeof body["sourceDatacenter"] === "string",
+    ),
+  },
+
   // The feed adapter reads whatever url it is given, so a matching feed hands
   // back its own url rather than the origin.
   ...["/history.rss", "/feed", "/index.xml"].map((path) => ({

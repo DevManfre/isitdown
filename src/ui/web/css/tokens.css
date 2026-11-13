@@ -106,6 +106,10 @@
   --compare-3: #a8327f;
   --compare-4: #2563c4;
   --compare-5: #7a5230;
+  /* Roadmap 6.11: the operator's own metric under the incidents. A blue no
+     status and no compared series uses, so the line can never read as an
+     impact or as a vendor. */
+  --chart-operator: #1d6fa5;
 
   /* The same severities painted, not written: a bar, ring or dot is a graphic
      (3:1), not text (4.5:1), so these sit one step brighter than the written
@@ -316,6 +320,7 @@
   --compare-3: #e07cc3;
   --compare-4: #7ba6ee;
   --compare-5: #c49a73;
+  --chart-operator: #6fb6e8;
 
   --status-operational-fill: #56a37f;
   --status-degraded-fill: #d8a34a;
@@ -488,6 +493,7 @@
     --compare-3: #e07cc3;
     --compare-4: #7ba6ee;
     --compare-5: #c49a73;
+    --chart-operator: #6fb6e8;
 
     --status-operational-fill: #56a37f;
     --status-degraded-fill: #d8a34a;
@@ -675,6 +681,7 @@
   --compare-3: #831843;
   --compare-4: #1e3a8a;
   --compare-5: #451a03;
+  --chart-operator: #0b3d66;
 }
 
 /* Colour-blind safe. The pair every status page leans on — green for fine, red

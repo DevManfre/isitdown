@@ -39,6 +39,16 @@ export function formatBody(body, contentType) {
       return { text: body, extension: "txt" };
     }
   }
+  // Some pages serve a JSON document as text/plain (Datadog Status Pages'
+  // `/config.json`). Sniffed the way the canary sniffs a live answer, since
+  // the canary only ever compares `.json` fixtures.
+  if (/^text\/plain/.test(type) && /^\s*[[{]/.test(body)) {
+    try {
+      return { text: `${JSON.stringify(JSON.parse(body), null, 2)}\n`, extension: "json" };
+    } catch {
+      // Not JSON after all: falls through to plain text.
+    }
+  }
   const match = EXTENSIONS.find(([pattern]) => pattern.test(type));
   return { text: body, extension: match?.[1] ?? "txt" };
 }

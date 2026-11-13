@@ -4,6 +4,7 @@ import type {
   ComponentPreview,
   FetchContext,
   IncidentHistoryResult,
+  IncidentUpdate,
   ServiceRef,
 } from "../core/adapter.interface.ts";
 import type {
@@ -319,6 +320,49 @@ export function parseIncidentHistory(raw: unknown, service: ServiceRef): Inciden
   };
 }
 
+/**
+ * Incidents with the prose a provider posted on each — roadmap 6.10. Separate
+ * from `historySchema` so a malformed update list can only lose the updates,
+ * never the incident history backfill reads from the same feed.
+ */
+const updatesSchema = z.object({
+  incidents: z.array(
+    z.object({
+      id: z.string().optional(),
+      incident_updates: z
+        .array(
+          z.object({
+            status: z.string().optional(),
+            body: z.string().optional(),
+            created_at: z.string().optional(),
+            display_at: z.string().optional(),
+          }),
+        )
+        .optional()
+        .catch(undefined),
+    }),
+  ),
+});
+
+/**
+ * Pure mapping from an incidents.json payload to one incident's updates, oldest
+ * first, exported for the fixture suite. An incident the feed no longer lists
+ * answers an empty array; an update with no body or no time is dropped.
+ */
+export function parseIncidentUpdates(raw: unknown, service: ServiceRef, incidentId: string): IncidentUpdate[] {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`statuspage incident updates for ${service.id} is not an object`);
+  }
+  const incident = updatesSchema.parse(raw).incidents.find((entry) => entry.id === incidentId);
+  return (incident?.incident_updates ?? [])
+    .flatMap((update) => {
+      const at = update.display_at ?? update.created_at;
+      const body = update.body?.trim() ?? "";
+      return at === undefined || body === "" ? [] : [{ at, status: update.status ?? "", body }];
+    })
+    .sort((a, b) => a.at.localeCompare(b.at));
+}
+
 /** Pure mapping for the picker, exported for the fixture suite. */
 export function parseComponentList(raw: unknown, service: ServiceRef): ComponentPreview[] {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
@@ -381,5 +425,13 @@ export const statuspageAdapter: Adapter = {
 
   async listComponents(service: ServiceRef, ctx: FetchContext): Promise<ComponentPreview[]> {
     return parseComponentList(await readJson(SUMMARY_PATH, service, ctx, "statuspage components fetch"), service);
+  },
+
+  async fetchIncidentUpdates(service: ServiceRef, incidentId: string, ctx: FetchContext): Promise<IncidentUpdate[]> {
+    return parseIncidentUpdates(
+      await readJson(INCIDENTS_PATH, service, ctx, "statuspage incident updates"),
+      service,
+      incidentId,
+    );
   },
 };
