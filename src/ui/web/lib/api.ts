@@ -1,4 +1,10 @@
 import type {
+  OperatorSeries,
+  NewOperatorSeries,
+  SeriesReading,
+  AiSettingsResponse,
+  AiModelList,
+  IncidentSummary,
   AdapterDebugResponse,
   Annotation,
   AdapterDetection,
@@ -601,3 +607,27 @@ export const removePushDevice = (id: string) =>
     "DELETE",
     `/config/push/subscriptions/${encodeURIComponent(id)}`,
   );
+
+/** Settings → AI implementation — roadmap 6.10. The key goes out and never comes back. */
+export const getAiSettings = () => request<AiSettingsResponse>("GET", "/config/ai");
+export const patchAiSettings = (patch: Partial<Pick<AiSettingsResponse, "provider" | "model" | "baseUrl">>) =>
+  request<AiSettingsResponse>("PATCH", "/config/ai", patch);
+export const getAiModels = () => request<AiModelList>("GET", "/config/ai/models");
+export type AiCredentialId = "key" | "cli-token";
+export const saveAiCredential = (id: AiCredentialId, value: string) =>
+  request<AiSettingsResponse>("PUT", `/config/ai/${id}`, { value });
+export const clearAiCredential = (id: AiCredentialId) => request<AiSettingsResponse>("DELETE", `/config/ai/${id}`);
+/** Written on request by the operator's chosen model, never stored. */
+export const summarizeIncident = (providerId: string, incidentId: string, locale: string) =>
+  request<IncidentSummary>(
+    "POST",
+    `/incidents/${encodeURIComponent(providerId)}/${encodeURIComponent(incidentId)}/summary`,
+    { locale },
+  );
+
+/** The operator's own metrics — roadmap 6.11. */
+export const getOperatorSeries = () => request<{ series: OperatorSeries[] }>("GET", "/config/series");
+export const addOperatorSeries = (series: NewOperatorSeries) => request<OperatorSeries>("POST", "/config/series", series);
+export const deleteOperatorSeries = (id: number) => request<undefined>("DELETE", `/config/series/${id}`);
+export const getSeriesReading = (id: number, from: string, to: string) =>
+  request<SeriesReading>("GET", `/series/${id}?${new URLSearchParams({ from, to }).toString()}`);

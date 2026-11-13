@@ -352,3 +352,10 @@ export const TREND_CHART = {
   rise: "var(--status-operational)",
   fall: "var(--status-major-outage)",
 } as const;
+
+/**
+ * The operator's own metric under the incident timeline (roadmap 6.11). Its own
+ * token: a status colour would read the operator's error rate as a provider's
+ * impact, and a compare colour as a vendor.
+ */
+export const OPERATOR_SERIES = "var(--chart-operator)";

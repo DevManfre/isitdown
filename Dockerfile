@@ -93,6 +93,12 @@ ENV BIND_HOST=0.0.0.0
 USER root
 COPY --from=builder /app/dist/ui ./dist/ui
 RUN chown -R node:node /app/dist/ui
+# Roadmap 6.10: the incident summary's "Local CLI" provider runs `claude -p`.
+# Opt-in at build time — `WITH_CLAUDE_CODE=true docker compose --profile ui up -d --build` —
+# so the published image stays without it. Sign-in is the operator's: a token
+# from `claude setup-token`, saved in Settings → AI implementation.
+ARG WITH_CLAUDE_CODE=false
+RUN if [ "$WITH_CLAUDE_CODE" = "true" ]; then npm install -g @anthropic-ai/claude-code && npm cache clean --force; fi
 USER node
 EXPOSE 3000
 # The probe is readiness, not liveness (roadmap 6.9): it stays 503 until the

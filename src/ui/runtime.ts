@@ -2,6 +2,9 @@ import { dirname, join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import type { Express } from "express";
 import { getAdapter } from "../adapters/index.ts";
+import type { Adapter } from "../core/adapter.interface.ts";
+import type { SummaryDeps } from "./incidentSummary.ts";
+import type { PromDeps } from "./operatorSeries.ts";
 import { registerPluginAdapters } from "../adapters/plugins.ts";
 import type { ChannelConfig, ConfigSource, ServiceDefinition } from "../core/configSource.interface.ts";
 import { createLogger, parseLogLevel, type Logger } from "../core/logger.ts";
@@ -61,6 +64,10 @@ export interface UiRuntimeOptions {
   logger?: Logger | undefined;
   /** Seed the three starter providers into an empty database. Defaults on; the server turns it off. */
   seedProviders?: boolean | undefined;
+  /** Test seams for the incident summary (roadmap 6.10); see `UiRuntimeCore`. */
+  getAdapter?: ((id: string) => Adapter) | undefined;
+  summaryDeps?: Partial<Omit<SummaryDeps, "env">> | undefined;
+  seriesDeps?: Omit<PromDeps, "env"> | undefined;
 }
 
 /**
@@ -78,6 +85,14 @@ export interface UiRuntimeCore {
   dbPath: string;
   /** The process environment secrets are resolved from; never serialised. */
   env: NodeJS.ProcessEnv;
+  /**
+   * Test seams for roadmap 6.10's incident summary: the adapter registry and
+   * the model clients. Absent in production, where the real ones are used.
+   */
+  getAdapter?: ((id: string) => Adapter) | undefined;
+  summaryDeps?: Partial<Omit<SummaryDeps, "env">> | undefined;
+  /** Test seam for roadmap 6.11's Prometheus reads. */
+  seriesDeps?: Omit<PromDeps, "env"> | undefined;
   /**
    * Credentials saved from the dashboard, applied to `env` on load — which is
    * what lets a save take effect without recreating the container.
@@ -600,6 +615,9 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     db,
     dbPath: options.dbPath,
     env: options.env,
+    getAdapter: options.getAdapter,
+    summaryDeps: options.summaryDeps,
+    seriesDeps: options.seriesDeps,
     secrets,
     dispatcher,
     interactiveChannels,

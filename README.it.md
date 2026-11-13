@@ -61,9 +61,11 @@ Anthropic       operational    ████████████████�
 
 - **Nessuna dipendenza esterna a runtime.** Nessun database server, nessun broker,
   nessun account cloud. A questa scala bastano un file JSON o un SQLite embedded.
-  L'unica eccezione è opt-in: gli outpost ([Docker §4.7](docs/docker.it.md#47-outpost--un-secondo-punto-di-vista-per-le-sonde))
-  sono container che gestisci tu per una seconda lettura delle sonde, e senza
-  nessuno configurato non se ne cerca nessuno.
+  Le eccezioni sono opt-in: gli outpost ([Docker §4.7](docs/docker.it.md#47-outpost--un-secondo-punto-di-vista-per-le-sonde))
+  sono container che gestisci tu per una seconda lettura delle sonde, e i
+  riassunti degli incidenti ([3.36](docs/configuration.it.md#336-riassunti-degli-incidenti--impostazioni--implementazione-ai))
+  chiamano un modello che scegli tu. Senza nessuno dei due configurato, non si
+  cerca nulla.
 - **Guidato dalla configurazione.** Aggiungere un provider non significa mai
   toccare codice: una voce in `config.yml` (Light) o un dialog nella dashboard (UI).
 - **Notifiche idempotenti.** Notificano solo le *transizioni* di stato: operational
@@ -253,8 +255,13 @@ Grafana committata, poi:
   confronto anno su anno, il costo di un outage, le esportazioni postmortem e per i
   crediti SLA, un report mensile stampabile, una previsione degli incidenti a 7 giorni
   dal ritmo degli ultimi 90, una pagella trimestrale dei fornitori con un voto per
-  asse, e le parole e i componenti che continuano a rompersi
-  ([3.32–3.35](docs/configuration.it.md#332-riepiloghi-giornalieri--ciò-che-la-retention-conserva)).
+  asse, le parole e i componenti che continuano a rompersi
+  ([3.32–3.35](docs/configuration.it.md#332-riepiloghi-giornalieri--ciò-che-la-retention-conserva)),
+  e un riassunto facoltativo in parole semplici degli aggiornamenti di un
+  incidente, scritto dall'API Anthropic, da un server compatibile OpenAI o dal tuo
+  Claude Code ([3.36](docs/configuration.it.md#336-riassunti-degli-incidenti--impostazioni--implementazione-ai)),
+  e la tua metrica — da Prometheus o da un CSV — disegnata sotto la cronologia
+  degli incidenti ([3.37](docs/configuration.it.md#337-la-tua-metrica-sotto-gli-incidenti)).
 - **Hardening**: la dashboard ascolta di default solo sul loopback, rifiuta
   scritture cross-origin e con host rebound, limita le dimensioni delle risposte e
   rifiuta i target link-local.

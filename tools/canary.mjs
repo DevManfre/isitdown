@@ -43,6 +43,10 @@ const CONDITIONAL = {
     "$.systems[].unresolvedIssues",
     "$.systems[].description",
   ],
+  // The fixture is DNSimple's page, which groups its components and declares
+  // maintenance; a page with no groups (Datadog's own) has no nested list, and
+  // one that never declared a window publishes `maintenances: null`.
+  datadog: ["$.components[].components", "$.maintenances"],
 };
 
 /**

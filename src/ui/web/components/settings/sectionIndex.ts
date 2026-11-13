@@ -80,7 +80,15 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       "settings.restore.label",
       "field.update-check",
       "field.catalog-feed",
+      "series.settings.label",
+      "series.add.label",
     ],
+  },
+  {
+    id: "ai",
+    labelKey: "settings.section.ai",
+    blurbKey: "settings.section.ai.blurb",
+    rowKeys: ["ai.provider.label", "ai.model.label", "ai.base-url.label", "ai.key.label"],
   },
   {
     id: "appearance",

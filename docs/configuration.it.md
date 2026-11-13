@@ -66,7 +66,7 @@ notifications:
 | `correlationWindowMinutes` | `10` | 1–1440. Quanto è larga quella finestra. Più larga intercetta un guasto condiviso che attraversa lentamente le status page, e rischia di unire due giornate storte non collegate. |
 | `locale` | `en` | Un tag di locale minuscolo; la build include `en`, `it`, `de`, `es`, `fr` e `pt`, e qualunque altro valore ricade su `en`. |
 | `services[].id` | — | Obbligatorio. Slug minuscolo: è la chiave dello stato salvato. |
-| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro e `watchdog` segnala qualunque cambiamento nel testo di una pagina (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `sequence` concatena due o tre richieste per un'API dietro un login, `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto, e `icmp` e `docker` sondano le macchine stesse dell'homelab (vedi sotto); `json` mappa qualunque documento JSON su uno stato, e `isitdown`, `upptime`, `statusio`, `githubactions`, `openstatus`, `sorry`, `cstate` e `registry` sono descritti sotto *Altre piattaforme di stato, altre istanze e segnali da sviluppatore*. |
+| `services[].adapter` | — | Obbligatorio. `statuspage` copre ogni pagina ospitata da Atlassian; `instatus`, `betterstack`, `cachet`, `uptimekuma` e `uptimecom` coprono quelle piattaforme ospitate e self-hosted; `rss` legge qualunque feed RSS o Atom di incidenti; `imap` legge gli avvisi di un vendor da una casella di posta (vedi sotto); `html` raschia una pagina che non pubblica né l'uno né l'altro e `watchdog` segnala qualunque cambiamento nel testo di una pagina (vedi sotto); `slack`, `aws`, `gcp` e `azure` leggono i formati propri di quei provider; `http` sonda un endpoint tuo invece di una status page, e `sequence` concatena due o tre richieste per un'API dietro un login, `tcp` e `dns` sondano una porta e un nome che non parlano HTTP affatto, e `icmp` e `docker` sondano le macchine stesse dell'homelab (vedi sotto); `json` mappa qualunque documento JSON su uno stato, e `isitdown`, `upptime`, `statusio`, `githubactions`, `openstatus`, `sorry`, `cstate`, `datadog` e `registry` sono descritti sotto *Altre piattaforme di stato, altre istanze e segnali da sviluppatore*. |
 | `services[].enabled` | `true` | `false` mantiene la voce ma smette di interrogarla. |
 | `services[].intervalMinutes` | — | 1–1440. La cadenza di questo provider; omesso, segue `pollIntervalMinutes`. Un ciclo gira alla cadenza più breve richiesta da qualcuno e i provider più lenti saltano i cicli in eccesso. |
 | `services[].intervalSeconds` | — | 10–3600, solo sonde (`http`, `sequence`, `tcp`, `dns`). La stessa cadenza in secondi, per un endpoint che può restare giù meno di un minuto; una pagina di stato resta sul pavimento del minuto e viene rifiutata al caricamento. Mai insieme a `intervalMinutes`. |
@@ -1275,6 +1275,7 @@ con lo stesso percorso a richieste condizionali di una pagina di stato, quindi
 | `openstatus` | La pagina, `https://acme.openstatus.dev` | `slug` (default: la prima etichetta dell'host), `apiBase` | `GET /public/status/<slug>`: solo la parola complessiva |
 | `sorry` | La pagina, `https://status.example.com` | — | `/api/v1/status`, `/components`, `/notices` |
 | `cstate` | La pagina, `https://status.example.com` | — | `index.json` (API v2.0 di cState) |
+| `datadog` | La pagina, `https://status.datadoghq.com` | — | `/config.json`: componenti, incidenti con la loro cronologia, manutenzioni |
 | `registry` | L'origine API: `https://registry.npmjs.org`, `https://pypi.org`, `https://hub.docker.com`, `https://crates.io`, `https://data.jsdelivr.com`, `https://api.cdnjs.com`, `https://unpkg.com` | `registry` (`npm`, `pypi`, `dockerhub`, `crates`, `jsdelivr`, `cdnjs`, `unpkg`) e `package`, entrambi obbligatori; `pinned` | I metadati di un pacchetto reale |
 
 **`isitdown` — federazione.** Nessun protocollo nuovo: un'istanza pubblica già
@@ -1307,6 +1308,19 @@ sono annunci e si ignorano.
 **`cstate`** legge l'`index.json` della pagina costruita con Hugo: `ok`,
 `disrupted`, `down` per sistema e per pagina. I sistemi sono i componenti, indicati
 con il nome, e le issue che elencano come non risolte sono gli incidenti.
+
+**`datadog`** legge una Datadog Status Page (ci girano la pagina di Datadog stessa
+e quella di DNSimple, che hanno lasciato Atlassian Statuspage). La pagina è
+un'app statica che disegna un unico documento pubblico, `/config.json`, con
+l'albero dei componenti, ogni incidente pubblicato e ogni finestra di
+manutenzione. I componenti si mappano parola per parola (`operational`,
+`degraded`, `partial_outage`, `major_outage`; `maintenance` si astiene) e i gruppi
+diventano i gruppi del selettore. Non c'è una parola per l'intera pagina, quindi
+la lettura è il componente peggiore, e un incidente aperto porta a degradato una
+pagina tutta verde. Gli incidenti indicano i componenti colpiti, quindi
+`scopeToComponents` scarta quelli su componenti non selezionati, come su
+Statuspage. Lo stesso documento riempie lo storico degli incidenti e gli
+aggiornamenti di un incidente.
 
 **incident.io** non ha bisogno di un adapter: le sue pagine servono
 `/api/v2/summary.json` nel formato di Statuspage, quindi le legge `statuspage`
@@ -3275,3 +3289,84 @@ formule di rito come "investigating issues with", e mostrando una frase intera
 invece delle sue parole — e i componenti selezionati per i giorni passati non
 operativi. Si leggono solo i titoli: il testo degli aggiornamenti dei provider
 non viene salvato. `GET /reliability/words?days=` serve gli stessi elenchi.
+
+### 3.36 Riassunti degli incidenti — Impostazioni → Implementazione AI
+
+Un incidente con una dozzina di aggiornamenti laconici del provider si può
+leggere in una frase (roadmap 6.10). Nella pagina di un incidente,
+**Riassumi gli aggiornamenti del provider** chiede a un modello di scrivere una
+o due frasi semplici: cosa si è rotto, cosa ha fatto il provider, a che punto
+è. È **spento di default**, non si scrive nulla finché non si preme il pulsante,
+e né gli aggiornamenti né il riassunto vengono salvati: gli aggiornamenti si
+leggono ogni volta dalla pagina del provider, quindi un riassunto non è mai più
+vecchio del clic che l'ha prodotto. Il riassunto è scritto nella lingua della
+dashboard; controlla la cronologia prima di agire.
+
+**Impostazioni → Implementazione AI** sceglie chi lo scrive:
+
+| Provider | Serve | Note |
+| --- | --- | --- |
+| Spento | — | Il default. Il pulsante non compare e nulla esce dal server. |
+| API Anthropic | una chiave API | Tramite l'SDK ufficiale. Il menu dei modelli elenca quelli dell'API una volta salvata la chiave; **Predefinito** significa `claude-opus-5-5`. |
+| Compatibile OpenAI | un URL base e un modello; una chiave solo se il server la chiede | OpenAI stesso, o un server nella tua rete che parla la stessa API: Ollama (`http://<host>:11434/v1`), llama.cpp, vLLM, LM Studio, o un proxy locale. Il menu dei modelli è quello che il server elenca a `/models`. |
+| CLI locale (Claude Code) | `claude` nel PATH del server, con l'accesso fatto | Il menu dei modelli offre il predefinito di Claude Code e gli alias `opus`, `sonnet` e `haiku`. Esegue `claude -p` con il prompt su stdin, senza strumenti, senza server MCP e senza sessione salvata. Paga l'accesso già configurato in quell'installazione — una chiave API o un abbonamento Claude; IsItDown non vede mai una credenziale. |
+
+La chiave si salva come la credenziale di un canale: digitata una volta nella
+casella, scritta nel file dei segreti accanto al database come `AI_API_KEY`, mai
+più mostrata. Funziona anche impostare `AI_API_KEY` nell'ambiente del container;
+la dashboard la indica allora come impostata dal container e non può
+cancellarla.
+
+Non c'è "accedi con Claude" né "accedi con ChatGPT": nessuno dei due offre un
+accesso utilizzabile da altre app. **CLI locale** è il modo di usare un
+abbonamento Claude: è il tuo Claude Code, con il tuo accesso.
+
+Le immagini Docker pubblicate non contengono `claude`. Per averlo nel container
+UI, costruisci l'immagine tu stesso includendolo:
+
+```bash
+WITH_CLAUDE_CODE=true docker compose --profile ui up -d --build
+```
+
+(oppure metti `WITH_CLAUDE_CODE=true` in `.env`). Dentro un container nessuno
+può fare l'accesso interattivo, quindi esegui `claude setup-token` sul tuo
+computer e incolla il token che stampa in **Token di Claude Code**, nella stessa
+sezione: viene salvato accanto al database come `CLAUDE_CODE_OAUTH_TOKEN` e
+Claude Code lo legge da lì. Dove IsItDown gira direttamente con Node
+(`node dist/ui/server.js`) si usa il `claude` già presente nel PATH di quella
+macchina, con il suo accesso, e il token non serve.
+
+Il modello legge titolo, impatto e stato dell'incidente e gli aggiornamenti del
+provider, tenendo i più recenti quando sono lunghi, dentro un blocco che gli si
+dice di trattare come dati e non come istruzioni. Si possono riassumere solo gli
+adapter che pubblicano il testo degli aggiornamenti — oggi le pagine
+Statuspage; per l'incidente di un altro provider la risposta è che non ci sono
+aggiornamenti da riassumere. Come ogni indirizzo digitato nella dashboard, l'URL
+base compatibile OpenAI viene rifiutato se punta a un indirizzo link-local, e a
+uno privato quando `OUTBOUND_BLOCK_PRIVATE=true`.
+
+### 3.37 La tua metrica sotto gli incidenti
+
+"È colpa nostra o di Cloudflare?" si capisce a occhio quando il tuo tasso di
+errore è disegnato sullo stesso asse dei tempi degli incidenti dei provider
+(roadmap 6.11). Dichiara una serie in **Impostazioni → Dati → Le tue
+metriche**; **Incidenti → Cronologia** la disegna allora come una corsia in più
+sotto il Gantt, con la finestra di ogni incidente riportata al suo interno come
+una fascia tenue. Una frase sotto il grafico dice dove la serie ha toccato il
+massimo e se in quel momento era in corso un incidente di un provider — oppure
+che non ce n'era nessuno. Con più serie dichiarate, un menu sul grafico ne
+sceglie una; **Nessuna metrica** nasconde la corsia.
+
+Due sorgenti:
+
+- **Prometheus** — un URL (Prometheus, Thanos, VictoriaMetrics, Mimir) e una
+  query PromQL, letta con `query_range` ogni volta che si disegna il grafico,
+  quindi non si copia nulla. La query deve restituire una sola serie: avvolgila
+  in `sum(...)`. Un token bearer, se il server lo chiede, va in
+  `PROMETHEUS_TOKEN`. L'indirizzo segue le stesse regole in uscita di ogni altro.
+- **File CSV** — `timestamp,valore` per riga, ISO 8601 o secondi Unix,
+  un'intestazione ammessa, fino a 50.000 righe, salvato nel database. Una riga
+  illeggibile viene rifiutata con il suo numero invece di essere saltata.
+
+Al massimo dieci serie. La serie non arriva mai a un notifier né al diff engine:
+è un'immagine con cui confrontarsi, non un segnale.

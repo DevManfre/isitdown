@@ -312,6 +312,12 @@ export function auditWrites(options: AuditOptions) {
       if (res.statusCode >= 400) return;
       try {
         const context: AuditContext = { at: new Date(), actor: actorOf(req, options.actorHeader), method: req.method, route };
+        // Roadmap 6.10: the AI key is a credential like a channel's — recorded
+        // as set or cleared, never with a value.
+        if (route === "/config/ai/key" || route === "/config/ai/cli-token") {
+          recordChanges(db, [{ kind: "credential", target: "ai", field: route.slice("/config/ai/".length), before: null, after: req.method === "DELETE" ? "cleared" : "set" }], context);
+          return;
+        }
         const secrets = SECRETS_ROUTE.exec(route);
         if (secrets !== null) {
           const channel = secrets[1] as string;

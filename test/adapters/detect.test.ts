@@ -93,6 +93,16 @@ test("an Uptime.com page on its own domain is recognised by the payload it rende
   });
 });
 
+test("a Datadog status page recognised by the config document it renders from", async () => {
+  resetValidators();
+  const config = JSON.stringify({ domainPrefix: "dnsimple-status", sourceDatacenter: "us1", components: [], incidents: [] });
+  await withServer(serve({ "/config.json": config }), async (baseUrl) => {
+    const detected = await detectAdapter(baseUrl, ctx);
+    assert.equal(detected.adapter, "datadog");
+    assert.equal(detected.baseUrl, baseUrl);
+  });
+});
+
 test("a page that only publishes a feed hands back the feed's own url", async () => {
   resetValidators();
   const feed = '<?xml version="1.0"?><rss version="2.0"><channel><title>Status</title></channel></rss>';

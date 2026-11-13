@@ -1247,3 +1247,71 @@ export interface CoincidenceReport {
   days: number;
   pairs: CoincidentPair[];
 }
+
+/** `GET /config/ai` — roadmap 6.10. Never carries the key itself. */
+export type AiProvider = "off" | "anthropic" | "openai" | "claude-cli";
+
+/** `GET /config/ai/models` — what the model menu offers for the chosen provider. */
+export interface AiModelList {
+  models: { id: string; label: string }[];
+  /** Why the live list could not be read; `models` is then the fallback. */
+  error?: string;
+}
+
+export interface AiCredential {
+  envVar: string;
+  set: boolean;
+  /** True only when the dashboard saved it — and so can clear it. */
+  saved: boolean;
+}
+
+export interface AiSettingsResponse {
+  provider: AiProvider;
+  model: string;
+  baseUrl: string;
+  /** What a blank model means, per provider; empty where there is no default. */
+  defaults: Record<Exclude<AiProvider, "off">, string>;
+  key: AiCredential;
+  /** `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, for Local CLI in a container. */
+  cliToken: AiCredential;
+  /** Whether a `claude` command is on the server's PATH. */
+  claudeCli: boolean;
+}
+
+/** `POST /incidents/:p/:i/summary` — roadmap 6.10. */
+export interface IncidentSummary {
+  summary: string;
+  model: string;
+  /** How many provider updates it was written from. */
+  updates: number;
+  generatedAt: string;
+}
+
+/** One of the operator's own metrics — roadmap 6.11. */
+export interface OperatorSeries {
+  id: number;
+  name: string;
+  unit: string;
+  source: "prometheus" | "csv";
+  url: string | null;
+  query: string | null;
+  points: number;
+  createdAt: string;
+}
+
+export interface SeriesPoint {
+  at: string;
+  value: number;
+}
+
+/** `GET /series/:id` — one series over a window, already thinned. */
+export interface SeriesReading {
+  series: OperatorSeries;
+  from: string;
+  to: string;
+  points: SeriesPoint[];
+}
+
+export type NewOperatorSeries =
+  | { source: "prometheus"; name: string; unit: string; url: string; query: string }
+  | { source: "csv"; name: string; unit: string; csv: string };

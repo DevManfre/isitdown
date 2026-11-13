@@ -126,6 +126,14 @@ test("fields that exist only while a maintenance or an incident is open are not 
   const cstate = { id: "civo", adapter: "cstate" };
   assert.equal(judge(cstate, { captured: [json("https://x/index.json", index)], fixtures: only("cstate", "index.json") }).outcome, "ok");
 
+  // The fixture is DNSimple's page, which groups its components; Datadog's own
+  // page groups none, and Datadog's own page publishes `maintenances: null`.
+  const config = read("datadog", "operational.json");
+  config.components = config.components.filter((component: { type: string }) => component.type !== "ComponentGroup");
+  config.maintenances = null;
+  const datadog = { id: "datadog", adapter: "datadog" };
+  assert.equal(judge(datadog, { captured: [json("https://x/config.json", config)], fixtures: only("datadog", "operational.json") }).outcome, "ok");
+
   // A Statuspage-compatible host (Recurly) ships no time_zone, resolved_at or
   // shortlink: the adapter reads none of them, or falls back without one.
   const history = read("statuspage", "incidents-history.json");

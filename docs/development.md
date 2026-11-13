@@ -42,7 +42,7 @@ isitdown/
 │   │   ├── aws.adapter.ts              AWS Health's open-events feed, region-scoped
 │   │   ├── gcp.adapter.ts              Google Cloud's incidents.json, current state and history in one
 │   │   ├── azure.adapter.ts            Azure's status feed, with its own closure vocabulary
-│   │   ├── betterstack · instatus · cachet · cstate · openstatus · statusio · upptime · uptimekuma · uptimecom · sorry · githubactions   other hosted status-page products, one `.adapter.ts` each
+│   │   ├── betterstack · instatus · cachet · cstate · datadog · openstatus · statusio · upptime · uptimekuma · uptimecom · sorry · githubactions   other hosted status-page products, one `.adapter.ts` each
 │   │   ├── http · tcp · dns · icmp · imap · json · html · docker · registry · sequence · watchdog   probes of things that publish no status page, one `.adapter.ts` each
 │   │   ├── detect.ts                   which adapter reads a given URL (`POST /config/services/detect`)
 │   │   ├── plugins.ts                  adapter plugins loaded from a directory (§3.14)

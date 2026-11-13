@@ -5,6 +5,7 @@ import { azureAdapter } from "./azure.adapter.ts";
 import { betterStackAdapter } from "./betterstack.adapter.ts";
 import { cachetAdapter } from "./cachet.adapter.ts";
 import { cStateAdapter } from "./cstate.adapter.ts";
+import { datadogAdapter } from "./datadog.adapter.ts";
 import { dnsAdapter } from "./dns.adapter.ts";
 import { dockerAdapter } from "./docker.adapter.ts";
 import { gcpAdapter } from "./gcp.adapter.ts";
@@ -64,6 +65,7 @@ export const adapters: Record<string, Adapter> = {
   [openStatusAdapter.id]: openStatusAdapter,
   [sorryAdapter.id]: sorryAdapter,
   [cStateAdapter.id]: cStateAdapter,
+  [datadogAdapter.id]: datadogAdapter,
 };
 
 /**
@@ -149,6 +151,7 @@ const AUTHENTICATED_READERS = new Set([
   openStatusAdapter.id,
   sorryAdapter.id,
   cStateAdapter.id,
+  datadogAdapter.id,
   uptimeComAdapter.id,
 ]);
 

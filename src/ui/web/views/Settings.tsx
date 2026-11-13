@@ -15,6 +15,7 @@ import { ServicesSection } from "@/components/settings/ServicesSection.tsx";
 import { RemovedSection } from "@/components/settings/RemovedSection.tsx";
 import { EngineSection } from "@/components/settings/EngineSection.tsx";
 import { DataSection } from "@/components/settings/DataSection.tsx";
+import { AiSection } from "@/components/settings/AiSection.tsx";
 import {
   SettingsChromeProvider,
   SettingsToolbar,
@@ -143,6 +144,8 @@ function SettingsView() {
         )}
 
         {open === "data" && <DataSection config={config} storage={storage} />}
+
+        {open === "ai" && <AiSection />}
 
         {open === "appearance" && <AppearanceSection preferences={preferences} />}
 

@@ -956,3 +956,75 @@ export function usePushMutations() {
     }),
   };
 }
+
+/**
+ * Settings → AI implementation (roadmap 6.10). Never throws: the incident page
+ * reads it only to decide whether to offer a summary, and a server from before
+ * the feature must leave that page standing.
+ */
+export const useAiSettings = () =>
+  useQuery({ queryKey: ["ai-settings"], queryFn: api.getAiSettings, throwOnError: false, retry: false });
+
+/**
+ * The model menu's choices. Keyed by provider and base URL, so switching either
+ * asks again; the answer may come from the provider, so it is not refetched on
+ * a timer.
+ */
+export const useAiModels = (provider: string, baseUrl: string) =>
+  useQuery({
+    queryKey: ["ai-models", provider, baseUrl],
+    queryFn: api.getAiModels,
+    enabled: provider !== "off",
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
+/** The three writes behind the AI section; each answers with the fresh settings. */
+export function useAiMutations() {
+  const client = useQueryClient();
+  const store = (next: Awaited<ReturnType<typeof api.getAiSettings>>) => {
+    client.setQueryData(["ai-settings"], next);
+    // A new key can change what the provider lists (Anthropic's live list).
+    void client.invalidateQueries({ queryKey: ["ai-models"] });
+  };
+  return {
+    patch: useMutation({ mutationFn: api.patchAiSettings, onSuccess: store }),
+    saveCredential: useMutation({
+      mutationFn: ({ id, value }: { id: api.AiCredentialId; value: string }) => api.saveAiCredential(id, value),
+      onSuccess: store,
+    }),
+    clearCredential: useMutation({ mutationFn: api.clearAiCredential, onSuccess: store }),
+  };
+}
+
+/** One summary on request; held in the mutation, not the cache — it is never stored. */
+export const useIncidentSummary = (providerId: string, incidentId: string) =>
+  useMutation({ mutationFn: (locale: string) => api.summarizeIncident(providerId, incidentId, locale) });
+
+/** The operator's declared metrics (roadmap 6.11); cheap, local, no timer of its own beyond the idle one. */
+export const useOperatorSeries = () =>
+  useQuery({ queryKey: ["operator-series"], queryFn: api.getOperatorSeries, throwOnError: false });
+
+/**
+ * One series over the timeline's window. `to` is rounded to the minute by the
+ * caller so the key holds still between renders; a Prometheus read may fail,
+ * which the lane shows in place rather than taking the card down.
+ */
+export const useSeriesReading = (id: number | undefined, from: string, to: string) =>
+  useQuery({
+    queryKey: ["series", id, from, to],
+    queryFn: () => api.getSeriesReading(id as number, from, to),
+    enabled: id !== undefined,
+    throwOnError: false,
+    retry: false,
+    staleTime: 60_000,
+  });
+
+export function useOperatorSeriesMutations() {
+  const client = useQueryClient();
+  const refresh = () => client.invalidateQueries({ queryKey: ["operator-series"] });
+  return {
+    add: useMutation({ mutationFn: api.addOperatorSeries, onSuccess: refresh }),
+    remove: useMutation({ mutationFn: api.deleteOperatorSeries, onSuccess: refresh }),
+  };
+}
