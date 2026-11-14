@@ -1,0 +1,74 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Dependency update policy — roadmap 13.7, written up in docs/development.md §9.7. Every PR targets dev and has to pass the whole CI suite (typecheck, unit + coverage, integration, bundle budget, visual baselines) before anyone merges it; nothing auto-merges.",
+  "extends": ["config:recommended", ":disableDependencyDashboard"],
+  "baseBranchPatterns": ["dev"],
+  "timezone": "Europe/Rome",
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "automerge": false,
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "prConcurrentLimit": 6,
+  "semanticCommits": "disabled",
+  "commitMessagePrefix": "⬆️ DEPS -",
+  "commitMessageAction": "bump",
+  "commitMessageTopic": "{{depName}}",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"],
+    "commitMessageAction": "refresh",
+    "commitMessageTopic": "the lockfile"
+  },
+  "vulnerabilityAlerts": {
+    "schedule": ["at any time"],
+    "minimumReleaseAge": null
+  },
+  "packageRules": [
+    {
+      "description": "devDependency patches and minors: one weekly PR for the lot.",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "devDependencies (non-major)",
+      "groupSlug": "dev-non-major"
+    },
+    {
+      "description": "The dashboard's stack moves together: a Vite major breaks Vitest and the React plugin, a Tailwind major breaks its Vite plugin, tailwind-merge and every shadcn primitive. Majors still get their own PR, separate from the minors (separateMajorMinor).",
+      "matchPackageNames": [
+        "react",
+        "react-dom",
+        "@types/react",
+        "@types/react-dom",
+        "vite",
+        "@vitejs/plugin-react",
+        "vitest",
+        "@vitest/coverage-v8",
+        "tailwindcss",
+        "@tailwindcss/vite",
+        "tailwind-merge",
+        "shadcn",
+        "radix-ui"
+      ],
+      "groupName": "dashboard stack",
+      "groupSlug": "dashboard-stack"
+    },
+    {
+      "description": "GitHub Actions patches and minors in one PR; a major (checkout v5 → v6) gets its own.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "GitHub Actions (non-major)",
+      "groupSlug": "actions-non-major"
+    },
+    {
+      "description": "A Node major is a deliberate move with a checklist (docs/development.md §9.7), never a bot PR: .nvmrc, the Dockerfile's node:<major>-alpine, engines and @types/node change together, by hand.",
+      "matchDepNames": ["node", "@types/node"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "engines.node is the floor npm enforces (engine-strict); it moves with the Node major, not on its own.",
+      "matchDepTypes": ["engines"],
+      "enabled": false
+    }
+  ]
+}

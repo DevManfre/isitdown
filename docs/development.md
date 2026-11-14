@@ -598,10 +598,15 @@ A release is a tag. `package.json` stays `private` (nothing is published to
 npm) but its `version` is the single source of truth:
 
 ```bash
-npm version minor          # preversion runs typecheck + both test suites first,
-                           # then the commit and the vX.Y.Z tag are created
-git push --follow-tags
+npm pkg set version=X.Y.Z  # then the same version into package-lock.json, by hand
+git commit -am "🔖 RELEASE - bump the version to X.Y.Z"
 ```
+
+`npm version` does not work in this repo: it fails after it has already written
+the new version, so a retry bumps twice. Bump `package.json` and
+`package-lock.json` (`version` and `packages[""].version`) by hand. The
+`release-flow` skill has the whole sequence, from the bump on `dev` through the
+pull request into `main` to the tag.
 
 Pushing the tag runs `.github/workflows/release.yml`, which first waits for CI's
 `verify` check on the tagged commit (a tag push does not trigger CI itself, so
@@ -626,3 +631,54 @@ commit dump. Preview it for any range before tagging:
 npm run release-notes -- v0.1.0 HEAD
 ```
 - Commits: `<emoji> <TITLE> - <description>`, English, gitmoji.
+
+### 9.7 Dependency and Node updates
+
+Roadmap 13.7. Dependencies move in small, regular steps, each one through the
+same gate as any other change, so that no upgrade ever has to be a project.
+
+**Renovate opens the pull requests** (`renovate.json`, which needs the Renovate
+GitHub app installed on the repository). They target `dev`, arrive on Monday
+mornings (Europe/Rome), and nothing merges itself: a PR is merged by hand once
+the full CI run is green. That run is typecheck and lint, unit tests under the
+coverage floor, integration, the bundle budget and the visual baselines, all
+described in [9.6](#96-releasing). A release younger than three days is not
+proposed (`minimumReleaseAge`), which keeps a package pulled from npm on its
+first day out of the tree. A security fix skips both the schedule and the wait.
+
+| What | How it arrives |
+|---|---|
+| devDependency patches and minors | one weekly PR for all of them |
+| the dashboard stack (React, Vite, Vitest, Tailwind, shadcn, Radix and their plugins) | one group, because a major in one breaks the others; its majors in a separate PR from its minors |
+| any other major | one PR per package |
+| GitHub Actions patches and minors | one weekly PR; a major gets its own |
+| the lockfile's transitive dependencies | a weekly lockfile refresh |
+| a Node major | never by the bot, see below |
+
+A PR that fails `test:visual` is not broken by definition: Tailwind, Radix or
+Recharts can move pixels legitimately. Look at the frames, agree them in a
+separate `✅ VISUAL` commit on the same branch ([9.4](#94-tests-and-checks)),
+and merge once green. A PR that fails anything else waits for a fix, or gets
+closed with the reason in a comment. Renovate then leaves that version alone.
+
+**Node follows the LTS line, a little late on purpose.** IsItDown runs on one
+Node major at a time, always an even-numbered LTS line. The move to the next
+one (Node 26 after Node 24) is due once the new line has been **Active LTS for
+about a month**, so its first LTS point releases have landed and the toolchain
+(Vite, Vitest, Playwright, Biome) has caught up. Node 26 entered Active LTS in
+October 2026, so its move is due from the end of November 2026. The move is
+one commit on `dev` and changes everything that names the major together:
+
+- `.nvmrc`, which CI and the release workflow read through `node-version-file`;
+- `engines.node` in `package.json`, which `engine-strict` turns into a refusal
+  to install on an older Node;
+- both `FROM node:<major>-alpine` lines in the `Dockerfile`;
+- the `@types/node` major.
+
+Before merging, check what the major can break on its own: `node:sqlite` (the
+UI edition's store), type stripping (what `dev:ui` and `dev:docker` run on),
+and the single-file build: `npm run build:sea` produces a binary from whichever
+`node` runs it, and that binary still has to start and poll. Then run the full
+suite, both images (`docker compose --profile ui up -d --build` until `healthy`)
+and a visual run. The Node version is the one bump that changes the published
+images without any package changing, so it goes in a release of its own.

@@ -621,10 +621,15 @@ Una release è un tag. `package.json` resta `private` (niente viene pubblicato s
 npm) ma il suo `version` è l'unica fonte di verità:
 
 ```bash
-npm version minor          # preversion esegue prima typecheck e le due suite di test,
-                           # poi crea il commit e il tag vX.Y.Z
-git push --follow-tags
+npm pkg set version=X.Y.Z  # poi la stessa versione in package-lock.json, a mano
+git commit -am "🔖 RELEASE - bump the version to X.Y.Z"
 ```
+
+`npm version` non funziona in questo repo: fallisce dopo aver già scritto la
+nuova versione, quindi un secondo tentativo fa un doppio bump. Si aggiornano
+`package.json` e `package-lock.json` (`version` e `packages[""].version`) a mano.
+La skill `release-flow` ha la sequenza completa, dal bump su `dev` alla pull
+request verso `main` fino al tag.
 
 Il push del tag avvia `.github/workflows/release.yml`, che prima attende il check
 `verify` della CI sul commit taggato (un push di tag non fa scattare la CI da
@@ -649,3 +654,59 @@ prima di taggare:
 ```bash
 npm run release-notes -- v0.1.0 HEAD
 ```
+
+### 9.7 Aggiornamenti delle dipendenze e di Node
+
+Roadmap 13.7. Le dipendenze si muovono a piccoli passi regolari, ognuno dietro
+lo stesso cancello di qualsiasi altra modifica, così che nessun aggiornamento
+debba mai diventare un progetto.
+
+**Le pull request le apre Renovate** (`renovate.json`, che richiede l'app
+GitHub di Renovate installata sul repository). Puntano a `dev`, arrivano il
+lunedì mattina (Europe/Rome), e niente si fonde da solo: una PR si fonde a mano
+quando il run completo della CI è verde. Quel run comprende typecheck e lint,
+test unitari sotto la soglia di copertura, integrazione, budget del bundle e
+baseline visive, tutto descritto in [9.6](#96-rilasci). Una release più giovane
+di tre giorni non viene proposta (`minimumReleaseAge`), e questo tiene fuori un
+pacchetto ritirato da npm il primo giorno. Una correzione di sicurezza salta sia
+il calendario sia l'attesa.
+
+| Cosa | Come arriva |
+|---|---|
+| patch e minor delle devDependency | una PR settimanale per tutte |
+| lo stack della dashboard (React, Vite, Vitest, Tailwind, shadcn, Radix e i loro plugin) | un gruppo solo, perché una major in uno rompe gli altri; le sue major in una PR separata dalle minor |
+| ogni altra major | una PR per pacchetto |
+| patch e minor delle GitHub Actions | una PR settimanale; una major ha la sua |
+| le dipendenze transitive del lockfile | un refresh settimanale del lockfile |
+| una major di Node | mai dal bot, vedi sotto |
+
+Una PR che fallisce `test:visual` non è rotta per definizione: Tailwind, Radix o
+Recharts possono spostare pixel legittimamente. Si guardano i frame, si
+accettano in un commit `✅ VISUAL` separato sullo stesso branch
+([9.4](#94-test-e-controlli)), e si fonde quando è verde. Una PR che fallisce
+qualsiasi altra cosa aspetta una correzione, oppure si chiude con il motivo in
+un commento. Renovate poi lascia stare quella versione.
+
+**Node segue la linea LTS, di proposito con un po' di ritardo.** IsItDown gira
+su una sola major di Node alla volta, sempre una linea LTS pari. Il passaggio
+alla successiva (Node 26 dopo Node 24) è dovuto quando la nuova linea è
+**Active LTS da circa un mese**, così le sue prime release LTS sono uscite e la
+toolchain (Vite, Vitest, Playwright, Biome) si è adeguata. Node 26 è entrato in
+Active LTS a ottobre 2026, quindi il suo passaggio è dovuto dalla fine di
+novembre 2026. Il passaggio è un solo commit su `dev` e cambia insieme tutto ciò
+che nomina la major:
+
+- `.nvmrc`, che CI e workflow di release leggono tramite `node-version-file`;
+- `engines.node` in `package.json`, che `engine-strict` trasforma nel rifiuto
+  di installare su un Node più vecchio;
+- entrambe le righe `FROM node:<major>-alpine` del `Dockerfile`;
+- la major di `@types/node`.
+
+Prima di fondere, si verifica ciò che la major può rompere da sola:
+`node:sqlite` (lo store dell'edizione UI), il type stripping (su cui girano
+`dev:ui` e `dev:docker`), e la build in un solo file: `npm run build:sea`
+produce un binario dal `node` che la esegue, e quel binario deve ancora partire
+e fare polling. Poi la suite completa, entrambe le immagini
+(`docker compose --profile ui up -d --build` fino a `healthy`) e un run visivo.
+La versione di Node è l'unico bump che cambia le immagini pubblicate senza che
+cambi alcun pacchetto, quindi va in una release a sé.
