@@ -133,3 +133,46 @@ test("no shared module imports an edition-only dependency", async () => {
   }
   assert.deepEqual(offenders, []);
 });
+
+/**
+ * Roadmap 13.2: everything that waits or reads the time in the engine does it
+ * through an injected `Clock`. A core test that sleeps on real timers, or
+ * patches `Date` for the whole process, is negotiating with the wall clock
+ * again — slow, and flaky on a loaded machine. `manualClock` is the way.
+ */
+test("no core test waits on real timers or patches the global clock", async () => {
+  const forbidden: [RegExp, string][] = [
+    [/(?<![.\w])setTimeout\s*\(/, "a real setTimeout"],
+    [/(?<![.\w])setInterval\s*\(/, "a real setInterval"],
+    [/mock\.timers/, "mock.timers"],
+    [/Date\.now\s*=/, "an overwritten Date.now"],
+    [/mock\.method\(\s*Date\b/, "a mocked Date"],
+    [/globalThis\.Date\s*=/, "a replaced Date"],
+  ];
+  const offenders: string[] = [];
+  for (const file of await sourceFiles("test/core")) {
+    if (file.endsWith("boundaries.test.ts")) continue;
+    const lines = (await readFile(file, "utf8")).split("\n");
+    lines.forEach((line, index) => {
+      if (/^\s*(\/\/|\*)/.test(line)) return;
+      for (const [pattern, what] of forbidden) {
+        if (pattern.test(line)) offenders.push(`${file}:${index + 1} uses ${what}`);
+      }
+    });
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test("the scheduler, poller and dispatcher read the time only from their clock", async () => {
+  const offenders: string[] = [];
+  for (const file of ["src/core/scheduler.ts", "src/core/poller.ts", "src/core/notificationDispatcher.ts"]) {
+    const lines = (await readFile(file, "utf8")).split("\n");
+    lines.forEach((line, index) => {
+      if (/^\s*(\/\/|\*)/.test(line)) return;
+      if (/\bDate\.now\s*\(|new Date\(\s*\)|(?<![.\w])(setTimeout|clearTimeout|setInterval)\s*\(/.test(line)) {
+        offenders.push(`${file}:${index + 1}: ${line.trim()}`);
+      }
+    });
+  }
+  assert.deepEqual(offenders, []);
+});

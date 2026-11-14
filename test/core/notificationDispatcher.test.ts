@@ -1,3 +1,4 @@
+import { manualClock, type ManualClock } from "../helpers/manualClock.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createDispatcher, type SentRecord } from "../../src/core/notificationDispatcher.ts";
@@ -70,17 +71,6 @@ function flaky(id: string, failures: number): { notifier: Notifier; calls: numbe
     },
   };
   return channel;
-}
-
-/** Records requested delays instead of waiting, so backoff is asserted not endured. */
-function fakeSleep(): { sleep: (ms: number) => Promise<void>; delays: number[] } {
-  const delays: number[] = [];
-  return {
-    delays,
-    sleep: async (ms: number) => {
-      delays.push(ms);
-    },
-  };
 }
 
 test("each change becomes one payload carrying the change, service and locale", async () => {
@@ -156,7 +146,7 @@ test("a change goes to every enabled channel", async () => {
 test("one failing channel never blocks another and never rejects the dispatch", async () => {
   const broken = recorder("telegram", "throw");
   const healthy = recorder("webhook");
-  const dispatcher = createDispatcher({ logger: silent, sleep: fakeSleep().sleep });
+  const dispatcher = createDispatcher({ logger: silent, clock: manualClock() });
 
   const records = await dispatcher.dispatch([change()], {
     services,
@@ -181,7 +171,7 @@ test("onSent is called once per change and channel, with the outcome", async () 
   const seen: SentRecord[] = [];
   const dispatcher = createDispatcher({
     logger: silent,
-    sleep: fakeSleep().sleep,
+    clock: manualClock(),
     onSent: (record) => {
       seen.push(record);
     },
@@ -393,7 +383,7 @@ test("a send that fails once and then works is one delivered record, not two", a
   const seen: SentRecord[] = [];
   const dispatcher = createDispatcher({
     logger: silent,
-    sleep: fakeSleep().sleep,
+    clock: manualClock(),
     onSent: (record) => {
       seen.push(record);
     },
@@ -417,8 +407,8 @@ test("a send that fails once and then works is one delivered record, not two", a
 
 test("a channel that fails every attempt is a dead letter, with growing backoff", async () => {
   const channel = flaky("telegram", 99);
-  const timer = fakeSleep();
-  const dispatcher = createDispatcher({ logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const dispatcher = createDispatcher({ logger: silent, clock: timer });
 
   const records = await dispatcher.dispatch([change()], {
     services,
@@ -438,8 +428,8 @@ test("a channel that fails every attempt is a dead letter, with growing backoff"
 
 test("a send that works first time is never retried and never waits", async () => {
   const channel = flaky("telegram", 0);
-  const timer = fakeSleep();
-  const dispatcher = createDispatcher({ logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const dispatcher = createDispatcher({ logger: silent, clock: timer });
 
   const records = await dispatcher.dispatch([change()], {
     services,
@@ -456,8 +446,8 @@ test("a send that works first time is never retried and never waits", async () =
 
 test("a delivery test is tried once: the operator is waiting for the answer", async () => {
   const channel = flaky("telegram", 99);
-  const timer = fakeSleep();
-  const dispatcher = createDispatcher({ logger: silent, sleep: timer.sleep });
+  const timer = manualClock();
+  const dispatcher = createDispatcher({ logger: silent, clock: timer });
 
   const record = await dispatcher.sendTest(channel.notifier, services[0]!, "en");
 
@@ -472,7 +462,7 @@ test("a dead letter is logged as an error, its retried attempts only as warnings
   const channel = flaky("telegram", 99);
   const dispatcher = createDispatcher({
     logger: createLogger("warn", (line) => lines.push(line)),
-    sleep: fakeSleep().sleep,
+    clock: manualClock(),
   });
 
   await dispatcher.dispatch([change()], {
@@ -491,13 +481,7 @@ test("a dead letter is logged as an error, its retried attempts only as warnings
  * A clock the test moves itself, so a digest window and the cap's rolling hour
  * are asserted rather than waited out.
  */
-function fakeClock(start = Date.parse("2026-09-08T14:00:00.000Z")): {
-  now: () => number;
-  advance: (ms: number) => void;
-} {
-  let at = start;
-  return { now: () => at, advance: (ms: number) => void (at += ms) };
-}
+const fakeClock = (start = Date.parse("2026-09-08T14:00:00.000Z")): ManualClock => manualClock(start);
 
 const delivery = (over: Partial<DeliveryConfig> = {}): DeliveryConfig => ({
   ...DELIVERY_DEFAULTS,
@@ -509,7 +493,7 @@ test("quiet hours hold back a change under their floor, and let a worse one thro
   // 23:30 in Rome, which is inside 23:00–07:00 there and not inside it in UTC —
   // so a zone read from the wrong place fails this rather than passing by luck.
   const clock = fakeClock(Date.parse("2026-09-08T21:30:00.000Z"));
-  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const ctx = {
     services,
     locale: "en",
@@ -540,7 +524,7 @@ test("quiet hours hold back a change under their floor, and let a worse one thro
 test("outside the window quiet hours change nothing", async () => {
   const channel = recorder("telegram");
   const clock = fakeClock(Date.parse("2026-09-08T10:00:00.000Z"));
-  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const dispatcher = createDispatcher({ logger: silent, clock });
 
   await dispatcher.dispatch([change()], {
     services,
@@ -565,7 +549,7 @@ test("outside the window quiet hours change nothing", async () => {
 test("the hourly cap stops a provider flooding, and the next message says how much it hid", async () => {
   const channel = recorder("telegram");
   const clock = fakeClock();
-  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const ctx = {
     services,
     locale: "en",
@@ -598,7 +582,7 @@ test("the cap counts one change once, however many channels it reaches", async (
   const telegram = recorder("telegram");
   const slack = recorder("slack");
   const clock = fakeClock();
-  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const ctx = {
     services,
     locale: "en",
@@ -621,7 +605,7 @@ test("the cap counts one change once, however many channels it reaches", async (
 test("a change under the digest floor waits for the window, then arrives as one message", async () => {
   const channel = recorder("telegram");
   const clock = fakeClock();
-  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const ctx = {
     services,
     locale: "en",
@@ -652,7 +636,7 @@ test("a change under the digest floor waits for the window, then arrives as one 
 test("a change at or above the digest floor is sent immediately, batch or no batch", async () => {
   const channel = recorder("telegram");
   const clock = fakeClock();
-  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const ctx = {
     services,
     locale: "en",
@@ -680,7 +664,7 @@ test("a change at or above the digest floor is sent immediately, batch or no bat
 test("a digest for a channel switched off mid-window is dropped, not sent elsewhere", async () => {
   const telegram = recorder("telegram");
   const clock = fakeClock();
-  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const shared = {
     services,
     locale: "en",
@@ -711,7 +695,7 @@ test("a digest for a channel switched off mid-window is dropped, not sent elsewh
 test("quiet hours and the digest compose: a held-back change never reaches the batch", async () => {
   const channel = recorder("telegram");
   const clock = fakeClock(Date.parse("2026-09-08T21:30:00.000Z"));
-  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const ctx = {
     services,
     locale: "en",
@@ -965,8 +949,8 @@ test("a channel's template reaches it, and only it", async () => {
 
 test("a digest reads in the batching channel's language, line by line", async () => {
   const channel = recorder("telegram");
-  let now = 0;
-  const dispatcher = createDispatcher({ logger: silent, now: () => now });
+  const clock = manualClock(0);
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const delivery: DeliveryConfig = {
     ...DELIVERY_DEFAULTS,
     digest: { enabled: true, windowMinutes: 1, immediateFloor: "major_outage" },
@@ -984,7 +968,7 @@ test("a digest reads in the batching channel's language, line by line", async ()
   await dispatcher.dispatch([change()], ctx);
   assert.equal(channel.seen.length, 0);
 
-  now += 61_000;
+  clock.advance(61_000);
   await dispatcher.dispatch([], ctx);
 
   const [payload] = channel.seen;
@@ -1036,7 +1020,7 @@ const escalationPolicy = (over: Partial<DeliveryConfig["escalation"]> = {}): Del
 });
 
 function escalationHarness(over: { acked?: boolean; inTrouble?: boolean; delivery?: DeliveryConfig } = {}) {
-  let at = Date.parse("2026-08-19T14:00:00.000Z");
+  const clock = manualClock(Date.parse("2026-08-19T14:00:00.000Z"));
   const state = { acked: over.acked ?? false, inTrouble: over.inTrouble ?? true, troubleLookupFails: false };
   const primary = recorder("telegram");
   const escalation = recorder("pushover");
@@ -1044,8 +1028,7 @@ function escalationHarness(over: { acked?: boolean; inTrouble?: boolean; deliver
   const fleet = services.map((service) => ({ ...service }));
   const dispatcher = createDispatcher({
     logger: silent,
-    now: () => at,
-    sleep: async () => {},
+    clock,
     escalation: {
       isAcked: async () => state.acked,
       inTrouble: async () => {
@@ -1068,7 +1051,7 @@ function escalationHarness(over: { acked?: boolean; inTrouble?: boolean; deliver
     primary,
     escalation,
     run,
-    advance: (minutes: number) => void (at += minutes * 60_000),
+    advance: (minutes: number) => clock.advance(minutes * 60_000),
     mute: () => void (fleet[0]!.mutedUntil = "2999-01-01T00:00:00.000Z"),
   };
 }
@@ -1184,11 +1167,11 @@ test("a muted provider is not escalated, and the escalation is off unless it was
 test("an escalation channel that is not enabled says so in the log instead of vanishing", async () => {
   const lines: string[] = [];
   const logger = createLogger("warn", (line: string) => void lines.push(line));
-  let at = Date.parse("2026-08-19T14:00:00.000Z");
+  const clock = manualClock(Date.parse("2026-08-19T14:00:00.000Z"));
   const primary = recorder("telegram");
   const dispatcher = createDispatcher({
     logger,
-    now: () => at,
+    clock,
     escalation: { isAcked: async () => false, inTrouble: async () => true },
   });
   const ctx = {
@@ -1200,7 +1183,7 @@ test("an escalation channel that is not enabled says so in the log instead of va
     delivery: escalationPolicy({ channel: "pushover" }),
   };
   await dispatcher.dispatch([outage()], ctx);
-  at += 20 * 60_000;
+  clock.advance(20 * 60_000);
   await dispatcher.dispatch([], ctx);
   assert.ok(lines.some((line) => /escalat/i.test(line) && /pushover/.test(line)), lines.join("\n"));
 });
@@ -1220,10 +1203,10 @@ test("the escalated message says it was not taken in charge, in the channel's ow
 test("without a way to ask who has taken it in charge, an escalation that was asked for is refused, not guessed", async () => {
   const lines: string[] = [];
   const logger = createLogger("warn", (line: string) => void lines.push(line));
-  let at = Date.parse("2026-08-19T14:00:00.000Z");
+  const clock = manualClock(Date.parse("2026-08-19T14:00:00.000Z"));
   const primary = recorder("telegram");
   const escalation = recorder("pushover");
-  const dispatcher = createDispatcher({ logger, now: () => at });
+  const dispatcher = createDispatcher({ logger, clock });
   const ctx = {
     services,
     locale: "en",
@@ -1233,7 +1216,7 @@ test("without a way to ask who has taken it in charge, an escalation that was as
     delivery: escalationPolicy(),
   };
   await dispatcher.dispatch([outage()], ctx);
-  at += 60 * 60_000;
+  clock.advance(60 * 60_000);
   await dispatcher.dispatch([], ctx);
   assert.equal(escalation.seen.length, 0);
   assert.ok(lines.some((line) => /escalat/i.test(line)), "the refusal is said out loud");
@@ -1256,7 +1239,7 @@ function channelHealthHarness(delivery: DeliveryConfig = channelHealthPolicy()) 
     },
   };
   const healthy = recorder("telegram");
-  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+  const dispatcher = createDispatcher({ logger: silent, clock: manualClock() });
   const ctx = {
     services,
     locale: "en",
@@ -1315,14 +1298,14 @@ test("a failing channel is not reported while the feature is off", async () => {
 });
 
 test("quiet hours hold the report back, and it goes out once they are over", async () => {
-  let at = Date.parse("2026-08-19T02:00:00.000Z");
+  const clock = manualClock(Date.parse("2026-08-19T02:00:00.000Z"));
   const delivery: DeliveryConfig = {
     ...channelHealthPolicy(2),
     quietHours: { enabled: true, start: "23:00", end: "07:00", timeZone: "UTC", minSeverity: "major_outage" },
   };
   const broken: Notifier = { id: "webhook", send: async () => Promise.reject(new Error("HTTP 500")) };
   const healthy = recorder("telegram");
-  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {}, now: () => at });
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const run = (changes: StatusChange[]) =>
     dispatcher.dispatch(changes, {
       services,
@@ -1337,7 +1320,7 @@ test("quiet hours hold the report back, and it goes out once they are over", asy
   await run([change({ currentStatus: "major_outage" })]);
   assert.equal(told(healthy.seen).length, 0, "held: a broken webhook is not worth waking anybody");
 
-  at = Date.parse("2026-08-19T08:00:00.000Z");
+  clock.setNow(Date.parse("2026-08-19T08:00:00.000Z"));
   await run([]);
   assert.equal(told(healthy.seen).length, 1);
 });
@@ -1358,7 +1341,7 @@ test("a recipient's channels collapse into its preferred one", async () => {
   const telegram = recorder("telegram");
   const discord = recorder("discord");
   const webhook = recorder("webhook");
-  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+  const dispatcher = createDispatcher({ logger: silent, clock: manualClock() });
 
   const records = await dispatcher.dispatch([change()], {
     services,
@@ -1378,7 +1361,7 @@ test("a recipient's channels collapse into its preferred one", async () => {
 test("a preferred channel that fails for good hands the message to the next", async () => {
   const telegram = recorder("telegram", "throw");
   const discord = recorder("discord");
-  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+  const dispatcher = createDispatcher({ logger: silent, clock: manualClock() });
 
   const records = await dispatcher.dispatch([change()], {
     services,
@@ -1403,7 +1386,7 @@ test("a preferred channel that fails for good hands the message to the next", as
 test("a recipient only falls back onto channels the rule reached", async () => {
   const telegram = recorder("telegram", "throw");
   const discord = recorder("discord");
-  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+  const dispatcher = createDispatcher({ logger: silent, clock: manualClock() });
 
   await dispatcher.dispatch([change()], {
     services,
@@ -1418,10 +1401,10 @@ test("a recipient only falls back onto channels the rule reached", async () => {
 });
 
 test("a recipient's digest goes to its preferred channel only", async () => {
-  let at = Date.parse("2026-08-19T14:00:00.000Z");
+  const clock = manualClock(Date.parse("2026-08-19T14:00:00.000Z"));
   const telegram = recorder("telegram");
   const discord = recorder("discord");
-  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {}, now: () => at });
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const ctx = {
     services,
     locale: "en",
@@ -1432,7 +1415,7 @@ test("a recipient's digest goes to its preferred channel only", async () => {
     delivery: { ...DELIVERY_DEFAULTS, digest: { enabled: true, windowMinutes: 15, immediateFloor: "major_outage" as const } },
   };
   await dispatcher.dispatch([change()], ctx);
-  at += 16 * 60_000;
+  clock.advance(16 * 60_000);
   await dispatcher.dispatch([], ctx);
   assert.equal(telegram.seen.length, 1);
   assert.notEqual(telegram.seen[0]?.digest, undefined);
@@ -1521,7 +1504,7 @@ test("quiet hours still hold a followed incident's update", async () => {
   const telegram = recorder("telegram");
   const dispatcher = createDispatcher({
     logger: silent,
-    now: () => Date.parse("2026-08-19T02:00:00.000Z"),
+    clock: manualClock("2026-08-19T02:00:00.000Z"),
     follows: { isFollowed: async () => true, unfollow: async () => {} },
   });
   await dispatcher.dispatch([change({ kind: "incident_updated", incident, currentStatus: "degraded" })], {
@@ -1565,7 +1548,7 @@ test("a message reference that cannot be saved does not resend a delivered messa
   const dispatcher = createDispatcher({
     logger: silent,
     messageRefs: refs,
-    sleep: async () => {},
+    clock: manualClock(),
     onSent: (record) => {
       sent.push(record);
     },
@@ -1598,7 +1581,7 @@ test("a delivery that throws before it can try is logged and recorded, not dropp
   const dispatcher = createDispatcher({
     logger: createLogger("error", (line) => lines.push(line)),
     messageRefs: refs,
-    sleep: async () => {},
+    clock: manualClock(),
     onSent: (record) => {
       sent.push(record);
     },
@@ -1753,7 +1736,7 @@ function coalescing(windowMinutes = 2): {
   return {
     channel,
     clock,
-    dispatcher: createDispatcher({ logger: silent, now: clock.now }),
+    dispatcher: createDispatcher({ logger: silent, clock }),
     ctx: {
       services,
       locale: "en",
@@ -1854,7 +1837,7 @@ test("without the policy every update is sent as it arrives", async () => {
 test("a known outage sends further updates to the digest and lets a resolution through", async () => {
   const channel = recorder("telegram");
   const clock = fakeClock();
-  const dispatcher = createDispatcher({ logger: silent, now: clock.now });
+  const dispatcher = createDispatcher({ logger: silent, clock });
   const ctx = {
     services,
     locale: "en",
@@ -1909,7 +1892,7 @@ function onCallHarness(over: Partial<DeliveryConfig["onCall"]> = {}) {
   const bo = recorder("bo-telegram");
   const boMail = recorder("bo-mail");
   const team = recorder("team");
-  const dispatcher = createDispatcher({ logger: silent, now: () => MONDAY_WEEK_2 });
+  const dispatcher = createDispatcher({ logger: silent, clock: manualClock(MONDAY_WEEK_2) });
   const ctx = {
     services,
     locale: "en",
@@ -1971,7 +1954,7 @@ const testChange = (channel: string): StatusChange => ({
 test("a routine test reaches only the channel it tests, and says it is a test", async () => {
   const a = recorder("telegram");
   const b = recorder("slack");
-  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+  const dispatcher = createDispatcher({ logger: silent, clock: manualClock() });
   const records = await dispatcher.dispatch([testChange("telegram"), testChange("slack")], {
     services,
     locale: "en",
@@ -1989,7 +1972,7 @@ test("a routine test reaches only the channel it tests, and says it is a test", 
 test("one failed routine test is already a broken channel, and the others are told", async () => {
   const broken = recorder("webhook", "throw");
   const healthy = recorder("telegram");
-  const dispatcher = createDispatcher({ logger: silent, sleep: async () => {} });
+  const dispatcher = createDispatcher({ logger: silent, clock: manualClock() });
   await dispatcher.dispatch([testChange("webhook"), testChange("telegram")], {
     services,
     locale: "en",
@@ -2001,4 +1984,87 @@ test("one failed routine test is already a broken channel, and the others are to
   const alerts = healthy.seen.filter((payload) => payload.change.kind === "channel_failing");
   assert.equal(alerts.length, 1);
   assert.equal(alerts[0]?.change.channel?.id, "webhook");
+});
+
+/*
+ * Roadmap 13.2: the awkward hours, now that the clock can be stood on them.
+ */
+
+const quietRome = delivery({
+  quietHours: { enabled: true, start: "23:00", end: "07:00", timeZone: "Europe/Rome", minSeverity: "major_outage" },
+});
+
+// Each instant is chosen so a fixed offset gets it wrong: the zone's rules for
+// that night, not last week's offset, decide whether 07:00 has come.
+const DST_CASES: { name: string; at: string; quiet: boolean }[] = [
+  { name: "the morning before spring forward, 06:30 CET", at: "2026-03-28T05:30:00.000Z", quiet: true },
+  { name: "spring-forward morning, 07:30 CEST — a fixed +1 would read 06:30", at: "2026-03-29T05:30:00.000Z", quiet: false },
+  { name: "spring-forward night, 03:30 CEST — the hour that never existed has passed", at: "2026-03-29T01:30:00.000Z", quiet: true },
+  { name: "fall-back morning, 06:30 CET — a fixed +2 would read 07:30", at: "2026-10-25T05:30:00.000Z", quiet: true },
+  { name: "fall-back morning, 07:30 CET", at: "2026-10-25T06:30:00.000Z", quiet: false },
+  { name: "the repeated 02:30, second time round, is still the night", at: "2026-10-25T01:30:00.000Z", quiet: true },
+];
+
+for (const c of DST_CASES) {
+  test(`quiet hours across the clock change in Rome: ${c.name}`, async () => {
+    const channel = recorder("telegram");
+    const dispatcher = createDispatcher({ logger: silent, clock: manualClock(c.at) });
+
+    await dispatcher.dispatch([change({ currentStatus: "degraded", at: c.at })], {
+      services,
+      locale: "en",
+      notifiers: [channel.notifier],
+      rules: [CATCH_ALL_RULE],
+      knownChannelIds: KNOWN,
+      delivery: quietRome,
+    });
+
+    assert.equal(channel.seen.length, c.quiet ? 0 : 1, c.quiet ? "held back: it is still night in Rome" : "sent: morning has come in Rome");
+  });
+}
+
+test("a digest window that opens before midnight closes after it, as one message", async () => {
+  const channel = recorder("telegram");
+  const clock = manualClock("2026-12-31T23:52:00.000Z");
+  const dispatcher = createDispatcher({ logger: silent, clock });
+  const ctx = {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+    delivery: delivery({ digest: { enabled: true, windowMinutes: 15, immediateFloor: "major_outage" } }),
+  };
+
+  await dispatcher.dispatch([change({ currentStatus: "degraded", at: "2026-12-31T23:52:00.000Z" })], ctx);
+  clock.setNow("2027-01-01T00:03:00.000Z");
+  await dispatcher.dispatch([change({ currentStatus: "partial_outage", at: "2027-01-01T00:03:00.000Z" })], ctx);
+  assert.deepEqual(channel.seen, [], "the window is still collecting across the new day");
+
+  clock.setNow("2027-01-01T00:06:59.000Z");
+  await dispatcher.dispatch([], ctx);
+  assert.deepEqual(channel.seen, [], "a second short of fifteen minutes is not fifteen minutes");
+
+  clock.advance(1_000);
+  await dispatcher.dispatch([], ctx);
+  assert.equal(channel.seen.length, 1, "one message for a window that straddles midnight");
+  assert.equal(channel.seen[0]?.digest?.items.length, 2);
+});
+
+test("a retried send waits its backoff on the clock, so the dead letter is stamped after it", async () => {
+  const channel = flaky("telegram", 99);
+  const clock = manualClock("2026-09-08T14:00:00.000Z");
+  const dispatcher = createDispatcher({ logger: silent, clock });
+
+  const records = await dispatcher.dispatch([change()], {
+    services,
+    locale: "en",
+    notifiers: [channel.notifier],
+    rules: [CATCH_ALL_RULE],
+    knownChannelIds: KNOWN,
+  });
+
+  assert.equal(clock.delays.length, 2, "two waits between three attempts");
+  const waited = clock.delays.reduce((sum, ms) => sum + ms, 0);
+  assert.equal(records[0]?.sentAt, new Date(Date.parse("2026-09-08T14:00:00.000Z") + waited).toISOString());
 });
