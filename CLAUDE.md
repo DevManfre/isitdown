@@ -49,7 +49,7 @@ npm run fake-provider                               # a status page to break by 
 but they put the dashboard on different ports, and mixing them up is the
 easiest way to stare at a stale page:
 
-- `npm run dev:ui` (local) runs the Express server on **:3000** via Node 24's
+- `npm run dev:ui` (local) runs the Express server on **:3000** via Node 26's
   load-time type stripping (`node --watch` restarts it on a `.ts` change) *and*
   a Vite dev server on **:5173** with HMR, which proxies `/status`, `/config`,
   … back to :3000. The dashboard itself lives on **`http://localhost:5173`**
@@ -145,7 +145,7 @@ npm run test:visual      # every view, both themes, both locales, against
                           # test/visual/baseline/ (needs a fresh build:ui)
 ```
 
-Requires Node 24 (`.nvmrc`); `npm install` refuses an older one.
+Requires Node 26 (`.nvmrc`); `npm install` refuses an older one.
 
 - New adapters need fixture JSON files under `test/fixtures/<provider>/` — never hit a live provider endpoint in tests.
 - New diff-engine behavior needs a table-driven test case added to the existing suite (no change / status change / new incident / incident resolved).

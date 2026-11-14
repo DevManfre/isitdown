@@ -159,7 +159,7 @@ isitdown/
 ├── docker-compose.dev.yml             dev override: UI edition live from src/, Vite watch-builds the bundle
 ├── config.example.yml                 tracked template; config.yml is git-ignored
 ├── .env.example                       secret variable names, never values
-├── .nvmrc  .npmrc                     pins Node 24 and makes an older one fail loudly
+├── .nvmrc  .npmrc                     pins Node 26 and makes an older one fail loudly
 ├── tsconfig.json                      server TypeScript
 ├── tsconfig.light.json                the Light build: excludes src/ui
 ├── tsconfig.cli.json                   the terminal client build: src/core/i18n and src/cli only
@@ -180,7 +180,7 @@ interfaces instead. A test enforces this, including the edition-only dependencie
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Runtime | Node.js 24 | Required: the built-in SQLite driver and native TypeScript type stripping both need it. |
+| Runtime | Node.js 26 | Required: the built-in SQLite driver and native TypeScript type stripping both need it. |
 | Language | TypeScript, strict | Plus `erasableSyntaxOnly` and `rewriteRelativeImportExtensions`, so `tsc` emits real `.js` while `node --test` runs the `.ts` sources directly. |
 | HTTP client | global `fetch` | Already in the runtime. |
 | Scheduling | `setTimeout`, re-armed with jitter | A slow cycle delays the next instead of overlapping. |
@@ -193,7 +193,7 @@ interfaces instead. A test enforces this, including the edition-only dependencie
 | Client routing | `react-router` 8, hash-based | Path-based routing was unavailable: `/incidents/:providerId/:incidentId` is already an API endpoint. |
 | Client i18n | `react-i18next` | Flat catalogs, single-brace interpolation, bundled rather than fetched. |
 | Server state | TanStack Query | 30-second `refetchInterval`, refetch on focus, held while a dialog or a field is in use. |
-| Container | one multi-stage `Dockerfile` | `--target light` / `--target ui`, `node:24-alpine`. |
+| Container | one multi-stage `Dockerfile` | `--target light` / `--target ui`, `node:26-alpine`. |
 
 Runtime dependencies, exhaustively: `zod` and `yaml` (both editions), `express`
 and `web-push` (UI, where the Web Push channel is built). Everything the dashboard uses — React, Vite, Tailwind, shadcn/ui's Radix
@@ -663,16 +663,17 @@ closed with the reason in a comment. Renovate then leaves that version alone.
 
 **Node follows the LTS line, a little late on purpose.** IsItDown runs on one
 Node major at a time, always an even-numbered LTS line. The move to the next
-one (Node 26 after Node 24) is due once the new line has been **Active LTS for
+one (Node 28 after Node 26) is due once the new line has been **Active LTS for
 about a month**, so its first LTS point releases have landed and the toolchain
-(Vite, Vitest, Playwright, Biome) has caught up. Node 26 entered Active LTS in
-October 2026, so its move is due from the end of November 2026. The move is
-one commit on `dev` and changes everything that names the major together:
+(Vite, Vitest, Playwright, Biome) has caught up. The last move, from Node 24
+to Node 26, landed in November 2026 (roadmap 13.13). The move is one commit on
+`dev` and changes everything that names the major together:
 
 - `.nvmrc`, which CI and the release workflow read through `node-version-file`;
 - `engines.node` in `package.json`, which `engine-strict` turns into a refusal
   to install on an older Node;
-- both `FROM node:<major>-alpine` lines in the `Dockerfile`;
+- both `FROM node:<major>-alpine` lines in the `Dockerfile`, and the SEA
+  build's esbuild `target` in `tools/build-sea.mjs`;
 - the `@types/node` major.
 
 Before merging, check what the major can break on its own: `node:sqlite` (the

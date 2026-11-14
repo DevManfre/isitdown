@@ -164,7 +164,7 @@ docker compose --profile ui up -d --build
 
 ### 2.2 Senza Docker
 
-Richiede **Node 24** sia per la build sia per il runtime: `.nvmrc` lo fissa e
+Richiede **Node 26** sia per la build sia per il runtime: `.nvmrc` lo fissa e
 `npm install` rifiuta versioni più vecchie, perché il driver SQLite integrato nel
 runtime e il suo supporto TypeScript nativo sono fondamentali anche in fase di
 build. `build:ui` in più esegue Vite per pacchettizzare la dashboard; `build:light`

@@ -3,7 +3,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d
 #   (or: npm run dev:docker)
 #
-# Node 24 strips the TypeScript types at load time, so the server needs no
+# Node 26 strips the TypeScript types at load time, so the server needs no
 # build step: `src` is mounted read-only and `node --watch` restarts it when a
 # `.ts` file changes. The React dashboard still has a build step — Vite
 # watches `src/ui/web` and rewrites `dist/ui/public` on every save, served at

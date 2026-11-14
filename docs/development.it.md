@@ -152,7 +152,7 @@ isitdown/
 ├── docker-compose.dev.yml             override di sviluppo: edizione UI live da src/, Vite ricompila il bundle in watch
 ├── config.example.yml                 template versionato; config.yml è in .gitignore
 ├── .env.example                       nomi delle variabili dei segreti, mai valori
-├── .nvmrc  .npmrc                     fissano Node 24 e fanno fallire in modo esplicito una versione più vecchia
+├── .nvmrc  .npmrc                     fissano Node 26 e fanno fallire in modo esplicito una versione più vecchia
 ├── tsconfig.json                      TypeScript del server
 ├── tsconfig.light.json                la build Light: esclude src/ui
 ├── tsconfig.cli.json                   la build del client da terminale: solo src/core/i18n e src/cli
@@ -174,7 +174,7 @@ esclusive di un'edizione.
 
 | Livello | Scelta | Note |
 |---|---|---|
-| Runtime | Node.js 24 | Obbligatorio: servono sia il driver SQLite integrato sia lo strip nativo dei tipi TypeScript. |
+| Runtime | Node.js 26 | Obbligatorio: servono sia il driver SQLite integrato sia lo strip nativo dei tipi TypeScript. |
 | Linguaggio | TypeScript, strict | Più `erasableSyntaxOnly` e `rewriteRelativeImportExtensions`, così `tsc` emette `.js` reali mentre `node --test` esegue direttamente i sorgenti `.ts`. |
 | Client HTTP | `fetch` globale | Già nel runtime. |
 | Scheduling | `setTimeout`, riarmato con jitter | Un ciclo lento ritarda il successivo invece di sovrapporsi. |
@@ -187,7 +187,7 @@ esclusive di un'edizione.
 | Client routing | `react-router` 8, basato su hash | Il routing basato su percorso non era disponibile: `/incidents/:providerId/:incidentId` è già un endpoint API. |
 | Client i18n | `react-i18next` | Cataloghi piatti, interpolazione a parentesi singola, incorporati nel bundle invece che recuperati via fetch. |
 | Server state | TanStack Query | `refetchInterval` di 30 secondi, refetch al focus, sospeso mentre un dialogo o un campo è in uso. |
-| Container | un `Dockerfile` multi-stage | `--target light` / `--target ui`, `node:24-alpine`. |
+| Container | un `Dockerfile` multi-stage | `--target light` / `--target ui`, `node:26-alpine`. |
 
 Dipendenze a runtime, in modo esaustivo: `zod` e `yaml` (entrambe le edizioni), `express`
 e `web-push` (UI, dove viene costruito il canale Web Push). Tutto ciò che la dashboard usa — React, Vite, Tailwind, le
@@ -689,17 +689,17 @@ un commento. Renovate poi lascia stare quella versione.
 
 **Node segue la linea LTS, di proposito con un po' di ritardo.** IsItDown gira
 su una sola major di Node alla volta, sempre una linea LTS pari. Il passaggio
-alla successiva (Node 26 dopo Node 24) è dovuto quando la nuova linea è
+alla successiva (Node 28 dopo Node 26) è dovuto quando la nuova linea è
 **Active LTS da circa un mese**, così le sue prime release LTS sono uscite e la
-toolchain (Vite, Vitest, Playwright, Biome) si è adeguata. Node 26 è entrato in
-Active LTS a ottobre 2026, quindi il suo passaggio è dovuto dalla fine di
-novembre 2026. Il passaggio è un solo commit su `dev` e cambia insieme tutto ciò
-che nomina la major:
+toolchain (Vite, Vitest, Playwright, Biome) si è adeguata. L'ultimo passaggio,
+da Node 24 a Node 26, è arrivato a novembre 2026 (roadmap 13.13). Il passaggio è
+un solo commit su `dev` e cambia insieme tutto ciò che nomina la major:
 
 - `.nvmrc`, che CI e workflow di release leggono tramite `node-version-file`;
 - `engines.node` in `package.json`, che `engine-strict` trasforma nel rifiuto
   di installare su un Node più vecchio;
-- entrambe le righe `FROM node:<major>-alpine` del `Dockerfile`;
+- entrambe le righe `FROM node:<major>-alpine` del `Dockerfile`, e il `target`
+  esbuild della build SEA in `tools/build-sea.mjs`;
 - la major di `@types/node`.
 
 Prima di fondere, si verifica ciò che la major può rompere da sola:

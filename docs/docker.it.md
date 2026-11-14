@@ -10,8 +10,8 @@ lo [sviluppo live](development.it.md#93-sviluppo-live) e non viene mai costruito
 `docker compose --profile ui up`.
 
 ```
-builder  node:24-alpine   npm ci (con le devDependencies), tsc, vite build, copia in dist gli asset non-TS
-light    node:24-alpine   dipendenze prod + dist/{core,adapters,notifiers,light,outpost}
+builder  node:26-alpine   npm ci (con le devDependencies), tsc, vite build, copia in dist gli asset non-TS
+light    node:26-alpine   dipendenze prod + dist/{core,adapters,notifiers,light,outpost}
                           VOLUME /app/config /app/data · nessun EXPOSE · nessun server
 dev      FROM builder     mantiene le devDependencies · vite build --watch + node --watch · taggato solo isitdown:dev
 ui       FROM light       + dist/ui (dashboard e cataloghi) · EXPOSE 3000
