@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createScheduler } from "../../src/core/scheduler.ts";
+import { manualClock } from "../helpers/manualClock.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import type { CycleResult, Poller } from "../../src/core/poller.ts";
 import type { ChannelConfig, ConfigSource, RuntimeConfig } from "../../src/core/configSource.interface.ts";
@@ -86,10 +87,11 @@ function fakeDispatcher(): Dispatcher & { batches: StatusChange[][]; locales: st
 /** Jitter is injected so the arming interval is exact in tests. */
 const noJitter = (): number => 0.5;
 
-test("start runs one cycle immediately", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("start runs one cycle immediately", async () => {
+  const clock = manualClock(0);
   const poller = fakePoller();
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
@@ -103,10 +105,11 @@ test("start runs one cycle immediately", async (t) => {
   scheduler.stop();
 });
 
-test("the next cycle fires one interval later", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("the next cycle fires one interval later", async () => {
+  const clock = manualClock(0);
   const poller = fakePoller();
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
@@ -116,21 +119,22 @@ test("the next cycle fires one interval later", async (t) => {
   });
 
   await scheduler.start();
-  t.mock.timers.tick(3 * 60_000 - 1);
+  clock.advance(3 * 60_000 - 1);
   await Promise.resolve();
   assert.equal(poller.calls, 1, "must not fire early");
 
-  t.mock.timers.tick(1);
+  clock.advance(1);
   await scheduler.settled();
   assert.equal(poller.calls, 2);
   scheduler.stop();
 });
 
-test("the configuration is re-read on every cycle, so a changed interval applies without a restart", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("the configuration is re-read on every cycle, so a changed interval applies without a restart", async () => {
+  const clock = manualClock(0);
   const source = fakeConfigSource();
   const poller = fakePoller();
   const scheduler = createScheduler({
+    clock,
     configSource: source,
     poller,
     dispatcher: fakeDispatcher(),
@@ -152,19 +156,19 @@ test("the configuration is re-read on every cycle, so a changed interval applies
       adaptiveIntervalMinutes: 1,
     },
   });
-  t.mock.timers.tick(3 * 60_000);
+  clock.advance(3 * 60_000);
   await scheduler.settled();
   assert.equal(source.loads, 2);
 
   // The new one-minute interval was read on that cycle and governs the next arming.
-  t.mock.timers.tick(60_000);
+  clock.advance(60_000);
   await scheduler.settled();
   assert.equal(poller.calls, 3);
   scheduler.stop();
 });
 
-test("the cycle's changes are handed to the dispatcher with the active locale", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("the cycle's changes are handed to the dispatcher with the active locale", async () => {
+  const clock = manualClock(0);
   const change: StatusChange = {
     kind: "status_change",
     providerId: "github",
@@ -174,6 +178,7 @@ test("the cycle's changes are handed to the dispatcher with the active locale", 
   };
   const dispatcher = fakeDispatcher();
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(baseConfig({ locale: "it" })),
     poller: fakePoller(async () => cycleResult([change])),
     dispatcher,
@@ -188,10 +193,11 @@ test("the cycle's changes are handed to the dispatcher with the active locale", 
   scheduler.stop();
 });
 
-test("a cycle with no changes still runs but dispatches nothing", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("a cycle with no changes still runs but dispatches nothing", async () => {
+  const clock = manualClock(0);
   const dispatcher = fakeDispatcher();
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller: fakePoller(),
     dispatcher,
@@ -205,8 +211,8 @@ test("a cycle with no changes still runs but dispatches nothing", async (t) => {
   scheduler.stop();
 });
 
-test("triggerNow joins an in-flight cycle instead of starting a second one", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("triggerNow joins an in-flight cycle instead of starting a second one", async () => {
+  const clock = manualClock(0);
   let release: (() => void) | undefined;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -216,6 +222,7 @@ test("triggerNow joins an in-flight cycle instead of starting a second one", asy
     return cycleResult();
   });
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
@@ -235,10 +242,11 @@ test("triggerNow joins an in-flight cycle instead of starting a second one", asy
   scheduler.stop();
 });
 
-test("triggerNow outside a cycle runs one on demand", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("triggerNow outside a cycle runs one on demand", async () => {
+  const clock = manualClock(0);
   const poller = fakePoller();
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
@@ -253,8 +261,8 @@ test("triggerNow outside a cycle runs one on demand", async (t) => {
   scheduler.stop();
 });
 
-test("a cycle that throws is logged and the loop keeps running", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("a cycle that throws is logged and the loop keeps running", async () => {
+  const clock = manualClock(0);
   const errors: string[] = [];
   let attempts = 0;
   const poller = fakePoller(async () => {
@@ -263,6 +271,7 @@ test("a cycle that throws is logged and the loop keeps running", async (t) => {
     return cycleResult();
   });
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
@@ -275,17 +284,18 @@ test("a cycle that throws is logged and the loop keeps running", async (t) => {
   assert.equal(errors.length, 1);
   assert.match(errors[0] ?? "", /exploded/);
 
-  t.mock.timers.tick(3 * 60_000);
+  clock.advance(3 * 60_000);
   await scheduler.settled();
   assert.equal(poller.calls, 2, "one bad cycle must not kill the service");
   scheduler.stop();
 });
 
-test("a config source that throws does not kill the loop either", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("a config source that throws does not kill the loop either", async () => {
+  const clock = manualClock(0);
   const errors: string[] = [];
   let loads = 0;
   const scheduler = createScheduler({
+    clock,
     configSource: {
       async load(): Promise<RuntimeConfig> {
         loads += 1;
@@ -302,16 +312,17 @@ test("a config source that throws does not kill the loop either", async (t) => {
 
   await scheduler.start();
   assert.match(errors[0] ?? "", /locked/);
-  t.mock.timers.tick(3 * 60_000);
+  clock.advance(3 * 60_000);
   await scheduler.settled();
   assert.equal(loads, 2);
   scheduler.stop();
 });
 
-test("stop prevents any further cycle", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("stop prevents any further cycle", async () => {
+  const clock = manualClock(0);
   const poller = fakePoller();
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
@@ -322,13 +333,13 @@ test("stop prevents any further cycle", async (t) => {
 
   await scheduler.start();
   scheduler.stop();
-  t.mock.timers.tick(10 * 60_000);
+  clock.advance(10 * 60_000);
   await Promise.resolve();
   assert.equal(poller.calls, 1);
 });
 
-test("jitter keeps the arming delay within ten percent of the interval", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("jitter keeps the arming delay within ten percent of the interval", async () => {
+  const clock = manualClock(0);
   const interval = 3 * 60_000;
   for (const [random, expected] of [
     [() => 0, interval * 0.9],
@@ -336,6 +347,7 @@ test("jitter keeps the arming delay within ten percent of the interval", async (
   ] as const) {
     const poller = fakePoller();
     const scheduler = createScheduler({
+    clock,
       configSource: fakeConfigSource(),
       poller,
       dispatcher: fakeDispatcher(),
@@ -344,20 +356,21 @@ test("jitter keeps the arming delay within ten percent of the interval", async (
       random,
     });
     await scheduler.start();
-    t.mock.timers.tick(expected - 1);
+    clock.advance(expected - 1);
     await Promise.resolve();
     assert.equal(poller.calls, 1, `must not fire before ${expected}ms`);
-    t.mock.timers.tick(1);
+    clock.advance(1);
     await scheduler.settled();
     assert.equal(poller.calls, 2, `must fire at ${expected}ms`);
     scheduler.stop();
   }
 });
 
-test("onCycle receives every cycle result", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("onCycle receives every cycle result", async () => {
+  const clock = manualClock(0);
   const seen: CycleResult[] = [];
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller: fakePoller(),
     dispatcher: fakeDispatcher(),
@@ -370,18 +383,19 @@ test("onCycle receives every cycle result", async (t) => {
   });
 
   await scheduler.start();
-  t.mock.timers.tick(3 * 60_000);
+  clock.advance(3 * 60_000);
   await scheduler.settled();
   assert.equal(seen.length, 2);
   scheduler.stop();
 });
 
-test("notifiers are rebuilt from the channels of each cycle, so enabling one needs no restart", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("notifiers are rebuilt from the channels of each cycle, so enabling one needs no restart", async () => {
+  const clock = manualClock(0);
   const source = fakeConfigSource();
   const seen: ChannelConfig[][] = [];
   const dispatcher = fakeDispatcher();
   const scheduler = createScheduler({
+    clock,
     configSource: source,
     poller: fakePoller(),
     dispatcher,
@@ -399,7 +413,7 @@ test("notifiers are rebuilt from the channels of each cycle, so enabling one nee
   source.current = baseConfig({
     channels: [{ id: "webhook", enabled: true, settings: { url: "https://hooks.example/x" } }],
   });
-  t.mock.timers.tick(3 * 60_000);
+  clock.advance(3 * 60_000);
   await scheduler.settled();
 
   assert.equal(seen.length, 2);
@@ -409,10 +423,11 @@ test("notifiers are rebuilt from the channels of each cycle, so enabling one nee
   scheduler.stop();
 });
 
-test("two sequential manual polls each run a cycle", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("two sequential manual polls each run a cycle", async () => {
+  const clock = manualClock(0);
   const poller = fakePoller();
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
@@ -434,9 +449,10 @@ test("two sequential manual polls each run a cycle", async (t) => {
 // countdown then parks at "0s" until the cycle actually finishes. The four
 // tests below pin the deadline to the timer that will really fire.
 
-test("nextRunAt is null before a cycle has armed anything", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("nextRunAt is null before a cycle has armed anything", async () => {
+  const clock = manualClock(0);
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller: fakePoller(),
     dispatcher: fakeDispatcher(),
@@ -449,9 +465,10 @@ test("nextRunAt is null before a cycle has armed anything", async (t) => {
   scheduler.stop();
 });
 
-test("nextRunAt reports the armed deadline with the jitter that was actually drawn", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+test("nextRunAt reports the armed deadline with the jitter that was actually drawn", async () => {
+  const clock = manualClock(0);
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller: fakePoller(),
     dispatcher: fakeDispatcher(),
@@ -470,9 +487,10 @@ test("nextRunAt reports the armed deadline with the jitter that was actually dra
   scheduler.stop();
 });
 
-test("nextRunAt is null once stopped, because no cycle is coming", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("nextRunAt is null once stopped, because no cycle is coming", async () => {
+  const clock = manualClock(0);
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller: fakePoller(),
     dispatcher: fakeDispatcher(),
@@ -487,10 +505,11 @@ test("nextRunAt is null once stopped, because no cycle is coming", async (t) => 
   assert.equal(scheduler.nextRunAt(), null);
 });
 
-test("a manual poll re-arms, so the next automatic cycle is a full interval after it", async (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"] });
+test("a manual poll re-arms, so the next automatic cycle is a full interval after it", async () => {
+  const clock = manualClock(0);
   const poller = fakePoller();
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
@@ -500,27 +519,26 @@ test("a manual poll re-arms, so the next automatic cycle is a full interval afte
   });
 
   await scheduler.start();
-  t.mock.timers.tick(60_000);
+  clock.advance(60_000);
   await scheduler.triggerNow();
 
-  t.mock.timers.tick(3 * 60_000 - 1);
+  clock.advance(3 * 60_000 - 1);
   await scheduler.settled();
   assert.equal(poller.calls, 2, "the timer armed before the manual poll must not still be standing");
 
-  t.mock.timers.tick(1);
+  clock.advance(1);
   await scheduler.settled();
   assert.equal(poller.calls, 3, "the interval restarts from the manual poll");
   scheduler.stop();
 });
 
-test("no cycle runs before the deadline the dashboard is counting down to", async (t) => {
-  // Date is mocked here, unlike most tests above, because this one compares a
-  // tick against `nextRunAt()` — which the scheduler derives from `Date.now()`
-  // when it arms. With a real clock the milliseconds spent awaiting between
-  // the arm and the measurement shrink `deadline - Date.now()` below the
-  // timer's remaining delay, the final tick(1) lands short, and no cycle runs:
-  // a failure that only appears on a machine slow enough to drift.
-  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+test("no cycle runs before the deadline the dashboard is counting down to", async () => {
+  // The deadline is measured on the scheduler's own clock. With the real one
+  // the milliseconds spent awaiting between the arm and the measurement shrink
+  // `deadline - now` below the timer's remaining delay, the final advance(1)
+  // lands short, and no cycle runs: a failure that only appears on a machine
+  // slow enough to drift.
+  const clock = manualClock(0);
   // Each arm() draws once. A fixed draw hides a leaked timer, because both
   // copies then land on the same millisecond and the second joins the first.
   const draws = [0.5, 0, 1];
@@ -534,6 +552,7 @@ test("no cycle runs before the deadline the dashboard is counting down to", asyn
     return cycleResult();
   });
   const scheduler = createScheduler({
+    clock,
     configSource: fakeConfigSource(),
     poller,
     dispatcher: fakeDispatcher(),
@@ -553,7 +572,7 @@ test("no cycle runs before the deadline the dashboard is counting down to", asyn
     release = resolve;
   });
   const manual = scheduler.triggerNow();
-  t.mock.timers.tick(3 * 60_000);
+  clock.advance(3 * 60_000);
   release?.();
   await manual;
   await scheduler.settled();
@@ -561,17 +580,18 @@ test("no cycle runs before the deadline the dashboard is counting down to", asyn
   assert.equal(poller.calls, 2, "the tick must join the manual cycle rather than run a second one");
 
   const deadline = Date.parse(scheduler.nextRunAt() ?? "");
-  t.mock.timers.tick(deadline - Date.now() - 1);
+  clock.advance(deadline - clock.now() - 1);
   await scheduler.settled();
   assert.equal(poller.calls, 2, "a poll before the published deadline means a second timer is still armed");
 
-  t.mock.timers.tick(1);
+  clock.advance(1);
   await scheduler.settled();
   assert.equal(poller.calls, 3);
   scheduler.stop();
 });
 
 test("the tick follows the shortest interval any provider asked for", async () => {
+  const clock = manualClock(0);
   const configSource = fakeConfigSource(
     baseConfig({
       polling: { intervalMinutes: 30, requestTimeoutSeconds: 8, maxRetries: 3, failureThreshold: 5 },
@@ -595,6 +615,7 @@ test("the tick follows the shortest interval any provider asked for", async () =
     }),
   );
   const scheduler = createScheduler({
+    clock,
     configSource,
     poller: fakePoller(),
     dispatcher: fakeDispatcher(),
@@ -604,7 +625,7 @@ test("the tick follows the shortest interval any provider asked for", async () =
   });
 
   await scheduler.start();
-  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - Date.now();
+  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - clock.now();
   scheduler.stop();
 
   // Two minutes, not thirty: a provider polled every two minutes needs a cycle
@@ -613,6 +634,7 @@ test("the tick follows the shortest interval any provider asked for", async () =
 });
 
 test("the tick follows a probe's cadence in seconds", async () => {
+  const clock = manualClock(0);
   const configSource = fakeConfigSource(
     baseConfig({
       polling: { intervalMinutes: 3, requestTimeoutSeconds: 8, maxRetries: 3, failureThreshold: 5 },
@@ -629,6 +651,7 @@ test("the tick follows a probe's cadence in seconds", async () => {
     }),
   );
   const scheduler = createScheduler({
+    clock,
     configSource,
     poller: fakePoller(),
     dispatcher: fakeDispatcher(),
@@ -638,13 +661,14 @@ test("the tick follows a probe's cadence in seconds", async () => {
   });
 
   await scheduler.start();
-  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - Date.now();
+  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - clock.now();
   scheduler.stop();
 
   assert.ok(armedIn > 15_000 && armedIn <= 20_000, `armed in ${armedIn}ms`);
 });
 
 test("a disabled provider's short interval does not drag the tick down with it", async () => {
+  const clock = manualClock(0);
   const configSource = fakeConfigSource(
     baseConfig({
       polling: { intervalMinutes: 30, requestTimeoutSeconds: 8, maxRetries: 3, failureThreshold: 5 },
@@ -661,6 +685,7 @@ test("a disabled provider's short interval does not drag the tick down with it",
     }),
   );
   const scheduler = createScheduler({
+    clock,
     configSource,
     poller: fakePoller(),
     dispatcher: fakeDispatcher(),
@@ -670,18 +695,20 @@ test("a disabled provider's short interval does not drag the tick down with it",
   });
 
   await scheduler.start();
-  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - Date.now();
+  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - clock.now();
   scheduler.stop();
 
   assert.ok(armedIn > 1_700_000, `armed in ${armedIn}ms`);
 });
 
 test("a poller asking to be run sooner is armed sooner: an incident is watched closely", async () => {
+  const clock = manualClock(0);
   // Roadmap 2.3. The scheduler cannot see which provider is having a bad day —
   // that is stored state, which the poller reads — so it asks, and the shorter
   // of the two answers is what the next cycle is armed for.
   const configSource = fakeConfigSource();
   const scheduler = createScheduler({
+    clock,
     configSource,
     poller: { ...fakePoller(), nextIntervalMinutes: async () => 1 },
     dispatcher: fakeDispatcher(),
@@ -691,7 +718,7 @@ test("a poller asking to be run sooner is armed sooner: an incident is watched c
   });
 
   await scheduler.start();
-  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - Date.now();
+  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - clock.now();
   scheduler.stop();
 
   // One minute, not the configured three.
@@ -699,10 +726,12 @@ test("a poller asking to be run sooner is armed sooner: an incident is watched c
 });
 
 test("a poller asking for a longer cadence than the configuration cannot have it", async () => {
+  const clock = manualClock(0);
   // The operator's interval is a ceiling on how rarely a cycle runs. A stub, an
   // older poller or a bug must not be able to stretch it.
   const configSource = fakeConfigSource();
   const scheduler = createScheduler({
+    clock,
     configSource,
     poller: { ...fakePoller(), nextIntervalMinutes: async () => 240 },
     dispatcher: fakeDispatcher(),
@@ -712,7 +741,7 @@ test("a poller asking for a longer cadence than the configuration cannot have it
   });
 
   await scheduler.start();
-  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - Date.now();
+  const armedIn = Date.parse(scheduler.nextRunAt() ?? "") - clock.now();
   scheduler.stop();
 
   assert.ok(armedIn > 170_000 && armedIn < 190_000, `armed in ${armedIn}ms`);

@@ -20,6 +20,7 @@ isitdown/
 │   │   ├── diffEngine.ts               the sole authority on whether a notification fires
 │   │   ├── notificationDispatcher.ts   the only caller of Notifier.send
 │   │   ├── scheduler.ts                the loop; re-reads config every cycle
+│   │   ├── clock.ts                    the one way the engine reads the time and waits (13.2)
 │   │   ├── http.ts                     the one HTTP read: ETag/Last-Modified revalidation, charset decoding
 │   │   ├── routing.ts · mute.ts · maintenance.ts   who is told, when, and what is silenced (§3.27–3.28)
 │   │   ├── delivery.ts · onCall.ts     the delivery policy and the on-call rotation
@@ -297,6 +298,25 @@ stay at 95% of lines, 88% of branches and 93% of functions, and the dashboard at
 passes and a new subsystem landing with no test of its own drags the total under
 and fails CI. Raise a floor when the suite has genuinely climbed; never lower one
 to make a red run green.
+
+The **diff engine's property test** (roadmap 13.1,
+`test/core/diffEngine.property.test.ts`) runs beside its transition table:
+500 seeded random sequences of readings — incidents opening and closing,
+components, maintenance windows, mutes, unreadable pages — through the same
+`confirmedChanges` gate the poller calls, checking at every step that nothing
+is notified twice, nothing leaks out of a window or a mute, an unchanged page
+says nothing, `unknown` is never a transition, and a recovered page resolves
+every incident. A failure prints its seed and a shrunk sequence;
+`PBT_SEED=<n>` replays it and `PBT_RUNS=<n>` changes how many sequences one run
+tries. A bug it finds also becomes a row in the table.
+
+**Time in tests** (roadmap 13.2) goes through the `Clock` in `src/core/clock.ts`:
+the scheduler, poller and dispatcher take one as `clock`, and a test passes
+`manualClock()` from `test/helpers/manualClock.ts` — `advance(ms)` and
+`setNow(date)` fire due timers in order, `sleep` moves the clock and records
+the wait in `delays`. A guard in `test/core/boundaries.test.ts` fails any core
+test that uses a real `setTimeout`, `t.mock.timers` or a patched `Date`, and
+any `Date.now()` or bare timer back in those three modules.
 
 The **accessibility pass** (roadmap 4.20) rides the visual harness: after each view
 settles, `tools/visual-regression.mjs` injects axe-core and checks WCAG 2.0 and

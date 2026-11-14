@@ -1,4 +1,5 @@
 import type { Recipient, ServiceDefinition } from "./configSource.interface.ts";
+import { systemClock, type Clock } from "./clock.ts";
 import { DELIVERY_DEFAULTS, type DeliveryConfig } from "./delivery.ts";
 import type { Logger } from "./logger.ts";
 import type { MessageRefStore } from "./messageRefStore.interface.ts";
@@ -117,10 +118,12 @@ export interface DispatcherDeps {
   logger: Logger;
   /** Called once per send, success or failure — never once per attempt. The UI edition persists these. */
   onSent?: ((record: SentRecord) => void | Promise<void>) | undefined;
-  /** Injected so tests assert the backoff schedule instead of waiting it out. */
-  sleep?: ((ms: number) => Promise<void>) | undefined;
-  /** Injected so a test can let a digest window and an hour of the cap elapse without waiting. */
-  now?: (() => number) | undefined;
+  /**
+   * Injected so a test asserts the backoff schedule, and lets a digest window
+   * and an hour of the cap elapse, instead of waiting any of them out. The wall
+   * clock when absent.
+   */
+  clock?: Clock | undefined;
   /**
    * Where the id of the message already sent about an incident is kept, so the
    * next update can edit it (roadmap 3.19). Absent means the feature cannot
@@ -259,11 +262,6 @@ function attempt(
 const RETRY_BASE_MS = 1000;
 const RETRY_JITTER_MS = 250;
 
-const realSleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
 /**
  * The only caller of `Notifier.send` in either edition. Its input is the diff
  * engine's output, which is what keeps "should this notify?" answerable in one
@@ -286,8 +284,9 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
       return fallback;
     }
   }
-  const sleep = deps.sleep ?? realSleep;
-  const now = deps.now ?? Date.now;
+  const clock = deps.clock ?? systemClock;
+  const sleep = (ms: number) => clock.sleep(ms);
+  const now = () => clock.now();
   const messageRefs = deps.messageRefs;
   const escalationDeps = deps.escalation;
   const follows = deps.follows;
@@ -399,7 +398,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
             channel: notifier.id,
             kind,
             text,
-            sentAt: new Date().toISOString(),
+            sentAt: new Date(now()).toISOString(),
             ok: true,
             attempts: 1,
           };
@@ -492,7 +491,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         text,
         // Stamped now rather than before the first attempt: this is when the
         // message reached the channel, or when it was given up on.
-        sentAt: new Date().toISOString(),
+        sentAt: new Date(now()).toISOString(),
         ok: failure === undefined,
         attempts,
         ...(failure === undefined ? {} : { error: failure }),
@@ -544,7 +543,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
         channel: context.channel,
         kind: context.kind,
         text: "",
-        sentAt: new Date().toISOString(),
+        sentAt: new Date(now()).toISOString(),
         ok: false,
         attempts: 0,
         error,
@@ -1006,7 +1005,7 @@ export function createDispatcher(deps: DispatcherDeps): Dispatcher {
           providerId: service.id,
           currentStatus: "unknown",
           failureCount: 0,
-          at: new Date().toISOString(),
+          at: new Date(now()).toISOString(),
         },
         service: payloadServiceOf(service),
         locale: message?.locale ?? locale,
