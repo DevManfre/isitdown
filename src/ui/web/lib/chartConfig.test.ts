@@ -8,7 +8,7 @@
 // src/ui/web/css/tokens.test.ts for the precedent.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { AGGREGATE_FILL, COMPARE_CHART, chartConfigFor, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, statusTier, tierColor, tierFill, trimToLatest, worstStatus, worstTier } from "./chartConfig.ts";
+import { AGGREGATE_FILL, COMPARE_CHART, chartConfigFor, evenTicks, severity, STATUS_CHART, statusColor, statusFill, statusLabelKey, statusTier, tierColor, tierFill, trimToLatest, worstStatus, worstTier } from "./chartConfig.ts";
 import en from "@/locales/en.json";
 
 const STATUSES = ["operational", "degraded", "partial_outage", "major_outage", "unknown"] as const;
@@ -223,5 +223,24 @@ describe("tierFill", () => {
     // told apart from an operational one. --status-*-fill is the token
     // declared for a chart mark.
     expect(tierFill("danger")).not.toBe(tierColor("danger"));
+  });
+});
+
+describe("evenTicks", () => {
+  const days = (n: number) =>
+    Array.from({ length: n }, (_, i) => `2026-01-${String(i + 1).padStart(2, "0")}`);
+
+  it("labels both ends of the window and spreads the rest evenly", () => {
+    expect(evenTicks(days(31), 6)).toEqual([
+      "2026-01-01", "2026-01-07", "2026-01-13", "2026-01-19", "2026-01-25", "2026-01-31",
+    ]);
+  });
+
+  it("labels every day when the window is no longer than the count", () => {
+    expect(evenTicks(days(7), 7)).toEqual(days(7));
+  });
+
+  it("has nothing to label on an empty window", () => {
+    expect(evenTicks([], 6)).toEqual([]);
   });
 });

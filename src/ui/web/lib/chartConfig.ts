@@ -332,6 +332,25 @@ export function uptimeDomain(uptimes: (number | null)[]): [number, number] {
 }
 
 /**
+ * The days a day-per-point X axis labels: both ends of the window and
+ * `count - 2` more spread evenly between them.
+ *
+ * Left to `minTickGap`, Recharts picks the labels by measuring each one's
+ * rendered width, so a font that finished loading a frame later moved every
+ * middle label by a day — the History trend chart's visual baseline flapped
+ * between Jul 17 and Jul 18 on identical code. Choosing them from the days
+ * alone makes the axis a function of the data, not of the text metrics.
+ */
+export function evenTicks(days: string[], count: number): string[] {
+  if (days.length <= count) return days;
+  const last = days.length - 1;
+  return Array.from(
+    { length: count },
+    (_, i) => days[Math.round((i * last) / (count - 1))] as string,
+  );
+}
+
+/**
  * The trend layer's colours.
  *
  * An *average* is not a status. Painting a fleet mean operational-green would
