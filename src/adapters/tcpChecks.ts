@@ -2,8 +2,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { connect as http2Connect } from "node:http2";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { connect as netConnect, isIP, type Socket } from "node:net";
+import { connect as netConnect, type Socket } from "node:net";
 import { connect as tlsConnect, type TLSSocket } from "node:tls";
+import { tlsServerName } from "../core/tlsServerName.ts";
 
 /**
  * The handshakes the `tcp` adapter can speak beyond a bare connect — roadmap
@@ -46,15 +47,12 @@ function daysUntil(validTo: string | undefined, now: number): number | undefined
   return Number.isNaN(expiresAt) ? undefined : Math.floor((expiresAt - now) / 86_400_000);
 }
 
-/** The SNI name: an IP literal is not a valid one and Node warns when it is sent. */
-const serverName = (host: string): string | undefined => (isIP(host) === 0 ? host : undefined);
-
 /** A connected socket — TLS-wrapped when the target is secure — or the reason it is not. */
 function open(target: HandshakeTarget, timeoutMs: number): Promise<{ socket: Socket; daysLeft?: number | undefined } | string> {
   return new Promise((resolve) => {
     const base = { host: target.host, port: target.port, timeout: timeoutMs };
     const socket: Socket = target.secure
-      ? tlsConnect({ ...base, servername: serverName(target.host), rejectUnauthorized: target.verify })
+      ? tlsConnect({ ...base, servername: tlsServerName(target.host), rejectUnauthorized: target.verify })
       : netConnect(base);
 
     const settle = (result: { socket: Socket; daysLeft?: number | undefined } | string): void => {
@@ -163,7 +161,7 @@ export function checkWebSocket(target: HandshakeTarget, timeoutMs: number): Prom
       path: target.path,
       method: "GET",
       timeout: timeoutMs,
-      ...(target.secure ? { servername: serverName(target.host), rejectUnauthorized: target.verify } : {}),
+      ...(target.secure ? { servername: tlsServerName(target.host), rejectUnauthorized: target.verify } : {}),
       headers: {
         connection: "Upgrade",
         upgrade: "websocket",

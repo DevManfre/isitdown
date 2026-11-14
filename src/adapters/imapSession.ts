@@ -1,5 +1,6 @@
 import { connect as netConnect, type Socket } from "node:net";
 import { connect as tlsConnect } from "node:tls";
+import { tlsServerName } from "../core/tlsServerName.ts";
 
 /**
  * Just enough IMAP4rev1 (RFC 3501) to read the headers of recent mail —
@@ -159,7 +160,7 @@ class Session {
 
 function open(endpoint: ImapEndpoint): Socket {
   return endpoint.tls
-    ? tlsConnect({ host: endpoint.host, port: endpoint.port, servername: endpoint.host })
+    ? tlsConnect({ host: endpoint.host, port: endpoint.port, servername: tlsServerName(endpoint.host) })
     : netConnect({ host: endpoint.host, port: endpoint.port });
 }
 

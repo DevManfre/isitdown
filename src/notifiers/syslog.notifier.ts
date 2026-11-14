@@ -8,6 +8,7 @@ import type { NotificationPayload, OverallStatus } from "../core/types.ts";
 import { ChannelError, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { fitText, renderParts } from "./formatting.ts";
 import { incidentKey } from "./incidentKey.ts";
+import { tlsServerName } from "../core/tlsServerName.ts";
 
 /**
  * How large one message may be. RFC 5426 has every receiver take 2048 bytes
@@ -162,7 +163,7 @@ function sendDatagram(host: string, port: number, message: Buffer): Promise<void
 function sendStream(transport: "tcp" | "tls", host: string, port: number, frame: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
     const socket: Socket =
-      transport === "tls" ? connectTls({ host, port, servername: host }) : connectTcp({ host, port });
+      transport === "tls" ? connectTls({ host, port, servername: tlsServerName(host) }) : connectTcp({ host, port });
     const ready = transport === "tls" ? "secureConnect" : "connect";
     socket.setTimeout(REQUEST_TIMEOUT_MS);
     socket.once("timeout", () => socket.destroy(new Error(`${host}:${port} did not answer in ${REQUEST_TIMEOUT_MS}ms`)));
