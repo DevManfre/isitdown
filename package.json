@@ -26,6 +26,7 @@
     "coverage:web:merge": "vitest run --merge-reports=src/ui/web/.vitest-reports --coverage",
     "dev:ui": "concurrently -n server,vite -c blue,magenta \"DB_PATH=./data/isitdown.db WEB_DIR=./dist/ui/public node --watch --env-file-if-exists=.env src/ui/server.ts\" \"vite\"",
     "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
+    "fake-provider": "node tools/fake-provider.mjs",
     "lint": "biome lint .",
     "preversion": "npm run typecheck && npm test && npm run test:integration",
     "record-fixture": "node tools/record-fixture.mjs",

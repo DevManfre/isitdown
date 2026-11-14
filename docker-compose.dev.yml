@@ -30,6 +30,11 @@ services:
     build:
       target: dev
     image: isitdown:dev
+    # Lets the container reach a dev tool on the host, such as
+    # `npm run fake-provider -- --host 0.0.0.0` (roadmap 13.11). Docker Desktop
+    # resolves this name on its own; Linux needs the mapping spelled out.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: "no"
     environment:
       NODE_ENV: development

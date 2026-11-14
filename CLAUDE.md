@@ -42,6 +42,7 @@ npm run build:cli && node dist/cli/index.js watch --url http://localhost:3000   
 
 npm run dev:docker                                  # UI edition, container, rebuild-on-save
 npm run dev:ui                                      # UI edition, local, HMR on :5173
+npm run fake-provider                               # a status page to break by hand on :4010 (roadmap 13.11)
 ```
 
 `dev:docker` and `dev:ui` both run the UI edition straight from the source tree,

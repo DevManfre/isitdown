@@ -131,6 +131,7 @@ isitdown/
 │   │                                   dashboard bundle itself is Vite's own output, not this script's)
 │   ├── readme-parity.mjs              every English page against its translations (npm run check:readme)
 │   ├── i18n-orphans.mjs               catalog keys against the code that asks for them (npm run check:i18n)
+│   ├── fake-provider.mjs              a local status page to break by hand, plus a webhook receiver (npm run fake-provider)
 │   ├── bundle-budget.mjs              the built dashboard against its gzipped budget (npm run check:bundle)
 │   ├── visual-regression.mjs          every view, both themes, every locale against test/visual/baseline (npm run test:visual); helpers in tools/visual/
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   the canary probe, load and mutation tests, fixture recording, release notes, the single-file build, PWA icons
@@ -210,6 +211,32 @@ Two modes, for two different loops:
 npm run dev:ui       # local: Express on :3000, Vite's dev server on :5173 with HMR
 npm run dev:docker   # container: Vite watch-builds into dist/, Express serves :3000
 ```
+
+**Start with the fake provider.** A dashboard pointed at real providers shows
+whatever GitHub and Cloudflare happen to be doing today, which is usually
+nothing. `npm run fake-provider` (roadmap 13.11, `tools/fake-provider.mjs`)
+starts one local status page on a fixed port, **4010**, and lets you break it
+by hand:
+
+```bash
+npm run fake-provider   # control page on http://127.0.0.1:4010/ (--port to move it)
+```
+
+It answers in three dialects at once: Statuspage at base URL
+`http://127.0.0.1:4010/statuspage`, Instatus at `…/instatus` and RSS at
+`…/rss/feed.xml`. It also runs a webhook receiver at `…/hook`. Add the fake as a
+provider in the dashboard, point a webhook channel at the receiver, then use
+the control page: set each component's level, open an incident and move it
+through its statuses up to resolved, start or end a maintenance window, or make
+the feeds answer 500 or slowly. The next poll (*Poll now* triggers one) shows the change
+in the dashboard, and the notification it sends shows up under *Webhook
+receiver* on the same page. State lives in memory: restarting the fake starts
+over from three operational components. Under `dev:docker`, start it with `npm run fake-provider -- --host 0.0.0.0`
+(the container cannot reach the host's loopback) and use
+`http://host.docker.internal:4010` in place of `127.0.0.1`. The
+integration suite (`test/integration/fakeProvider.itest.ts`) imports this same
+server and drives it through the real adapters, so a fake the adapters can no
+longer read fails CI first.
 
 `dev:ui` runs the server and Vite as two local processes together (`concurrently`).
 The browser talks to Vite on **5173** — that is where HMR lives — and Vite's own
