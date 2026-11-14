@@ -123,6 +123,7 @@ isitdown/
 │   ├── copy-assets.mjs                copia in dist i cataloghi i18n e delle lingue della dashboard (il
 │   │                                   bundle della dashboard è già output di Vite, non di questo script)
 │   ├── readme-parity.mjs              ogni pagina inglese contro le sue traduzioni (npm run check:readme)
+│   ├── i18n-orphans.mjs               le chiavi dei cataloghi contro il codice che le chiede (npm run check:i18n)
 │   ├── bundle-budget.mjs              la dashboard compilata contro il suo budget gzip (npm run check:bundle)
 │   ├── visual-regression.mjs          ogni vista, entrambi i temi, ogni lingua contro test/visual/baseline (npm run test:visual); helper in tools/visual/
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   la sonda canary, test di carico e di mutazione, registrazione dei fixture, note di rilascio, la build a file singolo, icone PWA
@@ -274,6 +275,7 @@ npm run test:load        # 200 provider sintetici, una settimana di storico, ogn
 npm run canary           # ogni pagina del catalogo, dal vivo, contro i fixture del suo adapter (1.9)
 npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
+npm run check:i18n       # chiavi di catalogo che nessun codice usa (avviso) e chiavi usate che mancano (errore)
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
 npm run lint             # Biome, solo controllo: regole correctness + suspicious, nessun formatter
 npm run build:light      # tsc + copia asset, escludendo src/ui
@@ -286,6 +288,23 @@ gzip, perché è quello che il browser scarica: `731,000` byte di JavaScript e `
 CSS (`BUDGET` in `tools/bundle-budget.mjs`), entrambi poco sopra la build di oggi. È
 un tetto, non un obiettivo — quando fallisce, prima si trova cosa è cresciuto; è stato
 alzato solo in un commit che nomina le righe di roadmap che l'hanno fatto crescere.
+
+Il **controllo delle chiavi orfane** (roadmap 13.5, `tools/i18n-orphans.mjs`)
+confronta entrambi i cataloghi inglesi, quello della dashboard
+`src/ui/web/locales/en.json` e quello del server `src/core/i18n/en.json`, con
+ogni file sorgente sotto `src/`. Una chiave conta come usata quando un
+letterale tra virgolette la nomina (così vale anche una costante `labelKey`
+passata più tardi a `t()`), quando un template literal come
+`` `theme.${mode}` `` potrebbe costruirla, o quando è una forma plurale di una
+base usata. Una chiave costruita in qualsiasi altro modo va in
+`tools/i18n-orphans.allow.json` (`{ "<scope>": { "keys": [], "prefixes": [] } }`,
+scope `dashboard` o `server`). Un'orfana è un avviso, e la CI la annota;
+`npm run check:i18n -- --fix` la cancella da ogni catalogo del suo scope in un
+colpo solo, riga per riga, così il diff mostra solo le chiavi cancellate. Una
+chiamata `t("…")` che nomina una chiave assente dal catalogo fa fallire il
+passo, perché l'utente vedrebbe la chiave grezza. I file di test non vengono
+letti: una chiave che solo il suo test chiede non ha comunque niente che la
+mostri.
 
 La soglia di copertura (roadmap 7.2) è un minimo garantito, non un obiettivo da
 rincorrere. Sono due, perché le due suite coprono metà diverse: il server e il

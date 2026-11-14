@@ -130,6 +130,7 @@ isitdown/
 │   ├── copy-assets.mjs                copies i18n and dashboard-locale catalogs into dist (the
 │   │                                   dashboard bundle itself is Vite's own output, not this script's)
 │   ├── readme-parity.mjs              every English page against its translations (npm run check:readme)
+│   ├── i18n-orphans.mjs               catalog keys against the code that asks for them (npm run check:i18n)
 │   ├── bundle-budget.mjs              the built dashboard against its gzipped budget (npm run check:bundle)
 │   ├── visual-regression.mjs          every view, both themes, every locale against test/visual/baseline (npm run test:visual); helpers in tools/visual/
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   the canary probe, load and mutation tests, fixture recording, release notes, the single-file build, PWA icons
@@ -278,6 +279,7 @@ npm run test:load        # 200 synthetic providers, a week of history, every rea
 npm run canary           # every catalog page, live, against its adapter's fixtures (1.9)
 npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
+npm run check:i18n       # catalog keys no code uses (warning) and used keys a catalog lacks (error)
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
 npm run lint             # Biome, check only: correctness + suspicious rules, no formatter
 npm run build:light      # tsc + copy assets, excluding src/ui
@@ -290,6 +292,20 @@ because that is what the browser downloads: `731,000` bytes of JavaScript and `2
 CSS (`BUDGET` in `tools/bundle-budget.mjs`), both a little over today's build. It is
 a ceiling rather than a target — when it fails, find what grew first; it has only
 been raised in a commit that names the roadmap rows that grew it.
+
+The **orphan-key check** (roadmap 13.5, `tools/i18n-orphans.mjs`) compares
+both English catalogs, the dashboard's `src/ui/web/locales/en.json` and the
+server's `src/core/i18n/en.json`, with every source file under `src/`. A key
+counts as used when a quoted literal names it (so a `labelKey` constant later
+handed to `t()` counts), when a template literal such as `` `theme.${mode}` ``
+could build it, or when it is a plural form of a used base. A key built any
+other way goes in `tools/i18n-orphans.allow.json` (`{ "<scope>": { "keys": [],
+"prefixes": [] } }`, scope `dashboard` or `server`). An orphan is a warning,
+and CI annotates it; `npm run check:i18n -- --fix` deletes it from every
+catalog of its scope in one go, line by line, so the diff shows only the
+deleted keys. A `t("…")` call naming a key the catalog lacks fails the step,
+because the user would see the raw key. Test files are not scanned: a key
+that only its own test asks for still has nothing rendering it.
 
 The coverage floor (roadmap 7.2) is a floor, not a target to game. Two of them,
 because the two suites cover different halves: the server and the engine must

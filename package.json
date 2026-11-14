@@ -18,6 +18,7 @@
     "canary": "node tools/canary.mjs",
     "check:bundle": "node tools/bundle-budget.mjs",
     "check:readme": "node tools/readme-parity.mjs",
+    "check:i18n": "node tools/i18n-orphans.mjs",
     "coverage": "npm run coverage:server && npm run coverage:web",
     "coverage:server": "node --test --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"tools/**\" --test-coverage-exclude=\"src/ui/web/**\" --test-coverage-exclude=\"**/isitdown-plugins-*/**\" --test-coverage-lines=95 --test-coverage-branches=88 --test-coverage-functions=93 \"test/**/*.test.ts\"",
     "coverage:web": "vitest run --coverage",
