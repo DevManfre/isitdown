@@ -369,3 +369,14 @@ test("/status reports no groups while the fleet is flat", async () => {
     await app.close();
   }
 });
+
+test("an unknown cross-checked pair is a 404 in the error shape every other route answers with", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.get("/trust/nobody->nothing/episodes");
+    assert.equal(status, 404);
+    assert.equal(typeof (body as { error?: { message?: unknown } }).error?.message, "string");
+  } finally {
+    await app.close();
+  }
+});
