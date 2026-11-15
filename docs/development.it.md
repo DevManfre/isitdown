@@ -86,7 +86,7 @@ isitdown/
 │       ├── configFile.ts             export / import di config.yml (§4.3)
 │       ├── configAudit.ts · configSnapshots.ts   la cronologia della configurazione e gli snapshot con nome (roadmap 5.7, 5.8)
 │       ├── dashboardStore.ts · dashboardLayout.ts   le dashboard Overview con nome e i layout dei loro widget
-│       ├── openapi.ts                 il documento OpenAPI servito su /openapi.json (§6.1)
+│       ├── openapi.ts · openapi/      il documento OpenAPI servito su /openapi.json (§6.1), un modulo per area
 │       ├── db/                        open.ts, migrate.ts, seed.ts
 │       ├── routes/                    un `<area>.routes.ts` ciascuno: status, events, history, incidents, export, notifications, config.* (services, channels, import/export, history, backup, storage, push), dashboards, maintenances, map, metrics, badge, render, public, openapi …
 │       └── web/                       la dashboard: react, vite, shadcn/ui

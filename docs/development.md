@@ -90,7 +90,7 @@ isitdown/
 │       ├── configFile.ts             config.yml export / import (§4.3)
 │       ├── configAudit.ts · configSnapshots.ts   the configuration history and named snapshots (roadmap 5.7, 5.8)
 │       ├── dashboardStore.ts · dashboardLayout.ts   named Overview dashboards and their widget layouts
-│       ├── openapi.ts                  the OpenAPI document served at /openapi.json (§6.1)
+│       ├── openapi.ts · openapi/       the OpenAPI document served at /openapi.json (§6.1), one module per area
 │       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
 │       ├── geo/                        resolveLocation.ts + the IATA/cloud-region lookup tables it resolves against
