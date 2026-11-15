@@ -18,7 +18,7 @@
 # output is plain JavaScript, identical on every architecture, so an arm64
 # release compiles natively and copies the result across instead of running
 # npm ci, tsc and Vite under QEMU — which was most of the release's wall clock.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:26-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -29,7 +29,7 @@ COPY src ./src
 RUN npm run build
 
 # --- Light edition -------------------------------------------------------------
-FROM node:24-alpine AS light
+FROM node:26-alpine AS light
 WORKDIR /app
 ENV NODE_ENV=production
 ENV CONFIG_PATH=/app/config/config.yml

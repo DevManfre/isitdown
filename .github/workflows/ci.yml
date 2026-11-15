@@ -50,6 +50,11 @@ jobs:
       # them before it can reach main.
       - name: README translation parity
         run: npm run check:readme
+      # Roadmap 13.5. Catalog keys against the code: an orphan key is a
+      # warning annotation (`npm run check:i18n -- --fix` removes it), a key a
+      # t() call asks for that en.json lacks fails the job.
+      - name: i18n orphan and missing keys
+        run: npm run check:i18n
 
   # Roadmap 7.2. The same two suites `npm test` runs, each under a coverage
   # floor: a new subsystem that lands without tests of its own drags the total

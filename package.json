@@ -1,12 +1,12 @@
 {
   "name": "isitdown",
-  "version": "2.43.1",
+  "version": "2.44.0",
   "private": true,
   "description": "Polls the public status pages of third-party providers and notifies on state transitions",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && vite build && node tools/copy-assets.mjs",
@@ -18,6 +18,7 @@
     "canary": "node tools/canary.mjs",
     "check:bundle": "node tools/bundle-budget.mjs",
     "check:readme": "node tools/readme-parity.mjs",
+    "check:i18n": "node tools/i18n-orphans.mjs",
     "coverage": "npm run coverage:server && npm run coverage:web",
     "coverage:server": "node --test --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"tools/**\" --test-coverage-exclude=\"src/ui/web/**\" --test-coverage-exclude=\"**/isitdown-plugins-*/**\" --test-coverage-lines=95 --test-coverage-branches=88 --test-coverage-functions=93 \"test/**/*.test.ts\"",
     "coverage:web": "vitest run --coverage",
@@ -25,6 +26,7 @@
     "coverage:web:merge": "vitest run --merge-reports=src/ui/web/.vitest-reports --coverage",
     "dev:ui": "concurrently -n server,vite -c blue,magenta \"DB_PATH=./data/isitdown.db WEB_DIR=./dist/ui/public node --watch --env-file-if-exists=.env src/ui/server.ts\" \"vite\"",
     "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
+    "fake-provider": "node tools/fake-provider.mjs",
     "lint": "biome lint .",
     "preversion": "npm run typecheck && npm test && npm run test:integration",
     "record-fixture": "node tools/record-fixture.mjs",
@@ -53,7 +55,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.5",
     "@types/express": "^5.0.6",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/web-push": "^3.6.4",

@@ -30,6 +30,13 @@ export default defineConfig({
     environment: "happy-dom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
+    // Node 26 ships its own global `localStorage` (Web Storage), a getter that
+    // answers `undefined` unless `--localstorage-file` is given. It shadows
+    // happy-dom's, so every `localStorage.setItem` throws, the shared
+    // `localStorage.clear()` in vitest.setup.ts throws with it, and the
+    // uncleaned DOM then shows up as "found multiple elements" in the tests
+    // that follow. The workers run without Node's, so happy-dom's is the one.
+    execArgv: ["--no-experimental-webstorage"],
     // Vitest's default is 5s, which the userEvent-heavy suites (ServiceDialog,
     // Incidents pagination) sit close enough to that they fail intermittently
     // under `npm run coverage` — v8 instrumentation costs this suite ~45% wall

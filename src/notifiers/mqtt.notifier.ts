@@ -6,6 +6,7 @@ import type { Notifier } from "../core/notifier.interface.ts";
 import type { NotificationPayload } from "../core/types.ts";
 import { ChannelError, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { renderParts } from "./formatting.ts";
+import { tlsServerName } from "../core/tlsServerName.ts";
 
 const DEFAULT_PORT = { mqtt: 1883, mqtts: 8883 } as const;
 
@@ -122,7 +123,7 @@ function publish(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const socket: Socket = broker.tls
-      ? connectTls({ host: broker.host, port: broker.port, servername: broker.host })
+      ? connectTls({ host: broker.host, port: broker.port, servername: tlsServerName(broker.host) })
       : connectTcp({ host: broker.host, port: broker.port });
     let buffered = Buffer.alloc(0);
     let settled = false;
