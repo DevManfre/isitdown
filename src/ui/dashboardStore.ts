@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Logger } from "../core/logger.ts";
 import { DEFAULT_LAYOUT, type DashboardLayout } from "./dashboardLayout.ts";
 import { layoutSchema } from "./dashboardLayoutSchema.ts";
+import { rollback } from "./db/open.ts";
 
 /**
  * The composable Overview's storage — roadmap 4.1, and since 4.2 more than one:
@@ -207,7 +208,7 @@ export function createDashboardStore(db: DatabaseSync, logger: Logger) {
         if (change.home === true) db.prepare("UPDATE dashboards SET home = (id = ?)").run(id);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        rollback(db);
         throw error;
       }
       return { kind: "updated", dashboard: resolve(row(id) as Row) };
@@ -251,7 +252,7 @@ export function createDashboardStore(db: DatabaseSync, logger: Logger) {
         if (removed.home) db.prepare("UPDATE dashboards SET home = (id = ?)").run(removed.id);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        rollback(db);
         throw error;
       }
       return { kind: "created", dashboard: resolve(row(removed.id) as Row) };

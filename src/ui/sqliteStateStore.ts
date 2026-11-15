@@ -39,6 +39,7 @@ import type {
   NotificationFilter,
   SampleRow,
 } from "./historyStore.interface.ts";
+import { rollback } from "./db/open.ts";
 
 const incidentsColumnSchema = z.array(incidentSchema);
 const componentsColumnSchema = z.array(componentStatusSchema);
@@ -600,7 +601,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         }
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        rollback(db);
         throw error;
       }
     },
@@ -1174,7 +1175,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         db.prepare("DELETE FROM status_samples WHERE observed_at < ?").run(cutoff);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        rollback(db);
         throw error;
       }
       db.prepare("DELETE FROM component_samples WHERE observed_at < ?").run(cutoff);
@@ -1238,7 +1239,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
         }
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        rollback(db);
         throw error;
       }
     },

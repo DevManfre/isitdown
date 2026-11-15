@@ -29,6 +29,7 @@ import { CATCH_ALL_RULE, SEVERITY_FLOORS } from "../core/routing.ts";
 import { isOptionalSetting } from "../notifiers/settings.ts";
 import { templateProblems } from "../notifiers/template.ts";
 import type { RoutingRule } from "../core/routing.ts";
+import { rollback } from "./db/open.ts";
 
 /**
  * The UI edition's configuration lives in SQLite and is read afresh every poll
@@ -1045,7 +1046,7 @@ export function replaceRoutingRules(
     });
     db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    rollback(db);
     throw error;
   }
 }
@@ -1103,7 +1104,7 @@ export function replaceRecipients(db: DatabaseSync, recipients: Recipient[]): vo
     });
     db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    rollback(db);
     throw error;
   }
 }

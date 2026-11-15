@@ -63,3 +63,13 @@ export function openDatabase(path: string): DatabaseSync {
     throw error;
   }
 }
+
+/**
+ * Undoes the transaction a failed write left open — if one is still open. On
+ * `SQLITE_FULL`, an I/O error or a busy timeout SQLite has already rolled it
+ * back itself, and an unconditional `ROLLBACK` then throws "no transaction is
+ * active" over the original error: the one that says the disk is full.
+ */
+export function rollback(db: DatabaseSync): void {
+  if (db.isTransaction) db.exec("ROLLBACK");
+}

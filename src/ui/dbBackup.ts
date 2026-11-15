@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, SCHEMA_VERSION } from "./db/migrate.ts";
-import { openDatabase } from "./db/open.ts";
+import { openDatabase, rollback } from "./db/open.ts";
 
 /**
  * Backup and restore of the whole database, from the dashboard — roadmap 4.4.
@@ -226,7 +226,7 @@ export function restoreBackup(db: DatabaseSync, bytes: Buffer, secretsPath?: str
         tables["settings"] = settingsCount?.n ?? 0;
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        rollback(db);
         throw error;
       }
     } finally {

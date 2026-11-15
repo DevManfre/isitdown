@@ -14,6 +14,7 @@ import {
   updateService,
   writeSettings,
 } from "./dbConfigSource.ts";
+import { rollback } from "./db/open.ts";
 
 /**
  * Configuration history (roadmap 5.7): every write that moved a value, with
@@ -189,7 +190,7 @@ export function recordChanges(db: DatabaseSync, changes: AuditChange[], context:
     db.prepare("DELETE FROM config_audit WHERE id <= (SELECT MAX(id) FROM config_audit) - ?").run(AUDIT_KEEP);
     db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    rollback(db);
     throw error;
   }
 }

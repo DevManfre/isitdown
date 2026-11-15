@@ -17,6 +17,7 @@ import {
 } from "../dbConfigSource.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { issues } from "./config.shared.ts";
+import { rollback } from "../db/open.ts";
 
 const previewComponentsSchema = serviceDefinitionSchema.pick({
   adapter: true,
@@ -375,7 +376,7 @@ export function configServiceRoutes(runtime: UiRuntimeCore, router: Router): voi
       for (const write of writes) updateService(db, write.id, write.patch);
       db.exec("COMMIT");
     } catch (error) {
-      db.exec("ROLLBACK");
+      rollback(db);
       throw error;
     }
     const wanted = new Set(ids);
