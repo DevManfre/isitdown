@@ -77,6 +77,7 @@ isitdown/
 │       ├── routePaths.ts              la tabella delle route della dashboard, condivisa col router client
 │       ├── healthcheck.ts             interroga /health
 │       ├── sqliteStateStore.ts        StateStore + cronologia, una transazione per salvataggio
+│       ├── sqliteStateRows.ts         gli schemi di riga e gli helper SQL con cui lo store rilegge
 │       ├── historyStore.interface.ts  il contratto della cronologia (la UI ne è l'unico consumatore)
 │       ├── history.ts                 aggregazione di uptime e incidenti
 │       ├── backfill.ts                ricostruisce 90 giorni di storico dagli incidenti di un provider al primo avvio

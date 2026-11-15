@@ -80,6 +80,7 @@ isitdown/
 │       ├── routePaths.ts               the dashboard's route table, shared with the client router
 │       ├── healthcheck.ts              probes /health
 │       ├── sqliteStateStore.ts         StateStore + history, one transaction per save
+│       ├── sqliteStateRows.ts          the row schemas and SQL helpers the store reads back with
 │       ├── historyStore.interface.ts   the history contract (UI is its only consumer)
 │       ├── history.ts                  uptime and incident aggregation
 │       ├── backfill.ts                 reconstructs 90 days of history from a provider's incidents on first boot
