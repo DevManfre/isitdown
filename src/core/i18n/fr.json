@@ -178,5 +178,7 @@
   "cli.import.tool.uptimekuma": "Uptime Kuma",
   "cli.import.tool.gatus": "Gatus",
   "cli.import.tool.statping": "Statping-ng",
-  "cli.import.tool.statusgator": "StatusGator"
+  "cli.import.tool.statusgator": "StatusGator",
+
+  "ui.startup.dbCorrupt": "IsItDown ne peut pas démarrer : la base de données {path} est endommagée.\nSQLite signale : {detail}\n\nRien n'y a été écrit. Pour repartir :\n  1. Arrêtez IsItDown et mettez le fichier endommagé de côté, avec les fichiers -wal et -shm à côté. Gardez-le : `sqlite3 <file> .recover > recovered.sql` peut récupérer des lignes que votre dernière sauvegarde n'a pas.\n  2. Copiez vers {path} votre sauvegarde la plus récente — le fichier enregistré par Réglages → Données → Sauvegarde de la base de données → Télécharger la base, nommé isitdown-<date>.db.\n  3. Redémarrez IsItDown. Une sauvegarde plus ancienne est mise au schéma actuel d'elle-même. Sans sauvegarde, démarrer avec le fichier mis de côté commence une base vide.\n\nPlus dans docs/docker.md, \"A database that will not open\"."
 }
