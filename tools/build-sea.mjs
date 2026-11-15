@@ -37,7 +37,7 @@ await build({
     ssr: "src/light/index.ts",
     outDir: "dist/sea",
     emptyOutDir: false,
-    target: "node24",
+    target: "node26",
     minify: false,
     rollupOptions: {
       output: { format: "cjs", entryFileNames: "isitdown-light.cjs", codeSplitting: false },

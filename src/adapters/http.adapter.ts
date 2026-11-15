@@ -3,6 +3,7 @@ import type { Adapter, FetchContext, ReadingNote, ServiceRef } from "../core/ada
 import { USER_AGENT } from "../core/http.ts";
 import { BodyTooLargeError, MAX_BODY_BYTES, guardedFetch, readCapped, readOutboundPolicy } from "../core/outboundPolicy.ts";
 import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
+import { tlsServerName } from "../core/tlsServerName.ts";
 
 /**
  * The probe: the one adapter whose subject is a service itself rather than a
@@ -353,7 +354,7 @@ export function certificateDaysLeft(url: string, timeoutMs: number, now: number 
       {
         host: target.hostname,
         port: Number(target.port === "" ? 443 : target.port),
-        servername: target.hostname,
+        servername: tlsServerName(target.hostname),
         // The chain was accepted by the request that just succeeded. Refusing
         // it here would turn "we could not read the expiry" into a failure of
         // its own on a host with a private CA the runtime trusts differently.

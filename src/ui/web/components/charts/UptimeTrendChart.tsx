@@ -5,6 +5,7 @@ import {
   CartesianGrid,
   ReferenceArea,
   ReferenceLine,
+  Text,
   XAxis,
   YAxis,
 } from "recharts";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/chart.tsx";
 import {
   annotationColour,
+  evenTicks,
   TREND_CHART,
   uptimeDomain,
 } from "@/lib/chartConfig.ts";
@@ -35,6 +37,9 @@ import type { Annotation, DayUptime } from "@/lib/types.ts";
  * off: motion.css owns view entry, and two animation systems on one node is
  * the double-play bug the React port exists to end.
  */
+// Seven, so the 7d window labels every one of its days instead of skipping one.
+const TREND_TICKS = 7;
+
 export function UptimeTrendChart({
   series,
   label,
@@ -124,9 +129,28 @@ export function UptimeTrendChart({
           dataKey="day"
           tickLine={false}
           axisLine={false}
-          // 90 day labels do not fit; Recharts drops ticks itself given a gap.
-          minTickGap={64}
-          tickFormatter={(day: string) => formatDay(i18n.language, day)}
+          // 90 day labels do not fit. The ones kept are chosen from the days,
+          // not by Recharts measuring text — see evenTicks — and `interval={0}`
+          // stops it dropping any of them again on its own.
+          ticks={evenTicks(series.map((entry) => entry.day), TREND_TICKS)}
+          interval={0}
+          // The first and last labels sit on the chart's edges: anchored
+          // there instead of centred, so they stay whole without the
+          // text-measuring nudge `interval={0}` switched off.
+          tick={(props) => (
+            <Text
+              {...props}
+              textAnchor={
+                props.index === 0
+                  ? "start"
+                  : props.index === props.visibleTicksCount - 1
+                    ? "end"
+                    : "middle"
+              }
+            >
+              {formatDay(i18n.language, String(props.payload.value))}
+            </Text>
+          )}
         />
         <YAxis
           domain={domain}

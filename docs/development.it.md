@@ -123,6 +123,8 @@ isitdown/
 │   ├── copy-assets.mjs                copia in dist i cataloghi i18n e delle lingue della dashboard (il
 │   │                                   bundle della dashboard è già output di Vite, non di questo script)
 │   ├── readme-parity.mjs              ogni pagina inglese contro le sue traduzioni (npm run check:readme)
+│   ├── i18n-orphans.mjs               le chiavi dei cataloghi contro il codice che le chiede (npm run check:i18n)
+│   ├── fake-provider.mjs              una pagina di stato locale da rompere a mano, più un receiver webhook (npm run fake-provider)
 │   ├── bundle-budget.mjs              la dashboard compilata contro il suo budget gzip (npm run check:bundle)
 │   ├── visual-regression.mjs          ogni vista, entrambi i temi, ogni lingua contro test/visual/baseline (npm run test:visual); helper in tools/visual/
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   la sonda canary, test di carico e di mutazione, registrazione dei fixture, note di rilascio, la build a file singolo, icone PWA
@@ -150,7 +152,7 @@ isitdown/
 ├── docker-compose.dev.yml             override di sviluppo: edizione UI live da src/, Vite ricompila il bundle in watch
 ├── config.example.yml                 template versionato; config.yml è in .gitignore
 ├── .env.example                       nomi delle variabili dei segreti, mai valori
-├── .nvmrc  .npmrc                     fissano Node 24 e fanno fallire in modo esplicito una versione più vecchia
+├── .nvmrc  .npmrc                     fissano Node 26 e fanno fallire in modo esplicito una versione più vecchia
 ├── tsconfig.json                      TypeScript del server
 ├── tsconfig.light.json                la build Light: esclude src/ui
 ├── tsconfig.cli.json                   la build del client da terminale: solo src/core/i18n e src/cli
@@ -172,7 +174,7 @@ esclusive di un'edizione.
 
 | Livello | Scelta | Note |
 |---|---|---|
-| Runtime | Node.js 24 | Obbligatorio: servono sia il driver SQLite integrato sia lo strip nativo dei tipi TypeScript. |
+| Runtime | Node.js 26 | Obbligatorio: servono sia il driver SQLite integrato sia lo strip nativo dei tipi TypeScript. |
 | Linguaggio | TypeScript, strict | Più `erasableSyntaxOnly` e `rewriteRelativeImportExtensions`, così `tsc` emette `.js` reali mentre `node --test` esegue direttamente i sorgenti `.ts`. |
 | Client HTTP | `fetch` globale | Già nel runtime. |
 | Scheduling | `setTimeout`, riarmato con jitter | Un ciclo lento ritarda il successivo invece di sovrapporsi. |
@@ -185,7 +187,7 @@ esclusive di un'edizione.
 | Client routing | `react-router` 8, basato su hash | Il routing basato su percorso non era disponibile: `/incidents/:providerId/:incidentId` è già un endpoint API. |
 | Client i18n | `react-i18next` | Cataloghi piatti, interpolazione a parentesi singola, incorporati nel bundle invece che recuperati via fetch. |
 | Server state | TanStack Query | `refetchInterval` di 30 secondi, refetch al focus, sospeso mentre un dialogo o un campo è in uso. |
-| Container | un `Dockerfile` multi-stage | `--target light` / `--target ui`, `node:24-alpine`. |
+| Container | un `Dockerfile` multi-stage | `--target light` / `--target ui`, `node:26-alpine`. |
 
 Dipendenze a runtime, in modo esaustivo: `zod` e `yaml` (entrambe le edizioni), `express`
 e `web-push` (UI, dove viene costruito il canale Web Push). Tutto ciò che la dashboard usa — React, Vite, Tailwind, le
@@ -204,6 +206,33 @@ Due modalità, per due cicli diversi:
 npm run dev:ui       # locale: Express su :3000, dev server di Vite su :5173 con HMR
 npm run dev:docker   # container: Vite ricompila in watch su dist/, Express serve :3000
 ```
+
+**Si parte dal provider finto.** Una dashboard puntata sui provider reali
+mostra quello che GitHub e Cloudflare stanno facendo oggi, cioè di solito
+niente. `npm run fake-provider` (roadmap 13.11, `tools/fake-provider.mjs`)
+avvia una pagina di stato locale su una porta fissa, la **4010**, e permette di
+romperla a mano:
+
+```bash
+npm run fake-provider   # pagina di controllo su http://127.0.0.1:4010/ (--port per spostarla)
+```
+
+Risponde in tre dialetti insieme: Statuspage con URL base
+`http://127.0.0.1:4010/statuspage`, Instatus su `…/instatus` e RSS su
+`…/rss/feed.xml`. Fa anche da receiver webhook su `…/hook`. Si aggiunge il
+finto come provider nella dashboard, si punta un canale webhook al receiver,
+poi si usa la pagina di controllo: livello di ogni componente, aprire un
+incidente e portarlo di stato in stato fino a risolto, avviare o chiudere una
+manutenzione, far rispondere i feed con un 500 o lentamente. Il poll
+successivo (*Aggiorna ora* ne avvia uno) mostra il cambiamento nella dashboard, e la notifica
+che ne parte compare sotto *Webhook receiver* nella stessa pagina. Lo stato sta
+in memoria: riavviare il finto riparte da tre componenti operativi. Con
+`dev:docker` va avviato con `npm run fake-provider -- --host 0.0.0.0` (il
+container non raggiunge il loopback dell'host) e si usa
+`http://host.docker.internal:4010` al posto di `127.0.0.1`. La suite
+d'integrazione (`test/integration/fakeProvider.itest.ts`) importa lo stesso
+server e lo fa leggere agli adapter veri, quindi un finto che gli adapter non
+sanno più leggere fa fallire la CI per primo.
 
 `dev:ui` esegue server e Vite come due processi locali insieme (`concurrently`).
 Il browser parla con Vite su **5173** — è lì che vive l'HMR — e il proxy del dev
@@ -274,6 +303,7 @@ npm run test:load        # 200 provider sintetici, una settimana di storico, ogn
 npm run canary           # ogni pagina del catalogo, dal vivo, contro i fixture del suo adapter (1.9)
 npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
+npm run check:i18n       # chiavi di catalogo che nessun codice usa (avviso) e chiavi usate che mancano (errore)
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
 npm run lint             # Biome, solo controllo: regole correctness + suspicious, nessun formatter
 npm run build:light      # tsc + copia asset, escludendo src/ui
@@ -286,6 +316,23 @@ gzip, perché è quello che il browser scarica: `731,000` byte di JavaScript e `
 CSS (`BUDGET` in `tools/bundle-budget.mjs`), entrambi poco sopra la build di oggi. È
 un tetto, non un obiettivo — quando fallisce, prima si trova cosa è cresciuto; è stato
 alzato solo in un commit che nomina le righe di roadmap che l'hanno fatto crescere.
+
+Il **controllo delle chiavi orfane** (roadmap 13.5, `tools/i18n-orphans.mjs`)
+confronta entrambi i cataloghi inglesi, quello della dashboard
+`src/ui/web/locales/en.json` e quello del server `src/core/i18n/en.json`, con
+ogni file sorgente sotto `src/`. Una chiave conta come usata quando un
+letterale tra virgolette la nomina (così vale anche una costante `labelKey`
+passata più tardi a `t()`), quando un template literal come
+`` `theme.${mode}` `` potrebbe costruirla, o quando è una forma plurale di una
+base usata. Una chiave costruita in qualsiasi altro modo va in
+`tools/i18n-orphans.allow.json` (`{ "<scope>": { "keys": [], "prefixes": [] } }`,
+scope `dashboard` o `server`). Un'orfana è un avviso, e la CI la annota;
+`npm run check:i18n -- --fix` la cancella da ogni catalogo del suo scope in un
+colpo solo, riga per riga, così il diff mostra solo le chiavi cancellate. Una
+chiamata `t("…")` che nomina una chiave assente dal catalogo fa fallire il
+passo, perché l'utente vedrebbe la chiave grezza. I file di test non vengono
+letti: una chiave che solo il suo test chiede non ha comunque niente che la
+mostri.
 
 La soglia di copertura (roadmap 7.2) è un minimo garantito, non un obiettivo da
 rincorrere. Sono due, perché le due suite coprono metà diverse: il server e il
@@ -574,10 +621,15 @@ Una release è un tag. `package.json` resta `private` (niente viene pubblicato s
 npm) ma il suo `version` è l'unica fonte di verità:
 
 ```bash
-npm version minor          # preversion esegue prima typecheck e le due suite di test,
-                           # poi crea il commit e il tag vX.Y.Z
-git push --follow-tags
+npm pkg set version=X.Y.Z  # poi la stessa versione in package-lock.json, a mano
+git commit -am "🔖 RELEASE - bump the version to X.Y.Z"
 ```
+
+`npm version` non funziona in questo repo: fallisce dopo aver già scritto la
+nuova versione, quindi un secondo tentativo fa un doppio bump. Si aggiornano
+`package.json` e `package-lock.json` (`version` e `packages[""].version`) a mano.
+La skill `release-flow` ha la sequenza completa, dal bump su `dev` alla pull
+request verso `main` fino al tag.
 
 Il push del tag avvia `.github/workflows/release.yml`, che prima attende il check
 `verify` della CI sul commit taggato (un push di tag non fa scattare la CI da
@@ -602,3 +654,59 @@ prima di taggare:
 ```bash
 npm run release-notes -- v0.1.0 HEAD
 ```
+
+### 9.7 Aggiornamenti delle dipendenze e di Node
+
+Roadmap 13.7. Le dipendenze si muovono a piccoli passi regolari, ognuno dietro
+lo stesso cancello di qualsiasi altra modifica, così che nessun aggiornamento
+debba mai diventare un progetto.
+
+**Le pull request le apre Renovate** (`renovate.json`, che richiede l'app
+GitHub di Renovate installata sul repository). Puntano a `dev`, arrivano il
+lunedì mattina (Europe/Rome), e niente si fonde da solo: una PR si fonde a mano
+quando il run completo della CI è verde. Quel run comprende typecheck e lint,
+test unitari sotto la soglia di copertura, integrazione, budget del bundle e
+baseline visive, tutto descritto in [9.6](#96-rilasci). Una release più giovane
+di tre giorni non viene proposta (`minimumReleaseAge`), e questo tiene fuori un
+pacchetto ritirato da npm il primo giorno. Una correzione di sicurezza salta sia
+il calendario sia l'attesa.
+
+| Cosa | Come arriva |
+|---|---|
+| patch e minor delle devDependency | una PR settimanale per tutte |
+| lo stack della dashboard (React, Vite, Vitest, Tailwind, shadcn, Radix e i loro plugin) | un gruppo solo, perché una major in uno rompe gli altri; le sue major in una PR separata dalle minor |
+| ogni altra major | una PR per pacchetto |
+| patch e minor delle GitHub Actions | una PR settimanale; una major ha la sua |
+| le dipendenze transitive del lockfile | un refresh settimanale del lockfile |
+| una major di Node | mai dal bot, vedi sotto |
+
+Una PR che fallisce `test:visual` non è rotta per definizione: Tailwind, Radix o
+Recharts possono spostare pixel legittimamente. Si guardano i frame, si
+accettano in un commit `✅ VISUAL` separato sullo stesso branch
+([9.4](#94-test-e-controlli)), e si fonde quando è verde. Una PR che fallisce
+qualsiasi altra cosa aspetta una correzione, oppure si chiude con il motivo in
+un commento. Renovate poi lascia stare quella versione.
+
+**Node segue la linea LTS, di proposito con un po' di ritardo.** IsItDown gira
+su una sola major di Node alla volta, sempre una linea LTS pari. Il passaggio
+alla successiva (Node 28 dopo Node 26) è dovuto quando la nuova linea è
+**Active LTS da circa un mese**, così le sue prime release LTS sono uscite e la
+toolchain (Vite, Vitest, Playwright, Biome) si è adeguata. L'ultimo passaggio,
+da Node 24 a Node 26, è arrivato a novembre 2026 (roadmap 13.13). Il passaggio è
+un solo commit su `dev` e cambia insieme tutto ciò che nomina la major:
+
+- `.nvmrc`, che CI e workflow di release leggono tramite `node-version-file`;
+- `engines.node` in `package.json`, che `engine-strict` trasforma nel rifiuto
+  di installare su un Node più vecchio;
+- entrambe le righe `FROM node:<major>-alpine` del `Dockerfile`, e il `target`
+  esbuild della build SEA in `tools/build-sea.mjs`;
+- la major di `@types/node`.
+
+Prima di fondere, si verifica ciò che la major può rompere da sola:
+`node:sqlite` (lo store dell'edizione UI), il type stripping (su cui girano
+`dev:ui` e `dev:docker`), e la build in un solo file: `npm run build:sea`
+produce un binario dal `node` che la esegue, e quel binario deve ancora partire
+e fare polling. Poi la suite completa, entrambe le immagini
+(`docker compose --profile ui up -d --build` fino a `healthy`) e un run visivo.
+La versione di Node è l'unico bump che cambia le immagini pubblicate senza che
+cambi alcun pacchetto, quindi va in una release a sé.

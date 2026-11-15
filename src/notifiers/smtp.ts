@@ -1,5 +1,6 @@
 import { createConnection, type Socket } from "node:net";
 import { connect as tlsConnect, type TLSSocket } from "node:tls";
+import { tlsServerName } from "../core/tlsServerName.ts";
 
 /**
  * Just enough SMTP to hand one message to a server (roadmap 3.3).
@@ -179,7 +180,7 @@ class SmtpConnection {
     plain.removeAllListeners();
     plain.setTimeout(0);
     const secure = await new Promise<TLSSocket>((resolve, reject) => {
-      const upgraded = tlsConnect({ socket: plain, servername: host, rejectUnauthorized }, () =>
+      const upgraded = tlsConnect({ socket: plain, servername: tlsServerName(host), rejectUnauthorized }, () =>
         resolve(upgraded),
       );
       upgraded.once("error", reject);
@@ -208,7 +209,7 @@ async function open(options: SmtpOptions): Promise<SmtpConnection> {
           {
             host: options.host,
             port: options.port,
-            servername: options.host,
+            servername: tlsServerName(options.host),
             rejectUnauthorized: options.allowSelfSigned !== true,
           },
           () => resolve(connection),
