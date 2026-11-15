@@ -4,7 +4,7 @@ import { isActive } from "../core/maintenance.ts";
 import { offsetSegments, resolveZone, shiftDay, zonedDayKey } from "./calendarDays.ts";
 import type { MaintenanceWindow } from "../core/types.ts";
 import { createTelegramBot, type TelegramBot } from "../notifiers/telegram.bot.ts";
-import { updateService } from "./dbConfigSource.ts";
+import { updateService } from "./dbServices.ts";
 import type { UiRuntimeCore } from "./runtime.ts";
 
 /**

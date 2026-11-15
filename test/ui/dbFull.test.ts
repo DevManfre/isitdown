@@ -7,7 +7,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "../../src/ui/db/open.ts";
 import { migrate } from "../../src/ui/db/migrate.ts";
 import { createSqliteStateStore } from "../../src/ui/sqliteStateStore.ts";
-import { insertService } from "../../src/ui/dbConfigSource.ts";
+import { insertService } from "../../src/ui/dbServices.ts";
 
 /**
  * Roadmap 13.4. On a full disk SQLite rolls the failed transaction back

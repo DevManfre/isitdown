@@ -82,6 +82,7 @@ isitdown/
 │       ├── history.ts                 aggregazione di uptime e incidenti
 │       ├── backfill.ts                ricostruisce 90 giorni di storico dagli incidenti di un provider al primo avvio
 │       ├── dbConfigSource.ts          configurazione da SQLite; risolve i segreti per nome di variabile
+│       ├── dbSettings.ts · dbServices.ts · dbRouting.ts · dbChannels.ts   le righe che legge, una famiglia di tabelle ciascuno
 │       ├── secretsFile.ts             credenziali salvate dalla dashboard: file 0600 accanto al database, applicate all'ambiente
 │       ├── metrics.ts                  la superficie di scrape Prometheus: gauge dallo store, counter in memoria
 │       ├── configFile.ts             export / import di config.yml (§4.3)

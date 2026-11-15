@@ -12,7 +12,7 @@ import {
   insertService,
   listServices,
   purgeService,
-} from "../../src/ui/dbConfigSource.ts";
+} from "../../src/ui/dbServices.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import { startFakeProvider } from "../../tools/fake-provider.mjs";
 

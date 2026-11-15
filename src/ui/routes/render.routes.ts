@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listServices } from "../dbConfigSource.ts";
+import { listServices } from "../dbServices.ts";
 import {
   clampSide,
   DEFAULT_HEIGHT,

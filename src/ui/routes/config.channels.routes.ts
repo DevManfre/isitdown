@@ -5,16 +5,18 @@ import {
   recipientsSchema,
   routingRulesSchema,
 } from "../../core/config.schema.ts";
+import { listServices } from "../dbServices.ts";
 import {
-  describeChannels,
   describeRouting,
-  listChannels,
   listRecipients,
-  listServices,
   replaceRecipients,
   replaceRoutingRules,
+} from "../dbRouting.ts";
+import {
+  describeChannels,
+  listChannels,
   updateChannel,
-} from "../dbConfigSource.ts";
+} from "../dbChannels.ts";
 import { TEMPLATE_MAX_LENGTH } from "../../notifiers/template.ts";
 import { noteInstallEvent } from "../installHealth.ts";
 import type { UiRuntimeCore } from "../runtime.ts";

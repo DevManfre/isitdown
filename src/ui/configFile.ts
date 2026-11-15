@@ -4,22 +4,21 @@ import { type DatabaseSync } from "node:sqlite";
 import { cadenceProblems } from "../adapters/index.ts";
 import type { Logger } from "../core/logger.ts";
 import { FILE_CHANNEL_IDS, fileConfigSchema } from "../light/config/schema.ts";
+import { deliveryOf, readSettings, writeSettings } from "./dbSettings.ts";
 import {
-  deliveryOf,
   insertService,
-  listChannels,
-  listRecipients,
-  listRoutingRules,
   listServices,
-  readSettings,
-  replaceRecipients,
-  replaceRoutingRules,
   restoreService,
   softDeleteService,
-  updateChannel,
   updateService,
-  writeSettings,
-} from "./dbConfigSource.ts";
+} from "./dbServices.ts";
+import {
+  listRecipients,
+  listRoutingRules,
+  replaceRecipients,
+  replaceRoutingRules,
+} from "./dbRouting.ts";
+import { listChannels, updateChannel } from "./dbChannels.ts";
 
 /**
  * The UI edition's configuration as the Light edition's own `config.yml`, and

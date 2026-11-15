@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getAdapter } from "../../adapters/index.ts";
-import { listServices, readSettings } from "../dbConfigSource.ts";
+import { readSettings } from "../dbSettings.ts";
+import { listServices } from "../dbServices.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 
 /**

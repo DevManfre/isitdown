@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getAdapter } from "../../adapters/index.ts";
 import { AI_KEY_ENV, AI_PROVIDERS, CLAUDE_TOKEN_ENV, type AiSettings } from "../aiSettings.ts";
-import { readSettings, writeSettings } from "../dbConfigSource.ts";
+import { readSettings, writeSettings } from "../dbSettings.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { issues } from "./config.shared.ts";
 

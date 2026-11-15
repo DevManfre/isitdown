@@ -85,6 +85,7 @@ isitdown/
 │       ├── history.ts                  uptime and incident aggregation
 │       ├── backfill.ts                 reconstructs 90 days of history from a provider's incidents on first boot
 │       ├── dbConfigSource.ts           config from SQLite; resolves secrets by variable name
+│       ├── dbSettings.ts · dbServices.ts · dbRouting.ts · dbChannels.ts   the rows it reads, one table family each
 │       ├── secretsFile.ts              credentials saved from the dashboard: 0600 file beside the database, applied to the environment
 │       ├── metrics.ts                  the Prometheus scrape surface: gauges from the store, counters in memory
 │       ├── liveEvents.ts               the push hub behind /events: subscribe, publish, nothing transport-specific
