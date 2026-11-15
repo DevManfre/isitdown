@@ -37,3 +37,6 @@ export const statusPaths: Json = {
     },
   },
 };
+
+/** Shapes this module's operations answer with, referenced as `#/components/schemas/<name>`. */
+export const statusSchemas: Json = {};

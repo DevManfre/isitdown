@@ -19,14 +19,14 @@ export const API_VERSION = "1.0.0";
 
 import type { Json } from "./openapi/shared.ts";
 import { schemas } from "./openapi/schemas.ts";
-import { statusPaths } from "./openapi/status.ts";
-import { historyPaths } from "./openapi/history.ts";
-import { incidentsPaths } from "./openapi/incidents.ts";
-import { dashboardsPaths } from "./openapi/dashboards.ts";
-import { exportPaths } from "./openapi/export.ts";
-import { configPaths } from "./openapi/config.ts";
-import { settingsPaths } from "./openapi/settings.ts";
-import { operationsPaths } from "./openapi/operations.ts";
+import { statusPaths, statusSchemas } from "./openapi/status.ts";
+import { historyPaths, historySchemas } from "./openapi/history.ts";
+import { incidentsPaths, incidentsSchemas } from "./openapi/incidents.ts";
+import { dashboardsPaths, dashboardsSchemas } from "./openapi/dashboards.ts";
+import { exportPaths, exportSchemas } from "./openapi/export.ts";
+import { configPaths, configSchemas } from "./openapi/config.ts";
+import { settingsPaths, settingsSchemas } from "./openapi/settings.ts";
+import { operationsPaths, operationsSchemas } from "./openapi/operations.ts";
 
 /**
  * Every route the server registers, in the order `docs/api.md` presents them.
@@ -93,7 +93,17 @@ export function openapiDocument(): Json {
     ],
     paths,
     components: {
-      schemas,
+      schemas: {
+        ...schemas,
+        ...statusSchemas,
+        ...historySchemas,
+        ...incidentsSchemas,
+        ...dashboardsSchemas,
+        ...exportSchemas,
+        ...configSchemas,
+        ...settingsSchemas,
+        ...operationsSchemas,
+      },
       /**
        * Declared rather than applied: with no `API_TOKEN` set — the default —
        * every route is open, and a `security` requirement on each path would
