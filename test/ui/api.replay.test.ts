@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { buildUiRuntime, type UiRuntime } from "../../src/ui/runtime.ts";
 import { createLogger } from "../../src/core/logger.ts";
-import type { SentRecord } from "../../src/core/notificationDispatcher.ts";
+import type { SentRecord } from "../../src/core/dispatcher.interface.ts";
 import type { NormalizedStatus, OverallStatus } from "../../src/core/types.ts";
 import type { ReplayResult } from "../../src/ui/replay.ts";
 import type { DeliveryLogBody } from "./helpers/deliveryLog.ts";

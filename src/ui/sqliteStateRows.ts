@@ -7,7 +7,7 @@
  */
 import { z } from "zod";
 import type { DaySegment } from "./calendarDays.ts";
-import type { SentRecord } from "../core/notificationDispatcher.ts";
+import type { SentRecord } from "../core/dispatcher.interface.ts";
 import type { ProviderRuntimeState } from "../core/stateStore.interface.ts";
 import { componentStatusSchema, incidentSchema, maintenanceWindowSchema, suspicionSchema, freshnessSchema } from "../core/status.schema.ts";
 import { STATUS_CHANGE_KINDS } from "../core/types.ts";

@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { DaySegment } from "./calendarDays.ts";
 import type { PollCycle } from "./coverage.ts";
-import type { SentRecord } from "../core/notificationDispatcher.ts";
+import type { SentRecord } from "../core/dispatcher.interface.ts";
 import type { AckRecord } from "../core/ackStore.interface.ts";
 import type { ProviderRuntimeState, SaveStatusMeta } from "../core/stateStore.interface.ts";
 import { normalizedStatusSchema } from "../core/status.schema.ts";
