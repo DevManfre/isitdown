@@ -164,6 +164,7 @@ isitdown/
 ├── config.example.yml                 tracked template; config.yml is git-ignored
 ├── .env.example                       secret variable names, never values
 ├── .nvmrc  .npmrc                     pins Node 26 and makes an older one fail loudly
+├── .devcontainer/                     ready-to-use environment for Codespaces (roadmap 13.10)
 ├── tsconfig.json                      server TypeScript
 ├── tsconfig.light.json                the Light build: excludes src/ui
 ├── tsconfig.cli.json                   the terminal client build: src/core/i18n and src/cli only
@@ -215,6 +216,18 @@ Two modes, for two different loops:
 npm run dev:ui       # local: Express on :3000, Vite's dev server on :5173 with HMR
 npm run dev:docker   # container: Vite watch-builds into dist/, Express serves :3000
 ```
+
+**Or skip the setup: open a Codespace.**
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/DevManfre/isitdown?ref=dev)
+`.devcontainer/` (roadmap 13.10) builds the same environment on Codespaces or
+any devcontainer host (VS Code's *Reopen in Container*, `devcontainer up`):
+Ubuntu 24.04 like CI, Node 26, the Chromium that `test:visual` pins already
+installed, `npm ci` run and the git hooks set up. The fake provider below is
+already running on **4010**, started again on every container start (log in
+`/tmp/fake-provider.log`), and ports 3000, 5173 and 4010 are forwarded.
+`npm test`, `npm run dev:ui` and `npm run build:ui && npm run test:visual` work
+with no further step. The badge opens `dev`, the branch that carries the hooks;
+on `main` the container works the same, minus the hooks.
 
 **Start with the fake provider.** A dashboard pointed at real providers shows
 whatever GitHub and Cloudflare happen to be doing today, which is usually

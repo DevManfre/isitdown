@@ -1,0 +1,28 @@
+{
+  // Roadmap 13.10 — a ready-to-use environment for Codespaces or any
+  // devcontainer host, written up in docs/development.md §9.3.
+  // Ubuntu 24.04, like CI's ubuntu-latest, so the visual baselines render
+  // with the same system fonts they were agreed against.
+  "name": "IsItDown",
+  "image": "mcr.microsoft.com/devcontainers/base:3-ubuntu24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "26" }
+  },
+  // Pinned to the same Playwright as CI's visual job (.github/workflows/ci.yml):
+  // a different Chromium can move pixels. Runs once, so a prebuild caches it.
+  "onCreateCommand": "npx --yes playwright@1.64.1 install --with-deps chromium",
+  // scripts/ exists on dev only; on main the hooks have nothing to install.
+  "postCreateCommand": "npm ci && if [ -f scripts/setup-hooks.sh ]; then sh scripts/setup-hooks.sh; fi",
+  "postStartCommand": "sh .devcontainer/start-services.sh",
+  "forwardPorts": [3000, 5173, 4010],
+  "portsAttributes": {
+    "3000": { "label": "UI edition (API, built dashboard)" },
+    "5173": { "label": "Dashboard with HMR (npm run dev:ui)", "onAutoForward": "openBrowser" },
+    "4010": { "label": "Fake provider + webhook receiver" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["biomejs.biome"]
+    }
+  }
+}
