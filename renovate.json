@@ -8,6 +8,7 @@
   "labels": ["dependencies"],
   "automerge": false,
   "minimumReleaseAge": "3 days",
+  "constraints": { "npm": "^11" },
   "internalChecksFilter": "strict",
   "prConcurrentLimit": 6,
   "semanticCommits": "disabled",
