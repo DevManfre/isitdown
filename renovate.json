@@ -4,7 +4,6 @@
   "extends": ["config:recommended", ":disableDependencyDashboard"],
   "baseBranchPatterns": ["dev"],
   "timezone": "Europe/Rome",
-  "schedule": ["before 6am on monday"],
   "labels": ["dependencies"],
   "automerge": false,
   "minimumReleaseAge": "3 days",
@@ -16,7 +15,6 @@
   "commitMessageTopic": "{{depName}}",
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 6am on monday"],
     "commitMessageAction": "refresh",
     "commitMessageTopic": "the lockfile"
   },
