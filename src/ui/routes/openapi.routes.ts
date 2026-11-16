@@ -18,7 +18,9 @@ export function openapiRoutes(): Router {
   });
 
   router.get("/openapi.yaml", (_req, res) => {
-    res.type("text/yaml").send(stringify(openapiDocument(), { lineWidth: 0 }));
+    // No anchors: the builders share objects, and a reader that meets hundreds of
+    // aliases rightly refuses the document as an alias bomb.
+    res.type("text/yaml").send(stringify(openapiDocument(), { lineWidth: 0, aliasDuplicateObjects: false }));
   });
 
   return router;

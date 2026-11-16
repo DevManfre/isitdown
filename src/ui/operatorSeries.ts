@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { guardedFetch, readCapped, readOutboundPolicy } from "../core/outboundPolicy.ts";
 import { USER_AGENT } from "../core/http.ts";
+import { rollback } from "./db/open.ts";
 
 /**
  * The operator's own metric, drawn under the providers' incidents — roadmap 6.11.
@@ -182,7 +183,7 @@ export function addSeries(db: DatabaseSync, input: NewSeries, now = new Date()):
     db.exec("COMMIT");
     return listSeries(db).find((series) => series.id === id) as OperatorSeries;
   } catch (error) {
-    db.exec("ROLLBACK");
+    rollback(db);
     throw error;
   }
 }

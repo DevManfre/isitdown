@@ -37,7 +37,7 @@ export function actionsRoutes(runtime: UiRuntimeCore): Router {
   router.post("/providers/:id/ack", async (req, res) => {
     const providerId = req.params["id"] ?? "";
     if (!exists(providerId)) {
-      res.status(404).json({ error: `no provider called ${providerId}` });
+      res.status(404).json({ error: { message: `no provider called ${providerId}` } });
       return;
     }
     res.json(await backend.ack(providerId, WEB_ACTOR));
@@ -48,11 +48,11 @@ export function actionsRoutes(runtime: UiRuntimeCore): Router {
     // A press sends no body at all, which `express.json` leaves as `undefined`.
     const parsed = muteBody.safeParse(req.body ?? {});
     if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.issues.map((issue) => issue.message).join("; ") });
+      res.status(400).json({ error: { message: parsed.error.issues.map((issue) => issue.message).join("; ") } });
       return;
     }
     if (!exists(providerId)) {
-      res.status(404).json({ error: `no provider called ${providerId}` });
+      res.status(404).json({ error: { message: `no provider called ${providerId}` } });
       return;
     }
     const mutedUntil = new Date(

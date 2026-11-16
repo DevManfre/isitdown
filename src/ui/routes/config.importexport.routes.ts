@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Router } from "express";
 import { discover } from "../../adapters/discover.ts";
 import { IMPORT_TOOLS, importMonitors, type ImportTool } from "../../adapters/import/index.ts";
-import { listServices } from "../dbConfigSource.ts";
+import { listServices } from "../dbServices.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { diffConfigYaml, exportConfigYaml, importConfigYaml } from "../configFile.ts";
 import {

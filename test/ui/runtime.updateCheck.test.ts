@@ -4,7 +4,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildUiRuntime } from "../../src/ui/runtime.ts";
-import { readSettings, writeSettings } from "../../src/ui/dbConfigSource.ts";
+import { readSettings, writeSettings } from "../../src/ui/dbSettings.ts";
 import { createLogger } from "../../src/core/logger.ts";
 
 const silent = createLogger("error", () => {});

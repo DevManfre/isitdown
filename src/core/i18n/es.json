@@ -178,5 +178,7 @@
   "cli.import.tool.uptimekuma": "Uptime Kuma",
   "cli.import.tool.gatus": "Gatus",
   "cli.import.tool.statping": "Statping-ng",
-  "cli.import.tool.statusgator": "StatusGator"
+  "cli.import.tool.statusgator": "StatusGator",
+
+  "ui.startup.dbCorrupt": "IsItDown no puede arrancar: la base de datos en {path} está dañada.\nSQLite informa: {detail}\n\nNo se ha escrito nada en ella. Para volver a arrancar:\n  1. Detén IsItDown y aparta el archivo dañado, junto con los archivos -wal y -shm de al lado. Consérvalo: `sqlite3 <file> .recover > recovered.sql` puede rescatar filas que tu última copia no tiene.\n  2. Copia en {path} tu copia más reciente — el archivo que guardó Ajustes → Datos → Copia de la base de datos → Descargar la base de datos, llamado isitdown-<fecha>.db.\n  3. Vuelve a arrancar IsItDown. Una copia más antigua se pone al día con el esquema actual por sí sola. Sin copia, arrancar con el archivo apartado empieza una base de datos vacía.\n\nMás en docs/docker.md, \"A database that will not open\"."
 }

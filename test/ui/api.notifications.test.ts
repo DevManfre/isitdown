@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { buildUiRuntime, type UiRuntime } from "../../src/ui/runtime.ts";
-import { updateService } from "../../src/ui/dbConfigSource.ts";
+import { updateService } from "../../src/ui/dbServices.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import type { SentRecord } from "../../src/core/notificationDispatcher.ts";
 import type { DeliveryLogBody } from "./helpers/deliveryLog.ts";

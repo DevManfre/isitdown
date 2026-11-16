@@ -77,16 +77,18 @@ isitdown/
 │       ├── routePaths.ts              la tabella delle route della dashboard, condivisa col router client
 │       ├── healthcheck.ts             interroga /health
 │       ├── sqliteStateStore.ts        StateStore + cronologia, una transazione per salvataggio
+│       ├── sqliteStateRows.ts         gli schemi di riga e gli helper SQL con cui lo store rilegge
 │       ├── historyStore.interface.ts  il contratto della cronologia (la UI ne è l'unico consumatore)
 │       ├── history.ts                 aggregazione di uptime e incidenti
 │       ├── backfill.ts                ricostruisce 90 giorni di storico dagli incidenti di un provider al primo avvio
 │       ├── dbConfigSource.ts          configurazione da SQLite; risolve i segreti per nome di variabile
+│       ├── dbSettings.ts · dbServices.ts · dbRouting.ts · dbChannels.ts   le righe che legge, una famiglia di tabelle ciascuno
 │       ├── secretsFile.ts             credenziali salvate dalla dashboard: file 0600 accanto al database, applicate all'ambiente
 │       ├── metrics.ts                  la superficie di scrape Prometheus: gauge dallo store, counter in memoria
 │       ├── configFile.ts             export / import di config.yml (§4.3)
 │       ├── configAudit.ts · configSnapshots.ts   la cronologia della configurazione e gli snapshot con nome (roadmap 5.7, 5.8)
 │       ├── dashboardStore.ts · dashboardLayout.ts   le dashboard Overview con nome e i layout dei loro widget
-│       ├── openapi.ts                 il documento OpenAPI servito su /openapi.json (§6.1)
+│       ├── openapi.ts · openapi/      il documento OpenAPI servito su /openapi.json (§6.1), un modulo per area
 │       ├── db/                        open.ts, migrate.ts, seed.ts
 │       ├── routes/                    un `<area>.routes.ts` ciascuno: status, events, history, incidents, export, notifications, config.* (services, channels, import/export, history, backup, storage, push), dashboards, maintenances, map, metrics, badge, render, public, openapi …
 │       └── web/                       la dashboard: react, vite, shadcn/ui

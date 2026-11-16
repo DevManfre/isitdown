@@ -7,7 +7,7 @@ import { isActive } from "../../core/maintenance.ts";
 import { staleReading } from "../../core/freshness.ts";
 import { openSuspicion } from "../../core/suspicion.ts";
 import { readiness } from "../readiness.ts";
-import { readSettings } from "../dbConfigSource.ts";
+import { readSettings } from "../dbSettings.ts";
 import { applyOrder } from "../fleetOrder.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 

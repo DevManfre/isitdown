@@ -80,17 +80,19 @@ isitdown/
 │       ├── routePaths.ts               the dashboard's route table, shared with the client router
 │       ├── healthcheck.ts              probes /health
 │       ├── sqliteStateStore.ts         StateStore + history, one transaction per save
+│       ├── sqliteStateRows.ts          the row schemas and SQL helpers the store reads back with
 │       ├── historyStore.interface.ts   the history contract (UI is its only consumer)
 │       ├── history.ts                  uptime and incident aggregation
 │       ├── backfill.ts                 reconstructs 90 days of history from a provider's incidents on first boot
 │       ├── dbConfigSource.ts           config from SQLite; resolves secrets by variable name
+│       ├── dbSettings.ts · dbServices.ts · dbRouting.ts · dbChannels.ts   the rows it reads, one table family each
 │       ├── secretsFile.ts              credentials saved from the dashboard: 0600 file beside the database, applied to the environment
 │       ├── metrics.ts                  the Prometheus scrape surface: gauges from the store, counters in memory
 │       ├── liveEvents.ts               the push hub behind /events: subscribe, publish, nothing transport-specific
 │       ├── configFile.ts             config.yml export / import (§4.3)
 │       ├── configAudit.ts · configSnapshots.ts   the configuration history and named snapshots (roadmap 5.7, 5.8)
 │       ├── dashboardStore.ts · dashboardLayout.ts   named Overview dashboards and their widget layouts
-│       ├── openapi.ts                  the OpenAPI document served at /openapi.json (§6.1)
+│       ├── openapi.ts · openapi/       the OpenAPI document served at /openapi.json (§6.1), one module per area
 │       ├── mapLane.ts                  the map's own 15-minute poll cycle: component lists → located points, no notifications
 │       ├── mapStore.ts                 map_points + map_geo_state persistence
 │       ├── geo/                        resolveLocation.ts + the IATA/cloud-region lookup tables it resolves against

@@ -8,7 +8,7 @@ import {
   logoUrl,
   readSettings,
   writeSettings,
-} from "../dbConfigSource.ts";
+} from "../dbSettings.ts";
 import { THEME_MODES } from "../themeModes.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 

@@ -12,7 +12,7 @@ import {
 } from "../adapters/catalogFeed.ts";
 import { USER_AGENT } from "../core/http.ts";
 import type { Logger } from "../core/logger.ts";
-import { listServices } from "./dbConfigSource.ts";
+import { listServices } from "./dbServices.ts";
 
 /**
  * The UI edition's half of roadmap 2.2: reading the signed catalog on a slow

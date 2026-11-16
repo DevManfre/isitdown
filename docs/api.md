@@ -159,12 +159,25 @@ route on this page in OpenAPI 3.1 — roadmap 4.10. It is served by the instance
 rather than only committed to the repository, so the spec a client is generated
 against is the one that instance implements.
 
-It is written by hand in `src/ui/openapi.ts`, deliberately: Express routes carry
-no type information about what they answer with, and a spec inferred from them
-would describe every payload as `object` and be worth nothing to a generated
-client. What keeps it honest is `test/ui/openapi.test.ts`, which walks the
-running app's own router and fails when a route is registered without being
-described, or described without existing.
+It is written by hand in `src/ui/openapi.ts` and the per-area modules under
+`src/ui/openapi/`, deliberately: Express routes carry no type information about
+what they answer with, and a spec inferred from them would describe every
+payload as `object` and be worth nothing to a generated client. Three checks
+keep it honest (roadmap 13.3):
+
+- `test/ui/openapi.test.ts` walks the running app's own router and fails when a
+  route is registered without being described, or described without existing.
+- `test/helpers/openapiContract.ts` rides along every server and integration
+  test (`node --import`): each JSON response a test provokes is validated
+  against the schema documented for its route and status. The check reads every
+  object schema as closed, so a field the code adds and the spec does not name
+  fails CI; the published document stays open, so a new field is not a
+  breaking change for a client. An object that really is a map says so with
+  `additionalProperties`.
+- `test/ui/openapi.requests.test.ts` generates bodies the spec rules out — the
+  wrong JSON type, a required field missing, a field of the wrong type, a value
+  outside its enum — and expects the `400` every operation with a body
+  documents.
 
 `info.version` is the *API contract's* version, not the product's: a client
 generated against this document has no reason to be regenerated because the

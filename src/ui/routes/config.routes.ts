@@ -15,16 +15,10 @@ import {
   pollingSchema,
   quietHoursSchema,
 } from "../../core/config.schema.ts";
-import {
-  deliveryOf,
-  describeChannels,
-  describeRouting,
-  listRecipients,
-  listRemovedServices,
-  listServices,
-  readSettings,
-  writeSettings,
-} from "../dbConfigSource.ts";
+import { deliveryOf, readSettings, writeSettings } from "../dbSettings.ts";
+import { listRemovedServices, listServices } from "../dbServices.ts";
+import { describeRouting, listRecipients } from "../dbRouting.ts";
+import { describeChannels } from "../dbChannels.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { auditWrites } from "../configAudit.ts";
 import { configHistoryRoutes } from "./config.history.routes.ts";

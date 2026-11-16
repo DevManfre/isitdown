@@ -1,5 +1,6 @@
 import type { Router } from "express";
-import { describeChannels, readSettings } from "../dbConfigSource.ts";
+import { readSettings } from "../dbSettings.ts";
+import { describeChannels } from "../dbChannels.ts";
 import { abandonedProviders, installChecks } from "../installHealth.ts";
 import { readPublicPageSettings } from "../publicPage.ts";
 import type { UiRuntimeCore } from "../runtime.ts";

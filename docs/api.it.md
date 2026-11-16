@@ -161,12 +161,27 @@ di questa pagina in OpenAPI 3.1 — roadmap 4.10. È servito dall'istanza e non
 solo committato nel repository, così la specifica su cui viene generato un
 client è quella che quell'istanza implementa davvero.
 
-È scritto a mano in `src/ui/openapi.ts`, deliberatamente: le rotte Express non
-portano informazioni di tipo su cosa rispondono, e una specifica dedotta da
-loro descriverebbe ogni payload come `object`, cioè nulla di utile per un client
-generato. A tenerlo onesto è `test/ui/openapi.test.ts`, che percorre il router
-dell'app in esecuzione e fallisce quando una rotta è registrata senza essere
-descritta, o descritta senza esistere.
+È scritto a mano in `src/ui/openapi.ts` e nei moduli per area sotto
+`src/ui/openapi/`, deliberatamente: le rotte Express non portano informazioni
+di tipo su cosa rispondono, e una specifica dedotta da loro descriverebbe ogni
+payload come `object`, cioè nulla di utile per un client generato. Tre
+controlli lo tengono onesto (roadmap 13.3):
+
+- `test/ui/openapi.test.ts` percorre il router dell'app in esecuzione e
+  fallisce quando una rotta è registrata senza essere descritta, o descritta
+  senza esistere.
+- `test/helpers/openapiContract.ts` accompagna ogni test del server e
+  d'integrazione (`node --import`): ogni risposta JSON provocata da un test viene
+  validata contro lo schema documentato per la sua rotta e il suo stato. Il
+  controllo legge ogni schema di oggetto come chiuso, quindi un campo che il
+  codice aggiunge e la specifica non nomina fa fallire la CI; il documento
+  pubblicato resta aperto, così un campo nuovo non è una modifica incompatibile
+  per un client. Un oggetto che è davvero una mappa lo dichiara con
+  `additionalProperties`.
+- `test/ui/openapi.requests.test.ts` genera corpi che la specifica esclude — il
+  tipo JSON sbagliato, un campo obbligatorio mancante, un campo del tipo
+  sbagliato, un valore fuori dal suo enum — e si aspetta il `400` che ogni
+  operazione con un corpo documenta.
 
 `info.version` è la versione del *contratto* dell'API, non del prodotto: un
 client generato su questo documento non ha motivo di essere rigenerato perché è

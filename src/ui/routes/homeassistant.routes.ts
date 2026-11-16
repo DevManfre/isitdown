@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listServices } from "../dbConfigSource.ts";
+import { listServices } from "../dbServices.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import type { OverallStatus } from "../../core/types.ts";
 

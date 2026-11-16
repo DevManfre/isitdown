@@ -108,3 +108,20 @@ test("a provider that does not exist is a 404 for both, and nothing is written",
     await app.close();
   }
 });
+
+test("a refusal carries the same error shape as every other route, so the dashboard can show its message", async () => {
+  const app = await api();
+  try {
+    const refusals = [
+      await app.post("/providers/ghost/ack"),
+      await app.post("/providers/ghost/mute"),
+      await app.post("/providers/github/mute", { minutes: "soon" }),
+    ];
+    for (const refusal of refusals) {
+      const message = (refusal.body as { error?: { message?: unknown } }).error?.message;
+      assert.equal(typeof message, "string", JSON.stringify(refusal.body));
+    }
+  } finally {
+    await app.close();
+  }
+});
