@@ -689,6 +689,17 @@ accettano in un commit `✅ VISUAL` separato sullo stesso branch
 qualsiasi altra cosa aspetta una correzione, oppure si chiude con il motivo in
 un commento. Renovate poi lascia stare quella versione.
 
+**Renovate scrive il lockfile con npm 11** (`"constraints": { "npm": "^11" }`),
+cioè l'npm che arriva con Node 26 e che usa la CI. Lasciato a sé sceglie l'npm
+più recente, e npm 12 ha `allow-remote=none` come default; con quel default,
+`npm install --package-lock-only` rifiuta il tarball del registry di qualsiasi
+pacchetto con `bundleDependencies` (`@tailwindcss/oxide-wasm32-wasi` di
+Tailwind 4) con `EALLOWREMOTE`: è un bug di npm,
+[npm/cli#9800](https://github.com/npm/cli/issues/9800). La PR allora cambia
+`package.json` ma non `package-lock.json`, e `npm ci` fa fallire ogni job. Il
+vincolo si toglie quando quella issue è risolta, oppure quando la major di Node
+passa a una che porta npm 12.
+
 **Node segue la linea LTS, di proposito con un po' di ritardo.** IsItDown gira
 su una sola major di Node alla volta, sempre una linea LTS pari. Il passaggio
 alla successiva (Node 28 dopo Node 26) è dovuto quando la nuova linea è
