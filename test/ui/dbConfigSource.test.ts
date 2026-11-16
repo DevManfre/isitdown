@@ -7,25 +7,28 @@ import type { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "../../src/ui/db/open.ts";
 import { migrate } from "../../src/ui/db/migrate.ts";
 import { seedDefaults } from "../../src/ui/db/seed.ts";
+import { readSettings, writeSettings } from "../../src/ui/dbSettings.ts";
 import {
-  createDbConfigSource,
-  describeChannels,
-  describeRouting,
   describeServiceImpact,
   insertService,
-  listChannels,
   listRemovedServices,
   listServices,
   purgeExpiredServices,
   purgeService,
-  readSettings,
-  replaceRoutingRules,
   restoreService,
   softDeleteService,
-  updateChannel,
   updateService,
-  writeSettings,
-} from "../../src/ui/dbConfigSource.ts";
+} from "../../src/ui/dbServices.ts";
+import {
+  describeRouting,
+  replaceRoutingRules,
+} from "../../src/ui/dbRouting.ts";
+import {
+  describeChannels,
+  listChannels,
+  updateChannel,
+} from "../../src/ui/dbChannels.ts";
+import { createDbConfigSource } from "../../src/ui/dbConfigSource.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import type { RoutingRule } from "../../src/core/routing.ts";
 

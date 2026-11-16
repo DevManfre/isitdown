@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { OverallStatus } from "../core/types.ts";
 import type { GeoSource } from "./geo/resolveLocation.ts";
+import { rollback } from "./db/open.ts";
 
 export interface StoredMapPoint {
   providerId: string;
@@ -116,7 +117,7 @@ export function createMapStore(db: DatabaseSync): MapStore {
         upsertState.run(providerId, state.located, state.total, state.checkedAt);
         db.exec("COMMIT");
       } catch (error) {
-        db.exec("ROLLBACK");
+        rollback(db);
         throw error;
       }
     },

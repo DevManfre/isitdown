@@ -274,3 +274,42 @@ OUTPOST_TOKEN=<the token above>
   Un outpost spento, lento o configurato male si astiene — registrato come
   `outpost did not answer` e nominato nella nota diagnostica del provider — e
   non conta mai come voto "down".
+
+### 4.8 Un database che non si apre
+
+Lo stato dell'edizione UI è un unico file SQLite, `/app/data/isitdown.db`, e
+un'interruzione di corrente a metà scrittura è il guasto più normale di un
+homelab. Il database è aperto in modalità WAL con `synchronous = FULL`, quindi un
+ciclo che ha fatto commit sopravvive all'interruzione; può ancora succedere che
+il disco strappi una pagina. Ogni avvio esegue `PRAGMA quick_check` prima di
+scrivere qualsiasi cosa, e un file che non lo supera ferma l'avvio: il container
+esce con codice 1 e stampa su stderr cosa ha trovato SQLite, il percorso e i tre
+passi qui sotto — mai uno stack trace, e il file danneggiato resta esattamente
+com'era.
+
+Per ripartire con Docker Compose, usando il backup più recente scaricato dalla
+dashboard (Impostazioni → Dati → Backup del database → Scarica il database, un
+file chiamato `isitdown-<data>.db`, qui nella directory corrente):
+
+```bash
+docker compose --profile ui stop ui
+# Metti da parte il file danneggiato e i suoi -wal/-shm, poi il backup al suo posto.
+# Il -wal deve andarsene con lui: lasciato lì, verrebbe riapplicato al backup.
+docker compose --profile ui run --rm --no-deps -v "$PWD:/restore:ro" --entrypoint sh ui -c '
+  cd /app/data && mkdir -p damaged && mv isitdown.db* damaged/ &&
+  cp /restore/isitdown-2026-11-14.db isitdown.db'
+docker compose --profile ui start ui
+```
+
+Un backup più vecchio viene portato allo schema attuale all'avvio, come fa un
+ripristino dalla dashboard. Due cose che un backup non copre:
+
+- **Le righe scritte dopo.** `sqlite3 damaged/isitdown.db .recover > recovered.sql`,
+  eseguito su una copia del file danneggiato, recupera ciò che SQLite riesce
+  ancora a leggere; vale un'occhiata prima di buttare il file.
+- **`secrets.env`.** Le credenziali dei canali stanno accanto al database, non
+  dentro ([3.4](configuration.it.md#34-come-vengono-gestiti-i-segreti)), quindi nulla di quanto sopra le tocca.
+
+Senza alcun backup, ripartire col file danneggiato messo da parte inizia un
+database vuoto: i provider si aggiungono di nuovo dalla dashboard o importando un
+`config.yml`.

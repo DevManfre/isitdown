@@ -6,7 +6,8 @@ import type { ServiceRef } from "../core/adapter.interface.ts";
 import { parseStatusSpec } from "../adapters/http.adapter.ts";
 import { tcpConfig } from "../adapters/tcp.adapter.ts";
 import { dnsConfig } from "../adapters/dns.adapter.ts";
-import { listServices, readSettings } from "./dbConfigSource.ts";
+import { readSettings } from "./dbSettings.ts";
+import { listServices } from "./dbServices.ts";
 
 /**
  * The fleet as a Gatus `config.yaml` (roadmap 17.4) — a downloadable second

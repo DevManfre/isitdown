@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { rollback } from "./open.ts";
 
 export const SCHEMA_VERSION = 42;
 
@@ -24,7 +25,7 @@ export function migrate(db: DatabaseSync): void {
     upgrade(db, from);
     db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    rollback(db);
     throw error;
   }
 }

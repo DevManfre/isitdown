@@ -265,3 +265,41 @@ OUTPOST_TOKEN=<the token above>
   outpost that is down, slow or misconfigured abstains — logged as `outpost did
   not answer` and named in the provider's diagnostics note — and never counts as
   a "down" vote.
+
+### 4.8 A database that will not open
+
+The UI edition's state is one SQLite file, `/app/data/isitdown.db`, and a power
+cut halfway through a write is the most ordinary failure a homelab has. The
+database is opened in WAL mode with `synchronous = FULL`, so a cycle that
+committed survives the cut; what can still happen is a disk that tore a page.
+Every start runs `PRAGMA quick_check` before anything is written, and a file
+that fails it stops the start: the container exits with code 1 and prints, on
+stderr, what SQLite found, the path, and the three steps below — never a stack
+trace, and the damaged file is left exactly as it was.
+
+To recover with Docker Compose, using the most recent backup the dashboard
+downloaded (Settings → Data → Database backup → Download database, a file named
+`isitdown-<date>.db`, here in the current directory):
+
+```bash
+docker compose --profile ui stop ui
+# Keep the damaged file and its -wal/-shm aside, then put the backup in its place.
+# The -wal must go with it: left behind, it would be replayed onto the backup.
+docker compose --profile ui run --rm --no-deps -v "$PWD:/restore:ro" --entrypoint sh ui -c '
+  cd /app/data && mkdir -p damaged && mv isitdown.db* damaged/ &&
+  cp /restore/isitdown-2026-11-14.db isitdown.db'
+docker compose --profile ui start ui
+```
+
+An older backup is brought up to the current schema on start, as a restore from
+the dashboard is. Two things a backup does not cover:
+
+- **Rows written after it.** `sqlite3 damaged/isitdown.db .recover > recovered.sql`,
+  run on a copy of the damaged file, salvages what SQLite can still read; it is
+  worth a look before the file is thrown away.
+- **`secrets.env`.** Channel credentials live beside the database, not in it
+  ([3.4](configuration.md#34-how-secrets-are-handled)), so they are untouched by all of the above.
+
+With no backup at all, starting with the damaged file moved aside begins an
+empty database, seeded from nothing: the providers are added again from the
+dashboard or with a `config.yml` import.

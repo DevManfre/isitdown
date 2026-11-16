@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { buildUiRuntime, type UiRuntime } from "../../src/ui/runtime.ts";
-import { updateService } from "../../src/ui/dbConfigSource.ts";
+import { updateService } from "../../src/ui/dbServices.ts";
 import { createLogger } from "../../src/core/logger.ts";
 
 const silent = createLogger("error", () => {});
@@ -365,6 +365,17 @@ test("/status reports no groups while the fleet is flat", async () => {
   try {
     const { body } = await app.get("/status");
     assert.deepEqual((body as { groups: unknown[] }).groups, []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("an unknown cross-checked pair is a 404 in the error shape every other route answers with", async () => {
+  const app = await api();
+  try {
+    const { status, body } = await app.get("/trust/nobody->nothing/episodes");
+    assert.equal(status, 404);
+    assert.equal(typeof (body as { error?: { message?: unknown } }).error?.message, "string");
   } finally {
     await app.close();
   }

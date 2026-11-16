@@ -178,5 +178,7 @@
   "cli.import.tool.uptimekuma": "Uptime Kuma",
   "cli.import.tool.gatus": "Gatus",
   "cli.import.tool.statping": "Statping-ng",
-  "cli.import.tool.statusgator": "StatusGator"
+  "cli.import.tool.statusgator": "StatusGator",
+
+  "ui.startup.dbCorrupt": "IsItDown kann nicht starten: Die Datenbank unter {path} ist beschädigt.\nSQLite meldet: {detail}\n\nEs wurde nichts hineingeschrieben. So geht es weiter:\n  1. IsItDown stoppen und die beschädigte Datei beiseitelegen, samt den -wal- und -shm-Dateien daneben. Aufbewahren: `sqlite3 <file> .recover > recovered.sql` kann Zeilen retten, die dem letzten Backup fehlen.\n  2. Das neueste Backup — die Datei, die Einstellungen → Daten → Datenbanksicherung → Datenbank herunterladen gespeichert hat, isitdown-<Datum>.db — nach {path} kopieren.\n  3. IsItDown neu starten. Ein älteres Backup wird selbst auf das aktuelle Schema gebracht. Ohne Backup beginnt ein Start mit beiseitegelegter Datei eine leere Datenbank.\n\nMehr in docs/docker.md, \"A database that will not open\"."
 }

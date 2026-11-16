@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { rollback } from "./open.ts";
 
 /**
  * First-boot defaults, so a fresh container shows a working dashboard instead of
@@ -248,7 +249,7 @@ export function seedDefaults(db: DatabaseSync, { providers = true }: { providers
     insertDefaults(db, providers);
     db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    rollback(db);
     throw error;
   }
 }

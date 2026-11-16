@@ -98,6 +98,13 @@ export function createApp(runtime: UiRuntimeCore): Express {
 
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const message = error instanceof Error ? error.message : String(error);
+    // The body parsers refuse a malformed, mistyped or oversized body with a
+    // 4xx of their own: that is the client's mistake, not a failure to log.
+    const status = (error as { status?: unknown } | null)?.status;
+    if (typeof status === "number" && status >= 400 && status < 500) {
+      res.status(status).json({ error: { message } });
+      return;
+    }
     runtime.logger.error("request failed", { error: message });
     res.status(500).json({ error: { message } });
   });

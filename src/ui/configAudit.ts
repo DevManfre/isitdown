@@ -3,17 +3,16 @@ import { type DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Logger } from "../core/logger.ts";
 import { buildConfigDocument } from "./configFile.ts";
+import { readSettings, writeSettings } from "./dbSettings.ts";
 import {
   listServices,
-  readSettings,
-  replaceRecipients,
-  replaceRoutingRules,
   restoreService,
   softDeleteService,
-  updateChannel,
   updateService,
-  writeSettings,
-} from "./dbConfigSource.ts";
+} from "./dbServices.ts";
+import { replaceRecipients, replaceRoutingRules } from "./dbRouting.ts";
+import { updateChannel } from "./dbChannels.ts";
+import { rollback } from "./db/open.ts";
 
 /**
  * Configuration history (roadmap 5.7): every write that moved a value, with
@@ -189,7 +188,7 @@ export function recordChanges(db: DatabaseSync, changes: AuditChange[], context:
     db.prepare("DELETE FROM config_audit WHERE id <= (SELECT MAX(id) FROM config_audit) - ?").run(AUDIT_KEEP);
     db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    rollback(db);
     throw error;
   }
 }

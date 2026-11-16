@@ -50,7 +50,7 @@ export function trustRoutes(runtime: UiRuntimeCore): Router {
     const days = parseWindow(req.query["days"]);
     const pair = runtime.trustPairs().find((candidate) => pairKey(candidate) === req.params.key);
     if (pair === undefined) {
-      res.status(404).json({ error: "no such cross-checked pair" });
+      res.status(404).json({ error: { message: "no such cross-checked pair" } });
       return;
     }
     // Every episode, excluded ones included: they are how the excluded counts
