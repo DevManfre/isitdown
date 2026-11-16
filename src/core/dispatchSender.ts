@@ -1,9 +1,11 @@
 import type { Clock } from "./clock.ts";
+import type { Recipient, ServiceDefinition } from "./configSource.interface.ts";
 import type { DispatcherDeps, SentRecord } from "./dispatcher.interface.ts";
 import type { Logger } from "./logger.ts";
 import type { MessageRefStore } from "./messageRefStore.interface.ts";
 import type { Notifier } from "./notifier.interface.ts";
 import type { NotificationPayload, StatusChangeKind } from "./types.ts";
+import { runbookHint } from "./runbook.ts";
 import { tracer } from "./tracing.ts";
 
 /**
@@ -44,6 +46,38 @@ export function attempt(
 const RETRY_BASE_MS = 1000;
 const RETRY_JITTER_MS = 250;
 
+/** What a message says about the provider it is about — its page, and why it matters (roadmap 3.7). */
+export function payloadServiceOf(service: ServiceDefinition): NotificationPayload["service"] {
+  return {
+    id: service.id,
+    name: service.name,
+    statusUrl: service.baseUrl,
+    ...(service.impact === undefined ? {} : { impact: service.impact }),
+    ...(service.owner === undefined ? {} : { owner: service.owner }),
+    ...(runbookHint(service.runbook) === null ? {} : { runbook: runbookHint(service.runbook)! }),
+  };
+}
+
+/**
+ * The targets a rule reached, grouped into delivery chains (roadmap 3.5). A
+ * channel in no recipient is a chain of one, sent to as it always was. A
+ * recipient becomes one chain of its channels *that the rule reached*, in the
+ * recipient's order: the rule still decides who may hear about a change, and the
+ * recipient only decides how many times — so a rule that keeps a provider off
+ * Discord keeps it off Discord's fallback too.
+ */
+export function chainsOf(targets: readonly string[], recipients: readonly Recipient[] | undefined): string[][] {
+  const chains: string[][] = [];
+  const placed = new Set<string>();
+  for (const channelId of targets) {
+    if (placed.has(channelId)) continue;
+    const recipient = recipients?.find((candidate) => candidate.channels.includes(channelId));
+    const chain = recipient === undefined ? [channelId] : recipient.channels.filter((id) => targets.includes(id));
+    for (const id of chain) placed.add(id);
+    chains.push(chain);
+  }
+  return chains;
+}
 /**
  * How a dispatcher hands one message to its channels: the retried send, the
  * in-place edit, the recipient's fallback chain and the audit row each one

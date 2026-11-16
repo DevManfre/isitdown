@@ -18,7 +18,9 @@ isitdown/
 │   │   ├── poller.ts                  un ciclo: sfasamento, retry, isolamento, conteggio fallimenti
 │   │   ├── groups.ts                  gruppi di provider: lo stato composito di un gruppo (§3.10)
 │   │   ├── diffEngine.ts              l'unica autorità su se una notifica scatta
-│   │   ├── notificationDispatcher.ts  l'unico chiamante di Notifier.send
+│   │   ├── notificationDispatcher.ts  l'unico chiamante di Notifier.send: chi sente un cambiamento, e quando
+│   │   ├── dispatchSender.ts          l'invio vero e proprio: retry, modifica in place, catena di fallback del destinatario
+│   │   ├── dispatchEscalation.ts · dispatchChannelHealth.ts  escalation (§3.2) e avvisi sui canali che falliscono (§3.4)
 │   │   ├── scheduler.ts               il loop; rilegge la configurazione a ogni ciclo
 │   │   ├── clock.ts                   l'unico modo in cui il motore legge l'ora e aspetta (13.2)
 │   │   ├── http.ts                    l'unica lettura HTTP: rivalidazione ETag/Last-Modified, decodifica del charset

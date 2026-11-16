@@ -18,7 +18,9 @@ isitdown/
 │   │   ├── poller.ts                   one cycle: stagger, retry, isolation, failure accounting
 │   │   ├── groups.ts                   provider groups: the composite status a group reports (§3.10)
 │   │   ├── diffEngine.ts               the sole authority on whether a notification fires
-│   │   ├── notificationDispatcher.ts   the only caller of Notifier.send
+│   │   ├── notificationDispatcher.ts   the only caller of Notifier.send: who hears a change, and when
+│   │   ├── dispatchSender.ts           the send itself: retries, in-place edits, a recipient's fallback chain
+│   │   ├── dispatchEscalation.ts · dispatchChannelHealth.ts  escalation (§3.2) and failing-channel alerts (§3.4)
 │   │   ├── scheduler.ts                the loop; re-reads config every cycle
 │   │   ├── clock.ts                    the one way the engine reads the time and waits (13.2)
 │   │   ├── http.ts                     the one HTTP read: ETag/Last-Modified revalidation, charset decoding
