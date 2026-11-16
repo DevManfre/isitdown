@@ -665,6 +665,16 @@ separate `✅ VISUAL` commit on the same branch ([9.4](#94-tests-and-checks)),
 and merge once green. A PR that fails anything else waits for a fix, or gets
 closed with the reason in a comment. Renovate then leaves that version alone.
 
+**Renovate writes the lockfile with npm 11** (`"constraints": { "npm": "^11" }`),
+the npm that ships with Node 26 and that CI uses. Left to itself it picks the
+newest npm, and npm 12 defaults to `allow-remote=none`; with that default,
+`npm install --package-lock-only` refuses the registry tarball of any package
+with `bundleDependencies` (Tailwind 4's `@tailwindcss/oxide-wasm32-wasi`) with
+`EALLOWREMOTE` — an npm bug, [npm/cli#9800](https://github.com/npm/cli/issues/9800).
+The PR then changes `package.json` but not `package-lock.json`, and `npm ci`
+fails every job. Drop the constraint once that issue is fixed, or when the Node
+major moves to one that ships npm 12.
+
 **Node follows the LTS line, a little late on purpose.** IsItDown runs on one
 Node major at a time, always an even-numbered LTS line. The move to the next
 one (Node 28 after Node 26) is due once the new line has been **Active LTS for
