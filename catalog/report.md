@@ -1,14 +1,12 @@
 # Catalog build
 
-Generated 2026-11-09T13:21:12.204Z: 206 providers in the catalog, 108 candidates left out.
+Generated 2026-11-16T13:08:58.648Z: 207 providers in the catalog, 107 candidates left out.
 
 ## Kept although they failed this run
 
 Already in the catalog, so a single failed read does not remove them.
 
-- **Datadog** — https://status.datadoghq.com: statuspage fetch for datadog failed: HTTP 403
 - **Postmark** — https://status.postmarkapp.com: no adapter recognises the page
-- **Gemfury** — https://status.gemfury.com: no adapter recognises the page
 
 ## Left out
 
@@ -24,7 +22,6 @@ Already in the catalog, so a single failed read does not remove them.
 - DeepL — https://www.deeplstatus.com: no adapter recognises the page
 - Deno Deploy — https://www.denostatus.com: no adapter recognises the page
 - Fastly — https://www.fastlystatus.com: no adapter recognises the page
-- Fivetran — https://status.fivetran.com: no adapter recognises the page
 - Freshworks — https://status.freshworks.com: no adapter recognises the page
 - Hetzner — https://status.hetzner.com: no adapter recognises the page
 - Intercom — https://www.intercomstatus.com: no adapter recognises the page
