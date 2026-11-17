@@ -6,7 +6,7 @@ import {
 } from "./configSource.interface.ts";
 import { systemClock, type Clock, type ClockTimer } from "./clock.ts";
 import type { Logger } from "./logger.ts";
-import type { DispatchContext, Dispatcher } from "./notificationDispatcher.ts";
+import type { DispatchContext, Dispatcher } from "./dispatcher.interface.ts";
 import type { Notifier } from "./notifier.interface.ts";
 import type { CycleResult, Poller } from "./poller.ts";
 import { tracer } from "./tracing.ts";

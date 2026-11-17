@@ -1,7 +1,7 @@
 import type { Annotation, IncidentNote, IncidentRow } from "./historyStore.interface.ts";
 import type { IncidentRevision } from "./incidentRevisions.ts";
 import { duration } from "./monthlyReport.ts";
-import type { SentRecord } from "../core/notificationDispatcher.ts";
+import type { SentRecord } from "../core/dispatcher.interface.ts";
 
 /**
  * The document somebody writes by hand the morning after — roadmap 6.4. One

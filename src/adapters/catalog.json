@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-09T13:21:12.204Z",
+  "generatedAt": "2026-11-16T13:08:58.648Z",
   "entries": [
     {
       "id": "github",
@@ -386,6 +386,12 @@
       "baseUrl": "https://status.expo.dev"
     },
     {
+      "id": "fivetran",
+      "name": "Fivetran",
+      "adapter": "statuspage",
+      "baseUrl": "https://status.fivetran.com"
+    },
+    {
       "id": "front",
       "name": "Front",
       "adapter": "statuspage",
@@ -520,8 +526,8 @@
     {
       "id": "netdata",
       "name": "Netdata",
-      "adapter": "statuspage",
-      "baseUrl": "https://status.netdata.cloud"
+      "adapter": "rss",
+      "baseUrl": "https://status.netdata.cloud/history.rss"
     },
     {
       "id": "new-relic",
@@ -538,8 +544,8 @@
     {
       "id": "openrouter",
       "name": "OpenRouter",
-      "adapter": "rss",
-      "baseUrl": "https://status.openrouter.ai/history.rss"
+      "adapter": "datadog",
+      "baseUrl": "https://status.openrouter.ai"
     },
     {
       "id": "optimizely",
@@ -952,8 +958,8 @@
     {
       "id": "mollie",
       "name": "Mollie",
-      "adapter": "instatus",
-      "baseUrl": "https://status.mollie.com"
+      "adapter": "rss",
+      "baseUrl": "https://status.mollie.com/history.rss"
     },
     {
       "id": "nhost",

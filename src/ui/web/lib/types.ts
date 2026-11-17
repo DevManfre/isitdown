@@ -4,7 +4,7 @@
  * `src/ui/routes/status.routes.ts` assembles; `ProviderHistory`,
  * `ComponentHistory` and `HistorySummary` come from `src/ui/history.ts`;
  * `IncidentRow` and `SampleRow` from `src/ui/historyStore.interface.ts`;
- * `SentRecord` from `src/core/notificationDispatcher.ts`; the config response
+ * `SentRecord` from `src/core/dispatcher.interface.ts`; the config response
  * shapes from `src/ui/dbConfigSource.ts` (the API never returns the internal
  * `RuntimeConfig`/`ChannelConfig` shapes core uses — channel credentials are
  * redacted to "is this env var set", never the resolved secret).
@@ -446,7 +446,7 @@ export type StatusChangeKind =
 
 /**
  * One dispatch attempt, delivered or failed. Field list follows
- * `src/core/notificationDispatcher.ts`'s `SentRecord`, not a guess: the
+ * `src/core/dispatcher.interface.ts`'s `SentRecord`, not a guess: the
  * channel id is `channel` (not `channelId`), the outcome flag is `ok` (not
  * `delivered`), and the rendered message is `text` (not `title`).
  */

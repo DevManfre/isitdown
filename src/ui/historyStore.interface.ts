@@ -1,6 +1,6 @@
 import type { DaySegment } from "./calendarDays.ts";
 import type { PollCycle } from "./coverage.ts";
-import type { SentRecord } from "../core/notificationDispatcher.ts";
+import type { SentRecord } from "../core/dispatcher.interface.ts";
 import type { MessageRefStore } from "../core/messageRefStore.interface.ts";
 import type { AckStore } from "../core/ackStore.interface.ts";
 import type { StateStore } from "../core/stateStore.interface.ts";
