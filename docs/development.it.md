@@ -130,7 +130,8 @@ isitdown/
 │   ├── readme-parity.mjs              ogni pagina inglese contro le sue traduzioni (npm run check:readme)
 │   ├── i18n-orphans.mjs               le chiavi dei cataloghi contro il codice che le chiede (npm run check:i18n)
 │   ├── fake-provider.mjs              una pagina di stato locale da rompere a mano, più un receiver webhook (npm run fake-provider)
-│   ├── bundle-budget.mjs              la dashboard compilata contro il suo budget gzip (npm run check:bundle)
+│   ├── scaffold.mjs                   un nuovo adapter o canale di notifica, impostato e registrato (npm run new:adapter / new:notifier)
+│   ├── bundle-budget.mjs              la dashboard compilata contro il suo budget gzip, e il catalogo tenuto fuori (npm run check:bundle)
 │   ├── visual-regression.mjs          ogni vista, entrambi i temi, ogni lingua contro test/visual/baseline (npm run test:visual); helper in tools/visual/
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   la sonda canary, test di carico e di mutazione, registrazione dei fixture, note di rilascio, la build a file singolo, icone PWA
 │   ├── build-catalog.mjs              rigenera il catalogo da tools/catalog/seed.json e dalle liste pubbliche (2.1)
@@ -252,6 +253,28 @@ container non raggiunge il loopback dell'host) e si usa
 d'integrazione (`test/integration/fakeProvider.itest.ts`) importa lo stesso
 server e lo fa leggere agli adapter veri, quindi un finto che gli adapter non
 sanno più leggere fa fallire la CI per primo.
+
+**Aggiungere un adapter o un canale** (roadmap 13.8) parte da un generatore, la
+stessa ricetta che seguono le skill `add-status-adapter` e `add-notifier-channel`:
+
+```bash
+npm run new:adapter -- acme-status    # src/adapters/acme-status.adapter.ts e il resto
+npm run new:notifier -- acme-push     # src/notifiers/acme-push.notifier.ts e il resto
+```
+
+Un adapter riceve il suo file, un test (il contratto degli adapter più un test
+di mappatura), un fixture segnaposto in `test/fixtures/<id>/`, la voce nel
+registro e una riga nella tabella degli adapter di
+[3.5](configuration.it.md#35-provider-monitorati), in entrambe le lingue. Un
+canale riceve il suo file, un test, la voce nel registro, `channel.name.<id>` in
+tutti e sei i cataloghi della dashboard (in inglese ovunque finché qualcuno non
+lo traduce) e una riga in [3.6](configuration.it.md#36-canali-di-notifica), in
+entrambe le lingue. Ciò che scrive compila; ciò che non può sapere — l'endpoint,
+le impostazioni — lancia "not implemented", così i test generati falliscono
+finché non viene scritto, e il resto (fixture registrati, caso di contratto,
+schema della Light, seed della UI, variabili d'ambiente) viene stampato come
+lista di controllo. Un id che esiste già viene rifiutato prima di scrivere
+qualunque cosa.
 
 `dev:ui` esegue server e Vite come due processi locali insieme (`concurrently`).
 Il browser parla con Vite su **5173** — è lì che vive l'HMR — e il proxy del dev

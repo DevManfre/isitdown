@@ -21,7 +21,17 @@ If the endpoint 404s, redirects to an HTML page, or returns a different shape, p
 
 ## Step 2 — Scaffold the custom adapter
 
-Create `src/adapters/<provider-id>.adapter.ts` implementing the shared interface
+Run the generator first — it is the same recipe a human contributor follows
+(roadmap 13.8), so the two cannot drift:
+
+```bash
+npm run new:adapter -- <provider-id>
+```
+
+It writes the adapter, its test (contract + one mapping test, failing with
+"not implemented" until you implement it), a placeholder fixture, the registry
+entry (Step 3) and a TODO row in both `docs/configuration*.md` tables (Step 6),
+then prints what is left. Fill the adapter in as below
 (`src/core/adapter.interface.ts` is the source of truth — read it first):
 
 ```ts

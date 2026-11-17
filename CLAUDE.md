@@ -206,11 +206,11 @@ node tools/visual-regression.mjs --only=settings --update   # agree that view
 ## When adding a new monitored provider
 
 1. Check if it runs on Atlassian Statuspage (`<domain>/api/v2/summary.json` returns data) — if so, no new adapter is needed, just add an entry to `config.yml` (Light) or via the dashboard (UI).
-2. If it's non-standard, use the `add-status-adapter` skill (see `.claude/skills/`) to scaffold a new adapter correctly.
+2. If it's non-standard, use the `add-status-adapter` skill (see `.claude/skills/`) to scaffold a new adapter correctly — it starts from `npm run new:adapter -- <id>`, the same generator a human contributor runs (roadmap 13.8).
 
 ## When adding a new notification channel
 
-Use the `add-notifier-channel` skill (see `.claude/skills/`) — it captures the required interface and the formatting conventions so new channels stay consistent with existing ones.
+Use the `add-notifier-channel` skill (see `.claude/skills/`) — it captures the required interface and the formatting conventions so new channels stay consistent with existing ones, and starts from `npm run new:notifier -- <id>`.
 
 ## Skills available in this repo
 

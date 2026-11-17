@@ -9,7 +9,19 @@ Scaffolds a new notifier under `src/notifiers/` for delivering status-change ale
 
 ## Step 1 — Implement the interface
 
-Create `src/notifiers/<channel>.notifier.ts`:
+Run the generator first — it is the same recipe a human contributor follows
+(roadmap 13.8), so the two cannot drift:
+
+```bash
+npm run new:notifier -- <channel>
+```
+
+It writes the notifier (a `create<Channel>Notifier(settings)` factory), its
+test (failing with "not implemented" until you implement it), the registry
+entry, `channel.name.<channel>` in all six dashboard catalogs and in
+`ChannelRow.tsx`, and a TODO row in both `docs/configuration*.md` tables — then
+prints the rest: the contract case, the Light schema, the UI seed, env vars and
+`config.example.yml`. Fill the notifier in along these lines:
 
 ```ts
 import { Notifier, NotificationPayload } from "../core/notifier.interface";

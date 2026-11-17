@@ -137,7 +137,8 @@ isitdown/
 │   ├── readme-parity.mjs              every English page against its translations (npm run check:readme)
 │   ├── i18n-orphans.mjs               catalog keys against the code that asks for them (npm run check:i18n)
 │   ├── fake-provider.mjs              a local status page to break by hand, plus a webhook receiver (npm run fake-provider)
-│   ├── bundle-budget.mjs              the built dashboard against its gzipped budget (npm run check:bundle)
+│   ├── scaffold.mjs                   a new adapter or notification channel, laid out and registered (npm run new:adapter / new:notifier)
+│   ├── bundle-budget.mjs              the built dashboard against its gzipped budget, and the catalog kept out of it (npm run check:bundle)
 │   ├── visual-regression.mjs          every view, both themes, every locale against test/visual/baseline (npm run test:visual); helpers in tools/visual/
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   the canary probe, load and mutation tests, fixture recording, release notes, the single-file build, PWA icons
 │   ├── build-catalog.mjs              regenerates the catalog from tools/catalog/seed.json and the public lists (2.1)
@@ -255,6 +256,26 @@ over from three operational components. Under `dev:docker`, start it with `npm r
 integration suite (`test/integration/fakeProvider.itest.ts`) imports this same
 server and drives it through the real adapters, so a fake the adapters can no
 longer read fails CI first.
+
+**Adding an adapter or a channel** (roadmap 13.8) starts from a generator, the
+same recipe the `add-status-adapter` and `add-notifier-channel` skills follow:
+
+```bash
+npm run new:adapter -- acme-status    # src/adapters/acme-status.adapter.ts and the rest
+npm run new:notifier -- acme-push     # src/notifiers/acme-push.notifier.ts and the rest
+```
+
+An adapter gets its file, a test (the adapter contract plus one mapping test), a
+placeholder fixture under `test/fixtures/<id>/`, its registry entry and a row in
+the adapter table of [3.5](configuration.md#35-monitored-providers), in both
+languages. A channel gets its file, a test, its registry entry,
+`channel.name.<id>` in all six dashboard catalogs (English everywhere until
+someone translates it) and a row in [3.6](configuration.md#36-notification-channels),
+in both languages. What it writes compiles; what it cannot know — the endpoint,
+the settings — throws "not implemented", so the generated tests fail until it is
+written, and the rest (recorded fixtures, contract case, Light schema, UI seed,
+env vars) is printed as a checklist. An id that already exists is refused before
+anything is written.
 
 `dev:ui` runs the server and Vite as two local processes together (`concurrently`).
 The browser talks to Vite on **5173** — that is where HMR lives — and Vite's own
