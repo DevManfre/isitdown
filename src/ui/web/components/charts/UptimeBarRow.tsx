@@ -147,7 +147,14 @@ export function UptimeBarRow({
             </pattern>
           ))}
         </defs>
-        <Bar dataKey="value" isAnimationActive={false} radius={1}>
+        {/* `crispEdges`: ninety bars across a width that is rarely a multiple
+            of ninety put every bar edge mid-pixel, and how an antialiased edge
+            pixel is shaded is not portable — the same frame came out a pixel
+            wider per bar on a CI runner than locally, so the Overview's
+            baselines could never hold on both (ALE-230). Without antialiasing
+            a pixel is in or out, decided from coordinates every machine
+            computes alike. At 1px of radius nothing visible is lost. */}
+        <Bar dataKey="value" isAnimationActive={false} radius={1} shapeRendering="crispEdges">
           {data.map((entry) => (
             <Cell
               key={entry.day}
