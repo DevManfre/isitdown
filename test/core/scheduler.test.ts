@@ -5,7 +5,7 @@ import { manualClock } from "../helpers/manualClock.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import type { CycleResult, Poller } from "../../src/core/poller.ts";
 import type { ChannelConfig, ConfigSource, RuntimeConfig } from "../../src/core/configSource.interface.ts";
-import type { Dispatcher, SentRecord } from "../../src/core/notificationDispatcher.ts";
+import type { Dispatcher, SentRecord } from "../../src/core/dispatcher.interface.ts";
 import type { StatusChange } from "../../src/core/types.ts";
 import { CATCH_ALL_RULE } from "../../src/core/routing.ts";
 

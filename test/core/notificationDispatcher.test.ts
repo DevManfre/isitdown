@@ -1,7 +1,8 @@
 import { manualClock, type ManualClock } from "../helpers/manualClock.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createDispatcher, type SentRecord } from "../../src/core/notificationDispatcher.ts";
+import type { SentRecord } from "../../src/core/dispatcher.interface.ts";
+import { createDispatcher } from "../../src/core/notificationDispatcher.ts";
 import { createLogger } from "../../src/core/logger.ts";
 import { CATCH_ALL_RULE } from "../../src/core/routing.ts";
 import { DELIVERY_DEFAULTS, type DeliveryConfig } from "../../src/core/delivery.ts";

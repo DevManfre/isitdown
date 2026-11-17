@@ -1,4 +1,4 @@
-import type { SentRecord } from "../../../src/core/notificationDispatcher.ts";
+import type { SentRecord } from "../../../src/core/dispatcher.interface.ts";
 
 /** What `GET /notifications/log` answers, as the dashboard reads it. */
 export interface DeliveryLogBody {

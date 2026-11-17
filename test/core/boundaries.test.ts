@@ -165,7 +165,7 @@ test("no core test waits on real timers or patches the global clock", async () =
 
 test("the scheduler, poller and dispatcher read the time only from their clock", async () => {
   const offenders: string[] = [];
-  for (const file of ["src/core/scheduler.ts", "src/core/poller.ts", "src/core/notificationDispatcher.ts"]) {
+  for (const file of ["src/core/scheduler.ts", "src/core/poller.ts", "src/core/notificationDispatcher.ts", "src/core/dispatchSender.ts", "src/core/dispatchEscalation.ts", "src/core/dispatchChannelHealth.ts"]) {
     const lines = (await readFile(file, "utf8")).split("\n");
     lines.forEach((line, index) => {
       if (/^\s*(\/\/|\*)/.test(line)) return;

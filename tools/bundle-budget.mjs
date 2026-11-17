@@ -210,8 +210,17 @@ const ASSETS = "dist/ui/public/assets";
  * thirty strings in six catalogs (the metric lane's peak sentences, the add
  * form and its hints); the rest is the lane, the Settings rows and the pure
  * module that draws the line. No dependency was added.
+ *
+ * It moved 772,000 -> 783,000 (753.9 -> 764.6 kB) for Renovate's first
+ * devDependencies lot (PR #36). Measured: 750.1 kB gzipped before, 761.0 kB
+ * after — 10.9 kB, and no line of the dashboard changed. It is the runtime
+ * libraries moving inside their ranges: motion 13.1 -> 13.5, react-router
+ * 8.3 -> 8.5 (which now pulls in @remix-run/route-pattern), recharts
+ * 3.8 -> 3.10 (immer 10 -> 11 with it), i18next 26.4 -> 26.7, lucide-react
+ * 1.33 -> 1.72, @tanstack/react-query and react-table. No direct dependency
+ * was added.
  */
-export const BUDGET = { js: 772_000, css: 23_500 };
+export const BUDGET = { js: 783_000, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];
