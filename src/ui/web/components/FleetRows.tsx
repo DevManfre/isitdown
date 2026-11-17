@@ -17,6 +17,13 @@ import type { HistoryBucket, ProviderStatus } from "@/lib/types.ts";
  * provider reads the same wherever it appears rather than as two rows that
  * drifted apart. The status column is 128px: the longest status word, Italian's
  * "Interruzione parziale", fits it in sentence case at 14px.
+ *
+ * The figure's column is fixed too, at 64px: "100.00%", the widest any locale
+ * writes, is ~59px in 14px mono. Each row is its own grid, so an `auto` column
+ * sized itself to its own text — a 100% row's bars came out narrower than a
+ * 93% row's, misaligned down the list, and by a fraction of a pixel that
+ * depended on the machine's font rasterisation, which is what made the
+ * Overview's visual baselines hold in CI and fail locally.
  */
 export function ProviderRow({
   provider, buckets, delay,
@@ -40,7 +47,7 @@ export function ProviderRow({
        row on its own full-width line under the pair that labels it. */
     <div
       {...pulseAttr(pulses, provider.id)}
-      className="overview-row anim-rise grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-3 lg:grid-cols-[minmax(0,200px)_1fr_auto_minmax(0,128px)] lg:gap-6"
+      className="overview-row anim-rise grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-5 py-3 lg:grid-cols-[minmax(0,200px)_1fr_4rem_minmax(0,128px)] lg:gap-6"
       style={delay === undefined ? undefined : { animationDelay: delay }}
     >
       <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-3">
