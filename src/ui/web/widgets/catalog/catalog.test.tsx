@@ -162,6 +162,14 @@ describe("catalogue widgets", () => {
     expect(await screen.findByText(t("widget.provider-tile.missing", { provider: "heroku" }))).toBeInTheDocument();
   });
 
+  it("provider tile: while the fleet is still loading, waits rather than calling its provider gone", async () => {
+    // Found by the component catalog (roadmap 13.9): `/status` on the wire
+    // read as "no such provider".
+    show({ id: "w", type: "provider-tile", width: "full", props: { provider: "stripe" } }, { status: new Promise(() => {}) });
+    expect(await screen.findByText(t("dashboard.widget.provider-tile.title"))).toBeInTheDocument();
+    expect(screen.queryByText(t("widget.provider-tile.missing", { provider: "stripe" }))).not.toBeInTheDocument();
+  });
+
   it("sparklines: says who is getting worse than the month before", async () => {
     const day = (i: number, uptime: number) => ({ day: `2026-08-${String((i % 28) + 1).padStart(2, "0")}`, uptime });
     const series = (before: number, after: number) => [
