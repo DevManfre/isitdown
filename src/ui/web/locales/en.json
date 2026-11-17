@@ -2172,5 +2172,10 @@
   "series.add.query-hint": "Must return one series — wrap it in sum(...). A bearer token, if Prometheus needs one, goes in PROMETHEUS_TOKEN.",
   "series.add.file": "CSV file",
   "series.add.file-hint": "timestamp,value per line, ISO 8601 or Unix seconds. Up to 50,000 rows.",
-  "series.add.action": "Add metric"
+  "series.add.action": "Add metric",
+  "component-catalog.title": "Components",
+  "component-catalog.component": "Component",
+  "component-catalog.language": "Language",
+  "component-catalog.all": "All",
+  "component-catalog.missing": "No story called “{id}”."
 }

@@ -45,6 +45,8 @@ const ROOT = new URL("../", import.meta.url).pathname;
 const BASELINE_DIR = join(ROOT, "test/visual/baseline");
 const OUTPUT_DIR = join(ROOT, "test/visual/current");
 const WEB_DIR = join(ROOT, "dist/ui/public");
+/** The component catalog's build (roadmap 13.9), what `--stories` renders. */
+const CATALOG_DIR = join(ROOT, "dist/catalog");
 
 /** Every view the rail can reach, by its hash route. */
 const VIEWS = [
@@ -260,28 +262,114 @@ function reportAccessibility(found) {
   return false;
 }
 
+/**
+ * Roadmap 13.9. Every story of the component catalog, in both themes and both
+ * locales, each captured as the component's own box rather than a whole view:
+ * a baseline a few hundred pixels across, which moves only when its component
+ * does. The catalog's fake API answers every request, so no fixture database
+ * and no server module — just its static build.
+ */
+async function renderStories(only, judge, accessibility) {
+  const { default: express } = await import("express");
+  const app = express();
+  app.use(express.static(CATALOG_DIR));
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  const base = `http://127.0.0.1:${server.address().port}/__catalog/`;
+  try {
+    await withBrowser({ frozenAt: NOW, timeZone: TIME_ZONE }, async ({ shot }) => {
+      const { value: ids } = await shot({
+        url: `${base}?list`,
+        colorScheme: "light",
+        storage: {},
+        ...VIEWPORT,
+        read: `JSON.parse(document.getElementById("story-ids").textContent)`,
+      });
+      // `--only=provider-tile` is every story of that component; a full id is one.
+      const picked = ids.filter((id) => only === undefined || id === only || id.startsWith(`${only}--`));
+      if (picked.length === 0) throw new Error(`no story matches --only=${only}`);
+      for (const id of picked) {
+        for (const theme of THEMES) {
+          for (const locale of LOCALES) {
+            const { png, violations } = await shot({
+              url: `${base}?${new URLSearchParams({ story: id, theme, locale })}`,
+              colorScheme: theme,
+              storage: {},
+              ...VIEWPORT,
+              audit: true,
+              // The component itself, or the error boundary standing in for it.
+              clip: "#view > :first-child",
+            });
+            for (const violation of violations) accessibility.push({ frame: `${id}-${theme}-${locale}`, ...violation });
+            await judge(shotName(id, theme, locale), png);
+          }
+        }
+      }
+    });
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
 async function main() {
   const update = process.argv.includes("--update");
   const only = process.argv.find((argument) => argument.startsWith("--only="))?.slice("--only=".length);
+  // Roadmap 13.9: the catalog's stories, one component per frame, instead of
+  // whole views. Their own baselines, beside the views' rather than among them.
+  const stories = process.argv.includes("--stories");
+  const baselineDir = stories ? join(BASELINE_DIR, "stories") : BASELINE_DIR;
+  const outputDir = stories ? join(OUTPUT_DIR, "stories") : OUTPUT_DIR;
 
-  if (!existsSync(join(WEB_DIR, "index.html"))) {
-    console.error(`no dashboard bundle in ${WEB_DIR}. Run "npm run build:ui" first.`);
+  const bundle = stories ? join(CATALOG_DIR, "__catalog", "index.html") : join(WEB_DIR, "index.html");
+  if (!existsSync(bundle)) {
+    console.error(`no bundle at ${bundle}. Run "npm run ${stories ? "build:catalog" : "build:ui"}" first.`);
     process.exit(1);
   }
 
   // Before the fixture is written and before the server module is loaded.
   freezeClock(NOW);
 
-  await mkdir(update ? BASELINE_DIR : OUTPUT_DIR, { recursive: true });
-  const targetDir = update ? BASELINE_DIR : OUTPUT_DIR;
+  await mkdir(update ? baselineDir : outputDir, { recursive: true });
   const failures = [];
   const written = [];
+
+  /** Writes one frame, and unless agreeing, compares it with its baseline. */
+  async function judge(name, png) {
+    const path = join(update ? baselineDir : outputDir, name);
+    await writeFile(path, png);
+    written.push(name);
+    if (update) return;
+
+    const baselinePath = join(baselineDir, name);
+    if (!existsSync(baselinePath)) {
+      failures.push(`${name}: no baseline yet — review ${path} and re-run with --update`);
+      return;
+    }
+    const result = comparePng(
+      downscale(decodePng(await readFile(baselinePath)), SCALE),
+      downscale(decodePng(png), SCALE),
+      CHANNEL_THRESHOLD,
+      STRONG_THRESHOLD,
+    );
+    if (result.sizeChanged) {
+      failures.push(`${name}: the frame changed size`);
+    } else if (result.differing > MAX_MOVED) {
+      failures.push(
+        `${name}: ${result.differing} of ${result.total} cells moved (${(result.ratio * 100).toFixed(2)}%) — see ${path}`,
+      );
+    } else if (result.recoloured > MAX_RECOLOURED) {
+      failures.push(`${name}: ${result.recoloured} cells changed colour outright — see ${path}`);
+    }
+  }
   // What axe found on every frame (roadmap 4.20). Gathered across the run and
   // reported together, so one bad token is one line per frame rather than a run
   // that stops at the first.
   const accessibility = [];
 
-  for (const fixture of RUN_FIXTURES) {
+  if (stories) await renderStories(only, judge, accessibility);
+
+  for (const fixture of stories ? [] : RUN_FIXTURES) {
     const views = VIEWS.filter(
       (view) => (view.fixture ?? "default") === fixture && (only === undefined || view.name === only),
     );
@@ -306,34 +394,7 @@ async function main() {
                 accessibility.push({ frame: `${view.name}-${theme}-${locale}`, ...violation });
               }
 
-              const path = join(targetDir, name);
-              await writeFile(path, png);
-              written.push(name);
-
-              if (update) continue;
-
-              const baselinePath = join(BASELINE_DIR, name);
-              if (!existsSync(baselinePath)) {
-                failures.push(`${name}: no baseline yet — review ${path} and re-run with --update`);
-                continue;
-              }
-              const result = comparePng(
-                downscale(decodePng(await readFile(baselinePath)), SCALE),
-                downscale(decodePng(png), SCALE),
-                CHANNEL_THRESHOLD,
-                STRONG_THRESHOLD,
-              );
-              if (result.sizeChanged) {
-                failures.push(`${name}: the frame changed size`);
-              } else if (result.differing > MAX_MOVED) {
-                failures.push(
-                  `${name}: ${result.differing} of ${result.total} cells moved (${(result.ratio * 100).toFixed(2)}%) — see ${path}`,
-                );
-              } else if (result.recoloured > MAX_RECOLOURED) {
-                failures.push(
-                  `${name}: ${result.recoloured} cells changed colour outright — see ${path}`,
-                );
-              }
+              await judge(name, png);
             }
           }
         }
@@ -361,11 +422,11 @@ async function main() {
   if (update) {
     // A view that was removed leaves a baseline nothing renders any more, and a
     // stale baseline is a check that passes for the wrong reason.
-    const stale = (await readdir(BASELINE_DIR)).filter(
+    const stale = (await readdir(baselineDir)).filter(
       (name) => name.endsWith(".png") && !written.includes(name),
     );
     if (only === undefined) {
-      for (const name of stale) await rm(join(BASELINE_DIR, name));
+      for (const name of stale) await rm(join(baselineDir, name));
     }
     console.log(`agreed ${written.length} baselines${stale.length > 0 && only === undefined ? `, dropped ${stale.length} stale` : ""}`);
     // Agreeing to a picture is not agreeing to a violation: the baselines are
@@ -383,7 +444,7 @@ async function main() {
   }
 
   console.log(`${written.length} views match their baselines`);
-  await rm(OUTPUT_DIR, { recursive: true, force: true });
+  await rm(outputDir, { recursive: true, force: true });
 }
 
 await main();

@@ -2172,5 +2172,10 @@
   "series.add.query-hint": "Doit renvoyer une seule série — entourez-la de sum(...). Un jeton bearer, si Prometheus en demande un, va dans PROMETHEUS_TOKEN.",
   "series.add.file": "Fichier CSV",
   "series.add.file-hint": "timestamp,valeur par ligne, ISO 8601 ou secondes Unix. Jusqu'à 50 000 lignes.",
-  "series.add.action": "Ajouter la métrique"
+  "series.add.action": "Ajouter la métrique",
+  "component-catalog.title": "Composants",
+  "component-catalog.component": "Composant",
+  "component-catalog.language": "Langue",
+  "component-catalog.all": "Tous",
+  "component-catalog.missing": "Aucune story nommée « {id} »."
 }

@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json && vite build && node tools/copy-assets.mjs",
     "build:light": "tsc -p tsconfig.light.json && node tools/copy-assets.mjs",
     "build:ui": "tsc -p tsconfig.json && vite build && node tools/copy-assets.mjs",
+    "build:catalog": "vite build --mode catalog",
     "build:cli": "tsc -p tsconfig.cli.json && node tools/copy-assets.mjs",
     "build:sea": "node tools/build-sea.mjs",
     "check:config": "node src/light/check.ts",
@@ -36,6 +37,7 @@
     "test:load": "node tools/loadtest.mjs",
     "test:mutation": "node tools/mutation.mjs",
     "test:visual": "node tools/visual-regression.mjs",
+    "test:visual:stories": "node tools/visual-regression.mjs --stories",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {

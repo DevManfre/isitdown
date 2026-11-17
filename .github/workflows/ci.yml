@@ -169,6 +169,15 @@ jobs:
       - name: Visual regression (every view, both themes, both locales)
         run: npm run test:visual
 
+      # Roadmap 13.9. The component catalog, built on its own (it never enters
+      # the dashboard's bundle), then every story captured as its component's
+      # own box against test/visual/baseline/stories.
+      - name: Build the component catalog
+        run: npm run build:catalog
+
+      - name: Visual regression (every catalog story)
+        run: npm run test:visual:stories
+
       # The rendered frames, so a failure can be looked at rather than argued
       # about. Only on failure: 24 screenshots per green run is noise.
       - name: Upload the rendered views

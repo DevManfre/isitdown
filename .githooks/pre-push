@@ -36,7 +36,11 @@ if ! npm run build:ui >/dev/null; then
   echo "pre-push: the build failed, so there is nothing to compare" >&2
   exit 1
 fi
-if ! npm run test:visual; then
+if ! npm run build:catalog >/dev/null; then
+  echo "pre-push: the component catalog failed to build" >&2
+  exit 1
+fi
+if ! { npm run test:visual && npm run test:visual:stories; }; then
   cat >&2 <<'EOF'
 
 pre-push: the rendered views no longer match their baselines.
@@ -46,6 +50,7 @@ pre-push: the rendered views no longer match their baselines.
   touches, one at a time, and look at each:
 
       node tools/visual-regression.mjs --only=<view> --update
+      node tools/visual-regression.mjs --stories --only=<component> --update
 
   Never agree the whole set blind: --update with no --only rewrites all 24,
   which is how a half-rendered frame once became the baseline.

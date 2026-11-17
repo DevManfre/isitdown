@@ -110,6 +110,7 @@ isitdown/
 │           ├── views/                  overview, providers, provider detail, components, incidents,
 │           │                           incident detail, history, delivery log, settings, wallboard
 │           ├── widgets/                the Overview's widget registry, grid drag and layout draft; catalog/ holds one file per widget
+│           ├── __catalog/              the component catalog (13.9): stories, one isolated frame each, dev server only
 │           ├── hooks/                  queries, theme, live, shortcuts, busy, pull-to-refresh …
 │           ├── lib/                    api, types, chartConfig, format, i18n, shortcuts …
 │           ├── css/base.css            Tailwind entry point: imports tailwindcss, tokens, motion
@@ -318,6 +319,7 @@ npm run coverage         # the same two suites under a coverage floor
                          # (coverage:server and coverage:web run one each, as CI does)
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
 npm run test:visual      # visual baselines + an axe-core pass: every view, both themes, both locales
+npm run test:visual:stories # the same per component: every catalog story (needs build:catalog)
 npm run test:mutation    # mutation testing on the diff engine
 npm run test:load        # 200 synthetic providers, a week of history, every read timed
 npm run canary           # every catalog page, live, against its adapter's fixtures (1.9)
@@ -329,13 +331,32 @@ npm run lint             # Biome, check only: correctness + suspicious rules, no
 npm run build:light      # tsc + copy assets, excluding src/ui
 npm run build:ui         # tsc + vite build + copy assets
 npm run build:cli        # tsc + copy assets, src/core/i18n and src/cli only (10.1)
+npm run build:catalog    # the component catalog alone, into dist/catalog (13.9)
 ```
 
 The bundle budget (roadmap 5.16) weighs what `build:ui` emitted, gzipped,
 because that is what the browser downloads: `731,000` bytes of JavaScript and `23,500` of
 CSS (`BUDGET` in `tools/bundle-budget.mjs`), both a little over today's build. It is
 a ceiling rather than a target — when it fails, find what grew first; it has only
-been raised in a commit that names the roadmap rows that grew it.
+been raised in a commit that names the roadmap rows that grew it. The same check
+fails if any built asset carries the component catalog's marker
+(`CATALOG_MARKER` in `src/ui/web/__catalog/marker.ts`): the catalog is a
+development page and never ships.
+
+The **component catalog** (roadmap 13.9) shows every catalogued component in
+every state — populated, empty, loading, error, every severity — light and dark
+side by side, in any of the six languages. With `npm run dev:ui` running it is
+at `http://localhost:5173/__catalog/`; `?story=<id>&theme=dark&locale=it` opens
+one story alone. Stories are plain objects in `src/ui/web/__catalog/stories.tsx`
+— `{ id, component, props, state }`, plus `fixtures` (what the fake API
+answers, the same routing the Vitest harness uses, from
+`src/ui/web/test/fakeApi.ts`) and `storage` (what the browser remembers). Each
+story renders in its own frame with its own in-memory storage and a `fetch`
+that never reaches the server, so a component's loading state is a request
+actually held, its error state a request actually failed. No Storybook: the
+catalog is a second Vite entry, `__catalog/index.html`, that the production
+build never names. `stories.test.tsx` renders every story and checks it is in
+the state it claims; adding a component means adding its stories there.
 
 The **orphan-key check** (roadmap 13.5, `tools/i18n-orphans.mjs`) compares
 both English catalogs, the dashboard's `src/ui/web/locales/en.json` and the
@@ -507,7 +528,12 @@ Notable suites:
   states roadmap 4.21 pins (`overview-empty`, `history-quiet`,
   `overview-offline`, …). Run
   `node tools/visual-regression.mjs --update` to agree to an intended change, and
-  `--only=<view>` while iterating on one.
+  `--only=<view>` while iterating on one. `--stories` renders the component
+  catalog's stories instead (`npm run test:visual:stories`, after
+  `npm run build:catalog`): each frame is the component's own box, clipped out of
+  the page, with baselines under `test/visual/baseline/stories/` — a few hundred
+  pixels across, moving only when that component does. `--only=` takes a
+  component (`--only=provider-tile`) or one story id.
 
   That 1.5%-of-edge-pixels noise assumes the machine running Chromium has the
   system fonts Playwright's own Chromium build expects — CI gets them because

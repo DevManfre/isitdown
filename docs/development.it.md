@@ -103,6 +103,7 @@ isitdown/
 │           ├── views/                 overview, providers, dettaglio provider, components, incidents,
 │           │                          dettaglio incidente, history, log invii, settings, wallboard
 │           ├── widgets/               il registro dei widget dell'Overview, drag della griglia e bozza del layout; catalog/ ha un file per widget
+│           ├── __catalog/             il catalogo dei componenti (13.9): storie, ognuna nel suo frame isolato, solo nel dev server
 │           ├── hooks/                 queries, theme, live, shortcuts, busy, pull-to-refresh …
 │           ├── lib/                   api, types, chartConfig, format, i18n, shortcuts …
 │           ├── css/base.css            punto di ingresso Tailwind: importa tailwindcss, tokens, motion
@@ -316,6 +317,7 @@ npm run coverage         # le stesse due suite sotto una soglia minima di copert
                          # (coverage:server e coverage:web ne eseguono una ciascuno, come fa la CI)
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
 npm run test:visual      # baseline visive + un passaggio axe-core: ogni vista, entrambi i temi, entrambe le lingue
+npm run test:visual:stories # lo stesso per componente: ogni storia del catalogo (serve build:catalog)
 npm run test:mutation    # mutation testing sul diff engine
 npm run test:load        # 200 provider sintetici, una settimana di storico, ogni lettura cronometrata
 npm run canary           # ogni pagina del catalogo, dal vivo, contro i fixture del suo adapter (1.9)
@@ -327,6 +329,7 @@ npm run lint             # Biome, solo controllo: regole correctness + suspiciou
 npm run build:light      # tsc + copia asset, escludendo src/ui
 npm run build:ui         # tsc + vite build + copia asset
 npm run build:cli        # tsc + copia asset, solo src/core/i18n e src/cli (10.1)
+npm run build:catalog    # solo il catalogo dei componenti, in dist/catalog (13.9)
 ```
 
 Il budget del bundle (roadmap 5.16) pesa ciò che `build:ui` ha prodotto, in
@@ -334,6 +337,25 @@ gzip, perché è quello che il browser scarica: `731,000` byte di JavaScript e `
 CSS (`BUDGET` in `tools/bundle-budget.mjs`), entrambi poco sopra la build di oggi. È
 un tetto, non un obiettivo — quando fallisce, prima si trova cosa è cresciuto; è stato
 alzato solo in un commit che nomina le righe di roadmap che l'hanno fatto crescere.
+Lo stesso controllo fallisce se un asset compilato contiene il marcatore del
+catalogo dei componenti (`CATALOG_MARKER` in `src/ui/web/__catalog/marker.ts`):
+il catalogo è una pagina di sviluppo e non viene mai distribuito.
+
+Il **catalogo dei componenti** (roadmap 13.9) mostra ogni componente catalogato
+in ogni stato — popolato, vuoto, caricamento, errore, ogni severità — chiaro e
+scuro affiancati, in una qualunque delle sei lingue. Con `npm run dev:ui` avviato
+si trova su `http://localhost:5173/__catalog/`; `?story=<id>&theme=dark&locale=it`
+apre una storia da sola. Le storie sono oggetti semplici in
+`src/ui/web/__catalog/stories.tsx` — `{ id, component, props, state }`, più
+`fixtures` (cosa risponde l'API finta, con lo stesso instradamento dell'harness
+di Vitest, da `src/ui/web/test/fakeApi.ts`) e `storage` (cosa ricorda il
+browser). Ogni storia gira nel suo frame, con uno storage in memoria tutto suo e
+un `fetch` che non arriva mai al server: lo stato di caricamento di un componente
+è una richiesta davvero trattenuta, quello di errore una richiesta davvero
+fallita. Niente Storybook: il catalogo è un secondo entry di Vite,
+`__catalog/index.html`, che la build di produzione non nomina mai.
+`stories.test.tsx` renderizza ogni storia e controlla che sia nello stato che
+dichiara; aggiungere un componente vuol dire aggiungere lì le sue storie.
 
 Il **controllo delle chiavi orfane** (roadmap 13.5, `tools/i18n-orphans.mjs`)
 confronta entrambi i cataloghi inglesi, quello della dashboard
@@ -521,7 +543,13 @@ Suite notevoli:
   ogni richiesta API — gli stati che la roadmap 4.21 fissa (`overview-empty`,
   `history-quiet`, `overview-offline`, …).
   `node tools/visual-regression.mjs --update` accetta un cambio
-  voluto, `--only=<vista>` serve mentre si itera su una sola.
+  voluto, `--only=<vista>` serve mentre si itera su una sola. `--stories`
+  renderizza invece le storie del catalogo dei componenti
+  (`npm run test:visual:stories`, dopo `npm run build:catalog`): ogni frame è il
+  riquadro del componente, ritagliato dalla pagina, con le baseline in
+  `test/visual/baseline/stories/` — poche centinaia di pixel di lato, che si
+  muovono solo quando si muove quel componente. `--only=` accetta un componente
+  (`--only=provider-tile`) o l'id di una storia.
 
   Quel rumore dell'1,5% lungo i bordi del testo presuppone che la macchina su
   cui gira Chromium abbia i font di sistema che la build di Chromium di

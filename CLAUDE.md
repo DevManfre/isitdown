@@ -43,6 +43,7 @@ npm run build:cli && node dist/cli/index.js watch --url http://localhost:3000   
 npm run dev:docker                                  # UI edition, container, rebuild-on-save
 npm run dev:ui                                      # UI edition, local, HMR on :5173
 npm run fake-provider                               # a status page to break by hand on :4010 (roadmap 13.11)
+# component catalog: every component in every state, on :5173/__catalog/ while dev:ui runs (roadmap 13.9)
 ```
 
 `dev:docker` and `dev:ui` both run the UI edition straight from the source tree,
@@ -143,6 +144,8 @@ npm run typecheck        # tsc -p tsconfig.json (server + core) and
 npm run check:bundle     # the built dashboard against its gzipped budget (needs build:ui)
 npm run test:visual      # every view, both themes, both locales, against
                           # test/visual/baseline/ (needs a fresh build:ui)
+npm run test:visual:stories # every component-catalog story, clipped to the component,
+                          # against test/visual/baseline/stories/ (needs build:catalog)
 ```
 
 Requires Node 26 (`.nvmrc`); `npm install` refuses an older one.
