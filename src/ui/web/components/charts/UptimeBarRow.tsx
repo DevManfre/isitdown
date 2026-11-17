@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { Bar, BarChart, Cell, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Cell, XAxis, YAxis, type BarShapeProps } from "recharts";
 import { useTranslation } from "react-i18next";
 import {
   ChartContainer,
@@ -22,6 +22,28 @@ import type { HistoryBucket } from "@/lib/types.ts";
 import { cn } from "@/lib/utils.ts";
 
 const HEIGHT: Record<BarScale, number> = { row: 44, compact: 22, poll: 26 };
+
+/**
+ * One bar, with every edge rounded to a whole pixel — see where `Bar` uses it.
+ * Each edge is rounded rather than the width, so neighbours keep the gap
+ * between them and the row keeps its length; a bar never drops under 1px.
+ * The Cell's own fill and opacity arrive in the props Recharts hands over.
+ */
+function PixelBar({ x = 0, y = 0, width = 0, height = 0, fill, opacity }: BarShapeProps) {
+  const left = Math.round(x);
+  const top = Math.round(y);
+  return (
+    <rect
+      x={left}
+      y={top}
+      width={Math.max(1, Math.round(x + width) - left)}
+      height={Math.max(1, Math.round(y + height) - top)}
+      rx={1}
+      fill={fill}
+      opacity={opacity}
+    />
+  );
+}
 
 /**
  * One bar per day, oldest first: the status-page uptime row.
@@ -147,14 +169,13 @@ export function UptimeBarRow({
             </pattern>
           ))}
         </defs>
-        {/* `crispEdges`: ninety bars across a width that is rarely a multiple
-            of ninety put every bar edge mid-pixel, and how an antialiased edge
-            pixel is shaded is not portable — the same frame came out a pixel
-            wider per bar on a CI runner than locally, so the Overview's
-            baselines could never hold on both (ALE-230). Without antialiasing
-            a pixel is in or out, decided from coordinates every machine
-            computes alike. At 1px of radius nothing visible is lost. */}
-        <Bar dataKey="value" isAnimationActive={false} radius={1} shapeRendering="crispEdges">
+        {/* Each bar drawn on whole pixels (`PixelBar`): ninety bars across a
+            width that is rarely a multiple of ninety leave every edge
+            mid-pixel, and how a rasteriser settles a fractional edge is not
+            portable — Recharts' 4.0000005px bars came out 4px wide locally
+            and 5px on a CI runner, so the Overview's baselines could never
+            hold on both (ALE-230). */}
+        <Bar dataKey="value" isAnimationActive={false} shape={PixelBar}>
           {data.map((entry) => (
             <Cell
               key={entry.day}
