@@ -55,6 +55,11 @@ jobs:
       # t() call asks for that en.json lacks fails the job.
       - name: i18n orphan and missing keys
         run: npm run check:i18n
+      # Roadmap 13.6. An expired quarantine entry fails here, whatever the
+      # tests do: the test is blocking again, and the entry has to go (or be
+      # renewed with a reason). The live ones are listed in the summary.
+      - name: Test quarantine
+        run: npm run check:quarantine
 
   # Roadmap 7.2. The same two suites `npm test` runs, each under a coverage
   # floor: a new subsystem that lands without tests of its own drags the total
@@ -197,7 +202,23 @@ jobs:
     needs: [static, server-tests, dashboard-tests, dashboard-coverage, build]
     if: always()
     runs-on: ubuntu-latest
+    # Reads this run's job timings for the time budget below.
+    permissions:
+      contents: read
+      actions: read
     steps:
+      # Roadmap 13.6. Every job's duration against its ceiling, as a table in
+      # the run's summary; a job over its ceiling is a warning, never a red run.
+      # Runs on the runner's own Node: the script needs nothing but fetch.
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: tools
+      - name: CI time budget
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/ci-durations.mjs
+
       - name: Every job above passed
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}

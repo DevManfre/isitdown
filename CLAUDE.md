@@ -139,6 +139,7 @@ npm test                 # unit tests: node:test (*.test.ts — adapters, diff e
 npm run coverage         # the same two suites under a coverage floor (server 95/88/93,
                           # dashboard 85/75/80) — CI runs this instead of `npm test`
 npm run test:integration # end to end: *.itest.ts — fake provider and webhook receiver
+npm run check:quarantine # test/quarantine.json: an expired entry fails CI (roadmap 13.6)
 npm run typecheck        # tsc -p tsconfig.json (server + core) and
                           # tsc -p tsconfig.web.json (dashboard React tree)
 npm run check:bundle     # the built dashboard against its gzipped budget (needs build:ui)

@@ -347,6 +347,7 @@ npm run canary           # every catalog page, live, against its adapter's fixtu
 npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
 npm run check:i18n       # catalog keys no code uses (warning) and used keys a catalog lacks (error)
+npm run check:quarantine # test/quarantine.json: fails on an expired or malformed entry (13.6)
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
 npm run lint             # Biome, check only: correctness + suspicious rules, no formatter
 npm run build:light      # tsc + copy assets, excluding src/ui
@@ -392,6 +393,27 @@ catalog of its scope in one go, line by line, so the diff shows only the
 deleted keys. A `t("…")` call naming a key the catalog lacks fails the step,
 because the user would see the raw key. Test files are not scanned: a key
 that only its own test asks for still has nothing rendering it.
+
+**Unstable tests are quarantined, never retried** (roadmap 13.6). An entry in
+`test/quarantine.json` names one test — `suite` (`server` or `dashboard`),
+`name` (its describe names and its own, joined by spaces, as both runners print
+it), `owner`, `reason`, `issue` (a link) and `expires` (a date). Every
+`npm test` and `coverage:*` script runs through `tools/quarantine.mjs`: while an
+entry is live, its test is skipped in the blocking run and executed in a second,
+non-blocking one, whose result goes to the job summary — so it keeps running,
+and a fix shows up as "passed — maybe stable again". From the day after
+`expires`, the test is blocking again and `npm run check:quarantine` (CI's
+`static` job) fails until the entry is removed or renewed with a reason in the
+diff. With the file empty, the scripts run exactly as before. Nothing retries a
+failed test anywhere: a retry hides a flaky test, quarantine names it.
+
+**CI's time budget** (roadmap 13.6) is the last step of `verify`:
+`tools/ci-durations.mjs` reads every job's timing for the run from the GitHub
+API and writes a table to the run summary, with a warning annotation on any job
+over its ceiling. The ceilings (`CEILINGS` in that file) are about 1.5× the
+slowest of six green runs; a test checks that every job `ci.yml` defines has
+one. Over a ceiling is a warning, never a red run — raise the ceiling in the
+commit that makes the job slower, and say why.
 
 The coverage floor (roadmap 7.2) is a floor, not a target to game. Two of them,
 because the two suites cover different halves: the server and the engine must

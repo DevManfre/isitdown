@@ -347,6 +347,7 @@ npm run canary           # ogni pagina del catalogo, dal vivo, contro i fixture 
 npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run check:i18n       # chiavi di catalogo che nessun codice usa (avviso) e chiavi usate che mancano (errore)
+npm run check:quarantine # test/quarantine.json: fallisce su una voce scaduta o malformata (13.6)
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
 npm run lint             # Biome, solo controllo: regole correctness + suspicious, nessun formatter
 npm run build:light      # tsc + copia asset, escludendo src/ui
@@ -396,6 +397,28 @@ chiamata `t("…")` che nomina una chiave assente dal catalogo fa fallire il
 passo, perché l'utente vedrebbe la chiave grezza. I file di test non vengono
 letti: una chiave che solo il suo test chiede non ha comunque niente che la
 mostri.
+
+**I test instabili vanno in quarantena, mai ripetuti** (roadmap 13.6). Una voce
+in `test/quarantine.json` nomina un test — `suite` (`server` o `dashboard`),
+`name` (i nomi dei describe e il suo, uniti da spazi, come li stampano entrambi i
+runner), `owner`, `reason`, `issue` (un link) e `expires` (una data). Ogni
+script `npm test` e `coverage:*` passa per `tools/quarantine.mjs`: finché una
+voce è attiva, il suo test viene saltato nel run bloccante ed eseguito in un
+secondo run non bloccante, il cui esito va nel riepilogo del job — così continua
+a girare, e una correzione si vede come "passed — maybe stable again". Dal
+giorno dopo `expires` il test torna bloccante e `npm run check:quarantine` (il
+job `static` della CI) fallisce finché la voce non viene tolta o rinnovata con
+un motivo nel diff. Con il file vuoto gli script girano esattamente come prima.
+Nessun test fallito viene ripetuto da nessuna parte: un retry nasconde un test
+instabile, la quarantena lo nomina.
+
+Il **budget di tempo della CI** (roadmap 13.6) è l'ultimo passo di `verify`:
+`tools/ci-durations.mjs` legge dall'API di GitHub la durata di ogni job del run e
+scrive una tabella nel riepilogo, con un'annotazione di avviso su ogni job oltre
+il suo tetto. I tetti (`CEILINGS` in quel file) sono circa 1,5× il più lento di
+sei run verdi; un test controlla che ogni job definito in `ci.yml` ne abbia uno.
+Oltre il tetto è un avviso, mai un run rosso — il tetto si alza nel commit che
+rende il job più lento, spiegando perché.
 
 La soglia di copertura (roadmap 7.2) è un minimo garantito, non un obiettivo da
 rincorrere. Sono due, perché le due suite coprono metà diverse: il server e il
