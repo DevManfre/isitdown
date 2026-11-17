@@ -31,6 +31,15 @@ done
 
 [ "$touched" = 1 ] || exit 0
 
+# A node_modules that is not exactly package-lock.json renders with other
+# library versions than CI's `npm ci`, and the comparison below then fails on
+# a difference that is not in the code (ALE-230). Say so plainly instead.
+if ! node scripts/check-node-modules.mjs; then
+  echo "pre-push: node_modules does not match package-lock.json — run \"npm ci\" and push again" >&2
+  echo "  (the visual check would compare against other library versions than CI uses)" >&2
+  exit 1
+fi
+
 echo "pre-push: the dashboard changed — rebuilding and comparing every view"
 if ! npm run build:ui >/dev/null; then
   echo "pre-push: the build failed, so there is nothing to compare" >&2
