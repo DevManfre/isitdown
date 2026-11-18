@@ -35,6 +35,8 @@ export function useSliceIds(filter: FleetFilter) {
 /** The one provider a provider widget draws: the one it names, or the worst of the fleet. */
 export function usePicked(provider: string | null) {
   const { data: status } = useStatus();
+  // Nothing read yet is not "no such provider": the caller shows itself busy.
+  if (status === undefined) return { provider: undefined, missing: null };
   const enabled = (status?.providers ?? []).filter((p) => p.enabled);
   if (provider === null) return { provider: pickWorst(enabled), missing: null };
   const found = enabled.find((p) => p.id === provider);

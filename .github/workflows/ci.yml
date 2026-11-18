@@ -55,6 +55,11 @@ jobs:
       # t() call asks for that en.json lacks fails the job.
       - name: i18n orphan and missing keys
         run: npm run check:i18n
+      # Roadmap 13.6. An expired quarantine entry fails here, whatever the
+      # tests do: the test is blocking again, and the entry has to go (or be
+      # renewed with a reason). The live ones are listed in the summary.
+      - name: Test quarantine
+        run: npm run check:quarantine
 
   # Roadmap 7.2. The same two suites `npm test` runs, each under a coverage
   # floor: a new subsystem that lands without tests of its own drags the total
@@ -158,7 +163,7 @@ jobs:
       # on purpose: a different Chromium can move pixels, so bump it together
       # with a reviewed baseline commit.
       - name: Cache Playwright Chromium
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-1.64.1-${{ runner.os }}
@@ -168,6 +173,15 @@ jobs:
 
       - name: Visual regression (every view, both themes, both locales)
         run: npm run test:visual
+
+      # Roadmap 13.9. The component catalog, built on its own (it never enters
+      # the dashboard's bundle), then every story captured as its component's
+      # own box against test/visual/baseline/stories.
+      - name: Build the component catalog
+        run: npm run build:catalog
+
+      - name: Visual regression (every catalog story)
+        run: npm run test:visual:stories
 
       # The rendered frames, so a failure can be looked at rather than argued
       # about. Only on failure: 24 screenshots per green run is noise.
@@ -188,7 +202,23 @@ jobs:
     needs: [static, server-tests, dashboard-tests, dashboard-coverage, build]
     if: always()
     runs-on: ubuntu-latest
+    # Reads this run's job timings for the time budget below.
+    permissions:
+      contents: read
+      actions: read
     steps:
+      # Roadmap 13.6. Every job's duration against its ceiling, as a table in
+      # the run's summary; a job over its ceiling is a warning, never a red run.
+      # Runs on the runner's own Node: the script needs nothing but fetch.
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: tools
+      - name: CI time budget
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/ci-durations.mjs
+
       - name: Every job above passed
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}

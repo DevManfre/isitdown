@@ -246,7 +246,13 @@ export async function withBrowser(options, body) {
     return result.value ?? [];
   }
 
-  async function shot({ url, colorScheme, storage, width, height, audit: wantAudit = false }) {
+  /**
+   * `clip`, a selector: capture that element's box rather than the viewport —
+   * a story's component alone (roadmap 13.9), so its baseline moves only when
+   * the component does. `read`, an expression evaluated on the settled page,
+   * whose value comes back as `value`.
+   */
+  async function shot({ url, colorScheme, storage, width, height, audit: wantAudit = false, clip, read }) {
     const { targetId } = await browser.send("Target.createTarget", { url: "about:blank" });
     const { sessionId } = await browser.send("Target.attachToTarget", { targetId, flatten: true });
     const send = (method, params) => browser.send(method, params, sessionId);
@@ -318,8 +324,31 @@ export async function withBrowser(options, body) {
       // Before the capture, on the same settled page: nothing the audit does
       // (it injects a script and reads the DOM) changes a pixel.
       const violations = wantAudit ? await audit(send, axeSource) : [];
-      const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
-      return { png: Buffer.from(data, "base64"), violations };
+      const value = read === undefined ? undefined : (await send("Runtime.evaluate", { expression: read, returnByValue: true })).result.value;
+      let box;
+      if (clip !== undefined) {
+        const { result } = await send("Runtime.evaluate", {
+          expression: `(() => {
+            const node = document.querySelector(${JSON.stringify(clip)});
+            if (node === null) return null;
+            const { x, y, width, height } = node.getBoundingClientRect();
+            return { x: Math.floor(x), y: Math.floor(y + scrollY), width: Math.ceil(width), height: Math.ceil(height), scale: 1 };
+          })()`,
+          returnByValue: true,
+        });
+        if (result.value === null) throw new Error(`${url}: nothing matches ${clip} to capture`);
+        if (result.value.y + result.value.height > height) throw new Error(`${url}: ${clip} is taller than the ${height}px window`);
+        box = result.value;
+      }
+      // Never `captureBeyondViewport`: it resizes the page for the capture,
+      // which replays every entry animation and caught the tile's bars at their
+      // first frame. A clipped element must fit the window it was given.
+      const { data } = await send("Page.captureScreenshot", {
+        format: "png",
+        captureBeyondViewport: false,
+        ...(box === undefined ? {} : { clip: box }),
+      });
+      return { png: Buffer.from(data, "base64"), violations, value };
     } finally {
       await browser.send("Target.closeTarget", { targetId });
     }

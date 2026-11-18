@@ -2172,5 +2172,10 @@
   "series.add.query-hint": "Muss genau eine Reihe liefern — mit sum(...) umschließen. Ein Bearer-Token, falls Prometheus eines braucht, gehört in PROMETHEUS_TOKEN.",
   "series.add.file": "CSV-Datei",
   "series.add.file-hint": "timestamp,wert pro Zeile, ISO 8601 oder Unix-Sekunden. Bis zu 50.000 Zeilen.",
-  "series.add.action": "Metrik hinzufügen"
+  "series.add.action": "Metrik hinzufügen",
+  "component-catalog.title": "Komponenten",
+  "component-catalog.component": "Komponente",
+  "component-catalog.language": "Sprache",
+  "component-catalog.all": "Alle",
+  "component-catalog.missing": "Keine Story namens „{id}“."
 }
