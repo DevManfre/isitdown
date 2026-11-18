@@ -128,6 +128,7 @@ isitdown/
 │   ├── copy-assets.mjs                copia in dist i cataloghi i18n e delle lingue della dashboard (il
 │   │                                   bundle della dashboard è già output di Vite, non di questo script)
 │   ├── readme-parity.mjs              ogni pagina inglese contro le sue traduzioni (npm run check:readme)
+│   ├── complexity-inventory.mjs       quanto costa ogni sottosistema, come tabella Markdown (9.8)
 │   ├── i18n-orphans.mjs               le chiavi dei cataloghi contro il codice che le chiede (npm run check:i18n)
 │   ├── fake-provider.mjs              una pagina di stato locale da rompere a mano, più un receiver webhook (npm run fake-provider)
 │   ├── scaffold.mjs                   un nuovo adapter o canale di notifica, impostato e registrato (npm run new:adapter / new:notifier)
@@ -813,3 +814,53 @@ e fare polling. Poi la suite completa, entrambe le immagini
 (`docker compose --profile ui up -d --build` fino a `healthy`) e un run visivo.
 La versione di Node è l'unico bump che cambia le immagini pubblicate senza che
 cambi alcun pacchetto, quindi va in una release a sé.
+
+### 9.8 Inventario della complessità
+
+IsItDown fa una cosa semplice — dirti che un servizio è giù — e il codice
+attorno è cresciuto fino a due edizioni, trenta canali, una CLI, gli outpost, un
+binario singolo e quattro descrittori di deploy. Prima di potare o aggiungere
+qualcosa sulla base di "è troppo complesso", il costo è un numero (roadmap 16.1):
+
+```bash
+node tools/complexity-inventory.mjs   # la tabella qui sotto, in Markdown
+```
+
+Per sottosistema: righe non vuote di sorgente e di test; chiavi di
+`config.yml` (i percorsi foglia dello schema della Light, gli elementi di un
+array contati una volta — `services` va agli adapter, `notifications` ai
+notifier, il resto al core); le variabili d'ambiente che il codice legge da sé;
+i controlli di form nelle superfici Impostazioni e aggiunta provider della
+dashboard; i concetti che un operatore deve imparare, da una lista scritta a
+mano nello script; e i target di build e di packaging con cui viene
+distribuito. L'output non porta né data né tempi, quindi lo stesso albero stampa
+sempre la stessa tabella.
+
+Misurata il 2026-11-18:
+
+| Subsystem | Source lines | Test lines | config.yml keys | Env vars | Settings fields | Concepts | Build targets |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| Core (poller, diff engine, scheduler) | 8,110 | 8,700 | 49 | 10 | — | 39 | — |
+| Adapters | 9,953 | 6,498 | 32 | 1 | — | 12 | — |
+| Notifiers | 4,373 | 4,759 | 168 | — | — | 6 | — |
+| Light edition | 1,254 | 973 | — | 3 | — | 4 | 2 |
+| UI server | 24,492 | 18,139 | — | 19 | — | 9 | 1 |
+| Dashboard | 43,523 | 17,637 | — | — | 141 | 11 | — |
+| CLI | 826 | 446 | — | 1 | — | 3 | 1 |
+| Outpost | 165 | 98 | — | 3 | — | 2 | — |
+| Packaging | 1,308 | — | — | 1 | — | 8 | 9 |
+| **Total** | 94,004 | 57,250 | 249 | 38 | 141 | 94 | 13 |
+
+Base path (`config.example.yml`, Light): 7 keys, ceiling 7.
+
+Il percorso base è la configurazione della
+[3.0](configuration.it.md#30-il-percorso-base) — ciò che `config.example.yml`
+imposta fuori da un commento. Un test
+(`test/tools/complexityInventory.test.ts`) fallisce quando supera il tetto. Il
+tetto è sette, non cinque: un provider del catalogo costa `id`, `name`,
+`adapter` e `baseUrl`, e un canale `enabled` e le sue due credenziali; per
+abbassarlo serve una modifica che tolga una di quelle chiavi, mai spostare una
+chiave fuori dal percorso base.
+
+Un concetto entra nella lista dello script nello stesso commit della funzione
+che obbliga qualcuno a impararlo.
