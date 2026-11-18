@@ -1,0 +1,4 @@
+{
+  "$comment": "Roadmap 13.6. Unstable tests, kept running but not blocking until their expiry date — see tools/quarantine.mjs and docs/development.md §9.4. Each entry: suite (server | dashboard), name (describe names and the test name, joined by spaces), owner, reason, issue (URL), expires (YYYY-MM-DD). An expired entry fails CI.",
+  "tests": []
+}

@@ -110,6 +110,7 @@ isitdown/
 │           ├── views/                  overview, providers, provider detail, components, incidents,
 │           │                           incident detail, history, delivery log, settings, wallboard
 │           ├── widgets/                the Overview's widget registry, grid drag and layout draft; catalog/ holds one file per widget
+│           ├── __catalog/              the component catalog (13.9): stories, one isolated frame each, dev server only
 │           ├── hooks/                  queries, theme, live, shortcuts, busy, pull-to-refresh …
 │           ├── lib/                    api, types, chartConfig, format, i18n, shortcuts …
 │           ├── css/base.css            Tailwind entry point: imports tailwindcss, tokens, motion
@@ -136,7 +137,8 @@ isitdown/
 │   ├── readme-parity.mjs              every English page against its translations (npm run check:readme)
 │   ├── i18n-orphans.mjs               catalog keys against the code that asks for them (npm run check:i18n)
 │   ├── fake-provider.mjs              a local status page to break by hand, plus a webhook receiver (npm run fake-provider)
-│   ├── bundle-budget.mjs              the built dashboard against its gzipped budget (npm run check:bundle)
+│   ├── scaffold.mjs                   a new adapter or notification channel, laid out and registered (npm run new:adapter / new:notifier)
+│   ├── bundle-budget.mjs              the built dashboard against its gzipped budget, and the catalog kept out of it (npm run check:bundle)
 │   ├── visual-regression.mjs          every view, both themes, every locale against test/visual/baseline (npm run test:visual); helpers in tools/visual/
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   the canary probe, load and mutation tests, fixture recording, release notes, the single-file build, PWA icons
 │   ├── build-catalog.mjs              regenerates the catalog from tools/catalog/seed.json and the public lists (2.1)
@@ -255,6 +257,26 @@ integration suite (`test/integration/fakeProvider.itest.ts`) imports this same
 server and drives it through the real adapters, so a fake the adapters can no
 longer read fails CI first.
 
+**Adding an adapter or a channel** (roadmap 13.8) starts from a generator, the
+same recipe the `add-status-adapter` and `add-notifier-channel` skills follow:
+
+```bash
+npm run new:adapter -- acme-status    # src/adapters/acme-status.adapter.ts and the rest
+npm run new:notifier -- acme-push     # src/notifiers/acme-push.notifier.ts and the rest
+```
+
+An adapter gets its file, a test (the adapter contract plus one mapping test), a
+placeholder fixture under `test/fixtures/<id>/`, its registry entry and a row in
+the adapter table of [3.5](configuration.md#35-monitored-providers), in both
+languages. A channel gets its file, a test, its registry entry,
+`channel.name.<id>` in all six dashboard catalogs (English everywhere until
+someone translates it) and a row in [3.6](configuration.md#36-notification-channels),
+in both languages. What it writes compiles; what it cannot know — the endpoint,
+the settings — throws "not implemented", so the generated tests fail until it is
+written, and the rest (recorded fixtures, contract case, Light schema, UI seed,
+env vars) is printed as a checklist. An id that already exists is refused before
+anything is written.
+
 `dev:ui` runs the server and Vite as two local processes together (`concurrently`).
 The browser talks to Vite on **5173** — that is where HMR lives — and Vite's own
 dev-server proxy forwards every API path (`/status`, `/config`, `/history`,
@@ -318,24 +340,45 @@ npm run coverage         # the same two suites under a coverage floor
                          # (coverage:server and coverage:web run one each, as CI does)
 npm run test:integration # end-to-end suite:  test/**/*.itest.ts
 npm run test:visual      # visual baselines + an axe-core pass: every view, both themes, both locales
+npm run test:visual:stories # the same per component: every catalog story (needs build:catalog)
 npm run test:mutation    # mutation testing on the diff engine
 npm run test:load        # 200 synthetic providers, a week of history, every read timed
 npm run canary           # every catalog page, live, against its adapter's fixtures (1.9)
 npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
 npm run check:i18n       # catalog keys no code uses (warning) and used keys a catalog lacks (error)
+npm run check:quarantine # test/quarantine.json: fails on an expired or malformed entry (13.6)
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
 npm run lint             # Biome, check only: correctness + suspicious rules, no formatter
 npm run build:light      # tsc + copy assets, excluding src/ui
 npm run build:ui         # tsc + vite build + copy assets
 npm run build:cli        # tsc + copy assets, src/core/i18n and src/cli only (10.1)
+npm run build:catalog    # the component catalog alone, into dist/catalog (13.9)
 ```
 
 The bundle budget (roadmap 5.16) weighs what `build:ui` emitted, gzipped,
 because that is what the browser downloads: `731,000` bytes of JavaScript and `23,500` of
 CSS (`BUDGET` in `tools/bundle-budget.mjs`), both a little over today's build. It is
 a ceiling rather than a target — when it fails, find what grew first; it has only
-been raised in a commit that names the roadmap rows that grew it.
+been raised in a commit that names the roadmap rows that grew it. The same check
+fails if any built asset carries the component catalog's marker
+(`CATALOG_MARKER` in `src/ui/web/__catalog/marker.ts`): the catalog is a
+development page and never ships.
+
+The **component catalog** (roadmap 13.9) shows every catalogued component in
+every state — populated, empty, loading, error, every severity — light and dark
+side by side, in any of the six languages. With `npm run dev:ui` running it is
+at `http://localhost:5173/__catalog/`; `?story=<id>&theme=dark&locale=it` opens
+one story alone. Stories are plain objects in `src/ui/web/__catalog/stories.tsx`
+— `{ id, component, props, state }`, plus `fixtures` (what the fake API
+answers, the same routing the Vitest harness uses, from
+`src/ui/web/test/fakeApi.ts`) and `storage` (what the browser remembers). Each
+story renders in its own frame with its own in-memory storage and a `fetch`
+that never reaches the server, so a component's loading state is a request
+actually held, its error state a request actually failed. No Storybook: the
+catalog is a second Vite entry, `__catalog/index.html`, that the production
+build never names. `stories.test.tsx` renders every story and checks it is in
+the state it claims; adding a component means adding its stories there.
 
 The **orphan-key check** (roadmap 13.5, `tools/i18n-orphans.mjs`) compares
 both English catalogs, the dashboard's `src/ui/web/locales/en.json` and the
@@ -350,6 +393,27 @@ catalog of its scope in one go, line by line, so the diff shows only the
 deleted keys. A `t("…")` call naming a key the catalog lacks fails the step,
 because the user would see the raw key. Test files are not scanned: a key
 that only its own test asks for still has nothing rendering it.
+
+**Unstable tests are quarantined, never retried** (roadmap 13.6). An entry in
+`test/quarantine.json` names one test — `suite` (`server` or `dashboard`),
+`name` (its describe names and its own, joined by spaces, as both runners print
+it), `owner`, `reason`, `issue` (a link) and `expires` (a date). Every
+`npm test` and `coverage:*` script runs through `tools/quarantine.mjs`: while an
+entry is live, its test is skipped in the blocking run and executed in a second,
+non-blocking one, whose result goes to the job summary — so it keeps running,
+and a fix shows up as "passed — maybe stable again". From the day after
+`expires`, the test is blocking again and `npm run check:quarantine` (CI's
+`static` job) fails until the entry is removed or renewed with a reason in the
+diff. With the file empty, the scripts run exactly as before. Nothing retries a
+failed test anywhere: a retry hides a flaky test, quarantine names it.
+
+**CI's time budget** (roadmap 13.6) is the last step of `verify`:
+`tools/ci-durations.mjs` reads every job's timing for the run from the GitHub
+API and writes a table to the run summary, with a warning annotation on any job
+over its ceiling. The ceilings (`CEILINGS` in that file) are about 1.5× the
+slowest of six green runs; a test checks that every job `ci.yml` defines has
+one. Over a ceiling is a warning, never a red run — raise the ceiling in the
+commit that makes the job slower, and say why.
 
 The coverage floor (roadmap 7.2) is a floor, not a target to game. Two of them,
 because the two suites cover different halves: the server and the engine must
@@ -507,7 +571,12 @@ Notable suites:
   states roadmap 4.21 pins (`overview-empty`, `history-quiet`,
   `overview-offline`, …). Run
   `node tools/visual-regression.mjs --update` to agree to an intended change, and
-  `--only=<view>` while iterating on one.
+  `--only=<view>` while iterating on one. `--stories` renders the component
+  catalog's stories instead (`npm run test:visual:stories`, after
+  `npm run build:catalog`): each frame is the component's own box, clipped out of
+  the page, with baselines under `test/visual/baseline/stories/` — a few hundred
+  pixels across, moving only when that component does. `--only=` takes a
+  component (`--only=provider-tile`) or one story id.
 
   That 1.5%-of-edge-pixels noise assumes the machine running Chromium has the
   system fonts Playwright's own Chromium build expects — CI gets them because

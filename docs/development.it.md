@@ -103,6 +103,7 @@ isitdown/
 │           ├── views/                 overview, providers, dettaglio provider, components, incidents,
 │           │                          dettaglio incidente, history, log invii, settings, wallboard
 │           ├── widgets/               il registro dei widget dell'Overview, drag della griglia e bozza del layout; catalog/ ha un file per widget
+│           ├── __catalog/             il catalogo dei componenti (13.9): storie, ognuna nel suo frame isolato, solo nel dev server
 │           ├── hooks/                 queries, theme, live, shortcuts, busy, pull-to-refresh …
 │           ├── lib/                   api, types, chartConfig, format, i18n, shortcuts …
 │           ├── css/base.css            punto di ingresso Tailwind: importa tailwindcss, tokens, motion
@@ -129,7 +130,8 @@ isitdown/
 │   ├── readme-parity.mjs              ogni pagina inglese contro le sue traduzioni (npm run check:readme)
 │   ├── i18n-orphans.mjs               le chiavi dei cataloghi contro il codice che le chiede (npm run check:i18n)
 │   ├── fake-provider.mjs              una pagina di stato locale da rompere a mano, più un receiver webhook (npm run fake-provider)
-│   ├── bundle-budget.mjs              la dashboard compilata contro il suo budget gzip (npm run check:bundle)
+│   ├── scaffold.mjs                   un nuovo adapter o canale di notifica, impostato e registrato (npm run new:adapter / new:notifier)
+│   ├── bundle-budget.mjs              la dashboard compilata contro il suo budget gzip, e il catalogo tenuto fuori (npm run check:bundle)
 │   ├── visual-regression.mjs          ogni vista, entrambi i temi, ogni lingua contro test/visual/baseline (npm run test:visual); helper in tools/visual/
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   la sonda canary, test di carico e di mutazione, registrazione dei fixture, note di rilascio, la build a file singolo, icone PWA
 │   ├── build-catalog.mjs              rigenera il catalogo da tools/catalog/seed.json e dalle liste pubbliche (2.1)
@@ -252,6 +254,28 @@ d'integrazione (`test/integration/fakeProvider.itest.ts`) importa lo stesso
 server e lo fa leggere agli adapter veri, quindi un finto che gli adapter non
 sanno più leggere fa fallire la CI per primo.
 
+**Aggiungere un adapter o un canale** (roadmap 13.8) parte da un generatore, la
+stessa ricetta che seguono le skill `add-status-adapter` e `add-notifier-channel`:
+
+```bash
+npm run new:adapter -- acme-status    # src/adapters/acme-status.adapter.ts e il resto
+npm run new:notifier -- acme-push     # src/notifiers/acme-push.notifier.ts e il resto
+```
+
+Un adapter riceve il suo file, un test (il contratto degli adapter più un test
+di mappatura), un fixture segnaposto in `test/fixtures/<id>/`, la voce nel
+registro e una riga nella tabella degli adapter di
+[3.5](configuration.it.md#35-provider-monitorati), in entrambe le lingue. Un
+canale riceve il suo file, un test, la voce nel registro, `channel.name.<id>` in
+tutti e sei i cataloghi della dashboard (in inglese ovunque finché qualcuno non
+lo traduce) e una riga in [3.6](configuration.it.md#36-canali-di-notifica), in
+entrambe le lingue. Ciò che scrive compila; ciò che non può sapere — l'endpoint,
+le impostazioni — lancia "not implemented", così i test generati falliscono
+finché non viene scritto, e il resto (fixture registrati, caso di contratto,
+schema della Light, seed della UI, variabili d'ambiente) viene stampato come
+lista di controllo. Un id che esiste già viene rifiutato prima di scrivere
+qualunque cosa.
+
 `dev:ui` esegue server e Vite come due processi locali insieme (`concurrently`).
 Il browser parla con Vite su **5173** — è lì che vive l'HMR — e il proxy del dev
 server di Vite instrada ogni percorso API (`/status`, `/config`, `/history`,
@@ -316,17 +340,20 @@ npm run coverage         # le stesse due suite sotto una soglia minima di copert
                          # (coverage:server e coverage:web ne eseguono una ciascuno, come fa la CI)
 npm run test:integration # suite end-to-end:  test/**/*.itest.ts
 npm run test:visual      # baseline visive + un passaggio axe-core: ogni vista, entrambi i temi, entrambe le lingue
+npm run test:visual:stories # lo stesso per componente: ogni storia del catalogo (serve build:catalog)
 npm run test:mutation    # mutation testing sul diff engine
 npm run test:load        # 200 provider sintetici, una settimana di storico, ogni lettura cronometrata
 npm run canary           # ogni pagina del catalogo, dal vivo, contro i fixture del suo adapter (1.9)
 npm run check:bundle     # la dashboard compilata contro il suo budget di dimensione gzip
 npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run check:i18n       # chiavi di catalogo che nessun codice usa (avviso) e chiavi usate che mancano (errore)
+npm run check:quarantine # test/quarantine.json: fallisce su una voce scaduta o malformata (13.6)
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
 npm run lint             # Biome, solo controllo: regole correctness + suspicious, nessun formatter
 npm run build:light      # tsc + copia asset, escludendo src/ui
 npm run build:ui         # tsc + vite build + copia asset
 npm run build:cli        # tsc + copia asset, solo src/core/i18n e src/cli (10.1)
+npm run build:catalog    # solo il catalogo dei componenti, in dist/catalog (13.9)
 ```
 
 Il budget del bundle (roadmap 5.16) pesa ciò che `build:ui` ha prodotto, in
@@ -334,6 +361,25 @@ gzip, perché è quello che il browser scarica: `731,000` byte di JavaScript e `
 CSS (`BUDGET` in `tools/bundle-budget.mjs`), entrambi poco sopra la build di oggi. È
 un tetto, non un obiettivo — quando fallisce, prima si trova cosa è cresciuto; è stato
 alzato solo in un commit che nomina le righe di roadmap che l'hanno fatto crescere.
+Lo stesso controllo fallisce se un asset compilato contiene il marcatore del
+catalogo dei componenti (`CATALOG_MARKER` in `src/ui/web/__catalog/marker.ts`):
+il catalogo è una pagina di sviluppo e non viene mai distribuito.
+
+Il **catalogo dei componenti** (roadmap 13.9) mostra ogni componente catalogato
+in ogni stato — popolato, vuoto, caricamento, errore, ogni severità — chiaro e
+scuro affiancati, in una qualunque delle sei lingue. Con `npm run dev:ui` avviato
+si trova su `http://localhost:5173/__catalog/`; `?story=<id>&theme=dark&locale=it`
+apre una storia da sola. Le storie sono oggetti semplici in
+`src/ui/web/__catalog/stories.tsx` — `{ id, component, props, state }`, più
+`fixtures` (cosa risponde l'API finta, con lo stesso instradamento dell'harness
+di Vitest, da `src/ui/web/test/fakeApi.ts`) e `storage` (cosa ricorda il
+browser). Ogni storia gira nel suo frame, con uno storage in memoria tutto suo e
+un `fetch` che non arriva mai al server: lo stato di caricamento di un componente
+è una richiesta davvero trattenuta, quello di errore una richiesta davvero
+fallita. Niente Storybook: il catalogo è un secondo entry di Vite,
+`__catalog/index.html`, che la build di produzione non nomina mai.
+`stories.test.tsx` renderizza ogni storia e controlla che sia nello stato che
+dichiara; aggiungere un componente vuol dire aggiungere lì le sue storie.
 
 Il **controllo delle chiavi orfane** (roadmap 13.5, `tools/i18n-orphans.mjs`)
 confronta entrambi i cataloghi inglesi, quello della dashboard
@@ -351,6 +397,28 @@ chiamata `t("…")` che nomina una chiave assente dal catalogo fa fallire il
 passo, perché l'utente vedrebbe la chiave grezza. I file di test non vengono
 letti: una chiave che solo il suo test chiede non ha comunque niente che la
 mostri.
+
+**I test instabili vanno in quarantena, mai ripetuti** (roadmap 13.6). Una voce
+in `test/quarantine.json` nomina un test — `suite` (`server` o `dashboard`),
+`name` (i nomi dei describe e il suo, uniti da spazi, come li stampano entrambi i
+runner), `owner`, `reason`, `issue` (un link) e `expires` (una data). Ogni
+script `npm test` e `coverage:*` passa per `tools/quarantine.mjs`: finché una
+voce è attiva, il suo test viene saltato nel run bloccante ed eseguito in un
+secondo run non bloccante, il cui esito va nel riepilogo del job — così continua
+a girare, e una correzione si vede come "passed — maybe stable again". Dal
+giorno dopo `expires` il test torna bloccante e `npm run check:quarantine` (il
+job `static` della CI) fallisce finché la voce non viene tolta o rinnovata con
+un motivo nel diff. Con il file vuoto gli script girano esattamente come prima.
+Nessun test fallito viene ripetuto da nessuna parte: un retry nasconde un test
+instabile, la quarantena lo nomina.
+
+Il **budget di tempo della CI** (roadmap 13.6) è l'ultimo passo di `verify`:
+`tools/ci-durations.mjs` legge dall'API di GitHub la durata di ogni job del run e
+scrive una tabella nel riepilogo, con un'annotazione di avviso su ogni job oltre
+il suo tetto. I tetti (`CEILINGS` in quel file) sono circa 1,5× il più lento di
+sei run verdi; un test controlla che ogni job definito in `ci.yml` ne abbia uno.
+Oltre il tetto è un avviso, mai un run rosso — il tetto si alza nel commit che
+rende il job più lento, spiegando perché.
 
 La soglia di copertura (roadmap 7.2) è un minimo garantito, non un obiettivo da
 rincorrere. Sono due, perché le due suite coprono metà diverse: il server e il
@@ -521,7 +589,13 @@ Suite notevoli:
   ogni richiesta API — gli stati che la roadmap 4.21 fissa (`overview-empty`,
   `history-quiet`, `overview-offline`, …).
   `node tools/visual-regression.mjs --update` accetta un cambio
-  voluto, `--only=<vista>` serve mentre si itera su una sola.
+  voluto, `--only=<vista>` serve mentre si itera su una sola. `--stories`
+  renderizza invece le storie del catalogo dei componenti
+  (`npm run test:visual:stories`, dopo `npm run build:catalog`): ogni frame è il
+  riquadro del componente, ritagliato dalla pagina, con le baseline in
+  `test/visual/baseline/stories/` — poche centinaia di pixel di lato, che si
+  muovono solo quando si muove quel componente. `--only=` accetta un componente
+  (`--only=provider-tile`) o l'id di una storia.
 
   Quel rumore dell'1,5% lungo i bordi del testo presuppone che la macchina su
   cui gira Chromium abbia i font di sistema che la build di Chromium di

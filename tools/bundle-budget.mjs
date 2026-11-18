@@ -14,6 +14,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import { join } from "node:path";
+import { CATALOG_MARKER } from "../src/ui/web/__catalog/marker.ts";
 
 const ASSETS = "dist/ui/public/assets";
 
@@ -258,6 +259,15 @@ export function checkBudget(assets, budget) {
   return { failed: kinds.some((entry) => entry.over), kinds };
 }
 
+/**
+ * Roadmap 13.9. The component catalog is a development page and must never
+ * ship: its entry stamps `CATALOG_MARKER`, so any built asset that contains
+ * the string carries catalog code. Returns the names of those assets.
+ */
+export function leakedCatalog(files) {
+  return files.filter(({ contents }) => contents.includes(CATALOG_MARKER)).map(({ name }) => name);
+}
+
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} kB`;
 
 if (process.argv[1]?.endsWith("bundle-budget.mjs")) {
@@ -273,7 +283,9 @@ if (process.argv[1]?.endsWith("bundle-budget.mjs")) {
   const files = await Promise.all(
     names.map(async (name) => ({ name, contents: await readFile(join(dir, name)) })),
   );
-  const { failed, kinds } = checkBudget(measure(files), BUDGET);
+  const { failed: over, kinds } = checkBudget(measure(files), BUDGET);
+  const leaked = leakedCatalog(files);
+  const failed = over || leaked.length > 0;
 
   for (const entry of kinds) {
     const verdict = entry.over ? "OVER BUDGET" : "ok";
@@ -281,7 +293,10 @@ if (process.argv[1]?.endsWith("bundle-budget.mjs")) {
       `${entry.kind}: ${kb(entry.gzipped)} gzipped (${kb(entry.raw)} raw) of ${kb(entry.budget)} — ${verdict}\n`,
     );
   }
-  if (failed) {
+  for (const name of leaked) {
+    process.stdout.write(`${name}: carries the component catalog, which is development-only — LEAKED\n`);
+  }
+  if (over) {
     process.stdout.write(
       "\nThe budget is a ceiling, not a target: find what grew before raising it.\n",
     );

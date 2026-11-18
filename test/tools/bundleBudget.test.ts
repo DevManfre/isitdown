@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BUDGET, checkBudget, measure } from "../../tools/bundle-budget.mjs";
+import { BUDGET, checkBudget, leakedCatalog, measure } from "../../tools/bundle-budget.mjs";
+import { CATALOG_MARKER } from "../../src/ui/web/__catalog/marker.ts";
 
 const asset = (name: string, gzipped: number) => ({ name, gzipped, raw: gzipped * 3 });
 
@@ -55,4 +56,17 @@ test("measuring an asset reports its gzipped size beside its real one", () => {
 
   assert.equal(entry?.raw, 4096);
   assert.ok((entry?.gzipped ?? 0) < 4096, "compressible text must measure smaller gzipped");
+});
+
+test("a production asset carrying the component catalog's marker is named as a leak (roadmap 13.9)", () => {
+  const leaked = leakedCatalog([
+    { name: "index-a1.js", contents: Buffer.from("render()") },
+    { name: "index-b2.js", contents: Buffer.from(`root.dataset.catalog = "${CATALOG_MARKER}"`) },
+  ]);
+
+  assert.deepEqual(leaked, ["index-b2.js"]);
+});
+
+test("a bundle without the catalog leaks nothing", () => {
+  assert.deepEqual(leakedCatalog([{ name: "index-a1.js", contents: Buffer.from("render()") }]), []);
 });
