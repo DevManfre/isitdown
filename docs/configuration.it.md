@@ -2,6 +2,46 @@
 
 ## 3. Configurazione
 
+### 3.0 Il percorso base
+
+"Avvisami quando GitHub cade" richiede qualche provider e un canale — nient'altro
+di questa pagina. Ogni altra impostazione ha un default funzionante, e ogni
+sezione dalla 3.1 in poi è il riferimento avanzato: niente di quello serve per
+iniziare.
+
+**Edizione Light** — tutto ciò che `config.example.yml` imposta fuori da un
+commento, sette chiavi:
+
+```yaml
+services:
+  - id: github                        # dal catalogo incluso
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+
+notifications:
+  telegram:
+    enabled: true
+    botToken: "${TELEGRAM_BOT_TOKEN}" # i due valori vanno in .env
+    chatId: "${TELEGRAM_CHAT_ID}"
+```
+
+Un provider si aggiunge ripetendo le quattro righe di una voce — il catalogo in
+`src/adapters/catalog.json` ha i quattro valori di ogni provider che conosce, e
+la [3.5](#35-provider-monitorati) spiega come aggiungerne uno che non conosce.
+Ogni altro canale funziona allo stesso modo: `enabled: true` e le sue variabili
+(vedi [3.6](#36-canali-di-notifica)). Tutto il resto di `config.example.yml` è
+commentato sotto il percorso base, un blocco per impostazione, pronto da
+scommentare.
+
+Un test tiene il percorso base a sette chiavi o meno
+([9.8](development.it.md#98-inventario-della-complessità)).
+
+**Edizione UI** — niente da scrivere. Un database nuovo si apre sul wizard del
+primo avvio: scegli i provider dal catalogo, scegli un canale e incolla le sue
+credenziali, manda una notifica di prova. Routing, quiet hours e il resto stanno
+in Impostazioni, e nessuno di questi serve per il primo avviso.
+
 ### 3.1 Edizione Light — `config.yml`
 
 Un solo file, montato come volume e **riletto all'inizio di ogni ciclo**:

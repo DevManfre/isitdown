@@ -6,351 +6,386 @@
 # Secrets are NEVER written here. Use ${ENV_VAR} references; the values come
 # from the environment (see .env.example).
 
-pollIntervalMinutes: 3      # how often to poll every provider
-requestTimeoutSeconds: 8    # per-request timeout
-maxRetries: 3               # attempts per provider per cycle, with backoff
-failureThreshold: 5         # consecutive failures before a "monitoring degraded" warning
-adaptivePolling: true       # while a provider has an open incident, poll it on the cadence below
-adaptiveIntervalMinutes: 1  # that cadence; never slower than the provider's own interval
-confirmSamples: 1           # consecutive polls that must agree before a change notifies (1 = off)
-# Correlated-outage detection (roadmap 2.7): when this many providers go bad
-# inside the window below, one "this looks like a shared failure" alert replaces
-# the individual ones. 0 and 1 are off, which is the default — it is the only
-# setting here that replaces alerts rather than adding them.
-correlationThreshold: 0
-correlationWindowMinutes: 10
-locale: en                  # language for notification messages: en | it (falls back to en)
+# ── The base path ────────────────────────────────────────────────────────────
+#
+# Everything you need to hear when GitHub, Cloudflare or Anthropic goes down:
+# three providers from the bundled catalog (src/adapters/catalog.json has the
+# rest, docs/configuration.md §3.5 how to add any other) and one channel. Put
+# the two Telegram variables in .env and start.
+# Every other setting has a working default.
 
 services:
-  - name: GitHub
-    id: github
+  - id: github
+    name: GitHub
     adapter: statuspage
     baseUrl: https://www.githubstatus.com
-    # Optional: poll this provider on its own cadence instead of the global
-    # pollIntervalMinutes above. A page that publishes every few minutes and one
-    # that changes twice a year do not deserve the same one. Omit to follow the
-    # global interval.
-    intervalMinutes: 2
-    # Optional: the group this provider belongs to — "my stack". Providers in
-    # the same group get a combined status (worst member wins), and one routing
-    # rule below can cover all of them with `provider: group:deploy-path`. A
-    # lowercase slug; omit it to leave the provider ungrouped.
-    group: deploy-path
-    # Optional: the monthly uptime this provider is supposed to deliver, as a
-    # percentage. The UI edition turns it into an error budget, reports what the
-    # month has spent of it, and sends one alert when the rate says the month
-    # will miss. Omit it when nobody promised anything — most providers.
-    slaTarget: 99.9
-    # Optional: what an hour of this provider being down costs you, in your own
-    # currency. Shown beside each incident, in the reliability table and in the
-    # monthly report. Omit it and no figure is shown — an unpriced outage is not
-    # a free one.
-    outageCostPerHour: 1200
-    # Optional: what breaks here when this provider does, and who answers for
-    # it. Both are added under every message about it, so an alert at 3 a.m.
-    # reads as a handover note.
-    impact: deploys blocked, CI stopped
-    owner: "@alice"
-    # Optional: what to do when it is down, in Markdown. Shown on the provider's
-    # page; every alert ends with its first link, or its first line.
-    runbook: |
-      Switch CI to the GitLab mirror: https://wiki.example.com/runbooks/github
-    # Optional: free labels beside the group. A routing rule can name one as
-    # `provider: tag:critical`.
-    tags: [paid, critical]
-    # Optional: planned mutes — a weekly window (may wrap midnight) or one span.
-    # While one runs the provider is muted exactly like the dashboard's Mute.
-    muteSchedules:
-      - { days: [sun], start: "03:00", end: "04:00", timeZone: Europe/Rome }
-    # Optional: maintenance you declare because the provider does not. It
-    # silences, is announced and is drawn on the timeline like the provider's
-    # own; it always needs an end.
-    # maintenanceWindows:
-    #   - { title: Our deploy, startsAt: "2026-12-01T22:00:00Z", endsAt: "2026-12-01T23:00:00Z" }
-
-  - name: Cloudflare
-    id: cloudflare
+  - id: cloudflare
+    name: Cloudflare
     adapter: statuspage
     baseUrl: https://www.cloudflarestatus.com
-    group: deploy-path
-    # Optional: watch only part of a provider. Component ids come from
-    # <baseUrl>/api/v2/summary.json, where Cloudflare groups its data centres by
-    # region. With scopeToComponents an incident attributed only to components
-    # outside this list is ignored, and the reported status is the worst of these
-    # components rather than the page-wide indicator. A notice the provider
-    # attaches to no component at all is page-wide and always reported.
-    scopeToComponents: true
-    components:
-      - id: 57ctn3f2qsyj
-        name: Amsterdam, Netherlands - (AMS)
-      - id: k8q1kmz4gfms
-        name: Milan, Italy - (MXP)
-
-  - name: Anthropic
-    id: anthropic
+  - id: anthropic
+    name: Anthropic
     adapter: statuspage
     # status.anthropic.com 301-redirects here; the canonical host avoids the hop
     baseUrl: https://status.claude.com
-
-  # A page that publishes neither JSON nor a feed: read one element's text and
-  # map the words onto a severity. Fragile by nature — a selector that stops
-  # matching is reported as a failing provider, never as "operational" — so use
-  # it only where there is nothing better.
-  #
-  # - name: Example
-  #   id: example
-  #   adapter: html
-  #   baseUrl: https://status.example.com/
-  #   options:
-  #     selector: ".status-banner"
-  #     # Optional. Each severity keeps its built-in words unless you give it
-  #     # your own; on the page, the longest match wins.
-  #     operational: "all systems operational"
-  #     major_outage: "outage, down"
-
-  # A probe of the service itself rather than of a page about it. Here it is
-  # also the second opinion on GitHub's own status page: when this probe cannot
-  # reach the API and githubstatus.com still reports operational with no
-  # incident open, the disagreement is itself an alert — the silent-outage
-  # cross-check.
-  #
-  # - name: GitHub API
-  #   id: github-api
-  #   adapter: http
-  #   baseUrl: https://api.github.com
-  #   crossChecks: github
-  #   options:
-  #     path: /meta
-  #     expectStatus: "200-299"
-  #
-  # Which source is the record for a provider — `declared` (its own status page)
-  # or `observed` (our own reading), roadmap 9.1. Left out, which is the normal
-  # case, the adapter decides: a probe is `observed` because it *is* the
-  # reading, and anything that parses somebody's page is `declared`. Set it only
-  # to disagree with that default.
-  #
-  # - name: Acme
-  #   id: acme
-  #   adapter: statuspage
-  #   baseUrl: https://status.acme.example
-  #   authority: observed
 
 notifications:
   telegram:
     enabled: true
     botToken: "${TELEGRAM_BOT_TOKEN}"
     chatId: "${TELEGRAM_CHAT_ID}"
-    # Optional, per channel (roadmap 3.20 and 3.15). `locale` overrides the
-    # notification language above for this channel alone — so this chat can read
-    # Italian while the webhook payload below stays English. `template` replaces
-    # the default message: substitution only, no conditions and no loops, and an
-    # unknown token stops the container with the token named. See
-    # docs/configuration.md#311-per-channel-locale-and-template for the tokens.
-    # locale: it
-    # template: "[{{severity}}] {{provider}} — {{title}}\n{{url}}"
-  webhook:
-    enabled: false
-    url: "${WEBHOOK_URL}"
-    # Optional. With a secret set, every request carries X-IsItDown-Timestamp
-    # and X-IsItDown-Signature (HMAC-SHA256 over "<timestamp>.<body>"), so a
-    # receiver can verify the payload came from here. Unset means unsigned.
-    secret: "${WEBHOOK_SECRET}"
-  discord:
-    enabled: false
-    # Server settings → Integrations → Webhooks → Copy Webhook URL
-    webhookUrl: "${DISCORD_WEBHOOK_URL}"
-  slack:
-    enabled: false
-    # An incoming webhook of a Slack app installed in the target channel
-    webhookUrl: "${SLACK_WEBHOOK_URL}"
-  ntfy:
-    enabled: false
-    # The topic URL, server included — ntfy.sh or an instance of your own
-    topicUrl: "${NTFY_TOPIC_URL}"
-    # Optional: only a server with access control needs a token
-    token: "${NTFY_TOKEN}"
-  gotify:
-    enabled: false
-    # The server itself, not a message path
-    serverUrl: "${GOTIFY_URL}"
-    # An application token, from the Gotify app you created for IsItDown
-    token: "${GOTIFY_TOKEN}"
-  pushover:
-    enabled: false
-    # The API token of the Pushover application you created for IsItDown
-    token: "${PUSHOVER_TOKEN}"
-    # Your user key, or a group key, from the Pushover dashboard
-    userKey: "${PUSHOVER_USER_KEY}"
-    # Optional: one registered device; empty delivers to every device
-    device: "${PUSHOVER_DEVICE}"
-  matrix:
-    enabled: false
-    # The homeserver's root, not a room path
-    homeserverUrl: "${MATRIX_HOMESERVER_URL}"
-    # The internal room id, not an alias: !abc:example.org
-    roomId: "${MATRIX_ROOM_ID}"
-    # An access token for the user that posts
-    accessToken: "${MATRIX_ACCESS_TOKEN}"
-  pagerduty:
-    enabled: false
-    # The integration key of an Events API v2 integration on a service. An
-    # incident that resolves closes the alert it opened, keyed on the change.
-    routingKey: "${PAGERDUTY_ROUTING_KEY}"
-    # Optional: "eu" for an account in PagerDuty's EU service region
-    region: "${PAGERDUTY_REGION}"
-  opsgenie:
-    enabled: false
-    # An API key from an Opsgenie API integration
-    apiKey: "${OPSGENIE_API_KEY}"
-    # Optional: "eu" for an account on Opsgenie's EU instance
-    region: "${OPSGENIE_REGION}"
-  apprise:
-    enabled: false
-    # An Apprise API server, which reaches the ~80 services Apprise knows
-    serverUrl: "${APPRISE_SERVER_URL}"
-    # Either the key of a configuration the server stores (preferred — the
-    # service URLs behind it are credentials) ...
-    configKey: "${APPRISE_CONFIG_KEY}"
-    # ... or the Apprise URLs themselves, comma-separated, for a stateless
-    # server. One of the two is required.
-    urls: "${APPRISE_URLS}"
-  teams:
-    enabled: false
-    # A Teams channel webhook: Workflows → "Post to a channel when a webhook
-    # request is received", or an Office 365 connector on an older tenant
-    webhookUrl: "${TEAMS_WEBHOOK_URL}"
-  email:
-    enabled: false
-    # An SMTP submission server. STARTTLS is used whenever the server offers it.
-    host: "${SMTP_HOST}"
-    # Optional, 587 by default. 465 is implicit TLS and is treated as such.
-    port: "${SMTP_PORT}"
-    # Optional: "true" forces TLS from the first byte, as on port 465
-    secure: "${SMTP_SECURE}"
-    # Optional. Credentials are never sent over an unencrypted connection
-    # unless this says "true" — meant for a relay on this machine.
-    allowInsecureAuth: "${SMTP_ALLOW_INSECURE_AUTH}"
-    # Optional: "true" accepts a certificate no public CA signed
-    allowSelfSigned: "${SMTP_ALLOW_SELF_SIGNED}"
-    # Optional: a relay that trusts this network needs no credentials
-    username: "${SMTP_USERNAME}"
-    password: "${SMTP_PASSWORD}"
-    from: "${SMTP_FROM}"
-    # One address, or several separated by commas
-    to: "${SMTP_TO}"
-  # On-call chains (roadmap 3.9). Like PagerDuty and Opsgenie, each keys its
-  # alert on the change, so a provider's own "resolved" closes what it opened.
-  splunk-oncall:
-    enabled: false
-    # The REST endpoint integration's API key, and the routing key that picks
-    # the escalation policy
-    apiKey: "${SPLUNK_ONCALL_API_KEY}"
-    routingKey: "${SPLUNK_ONCALL_ROUTING_KEY}"
-  squadcast:
-    enabled: false
-    # An Incident Webhook integration's URL
-    webhookUrl: "${SQUADCAST_WEBHOOK_URL}"
-  zenduty:
-    enabled: false
-    # An API integration's key
-    integrationKey: "${ZENDUTY_INTEGRATION_KEY}"
-  incident-io:
-    enabled: false
-    # An HTTP alert source: its config id and its bearer token
-    alertSourceId: "${INCIDENT_IO_ALERT_SOURCE_ID}"
-    token: "${INCIDENT_IO_TOKEN}"
-  grafana-oncall:
-    enabled: false
-    # A Formatted Webhook integration's URL
-    webhookUrl: "${GRAFANA_ONCALL_WEBHOOK_URL}"
-  # Team chat through each server's API, so an incident's updates edit the
-  # message they belong to instead of adding one each.
-  mattermost:
-    enabled: false
-    serverUrl: "${MATTERMOST_URL}"
-    # A bot account's access token, and the channel's id (not its name)
-    token: "${MATTERMOST_TOKEN}"
-    channelId: "${MATTERMOST_CHANNEL_ID}"
-  rocketchat:
-    enabled: false
-    serverUrl: "${ROCKETCHAT_URL}"
-    # The bot user's id and a personal access token of it, and the room's id
-    userId: "${ROCKETCHAT_USER_ID}"
-    token: "${ROCKETCHAT_TOKEN}"
-    roomId: "${ROCKETCHAT_ROOM_ID}"
-  zulip:
-    enabled: false
-    siteUrl: "${ZULIP_SITE_URL}"
-    botEmail: "${ZULIP_BOT_EMAIL}"
-    apiKey: "${ZULIP_API_KEY}"
-    # The channel ("stream") to post in
-    stream: "${ZULIP_STREAM}"
-    # Optional: one fixed topic. Unset, each provider gets a topic of its own.
-    topic: "${ZULIP_TOPIC}"
-  google-chat:
-    enabled: false
-    # A space's incoming webhook. An incident's messages share one thread.
-    webhookUrl: "${GOOGLE_CHAT_WEBHOOK_URL}"
-  # Phones. Numbers are E.164 (+39...). Route only what is worth waking up
-  # for to the call — a rule with minSeverity: major_outage.
-  twilio-sms:
-    enabled: false
-    accountSid: "${TWILIO_SMS_ACCOUNT_SID}"
-    authToken: "${TWILIO_SMS_AUTH_TOKEN}"
-    from: "${TWILIO_SMS_FROM}"
-    to: "${TWILIO_SMS_TO}"
-  twilio-call:
-    enabled: false
-    accountSid: "${TWILIO_CALL_ACCOUNT_SID}"
-    authToken: "${TWILIO_CALL_AUTH_TOKEN}"
-    from: "${TWILIO_CALL_FROM}"
-    to: "${TWILIO_CALL_TO}"
-  bark:
-    enabled: false
-    # The device key the Bark iOS app shows
-    deviceKey: "${BARK_DEVICE_KEY}"
-    # Optional: a self-hosted bark-server. Unset means https://api.day.app
-    serverUrl: "${BARK_SERVER_URL}"
-  signal:
-    enabled: false
-    # A signal-cli-rest-api server, which holds the account's keys
-    serverUrl: "${SIGNAL_API_URL}"
-    # The registered number to send from, and who receives: numbers or
-    # group.… ids, comma-separated
-    number: "${SIGNAL_NUMBER}"
-    recipients: "${SIGNAL_RECIPIENTS}"
-  # Machines.
-  syslog:
-    enabled: false
-    # udp://host:514, tcp://host:601 or tls://host:6514 — RFC 5424 messages
-    url: "${SYSLOG_URL}"
-    # Optional: local0 (the default) to local7
-    facility: "${SYSLOG_FACILITY}"
-  mqtt:
-    enabled: false
-    # mqtt://broker:1883, or mqtts:// for TLS
-    brokerUrl: "${MQTT_BROKER_URL}"
-    # Optional: the topic prefix, "isitdown" by default. Messages go to
-    # <prefix>/<provider>; a provider's state is published retained.
-    topic: "${MQTT_TOPIC}"
-    # Optional: only for a broker that wants credentials
-    username: "${MQTT_USERNAME}"
-    password: "${MQTT_PASSWORD}"
-  # Public posts. The operator's impact and owner notes are never posted.
-  mastodon:
-    enabled: false
-    instanceUrl: "${MASTODON_INSTANCE_URL}"
-    # An application's access token with write:statuses
-    accessToken: "${MASTODON_ACCESS_TOKEN}"
-    # Optional: public (the default), unlisted or private
-    visibility: "${MASTODON_VISIBILITY}"
-  bluesky:
-    enabled: false
-    handle: "${BLUESKY_HANDLE}"
-    # An app password (Settings → App passwords), never the account's own
-    appPassword: "${BLUESKY_APP_PASSWORD}"
-    # Optional: the account's PDS, when it is not bsky.social
-    serviceUrl: "${BLUESKY_SERVICE_URL}"
+
+# ── Advanced ─────────────────────────────────────────────────────────────────
+#
+# Nothing below is needed to get started, and all of it is commented out. Each
+# block shows every setting with an example value: uncomment the lines you want
+# (drop the leading "# ") and merge them into the base path above — a provider
+# setting goes under its entry in `services`, a channel under `notifications`.
+# The full reference is docs/configuration.md.
+
+# pollIntervalMinutes: 3      # how often to poll every provider
+# requestTimeoutSeconds: 8    # per-request timeout
+# maxRetries: 3               # attempts per provider per cycle, with backoff
+# failureThreshold: 5         # consecutive failures before a "monitoring degraded" warning
+# adaptivePolling: true       # while a provider has an open incident, poll it on the cadence below
+# adaptiveIntervalMinutes: 1  # that cadence; never slower than the provider's own interval
+# confirmSamples: 1           # consecutive polls that must agree before a change notifies (1 = off)
+# Correlated-outage detection (roadmap 2.7): when this many providers go bad
+# inside the window below, one "this looks like a shared failure" alert replaces
+# the individual ones. 0 and 1 are off, which is the default — it is the only
+# setting here that replaces alerts rather than adding them.
+# correlationThreshold: 0
+# correlationWindowMinutes: 10
+# locale: en                  # language for notification messages: en | it (falls back to en)
+
+# Per provider: every optional setting, shown on GitHub and Cloudflare. Copy a
+# line under the provider's own entry in `services` above.
+# services:
+#   - name: GitHub
+#     id: github
+#     adapter: statuspage
+#     baseUrl: https://www.githubstatus.com
+#     # Optional: poll this provider on its own cadence instead of the global
+#     # pollIntervalMinutes above. A page that publishes every few minutes and one
+#     # that changes twice a year do not deserve the same one. Omit to follow the
+#     # global interval.
+#     intervalMinutes: 2
+#     # Optional: the group this provider belongs to — "my stack". Providers in
+#     # the same group get a combined status (worst member wins), and one routing
+#     # rule below can cover all of them with `provider: group:deploy-path`. A
+#     # lowercase slug; omit it to leave the provider ungrouped.
+#     group: deploy-path
+#     # Optional: the monthly uptime this provider is supposed to deliver, as a
+#     # percentage. The UI edition turns it into an error budget, reports what the
+#     # month has spent of it, and sends one alert when the rate says the month
+#     # will miss. Omit it when nobody promised anything — most providers.
+#     slaTarget: 99.9
+#     # Optional: what an hour of this provider being down costs you, in your own
+#     # currency. Shown beside each incident, in the reliability table and in the
+#     # monthly report. Omit it and no figure is shown — an unpriced outage is not
+#     # a free one.
+#     outageCostPerHour: 1200
+#     # Optional: what breaks here when this provider does, and who answers for
+#     # it. Both are added under every message about it, so an alert at 3 a.m.
+#     # reads as a handover note.
+#     impact: deploys blocked, CI stopped
+#     owner: "@alice"
+#     # Optional: what to do when it is down, in Markdown. Shown on the provider's
+#     # page; every alert ends with its first link, or its first line.
+#     runbook: |
+#       Switch CI to the GitLab mirror: https://wiki.example.com/runbooks/github
+#     # Optional: free labels beside the group. A routing rule can name one as
+#     # `provider: tag:critical`.
+#     tags: [paid, critical]
+#     # Optional: planned mutes — a weekly window (may wrap midnight) or one span.
+#     # While one runs the provider is muted exactly like the dashboard's Mute.
+#     muteSchedules:
+#       - { days: [sun], start: "03:00", end: "04:00", timeZone: Europe/Rome }
+#     # Optional: maintenance you declare because the provider does not. It
+#     # silences, is announced and is drawn on the timeline like the provider's
+#     # own; it always needs an end.
+#     # maintenanceWindows:
+#     #   - { title: Our deploy, startsAt: "2026-12-01T22:00:00Z", endsAt: "2026-12-01T23:00:00Z" }
+
+#   - name: Cloudflare
+#     id: cloudflare
+#     adapter: statuspage
+#     baseUrl: https://www.cloudflarestatus.com
+#     group: deploy-path
+#     # Optional: watch only part of a provider. Component ids come from
+#     # <baseUrl>/api/v2/summary.json, where Cloudflare groups its data centres by
+#     # region. With scopeToComponents an incident attributed only to components
+#     # outside this list is ignored, and the reported status is the worst of these
+#     # components rather than the page-wide indicator. A notice the provider
+#     # attaches to no component at all is page-wide and always reported.
+#     scopeToComponents: true
+#     components:
+#       - id: 57ctn3f2qsyj
+#         name: Amsterdam, Netherlands - (AMS)
+#       - id: k8q1kmz4gfms
+#         name: Milan, Italy - (MXP)
+
+#   # A page that publishes neither JSON nor a feed: read one element's text and
+#   # map the words onto a severity. Fragile by nature — a selector that stops
+#   # matching is reported as a failing provider, never as "operational" — so use
+#   # it only where there is nothing better.
+#   #
+#   # - name: Example
+#   #   id: example
+#   #   adapter: html
+#   #   baseUrl: https://status.example.com/
+#   #   options:
+#   #     selector: ".status-banner"
+#   #     # Optional. Each severity keeps its built-in words unless you give it
+#   #     # your own; on the page, the longest match wins.
+#   #     operational: "all systems operational"
+#   #     major_outage: "outage, down"
+
+#   # A probe of the service itself rather than of a page about it. Here it is
+#   # also the second opinion on GitHub's own status page: when this probe cannot
+#   # reach the API and githubstatus.com still reports operational with no
+#   # incident open, the disagreement is itself an alert — the silent-outage
+#   # cross-check.
+#   #
+#   # - name: GitHub API
+#   #   id: github-api
+#   #   adapter: http
+#   #   baseUrl: https://api.github.com
+#   #   crossChecks: github
+#   #   options:
+#   #     path: /meta
+#   #     expectStatus: "200-299"
+#   #
+#   # Which source is the record for a provider — `declared` (its own status page)
+#   # or `observed` (our own reading), roadmap 9.1. Left out, which is the normal
+#   # case, the adapter decides: a probe is `observed` because it *is* the
+#   # reading, and anything that parses somebody's page is `declared`. Set it only
+#   # to disagree with that default.
+#   #
+#   # - name: Acme
+#   #   id: acme
+#   #   adapter: statuspage
+#   #   baseUrl: https://status.acme.example
+#   #   authority: observed
+
+# Per channel: every channel the Light edition knows. Copy the one you
+# want under `notifications` above, set enabled: true and its variables in .env.
+# notifications:
+#   telegram:
+#     enabled: true
+#     botToken: "${TELEGRAM_BOT_TOKEN}"
+#     chatId: "${TELEGRAM_CHAT_ID}"
+#     # Optional, per channel (roadmap 3.20 and 3.15). `locale` overrides the
+#     # notification language above for this channel alone — so this chat can read
+#     # Italian while the webhook payload below stays English. `template` replaces
+#     # the default message: substitution only, no conditions and no loops, and an
+#     # unknown token stops the container with the token named. See
+#     # docs/configuration.md#311-per-channel-locale-and-template for the tokens.
+#     # locale: it
+#     # template: "[{{severity}}] {{provider}} — {{title}}\n{{url}}"
+#   webhook:
+#     enabled: false
+#     url: "${WEBHOOK_URL}"
+#     # Optional. With a secret set, every request carries X-IsItDown-Timestamp
+#     # and X-IsItDown-Signature (HMAC-SHA256 over "<timestamp>.<body>"), so a
+#     # receiver can verify the payload came from here. Unset means unsigned.
+#     secret: "${WEBHOOK_SECRET}"
+#   discord:
+#     enabled: false
+#     # Server settings → Integrations → Webhooks → Copy Webhook URL
+#     webhookUrl: "${DISCORD_WEBHOOK_URL}"
+#   slack:
+#     enabled: false
+#     # An incoming webhook of a Slack app installed in the target channel
+#     webhookUrl: "${SLACK_WEBHOOK_URL}"
+#   ntfy:
+#     enabled: false
+#     # The topic URL, server included — ntfy.sh or an instance of your own
+#     topicUrl: "${NTFY_TOPIC_URL}"
+#     # Optional: only a server with access control needs a token
+#     token: "${NTFY_TOKEN}"
+#   gotify:
+#     enabled: false
+#     # The server itself, not a message path
+#     serverUrl: "${GOTIFY_URL}"
+#     # An application token, from the Gotify app you created for IsItDown
+#     token: "${GOTIFY_TOKEN}"
+#   pushover:
+#     enabled: false
+#     # The API token of the Pushover application you created for IsItDown
+#     token: "${PUSHOVER_TOKEN}"
+#     # Your user key, or a group key, from the Pushover dashboard
+#     userKey: "${PUSHOVER_USER_KEY}"
+#     # Optional: one registered device; empty delivers to every device
+#     device: "${PUSHOVER_DEVICE}"
+#   matrix:
+#     enabled: false
+#     # The homeserver's root, not a room path
+#     homeserverUrl: "${MATRIX_HOMESERVER_URL}"
+#     # The internal room id, not an alias: !abc:example.org
+#     roomId: "${MATRIX_ROOM_ID}"
+#     # An access token for the user that posts
+#     accessToken: "${MATRIX_ACCESS_TOKEN}"
+#   pagerduty:
+#     enabled: false
+#     # The integration key of an Events API v2 integration on a service. An
+#     # incident that resolves closes the alert it opened, keyed on the change.
+#     routingKey: "${PAGERDUTY_ROUTING_KEY}"
+#     # Optional: "eu" for an account in PagerDuty's EU service region
+#     region: "${PAGERDUTY_REGION}"
+#   opsgenie:
+#     enabled: false
+#     # An API key from an Opsgenie API integration
+#     apiKey: "${OPSGENIE_API_KEY}"
+#     # Optional: "eu" for an account on Opsgenie's EU instance
+#     region: "${OPSGENIE_REGION}"
+#   apprise:
+#     enabled: false
+#     # An Apprise API server, which reaches the ~80 services Apprise knows
+#     serverUrl: "${APPRISE_SERVER_URL}"
+#     # Either the key of a configuration the server stores (preferred — the
+#     # service URLs behind it are credentials) ...
+#     configKey: "${APPRISE_CONFIG_KEY}"
+#     # ... or the Apprise URLs themselves, comma-separated, for a stateless
+#     # server. One of the two is required.
+#     urls: "${APPRISE_URLS}"
+#   teams:
+#     enabled: false
+#     # A Teams channel webhook: Workflows → "Post to a channel when a webhook
+#     # request is received", or an Office 365 connector on an older tenant
+#     webhookUrl: "${TEAMS_WEBHOOK_URL}"
+#   email:
+#     enabled: false
+#     # An SMTP submission server. STARTTLS is used whenever the server offers it.
+#     host: "${SMTP_HOST}"
+#     # Optional, 587 by default. 465 is implicit TLS and is treated as such.
+#     port: "${SMTP_PORT}"
+#     # Optional: "true" forces TLS from the first byte, as on port 465
+#     secure: "${SMTP_SECURE}"
+#     # Optional. Credentials are never sent over an unencrypted connection
+#     # unless this says "true" — meant for a relay on this machine.
+#     allowInsecureAuth: "${SMTP_ALLOW_INSECURE_AUTH}"
+#     # Optional: "true" accepts a certificate no public CA signed
+#     allowSelfSigned: "${SMTP_ALLOW_SELF_SIGNED}"
+#     # Optional: a relay that trusts this network needs no credentials
+#     username: "${SMTP_USERNAME}"
+#     password: "${SMTP_PASSWORD}"
+#     from: "${SMTP_FROM}"
+#     # One address, or several separated by commas
+#     to: "${SMTP_TO}"
+#   # On-call chains (roadmap 3.9). Like PagerDuty and Opsgenie, each keys its
+#   # alert on the change, so a provider's own "resolved" closes what it opened.
+#   splunk-oncall:
+#     enabled: false
+#     # The REST endpoint integration's API key, and the routing key that picks
+#     # the escalation policy
+#     apiKey: "${SPLUNK_ONCALL_API_KEY}"
+#     routingKey: "${SPLUNK_ONCALL_ROUTING_KEY}"
+#   squadcast:
+#     enabled: false
+#     # An Incident Webhook integration's URL
+#     webhookUrl: "${SQUADCAST_WEBHOOK_URL}"
+#   zenduty:
+#     enabled: false
+#     # An API integration's key
+#     integrationKey: "${ZENDUTY_INTEGRATION_KEY}"
+#   incident-io:
+#     enabled: false
+#     # An HTTP alert source: its config id and its bearer token
+#     alertSourceId: "${INCIDENT_IO_ALERT_SOURCE_ID}"
+#     token: "${INCIDENT_IO_TOKEN}"
+#   grafana-oncall:
+#     enabled: false
+#     # A Formatted Webhook integration's URL
+#     webhookUrl: "${GRAFANA_ONCALL_WEBHOOK_URL}"
+#   # Team chat through each server's API, so an incident's updates edit the
+#   # message they belong to instead of adding one each.
+#   mattermost:
+#     enabled: false
+#     serverUrl: "${MATTERMOST_URL}"
+#     # A bot account's access token, and the channel's id (not its name)
+#     token: "${MATTERMOST_TOKEN}"
+#     channelId: "${MATTERMOST_CHANNEL_ID}"
+#   rocketchat:
+#     enabled: false
+#     serverUrl: "${ROCKETCHAT_URL}"
+#     # The bot user's id and a personal access token of it, and the room's id
+#     userId: "${ROCKETCHAT_USER_ID}"
+#     token: "${ROCKETCHAT_TOKEN}"
+#     roomId: "${ROCKETCHAT_ROOM_ID}"
+#   zulip:
+#     enabled: false
+#     siteUrl: "${ZULIP_SITE_URL}"
+#     botEmail: "${ZULIP_BOT_EMAIL}"
+#     apiKey: "${ZULIP_API_KEY}"
+#     # The channel ("stream") to post in
+#     stream: "${ZULIP_STREAM}"
+#     # Optional: one fixed topic. Unset, each provider gets a topic of its own.
+#     topic: "${ZULIP_TOPIC}"
+#   google-chat:
+#     enabled: false
+#     # A space's incoming webhook. An incident's messages share one thread.
+#     webhookUrl: "${GOOGLE_CHAT_WEBHOOK_URL}"
+#   # Phones. Numbers are E.164 (+39...). Route only what is worth waking up
+#   # for to the call — a rule with minSeverity: major_outage.
+#   twilio-sms:
+#     enabled: false
+#     accountSid: "${TWILIO_SMS_ACCOUNT_SID}"
+#     authToken: "${TWILIO_SMS_AUTH_TOKEN}"
+#     from: "${TWILIO_SMS_FROM}"
+#     to: "${TWILIO_SMS_TO}"
+#   twilio-call:
+#     enabled: false
+#     accountSid: "${TWILIO_CALL_ACCOUNT_SID}"
+#     authToken: "${TWILIO_CALL_AUTH_TOKEN}"
+#     from: "${TWILIO_CALL_FROM}"
+#     to: "${TWILIO_CALL_TO}"
+#   bark:
+#     enabled: false
+#     # The device key the Bark iOS app shows
+#     deviceKey: "${BARK_DEVICE_KEY}"
+#     # Optional: a self-hosted bark-server. Unset means https://api.day.app
+#     serverUrl: "${BARK_SERVER_URL}"
+#   signal:
+#     enabled: false
+#     # A signal-cli-rest-api server, which holds the account's keys
+#     serverUrl: "${SIGNAL_API_URL}"
+#     # The registered number to send from, and who receives: numbers or
+#     # group.… ids, comma-separated
+#     number: "${SIGNAL_NUMBER}"
+#     recipients: "${SIGNAL_RECIPIENTS}"
+#   # Machines.
+#   syslog:
+#     enabled: false
+#     # udp://host:514, tcp://host:601 or tls://host:6514 — RFC 5424 messages
+#     url: "${SYSLOG_URL}"
+#     # Optional: local0 (the default) to local7
+#     facility: "${SYSLOG_FACILITY}"
+#   mqtt:
+#     enabled: false
+#     # mqtt://broker:1883, or mqtts:// for TLS
+#     brokerUrl: "${MQTT_BROKER_URL}"
+#     # Optional: the topic prefix, "isitdown" by default. Messages go to
+#     # <prefix>/<provider>; a provider's state is published retained.
+#     topic: "${MQTT_TOPIC}"
+#     # Optional: only for a broker that wants credentials
+#     username: "${MQTT_USERNAME}"
+#     password: "${MQTT_PASSWORD}"
+#   # Public posts. The operator's impact and owner notes are never posted.
+#   mastodon:
+#     enabled: false
+#     instanceUrl: "${MASTODON_INSTANCE_URL}"
+#     # An application's access token with write:statuses
+#     accessToken: "${MASTODON_ACCESS_TOKEN}"
+#     # Optional: public (the default), unlisted or private
+#     visibility: "${MASTODON_VISIBILITY}"
+#   bluesky:
+#     enabled: false
+#     handle: "${BLUESKY_HANDLE}"
+#     # An app password (Settings → App passwords), never the account's own
+#     appPassword: "${BLUESKY_APP_PASSWORD}"
+#     # Optional: the account's PDS, when it is not bsky.social
+#     serviceUrl: "${BLUESKY_SERVICE_URL}"
 
 # Which channels hear about what. The first rule that matches a change decides,
 # rules below it are not consulted — put specific ones on top. Leave this
