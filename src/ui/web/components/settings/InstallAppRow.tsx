@@ -46,6 +46,9 @@ export function InstallAppRow(): React.JSX.Element {
             ? t("settings.install.hint")
             : t("settings.install.manual")
       }
+      // Roadmap 16.3: still works, says it is going, for one major — in the
+      // status slot, which compact density never folds away.
+      status={t("settings.install.deprecated")}
       align="top"
     >
       {installed ? (

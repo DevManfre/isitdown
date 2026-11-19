@@ -299,6 +299,37 @@ export const settingsPaths: Json = {
       },
     },
   },
+  "/config/usage-report": {
+    get: {
+      tags: ["Configuration"],
+      summary: "The opt-in usage report (roadmap 16.3): counts and identifiers only, for the operator to paste into an issue.",
+      responses: {
+        "200": ok({
+          type: "object",
+          required: ["edition", "version", "providers", "channels", "delivery", "routingRules", "recipients", "features", "deprecatedInUse"],
+          properties: {
+            edition: { type: "string", enum: ["light", "ui"] },
+            version: { type: "string" },
+            providers: {
+              type: "object",
+              required: ["total", "enabled", "byAdapter"],
+              properties: {
+                total: { type: "integer" },
+                enabled: { type: "integer" },
+                byAdapter: { type: "object", additionalProperties: { type: "integer" } },
+              },
+            },
+            channels: { type: "array", items: { type: "string" }, description: "Enabled channel ids." },
+            delivery: { type: "array", items: { type: "string" }, description: "Delivery features switched on." },
+            routingRules: { type: "integer" },
+            recipients: { type: "integer" },
+            features: { type: "object", additionalProperties: { type: "boolean" } },
+            deprecatedInUse: { type: "array", items: { type: "string" }, description: "Deprecated routes served since start." },
+          },
+        }),
+      },
+    },
+  },
   "/config/health": {
     get: {
       tags: ["Configuration"],

@@ -2011,6 +2011,10 @@ docker exec isitdown-light node dist/light/check.js; echo "exit=$?"
 #   exit=0
 ```
 
+`--usage` prints the opt-in usage report for the same file instead — counts
+and ids, nothing that says whose installation it is; see
+[Deprecations §13.2](deprecations.md#132-telling-us-what-you-use).
+
 With no path it reads `$CONFIG_PATH`, the way the container does. From a source
 checkout, `npm run check:config -- ./config.yml` runs the same command without a
 build.

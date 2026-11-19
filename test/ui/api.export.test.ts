@@ -398,3 +398,52 @@ test("a malformed or future quarter is refused rather than reported empty", asyn
     await app.close();
   }
 });
+
+test("the five unlinked export twins still answer, say they are deprecated, and land in the usage report", async () => {
+  // Roadmap 16.3. Deprecated in 2.46, removed in 3.0: until then each answers
+  // exactly as before, with RFC 9745's headers pointing at the list.
+  const app = await api();
+  try {
+    const { body: before } = await app.get("/config/usage-report").then((r) => ({ body: JSON.parse(r.text) as { deprecatedInUse: string[] } }));
+    assert.deepEqual(before.deprecatedInUse, []);
+
+    const twins = [
+      "/export/history.json",
+      "/export/trust.csv",
+      "/export/trust.json",
+      `/export/report-card.json`,
+    ];
+    for (const path of twins) {
+      const response = await app.get(path);
+      assert.equal(response.status, 200, path);
+      assert.equal(response.headers.get("deprecation"), "@1795046400", path);
+      assert.match(response.headers.get("link") ?? "", /docs\/deprecations\.md>; rel="deprecation"/, path);
+    }
+
+    for (const path of ["/export/history.csv", "/export/incidents.json", "/export/report-card.md"]) {
+      const response = await app.get(path);
+      assert.equal(response.headers.get("deprecation"), null, `${path} is not deprecated`);
+    }
+
+    const after = JSON.parse((await app.get("/config/usage-report")).text) as { deprecatedInUse: string[] };
+    assert.deepEqual(after.deprecatedInUse, [...twins].sort());
+  } finally {
+    await app.close();
+  }
+});
+
+test("the usage report counts what is configured and names nothing", async () => {
+  const app = await api();
+  try {
+    const response = await app.get("/config/usage-report");
+    assert.equal(response.status, 200);
+    const report = JSON.parse(response.text) as Record<string, unknown>;
+    assert.equal(report["edition"], "ui");
+    assert.deepEqual(report["providers"], { total: 3, enabled: 3, byAdapter: { statuspage: 3 } });
+    assert.deepEqual(report["features"], { apiToken: false, egressAllow: false, heartbeat: false, publicPage: false, push: false });
+    // The seeded providers' urls and names never appear.
+    assert.doesNotMatch(response.text, /https?:|github/i);
+  } finally {
+    await app.close();
+  }
+});

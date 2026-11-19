@@ -2094,6 +2094,10 @@ docker exec isitdown-light node dist/light/check.js; echo "exit=$?"
 #   exit=0
 ```
 
+`--usage` stampa invece il report d'uso facoltativo per lo stesso file — conteggi
+e identificatori, nulla che dica di chi è l'installazione; vedi
+[Deprecazioni §13.2](deprecations.it.md#132-dirci-cosa-usi).
+
 Senza percorso legge `$CONFIG_PATH`, come fa il container. Da un checkout dei
 sorgenti, `npm run check:config -- ./config.yml` esegue lo stesso comando senza
 build.

@@ -167,6 +167,10 @@ perché una ConfigMap montata che cambia su disco non riavvia nulla da sola.
 
 ### 4.5 Nessuno dei due: l'edizione Light in un solo file
 
+> **Deprecata dalla 2.46, non più pubblicata dalla 3.0** ([Deprecazioni](deprecations.it.md)):
+> usa l'immagine container della Light. Fino ad allora il binario scrive un
+> avviso nel log a ogni avvio.
+
 Chi non vuole né Docker né un'installazione di Node può eseguire l'edizione
 Light come un unico eseguibile — roadmap 6.7. Ogni release lo allega accanto
 alle immagini, con un checksum:
