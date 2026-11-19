@@ -120,6 +120,13 @@ e tradotta in sei lingue. Ogni route che ci sta dietro è documentata nell'
 
 ## 2. Avvio rapido
 
+**Il percorso base.** A entrambe le edizioni bastano i provider e un canale per
+mandare il primo avviso. Nell'edizione UI è il wizard del primo avvio;
+nell'edizione Light è la parte non commentata in cima a `config.example.yml` —
+sette chiavi, tre provider e Telegram — con ogni altra impostazione commentata
+sotto. Routing, quiet hours, digest e il resto sono facoltativi
+([3.0](docs/configuration.it.md#30-il-percorso-base)).
+
 ### 2.1 Con Docker
 
 **Edizione UI, senza clone** — un file, due comandi. Le immagini sono pubblicate
@@ -148,7 +155,7 @@ un `config.yml` da montare, quindi si parte da un clone:
 ```bash
 git clone https://github.com/DevManfre/isitdown.git && cd isitdown
 cp .env.example .env                # compila solo i canali che abiliterai
-cp config.example.yml config.yml    # modifica: provider, intervallo, canali
+cp config.example.yml config.yml    # il percorso base: provider e Telegram
 docker compose --profile light up -d
 docker logs -f isitdown-light
 ```

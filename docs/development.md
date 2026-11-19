@@ -135,6 +135,7 @@ isitdown/
 │   ├── copy-assets.mjs                copies i18n and dashboard-locale catalogs into dist (the
 │   │                                   dashboard bundle itself is Vite's own output, not this script's)
 │   ├── readme-parity.mjs              every English page against its translations (npm run check:readme)
+│   ├── complexity-inventory.mjs       what each subsystem costs, as a Markdown table (9.8)
 │   ├── i18n-orphans.mjs               catalog keys against the code that asks for them (npm run check:i18n)
 │   ├── fake-provider.mjs              a local status page to break by hand, plus a webhook receiver (npm run fake-provider)
 │   ├── scaffold.mjs                   a new adapter or notification channel, laid out and registered (npm run new:adapter / new:notifier)
@@ -779,3 +780,51 @@ and the single-file build: `npm run build:sea` produces a binary from whichever
 suite, both images (`docker compose --profile ui up -d --build` until `healthy`)
 and a visual run. The Node version is the one bump that changes the published
 images without any package changing, so it goes in a release of its own.
+
+### 9.8 Complexity inventory
+
+IsItDown does one simple thing — tell you a service is down — and the code
+around it has grown two editions, thirty channels, a CLI, outposts, a single
+binary and four deployment descriptors. Before anything is pruned or added on
+the strength of "it's too complex", the cost is a number (roadmap 16.1):
+
+```bash
+node tools/complexity-inventory.mjs   # the table below, as Markdown
+```
+
+Per subsystem: non-blank source and test lines; `config.yml` keys (leaf key
+paths of the Light schema, an array's items counted once — `services` belongs
+to the adapters, `notifications` to the notifiers, the rest to the core);
+environment variables the code reads itself; form controls in the dashboard's
+Settings and add-provider surfaces; the concepts an operator must learn, from a
+hand-written list in the script; and the build and packaging targets it ships
+as. The output carries no date and no timing, so the same tree always prints
+the same table.
+
+Measured on 2026-11-18:
+
+| Subsystem | Source lines | Test lines | config.yml keys | Env vars | Settings fields | Concepts | Build targets |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| Core (poller, diff engine, scheduler) | 8,110 | 8,700 | 49 | 10 | — | 39 | — |
+| Adapters | 9,953 | 6,498 | 32 | 1 | — | 12 | — |
+| Notifiers | 4,373 | 4,759 | 168 | — | — | 6 | — |
+| Light edition | 1,254 | 973 | — | 3 | — | 4 | 2 |
+| UI server | 24,492 | 18,139 | — | 19 | — | 9 | 1 |
+| Dashboard | 43,523 | 17,637 | — | — | 141 | 11 | — |
+| CLI | 826 | 446 | — | 1 | — | 3 | 1 |
+| Outpost | 165 | 98 | — | 3 | — | 2 | — |
+| Packaging | 1,308 | — | — | 1 | — | 8 | 9 |
+| **Total** | 94,004 | 57,250 | 249 | 38 | 141 | 94 | 13 |
+
+Base path (`config.example.yml`, Light): 7 keys, ceiling 7.
+
+The base path is the configuration in [3.0](configuration.md#30-the-base-path)
+— what `config.example.yml` sets outside a comment. A test
+(`test/tools/complexityInventory.test.ts`) fails when it grows past the
+ceiling. That ceiling is seven, not five: one catalog provider costs `id`,
+`name`, `adapter` and `baseUrl`, and one channel `enabled` and its two
+credentials; lowering it takes a change that removes one of those keys, never
+moving a key out of the base path.
+
+A concept goes into the script's list in the same commit as the feature that
+makes someone learn it.
