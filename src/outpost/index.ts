@@ -1,6 +1,7 @@
 import { getAdapter } from "../adapters/index.ts";
 import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
+import { configureOutbound } from "../core/outboundPolicy.ts";
 import { createOutpostServer } from "./server.ts";
 
 /**
@@ -21,6 +22,9 @@ function main(): void {
     process.exit(1);
   }
   const port = Number(process.env["PORT"] ?? 8080);
+  // An outpost exists to probe from inside a network, so it reads private
+  // targets like the Light edition it ships with — warning once per host.
+  configureOutbound({ privateTargets: "warn", warn: (message, fields) => logger.warn(message, fields) });
 
   const server = createOutpostServer({ token, getAdapter, logger });
   server.listen(port, () => {

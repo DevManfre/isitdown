@@ -26,7 +26,7 @@
     "coverage:web": "node tools/quarantine.mjs run dashboard -- vitest run --coverage",
     "coverage:web:shard": "node tools/quarantine.mjs run dashboard -- vitest run --coverage --coverage.thresholds.lines=0 --coverage.thresholds.branches=0 --coverage.thresholds.functions=0 --coverage.thresholds.statements=0 --reporter=default --reporter=blob",
     "coverage:web:merge": "vitest run --merge-reports=src/ui/web/.vitest-reports --coverage",
-    "dev:ui": "concurrently -n server,vite -c blue,magenta \"DB_PATH=./data/isitdown.db WEB_DIR=./dist/ui/public node --watch --env-file-if-exists=.env src/ui/server.ts\" \"vite\"",
+    "dev:ui": "concurrently -n server,vite -c blue,magenta \"DB_PATH=./data/isitdown.db WEB_DIR=./dist/ui/public EGRESS_ALLOW=127.0.0.1,::1 node --watch --env-file-if-exists=.env src/ui/server.ts\" \"vite\"",
     "dev:docker": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile ui up -d",
     "fake-provider": "node tools/fake-provider.mjs",
     "lint": "biome lint .",

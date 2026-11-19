@@ -11,6 +11,7 @@ import {
   type HandshakeTarget,
   type TcpCheck,
 } from "./tcpChecks.ts";
+import { assertProbeHost } from "../core/outboundPolicy.ts";
 
 /**
  * A bare TCP connect — roadmap 1.9, the half of it the HTTP probe could not
@@ -277,6 +278,7 @@ export const tcpAdapter: Adapter = {
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const config = tcpConfig(service);
+    await assertProbeHost(config.host);
     const outcome = await attemptConnect(config, ctx.timeoutMs);
 
     // A completed handshake is a read, and how long it took is worth recording

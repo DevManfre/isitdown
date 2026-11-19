@@ -253,7 +253,11 @@ in the dashboard, and the notification it sends shows up under *Webhook
 receiver* on the same page. State lives in memory: restarting the fake starts
 over from three operational components. Under `dev:docker`, start it with `npm run fake-provider -- --host 0.0.0.0`
 (the container cannot reach the host's loopback) and use
-`http://host.docker.internal:4010` in place of `127.0.0.1`. The
+`http://host.docker.internal:4010` in place of `127.0.0.1`. Both dev modes already
+let that address past the UI edition's egress policy
+([3.38](configuration.md#338-the-egress-policy--what-a-probe-may-reach)):
+`dev:ui` sets `EGRESS_ALLOW=127.0.0.1,::1`, `dev:docker` sets
+`EGRESS_ALLOW=host.docker.internal`. The
 integration suite (`test/integration/fakeProvider.itest.ts`) imports this same
 server and drives it through the real adapters, so a fake the adapters can no
 longer read fails CI first.

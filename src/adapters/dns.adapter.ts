@@ -5,6 +5,7 @@ import { checkDnssec, type DnssecVerdict } from "./dnssec.ts";
 import { registrableDomain } from "./discover.ts";
 import { domainExpiry, type ExpiryLookup } from "./rdap.ts";
 import { worstStatus } from "./severity.ts";
+import { assertProbeHost } from "../core/outboundPolicy.ts";
 
 /**
  * A DNS resolution — roadmap 1.9, the other half the HTTP probe could not
@@ -227,6 +228,14 @@ async function askFor(resolver: Resolver, config: DnsProbeConfig): Promise<strin
   }
 }
 
+/** The address in a resolver option: `1.1.1.1`, `1.1.1.1:53`, `::1` or `[::1]:53`. */
+export function resolverHost(server: string): string {
+  const bracketed = /^\[([^\]]+)\]/.exec(server);
+  if (bracketed !== null) return bracketed[1] ?? server;
+  const withPort = /^(\d+\.\d+\.\d+\.\d+):\d+$/.exec(server);
+  return withPort?.[1] ?? server;
+}
+
 /**
  * One resolution. Never rejects: NXDOMAIN, an empty answer and a resolver that
  * never replies are all readings, and node's own code (`ENOTFOUND`,
@@ -328,6 +337,10 @@ export const dnsAdapter: Adapter = {
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const config = dnsConfig(service);
+    // The name asked about is never connected to; the resolver asked is.
+    for (const server of [config.resolver, config.dnssec]) {
+      if (server !== undefined) await assertProbeHost(resolverHost(server));
+    }
     const outcome = await attemptResolve(config, ctx.timeoutMs);
 
     // An answer is a read, and how long it took is worth recording for the same

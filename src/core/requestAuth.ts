@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { USER_AGENT } from "./http.ts";
+import { guardedFetch, readOutboundPolicy } from "./outboundPolicy.ts";
 
 /**
  * Credentials for a status source that answers only to somebody it knows —
@@ -160,7 +161,12 @@ async function clientCredentialsToken(
 
   const body = new URLSearchParams({ grant_type: "client_credentials", client_id: clientId, client_secret: secret });
   if (scope !== undefined) body.set("scope", scope);
-  const response = await fetch(tokenUrl, {
+  // Through the egress policy like the read it authorises: the token URL is
+  // operator input too (roadmap 9.1). Not followed: a token endpoint that
+  // redirects a POST carrying a client secret is not one to trust.
+  const response = await guardedFetch(
+    tokenUrl,
+    {
     method: "POST",
     headers: {
       accept: "application/json",
@@ -169,7 +175,10 @@ async function clientCredentialsToken(
     },
     body,
     signal: AbortSignal.timeout(timeoutMs),
-  });
+    },
+    readOutboundPolicy(process.env),
+    false,
+  );
   if (!response.ok) {
     // The body of a refused token request is the identity provider's reason
     // ("invalid_client", "AADSTS7000215"), and it never echoes the secret back.

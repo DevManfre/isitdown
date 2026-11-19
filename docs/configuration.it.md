@@ -252,20 +252,12 @@ Quattro cose da sapere prima di affidarcisi:
   503, outside the accepted 200-299`, `no answer from …: connect ECONNREFUSED`,
   `the TLS certificate expires in 9 day(s)`. "Giù" e "giù perché il nome non si
   risolve più" sono la stessa severità e due problemi diversi.
-- sonda **qualunque cosa questo container riesca a raggiungere**, indirizzi
-  privati compresi, e non ha alcuna allowlist. È voluto per una dashboard a
-  operatore singolo in ascolto su `127.0.0.1` (`BIND_HOST` e la mappatura delle porte di compose); è anche il motivo per cui un
-  token API in sola lettura o una pagina pubblica in sola lettura (roadmap 4.15
-  e 5.1) dovranno decidere chi può scrivere una definizione di servizio prima di
-  esistere. Due limiti valgono comunque: il corpo di una risposta viene letto
-  fino a **8 MiB** e una sonda che ne trasmette di più fallisce con
-  `response exceeded 8388608 bytes`, e gli **indirizzi link-local**
-  (`169.254.0.0/16`, `fe80::/10`, l'indirizzo di metadata `fd00:ec2::254`)
-  vengono sempre rifiutati, come ogni redirect che arriva su uno di essi.
-  Imposta `OUTBOUND_BLOCK_PRIVATE=true` per rifiutare anche loopback e range
-  privati (`127/8`, `10/8`, `172.16/12`, `192.168/16`, `100.64/10`, `::1`,
-  `fc00::/7`) — consigliato ogni volta che la dashboard è raggiungibile oltre
-  questo host.
+- risponde a una **policy di uscita** ([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)):
+  la UI rifiuta gli indirizzi loopback e privati se `EGRESS_ALLOW` non li
+  elenca, la Light li legge con un avviso, e gli indirizzi link-local (i
+  metadata del cloud) sono rifiutati ovunque. Il corpo di una risposta viene
+  letto fino a **8 MiB**; una sonda che ne trasmette di più fallisce con
+  `response exceeded 8388608 bytes`.
 - **una sfida anti-bot non è un disservizio.** Cloudflare e simili rispondono a
   un client che non sa eseguire il loro JavaScript con `403` e un header
   `cf-mitigated` — la pagina "Just a moment…". Il bordo non ha mai chiesto nulla
@@ -726,7 +718,8 @@ prova reale (roadmap 4.5).
 | `PUBLIC_PAGE_LOCALE` | UI | — | La lingua in cui è scritta quella pagina. Se non è impostata segue il locale delle notifiche dell'installazione. |
 | `PUSH_TOKEN` | UI | — | Attiva l'endpoint per i webhook dei provider ([3.15](#315-push-del-provider-invece-del-polling)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
 | `HEARTBEAT_TOKEN` | UI | — | Attiva l'endpoint dei ping heartbeat ([3.19](#319-heartbeat--il-dead-mans-switch)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
-| `OUTBOUND_BLOCK_PRIVATE` | entrambe | non impostata | `true` fa rifiutare a sonde e letture delle pagine di stato i target loopback e dei range privati (e i redirect verso di essi), oltre agli indirizzi link-local che sono sempre rifiutati. Qualsiasi altro valore lascia consentiti i target privati. |
+| `EGRESS_ALLOW` | entrambe | — | Indirizzi, range CIDR e nomi host che la policy di uscita lascia passare ([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)), separati da virgole o spazi: `10.0.0.0/8,nas.lan`. Alla UI serve per osservare qualunque cosa sulla LAN o su questo host. |
+| `OUTBOUND_BLOCK_PRIVATE` | entrambe | non impostata | `true` fa rifiutare alla Light e all'outpost i target loopback e privati, come già fa la UI ([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)). Qualsiasi altro valore lascia il default dell'edizione. |
 | `BIND_HOST` | UI | `127.0.0.1` | L'indirizzo su cui la dashboard è in ascolto. Per impostazione predefinita è il loopback, ciò che mantiene un'istanza senza `API_TOKEN` raggiungibile solo da questa macchina; le immagini container impostano `0.0.0.0` (la mappatura `ports` di compose decide poi chi può raggiungerla, e pubblica solo su `127.0.0.1`). Per raggiungere la dashboard da un'altra macchina, pubblica su `0.0.0.0` (o imposta `BIND_HOST` su bare metal) **e** imposta `API_TOKEN` — vedi [3.12](#312-raggiungere-lapi-da-un-altro-host) per ciò che una richiesta da fuori questa macchina può fare. |
 | `PORT` | UI, outpost | `3000` (`8080` per l'outpost) | Porta HTTP. |
 
@@ -3382,8 +3375,10 @@ dice di trattare come dati e non come istruzioni. Si possono riassumere solo gli
 adapter che pubblicano il testo degli aggiornamenti — oggi le pagine
 Statuspage; per l'incidente di un altro provider la risposta è che non ci sono
 aggiornamenti da riassumere. Come ogni indirizzo digitato nella dashboard, l'URL
-base compatibile OpenAI viene rifiutato se punta a un indirizzo link-local, e a
-uno privato quando `OUTBOUND_BLOCK_PRIVATE=true`.
+base compatibile OpenAI risponde alla policy di uscita
+([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)): un server
+di modelli su questo host o sulla LAN ha bisogno del suo indirizzo in
+`EGRESS_ALLOW`.
 
 ### 3.37 La tua metrica sotto gli incidenti
 
@@ -3410,3 +3405,53 @@ Due sorgenti:
 
 Al massimo dieci serie. La serie non arriva mai a un notifier né al diff engine:
 è un'immagine con cui confrontarsi, non un segnale.
+
+### 3.38 La policy di uscita — cosa può raggiungere una sonda
+
+Ogni indirizzo dato a IsItDown — una pagina di stato, una sonda HTTP/TCP/ICMP/IMAP,
+il `resolver` di una sonda DNS, l'URL del token OAuth, il modello dei riassunti
+degli incidenti — viene controllato prima che ci si connetta (roadmap 9.1). Il
+controllo guarda l'indirizzo a cui un nome **risolve**, quindi un nome
+dall'aria pubblica che punta a `10.0.0.5` è un target `10.0.0.5`, e si ripete a
+ogni redirect.
+
+| Target | UI | Light, outpost |
+|---|---|---|
+| Indirizzo pubblico | letto | letto |
+| Privato: `10/8`, `172.16/12`, `192.168/16`, `100.64/10`, `0.0.0.0`, `fc00::/7`, `::` | rifiutato | letto, con un avviso per host nel log |
+| Loopback: `127/8`, `::1` | rifiutato | letto, con un avviso per host nel log |
+| Link-local: `169.254/16`, `fe80::/10`, `fd00:ec2::254` (metadata del cloud) | rifiutato | rifiutato |
+
+La UI rifiuta di default perché chiunque possa aggiungere un provider — dalla
+dashboard o con un token API — potrebbe altrimenti leggere i servizi della tua
+rete. La Light li legge perché il suo `config.yml` lo scrive solo l'operatore, e
+un homelab che osserva il proprio NAS è il suo scopo; imposta
+`OUTBOUND_BLOCK_PRIVATE=true` per farla rifiutare comunque.
+
+Un target rifiutato è un errore leggibile sul provider, mai uno stack trace:
+
+```
+blocked by the egress policy: nas.lan (192.168.1.20) is a private address; add nas.lan to EGRESS_ALLOW
+```
+
+**Far passare un target.** `EGRESS_ALLOW` (entrambe le edizioni) accetta
+indirizzi, range CIDR e nomi host, separati da virgole o spazi; la Light legge
+anche `egress.allow` da `config.yml`, aggiunto alla variabile:
+
+```yaml
+egress:
+  allow:
+    - 192.168.1.0/24
+    - nas.lan
+```
+
+- Un indirizzo o un range fa passare tutto ciò che copre — anche un indirizzo
+  link-local, se lo scrivi apposta.
+- Un nome host fa passare gli indirizzi privati e loopback a cui risolve, mai
+  uno link-local: un nome si può ripuntare in seguito, un indirizzo scritto no.
+- Una voce che non è nessuna delle due viene rifiutata da `check` e all'avvio
+  (`egress.allow entry "10.0.0.0/33" is neither an address, a CIDR range nor a
+  host name`); in `EGRESS_ALLOW` viene saltata con un avviso.
+
+Esclusi, perché locali per definizione: il socket della sonda Docker, e i
+canali di notifica, i cui URL arrivano dall'ambiente e non dalla dashboard.

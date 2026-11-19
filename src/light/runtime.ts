@@ -1,6 +1,7 @@
 import { getAdapter } from "../adapters/index.ts";
 import { registerPluginAdapters } from "../adapters/plugins.ts";
 import type { ConfigSource } from "../core/configSource.interface.ts";
+import { configureOutbound, parseAllowList, unusableAllowEntries } from "../core/outboundPolicy.ts";
 import { createLogger, parseLogLevel, type Logger } from "../core/logger.ts";
 import { createDispatcher } from "../core/notificationDispatcher.ts";
 import { readOutposts } from "../core/outpost.ts";
@@ -47,6 +48,13 @@ export async function buildLightRuntime(options: LightRuntimeOptions): Promise<L
   // plugin validates rather than failing as "unknown adapter" (roadmap 1.13).
   // Does nothing unless `PLUGINS_DIR` is set.
   await registerPluginAdapters(options.env, logger);
+
+  // Roadmap 9.1: this edition watches homelabs, so a private or loopback
+  // target is read — once per host, the log says the UI edition would refuse it.
+  configureOutbound({ privateTargets: "warn", warn: (message, fields) => logger.warn(message, fields) });
+  for (const entry of unusableAllowEntries(parseAllowList(options.env["EGRESS_ALLOW"]))) {
+    logger.warn("EGRESS_ALLOW entry ignored: neither an address, a CIDR range nor a host name", { entry });
+  }
 
   await loadConfig(options.configPath, options.env);
   const configSource = createFileConfigSource(options.configPath, options.env);
