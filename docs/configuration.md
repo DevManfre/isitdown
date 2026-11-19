@@ -2,6 +2,44 @@
 
 ## 3. Configuration
 
+### 3.0 The base path
+
+"Tell me when GitHub goes down" needs a few providers and one channel — nothing
+else on this page. Every other setting has a working default, and every section
+from 3.1 on is the advanced reference: none of it is needed to get started.
+
+**Light edition** — the whole of what `config.example.yml` sets outside a
+comment, seven keys:
+
+```yaml
+services:
+  - id: github                        # from the bundled catalog
+    name: GitHub
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+
+notifications:
+  telegram:
+    enabled: true
+    botToken: "${TELEGRAM_BOT_TOKEN}" # the two values go in .env
+    chatId: "${TELEGRAM_CHAT_ID}"
+```
+
+Add a provider by repeating the four lines of an entry — the catalog in
+`src/adapters/catalog.json` has the four values for every provider it knows,
+and [3.5](#35-monitored-providers) covers one it does not. Any other channel
+works the same way: `enabled: true` and its variables (see
+[3.6](#36-notification-channels)). Everything else in `config.example.yml` is
+commented out under the base path, one block per setting, ready to uncomment.
+
+A test keeps the base path at seven keys or fewer
+([9.8](development.md#98-complexity-inventory)).
+
+**UI edition** — nothing to write. A fresh database opens on the first-run
+wizard: pick providers from the catalog, pick one channel and paste its
+credentials, send a test notification. Routing, quiet hours and the rest live in
+Settings, and none of them is needed for the first alert.
+
 ### 3.1 Light edition — `config.yml`
 
 One file, mounted as a volume, **re-read at the start of every cycle** — editing

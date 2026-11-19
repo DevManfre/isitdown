@@ -118,6 +118,13 @@ and translated into six languages. Every route behind it is documented in
 
 ## 2. Quick start
 
+**The base path.** Either edition needs only providers and one channel to send
+its first alert. In the UI edition that is the first-run wizard; in the Light
+edition it is the uncommented top of `config.example.yml` — seven keys, three
+providers and Telegram — with every other setting commented out below it.
+Routing, quiet hours, digests and the rest are optional
+([3.0](docs/configuration.md#30-the-base-path)).
+
 ### 2.1 With Docker
 
 **UI edition, without a clone** — one file, two commands. The images are
@@ -146,7 +153,7 @@ a `config.yml` to mount, so start from a clone:
 ```bash
 git clone https://github.com/DevManfre/isitdown.git && cd isitdown
 cp .env.example .env                # only fill in the channels you will enable
-cp config.example.yml config.yml    # edit: providers, interval, channels
+cp config.example.yml config.yml    # the base path: providers and Telegram
 docker compose --profile light up -d
 docker logs -f isitdown-light
 ```
