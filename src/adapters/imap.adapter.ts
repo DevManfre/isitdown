@@ -1,4 +1,5 @@
 import type { Adapter, FetchContext, ReadingNote, ServiceRef } from "../core/adapter.interface.ts";
+import { assertProbeHost } from "../core/outboundPolicy.ts";
 import type { Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { readRecentHeaders, type ImapEndpoint, type MailHeaders } from "./imapSession.ts";
 import { severityFromWords, worstStatus } from "./severity.ts";
@@ -362,6 +363,7 @@ export const imapAdapter: Adapter = {
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const config = imapConfig(service);
+    await assertProbeHost(config.host);
     const now = new Date();
     const askedAt = Date.now();
     let mail: MailHeaders[];

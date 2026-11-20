@@ -459,6 +459,15 @@ export const fileConfigSchema = z.object({
    * Absent means none: every channel a rule names is sent to on its own.
    */
   recipients: recipientsSchema.optional(),
+  /**
+   * Targets let past the egress policy (roadmap 9.1): addresses, CIDR ranges
+   * and host names, added to `EGRESS_ALLOW`. This edition reads private and
+   * loopback targets anyway, with a warning; listing one here silences it.
+   */
+  egress: z
+    .object({ allow: z.array(z.string().trim().min(1)).max(200).default([]) })
+    .strict()
+    .optional(),
 });
 
 export type FileConfig = z.infer<typeof fileConfigSchema>;

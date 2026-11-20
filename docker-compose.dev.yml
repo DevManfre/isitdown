@@ -38,6 +38,9 @@ services:
     restart: "no"
     environment:
       NODE_ENV: development
+      # The fake provider on the host (roadmap 13.11) is a private address to
+      # the egress policy (roadmap 9.1), which the UI edition refuses unlisted.
+      EGRESS_ALLOW: host.docker.internal
       WEB_DIR: /app/dist/ui/public
     volumes:
       - ./src:/app/src:ro

@@ -42,6 +42,7 @@ The manual, one file per section:
 - [8. Theming and localisation](docs/theming.md) — themes, the six dashboard languages, accessibility
 - [9. Development](docs/development.md) — layout, tech stack, live development, tests, releases
 - [10. Terminal client](docs/cli.md) — `isitdown watch`, a read-only fleet view for a terminal, `isitdown discover`, a first fleet read from a project's own files, and `isitdown import`, a fleet carried over from Uptime Kuma, Gatus, Statping or StatusGator
+- [13. Deprecations](docs/deprecations.md) — what is on its way out and when, and the opt-in usage report that decides what is next
 
 Each page has an Italian twin beside it (`docs/<name>.it.md`).
 
@@ -107,7 +108,7 @@ rail, the command palette (`⌘K` / `Ctrl+K`) and the keyboard shortcuts:
 | **History** | Uptime over 7, 30 or 90 days, in up to five tabs: trend, reliability, patterns, compare and latency. |
 | **Delivery log** | What was sent, to which channel, and what it said or why it failed. |
 | **Settings** | Providers, channels, routing, delivery policy, appearance and data, applied on the next cycle without a restart. |
-| **Wallboard** | A full-screen, chrome-less view for a spare display, with a QR code to the provider in the worst trouble. |
+| **Wallboard** | A full-screen, chrome-less view for a spare display, with a QR code to the provider in the worst trouble. Deprecated: removed in 3.0 ([why](docs/deprecations.md)). |
 
 It is light, dark or system, with high-contrast, colour-blind and OLED variants,
 and translated into six languages. Every route behind it is documented in

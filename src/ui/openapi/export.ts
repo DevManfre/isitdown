@@ -64,6 +64,7 @@ export const exportPaths: Json = {
   "/export/history.json": {
     get: {
       tags: ["Export"],
+      deprecated: true,
       summary: "The same window as the charts are drawn from.",
       parameters: [
         query("provider", "One provider; omit for all."),
@@ -155,6 +156,7 @@ export const exportPaths: Json = {
   "/export/trust.csv": {
     get: {
       tags: ["Export"],
+      deprecated: true,
       summary: "One row per trust episode, pair repeated on each.",
       parameters: [query("days", "Window in days.", { type: "integer" })],
       responses: { "200": media("text/csv", "The episodes.") },
@@ -163,6 +165,7 @@ export const exportPaths: Json = {
   "/export/trust.json": {
     get: {
       tags: ["Export"],
+      deprecated: true,
       summary: "Trust cards with their episodes, exclusions and vantage point.",
       parameters: [query("days", "Window in days.", { type: "integer" })],
       responses: {
@@ -225,6 +228,7 @@ export const exportPaths: Json = {
   "/export/sla-evidence.json": {
     get: {
       tags: ["Export"],
+      deprecated: true,
       summary: "The same evidence as JSON.",
       parameters: [
         query("provider", "Provider id; it must have an SLA target."),
@@ -294,6 +298,7 @@ export const exportPaths: Json = {
   "/export/report-card.json": {
     get: {
       tags: ["Export"],
+      deprecated: true,
       summary: "The same report card as JSON, with the scale it was graded on.",
       parameters: [query("quarter", "YYYY-Qn; defaults to the current quarter.")],
       responses: {

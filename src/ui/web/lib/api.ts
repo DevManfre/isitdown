@@ -58,6 +58,7 @@ import type {
   ServiceImpact,
   StatusResponse,
   StorageReport,
+  UsageReport,
   InstallHealth,
 } from "./types.ts";
 import type { PushSubscriptionBody } from "./push.ts";
@@ -483,6 +484,9 @@ export const patchSettings = (patch: unknown) =>
   request<unknown>("PATCH", "/config/settings", patch);
 export const getStorage = () =>
   request<StorageReport>("GET", "/config/storage");
+/** The opt-in "what I use" report — roadmap 16.3. Read only when the operator asks. */
+export const getUsageReport = () =>
+  request<UsageReport>("GET", "/config/usage-report");
 /** Forgotten providers and the housekeeping checklist — roadmap 5.15, 5.16. */
 export const getInstallHealth = () =>
   request<InstallHealth>("GET", "/config/health");

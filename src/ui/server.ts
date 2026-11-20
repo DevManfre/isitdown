@@ -1,5 +1,6 @@
 import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
+import { configureOutbound, parseAllowList, unusableAllowEntries } from "../core/outboundPolicy.ts";
 import { createChatops } from "./chatops.ts";
 import { buildUiRuntime } from "./runtime.ts";
 import { REVISION_CHECK_INTERVAL_MS } from "./incidentRevisions.ts";
@@ -15,6 +16,14 @@ const logger = createLogger(
   parseLogLevel(process.env["LOG_LEVEL"]),
   createLogWriter(readFileLogOptions(process.env)),
 );
+
+// Roadmap 9.1: anyone who can add a provider here — through the dashboard or
+// an API token — could otherwise read the LAN, so loopback and private targets
+// are refused unless EGRESS_ALLOW lists them.
+configureOutbound({ privateTargets: "deny" });
+for (const entry of unusableAllowEntries(parseAllowList(process.env["EGRESS_ALLOW"]))) {
+  logger.warn("EGRESS_ALLOW entry ignored: neither an address, a CIDR range nor a host name", { entry });
+}
 
 let runtime: Awaited<ReturnType<typeof buildUiRuntime>> | undefined;
 try {

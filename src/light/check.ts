@@ -1,24 +1,31 @@
 import { registerPluginAdapters } from "../adapters/plugins.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
+import { buildUsageReport } from "../core/usageReport.ts";
 import { checkConfig } from "./config/checkConfig.ts";
+import { inspectConfig } from "./config/loadConfig.ts";
+import pkg from "../../package.json" with { type: "json" };
 
 /**
  * `check` — validate a Light edition `config.yml` without starting a poller
  * (roadmap 6.12).
  *
- *   node dist/light/check.js [--probe] [path]
+ *   node dist/light/check.js [--probe | --usage] [path]
  *
  * Prints every problem rather than the first, and exits non-zero when any of
  * them is an error, so an operator can run it in their own CI the way we run
  * the test suite in ours. Offline unless `--probe` is passed.
  */
-const USAGE = `usage: node dist/light/check.js [--probe] [path]
+const USAGE = `usage: node dist/light/check.js [--probe | --usage] [path]
 
 Validates a Light edition config.yml and exits non-zero when it is unusable.
 
   path      config file to read (default: $CONFIG_PATH, else /app/config/config.yml)
   --probe   also read every enabled provider's page and say which adapter it
             looks like — needs network access, so it is off by default
+  --usage   print the opt-in usage report instead (roadmap 16.3): which
+            adapters, channels and delivery features this file uses, as
+            counts and ids only — nothing is sent, paste it into an issue
+            if you want to
 `;
 
 const args = process.argv.slice(2);
@@ -28,12 +35,19 @@ if (args.includes("--help") || args.includes("-h")) {
 }
 
 const probe = args.includes("--probe");
+const usage = args.includes("--usage");
 const positional = args.filter((arg) => !arg.startsWith("-"));
-const unknown = args.filter((arg) => arg.startsWith("-") && arg !== "--probe");
+const unknown = args.filter((arg) => arg.startsWith("-") && arg !== "--probe" && arg !== "--usage");
 
-if (unknown.length > 0 || positional.length > 1) {
+if (unknown.length > 0 || positional.length > 1 || (probe && usage)) {
   process.stderr.write(
-    `${unknown.length > 0 ? `unknown option: ${unknown.join(", ")}` : "at most one config path"}\n\n${USAGE}`,
+    `${
+      unknown.length > 0
+        ? `unknown option: ${unknown.join(", ")}`
+        : probe && usage
+          ? "--probe and --usage do not combine"
+          : "at most one config path"
+    }\n\n${USAGE}`,
   );
   process.exit(2);
 }
@@ -46,6 +60,17 @@ const path = positional[0] ?? process.env["CONFIG_PATH"] ?? "/app/config/config.
 // unknown adapter and exit non-zero on a file that runs perfectly well. Any
 // plugin that could not be loaded is a finding of its own, below.
 const plugins = await registerPluginAdapters(process.env, createLogger(parseLogLevel(process.env["LOG_LEVEL"])));
+
+if (usage) {
+  const { problems, config } = await inspectConfig(path, process.env);
+  if (config === null || problems.length > 0) {
+    for (const problem of problems) process.stderr.write(`error: ${problem}\n`);
+    process.exit(1);
+  }
+  const report = buildUsageReport({ edition: "light", version: pkg.version, config });
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  process.exit(0);
+}
 
 const report = await checkConfig({ path, env: process.env, probe });
 

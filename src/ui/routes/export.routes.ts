@@ -9,6 +9,7 @@ import { buildSlaEvidence, renderSlaEvidence } from "../slaEvidence.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { ALLOWED_DAYS, parseDays } from "./historyWindow.ts";
 import { readIncidentQuery } from "./incidentQuery.ts";
+import { DEPRECATED_EXPORTS } from "../deprecations.ts";
 
 /**
  * CSV and JSON exports of what the dashboard already shows (roadmap 4.6).
@@ -310,18 +311,21 @@ export function exportRoutes(runtime: UiRuntimeCore): Router {
   // extension in the url is what makes the downloaded file open in the right
   // application, and Express 5 no longer accepts an inline pattern to constrain
   // the parameter to the two formats that exist.
+  // Roadmap 16.3: the twins nothing in the dashboard links to answer as
+  // before, with RFC 9745 headers and one log line, until 3.0 removes them.
+  const deprecated = (path: string) => runtime.deprecations.mark(path, DEPRECATED_EXPORTS[path] ?? "");
   router.get("/export/incidents.csv", incidents("csv"));
   router.get("/export/incidents.json", incidents("json"));
   router.get("/export/history.csv", history("csv"));
-  router.get("/export/history.json", history("json"));
-  router.get("/export/trust.csv", trust("csv"));
-  router.get("/export/trust.json", trust("json"));
+  router.get("/export/history.json", deprecated("/export/history.json"), history("json"));
+  router.get("/export/trust.csv", deprecated("/export/trust.csv"), trust("csv"));
+  router.get("/export/trust.json", deprecated("/export/trust.json"), trust("json"));
   router.get("/export/monthly.md", monthly("md"));
   router.get("/export/monthly.html", monthly("html"));
   router.get("/export/sla-evidence.md", slaEvidence("md"));
-  router.get("/export/sla-evidence.json", slaEvidence("json"));
+  router.get("/export/sla-evidence.json", deprecated("/export/sla-evidence.json"), slaEvidence("json"));
   router.get("/export/report-card.md", reportCard("md"));
-  router.get("/export/report-card.json", reportCard("json"));
+  router.get("/export/report-card.json", deprecated("/export/report-card.json"), reportCard("json"));
   router.get("/export/gatus.yaml", gatus);
 
   return router;

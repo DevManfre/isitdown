@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import type { Adapter, FetchContext, ReadingNote, ServiceRef } from "../core/adapter.interface.ts";
 import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
+import { assertProbeHost } from "../core/outboundPolicy.ts";
 
 /**
  * An ICMP echo — roadmap 2.6, the homelab's oldest question: does the box
@@ -167,6 +168,7 @@ export const icmpAdapter: Adapter = {
 
   async fetchStatus(service: ServiceRef, ctx: FetchContext): Promise<NormalizedStatus> {
     const config = icmpConfig(service);
+    await assertProbeHost(config.host);
     const outcome = await attemptPing(config, ctx.timeoutMs);
 
     if (outcome.replied && outcome.avgMs !== undefined) ctx.onRead?.({ latencyMs: outcome.avgMs, notModified: false });

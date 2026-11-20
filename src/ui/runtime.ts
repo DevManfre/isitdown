@@ -8,6 +8,7 @@ import type { PromDeps } from "./operatorSeries.ts";
 import { registerPluginAdapters } from "../adapters/plugins.ts";
 import type { ChannelConfig, ConfigSource, ServiceDefinition } from "../core/configSource.interface.ts";
 import { createLogger, parseLogLevel, type Logger } from "../core/logger.ts";
+import { createDeprecationLedger, type DeprecationLedger } from "./deprecations.ts";
 import type { Dispatcher } from "../core/dispatcher.interface.ts";
 import { createDispatcher } from "../core/notificationDispatcher.ts";
 import type { Notifier } from "../core/notifier.interface.ts";
@@ -158,6 +159,8 @@ export interface UiRuntimeCore {
    */
   mapLane: MapLane;
   logger: Logger;
+  /** Deprecated surfaces served since start (roadmap 16.3), for the headers and the usage report. */
+  deprecations: DeprecationLedger;
   /** Every configured provider, including disabled ones — the dashboard shows both. */
   listAllServices(): ServiceDefinition[];
   /**
@@ -641,6 +644,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     buildNotifiers: buildAllNotifiers,
     mapLane,
     logger,
+    deprecations: createDeprecationLedger(logger),
     listAllServices: () => listServices(db),
     enabledProviderIds: () =>
       listServices(db)
