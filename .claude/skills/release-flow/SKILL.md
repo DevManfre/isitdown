@@ -34,6 +34,7 @@ Bump *before* pushing, so the one CI run on `dev` covers the commit that ships. 
 ```bash
 npm pkg set version=X.Y.Z
 node -e 'const fs=require("fs"),p="package-lock.json",j=JSON.parse(fs.readFileSync(p,"utf8"));j.version="X.Y.Z";if(j.packages&&j.packages[""])j.packages[""].version="X.Y.Z";fs.writeFileSync(p,JSON.stringify(j,null,2)+"\n")'
+npm run changelog -- --release X.Y.Z    # CHANGELOG.md gains the vX.Y.Z section, dated today
 git commit -am "🔖 RELEASE - bump the version to X.Y.Z"
 git push origin dev:dev
 RUN=$(gh run list --branch dev --limit 1 --json databaseId -q '.[0].databaseId')
@@ -131,6 +132,7 @@ runner — read that step's log rather than re-tagging.
 
 ## Common mistakes
 
+- Skipping `npm run changelog -- --release X.Y.Z` before the bump commit, or editing `CHANGELOG.md` by hand — it is generated, and the next release would silently drop the edit.
 - Reporting a release as published without checking the binary asset as well as the two image tags.
 - Pushing the release branch when the tree comparison printed a path — that is the one case where `main` would not be the code CI passed.
 - `git push origin main`, or `gh pr create --head dev` — the first keeps `dev`'s commits off the contribution graph, the second carries the excluded paths onto `main`.

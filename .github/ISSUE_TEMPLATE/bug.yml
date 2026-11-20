@@ -1,0 +1,43 @@
+name: Bug
+description: Something IsItDown does wrong — a missed or duplicate notification, a wrong status, a crash.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Never paste a bot token, a webhook URL or an API key here — redact them.
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Edition
+      options:
+        - UI (dashboard)
+        - Light
+        - CLI
+        - Outpost
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The image tag (e.g. `ui-v2.46.0`) or the version shown in Settings.
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what you expected instead
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce it
+      description: The provider and channel involved, and the relevant part of `config.yml` if you use the Light edition.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "`docker logs isitdown-ui` (or `isitdown-light`) around the moment it happened."
+      render: text

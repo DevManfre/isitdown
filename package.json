@@ -41,7 +41,8 @@
     "test:mutation": "node tools/mutation.mjs",
     "test:visual": "node tools/visual-regression.mjs",
     "test:visual:stories": "node tools/visual-regression.mjs --stories",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "changelog": "node tools/changelog.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

@@ -658,6 +658,12 @@ to what they cover.
 
 ### 9.5 Conventions
 
+- **Remove before you add** (roadmap 16.6). Every new issue and pull request says
+  what it simplifies or removes, or states plainly that it adds complexity and
+  why that is worth it — a config key, an environment variable, a setting, a
+  screen, a dependency. It forbids nothing; it makes each addition a choice. The
+  pull request template has the section, and [9.8](#98-complexity-inventory)
+  gives the numbers to argue with.
 - Validate every external input with `zod` at the boundary; trust internals.
 - One adapter per file under `src/adapters/`, one notifier per file under
   `src/notifiers/`, each implementing the shared interface.
@@ -721,6 +727,13 @@ commit dump. Preview it for any range before tagging:
 ```bash
 npm run release-notes -- v0.1.0 HEAD
 ```
+
+The same grouping, one section per tag, is `CHANGELOG.md` at the root
+(roadmap 14.1). It is generated, never edited: `npm run changelog` rewrites it
+from the tags, and `npm run changelog -- --release X.Y.Z` adds the commits since
+the last tag as the coming release, dated today — the release flow runs that
+right before the bump commit, so the changelog ships inside the release it
+describes.
 - Commits: `<emoji> <TITLE> - <description>`, English, gitmoji.
 
 ### 9.7 Dependency and Node updates

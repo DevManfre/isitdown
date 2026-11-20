@@ -1,0 +1,28 @@
+name: New notification channel
+description: Ask for a way to be notified that IsItDown doesn't have yet.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check first whether the generic webhook channel already reaches it —
+        many services accept an incoming webhook.
+  - type: input
+    id: name
+    attributes:
+      label: Channel
+    validations:
+      required: true
+  - type: input
+    id: docs
+    attributes:
+      label: API documentation
+      description: The page describing how to send a message.
+    validations:
+      required: true
+  - type: textarea
+    id: why-not-webhook
+    attributes:
+      label: Why the webhook channel isn't enough
+    validations:
+      required: true

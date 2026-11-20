@@ -194,6 +194,8 @@ node tools/visual-regression.mjs --only=settings --update   # agree that view
 
 ## Conventions
 
+- **Remove before you add** (roadmap 16.6). Every new Linear issue in this project, and every PR, says **what it simplifies or removes** — or states plainly that it adds complexity (a config key, env var, setting, screen, dependency, concept) and why that is worth it. Write the section as "Complessità: cosa toglie / cosa aggiunge" in the issue description. It forbids nothing; it makes each addition a choice. Numbers to argue with: `node tools/complexity-inventory.mjs` (`docs/development.md` §9.8).
+
 - TypeScript, strict mode. Validate all external config/API input with `zod` — never trust a provider's JSON shape blindly, even for the "standard" Statuspage format.
 - One adapter = one file under `src/adapters/`, implementing the shared `Adapter` interface and returning a `NormalizedStatus`.
 - One notifier = one file under `src/notifiers/`, implementing `send(payload): Promise<void>`. Keep formatting logic (emoji, message layout) inside the notifier, not in the diff engine.
@@ -236,6 +238,10 @@ This repo ships with Claude Code skills under `.claude/skills/` tailored to recu
 Consult the relevant skill before doing free-form implementation of these recurring tasks — they encode conventions that aren't obvious from the code alone.
 
 The `ux-reviewer` subagent (`.claude/agents/`) audits a dashboard diff against the three dashboard skills, read-only. Project hooks in `.claude/hooks/` enforce some rules mechanically: a dashboard edit is typechecked and its related Vitest files run; a JSX literal outside `t()` is refused (`// i18n-ignore` on the line opts out); text below 12px, a retired Magic UI effect or a second animation library is refused (`design-ignore` on the line opts out); `--update` without `--only` on the visual harness is blocked; and stopping with undeployed `src/ui` edits brings up the prove-it-live reminder.
+
+## Contributor files
+
+`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE.md` reach `main` (roadmap 14.1) — they are what a contributor without this file sees. A new contributor-facing rule here gets its short form in `CONTRIBUTING.md` too, which links into `docs/development.md` rather than copying it. `CHANGELOG.md` is generated (`npm run changelog`), never edited by hand.
 
 ## Git commits
 
