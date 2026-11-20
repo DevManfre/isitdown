@@ -1179,6 +1179,19 @@ export interface StorageReport {
   samplesPerDay: number;
 }
 
+/** `GET /config/usage-report` — roadmap 16.3. Counts and ids only. */
+export interface UsageReport {
+  edition: "light" | "ui";
+  version: string;
+  providers: { total: number; enabled: number; byAdapter: Record<string, number> };
+  channels: string[];
+  delivery: string[];
+  routingRules: number;
+  recipients: number;
+  features: Record<string, boolean>;
+  deprecatedInUse: string[];
+}
+
 /** One provider `GET /config/health` thinks was forgotten — roadmap 5.15. */
 export interface AbandonedProvider {
   id: string;

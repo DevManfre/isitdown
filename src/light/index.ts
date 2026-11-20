@@ -1,3 +1,4 @@
+import { isSea } from "node:sea";
 import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { buildLightRuntime } from "./runtime.ts";
@@ -56,6 +57,14 @@ async function main(): Promise<void> {
   }
 
   logger.info("isitdown light started", { configPath: CONFIG_PATH, dataPath: DATA_PATH });
+  if (isSea()) {
+    // Roadmap 16.3: the single-file build goes in 3.0 — the Light container
+    // does the same job, and almost nobody downloads the binary.
+    logger.warn("the single-file binary is deprecated and will not be published from 3.0.0; run the Light container image instead", {
+      removedIn: "3.0.0",
+      instead: "ghcr.io/devmanfre/isitdown:light-latest",
+    });
+  }
   await started.scheduler.start();
 }
 

@@ -5,6 +5,7 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/lib/i18n.ts";
 import { Wallboard } from "./Wallboard.tsx";
 import type { ProviderStatus, StatusResponse } from "@/lib/types.ts";
+import { deprecatedUse } from "@/lib/deprecatedUse.ts";
 
 const status = vi.fn();
 
@@ -77,6 +78,14 @@ describe("the wallboard", () => {
     status.mockReturnValue(answer([provider("github"), provider("cloudflare")]));
     show();
     expect(screen.getByText(i18n.t("wallboard.all-well", { count: 2 }))).toBeInTheDocument();
+  });
+
+  it("says it is deprecated, and remembers in this browser that it was used (roadmap 16.3)", () => {
+    localStorage.clear();
+    status.mockReturnValue(answer([provider("github")]));
+    show();
+    expect(screen.getByText(i18n.t("wallboard.deprecated"))).toBeInTheDocument();
+    expect(deprecatedUse()).toEqual(["wallboard"]);
   });
 
   it("counts what is in alarm, and does not count a provider nobody has read yet", () => {

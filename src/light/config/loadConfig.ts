@@ -9,6 +9,7 @@ import {
   type Recipient,
   type RuntimeConfig,
 } from "../../core/configSource.interface.ts";
+import { configureOutbound, parseAllowList, unusableAllowEntries } from "../../core/outboundPolicy.ts";
 import { CATCH_ALL_RULE, type RoutingRule } from "../../core/routing.ts";
 import { templateProblems } from "../../notifiers/template.ts";
 import { fileConfigSchema, REQUIRED_CHANNEL_SETTINGS, type FileConfig } from "./schema.ts";
@@ -26,12 +27,15 @@ const ENV_REFERENCE = /\$\{([A-Z0-9_]+)\}/g;
  * the environment, and an unresolved reference is reported by variable name.
  */
 export async function loadConfig(path: string, env: NodeJS.ProcessEnv): Promise<RuntimeConfig> {
-  const { problems, config } = await inspectConfig(path, env);
+  const { problems, config, egressAllow } = await inspectConfig(path, env);
   // The first problem is the one the container reports, exactly as it did when
   // each check threw where it stood. `check` prints the whole list instead.
   if (problems.length > 0 || config === null) {
     throw new Error(problems[0] ?? `config file ${path} could not be read`);
   }
+  // Applied on every load, so an edited list takes effect on the next cycle
+  // like the rest of the file.
+  configureOutbound({ allow: parseAllowList(egressAllow.join(",")) });
   return config;
 }
 
@@ -40,6 +44,8 @@ export interface ConfigInspection {
   problems: string[];
   /** Null when the file could not be read, parsed or validated at all. */
   config: RuntimeConfig | null;
+  /** `egress.allow`, as written; empty when absent or unreadable. */
+  egressAllow: string[];
 }
 
 /**
@@ -53,7 +59,7 @@ export async function inspectConfig(path: string, env: NodeJS.ProcessEnv): Promi
   try {
     raw = await readConfigFile(path);
   } catch (error) {
-    return { problems: [error instanceof Error ? error.message : String(error)], config: null };
+    return { problems: [error instanceof Error ? error.message : String(error)], config: null, egressAllow: [] };
   }
 
   let document: unknown;
@@ -65,6 +71,7 @@ export async function inspectConfig(path: string, env: NodeJS.ProcessEnv): Promi
         `config file ${path} is not valid YAML: ${error instanceof Error ? error.message : String(error)}`,
       ],
       config: null,
+      egressAllow: [],
     };
   }
 
@@ -90,9 +97,15 @@ export async function inspectConfig(path: string, env: NodeJS.ProcessEnv): Promi
         .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
         .join("; ")}`,
     );
-    return { problems, config: null };
+    return { problems, config: null, egressAllow: [] };
   }
   const file = result.data;
+  const egressAllow = file.egress?.allow ?? [];
+  for (const entry of unusableAllowEntries(parseAllowList(egressAllow.join(",")))) {
+    problems.push(
+      `config file ${path}: egress.allow entry "${entry}" is neither an address, a CIDR range nor a host name`,
+    );
+  }
 
   const seen = new Set<string>();
   for (const service of file.services) {
@@ -136,7 +149,7 @@ export async function inspectConfig(path: string, env: NodeJS.ProcessEnv): Promi
     recipients: buildRecipients(file, channels, path, problems),
   };
 
-  return { problems, config };
+  return { problems, config, egressAllow };
 }
 
 /**

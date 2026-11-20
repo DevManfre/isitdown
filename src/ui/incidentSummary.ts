@@ -201,7 +201,7 @@ async function viaOpenAi(settings: AiSettings, model: string, input: SummaryInpu
   let response: Response;
   try {
     // The same refusal every operator-supplied address gets: never link-local
-    // (cloud metadata), never private when OUTBOUND_BLOCK_PRIVATE is set.
+    // (cloud metadata), never private or loopback unless EGRESS_ALLOW lists it.
     await assertTargetAllowed(`${base}/chat/completions`, readOutboundPolicy(deps.env));
     response = await doFetch(`${base}/chat/completions`, {
       method: "POST",

@@ -531,3 +531,13 @@ notifications:
 #   - id: alice
 #     name: Alice
 #     channels: [telegram, discord]
+
+# Targets let past the egress policy, added to EGRESS_ALLOW: addresses, CIDR
+# ranges and host names. This edition reads private and loopback targets anyway
+# and logs a warning once per host; listing one here silences it. Link-local
+# addresses (cloud metadata) are refused unless an address or range names them.
+#
+# egress:
+#   allow:
+#     - 192.168.1.0/24
+#     - nas.lan

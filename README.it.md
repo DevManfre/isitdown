@@ -42,6 +42,7 @@ Il manuale, un file per sezione:
 - [8. Tema e localizzazione](docs/theming.it.md) — temi, le sei lingue della dashboard, accessibilità
 - [9. Sviluppo](docs/development.it.md) — struttura, stack tecnico, sviluppo live, test, rilasci
 - [10. Client da terminale](docs/cli.it.md) — `isitdown watch`, una vista di sola lettura della flotta per il terminale, `isitdown discover`, una prima flotta letta dai file di un progetto, e `isitdown import`, una flotta portata da Uptime Kuma, Gatus, Statping o StatusGator
+- [13. Deprecazioni](docs/deprecations.it.md) — cosa se ne sta andando e quando, e il report d'uso facoltativo che decide il resto
 
 Ogni pagina ha accanto la sua gemella inglese (`docs/<nome>.md`).
 
@@ -109,7 +110,7 @@ dalla rail, dalla command palette (`⌘K` / `Ctrl+K`) e dalle scorciatoie da tas
 | **History** | Uptime su 7, 30 o 90 giorni, in al massimo cinque tab: trend, affidabilità, pattern, confronto e latenza. |
 | **Delivery log** | Cosa è stato inviato, a quale canale, e cosa diceva o perché è fallito. |
 | **Settings** | Provider, canali, instradamento, politica di consegna, aspetto e dati, applicati al ciclo successivo senza restart. |
-| **Wallboard** | Una vista a schermo intero, senza cornice, per uno schermo libero, con un QR code verso il provider nei guai peggiori. |
+| **Wallboard** | Una vista a schermo intero, senza cornice, per uno schermo libero, con un QR code verso il provider nei guai peggiori. Deprecata: rimossa nella 3.0 ([perché](docs/deprecations.it.md)). |
 
 È chiara, scura o di sistema, con varianti ad alto contrasto, per daltonici e OLED,
 e tradotta in sei lingue. Ogni route che ci sta dietro è documentata nell'

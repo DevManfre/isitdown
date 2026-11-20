@@ -246,19 +246,12 @@ Four things worth knowing before relying on it:
   ECONNREFUSED`, `the TLS certificate expires in 9 day(s)`. "Down" and "down
   because the name no longer resolves" are the same severity and different
   problems.
-- it will probe **anything this container can reach**, private addresses
-  included, and it has no allowlist. That is deliberate for a
-  single-operator dashboard bound to `127.0.0.1` (`BIND_HOST`, and the compose port mapping); it is also the reason a
-  read-only API token or a public read-only page (roadmap 4.15 and 5.1) would
-  have to decide who may write a service definition before either ships. Two
-  limits apply regardless: a response body is read up to **8 MiB** and a probe
-  that streams more fails with `response exceeded 8388608 bytes`, and
-  **link-local addresses** (`169.254.0.0/16`, `fe80::/10`, the `fd00:ec2::254`
-  metadata address) are always refused, as is any redirect that lands on one.
-  Set `OUTBOUND_BLOCK_PRIVATE=true` to refuse loopback and private ranges as
-  well (`127/8`, `10/8`, `172.16/12`, `192.168/16`, `100.64/10`, `::1`,
-  `fc00::/7`) — recommended whenever the dashboard is reachable beyond this
-  host.
+- it answers to an **egress policy** ([3.38](#338-the-egress-policy--what-a-probe-may-reach)):
+  the UI edition refuses loopback and private addresses unless `EGRESS_ALLOW`
+  lists them, the Light edition reads them with a warning, and link-local
+  addresses (cloud metadata) are refused everywhere. A response body is read up
+  to **8 MiB**; a probe that streams more fails with `response exceeded 8388608
+  bytes`.
 - **a bot challenge is not an outage.** Cloudflare and friends answer a client
   that cannot run their JavaScript with `403` and a `cf-mitigated` header — the
   "Just a moment…" page. The edge never asked your service anything, so the
@@ -703,7 +696,8 @@ notification (roadmap 4.5).
 | `PUBLIC_PAGE_LOCALE` | UI | — | The language that page is written in. Unset follows the installation's own notification locale. |
 | `PUSH_TOKEN` | UI | — | Turns on the provider-webhook endpoint ([3.15](#315-provider-push-instead-of-poll)) and is the credential in its URL. Unset, that route answers `404`. |
 | `HEARTBEAT_TOKEN` | UI | — | Turns on the heartbeat ping endpoint ([3.19](#319-heartbeats--the-dead-mans-switch)) and is the credential in its URL. Unset, that route answers `404`. |
-| `OUTBOUND_BLOCK_PRIVATE` | both | unset | `true` makes probes and status-page reads refuse loopback and private-range targets (and redirects to them), on top of the link-local addresses that are always refused. Anything else leaves private targets allowed. |
+| `EGRESS_ALLOW` | both | — | Addresses, CIDR ranges and host names the egress policy lets through ([3.38](#338-the-egress-policy--what-a-probe-may-reach)), comma- or space-separated: `10.0.0.0/8,nas.lan`. The UI edition needs it to watch anything on the LAN or on this host. |
+| `OUTBOUND_BLOCK_PRIVATE` | both | unset | `true` makes the Light edition and the outpost refuse loopback and private targets the way the UI edition already does ([3.38](#338-the-egress-policy--what-a-probe-may-reach)). Anything else keeps the edition's default. |
 | `BIND_HOST` | UI | `127.0.0.1` | The address the dashboard listens on. Loopback by default, which is what keeps an instance with no `API_TOKEN` reachable only from this machine; the container images set `0.0.0.0` (the compose `ports` mapping then decides who can reach it, and publishes on `127.0.0.1` only). To reach the dashboard from another machine, publish on `0.0.0.0` (or set `BIND_HOST` on bare metal) **and** set `API_TOKEN` — see [3.12](#312-reaching-the-api-from-another-host) for what a request off this machine may then do. |
 | `PORT` | UI, outpost | `3000` (`8080` for the outpost) | HTTP port. |
 
@@ -2017,6 +2011,10 @@ docker exec isitdown-light node dist/light/check.js; echo "exit=$?"
 #   exit=0
 ```
 
+`--usage` prints the opt-in usage report for the same file instead — counts
+and ids, nothing that says whose installation it is; see
+[Deprecations §13.2](deprecations.md#132-telling-us-what-you-use).
+
 With no path it reads `$CONFIG_PATH`, the way the container does. From a source
 checkout, `npm run check:config -- ./config.yml` runs the same command without a
 build.
@@ -3241,8 +3239,9 @@ provider's updates, newest kept when they are long, inside a block it is told to
 treat as data, not instructions. Only adapters that publish update text can be
 summarized — Statuspage pages today; another provider's incident answers that it
 has no updates to summarize. Like any address you type into the dashboard, the
-OpenAI-compatible base URL is refused when it points at a link-local address,
-and at a private one when `OUTBOUND_BLOCK_PRIVATE=true`.
+OpenAI-compatible base URL answers to the egress policy
+([3.38](#338-the-egress-policy--what-a-probe-may-reach)): a local model server
+on this host or the LAN needs its address in `EGRESS_ALLOW`.
 
 ### 3.37 Your metric under the incidents
 
@@ -3268,3 +3267,54 @@ Two sources:
 
 At most ten series. The series never reaches a notifier or the diff engine: it
 is a picture to compare against, not a signal.
+
+### 3.38 The egress policy — what a probe may reach
+
+Every address IsItDown is given — a status page, an HTTP/TCP/ICMP/IMAP probe,
+a DNS probe's `resolver`, an OAuth token URL, the incident-summary model —
+is checked before anything connects to it (roadmap 9.1). The check runs on the
+address a name **resolves to**, so a public-looking name pointed at `10.0.0.5`
+is a `10.0.0.5` target, and it runs again on every redirect hop.
+
+| Target | UI edition | Light edition, outpost |
+|---|---|---|
+| Public address | read | read |
+| Private: `10/8`, `172.16/12`, `192.168/16`, `100.64/10`, `0.0.0.0`, `fc00::/7`, `::` | refused | read, with one warning per host in the log |
+| Loopback: `127/8`, `::1` | refused | read, with one warning per host in the log |
+| Link-local: `169.254/16`, `fe80::/10`, `fd00:ec2::254` (cloud metadata) | refused | refused |
+
+The UI edition refuses by default because anyone who can add a provider there —
+from the dashboard or with an API token — could otherwise read the services on
+your network. The Light edition reads them because its `config.yml` is written
+by the operator alone, and a homelab watching its own NAS is its point; set
+`OUTBOUND_BLOCK_PRIVATE=true` to make it refuse too.
+
+A refused target is a readable error on the provider, never a stack trace:
+
+```
+blocked by the egress policy: nas.lan (192.168.1.20) is a private address; add nas.lan to EGRESS_ALLOW
+```
+
+**Letting a target through.** `EGRESS_ALLOW` (both editions) takes addresses,
+CIDR ranges and host names, comma- or space-separated; the Light edition also
+reads `egress.allow` from `config.yml`, added to the variable:
+
+```yaml
+egress:
+  allow:
+    - 192.168.1.0/24
+    - nas.lan
+```
+
+- An address or range lets through whatever it covers — including a link-local
+  address, if you type one on purpose.
+- A host name lets through the private and loopback addresses it resolves to,
+  never a link-local one: a name can be re-pointed later, a typed address
+  cannot.
+- An entry that is neither is refused by `check` and at start-up (`egress.allow
+  entry "10.0.0.0/33" is neither an address, a CIDR range nor a host name`); in
+  `EGRESS_ALLOW` it is skipped with a warning.
+
+Not covered, because they are local by definition: the Docker probe's socket,
+and notification channels, whose URLs come from the environment rather than
+from the dashboard.

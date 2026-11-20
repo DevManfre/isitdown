@@ -620,3 +620,22 @@ ${MINIMAL}
 
   assert.deepEqual(config.delivery.report, { enabled: true, frequency: "monthly", channel: "slack" });
 });
+
+test("egress.allow reaches the egress policy, and a malformed entry refuses the file", async (t) => {
+  const { readOutboundPolicy, resetOutbound } = await import("../../src/core/outboundPolicy.ts");
+  t.after(resetOutbound);
+  const base = `
+services:
+  - name: NAS
+    id: nas
+    adapter: http
+    baseUrl: http://nas.lan
+`;
+  await loadConfig(await configFile(`${base}egress:\n  allow: ["10.0.0.0/8", "NAS.lan"]\n`), {});
+  assert.deepEqual(readOutboundPolicy({}).allow, ["10.0.0.0/8", "nas.lan"]);
+
+  await assert.rejects(
+    loadConfig(await configFile(`${base}egress:\n  allow: ["10.0.0.0/33"]\n`), {}),
+    /egress\.allow entry "10\.0\.0\.0\/33" is neither an address, a CIDR range nor a host name/,
+  );
+});

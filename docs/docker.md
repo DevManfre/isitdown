@@ -162,6 +162,10 @@ restarts nothing on its own.
 
 ### 4.5 Neither: the single-file Light edition
 
+> **Deprecated in 2.46, not published from 3.0** ([Deprecations](deprecations.md)):
+> run the Light container image instead. Until then the binary logs a warning
+> at every start.
+
 An operator who wants neither Docker nor a Node install can run the Light
 edition as one executable — roadmap 6.7. Every release attaches it beside the
 images, with a checksum:

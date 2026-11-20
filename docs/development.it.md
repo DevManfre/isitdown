@@ -250,7 +250,11 @@ che ne parte compare sotto *Webhook receiver* nella stessa pagina. Lo stato sta
 in memoria: riavviare il finto riparte da tre componenti operativi. Con
 `dev:docker` va avviato con `npm run fake-provider -- --host 0.0.0.0` (il
 container non raggiunge il loopback dell'host) e si usa
-`http://host.docker.internal:4010` al posto di `127.0.0.1`. La suite
+`http://host.docker.internal:4010` al posto di `127.0.0.1`. Entrambe le modalità di
+sviluppo lasciano già passare quell'indirizzo dalla policy di uscita della UI
+([3.38](configuration.it.md#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)):
+`dev:ui` imposta `EGRESS_ALLOW=127.0.0.1,::1`, `dev:docker` imposta
+`EGRESS_ALLOW=host.docker.internal`. La suite
 d'integrazione (`test/integration/fakeProvider.itest.ts`) importa lo stesso
 server e lo fa leggere agli adapter veri, quindi un finto che gli adapter non
 sanno più leggere fa fallire la CI per primo.

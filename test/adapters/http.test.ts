@@ -477,7 +477,7 @@ test("a redirect into a link-local address fails the probe with the refusal", as
       const notes: ReadingNote[] = [];
       const reading = await httpAdapter.fetchStatus(service({}, baseUrl), { ...ctx, onNote: (note) => notes.push(note) });
       assert.equal(reading.overallStatus, "major_outage");
-      assert.match(notes.map((note) => note.text).join(" "), /refused: link-local address/);
+      assert.match(notes.map((note) => note.text).join(" "), /blocked by the egress policy: .*link-local/);
     },
   );
 });

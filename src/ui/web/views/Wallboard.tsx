@@ -15,6 +15,7 @@ import { useStatusFeedback } from "@/hooks/useStatusFeedback.ts";
 import { wallboardPage } from "@/lib/favorites.ts";
 import { statusRank } from "@/lib/statusChanges.ts";
 import { pulseAttr, usePulses } from "@/lib/statusPulse.ts";
+import { noteDeprecatedUse } from "@/lib/deprecatedUse.ts";
 
 /**
  * The office screen — roadmap 5.8.
@@ -73,6 +74,9 @@ export function Wallboard() {
   const providers = (status?.providers ?? []).filter((provider) => provider.enabled);
   // Roadmap 5.14: the starred stay on every page, the rest rotate through what is left.
   const { shown, pages } = wallboardPage(providers, page, PER_PAGE);
+
+  // Roadmap 16.3: remembered in this browser only, for the usage report.
+  useEffect(() => noteDeprecatedUse("wallboard"), []);
 
   // Rotation is an effect of the page count, so a fleet that shrinks below one
   // page stops rotating rather than cycling through a single page forever.
@@ -225,6 +229,10 @@ export function Wallboard() {
           })}
         </div>
       )}
+      {/* Roadmap 16.3: the view still works and says it is going, in the
+          muted voice of the poll time above, large enough to read from across the room — a notice, not an alarm, on a
+          screen whose colour belongs to the fleet. */}
+      <p className="mt-auto text-lg text-muted-foreground">{t("wallboard.deprecated")}</p>
       {/* Roadmap 4.26. Fixed to the corner so the page rotation under it never
           moves it; hidden until the encoder has arrived, so a slow chunk does
           not leave an empty white square on the wall. */}
