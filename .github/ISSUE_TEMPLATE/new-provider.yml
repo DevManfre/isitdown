@@ -1,0 +1,32 @@
+name: New provider
+description: Ask for a service whose status page IsItDown can't read yet.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        First check whether it runs on Atlassian Statuspage: if
+        `<domain>/api/v2/summary.json` returns data, it already works — add it
+        to `config.yml` or from the dashboard.
+  - type: input
+    id: name
+    attributes:
+      label: Service
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Status page URL
+    validations:
+      required: true
+  - type: textarea
+    id: feed
+    attributes:
+      label: Machine-readable feed
+      description: A JSON endpoint, RSS/Atom feed or API the status page offers, if you found one.
+  - type: textarea
+    id: complexity
+    attributes:
+      label: Why it's worth it
+      description: Every adapter is code someone maintains when the page changes shape. How many people would use it?
