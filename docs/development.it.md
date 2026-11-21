@@ -684,6 +684,12 @@ accanto a ciò che coprono.
 
 ### 9.5 Convenzioni
 
+- **Togliere prima di aggiungere** (roadmap 16.6). Ogni nuova issue e pull request
+  dice cosa semplifica o rimuove, oppure dichiara apertamente che aggiunge
+  complessità e perché ne vale la pena — una chiave di configurazione, una
+  variabile d'ambiente, un'impostazione, una schermata, una dipendenza. Non vieta
+  niente: rende ogni aggiunta una scelta. Il template delle pull request ha la
+  sezione, e [9.8](#98-inventario-della-complessità) dà i numeri su cui discutere.
 - Validare ogni input esterno con `zod` al confine; fidarsi dell'interno.
 - Un adapter per file sotto `src/adapters/`, un notifier per file sotto
   `src/notifiers/`, ciascuno che implementa l'interfaccia condivisa.
@@ -751,6 +757,13 @@ prima di taggare:
 ```bash
 npm run release-notes -- v0.1.0 HEAD
 ```
+
+Lo stesso raggruppamento, una sezione per tag, è `CHANGELOG.md` nella radice
+(roadmap 14.1). Si genera, non si modifica a mano: `npm run changelog` lo
+riscrive dai tag, e `npm run changelog -- --release X.Y.Z` aggiunge i commit
+dall'ultimo tag come rilascio in arrivo, datato oggi — il release flow lo lancia
+subito prima del commit di bump, così il changelog viaggia dentro il rilascio
+che descrive.
 
 ### 9.7 Aggiornamenti delle dipendenze e di Node
 
