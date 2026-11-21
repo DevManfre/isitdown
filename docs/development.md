@@ -142,6 +142,7 @@ isitdown/
 │   ├── scaffold.mjs                   a new adapter or notification channel, laid out and registered (npm run new:adapter / new:notifier)
 │   ├── bundle-budget.mjs              the built dashboard against its gzipped budget, and the catalog kept out of it (npm run check:bundle)
 │   ├── visual-regression.mjs          every view, both themes, every locale against test/visual/baseline (npm run test:visual); helpers in tools/visual/
+│   ├── envelope.mjs                   memory, CPU, startup and database growth at 10 / 100 / 500 providers (npm run measure:envelope, docker.md 4.9)
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   the canary probe, load and mutation tests, fixture recording, release notes, the single-file build, PWA icons
 │   ├── build-catalog.mjs              regenerates the catalog from tools/catalog/seed.json and the public lists (2.1)
 │   └── sign-catalog.mjs               signs catalog/catalog.json with $CATALOG_SIGNING_KEY (2.2)
@@ -498,6 +499,14 @@ about a minute. The p95 budgets in the script are generous for the same reason
 the coverage floor is a floor — they catch an order-of-magnitude regression (an
 index dropped, a query that started scanning), not a few percent of drift.
 
+Its sibling `tools/envelope.mjs` (roadmap 8.8) sizes the machine rather than
+the queries: both editions, built, polling 10, 100 and 500 providers on a
+local fake, with resident memory, CPU per cycle, startup time and database
+growth read off them. `npm run measure:envelope` prints the table that
+[4.9](docker.md#49-resource-envelope--what-a-fleet-costs) quotes, with the
+date, version and machine it was measured on; rerun it and paste the block
+when a release moves one of those figures. Also by hand, not in CI: it needs a
+fresh `npm run build:ui` and takes about ten minutes.
 
 Mutation testing (roadmap 7.3) asks the question coverage cannot: a line that
 ran is not a line a test would have objected to. `tools/mutation.mjs` swaps one

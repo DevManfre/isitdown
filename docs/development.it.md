@@ -135,6 +135,7 @@ isitdown/
 │   ├── scaffold.mjs                   un nuovo adapter o canale di notifica, impostato e registrato (npm run new:adapter / new:notifier)
 │   ├── bundle-budget.mjs              la dashboard compilata contro il suo budget gzip, e il catalogo tenuto fuori (npm run check:bundle)
 │   ├── visual-regression.mjs          ogni vista, entrambi i temi, ogni lingua contro test/visual/baseline (npm run test:visual); helper in tools/visual/
+│   ├── envelope.mjs                   memoria, CPU, avvio e crescita del database a 10 / 100 / 500 provider (npm run measure:envelope, docker.it.md 4.9)
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   la sonda canary, test di carico e di mutazione, registrazione dei fixture, note di rilascio, la build a file singolo, icone PWA
 │   ├── build-catalog.mjs              rigenera il catalogo da tools/catalog/seed.json e dalle liste pubbliche (2.1)
 │   └── sign-catalog.mjs               firma catalog/catalog.json con $CATALOG_SIGNING_KEY (2.2)
@@ -508,6 +509,16 @@ per cui la soglia di copertura è un minimo garantito — intercettano una regre
 un ordine di grandezza (un indice caduto, una query che ha iniziato a fare
 scansioni), non qualche punto percentuale di deriva.
 
+Il suo fratello `tools/envelope.mjs` (roadmap 8.8) dimensiona la macchina
+invece delle query: entrambe le edizioni, compilate, a interrogare 10, 100 e
+500 provider su un finto provider locale, con memoria residente, CPU per ciclo,
+tempo di avvio e crescita del database letti da lì. `npm run measure:envelope`
+stampa la tabella che
+[4.9](docker.it.md#49-inviluppo-di-risorse--quanto-costa-un-parco-provider)
+riporta, con data, versione e macchina su cui è stata misurata; si rilancia e
+si incolla il blocco quando un rilascio sposta uno di quei numeri. Anche questo
+a mano, non in CI: serve una `npm run build:ui` fresca e richiede una decina di
+minuti.
 
 Il mutation testing (roadmap 7.3) pone la domanda che la copertura non può
 porre: una riga eseguita non è una riga a cui un test avrebbe obiettato.

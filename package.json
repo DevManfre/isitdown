@@ -39,6 +39,7 @@
     "test": "node tools/quarantine.mjs run server -- node --import ./test/helpers/openapiContract.ts --test \"test/**/*.test.ts\" && node tools/quarantine.mjs run dashboard -- vitest run",
     "test:integration": "node --import ./test/helpers/openapiContract.ts --test \"test/**/*.itest.ts\"",
     "test:load": "node tools/loadtest.mjs",
+    "measure:envelope": "node tools/envelope.mjs",
     "test:mutation": "node tools/mutation.mjs",
     "test:visual": "node tools/visual-regression.mjs",
     "test:visual:stories": "node tools/visual-regression.mjs --stories",
