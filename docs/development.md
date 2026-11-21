@@ -136,6 +136,7 @@ isitdown/
 │   │                                   dashboard bundle itself is Vite's own output, not this script's)
 │   ├── readme-parity.mjs              every English page against its translations (npm run check:readme)
 │   ├── complexity-inventory.mjs       what each subsystem costs, as a Markdown table (9.8)
+│   ├── complexity-budget.mjs          ceilings on the inventory's counts, warned in CI (npm run check:complexity, 9.8)
 │   ├── i18n-orphans.mjs               catalog keys against the code that asks for them (npm run check:i18n)
 │   ├── fake-provider.mjs              a local status page to break by hand, plus a webhook receiver (npm run fake-provider)
 │   ├── scaffold.mjs                   a new adapter or notification channel, laid out and registered (npm run new:adapter / new:notifier)
@@ -497,6 +498,7 @@ about a minute. The p95 budgets in the script are generous for the same reason
 the coverage floor is a floor — they catch an order-of-magnitude regression (an
 index dropped, a query that started scanning), not a few percent of drift.
 
+
 Mutation testing (roadmap 7.3) asks the question coverage cannot: a line that
 ran is not a line a test would have objected to. `tools/mutation.mjs` swaps one
 operator in `src/core/diffEngine.ts` — a comparison inverted, a boundary moved
@@ -845,3 +847,21 @@ moving a key out of the base path.
 
 A concept goes into the script's list in the same commit as the feature that
 makes someone learn it.
+
+**The budget** (roadmap 16.5). `tools/complexity-budget.mjs` puts a ceiling on
+six of those counts — `config.yml` keys, environment variables, subsystems,
+build and packaging targets, adapters (`*.adapter.ts`) and notification
+channels (`*.notifier.ts`) — the way `tools/bundle-budget.mjs` does on the
+dashboard's weight:
+
+```bash
+npm run check:complexity   # today's counts against their ceilings
+```
+
+Each ceiling is today's figure, with no headroom, so any addition goes over.
+In CI that is a warning annotation and a row in the run's summary, not a
+failure: the budget makes growth visible the moment it lands, it does not
+forbid it. Silencing the warning means raising the ceiling in the budget file,
+in a commit of its own whose comment says what grew and names the Linear issue
+that justifies it. A removal leaves room under its ceiling for one later
+addition; ceilings are never lowered automatically.

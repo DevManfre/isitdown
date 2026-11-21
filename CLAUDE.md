@@ -140,6 +140,8 @@ npm run coverage         # the same two suites under a coverage floor (server 95
                           # dashboard 85/75/80) — CI runs this instead of `npm test`
 npm run test:integration # end to end: *.itest.ts — fake provider and webhook receiver
 npm run check:quarantine # test/quarantine.json: an expired entry fails CI (roadmap 13.6)
+npm run check:complexity # config keys, env vars, targets, adapters, channels against their
+                          # ceilings — CI warns, never fails; raise one in its own commit (16.5)
 npm run typecheck        # tsc -p tsconfig.json (server + core) and
                           # tsc -p tsconfig.web.json (dashboard React tree)
 npm run check:bundle     # the built dashboard against its gzipped budget (needs build:ui)
@@ -194,7 +196,7 @@ node tools/visual-regression.mjs --only=settings --update   # agree that view
 
 ## Conventions
 
-- **Remove before you add** (roadmap 16.6). Every new Linear issue in this project, and every PR, says **what it simplifies or removes** — or states plainly that it adds complexity (a config key, env var, setting, screen, dependency, concept) and why that is worth it. Write the section as "Complessità: cosa toglie / cosa aggiunge" in the issue description. It forbids nothing; it makes each addition a choice. Numbers to argue with: `node tools/complexity-inventory.mjs` (`docs/development.md` §9.8).
+- **Remove before you add** (roadmap 16.6). Every new Linear issue in this project, and every PR, says **what it simplifies or removes** — or states plainly that it adds complexity (a config key, env var, setting, screen, dependency, concept) and why that is worth it. Write the section as "Complessità: cosa toglie / cosa aggiunge" in the issue description. It forbids nothing; it makes each addition a choice. Numbers to argue with: `node tools/complexity-inventory.mjs` (`docs/development.md` §9.8); a change that grows one of the budgeted counts raises its ceiling in `tools/complexity-budget.mjs` in a separate commit, with the reason and the Linear issue.
 
 - TypeScript, strict mode. Validate all external config/API input with `zod` — never trust a provider's JSON shape blindly, even for the "standard" Statuspage format.
 - One adapter = one file under `src/adapters/`, implementing the shared `Adapter` interface and returning a `NormalizedStatus`.

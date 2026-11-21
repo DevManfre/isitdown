@@ -129,6 +129,7 @@ isitdown/
 │   │                                   bundle della dashboard è già output di Vite, non di questo script)
 │   ├── readme-parity.mjs              ogni pagina inglese contro le sue traduzioni (npm run check:readme)
 │   ├── complexity-inventory.mjs       quanto costa ogni sottosistema, come tabella Markdown (9.8)
+│   ├── complexity-budget.mjs          tetti sui conteggi dell'inventario, avvisati in CI (npm run check:complexity, 9.8)
 │   ├── i18n-orphans.mjs               le chiavi dei cataloghi contro il codice che le chiede (npm run check:i18n)
 │   ├── fake-provider.mjs              una pagina di stato locale da rompere a mano, più un receiver webhook (npm run fake-provider)
 │   ├── scaffold.mjs                   un nuovo adapter o canale di notifica, impostato e registrato (npm run new:adapter / new:notifier)
@@ -507,6 +508,7 @@ per cui la soglia di copertura è un minimo garantito — intercettano una regre
 un ordine di grandezza (un indice caduto, una query che ha iniziato a fare
 scansioni), non qualche punto percentuale di deriva.
 
+
 Il mutation testing (roadmap 7.3) pone la domanda che la copertura non può
 porre: una riga eseguita non è una riga a cui un test avrebbe obiettato.
 `tools/mutation.mjs` cambia un operatore in `src/core/diffEngine.ts` — un
@@ -881,3 +883,21 @@ chiave fuori dal percorso base.
 
 Un concetto entra nella lista dello script nello stesso commit della funzione
 che obbliga qualcuno a impararlo.
+
+**Il budget** (roadmap 16.5). `tools/complexity-budget.mjs` mette un tetto a
+sei di quei conteggi — chiavi di `config.yml`, variabili d'ambiente,
+sottosistemi, target di build e packaging, adapter (`*.adapter.ts`) e canali
+di notifica (`*.notifier.ts`) — come `tools/bundle-budget.mjs` fa con il peso
+della dashboard:
+
+```bash
+npm run check:complexity   # i conteggi di oggi contro i loro tetti
+```
+
+Ogni tetto è il valore di oggi, senza margine, quindi qualsiasi aggiunta lo
+supera. In CI questo è un'annotazione di avviso e una riga nel riepilogo della
+run, non un fallimento: il budget rende visibile la crescita nel momento in
+cui avviene, non la vieta. Per far tacere l'avviso si alza il tetto nel file
+del budget, in un commit a sé il cui commento dice cosa è cresciuto e nomina
+la issue Linear che lo giustifica. Una rimozione lascia spazio sotto il suo
+tetto per un'aggiunta successiva; i tetti non si abbassano mai da soli.
