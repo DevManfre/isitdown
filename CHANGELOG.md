@@ -4,6 +4,12 @@ Every release of IsItDown, newest first, grouped by the surface each commit
 touched. Generated from the commit log by `tools/changelog.mjs` — don't edit
 it by hand; the release flow regenerates it.
 
+## v2.46.1 — 2026-11-21
+
+### CONTRIBUTING
+
+- 📝 add contributor files, generated changelog and the remove-before-add rule
+
 ## v2.46.0 — 2026-11-20
 
 ### RELEASE
