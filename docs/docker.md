@@ -307,3 +307,47 @@ the dashboard is. Two things a backup does not cover:
 With no backup at all, starting with the damaged file moved aside begins an
 empty database, seeded from nothing: the providers are added again from the
 dashboard or with a `config.yml` import.
+
+### 4.9 Resource envelope — what a fleet costs
+
+"Will it run on my Raspberry Pi?" — measured, not guessed. `npm run
+measure:envelope` ([9.4](development.md#94-tests-and-checks)) runs both editions,
+built, against a local fake Statuspage at three fleet sizes, and prints this
+table:
+
+Measured on 2026-11-21, IsItDown v2.46.1, Node 26.13.1, 13th Gen Intel(R) Core(TM) i7-1355U (6 threads), 10 GB RAM.
+Providers served by a local fake Statuspage (all operational), 2,000+ samples per size;
+growth extrapolated at the default 3-minute interval.
+
+| Edition | Providers | Startup to ready | Memory (RSS) | CPU per cycle | Cycle duration | Database after startup | Database per provider per month |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| Light | 10 | 198 ms | 202 MB | 12 ms | 9 ms | — | — (state file) |
+| UI | 10 | 18.3 s | 267 MB | 17 ms | 47 ms | 38.5 MB | 1.5 MB |
+| Light | 100 | 444 ms | 255 MB | 158 ms | 137 ms | — | — (state file) |
+| UI | 100 | 27.9 s | 255 MB | 80 ms | 271 ms | 392.1 MB | 1.5 MB |
+| Light | 500 | 2.8 s | 304 MB | 1.6 s | 1.5 s | — | — (state file) |
+| UI | 500 | 74.7 s | 296 MB | 386 ms | 1.4 s | 2030.3 MB | 1.5 MB |
+
+How to read it:
+
+- **Memory** is resident memory after at least a hundred cycles, when it has
+  stopped climbing. Most of it is what V8 and the allocator hold in reserve:
+  the JavaScript heap itself stays around 20 MB at 10 providers. Plan for
+  about 300 MB per edition. Either edition fits on a 1 GB board.
+- **CPU per cycle** is IsItDown's own work against a provider on loopback. A
+  real fleet adds network round trips to the cycle's *duration*, not to its
+  CPU. Even the worst figure, 1.6 s every 3 minutes, is under 1% of one core.
+  The Light edition's cost grows faster than its fleet because it rewrites its
+  whole JSON state file on every change.
+- **Startup** for the UI edition is mostly history: a provider it has never
+  seen gets 90 days of samples backfilled from its own incident list before
+  the first cycle is reported, and `/ready` answers 200 only after that
+  cycle. A restart with the history already in place is faster. The Light
+  edition keeps no history, so it is ready after one cycle.
+- **Database.** The backfill is why a new fleet starts at about 4 MB per
+  provider. After that it grows 1.5 MB per provider a month and levels off at
+  the retention (120 days by default): about 6 MB per provider, so ~60 MB for
+  10 providers, ~600 MB for 100 and ~3 GB for 500. Lowering the retention in
+  Settings shrinks that in proportion. The replay's whole readings are a
+  fixed extra, capped at 100 per provider. The Light edition writes one
+  small JSON state file.

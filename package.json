@@ -1,6 +1,6 @@
 {
   "name": "isitdown",
-  "version": "2.46.1",
+  "version": "2.46.2",
   "private": true,
   "description": "Polls the public status pages of third-party providers and notifies on state transitions",
   "license": "MIT",
@@ -21,6 +21,7 @@
     "check:readme": "node tools/readme-parity.mjs",
     "check:i18n": "node tools/i18n-orphans.mjs",
     "check:quarantine": "node tools/quarantine.mjs check",
+    "check:complexity": "node tools/complexity-budget.mjs",
     "coverage": "npm run coverage:server && npm run coverage:web",
     "coverage:server": "node tools/quarantine.mjs run server -- node --import ./test/helpers/openapiContract.ts --test --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"tools/**\" --test-coverage-exclude=\"src/ui/web/**\" --test-coverage-exclude=\"**/isitdown-plugins-*/**\" --test-coverage-lines=95 --test-coverage-branches=88 --test-coverage-functions=93 \"test/**/*.test.ts\"",
     "coverage:web": "node tools/quarantine.mjs run dashboard -- vitest run --coverage",
@@ -38,6 +39,7 @@
     "test": "node tools/quarantine.mjs run server -- node --import ./test/helpers/openapiContract.ts --test \"test/**/*.test.ts\" && node tools/quarantine.mjs run dashboard -- vitest run",
     "test:integration": "node --import ./test/helpers/openapiContract.ts --test \"test/**/*.itest.ts\"",
     "test:load": "node tools/loadtest.mjs",
+    "measure:envelope": "node tools/envelope.mjs",
     "test:mutation": "node tools/mutation.mjs",
     "test:visual": "node tools/visual-regression.mjs",
     "test:visual:stories": "node tools/visual-regression.mjs --stories",
