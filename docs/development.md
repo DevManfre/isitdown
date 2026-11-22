@@ -136,11 +136,13 @@ isitdown/
 │   │                                   dashboard bundle itself is Vite's own output, not this script's)
 │   ├── readme-parity.mjs              every English page against its translations (npm run check:readme)
 │   ├── complexity-inventory.mjs       what each subsystem costs, as a Markdown table (9.8)
+│   ├── complexity-budget.mjs          ceilings on the inventory's counts, warned in CI (npm run check:complexity, 9.8)
 │   ├── i18n-orphans.mjs               catalog keys against the code that asks for them (npm run check:i18n)
 │   ├── fake-provider.mjs              a local status page to break by hand, plus a webhook receiver (npm run fake-provider)
 │   ├── scaffold.mjs                   a new adapter or notification channel, laid out and registered (npm run new:adapter / new:notifier)
 │   ├── bundle-budget.mjs              the built dashboard against its gzipped budget, and the catalog kept out of it (npm run check:bundle)
 │   ├── visual-regression.mjs          every view, both themes, every locale against test/visual/baseline (npm run test:visual); helpers in tools/visual/
+│   ├── envelope.mjs                   memory, CPU, startup and database growth at 10 / 100 / 500 providers (npm run measure:envelope, docker.md 4.9)
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   the canary probe, load and mutation tests, fixture recording, release notes, the single-file build, PWA icons
 │   ├── build-catalog.mjs              regenerates the catalog from tools/catalog/seed.json and the public lists (2.1)
 │   └── sign-catalog.mjs               signs catalog/catalog.json with $CATALOG_SIGNING_KEY (2.2)
@@ -497,6 +499,15 @@ about a minute. The p95 budgets in the script are generous for the same reason
 the coverage floor is a floor — they catch an order-of-magnitude regression (an
 index dropped, a query that started scanning), not a few percent of drift.
 
+Its sibling `tools/envelope.mjs` (roadmap 8.8) sizes the machine rather than
+the queries: both editions, built, polling 10, 100 and 500 providers on a
+local fake, with resident memory, CPU per cycle, startup time and database
+growth read off them. `npm run measure:envelope` prints the table that
+[4.9](docker.md#49-resource-envelope--what-a-fleet-costs) quotes, with the
+date, version and machine it was measured on; rerun it and paste the block
+when a release moves one of those figures. Also by hand, not in CI: it needs a
+fresh `npm run build:ui` and takes about ten minutes.
+
 Mutation testing (roadmap 7.3) asks the question coverage cannot: a line that
 ran is not a line a test would have objected to. `tools/mutation.mjs` swaps one
 operator in `src/core/diffEngine.ts` — a comparison inverted, a boundary moved
@@ -845,3 +856,21 @@ moving a key out of the base path.
 
 A concept goes into the script's list in the same commit as the feature that
 makes someone learn it.
+
+**The budget** (roadmap 16.5). `tools/complexity-budget.mjs` puts a ceiling on
+six of those counts — `config.yml` keys, environment variables, subsystems,
+build and packaging targets, adapters (`*.adapter.ts`) and notification
+channels (`*.notifier.ts`) — the way `tools/bundle-budget.mjs` does on the
+dashboard's weight:
+
+```bash
+npm run check:complexity   # today's counts against their ceilings
+```
+
+Each ceiling is today's figure, with no headroom, so any addition goes over.
+In CI that is a warning annotation and a row in the run's summary, not a
+failure: the budget makes growth visible the moment it lands, it does not
+forbid it. Silencing the warning means raising the ceiling in the budget file,
+in a commit of its own whose comment says what grew and names the Linear issue
+that justifies it. A removal leaves room under its ceiling for one later
+addition; ceilings are never lowered automatically.

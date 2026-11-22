@@ -4,7 +4,21 @@ Every release of IsItDown, newest first, grouped by the surface each commit
 touched. Generated from the commit log by `tools/changelog.mjs` — don't edit
 it by hand; the release flow regenerates it.
 
+## v2.46.2 — 2026-11-22
+
+### ENVELOPE
+
+- 📝 measure and publish what 10, 100 and 500 providers cost
+
+### COMPLEXITY
+
+- 🔨 warn in CI when a budgeted count grows past its ceiling
+
 ## v2.46.1 — 2026-11-21
+
+### RELEASE
+
+- 🔖 bump the version to 2.46.1
 
 ### CONTRIBUTING
 

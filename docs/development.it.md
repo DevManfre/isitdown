@@ -129,11 +129,13 @@ isitdown/
 │   │                                   bundle della dashboard è già output di Vite, non di questo script)
 │   ├── readme-parity.mjs              ogni pagina inglese contro le sue traduzioni (npm run check:readme)
 │   ├── complexity-inventory.mjs       quanto costa ogni sottosistema, come tabella Markdown (9.8)
+│   ├── complexity-budget.mjs          tetti sui conteggi dell'inventario, avvisati in CI (npm run check:complexity, 9.8)
 │   ├── i18n-orphans.mjs               le chiavi dei cataloghi contro il codice che le chiede (npm run check:i18n)
 │   ├── fake-provider.mjs              una pagina di stato locale da rompere a mano, più un receiver webhook (npm run fake-provider)
 │   ├── scaffold.mjs                   un nuovo adapter o canale di notifica, impostato e registrato (npm run new:adapter / new:notifier)
 │   ├── bundle-budget.mjs              la dashboard compilata contro il suo budget gzip, e il catalogo tenuto fuori (npm run check:bundle)
 │   ├── visual-regression.mjs          ogni vista, entrambi i temi, ogni lingua contro test/visual/baseline (npm run test:visual); helper in tools/visual/
+│   ├── envelope.mjs                   memoria, CPU, avvio e crescita del database a 10 / 100 / 500 provider (npm run measure:envelope, docker.it.md 4.9)
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   la sonda canary, test di carico e di mutazione, registrazione dei fixture, note di rilascio, la build a file singolo, icone PWA
 │   ├── build-catalog.mjs              rigenera il catalogo da tools/catalog/seed.json e dalle liste pubbliche (2.1)
 │   └── sign-catalog.mjs               firma catalog/catalog.json con $CATALOG_SIGNING_KEY (2.2)
@@ -506,6 +508,17 @@ circa un minuto. I budget p95 nello script sono generosi per lo stesso motivo
 per cui la soglia di copertura è un minimo garantito — intercettano una regressione di
 un ordine di grandezza (un indice caduto, una query che ha iniziato a fare
 scansioni), non qualche punto percentuale di deriva.
+
+Il suo fratello `tools/envelope.mjs` (roadmap 8.8) dimensiona la macchina
+invece delle query: entrambe le edizioni, compilate, a interrogare 10, 100 e
+500 provider su un finto provider locale, con memoria residente, CPU per ciclo,
+tempo di avvio e crescita del database letti da lì. `npm run measure:envelope`
+stampa la tabella che
+[4.9](docker.it.md#49-inviluppo-di-risorse--quanto-costa-un-parco-provider)
+riporta, con data, versione e macchina su cui è stata misurata; si rilancia e
+si incolla il blocco quando un rilascio sposta uno di quei numeri. Anche questo
+a mano, non in CI: serve una `npm run build:ui` fresca e richiede una decina di
+minuti.
 
 Il mutation testing (roadmap 7.3) pone la domanda che la copertura non può
 porre: una riga eseguita non è una riga a cui un test avrebbe obiettato.
@@ -881,3 +894,21 @@ chiave fuori dal percorso base.
 
 Un concetto entra nella lista dello script nello stesso commit della funzione
 che obbliga qualcuno a impararlo.
+
+**Il budget** (roadmap 16.5). `tools/complexity-budget.mjs` mette un tetto a
+sei di quei conteggi — chiavi di `config.yml`, variabili d'ambiente,
+sottosistemi, target di build e packaging, adapter (`*.adapter.ts`) e canali
+di notifica (`*.notifier.ts`) — come `tools/bundle-budget.mjs` fa con il peso
+della dashboard:
+
+```bash
+npm run check:complexity   # i conteggi di oggi contro i loro tetti
+```
+
+Ogni tetto è il valore di oggi, senza margine, quindi qualsiasi aggiunta lo
+supera. In CI questo è un'annotazione di avviso e una riga nel riepilogo della
+run, non un fallimento: il budget rende visibile la crescita nel momento in
+cui avviene, non la vieta. Per far tacere l'avviso si alza il tetto nel file
+del budget, in un commit a sé il cui commento dice cosa è cresciuto e nomina
+la issue Linear che lo giustifica. Una rimozione lascia spazio sotto il suo
+tetto per un'aggiunta successiva; i tetti non si abbassano mai da soli.

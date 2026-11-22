@@ -317,3 +317,49 @@ ripristino dalla dashboard. Due cose che un backup non copre:
 Senza alcun backup, ripartire col file danneggiato messo da parte inizia un
 database vuoto: i provider si aggiungono di nuovo dalla dashboard o importando un
 `config.yml`.
+
+### 4.9 Inviluppo di risorse — quanto costa un parco provider
+
+"Gira sul mio Raspberry Pi?" — misurato, non stimato. `npm run
+measure:envelope` ([9.4](development.it.md#94-test-e-controlli)) avvia entrambe le
+edizioni, compilate, contro un finto Statuspage locale con tre dimensioni di
+parco provider, e stampa questa tabella:
+
+Measured on 2026-11-21, IsItDown v2.46.1, Node 26.13.1, 13th Gen Intel(R) Core(TM) i7-1355U (6 threads), 10 GB RAM.
+Providers served by a local fake Statuspage (all operational), 2,000+ samples per size;
+growth extrapolated at the default 3-minute interval.
+
+| Edition | Providers | Startup to ready | Memory (RSS) | CPU per cycle | Cycle duration | Database after startup | Database per provider per month |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| Light | 10 | 198 ms | 202 MB | 12 ms | 9 ms | — | — (state file) |
+| UI | 10 | 18.3 s | 267 MB | 17 ms | 47 ms | 38.5 MB | 1.5 MB |
+| Light | 100 | 444 ms | 255 MB | 158 ms | 137 ms | — | — (state file) |
+| UI | 100 | 27.9 s | 255 MB | 80 ms | 271 ms | 392.1 MB | 1.5 MB |
+| Light | 500 | 2.8 s | 304 MB | 1.6 s | 1.5 s | — | — (state file) |
+| UI | 500 | 74.7 s | 296 MB | 386 ms | 1.4 s | 2030.3 MB | 1.5 MB |
+
+Il blocco è l'output dello script, lasciato in inglese perché si rigenera così
+com'è. Come leggerlo:
+
+- **Memoria**: è la memoria residente dopo almeno cento cicli, quando ha
+  smesso di salire. Gran parte è ciò che V8 e l'allocatore tengono in riserva:
+  l'heap JavaScript vero e proprio resta intorno ai 20 MB a 10 provider.
+  Conviene prevedere circa 300 MB per edizione. Entrambe le edizioni stanno su
+  una scheda da 1 GB.
+- **CPU per ciclo**: è il lavoro di IsItDown contro un provider su loopback. Un
+  parco reale aggiunge i round trip di rete alla *durata* del ciclo, non alla
+  sua CPU. Anche il valore peggiore, 1,6 s ogni 3 minuti, sta sotto l'1% di un
+  core. Il costo dell'edizione Light cresce più in fretta del parco perché
+  riscrive l'intero file di stato JSON a ogni modifica.
+- **Avvio**: per l'edizione UI è soprattutto storia. Per un provider mai visto
+  ricostruisce 90 giorni di campioni dal suo elenco di incidenti prima di
+  registrare il primo ciclo, e `/ready` risponde 200 solo dopo quel ciclo. Un
+  riavvio con la storia già presente è più veloce. L'edizione Light non tiene
+  storia, quindi è pronta dopo un ciclo.
+- **Database**: la ricostruzione è il motivo per cui un nuovo parco parte da
+  circa 4 MB per provider. Da lì cresce di 1,5 MB per provider al mese e si
+  stabilizza alla retention (120 giorni di default): circa 6 MB per provider,
+  quindi ~60 MB per 10 provider, ~600 MB per 100 e ~3 GB per 500. Abbassare la
+  retention nelle Impostazioni riduce il totale in proporzione. Le letture
+  complete del replay sono un costo fisso in più, al massimo 100 per provider.
+  L'edizione Light scrive un piccolo file di stato JSON.

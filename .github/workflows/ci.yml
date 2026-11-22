@@ -60,6 +60,12 @@ jobs:
       # renewed with a reason). The live ones are listed in the summary.
       - name: Test quarantine
         run: npm run check:quarantine
+      # Roadmap 16.5. What the complexity inventory counts (config keys, env
+      # vars, subsystems, targets, adapters, channels) against a ceiling at
+      # today's figure: going over warns and lands in the summary, it does not
+      # fail. Raising a ceiling is a commit of its own in the budget file.
+      - name: Complexity budget
+        run: npm run check:complexity
 
   # Roadmap 7.2. The same two suites `npm test` runs, each under a coverage
   # floor: a new subsystem that lands without tests of its own drags the total

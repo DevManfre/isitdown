@@ -16,7 +16,11 @@ and why that is worth it. This doesn't forbid features; it makes each one a
 deliberate choice. The pull request template has a section for it.
 
 The numbers behind that rule are in the complexity inventory,
-[9.8](docs/development.md#98-complexity-inventory).
+[9.8](docs/development.md#98-complexity-inventory). Six of them — config
+keys, environment variables, subsystems, build targets, adapters, channels —
+have a ceiling at today's figure (`npm run check:complexity`). CI warns when
+your change goes over one; if the addition is worth it, raise the ceiling in
+`tools/complexity-budget.mjs` in a commit of its own, saying why.
 
 ## Setup
 
