@@ -110,6 +110,11 @@ commit.
   from a route handler or the poller directly.
 - **Secrets come from environment variables only** — never in code, config
   files or examples.
+- **A migration must open the oldest supported database.**
+  `test/fixtures/db/oldest-supported.db` is a v1.0.0 install; the integration
+  suite migrates it and reads it back. Raising the minimum regenerates it with
+  `node tools/oldest-db.mjs`, in a commit of its own — see
+  [9.4](docs/development.md#94-tests-and-checks).
 - **New dashboard screens are discussed before they are built** — open an issue
   with the idea first.
 

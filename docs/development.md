@@ -141,6 +141,7 @@ isitdown/
 │   ├── fake-provider.mjs              a local status page to break by hand, plus a webhook receiver (npm run fake-provider)
 │   ├── scaffold.mjs                   a new adapter or notification channel, laid out and registered (npm run new:adapter / new:notifier)
 │   ├── bundle-budget.mjs              the built dashboard against its gzipped budget, and the catalog kept out of it (npm run check:bundle)
+│   ├── oldest-db.mjs                  test/fixtures/db/oldest-supported.db, from the oldest supported release's own migrations (10.3)
 │   ├── visual-regression.mjs          every view, both themes, every locale against test/visual/baseline (npm run test:visual); helpers in tools/visual/
 │   ├── envelope.mjs                   memory, CPU, startup and database growth at 10 / 100 / 500 providers (npm run measure:envelope, docker.md 4.9)
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   the canary probe, load and mutation tests, fixture recording, release notes, the single-file build, PWA icons
@@ -159,6 +160,7 @@ isitdown/
 │   ├── ui/                            store contract, aggregation, every API route, theme and locale guards
 │   ├── cli/                           watch's args, reducers, renderer, and the loop against a fake server
 │   ├── fixtures/<provider>/            payloads recorded from the live pages, never fetched in a test
+│   ├── fixtures/db/                   oldest-supported.db — the oldest database a build must open (10.3)
 │   ├── helpers/
 │   └── integration/                   *.itest.ts — fake provider and webhook receiver end to end
 ├── docs/grafana/isitdown.json         the committed Grafana dashboard for /metrics
@@ -448,6 +450,22 @@ the scheduler, poller and dispatcher take one as `clock`, and a test passes
 the wait in `delays`. A guard in `test/core/boundaries.test.ts` fails any core
 test that uses a real `setTimeout`, `t.mock.timers` or a patched `Date`, and
 any `Date.now()` or bare timer back in those three modules.
+
+**The oldest supported database** (roadmap 10.3) is
+`test/fixtures/db/oldest-supported.db`: v1.0.0's schema (7), with four
+providers, ninety days of samples, open and resolved incidents, components, an
+enabled channel and a delivery log. `test/integration/oldestDatabase.itest.ts`
+copies it, opens it with the current build and checks that `/status`,
+`/history`, `/incidents`, `/config` and `/notifications` still return its data,
+and that the tables added since (rollups, annotations) work on top of it; the
+visual harness draws Overview and History over it as `overview-oldest` and
+`history-oldest`. Every other test starts from an empty database, so this is
+the one that fails when a migration breaks a year-old installation. The file is
+not written by hand: `node tools/oldest-db.mjs` runs that release's own
+`migrate.ts` and `seed.ts`, read out of git at its tag, then fills in the
+rows. When the minimum supported release goes up, change `OLDEST_TAG` in the
+script, regenerate the file and agree the two frames again, all in **one
+commit of its own**, with nothing else in it.
 
 The **accessibility pass** (roadmap 4.20) rides the visual harness: after each view
 settles, `tools/visual-regression.mjs` injects axe-core and checks WCAG 2.0 and
