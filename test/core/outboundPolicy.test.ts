@@ -172,9 +172,9 @@ test("unusableAllowEntries names what no rule can use", () => {
 
 test("readOutboundPolicy: the edition's mode, OUTBOUND_BLOCK_PRIVATE forcing deny, EGRESS_ALLOW added", (t) => {
   t.after(resetOutbound);
-  assert.deepEqual(readOutboundPolicy({}), ALLOW);
+  assert.deepEqual(readOutboundPolicy({}), { ...ALLOW, proxied: false });
   configureOutbound({ privateTargets: "warn", allow: ["nas.lan"] });
-  assert.deepEqual(readOutboundPolicy({}), { privateTargets: "warn", allow: ["nas.lan"] });
+  assert.deepEqual(readOutboundPolicy({}), { privateTargets: "warn", allow: ["nas.lan"], proxied: false });
   assert.deepEqual(readOutboundPolicy({ OUTBOUND_BLOCK_PRIVATE: "yes" }).privateTargets, "warn");
   assert.deepEqual(readOutboundPolicy({ OUTBOUND_BLOCK_PRIVATE: " TRUE " }).privateTargets, "deny");
   assert.deepEqual(readOutboundPolicy({ EGRESS_ALLOW: "10.0.0.0/8" }).allow, ["nas.lan", "10.0.0.0/8"]);

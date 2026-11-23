@@ -1,6 +1,7 @@
 import { isSea } from "node:sea";
 import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
+import { useEnvProxy } from "../core/proxy.ts";
 import { buildLightRuntime } from "./runtime.ts";
 
 const CONFIG_PATH = process.env["CONFIG_PATH"] ?? "/app/config/config.yml";
@@ -20,6 +21,11 @@ async function main(): Promise<void> {
     parseLogLevel(process.env["LOG_LEVEL"]),
     createLogWriter(readFileLogOptions(process.env)),
   );
+
+  // Roadmap 10.7: before the runtime is built, so the first cycle reads through
+  // the proxy too. Process-wide, so it lives here rather than in the runtime
+  // the end-to-end tests build.
+  useEnvProxy(process.env, logger);
 
   let started: Awaited<ReturnType<typeof buildLightRuntime>>;
   try {

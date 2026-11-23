@@ -220,8 +220,16 @@ const ASSETS = "dist/ui/public/assets";
  * 3.8 -> 3.10 (immer 10 -> 11 with it), i18next 26.4 -> 26.7, lucide-react
  * 1.33 -> 1.72, @tanstack/react-query and react-table. No direct dependency
  * was added.
+ *
+ * It moved 783,000 -> 812,000 (764.6 -> 793.0 kB) for Renovate's second
+ * lot (PRs #46 and #47). Measured: 763.3 kB gzipped before, 788.6 kB after
+ * both — 25.3 kB, and again no line of the dashboard changed. 16 kB of it is
+ * recharts 3.10 -> 3.11 alone (same dependencies, still `sideEffects: false`
+ * — it simply ships more code); the other ~10 kB is the dashboard stack:
+ * react/react-dom 19.2 -> 19.3, radix-ui 1.6 -> 1.8, vite 8.2 -> 8.3.
+ * No direct dependency was added.
  */
-export const BUDGET = { js: 783_000, css: 23_500 };
+export const BUDGET = { js: 812_000, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

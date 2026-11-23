@@ -363,3 +363,54 @@ com'è. Come leggerlo:
   retention nelle Impostazioni riduce il totale in proporzione. Le letture
   complete del replay sono un costo fisso in più, al massimo 100 per provider.
   L'edizione Light scrive un piccolo file di stato JSON.
+
+### 4.10 Proxy e reti senza Internet
+
+**Dietro un proxy.** Imposta le solite variabili sul container. Da quel
+momento ogni richiesta HTTP di IsItDown passa dal proxy: pagine di stato,
+canali di notifica, controllo aggiornamenti, catalogo, heartbeat
+([3.39](configuration.it.md#339-ping-in-uscita--il-dead-mans-switch-di-isitdown)).
+Gli host in `NO_PROXY` vengono raggiunti direttamente. Funzionano sia le
+maiuscole sia le minuscole, e le credenziali possono stare nell'URL
+(`http://utente:password@proxy:3128`). All'avvio il log dice una volta quale
+proxy è in uso, senza la credenziale.
+
+```yaml
+services:
+  isitdown:
+    environment:
+      HTTPS_PROXY: http://proxy.corp:3128
+      HTTP_PROXY: http://proxy.corp:3128
+      NO_PROXY: localhost,127.0.0.1,.lan,10.0.0.0/8
+```
+
+Da sapere:
+
+- **Metti la tua LAN in `NO_PROXY`.** Senza, anche una richiesta a `nas.lan`
+  o a un outpost sulla LAN va al proxy, come farebbe `curl`.
+- **I controlli TCP, ping, DNS e IMAP non usano il proxy**: un proxy porta
+  solo HTTP. Si collegano direttamente dal container.
+- **La policy di uscita ([3.38](configuration.it.md#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda))
+  giudica sempre la destinazione, non il proxy.** Una differenza: un nome
+  host che questo container non sa risolvere viene passato al proxy invece di
+  essere rifiutato, perché in una rete chiusa spesso solo il proxy risolve i
+  nomi pubblici.
+- **L'healthcheck del container** parla con `localhost` e non passa mai dal
+  proxy.
+
+**Senza nessuna uscita.** IsItDown continua a funzionare per tutto ciò che
+riesce a raggiungere: servizi sulla LAN, controlli TCP e ping, canali di
+notifica interni alla rete (un webhook, Mattermost, un ntfy o Gotify locale).
+Ciò che ha bisogno di Internet degrada in silenzio, senza un errore nel log a
+ogni ciclo:
+
+| Funzione | Senza Internet |
+|---|---|
+| Pagine di stato pubbliche (GitHub, Cloudflare…) | Lette come fallite, come in qualunque disservizio. Non aggiungerle. |
+| Icone dei provider nella dashboard | Il browser non riesce a caricarle; ogni riquadro tiene l'etichetta di tre lettere. |
+| Font della dashboard (Google Fonts) | Il browser ripiega sul font di sistema. |
+| Catalogo remoto dei provider | Si usa il catalogo incluso nell'immagine. Gli errori vanno solo nel log `debug`. |
+| Controllo aggiornamenti | Nessun avviso di nuova versione. Gli errori vanno solo nel log `debug`. |
+| Web push | Serve il servizio push del produttore del browser, quindi l'invio fallisce e compare nel registro delle consegne, come per ogni canale che non riesce a inviare. |
+| Riassunti degli incidenti con l'IA | Serve l'API del fornitore del modello; i riassunti non vengono scritti. |
+

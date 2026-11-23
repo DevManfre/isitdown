@@ -720,6 +720,10 @@ prova reale (roadmap 4.5).
 | `HEARTBEAT_TOKEN` | UI | — | Attiva l'endpoint dei ping heartbeat ([3.19](#319-heartbeat--il-dead-mans-switch)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
 | `EGRESS_ALLOW` | entrambe | — | Indirizzi, range CIDR e nomi host che la policy di uscita lascia passare ([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)), separati da virgole o spazi: `10.0.0.0/8,nas.lan`. Alla UI serve per osservare qualunque cosa sulla LAN o su questo host. |
 | `OUTBOUND_BLOCK_PRIVATE` | entrambe | non impostata | `true` fa rifiutare alla Light e all'outpost i target loopback e privati, come già fa la UI ([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)). Qualsiasi altro valore lascia il default dell'edizione. |
+| `HEARTBEAT_URL` | entrambe | — | Chiamato dopo ogni ciclo di polling completato: il dead-man's switch di IsItDown stesso ([3.39](#339-ping-in-uscita--il-dead-mans-switch-di-isitdown)). Un URL di Healthchecks.io o di un monitor push di Uptime Kuma. Nella Light vince `heartbeat.url` in `config.yml`. |
+| `HEARTBEAT_FAIL_URL` | entrambe | — | Chiamato dopo un ciclo fallito (config illeggibile, database bloccato): l'URL `/fail` di Healthchecks.io. |
+| `HEARTBEAT_METHOD` | entrambe | `GET` | `GET` o `POST`. `POST` invia una riga di testo: il riepilogo del ciclo, o il motivo del fallimento. |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | entrambe, outpost | — | Ogni richiesta HTTP passa da questo proxy; gli host in `NO_PROXY` no. Maiuscole o minuscole. Vedi [Proxy e reti senza Internet](docker.it.md#410-proxy-e-reti-senza-internet). |
 | `BIND_HOST` | UI | `127.0.0.1` | L'indirizzo su cui la dashboard è in ascolto. Per impostazione predefinita è il loopback, ciò che mantiene un'istanza senza `API_TOKEN` raggiungibile solo da questa macchina; le immagini container impostano `0.0.0.0` (la mappatura `ports` di compose decide poi chi può raggiungerla, e pubblica solo su `127.0.0.1`). Per raggiungere la dashboard da un'altra macchina, pubblica su `0.0.0.0` (o imposta `BIND_HOST` su bare metal) **e** imposta `API_TOKEN` — vedi [3.12](#312-raggiungere-lapi-da-un-altro-host) per ciò che una richiesta da fuori questa macchina può fare. |
 | `PORT` | UI, outpost | `3000` (`8080` per l'outpost) | Porta HTTP. |
 
@@ -3459,3 +3463,63 @@ egress:
 
 Esclusi, perché locali per definizione: il socket della sonda Docker, e i
 canali di notifica, i cui URL arrivano dall'ambiente e non dalla dashboard.
+
+### 3.39 Ping in uscita — il dead-man's switch di IsItDown
+
+Nessun processo può accorgersi di essere spento. Altrimenti un container
+morto alle 3 di notte lo scopri quando un provider va giù e il messaggio non
+arriva. Per questo IsItDown si può far osservare da fuori (roadmap 10.5): dopo
+ogni ciclo di polling completato chiama un URL, e un servizio che avvisa
+quando le chiamate smettono di arrivare (Healthchecks.io, un monitor push di
+Uptime Kuma, Cronitor, Better Stack) ti dice quando è iniziato il silenzio.
+
+È la direzione opposta dei monitor passivi di
+[3.19](#319-heartbeat--il-dead-mans-switch), che sono altri job a chiamare.
+
+| Impostazione | Ambiente | `config.yml` (Light) | |
+|---|---|---|---|
+| URL di successo | `HEARTBEAT_URL` | `heartbeat.url` | Chiamato dopo ogni ciclo completato. |
+| URL di fallimento | `HEARTBEAT_FAIL_URL` | `heartbeat.failUrl` | Chiamato dopo un ciclo che è andato in errore: config illeggibile, database bloccato. |
+| Metodo | `HEARTBEAT_METHOD` | `heartbeat.method` | `GET` (predefinito) o `POST`. `POST` invia una riga di testo: `12 providers read in 3s`, oppure `poll cycle failed: …`. |
+
+Un provider giù **non** è un ciclo fallito: il ciclo l'ha letto e ha fatto il
+suo lavoro. "Fallito" vuol dire che il ciclo stesso non è riuscito a girare.
+
+Il ping non rallenta né fa fallire mai il ciclo. Il ciclo non lo aspetta, il
+ping rinuncia dopo 5 secondi, e un errore lascia un solo avviso nel log
+(`heartbeat ping failed; the cycle carries on`), poi silenzio finché non torna
+a funzionare (`heartbeat reachable again`). Il log riporta l'host, mai l'URL,
+perché un URL di Healthchecks.io è già una credenziale. Come l'URL di un canale
+di notifica, arriva da te e non dalla dashboard, quindi la policy di uscita
+([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)) non si
+applica: un Uptime Kuma sulla LAN non ha bisogno di `EGRESS_ALLOW`. Il proxy
+([4.10](docker.it.md#410-proxy-e-reti-senza-internet)) invece sì.
+
+**Healthchecks.io.** Crea un check con un periodo un po' più lungo
+dell'intervallo di polling (3 minuti → periodo 5 minuti, tolleranza 5
+minuti), poi:
+
+```bash
+HEARTBEAT_URL=https://hc-ping.com/<uuid>
+HEARTBEAT_FAIL_URL=https://hc-ping.com/<uuid>/fail
+HEARTBEAT_METHOD=POST   # facoltativo: il riepilogo compare nel log del check
+```
+
+Nella Light, lo stesso in `config.yml`, con il segreto preso dall'ambiente:
+
+```yaml
+heartbeat:
+  url: ${HC_URL}
+  failUrl: ${HC_URL}/fail
+```
+
+**Uptime Kuma.** Aggiungi un monitor di tipo *Push*, imposta l'intervallo un
+po' più lungo di quello di polling e usa il suo URL push:
+`HEARTBEAT_URL=http://kuma.lan:3001/api/push/<token>?status=up&msg=OK`.
+
+**ntfy.** Un topic non può accorgersi del silenzio, quindi va bene solo per il
+lato dei fallimenti: `HEARTBEAT_FAIL_URL=https://ntfy.sh/<tuo-topic>` con
+`HEARTBEAT_METHOD=POST` ti manda sul telefono il motivo quando un ciclo
+fallisce. Per sapere che il container non c'è più, abbinalo a uno dei servizi
+qui sopra (Healthchecks.io stesso può avvisare tramite ntfy).
+

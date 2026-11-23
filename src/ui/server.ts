@@ -1,6 +1,7 @@
 import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { configureOutbound, parseAllowList, unusableAllowEntries } from "../core/outboundPolicy.ts";
+import { useEnvProxy } from "../core/proxy.ts";
 import { createChatops } from "./chatops.ts";
 import { buildUiRuntime } from "./runtime.ts";
 import { REVISION_CHECK_INTERVAL_MS } from "./incidentRevisions.ts";
@@ -21,6 +22,8 @@ const logger = createLogger(
 // an API token — could otherwise read the LAN, so loopback and private targets
 // are refused unless EGRESS_ALLOW lists them.
 configureOutbound({ privateTargets: "deny" });
+// Roadmap 10.7: before anything reads the network, so the first request too.
+useEnvProxy(process.env, logger);
 for (const entry of unusableAllowEntries(parseAllowList(process.env["EGRESS_ALLOW"]))) {
   logger.warn("EGRESS_ALLOW entry ignored: neither an address, a CIDR range nor a host name", { entry });
 }
