@@ -1,11 +1,12 @@
 # Catalog build
 
-Generated 2026-11-16T13:08:58.648Z: 207 providers in the catalog, 107 candidates left out.
+Generated 2026-11-23T15:20:45.707Z: 207 providers in the catalog, 107 candidates left out.
 
 ## Kept although they failed this run
 
 Already in the catalog, so a single failed read does not remove them.
 
+- **Pipedrive** — https://status.pipedrive.com: sorry fetch for pipedrive failed: HTTP 429 (retry after 60s)
 - **Postmark** — https://status.postmarkapp.com: no adapter recognises the page
 
 ## Left out
