@@ -1,5 +1,6 @@
 import { lookup as dnsLookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { proxyActive } from "./proxy.ts";
 
 /**
  * What the process may fetch on an operator's behalf, and how much of the answer
@@ -67,6 +68,13 @@ export interface OutboundPolicy {
   privateTargets: PrivateTargets;
   /** `EGRESS_ALLOW` plus `egress.allow`: addresses, CIDR ranges and host names let through. */
   allow: readonly string[];
+  /**
+   * An HTTP proxy is configured (roadmap 10.7). The policy still judges the
+   * final destination, not the proxy, but a name this host cannot resolve is
+   * then the proxy's to resolve — an air-gapped network often has no public
+   * DNS at all — so an unresolvable target is let through to it.
+   */
+  proxied?: boolean | undefined;
 }
 
 type Warn = (message: string, fields: Record<string, unknown>) => void;
@@ -103,6 +111,7 @@ export function readOutboundPolicy(env: Record<string, string | undefined>): Out
   return {
     privateTargets: block ? "deny" : defaults.privateTargets,
     allow: [...defaults.allow, ...parseAllowList(env["EGRESS_ALLOW"])],
+    proxied: proxyActive(),
   };
 }
 
@@ -309,7 +318,7 @@ export async function assertTargetAllowed(
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new EgressRefusedError(`scheme ${parsed.protocol} is not http or https`);
   }
-  await assertHostAllowed(parsed.hostname, policy, { lookup });
+  await assertHostAllowed(parsed.hostname, policy, { lookup, passUnresolved: policy.proxied === true });
 }
 
 /**

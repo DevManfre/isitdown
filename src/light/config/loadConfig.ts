@@ -147,6 +147,7 @@ export async function inspectConfig(path: string, env: NodeJS.ProcessEnv): Promi
     // as a literal here.
     delivery: deliverySchema.parse(file.delivery ?? {}),
     recipients: buildRecipients(file, channels, path, problems),
+    ...(file.heartbeat === undefined ? {} : { heartbeat: file.heartbeat }),
   };
 
   return { problems, config, egressAllow };

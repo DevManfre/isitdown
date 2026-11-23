@@ -698,6 +698,10 @@ notification (roadmap 4.5).
 | `HEARTBEAT_TOKEN` | UI | — | Turns on the heartbeat ping endpoint ([3.19](#319-heartbeats--the-dead-mans-switch)) and is the credential in its URL. Unset, that route answers `404`. |
 | `EGRESS_ALLOW` | both | — | Addresses, CIDR ranges and host names the egress policy lets through ([3.38](#338-the-egress-policy--what-a-probe-may-reach)), comma- or space-separated: `10.0.0.0/8,nas.lan`. The UI edition needs it to watch anything on the LAN or on this host. |
 | `OUTBOUND_BLOCK_PRIVATE` | both | unset | `true` makes the Light edition and the outpost refuse loopback and private targets the way the UI edition already does ([3.38](#338-the-egress-policy--what-a-probe-may-reach)). Anything else keeps the edition's default. |
+| `HEARTBEAT_URL` | both | — | Pinged after every poll cycle that completed — IsItDown's own dead-man's switch ([3.39](#339-pinging-out--isitdowns-own-dead-mans-switch)). A Healthchecks.io or Uptime Kuma push URL. In the Light edition, `heartbeat.url` in `config.yml` wins. |
+| `HEARTBEAT_FAIL_URL` | both | — | Pinged after a cycle that failed (unreadable config, locked database) — Healthchecks.io's `/fail` URL. |
+| `HEARTBEAT_METHOD` | both | `GET` | `GET` or `POST`. `POST` sends a one-line text body: the cycle's summary, or why it failed. |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | both, outpost | — | Every HTTP request goes through this proxy; hosts in `NO_PROXY` do not. Upper or lower case. See [Proxies and networks with no Internet](docker.md#410-proxies-and-networks-with-no-internet). |
 | `BIND_HOST` | UI | `127.0.0.1` | The address the dashboard listens on. Loopback by default, which is what keeps an instance with no `API_TOKEN` reachable only from this machine; the container images set `0.0.0.0` (the compose `ports` mapping then decides who can reach it, and publishes on `127.0.0.1` only). To reach the dashboard from another machine, publish on `0.0.0.0` (or set `BIND_HOST` on bare metal) **and** set `API_TOKEN` — see [3.12](#312-reaching-the-api-from-another-host) for what a request off this machine may then do. |
 | `PORT` | UI, outpost | `3000` (`8080` for the outpost) | HTTP port. |
 
@@ -3318,3 +3322,62 @@ egress:
 Not covered, because they are local by definition: the Docker probe's socket,
 and notification channels, whose URLs come from the environment rather than
 from the dashboard.
+
+### 3.39 Pinging out — IsItDown's own dead-man's switch
+
+Nothing inside a process can notice the process is gone. A container that died
+at 3am is otherwise found when a provider goes down and the message never
+comes. So IsItDown can be watched from outside (roadmap 10.5): after every
+poll cycle that completed it calls a URL, and a service that alerts when the
+calls stop — Healthchecks.io, an Uptime Kuma push monitor, Cronitor, Better
+Stack — tells you the silence started.
+
+This is the opposite direction of the passive monitors in
+[3.19](#319-heartbeats--the-dead-mans-switch), which other jobs ping.
+
+| Setting | Environment | `config.yml` (Light) | |
+|---|---|---|---|
+| Success URL | `HEARTBEAT_URL` | `heartbeat.url` | Called after every cycle that completed. |
+| Failure URL | `HEARTBEAT_FAIL_URL` | `heartbeat.failUrl` | Called after a cycle that threw: unreadable config, locked database. |
+| Method | `HEARTBEAT_METHOD` | `heartbeat.method` | `GET` (default) or `POST`. `POST` sends one line of text: `12 providers read in 3s`, or `poll cycle failed: …`. |
+
+A provider that is down is **not** a failed cycle: the cycle read it and did
+its job. "Failed" means the cycle itself could not run.
+
+The ping never slows or breaks the cycle. It is not awaited, gives up after 5
+seconds, and a failure is one warning in the log (`heartbeat ping failed; the
+cycle carries on`), then quiet until it works again (`heartbeat reachable
+again`). The log names the host, never the URL, because a Healthchecks.io URL
+is its own credential. Like a notification channel's URL, it comes from you
+and not from the dashboard, so the egress policy ([3.38](#338-the-egress-policy--what-a-probe-may-reach))
+does not apply: an Uptime Kuma on the LAN needs no `EGRESS_ALLOW`. A proxy
+([4.10](docker.md#410-proxies-and-networks-with-no-internet)) does apply.
+
+**Healthchecks.io.** Create a check with a period a little longer than your
+poll interval (3 minutes → period 5 minutes, grace 5 minutes), then:
+
+```bash
+HEARTBEAT_URL=https://hc-ping.com/<uuid>
+HEARTBEAT_FAIL_URL=https://hc-ping.com/<uuid>/fail
+HEARTBEAT_METHOD=POST   # optional: the summary shows up in the check's log
+```
+
+In the Light edition, the same in `config.yml`, with the secret from the
+environment:
+
+```yaml
+heartbeat:
+  url: ${HC_URL}
+  failUrl: ${HC_URL}/fail
+```
+
+**Uptime Kuma.** Add a monitor of type *Push*, set its heartbeat interval a
+little longer than your poll interval, and use its push URL:
+`HEARTBEAT_URL=http://kuma.lan:3001/api/push/<token>?status=up&msg=OK`.
+
+**ntfy.** A topic cannot notice silence, so it only fits the failure side:
+`HEARTBEAT_FAIL_URL=https://ntfy.sh/<your-topic>` with `HEARTBEAT_METHOD=POST`
+sends the reason to your phone when a cycle fails. To be told the container
+is gone, pair it with one of the services above (Healthchecks.io can itself
+notify through ntfy).
+

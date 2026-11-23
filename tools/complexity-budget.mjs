@@ -25,8 +25,13 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
  * commit, with a line here: from -> to, what grew, the Linear issue.
  */
 export const BUDGET = {
-  configKeys: 250,
-  envVars: 41,
+  // +3 (heartbeat.url, .failUrl, .method): IsItDown's own dead-man's switch,
+  // ALE-89 (roadmap 10.5) — the only way to learn the container is gone.
+  configKeys: 253,
+  // +3 (HEARTBEAT_URL, _FAIL_URL, _METHOD), same issue: the UI edition has no
+  // config.yml, so the environment is its only way in. The proxy variables of
+  // ALE-141 (10.7) are read by Node itself and add nothing here.
+  envVars: 44,
   subsystems: 9,
   targets: 13,
   adapters: 30,

@@ -6,6 +6,7 @@ import {
   routingRuleSchema,
   serviceDefinitionSchema,
 } from "../../core/config.schema.ts";
+import { heartbeatTargetSchema } from "../../core/outboundHeartbeat.ts";
 import { TEMPLATE_MAX_LENGTH } from "../../notifiers/template.ts";
 
 /**
@@ -468,6 +469,11 @@ export const fileConfigSchema = z.object({
     .object({ allow: z.array(z.string().trim().min(1)).max(200).default([]) })
     .strict()
     .optional(),
+  /**
+   * IsItDown's own dead-man's switch (roadmap 10.5): a URL pinged after every
+   * cycle, another after a failed one. `HEARTBEAT_URL` and friends when absent.
+   */
+  heartbeat: heartbeatTargetSchema.optional(),
 });
 
 export type FileConfig = z.infer<typeof fileConfigSchema>;
