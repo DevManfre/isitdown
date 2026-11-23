@@ -639,3 +639,28 @@ services:
     /egress\.allow entry "10\.0\.0\.0\/33" is neither an address, a CIDR range nor a host name/,
   );
 });
+
+test("heartbeat: url and failUrl from the environment, method in any case; a broken one refuses the file", async () => {
+  const base = `
+services:
+  - name: GitHub
+    id: github
+    adapter: statuspage
+    baseUrl: https://www.githubstatus.com
+`;
+  const config = await loadConfig(
+    await configFile(`${base}heartbeat:\n  url: \${HC_URL}\n  failUrl: \${HC_URL}/fail\n  method: post\n`),
+    { HC_URL: "https://hc-ping.com/abc" },
+  );
+  assert.deepEqual(config.heartbeat, {
+    url: "https://hc-ping.com/abc",
+    failUrl: "https://hc-ping.com/abc/fail",
+    method: "POST",
+  });
+
+  const without = await loadConfig(await configFile(base), {});
+  assert.equal(without.heartbeat, undefined, "absent, the environment's heartbeat applies");
+
+  await assert.rejects(loadConfig(await configFile(`${base}heartbeat:\n  method: GET\n`), {}), /heartbeat/);
+  await assert.rejects(loadConfig(await configFile(`${base}heartbeat:\n  url: hc-ping.com/abc\n`), {}), /heartbeat/);
+});

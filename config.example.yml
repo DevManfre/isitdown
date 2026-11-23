@@ -541,3 +541,15 @@ notifications:
 #   allow:
 #     - 192.168.1.0/24
 #     - nas.lan
+
+# IsItDown's own dead-man's switch: a URL called after every poll cycle that
+# completed, another after one that failed. A service such as Healthchecks.io
+# or an Uptime Kuma push monitor alerts when the calls stop — the container is
+# gone. Keep the URL in the environment: it is a credential. HEARTBEAT_URL,
+# HEARTBEAT_FAIL_URL and HEARTBEAT_METHOD do the same when this block is absent.
+#
+# heartbeat:
+#   url: ${HC_URL}
+#   failUrl: ${HC_URL}/fail
+#   method: GET        # or POST, which sends a one-line summary
+

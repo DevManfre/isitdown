@@ -8,6 +8,7 @@ import { systemClock, type Clock, type ClockTimer } from "./clock.ts";
 import type { Logger } from "./logger.ts";
 import type { DispatchContext, Dispatcher } from "./dispatcher.interface.ts";
 import type { Notifier } from "./notifier.interface.ts";
+import { createHeartbeatPinger, type HeartbeatTarget } from "./outboundHeartbeat.ts";
 import type { CycleResult, Poller } from "./poller.ts";
 import { tracer } from "./tracing.ts";
 
@@ -64,6 +65,11 @@ export interface SchedulerDeps {
   onCycle?: ((result: CycleResult) => void | Promise<void>) | undefined;
   /** Injected so tests get an exact arming delay. */
   random?: (() => number) | undefined;
+  /**
+   * The environment's heartbeat target (roadmap 10.5), used when the loaded
+   * configuration names none of its own.
+   */
+  heartbeat?: HeartbeatTarget | undefined;
   /** Injected so a test steps from one cycle to the next instead of waiting. The wall clock when absent. */
   clock?: Clock | undefined;
 }
@@ -132,6 +138,16 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
   let stopped = false;
   let inFlight: Promise<CycleResult> | undefined;
   let lastIntervalMinutes = 3;
+  // The last configuration's heartbeat, kept so a cycle that fails before it
+  // can load one — a broken config file — still has somewhere to say so.
+  let heartbeatTarget = deps.heartbeat;
+  const pinger = createHeartbeatPinger(logger);
+  const pings = new Set<Promise<void>>();
+  /** Not awaited by the cycle; only `settled()` waits for it. */
+  function track(ping: Promise<void>): void {
+    pings.add(ping);
+    void ping.finally(() => pings.delete(ping));
+  }
 
   /**
    * How often a cycle has to run: the shortest cadence anything asked for.
@@ -168,7 +184,10 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     // arms the next one on the configuration it managed to read. Skipped for a
     // narrowed cycle: reading one provider says nothing about how often the
     // fleet has to be read, and the standing timer is not this cycle's business.
-    if (only === undefined) lastIntervalMinutes = tickIntervalMinutes(config);
+    if (only === undefined) {
+      lastIntervalMinutes = tickIntervalMinutes(config);
+      heartbeatTarget = config.heartbeat ?? deps.heartbeat;
+    }
 
     const result = await poller.runCycle(config, {
       ignoreSchedule,
@@ -235,13 +254,21 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 
   async function tick(): Promise<void> {
     try {
-      await cycle();
+      const result = await cycle();
+      track(
+        pinger.succeeded(
+          heartbeatTarget,
+          `${result.results.length} providers read in ${Math.round(
+            (Date.parse(result.finishedAt) - Date.parse(result.startedAt)) / 1000,
+          )}s`,
+        ),
+      );
     } catch (error) {
       // One bad cycle — an unreachable database, a broken config file — must not
       // end the service. Log it and stay on the clock.
-      logger.error("poll cycle failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const reason = error instanceof Error ? error.message : String(error);
+      logger.error("poll cycle failed", { error: reason });
+      track(pinger.failed(heartbeatTarget, `poll cycle failed: ${reason}`));
     } finally {
       arm();
     }
@@ -288,6 +315,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       while (inFlight !== undefined) {
         await inFlight.catch(() => undefined);
       }
+      await Promise.all(pings);
     },
   };
 }

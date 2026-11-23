@@ -1,3 +1,4 @@
+import type { HeartbeatTarget } from "./outboundHeartbeat.ts";
 import type { DeliveryConfig } from "./delivery.ts";
 import type { RoutingRule } from "./routing.ts";
 
@@ -188,6 +189,11 @@ export interface RuntimeConfig {
    * channel a rule names is sent to, exactly as before recipients existed.
    */
   recipients: Recipient[];
+  /**
+   * Where to ping after each cycle (roadmap 10.5) — set only by an edition whose
+   * configuration file names one; the scheduler falls back on the environment's.
+   */
+  heartbeat?: HeartbeatTarget | undefined;
 }
 
 /**

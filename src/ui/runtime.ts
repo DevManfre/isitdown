@@ -14,6 +14,7 @@ import { createDispatcher } from "../core/notificationDispatcher.ts";
 import type { Notifier } from "../core/notifier.interface.ts";
 import { readOutposts } from "../core/outpost.ts";
 import { createPoller, type CycleResult } from "../core/poller.ts";
+import { readHeartbeatTarget } from "../core/outboundHeartbeat.ts";
 import { createScheduler, dispatchContextOf, type Scheduler } from "../core/scheduler.ts";
 import { initTracing, tracer } from "../core/tracing.ts";
 import { createWebPushNotifier } from "../notifiers/webpush.notifier.ts";
@@ -322,6 +323,8 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     configSource,
     poller,
     dispatcher,
+    // IsItDown's own dead-man's switch (roadmap 10.5): environment only here.
+    heartbeat: readHeartbeatTarget(options.env),
     buildNotifiers: buildAllNotifiers,
     interactiveChannels: () => [...interactiveChannels],
     logger,

@@ -6,6 +6,7 @@ import { createLogger, parseLogLevel, type Logger } from "../core/logger.ts";
 import { createDispatcher } from "../core/notificationDispatcher.ts";
 import { readOutposts } from "../core/outpost.ts";
 import { createPoller } from "../core/poller.ts";
+import { readHeartbeatTarget } from "../core/outboundHeartbeat.ts";
 import { createScheduler, type Scheduler } from "../core/scheduler.ts";
 import { initTracing, tracer } from "../core/tracing.ts";
 import type { StateStore } from "../core/stateStore.interface.ts";
@@ -70,6 +71,8 @@ export async function buildLightRuntime(options: LightRuntimeOptions): Promise<L
     dispatcher,
     buildNotifiers,
     logger,
+    // config.yml's `heartbeat:` wins when it has one (roadmap 10.5).
+    heartbeat: readHeartbeatTarget(options.env),
   });
 
   return {
