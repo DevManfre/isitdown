@@ -351,3 +351,52 @@ How to read it:
   Settings shrinks that in proportion. The replay's whole readings are a
   fixed extra, capped at 100 per provider. The Light edition writes one
   small JSON state file.
+
+### 4.10 Proxies and networks with no Internet
+
+**Behind a proxy.** Set the usual variables on the container. Every HTTP
+request IsItDown makes then goes through the proxy: status pages,
+notification channels, the update check, the catalog, the heartbeat
+([3.39](configuration.md#339-pinging-out--isitdowns-own-dead-mans-switch)).
+Hosts in `NO_PROXY` are reached directly. Upper and lower case both work, and
+credentials can go in the URL (`http://user:pass@proxy:3128`). The log says
+once at start-up which proxy is in use, without the credential.
+
+```yaml
+services:
+  isitdown:
+    environment:
+      HTTPS_PROXY: http://proxy.corp:3128
+      HTTP_PROXY: http://proxy.corp:3128
+      NO_PROXY: localhost,127.0.0.1,.lan,10.0.0.0/8
+```
+
+Things to know:
+
+- **Put your LAN in `NO_PROXY`.** Without it, a request to `nas.lan` or to
+  an outpost on the LAN goes to the proxy too, like it would with `curl`.
+- **TCP, ping, DNS and IMAP checks do not use the proxy** — a proxy only
+  carries HTTP. They connect straight from the container.
+- **The egress policy ([3.38](configuration.md#338-the-egress-policy--what-a-probe-may-reach))
+  still judges the destination, not the proxy.** One difference: a host
+  name this container cannot resolve is passed on to the proxy instead of
+  refused, because in a closed network often only the proxy can resolve
+  public names.
+- **The container's own healthcheck** talks to `localhost` and never goes
+  through the proxy.
+
+**With no way out at all.** IsItDown keeps working for whatever it can reach:
+services on the LAN, TCP and ping checks, notification channels inside the
+network (a webhook, Mattermost, a local ntfy or Gotify). What needs the
+Internet degrades quietly — no error in the log every cycle:
+
+| Feature | Without Internet |
+|---|---|
+| Public status pages (GitHub, Cloudflare…) | Read as failed, as they would be in any outage. Do not add them. |
+| Provider icons in the dashboard | The browser cannot load them; each tile keeps its three-letter label. |
+| Dashboard fonts (Google Fonts) | The browser falls back to the system font. |
+| Remote provider catalog | The catalog built into the image is used. Failures go to the `debug` log only. |
+| Update check | No "new version" notice. Failures go to the `debug` log only. |
+| Web push | Needs the browser vendor's push service, so delivery fails and shows in the delivery log, like any channel that cannot send. |
+| AI incident summaries | Need the model provider's API; summaries are not written. |
+

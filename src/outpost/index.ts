@@ -2,6 +2,7 @@ import { getAdapter } from "../adapters/index.ts";
 import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { configureOutbound } from "../core/outboundPolicy.ts";
+import { useEnvProxy } from "../core/proxy.ts";
 import { createOutpostServer } from "./server.ts";
 
 /**
@@ -25,6 +26,8 @@ function main(): void {
   // An outpost exists to probe from inside a network, so it reads private
   // targets like the Light edition it ships with — warning once per host.
   configureOutbound({ privateTargets: "warn", warn: (message, fields) => logger.warn(message, fields) });
+  // Roadmap 10.7: an outpost inside a proxied network reads through the proxy too.
+  useEnvProxy(process.env, logger);
 
   const server = createOutpostServer({ token, getAdapter, logger });
   server.listen(port, () => {
