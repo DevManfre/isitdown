@@ -3381,3 +3381,35 @@ sends the reason to your phone when a cycle fails. To be told the container
 is gone, pair it with one of the services above (Healthchecks.io can itself
 notify through ntfy).
 
+
+### 3.40 The instance as a provider — IsItDown watching itself
+
+The ping in [3.39](#339-pinging-out--isitdowns-own-dead-mans-switch) notices
+an instance that has stopped. It cannot notice one still running, but badly:
+cycles that slip, a provider whose adapter fails cycle after cycle, messages
+that never arrived, a disk filling up. Those used to show up only in
+`/metrics` (roadmap 10.6). In the UI edition the instance is now a provider of
+its own: **IsItDown**, a row on the Overview like any other, with an uptime
+history and four components.
+
+| Component | Degraded when |
+|---|---|
+| Polling | no cycle has started for more than twice the poll interval, or the last three cycles each took over half of it |
+| Adapters | another enabled provider has failed as many reads in a row as `failureThreshold` ([3.1](#31-light-edition--configyml)), the same count that marks its own view degraded |
+| Notifications | a notification failed for good, every retry spent, in the last 24 hours |
+| Database | less than 256 MiB is free on the filesystem holding the database |
+
+The provider is degraded while any component is, and never down: an instance
+that can answer is not down. A gap from before the current process started is
+a restart, not a slipped cycle; 3.39's ping is the one that sees that.
+
+The row's changes go through the same diff engine and notifiers as every
+other provider's, so routing rules, quiet hours, the digest and muting all
+apply. To stop being told about one part, take that component off the row in
+its edit dialog. To stop being told about any of it, mute or remove the row.
+
+The row is added once, on the first start of an installation (new or
+upgraded). A row you remove stays removed. It is left out of a `config.yml`
+export ([3.2](#32-ui-edition--runtime-settings)), because the Light
+edition has no such provider, and an import never removes it. Its component
+names follow the notification language set when it was added.

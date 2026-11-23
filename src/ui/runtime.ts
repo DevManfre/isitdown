@@ -21,6 +21,7 @@ import { createWebPushNotifier } from "../notifiers/webpush.notifier.ts";
 import { buildNotifiers } from "../notifiers/index.ts";
 import { createApp } from "./app.ts";
 import { createAdapterDebugStore, type AdapterDebugStore } from "./adapterDebug.ts";
+import { seedSelfMonitor, useSelfMonitor } from "./selfMonitor.ts";
 import { createBackfillService, type BackfillService } from "./backfill.ts";
 import { readSettings, writeSettings } from "./dbSettings.ts";
 import { listServices, purgeExpiredServices } from "./dbServices.ts";
@@ -63,6 +64,11 @@ export interface UiRuntimeOptions {
   logger?: Logger | undefined;
   /** Seed the three starter providers into an empty database. Defaults on; the server turns it off. */
   seedProviders?: boolean | undefined;
+  /**
+   * Add the instance's own row (roadmap 10.6) on the first boot that has not.
+   * Off by default, so a test's fleet is the one it built; the server turns it on.
+   */
+  seedSelfMonitor?: boolean | undefined;
   /** Test seams for the incident summary (roadmap 6.10); see `UiRuntimeCore`. */
   getAdapter?: ((id: string) => Adapter) | undefined;
   summaryDeps?: Partial<Omit<SummaryDeps, "env">> | undefined;
@@ -211,6 +217,10 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   // Before the first cycle, like the plugins: a heartbeat provider row has to
   // resolve to its adapter on the first read (roadmap 2.5).
   const heartbeats = useHeartbeatLedger(db);
+  // Roadmap 10.6: the instance as a provider of its own. Bound whether or not
+  // the row is seeded here, so a row a restored backup brings along is polled.
+  useSelfMonitor(db, options.dbPath, logger);
+  if (options.seedSelfMonitor === true) seedSelfMonitor(db, logger);
 
   // Before anything reads the environment: an entry saved from the dashboard on
   // a previous run has to be in place for the first cycle, exactly as it would

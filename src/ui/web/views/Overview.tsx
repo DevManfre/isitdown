@@ -33,6 +33,7 @@ import { suspectedHatchCss } from "@/lib/chartConfig.ts";
 import { OVERVIEW_WINDOW_DAYS } from "@/lib/fleetSlice.ts";
 import { DEFAULT_LAYOUT, type WidgetConfig } from "../../dashboardLayout.ts";
 import { ROUTE_PATHS } from "../../routePaths.ts";
+import { SELF_MONITOR_ID } from "../../selfMonitorId.ts";
 import { Reveal } from "@/widgets/edit/Reveal.tsx";
 import CellChrome from "@/widgets/edit/CellChrome.tsx";
 import EditMode from "@/widgets/edit/EditMode.tsx";
@@ -130,7 +131,9 @@ export function Overview() {
   const configured = status?.providers ?? [];
   const providers = configured.filter((provider) => provider.enabled);
   const allDisabled = configured.length > 0 && providers.length === 0;
-  const noneConfigured = configured.length === 0;
+  // The instance's own row (roadmap 10.6) is there from the first boot, so it
+  // cannot be what says the operator has set something up.
+  const noneConfigured = configured.every((provider) => provider.adapter === SELF_MONITOR_ID);
   canCustomise.current = !editing && !noneConfigured && !dashboardPending && !dashboardErrored;
 
   // The headline is chosen by plural rule, never assembled from fragments —

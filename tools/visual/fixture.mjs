@@ -22,6 +22,8 @@ const providers = [
   { id: "cloudflare", name: "Cloudflare", baseUrl: "https://www.cloudflarestatus.com", status: "degraded" },
   { id: "anthropic", name: "Anthropic", baseUrl: "https://status.anthropic.com", status: "major_outage" },
   { id: "vercel", name: "Vercel", baseUrl: "https://www.vercel-status.com", status: "operational" },
+  // Roadmap 10.6: the instance's own row, as every real installation has it.
+  { id: "self", name: "IsItDown", baseUrl: "https://self.invalid", status: "operational", adapter: "self" },
 ];
 
 /**
@@ -42,6 +44,12 @@ const COMPONENTS = {
   anthropic: [
     { id: "api", name: "Claude API", status: "major_outage" },
     { id: "console", name: "Console", status: "operational" },
+  ],
+  self: [
+    { id: "polling", name: "Polling", status: "operational" },
+    { id: "adapters", name: "Adapters", status: "operational" },
+    { id: "notifications", name: "Notifications", status: "operational" },
+    { id: "database", name: "Database", status: "operational" },
   ],
 };
 
@@ -87,7 +95,7 @@ export function seedVisualFixture(db, fixture = "default") {
   }
 
   const insertService = db.prepare(
-    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, created_at) VALUES (?, ?, 'statuspage', ?, NULL, 1, NULL, 0, NULL, ?, ?)",
+    "INSERT INTO services (id, name, adapter, base_url, options, enabled, components, scope_to_components, interval_minutes, muted_until, created_at) VALUES (?, ?, ?, ?, NULL, 1, NULL, 0, NULL, ?, ?)",
   );
   const insertState = db.prepare(
     "INSERT INTO provider_state (provider_id, overall_status, active_incidents, components, maintenances, fetched_at, failure_count, degraded_notified) VALUES (?, ?, ?, ?, '[]', ?, 0, 0)",
@@ -104,7 +112,7 @@ export function seedVisualFixture(db, fixture = "default") {
 
   if (fixture === "quiet") {
     for (const provider of providers) {
-      insertService.run(provider.id, provider.name, provider.baseUrl, null, iso(DAY));
+      insertService.run(provider.id, provider.name, provider.adapter ?? "statuspage", provider.baseUrl, null, iso(DAY));
       insertState.run(provider.id, "operational", "[]", "[]", iso(4 * 60_000));
     }
     seedSettings(db);
@@ -115,6 +123,7 @@ export function seedVisualFixture(db, fixture = "default") {
     insertService.run(
       provider.id,
       provider.name,
+      provider.adapter ?? "statuspage",
       provider.baseUrl,
       // Cloudflare is the muted one, so the mute badge is in the baseline too.
       provider.id === "cloudflare" ? new Date(NOW + 2 * 3600_000).toISOString() : null,

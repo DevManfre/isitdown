@@ -3523,3 +3523,36 @@ lato dei fallimenti: `HEARTBEAT_FAIL_URL=https://ntfy.sh/<tuo-topic>` con
 fallisce. Per sapere che il container non c'è più, abbinalo a uno dei servizi
 qui sopra (Healthchecks.io stesso può avvisare tramite ntfy).
 
+### 3.40 L'istanza come provider — IsItDown che osserva se stesso
+
+Il ping di [3.39](#339-ping-in-uscita--il-dead-mans-switch-di-isitdown) si
+accorge di un'istanza che si è fermata. Non può accorgersi di una che gira
+ancora, ma male: cicli che slittano, un provider il cui adapter fallisce ciclo
+dopo ciclo, messaggi mai arrivati, un disco che si riempie. Finora si vedevano
+solo in `/metrics` (roadmap 10.6). Nell'edizione UI l'istanza è ora un provider
+a sé: **IsItDown**, una riga nella Panoramica come le altre, con una storia di
+uptime e quattro componenti.
+
+| Componente | Degradato quando |
+|---|---|
+| Polling | nessun ciclo parte da più del doppio dell'intervallo di poll, oppure gli ultimi tre cicli hanno impiegato ciascuno più della sua metà |
+| Adapter | un altro provider attivo ha fallito tante letture di fila quante ne dice `failureThreshold` ([3.1](#31-edizione-light--configyml)), lo stesso conteggio che segna come degradata la sua vista |
+| Notifiche | una notifica è fallita del tutto, esauriti i tentativi, nelle ultime 24 ore |
+| Database | sul filesystem che ospita il database restano meno di 256 MiB liberi |
+
+Il provider è degradato finché lo è un componente, e mai giù: un'istanza che
+risponde non è giù. Un vuoto precedente all'avvio del processo attuale è un
+riavvio, non un ciclo slittato; lo vede il ping di 3.39.
+
+I cambi della riga passano dallo stesso diff engine e dagli stessi notifier di
+ogni altro provider, quindi valgono regole di routing, quiet hours, digest e
+silenziamenti. Per non essere avvisato su una parte, togli quel componente
+dalla riga nella sua finestra di modifica. Per non essere avvisato su niente,
+silenzia o rimuovi la riga.
+
+La riga viene aggiunta una volta, al primo avvio di un'installazione (nuova o
+aggiornata). Una riga rimossa resta rimossa. È esclusa dall'esportazione in
+`config.yml` ([3.2](#32-edizione-ui--impostazioni-a-runtime)), perché
+l'edizione Light non ha un provider del genere, e un'importazione non la
+rimuove mai. I nomi dei componenti seguono la lingua delle notifiche impostata
+quando è stata aggiunta.
