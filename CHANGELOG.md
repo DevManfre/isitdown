@@ -4,7 +4,34 @@ Every release of IsItDown, newest first, grouped by the surface each commit
 touched. Generated from the commit log by `tools/changelog.mjs` — don't edit
 it by hand; the release flow regenerates it.
 
+## v2.47.0 — 2026-11-23
+
+### COMPLEXITY
+
+- 🔧 raise the env and config.yml ceilings for the heartbeat settings
+
+### HEARTBEAT
+
+- ✨ ping an external dead-man's switch after every poll cycle
+
+### PROXY
+
+- ✨ send every HTTP request through HTTP_PROXY, HTTPS_PROXY and NO_PROXY
+
+### DEPS
+
+- ⬆️ bump dashboard stack (#46)
+- ⬆️ bump devDependencies (non-major) (#47)
+
+### BUNDLE
+
+- 🔨 raise the JS budget for Renovate's recharts and dashboard stack bumps
+
 ## v2.46.2 — 2026-11-22
+
+### RELEASE
+
+- 🔖 bump the version to 2.46.2
 
 ### ENVELOPE
 
