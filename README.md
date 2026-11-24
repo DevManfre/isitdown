@@ -49,6 +49,9 @@ Each page has an Italian twin beside it (`docs/<name>.it.md`).
 Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) (setup, checks, the rules a pull
 request is held to) · [code of conduct](CODE_OF_CONDUCT.md) · [changelog](CHANGELOG.md).
 
+Security: [SECURITY.md](SECURITY.md) (supported versions, how to report a
+vulnerability privately — never in a public issue).
+
 ## 1. What it does
 
 Every few minutes IsItDown fetches each provider's status page, normalises the
