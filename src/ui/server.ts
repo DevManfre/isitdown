@@ -30,7 +30,7 @@ for (const entry of unusableAllowEntries(parseAllowList(process.env["EGRESS_ALLO
 
 let runtime: Awaited<ReturnType<typeof buildUiRuntime>> | undefined;
 try {
-  runtime = await buildUiRuntime({ dbPath: DB_PATH, env: process.env, logger, seedProviders: false });
+  runtime = await buildUiRuntime({ dbPath: DB_PATH, env: process.env, logger, seedProviders: false, seedSelfMonitor: true });
 } catch (error) {
   // Roadmap 10.4. A torn page is a state the operator recovers from by hand,
   // so it is said in words on stderr — what, where, and the three steps —

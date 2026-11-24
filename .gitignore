@@ -16,6 +16,8 @@ config.yml
 *.db-journal
 *.db-wal
 *.db-shm
+# Roadmap 10.3: the oldest database a build must open, committed on purpose.
+!test/fixtures/db/oldest-supported.db
 test/visual/current/
 
 # graphify

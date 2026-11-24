@@ -4,7 +4,30 @@ Every release of IsItDown, newest first, grouped by the surface each commit
 touched. Generated from the commit log by `tools/changelog.mjs` — don't edit
 it by hand; the release flow regenerates it.
 
+## v2.48.0 — 2026-11-24
+
+### VISUAL
+
+- ✅ agree the baselines with the instance's own row
+- ✅ agree the Overview and History baselines over the oldest database
+
+### SELF MONITOR
+
+- ✨ watch the instance itself as a provider
+
+### MIGRATIONS
+
+- ✅ open the oldest supported database in CI
+
+### CATALOG
+
+- 🍱 regenerate the provider catalog (207 providers)
+
 ## v2.47.0 — 2026-11-23
+
+### RELEASE
+
+- 🔖 bump the version to 2.47.0
 
 ### COMPLEXITY
 

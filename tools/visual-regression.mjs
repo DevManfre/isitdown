@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -75,10 +75,19 @@ const VIEWS = [
   { name: "history-quiet", hash: "#/history", fixture: "quiet" },
   { name: "delivery-log-quiet", hash: "#/delivery-log", fixture: "quiet" },
   { name: "overview-offline", hash: "#/overview", fixture: "offline" },
+
+  // Roadmap 10.3: the oldest supported release's database, migrated by this
+  // build and drawn as it is — no fixture seeded over it. Proves the views
+  // render what an operator upgrading from v1.0.0 would see.
+  { name: "overview-oldest", hash: "#/overview", fixture: "oldest" },
+  { name: "history-oldest", hash: "#/history", fixture: "oldest" },
 ];
 
+/** The file `oldest` is drawn of, written by tools/oldest-db.mjs. */
+const OLDEST_DB = join(ROOT, "test/fixtures/db/oldest-supported.db");
+
 /** Every fixture a view can be drawn of, in the order the run visits them. */
-const RUN_FIXTURES = [...FIXTURES, "offline"];
+const RUN_FIXTURES = [...FIXTURES, "oldest", "offline"];
 
 const THEMES = ["light", "dark"];
 
@@ -201,13 +210,15 @@ async function withServer(fixture, body) {
   // `WEB_DIR` is read once at import time, and a static import would have
   // pinned the static root to a directory that only exists in a container.
   process.env["WEB_DIR"] = WEB_DIR;
+  const dbPath = join(dir, "isitdown.db");
+  if (fixture === "oldest") await copyFile(OLDEST_DB, dbPath);
   const { buildUiRuntime } = await import("../src/ui/runtime.ts");
   const runtime = await buildUiRuntime({
-    dbPath: join(dir, "isitdown.db"),
+    dbPath,
     env: {},
     logger: createLogger("error", () => {}),
   });
-  seedVisualFixture(runtime.db, fixture);
+  if (fixture !== "oldest") seedVisualFixture(runtime.db, fixture);
 
   // The scheduler is deliberately never started: a poll landing mid-run would
   // overwrite the fixture with whatever the real internet says today.

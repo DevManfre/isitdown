@@ -134,6 +134,7 @@ isitdown/
 │   ├── fake-provider.mjs              una pagina di stato locale da rompere a mano, più un receiver webhook (npm run fake-provider)
 │   ├── scaffold.mjs                   un nuovo adapter o canale di notifica, impostato e registrato (npm run new:adapter / new:notifier)
 │   ├── bundle-budget.mjs              la dashboard compilata contro il suo budget gzip, e il catalogo tenuto fuori (npm run check:bundle)
+│   ├── oldest-db.mjs                  test/fixtures/db/oldest-supported.db, dalle migrazioni della release più vecchia supportata (10.3)
 │   ├── visual-regression.mjs          ogni vista, entrambi i temi, ogni lingua contro test/visual/baseline (npm run test:visual); helper in tools/visual/
 │   ├── envelope.mjs                   memoria, CPU, avvio e crescita del database a 10 / 100 / 500 provider (npm run measure:envelope, docker.it.md 4.9)
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   la sonda canary, test di carico e di mutazione, registrazione dei fixture, note di rilascio, la build a file singolo, icone PWA
@@ -152,6 +153,7 @@ isitdown/
 │   ├── ui/                            contratto dello store, aggregazione, ogni route API, guardie tema e lingue
 │   ├── cli/                           args, riduttori e renderer di watch, e il ciclo contro un server finto
 │   ├── fixtures/statuspage/           payload registrati dalle pagine vere, mai scaricati in un test
+│   ├── fixtures/db/                   oldest-supported.db — il database più vecchio che una build deve aprire (10.3)
 │   ├── helpers/
 │   └── integration/                   *.itest.ts — provider finto e ricevitore webhook end to end
 ├── docs/grafana/isitdown.json         la dashboard Grafana committata per /metrics
@@ -456,6 +458,23 @@ clock e registra l'attesa in `delays`. Una guardia in
 `test/core/boundaries.test.ts` fa fallire ogni test del core che usi un
 `setTimeout` reale, `t.mock.timers` o un `Date` sostituito, e ogni `Date.now()`
 o timer diretto che torni in quei tre moduli.
+
+**Il database più vecchio supportato** (roadmap 10.3) è
+`test/fixtures/db/oldest-supported.db`: lo schema di v1.0.0 (7), con quattro
+provider, novanta giorni di campioni, incidenti aperti e risolti, componenti, un
+canale attivo e un log degli invii. `test/integration/oldestDatabase.itest.ts`
+lo copia, lo apre con la build corrente e verifica che `/status`, `/history`,
+`/incidents`, `/config` e `/notifications` restituiscano ancora i suoi dati, e
+che le tabelle aggiunte dopo (rollup, annotazioni) funzionino sopra di esso; il
+harness visivo disegna Panoramica e Cronologia sopra di esso come
+`overview-oldest` e `history-oldest`. Ogni altro test parte da un database
+vuoto, quindi è questo che fallisce quando una migrazione rompe
+un'installazione vecchia di un anno. Il file non si scrive a mano:
+`node tools/oldest-db.mjs` esegue `migrate.ts` e `seed.ts` di quella release,
+letti da git al suo tag, poi riempie le righe. Quando si alza la release minima
+supportata, si cambia `OLDEST_TAG` nello script, si rigenera il file e si
+accettano di nuovo i due frame, tutto in **un commit a sé**, senza nient'altro
+dentro.
 
 Il **passaggio sull'accessibilità** (roadmap 4.20) viaggia sull'harness visivo: dopo
 che ogni vista si è assestata, `tools/visual-regression.mjs` inietta axe-core e

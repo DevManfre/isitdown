@@ -180,5 +180,10 @@
   "cli.import.tool.statping": "Statping-ng",
   "cli.import.tool.statusgator": "StatusGator",
 
-  "ui.startup.dbCorrupt": "O IsItDown não consegue arrancar: a base de dados em {path} está danificada.\nO SQLite indica: {detail}\n\nNada foi escrito nela. Para voltar a arrancar:\n  1. Pare o IsItDown e ponha de parte o ficheiro danificado, com os ficheiros -wal e -shm ao lado. Guarde-o: `sqlite3 <file> .recover > recovered.sql` pode recuperar linhas que a última cópia não tem.\n  2. Copie para {path} a cópia mais recente — o ficheiro guardado por Definições → Dados → Cópia da base de dados → Transferir a base de dados, chamado isitdown-<data>.db.\n  3. Volte a arrancar o IsItDown. Uma cópia mais antiga é posta no esquema atual por si só. Sem cópia, arrancar com o ficheiro posto de parte começa uma base de dados vazia.\n\nMais em docs/docker.md, \"A database that will not open\"."
+  "ui.startup.dbCorrupt": "O IsItDown não consegue arrancar: a base de dados em {path} está danificada.\nO SQLite indica: {detail}\n\nNada foi escrito nela. Para voltar a arrancar:\n  1. Pare o IsItDown e ponha de parte o ficheiro danificado, com os ficheiros -wal e -shm ao lado. Guarde-o: `sqlite3 <file> .recover > recovered.sql` pode recuperar linhas que a última cópia não tem.\n  2. Copie para {path} a cópia mais recente — o ficheiro guardado por Definições → Dados → Cópia da base de dados → Transferir a base de dados, chamado isitdown-<data>.db.\n  3. Volte a arrancar o IsItDown. Uma cópia mais antiga é posta no esquema atual por si só. Sem cópia, arrancar com o ficheiro posto de parte começa uma base de dados vazia.\n\nMais em docs/docker.md, \"A database that will not open\".",
+
+  "self-monitor.component.polling": "Consulta",
+  "self-monitor.component.adapters": "Adaptadores",
+  "self-monitor.component.notifications": "Notificações",
+  "self-monitor.component.database": "Banco de dados"
 }

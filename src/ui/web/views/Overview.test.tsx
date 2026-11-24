@@ -185,6 +185,21 @@ describe("Overview", () => {
     expect(screen.getByRole("button", { name: i18n.t("action.add-service") })).toBeInTheDocument();
   });
 
+  it("keeps the empty state while the instance's own row is the only provider", async () => {
+    // Roadmap 10.6: the row is seeded on first boot, before the operator has
+    // chosen anything — it must not be what ends the first-run state.
+    renderWithProviders(<Overview />, {
+      status: {
+        providers: [providerFixture({ id: "self", name: "IsItDown", adapter: "self" })],
+        pollIntervalMinutes: 5,
+        lastPollAt: null,
+        nextPollAt: null,
+      },
+      history: { aggregateUptime: 0, months: [], providers: [] },
+    });
+    expect(await screen.findByText(i18n.t("providers.empty-title"))).toBeInTheDocument();
+  });
+
   it("draws a loading skeleton, not the empty state, before /status answers", async () => {
     // A request that never settles: the view is released after its hold cap
     // with no data, which is exactly when it used to claim an empty fleet.

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-16T13:08:58.648Z",
+  "generatedAt": "2026-11-23T15:20:45.707Z",
   "entries": [
     {
       "id": "github",
@@ -526,8 +526,8 @@
     {
       "id": "netdata",
       "name": "Netdata",
-      "adapter": "rss",
-      "baseUrl": "https://status.netdata.cloud/history.rss"
+      "adapter": "statuspage",
+      "baseUrl": "https://status.netdata.cloud"
     },
     {
       "id": "new-relic",
