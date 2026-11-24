@@ -49,6 +49,9 @@ Ogni pagina ha accanto la sua gemella inglese (`docs/<nome>.md`).
 Contribuire: [CONTRIBUTING.md](CONTRIBUTING.md) (setup, controlli, le regole a cui
 risponde una pull request) · [codice di condotta](CODE_OF_CONDUCT.md) · [changelog](CHANGELOG.md).
 
+Sicurezza: [SECURITY.md](SECURITY.md) (versioni supportate, come segnalare una
+vulnerabilità in privato — mai in una issue pubblica).
+
 ## 1. Cosa fa
 
 Ogni pochi minuti IsItDown recupera la status page di ogni provider, normalizza
