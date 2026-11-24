@@ -414,6 +414,51 @@ ogni ciclo:
 | Web push | Serve il servizio push del produttore del browser, quindi l'invio fallisce e compare nel registro delle consegne, come per ogni canale che non riesce a inviare. |
 | Riassunti degli incidenti con l'IA | Serve l'API del fornitore del modello; i riassunti non vengono scritti. |
 
+
+### 4.11 Backup programmati
+
+Il download in Impostazioni → Dati è il backup che qualcuno si ricorda di fare.
+La UI edition ne fa anche uno da sola, secondo una pianificazione cron, in una
+cartella sul server — spento finché non si imposta una pianificazione.
+
+| Variabile | Default | Cosa fa |
+|---|---|---|
+| `BACKUP_CRON` | — (spento) | Espressione cron a cinque campi, letta nel fuso orario dell'istanza: `0 3 * * *` è ogni notte alle tre. Si imposta anche da Impostazioni → Dati → Backup programmati; la variabile vince e blocca il campo. |
+| `BACKUP_KEEP` | `7` | Quante copie programmate tenere (1–365). Le più vecchie vengono cancellate dopo che ne è stata scritta una nuova. Impostabile anche dalla dashboard, stessa regola. |
+| `BACKUP_DIR` | `/app/data/backups` | La cartella. Solo da ambiente: un percorso sul server lo decide un mount. |
+| `BACKUP_WEBDAV_URL` | — | Fa anche una PUT di ogni copia in questa cartella WebDAV (Nextcloud, un NAS). Utente e password, codificati per URL, dentro l'URL: `https://me:pa%40ss@cloud.example/remote.php/dav/files/me/isitdown/`. |
+| `BACKUP_S3_URL` | — | Fa anche una PUT di ogni copia su S3 o su ciò che ne parla il protocollo (MinIO, R2, B2), path style, chiavi nell'URL, regione come parametro: `https://KEY:SECRET@s3.eu-south-1.amazonaws.com/my-bucket/isitdown?region=eu-south-1`. Una PUT firmata, nessun SDK. |
+
+Ogni copia è un `VACUUM INTO` in un file chiamato `isitdown-auto-<ora UTC>-v<versione>.db`,
+controllato con `PRAGMA integrity_check` prima di ricevere il suo nome — un
+disco che si riempie a metà lascia un errore, mai un file che sembra un backup
+e non lo è. La rotazione tocca solo i file con quel prefisso: i download della
+dashboard e le copie pre-aggiornamento di [4.12](#412-aggiornare-e-tornare-indietro)
+nella stessa cartella restano dove sono. Come il download, una copia
+programmata non contiene `secrets.env` né la coppia di chiavi web-push.
+
+Una cartella dentro il volume dei dati sopravvive a un riavvio ma non al disco
+su cui sta, quindi montala da un'altra parte:
+
+```yaml
+services:
+  ui:
+    environment:
+      BACKUP_CRON: "0 3 * * *"
+      BACKUP_KEEP: "14"
+    volumes:
+      - isitdown-data:/app/data
+      - /mnt/nas/isitdown-backups:/app/data/backups
+```
+
+Impostazioni → Dati → Backup programmati mostra l'ultima copia riuscita e
+quando parte la prossima, e ha un pulsante **Esegui backup ora** che ne fa una
+sullo stesso percorso — cartella, rotazione, upload. Una copia fallita è detta
+lì, con il motivo, e rende degradata la riga dell'istanza stessa
+([3.40](configuration.it.md#340-listanza-come-provider--isitdown-che-osserva-se-stesso)) sul suo componente Database: l'avviso arriva
+dagli stessi canali, routing e ore di silenzio di qualunque provider. La
+prossima copia riuscita lo cancella.
+
 ### 4.12 Aggiornare e tornare indietro
 
 Ogni aggiornamento che cambia lo schema del database prima copia il file in

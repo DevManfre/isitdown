@@ -400,6 +400,50 @@ Internet degrades quietly — no error in the log every cycle:
 | Web push | Needs the browser vendor's push service, so delivery fails and shows in the delivery log, like any channel that cannot send. |
 | AI incident summaries | Need the model provider's API; summaries are not written. |
 
+
+### 4.11 Scheduled backups
+
+The download in Settings → Data is the backup somebody remembers to take. The
+UI edition also takes one by itself, on a cron schedule, into a folder on the
+server — off until a schedule is set.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `BACKUP_CRON` | — (off) | Five-field cron expression, read in the instance's time zone: `0 3 * * *` is every night at three. Set from Settings → Data → Scheduled backups too; the variable wins and locks the field. |
+| `BACKUP_KEEP` | `7` | How many scheduled copies to keep (1–365). Older ones are deleted after each new one is written. Settable from the dashboard too, same rule. |
+| `BACKUP_DIR` | `/app/data/backups` | The folder. Environment only: a path on the server is what a mount decides. |
+| `BACKUP_WEBDAV_URL` | — | Also PUT every copy to this WebDAV folder (Nextcloud, a NAS). User and password, URL-encoded, in the URL: `https://me:pa%40ss@cloud.example/remote.php/dav/files/me/isitdown/`. |
+| `BACKUP_S3_URL` | — | Also PUT every copy to S3 or anything that speaks it (MinIO, R2, B2), path style, keys in the URL, region as a parameter: `https://KEY:SECRET@s3.eu-south-1.amazonaws.com/my-bucket/isitdown?region=eu-south-1`. One signed PUT, no SDK. |
+
+Each copy is `VACUUM INTO` a file named `isitdown-auto-<UTC time>-v<version>.db`,
+checked with `PRAGMA integrity_check` before it is given its name — a disk
+that fills half way leaves an error, never a file that looks like a backup and
+is not one. Rotation touches only files with that prefix: the dashboard's own
+downloads and the pre-upgrade copies of [4.12](#412-upgrading-and-rolling-back)
+in the same folder are left alone. Like the download, a scheduled copy leaves
+out `secrets.env` and the web-push key pair.
+
+A folder inside the data volume survives a restart but not the disk it is on,
+so mount it from somewhere else:
+
+```yaml
+services:
+  ui:
+    environment:
+      BACKUP_CRON: "0 3 * * *"
+      BACKUP_KEEP: "14"
+    volumes:
+      - isitdown-data:/app/data
+      - /mnt/nas/isitdown-backups:/app/data/backups
+```
+
+Settings → Data → Scheduled backups shows the last copy that worked and when
+the next one runs, and has a **Back up now** button that takes one on the same
+path — folder, rotation, uploads. A copy that fails is said there, with the
+reason, and turns the instance's own row ([3.40](configuration.md#340-the-instance-as-a-provider--isitdown-watching-itself)) degraded
+on its Database component: the alert reaches you through the same channels,
+routing and quiet hours as any provider's. The next copy that works clears it.
+
 ### 4.12 Upgrading and rolling back
 
 Every upgrade that changes the database schema first copies the file to

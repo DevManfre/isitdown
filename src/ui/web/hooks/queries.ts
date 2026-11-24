@@ -13,7 +13,7 @@ import {
   REFRESH_MS,
   statusRefetchDelay,
 } from "@/lib/statusRefetch.ts";
-import type { DashboardResponse, LatencyRange, RemovedDashboard, StatusResponse } from "@/lib/types.ts";
+import type { BackupSchedule, DashboardResponse, LatencyRange, RemovedDashboard, StatusResponse } from "@/lib/types.ts";
 import { DEFAULT_LAYOUT, type DashboardLayout } from "../../dashboardLayout.ts";
 import { useBusy } from "./useBusy.tsx";
 import { useLive } from "./useLive.tsx";
@@ -879,6 +879,31 @@ export function useStorageMaintenance() {
     mutationFn: api.runStorageMaintenance,
     onSuccess: invalidate,
   });
+}
+
+/**
+ * Scheduled backups — roadmap 10.1. Both writes answer with the schedule as it
+ * now stands, so it is put straight into the cache rather than read again —
+ * and the config is invalidated too, since a run turns the install checklist's
+ * backup check green.
+ */
+export function useBackupSchedule() {
+  const client = useQueryClient();
+  const invalidate = useInvalidateAll();
+  const onSuccess = (schedule: BackupSchedule) => {
+    client.setQueryData(["backup-schedule"], schedule);
+    return invalidate();
+  };
+  return {
+    query: useQuery({ queryKey: ["backup-schedule"], queryFn: api.getBackupSchedule }),
+    save: useMutation({ mutationFn: api.putBackupSchedule, onSuccess }),
+    run: useMutation({
+      mutationFn: api.runBackupNow,
+      onSuccess,
+      // A failed run changed `lastError`: read it back so the row says why.
+      onError: () => client.invalidateQueries({ queryKey: ["backup-schedule"] }),
+    }),
+  };
 }
 
 export function useSettingsMutation() {

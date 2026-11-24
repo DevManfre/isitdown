@@ -1170,6 +1170,23 @@ export interface Preferences {
  * multiplies the last three itself so the projection tracks a half-typed
  * number without a request per keystroke.
  */
+/** Scheduled backups — roadmap 10.1. `GET /config/backup/schedule`. */
+export interface BackupSchedule {
+  /** Empty while scheduled backups are off. */
+  cron: string;
+  keep: number;
+  /** The server's folder the files go into: `BACKUP_DIR`, or `<data>/backups`. */
+  dir: string;
+  /** `env` means `BACKUP_CRON` / `BACKUP_KEEP` set it, and the dashboard cannot. */
+  source: { cron: "env" | "settings" | "default"; keep: "env" | "settings" | "default" };
+  uploads: { kind: "webdav" | "s3"; label: string }[];
+  nextAt: string | null;
+  lastAttemptAt: string | null;
+  lastOkAt: string | null;
+  lastFile: string | null;
+  lastError: string | null;
+}
+
 export interface StorageReport {
   dbBytes: number;
   sampleCount: number;

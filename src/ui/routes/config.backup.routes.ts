@@ -4,9 +4,86 @@ import { resetValidators } from "../../core/http.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { createBackup, restoreBackup } from "../dbBackup.ts";
 import { noteInstallEvent } from "../installHealth.ts";
+import { z } from "zod";
+import { KEEP_MAX, readBackupState } from "../backupSchedule.ts";
+import { parseCron } from "../cron.ts";
+import { writeSettings } from "../dbSettings.ts";
+import { issues } from "./config.shared.ts";
+
+/** Roadmap 10.1: either field alone, as the dashboard's rows save one at a time. */
+const schedulePatchSchema = z
+  .object({
+    cron: z.string().trim().max(100).optional(),
+    keep: z.number().int().min(1).max(KEEP_MAX).optional(),
+  })
+  .strict();
 
 export function configBackupRoutes(runtime: UiRuntimeCore, router: Router): void {
   const db = runtime.db;
+
+  /**
+   * Scheduled backups — roadmap 10.1. The policy in force, where each half of
+   * it came from, the folder, the upload targets (labels only, never a key),
+   * and the last and next run: everything the Data section shows.
+   */
+  const describeSchedule = () => {
+    const policy = runtime.backups.policy();
+    return {
+      cron: policy.cron,
+      keep: policy.keep,
+      dir: policy.dir,
+      source: policy.source,
+      uploads: policy.uploads.map((target) => ({ kind: target.kind, label: target.label })),
+      nextAt: runtime.backups.nextAt(),
+      ...readBackupState(db),
+    };
+  };
+
+  router.get("/config/backup/schedule", (_req, res) => {
+    try {
+      res.json(describeSchedule());
+    } catch (error) {
+      // An upload target the environment names wrongly: said, not a 500 page.
+      res.status(500).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+    }
+  });
+
+  router.put("/config/backup/schedule", (req, res) => {
+    const parsed = schedulePatchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { message: issues(parsed.error) } });
+      return;
+    }
+    const { cron, keep } = parsed.data;
+    if (cron !== undefined && cron !== "") {
+      try {
+        parseCron(cron);
+      } catch (error) {
+        res.status(400).json({ error: { message: error instanceof Error ? error.message : String(error) } });
+        return;
+      }
+    }
+    // A value the environment sets would be saved and then never used: refused
+    // with the reason, rather than accepted and silently shadowed.
+    const policy = runtime.backups.policy();
+    const shadowed = [
+      ...(cron !== undefined && policy.source.cron === "env" ? ["BACKUP_CRON"] : []),
+      ...(keep !== undefined && policy.source.keep === "env" ? ["BACKUP_KEEP"] : []),
+    ];
+    if (shadowed.length > 0) {
+      res.status(409).json({ error: { message: `set by the environment (${shadowed.join(", ")}); change it there` } });
+      return;
+    }
+    writeSettings(db, { backupCron: cron, backupKeep: keep });
+    runtime.backups.reschedule();
+    res.json(describeSchedule());
+  });
+
+  /** A backup now, on the schedule's own path: same folder, rotation and uploads. */
+  router.post("/config/backup/run", async (_req, res) => {
+    const result = await runtime.backups.runNow();
+    res.status(result.ok ? 200 : 500).json({ ...describeSchedule(), ...(result.ok ? {} : { error: { message: result.error } }) });
+  });
 
   /**
    * The whole database, as one file (roadmap 4.4). `VACUUM INTO` rather than a

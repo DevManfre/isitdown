@@ -22,6 +22,7 @@ import { buildNotifiers } from "../notifiers/index.ts";
 import { createApp } from "./app.ts";
 import { createAdapterDebugStore, type AdapterDebugStore } from "./adapterDebug.ts";
 import { seedSelfMonitor, useSelfMonitor } from "./selfMonitor.ts";
+import { createBackupScheduler, type BackupScheduler } from "./backupSchedule.ts";
 import { createBackfillService, type BackfillService } from "./backfill.ts";
 import { readSettings, writeSettings } from "./dbSettings.ts";
 import { listServices, purgeExpiredServices } from "./dbServices.ts";
@@ -150,6 +151,8 @@ export interface UiRuntimeCore {
    * (roadmap 5.18). In memory: diagnostics for the run in front of you.
    */
   adapterDebug: AdapterDebugStore;
+  /** Roadmap 10.1: scheduled backups into a mounted folder. */
+  backups: BackupScheduler;
   /** Roadmap 15.11a: the opt-in "is a newer version out" check against GHCR. */
   updateCheck: UpdateChecker;
   /** The provider catalog in force, and its opt-in signed updates — roadmap 2.2. */
@@ -627,6 +630,11 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   const catalogFeedTimer = setInterval(runCatalogFeed, CATALOG_CHECK_INTERVAL_MS);
   catalogFeedTimer.unref();
 
+  // Roadmap 10.1. Off until a schedule is set, read fresh on every arm so a
+  // change saved from the dashboard reschedules without a restart.
+  const backups = createBackupScheduler({ db, dbPath: options.dbPath, env: options.env, logger, timeZone });
+  if (options.dbPath !== ":memory:") backups.start();
+
   const core: UiRuntimeCore = {
     db,
     dbPath: options.dbPath,
@@ -654,6 +662,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     live,
     pushSubscriptions,
     heartbeats,
+    backups,
     adapterDebug,
     updateCheck: updateChecker,
     catalogFeed,
@@ -681,6 +690,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
       clearInterval(pruneTimer);
       clearInterval(updateCheckTimer);
       clearInterval(catalogFeedTimer);
+      backups.stop();
       mapLane.stop();
       scheduler.stop();
       await scheduler.settled();
