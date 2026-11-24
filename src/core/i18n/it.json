@@ -181,6 +181,10 @@
   "cli.import.tool.statusgator": "StatusGator",
 
   "ui.startup.dbCorrupt": "IsItDown non può partire: il database in {path} è danneggiato.\nSQLite riporta: {detail}\n\nNon vi è stato scritto nulla. Per ripartire:\n  1. Ferma IsItDown e sposta altrove il file danneggiato, insieme ai file -wal e -shm accanto. Conservalo: `sqlite3 <file> .recover > recovered.sql` può recuperare righe che l'ultimo backup non ha.\n  2. Copia in {path} il backup più recente — il file salvato da Impostazioni → Dati → Backup del database → Scarica il database, chiamato isitdown-<data>.db.\n  3. Riavvia IsItDown. Un backup più vecchio viene portato da solo allo schema attuale. Senza backup, ripartire col file spostato altrove inizia un database vuoto.\n\nDettagli in docs/docker.md, \"Un database che non si apre\".",
+  "ui.startup.dbNewer": "IsItDown non può partire: il database in {path} è allo schema {found}, e questa versione arriva solo fino al {known}. Lo ha aggiornato un IsItDown più nuovo ({version}).\n\nNon vi è stato scritto nulla. Puoi:\n  - riavviare l'immagine più nuova; oppure\n  - per restare su questa versione, riportare indietro lo schema prima con quella più nuova: `node dist/ui/server.js --migrate-down {known}`, poi avviare questa; oppure\n  - ripristinare la copia presa prima di quell'aggiornamento, {backup}, che è il database com'era — quello che è stato registrato dopo non c'è.\n\nDettagli in docs/docker.md, \"Aggiornare e tornare indietro\".",
+  "ui.migrateDown.usage": "uso: node dist/ui/server.js --migrate-down <versione dello schema>  (il minimo raggiungibile da questa versione è {floor})",
+  "ui.migrateDown.done": "Il database è sceso dallo schema {from} al {to}. La copia presa prima: {backup}\nAvvia ora l'IsItDown più vecchio — non questo, che lo aggiornerebbe di nuovo.",
+  "ui.migrateDown.failed": "Non è cambiato nulla: {detail}",
 
   "self-monitor.component.polling": "Polling",
   "self-monitor.component.adapters": "Adapter",

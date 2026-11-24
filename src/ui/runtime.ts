@@ -212,7 +212,10 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
   await registerPluginAdapters(options.env, logger);
 
   const db = openDatabase(options.dbPath);
-  migrate(db);
+  // Roadmap 10.2: a newer schema is refused before anything is written, and an
+  // upgrade copies the file to `<data>/backups/pre-v<N>.db` before its first write.
+  const preUpgrade = migrate(db, options.dbPath === ":memory:" ? {} : { backupDir: join(dirname(options.dbPath), "backups") });
+  if (preUpgrade !== null) logger.info("the database was copied before its schema upgrade", { backup: preUpgrade });
   seedDefaults(db, { providers: options.seedProviders ?? true });
   // Before the first cycle, like the plugins: a heartbeat provider row has to
   // resolve to its adapter on the first read (roadmap 2.5).

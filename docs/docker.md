@@ -400,3 +400,36 @@ Internet degrades quietly — no error in the log every cycle:
 | Web push | Needs the browser vendor's push service, so delivery fails and shows in the delivery log, like any channel that cannot send. |
 | AI incident summaries | Need the model provider's API; summaries are not written. |
 
+### 4.12 Upgrading and rolling back
+
+Every upgrade that changes the database schema first copies the file to
+`/app/data/backups/pre-v<schema>.db`, then upgrades it in one transaction.
+If the copy cannot be made — a full disk — the upgrade does not start.
+
+An older image started over a database a newer one has upgraded refuses to
+start, before writing anything: rolling back is a normal operation, and an old
+build reading a schema it does not know could write rows the new one cannot
+trust. It exits with code 1 and says, on stderr, which schema the file is at,
+which IsItDown wrote it, and the ways forward. There are two.
+
+**Take the schema back down, keeping the data.** With the *newer* image — the
+only one that knows what its steps did — run `--migrate-down` with the
+schema the older one knows (the refusal names it), then start the older image:
+
+```bash
+docker compose --profile ui stop ui
+docker compose --profile ui run --rm --no-deps ui node dist/ui/server.js --migrate-down 41
+# now pin the older tag in compose.yml and start it
+docker compose --profile ui up -d
+```
+
+It copies the file to `backups/pre-down-v<schema>.db` first, then drops what
+the newer schema added — the columns and tables, with the rows in them — in one
+transaction. Everything the older schema has a place for stays. Some old steps
+cannot be undone (one cleared web-push subscriptions): `--migrate-down` stops
+at the newest of those and says how far it can go.
+
+**Or put the pre-upgrade copy back.** `backups/pre-v<schema>.db` is the
+database exactly as the older version left it. Restore it the way
+[4.8](#48-a-database-that-will-not-open) restores a backup; anything recorded
+since the upgrade is not in it.

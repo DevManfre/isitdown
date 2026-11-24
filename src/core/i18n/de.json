@@ -181,6 +181,10 @@
   "cli.import.tool.statusgator": "StatusGator",
 
   "ui.startup.dbCorrupt": "IsItDown kann nicht starten: Die Datenbank unter {path} ist beschädigt.\nSQLite meldet: {detail}\n\nEs wurde nichts hineingeschrieben. So geht es weiter:\n  1. IsItDown stoppen und die beschädigte Datei beiseitelegen, samt den -wal- und -shm-Dateien daneben. Aufbewahren: `sqlite3 <file> .recover > recovered.sql` kann Zeilen retten, die dem letzten Backup fehlen.\n  2. Das neueste Backup — die Datei, die Einstellungen → Daten → Datenbanksicherung → Datenbank herunterladen gespeichert hat, isitdown-<Datum>.db — nach {path} kopieren.\n  3. IsItDown neu starten. Ein älteres Backup wird selbst auf das aktuelle Schema gebracht. Ohne Backup beginnt ein Start mit beiseitegelegter Datei eine leere Datenbank.\n\nMehr in docs/docker.md, \"A database that will not open\".",
+  "ui.startup.dbNewer": "IsItDown kann nicht starten: Die Datenbank unter {path} hat Schema {found}, diese Version kennt nur bis {known}. Ein neueres IsItDown ({version}) hat sie aktualisiert.\n\nEs wurde nichts hineingeschrieben. Entweder:\n  - das neuere Image wieder starten; oder\n  - um bei dieser Version zu bleiben, das Schema zuerst mit der neueren zurücksetzen: `node dist/ui/server.js --migrate-down {known}`, dann diese starten; oder\n  - die vor dem Update erstellte Kopie {backup} wiederherstellen — was seither aufgezeichnet wurde, fehlt darin.\n\nMehr in docs/docker.md, \"Upgrading and rolling back\".",
+  "ui.migrateDown.usage": "Aufruf: node dist/ui/server.js --migrate-down <Schemaversion>  (diese Version erreicht mindestens {floor})",
+  "ui.migrateDown.done": "Die Datenbank ging von Schema {from} auf {to} zurück. Die zuvor erstellte Kopie: {backup}\nStarte jetzt das ältere IsItDown — nicht dieses, es würde sie erneut aktualisieren.",
+  "ui.migrateDown.failed": "Nichts geändert: {detail}",
 
   "self-monitor.component.polling": "Abfrage",
   "self-monitor.component.adapters": "Adapter",

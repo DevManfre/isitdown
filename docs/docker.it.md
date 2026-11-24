@@ -414,3 +414,39 @@ ogni ciclo:
 | Web push | Serve il servizio push del produttore del browser, quindi l'invio fallisce e compare nel registro delle consegne, come per ogni canale che non riesce a inviare. |
 | Riassunti degli incidenti con l'IA | Serve l'API del fornitore del modello; i riassunti non vengono scritti. |
 
+### 4.12 Aggiornare e tornare indietro
+
+Ogni aggiornamento che cambia lo schema del database prima copia il file in
+`/app/data/backups/pre-v<schema>.db`, poi lo aggiorna in una sola transazione.
+Se la copia non si può fare — un disco pieno — l'aggiornamento non parte.
+
+Un'immagine più vecchia avviata su un database che una più nuova ha aggiornato
+si rifiuta di partire, prima di scrivere qualsiasi cosa: tornare indietro è
+un'operazione normale, e una build vecchia che legge uno schema che non conosce
+potrebbe scrivere righe di cui la nuova non può fidarsi. Esce con codice 1 e
+dice, su stderr, a che schema è il file, quale IsItDown l'ha scritto e le
+strade possibili. Sono due.
+
+**Riportare indietro lo schema, tenendo i dati.** Con l'immagine *più nuova* —
+l'unica che sa cosa hanno fatto i suoi passi — esegui `--migrate-down` con lo
+schema che conosce quella più vecchia (il rifiuto lo nomina), poi avvia
+l'immagine più vecchia:
+
+```bash
+docker compose --profile ui stop ui
+docker compose --profile ui run --rm --no-deps ui node dist/ui/server.js --migrate-down 41
+# ora fissa il tag più vecchio in compose.yml e avvialo
+docker compose --profile ui up -d
+```
+
+Copia prima il file in `backups/pre-down-v<schema>.db`, poi toglie quello che
+lo schema più nuovo ha aggiunto — colonne e tabelle, con le righe dentro — in
+una sola transazione. Tutto ciò per cui lo schema più vecchio ha un posto
+resta. Alcuni passi vecchi non si possono annullare (uno ha svuotato le
+iscrizioni web-push): `--migrate-down` si ferma al più recente di questi e dice
+fin dove può arrivare.
+
+**Oppure rimettere la copia pre-aggiornamento.** `backups/pre-v<schema>.db` è
+il database esattamente come l'ha lasciato la versione più vecchia.
+Ripristinalo come [4.8](#48-un-database-che-non-si-apre) ripristina un backup;
+quello che è stato registrato dopo l'aggiornamento non c'è.

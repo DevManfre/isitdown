@@ -1,7 +1,57 @@
+import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import pkg from "../../../package.json" with { type: "json" };
 import { rollback } from "./open.ts";
+import { snapshotInto } from "./snapshot.ts";
 
 export const SCHEMA_VERSION = 42;
+
+/**
+ * The `settings` row naming the IsItDown version that last moved the schema —
+ * roadmap 10.2. What an older build reads back to say which version the file
+ * needs, rather than only a schema number nobody can map to a release.
+ */
+export const SCHEMA_WRITTEN_BY_KEY = "schemaWrittenBy";
+
+/** The file holding the database as it was before the upgrade to `version`. */
+export const preUpgradeBackupName = (version: number): string => `pre-v${version}.db`;
+
+/**
+ * A database a newer IsItDown has already upgraded — roadmap 10.2. Thrown
+ * before anything is written to it: rolling an image back is a normal thing to
+ * do, and the older build reading a schema it does not know would at best
+ * ignore columns and at worst write rows the newer one cannot trust.
+ */
+export class NewerDatabaseError extends Error {
+  /** The schema version the file carries. */
+  readonly found: number;
+  /** The newest schema version this build knows. */
+  readonly known: number;
+  /** The IsItDown version that wrote it, when it said. */
+  readonly writtenBy: string | null;
+
+  constructor(found: number, known: number, writtenBy: string | null) {
+    super(`the database is at schema ${found}, newer than the ${known} this version knows`);
+    this.name = "NewerDatabaseError";
+    this.found = found;
+    this.known = known;
+    this.writtenBy = writtenBy;
+  }
+}
+
+export interface MigrateOptions {
+  /**
+   * Where the copy taken before an upgrade goes (`pre-v<N>.db`). Unset — a
+   * restore's scratch file, a test — means no copy: only the instance's own
+   * database is worth one.
+   */
+  backupDir?: string;
+}
+
+export const schemaVersionOf = (db: DatabaseSync): number => {
+  const [row] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
+  return row?.user_version ?? 0;
+};
 
 /**
  * Creates the schema. Idempotent and version-tracked in `PRAGMA user_version`, so
@@ -10,11 +60,23 @@ export const SCHEMA_VERSION = 42;
  * A provider's history hangs off its service row with ON DELETE CASCADE: removing
  * a provider from the dashboard must not leave uptime bars and incidents behind
  * for something no longer monitored.
+ *
+ * Returns the path of the copy taken before upgrading, or null when there was
+ * nothing to upgrade, nothing to copy (a new database) or nowhere to put it.
  */
-export function migrate(db: DatabaseSync): void {
-  const [row] = db.prepare("PRAGMA user_version").all() as { user_version: number }[];
-  const from = row?.user_version ?? 0;
-  if (from >= SCHEMA_VERSION) return;
+export function migrate(db: DatabaseSync, options: MigrateOptions = {}): string | null {
+  const from = schemaVersionOf(db);
+  if (from > SCHEMA_VERSION) throw new NewerDatabaseError(from, SCHEMA_VERSION, writtenBy(db));
+  if (from === SCHEMA_VERSION) return null;
+
+  // Roadmap 10.2: the way back from an upgrade is the file as it was, so it is
+  // taken before the first write — and an upgrade that cannot take it does not
+  // start. A new database (`from` 0) has nothing to keep.
+  let backup: string | null = null;
+  if (from > 0 && options.backupDir !== undefined) {
+    backup = join(options.backupDir, preUpgradeBackupName(SCHEMA_VERSION));
+    snapshotInto(db, backup);
+  }
 
   // One transaction for the whole upgrade: SQLite's DDL and `user_version` are
   // both transactional, so an upgrade that dies half way leaves the previous
@@ -23,10 +85,26 @@ export function migrate(db: DatabaseSync): void {
   db.exec("BEGIN");
   try {
     upgrade(db, from);
+    db.prepare(
+      "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    ).run(SCHEMA_WRITTEN_BY_KEY, pkg.version);
     db.exec("COMMIT");
   } catch (error) {
     rollback(db);
     throw error;
+  }
+  return backup;
+}
+
+/** Which IsItDown last moved the schema; null on a file older than the question. */
+function writtenBy(db: DatabaseSync): string | null {
+  try {
+    const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(SCHEMA_WRITTEN_BY_KEY) as
+      | { value: unknown }
+      | undefined;
+    return typeof row?.value === "string" ? row.value : null;
+  } catch {
+    return null;
   }
 }
 

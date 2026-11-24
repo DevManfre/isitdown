@@ -181,6 +181,10 @@
   "cli.import.tool.statusgator": "StatusGator",
 
   "ui.startup.dbCorrupt": "IsItDown cannot start: the database at {path} is damaged.\nSQLite reports: {detail}\n\nNothing has been written to it. To get going again:\n  1. Stop IsItDown and move the damaged file aside, with the -wal and -shm files beside it. Keep it: `sqlite3 <file> .recover > recovered.sql` can salvage rows your last backup does not have.\n  2. Copy your most recent backup — the file Settings → Data → Database backup → Download database saved, named isitdown-<date>.db — to {path}.\n  3. Start IsItDown again. It brings an older backup up to the current schema by itself. With no backup, starting with the file moved aside begins an empty database.\n\nMore in docs/docker.md, \"A database that will not open\".",
+  "ui.startup.dbNewer": "IsItDown cannot start: the database at {path} is at schema {found}, and this version only knows up to {known}. A newer IsItDown ({version}) upgraded it.\n\nNothing has been written to it. Either:\n  - run the newer image again; or\n  - to stay on this version, take the schema back down with the newer one first: `node dist/ui/server.js --migrate-down {known}`, then start this one; or\n  - restore the copy taken before that upgrade, {backup}, which is the database as it was — anything recorded since is not in it.\n\nMore in docs/docker.md, \"Upgrading and rolling back\".",
+  "ui.migrateDown.usage": "usage: node dist/ui/server.js --migrate-down <schema version>  (the lowest this version can reach is {floor})",
+  "ui.migrateDown.done": "The database went from schema {from} down to {to}. The copy taken first: {backup}\nStart the older IsItDown now — not this one, which would upgrade it again.",
+  "ui.migrateDown.failed": "Nothing changed: {detail}",
 
   "self-monitor.component.polling": "Polling",
   "self-monitor.component.adapters": "Adapters",
