@@ -5,6 +5,7 @@ import { cadenceProblems } from "../adapters/index.ts";
 import type { Logger } from "../core/logger.ts";
 import { FILE_CHANNEL_IDS, fileConfigSchema } from "../light/config/schema.ts";
 import { deliveryOf, readSettings, writeSettings } from "./dbSettings.ts";
+import { SELF_MONITOR_ID } from "./selfMonitorId.ts";
 import {
   insertService,
   listServices,
@@ -78,7 +79,11 @@ export function buildConfigDocument(db: DatabaseSync, logger: Logger): Record<st
     locale: settings.uiLocale,
     // Exactly what the file schema takes, field for field: a service that
     // round-trips through this must come back the same service.
-    services: listServices(db).map((service) => ({
+    // The instance's own row (roadmap 10.6) stays behind: the Light edition has
+    // no such adapter, and a file carrying it would refuse to start.
+    services: listServices(db)
+      .filter((service) => service.adapter !== SELF_MONITOR_ID)
+      .map((service) => ({
       id: service.id,
       name: service.name,
       adapter: service.adapter,
@@ -336,7 +341,8 @@ export function importConfigYaml(db: DatabaseSync, source: string, logger: Logge
 
   const inFile = new Set(file.services.map((service) => service.id));
   for (const id of existing) {
-    if (inFile.has(id)) continue;
+    // Never in an exported file, so a file leaving it out is not asking for it gone.
+    if (inFile.has(id) || id === SELF_MONITOR_ID) continue;
     if (softDeleteService(db, id)) report.removed.push(id);
   }
 
