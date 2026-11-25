@@ -145,8 +145,11 @@ isitdown/
 │   ├── visual-regression.mjs          every view, both themes, every locale against test/visual/baseline (npm run test:visual); helpers in tools/visual/
 │   ├── envelope.mjs                   memory, CPU, startup and database growth at 10 / 100 / 500 providers (npm run measure:envelope, docker.md 4.9)
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   the canary probe, load and mutation tests, fixture recording, release notes, the single-file build, PWA icons
+│   ├── webhook-schema.mjs             schema/webhook-event.v1.json from the zod definition in src/notifiers/webhookEvent.ts (7.11)
 │   ├── build-catalog.mjs              regenerates the catalog from tools/catalog/seed.json and the public lists (2.1)
 │   └── sign-catalog.mjs               signs catalog/catalog.json with $CATALOG_SIGNING_KEY (2.2)
+├── schema/webhook-event.v1.json       the generic webhook's published JSON Schema, checked against the generated one (7.11)
+├── examples/                          an n8n workflow and a Node-RED flow that receive the webhook event
 ├── catalog/                           the published, signed catalog and the last build's report
 ├── test/
 │   ├── core/                          diff engine, poller, scheduler, dispatcher, i18n, schemas

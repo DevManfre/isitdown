@@ -5,6 +5,7 @@ import type { NotificationPayload } from "../core/types.ts";
 import { httpFailure, REQUEST_TIMEOUT_MS } from "./errors.ts";
 import { renderMessage } from "./formatting.ts";
 import { httpUrlSetting } from "./settings.ts";
+import { webhookEvent } from "./webhookEvent.ts";
 
 const settingsSchema = z.object({
   url: httpUrlSetting("url", "webhook"),
@@ -63,7 +64,8 @@ export function verifySignature(
 
 /**
  * Generic webhook: posts the structured change alongside the rendered message,
- * so a consumer can either display the text or route on the fields.
+ * so a consumer can either display the text or route on the fields. The body
+ * is versioned and its JSON Schema published (roadmap 7.11, `webhookEvent.ts`).
  *
  * With a secret configured, the request also carries an HMAC-SHA256 signature
  * over the timestamp and the body (roadmap 3.16), which is what lets a receiver
@@ -79,15 +81,7 @@ export function createWebhookNotifier(settings: Record<string, string>): Notifie
     async send(payload: NotificationPayload): Promise<void> {
       // Serialised once and sent verbatim: a signature over a re-serialised
       // body is a signature over something the receiver never saw.
-      const body = JSON.stringify({
-        change: payload.change,
-        service: payload.service,
-        message: renderMessage(payload),
-        // The provider's last 24 hours as an SVG (roadmap 3.12). Absent unless
-        // the operator turned charts on, so a receiver that never asked for one
-        // sees the body it always saw.
-        ...(payload.chart === undefined ? {} : { chart: { contentType: "image/svg+xml", svg: payload.chart.svg } }),
-      });
+      const body = JSON.stringify(webhookEvent(payload, renderMessage(payload)));
       const timestamp = new Date().toISOString();
 
       const headers: Record<string, string> = { "content-type": "application/json" };

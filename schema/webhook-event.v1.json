@@ -1,0 +1,480 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DevManfre/isitdown/blob/main/schema/webhook-event.v1.json",
+  "title": "IsItDown webhook event",
+  "description": "The body of the generic webhook channel. Fields are added without changing schemaVersion; ignore the ones you do not know.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "change": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "status_change",
+            "component_status_change",
+            "incident_opened",
+            "incident_updated",
+            "incident_resolved",
+            "maintenance_started",
+            "maintenance_ended",
+            "maintenance_upcoming",
+            "monitoring_degraded",
+            "correlated_outage",
+            "correlated_resolved",
+            "periodic_report",
+            "delivery_test",
+            "silent_outage",
+            "sla_burn",
+            "slow_status_page",
+            "channel_failing"
+          ]
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "previousStatus": {
+          "description": "Absent when there is no comparable prior state.",
+          "type": "string",
+          "enum": [
+            "operational",
+            "degraded",
+            "partial_outage",
+            "major_outage",
+            "unknown"
+          ]
+        },
+        "currentStatus": {
+          "type": "string",
+          "enum": [
+            "operational",
+            "degraded",
+            "partial_outage",
+            "major_outage",
+            "unknown"
+          ]
+        },
+        "incident": {
+          "description": "On the incident_* kinds.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "description": "The provider's own title; empty when it gives none.",
+              "type": "string"
+            },
+            "impact": {
+              "description": "The provider's own impact word, e.g. `minor`. Not normalised.",
+              "type": "string"
+            },
+            "status": {
+              "description": "The provider's own lifecycle word, e.g. `investigating`. Not normalised.",
+              "type": "string"
+            },
+            "updatedAt": {
+              "description": "ISO 8601, UTC.",
+              "type": "string"
+            },
+            "createdAt": {
+              "description": "When the provider declared it; absent when the page does not say.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "impact",
+            "status",
+            "updatedAt"
+          ]
+        },
+        "component": {
+          "description": "On component_status_change.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ]
+        },
+        "failureCount": {
+          "description": "On monitoring_degraded.",
+          "type": "number"
+        },
+        "maintenance": {
+          "description": "On the maintenance_* kinds.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "status": {
+              "description": "The provider's own lifecycle word, e.g. `in_progress`. Not normalised.",
+              "type": "string"
+            },
+            "startsAt": {
+              "description": "ISO 8601, UTC.",
+              "type": "string"
+            },
+            "endsAt": {
+              "description": "Null when the provider declares no end.",
+              "anyOf": [
+                {
+                  "description": "ISO 8601, UTC.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "componentIds": {
+              "description": "Components it covers; empty means the whole page.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "status",
+            "startsAt",
+            "endsAt",
+            "componentIds"
+          ]
+        },
+        "openIncidents": {
+          "description": "On maintenance_ended: incidents still open as it closed.",
+          "type": "number"
+        },
+        "startsInMinutes": {
+          "description": "On maintenance_upcoming: whole minutes until it opens, rounded up.",
+          "type": "number"
+        },
+        "correlated": {
+          "description": "On correlated_outage and correlated_resolved.",
+          "type": "object",
+          "properties": {
+            "providerIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "windowMinutes": {
+              "type": "number"
+            },
+            "cause": {
+              "type": "string"
+            },
+            "durationMinutes": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "providerIds",
+            "windowMinutes"
+          ]
+        },
+        "crossCheck": {
+          "description": "On silent_outage.",
+          "type": "object",
+          "properties": {
+            "probeId": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            },
+            "authority": {
+              "type": "string",
+              "enum": [
+                "declared",
+                "observed"
+              ]
+            }
+          },
+          "required": [
+            "probeId"
+          ]
+        },
+        "sla": {
+          "description": "On sla_burn. Percentages as numbers: 99.9.",
+          "type": "object",
+          "properties": {
+            "month": {
+              "description": "`YYYY-MM`, UTC.",
+              "type": "string"
+            },
+            "target": {
+              "type": "number"
+            },
+            "uptime": {
+              "type": "number"
+            },
+            "budgetMinutes": {
+              "type": "number"
+            },
+            "spentMinutes": {
+              "type": "number"
+            },
+            "projectedUptime": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "month",
+            "target",
+            "uptime",
+            "budgetMinutes",
+            "spentMinutes",
+            "projectedUptime"
+          ]
+        },
+        "latency": {
+          "description": "On slow_status_page.",
+          "type": "object",
+          "properties": {
+            "latencyMs": {
+              "type": "number"
+            },
+            "medianMs": {
+              "type": "number"
+            },
+            "thresholdMs": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "latencyMs",
+            "medianMs",
+            "thresholdMs"
+          ]
+        },
+        "channel": {
+          "description": "On channel_failing.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "failures": {
+              "type": "number"
+            },
+            "since": {
+              "description": "ISO 8601, UTC.",
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "failures",
+            "since"
+          ]
+        },
+        "report": {
+          "description": "On periodic_report.",
+          "type": "object",
+          "properties": {
+            "frequency": {
+              "type": "string",
+              "enum": [
+                "weekly",
+                "monthly"
+              ]
+            },
+            "from": {
+              "description": "`YYYY-MM-DD`, inclusive.",
+              "type": "string"
+            },
+            "to": {
+              "description": "`YYYY-MM-DD`, inclusive.",
+              "type": "string"
+            },
+            "fleetUptime": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "incidentCount": {
+              "type": "number"
+            },
+            "worst": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string"
+                  },
+                  "uptime": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "uptime"
+                ]
+              }
+            },
+            "favorites": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string"
+                  },
+                  "uptime": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "uptime"
+                ]
+              }
+            },
+            "sla": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "type": "number"
+                  },
+                  "spentMinutes": {
+                    "type": "number"
+                  },
+                  "budgetMinutes": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "target",
+                  "spentMinutes",
+                  "budgetMinutes"
+                ]
+              }
+            }
+          },
+          "required": [
+            "frequency",
+            "from",
+            "to",
+            "fleetUptime",
+            "incidentCount",
+            "worst",
+            "sla"
+          ]
+        },
+        "at": {
+          "description": "ISO 8601, UTC.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "providerId",
+        "currentStatus",
+        "at"
+      ]
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "statusUrl": {
+          "description": "The provider's public status page.",
+          "type": "string"
+        },
+        "impact": {
+          "description": "The operator's note: what breaks when it does.",
+          "type": "string"
+        },
+        "owner": {
+          "description": "The operator's note: who to call.",
+          "type": "string"
+        },
+        "runbook": {
+          "description": "The runbook's first link, or its first line.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "statusUrl"
+      ]
+    },
+    "message": {
+      "description": "The same text every chat channel sends, rendered in the channel's language.",
+      "type": "string"
+    },
+    "chart": {
+      "description": "The provider's last 24 hours, when the operator turned charts on.",
+      "type": "object",
+      "properties": {
+        "contentType": {
+          "type": "string",
+          "const": "image/svg+xml"
+        },
+        "svg": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contentType",
+        "svg"
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "change",
+    "service",
+    "message"
+  ]
+}
