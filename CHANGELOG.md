@@ -4,7 +4,25 @@ Every release of IsItDown, newest first, grouped by the surface each commit
 touched. Generated from the commit log by `tools/changelog.mjs` — don't edit
 it by hand; the release flow regenerates it.
 
+## v2.49.0 — 2026-11-25
+
+### BACKUP
+
+- ✨ take scheduled backups into a mounted folder, with optional WebDAV and S3 upload
+
+### MIGRATIONS
+
+- 🗃️ refuse a newer database, back up before upgrading, add --migrate-down
+
+### COMPLEXITY
+
+- 🔧 raise the environment variable ceiling to 49 for scheduled backups
+
 ## v2.48.0 — 2026-11-24
+
+### RELEASE
+
+- 🔖 bump the version to 2.48.0
 
 ### VISUAL
 
@@ -21,6 +39,7 @@ it by hand; the release flow regenerates it.
 
 ### CATALOG
 
+- 🍱 publish the signed provider catalog
 - 🍱 regenerate the provider catalog (207 providers)
 
 ## v2.47.0 — 2026-11-23
