@@ -26,3 +26,9 @@ IsItDown is maintained by one person. Reports are read and handled on a best
 effort basis: you will get an answer once the report has been looked at, the
 fix ships in a regular release, and the advisory is published after it. There
 is no guaranteed response or fix time.
+
+## Threat model
+
+What IsItDown trusts, what it stores where, and what is out of scope (several
+users, exposure to the Internet without a proxy) is in
+[docs/security.md](docs/security.md).

@@ -9,7 +9,7 @@ IsItDown is a Dockerized service that polls the public status pages of third-par
 - **Light**: polling + notifications only, config via `config.yml`, no HTTP server. Image: `ghcr.io/devmanfre/isitdown:light-latest`.
 - **UI**: adds a local web dashboard (status grid, uptime charts, incident timeline) and runtime configuration via SQLite instead of a static file. Image: `ghcr.io/devmanfre/isitdown:ui-latest`.
 
-Full architecture, data flow, and rationale live in the manual: `README.md` is the landing page (what it is, how to start it), and `docs/` carries one file per section — `configuration.md`, `docker.md`, `verifying.md`, `api.md`, `how-it-works.md`, `theming.md`, `development.md` (roadmap 7.5). Each has an `.it.md` twin beside it. Read the relevant page before making structural changes.
+Full architecture, data flow, and rationale live in the manual: `README.md` is the landing page (what it is, how to start it), and `docs/` carries one file per section — `configuration.md`, `docker.md`, `verifying.md`, `api.md`, `how-it-works.md`, `theming.md`, `development.md` (roadmap 7.5), `security.md` (the threat model, roadmap 9.7). Each has an `.it.md` twin beside it. Read the relevant page before making structural changes.
 
 ## Repo layout (source of truth)
 
