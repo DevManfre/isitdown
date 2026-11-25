@@ -712,7 +712,7 @@ to what they cover.
 
 ### 9.6 Releasing
 
-Two workflows, and the version lives in exactly one place.
+Three workflows, and the version lives in exactly one place.
 
 `.github/workflows/ci.yml` runs on every pull request and on every push to `dev`
 or `main`, as jobs side by side on their own runners — typecheck, lint and
@@ -735,11 +735,34 @@ git commit -am "🔖 RELEASE - bump the version to X.Y.Z"
 the new version, so a retry bumps twice. Bump `package.json` and
 `package-lock.json` (`version` and `packages[""].version`) by hand. The
 `release-flow` skill has the whole sequence, from the bump on `dev` through the
-pull request into `main` to the tag.
+pull request into `main` to the published release.
 
-Pushing the tag runs `.github/workflows/release.yml`, which first waits for CI's
-`verify` check on the tagged commit (a tag push does not trigger CI itself, so
-it reads the run the `main` push started) and stops if it failed, refuses to
+Merging the release pull request (`release/vX.Y.Z`) into `main` is the release:
+`.github/workflows/tag-release.yml` runs on every push to `main`, and when the
+`package.json` version differs from the one `main` had before the push (or the
+push is the merge of `release/v<version>`) and `v<version>` has no tag yet, it
+creates the annotated tag on that commit and calls `release.yml` with it. Any
+other push to `main` ends there with nothing created. The tag is pushed with
+the workflow's own `GITHUB_TOKEN` — no personal token, no extra secret — and,
+by GitHub's rule, a tag pushed that way starts no workflow, which is why
+`release.yml` is called as a reusable workflow instead of waiting for the tag
+push, and why the same release never runs twice.
+
+Pushing a `vX.Y.Z` tag by hand still works and is the fallback — for a commit
+the automatic path skipped, or to re-run a release after deleting its tag:
+
+```bash
+git tag -a vX.Y.Z origin/main -m "🔖 RELEASE - vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+A tag pushed by hand before the merge lands makes `tag-release.yml` exit, so
+that release runs once, from the tag push; the release job is also serialised
+per tag, so two runs of one version never publish side by side.
+
+Either way `.github/workflows/release.yml` runs on the tag, and first waits
+for CI's `verify` check on the tagged commit (a tag does not trigger CI itself,
+so it reads the run the `main` push started) and stops if it failed, refuses to
 continue if the tag and
 `package.json` disagree, builds both targets for `linux/amd64` and
 `linux/arm64` — the build stage runs once on the runner's own platform, since

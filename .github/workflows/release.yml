@@ -1,7 +1,8 @@
-# Tag-driven release: `npm version <patch|minor|major>` creates the commit and
-# the `vX.Y.Z` tag, pushing the tag runs this. The workflow verifies the tag
-# against package.json and then reads the version out of package.json — the tag
-# is a trigger, not a second source of truth.
+# Tag-driven release, run two ways: tag-release.yml calls it with the tag it
+# has just created when a release is merged into `main`, and pushing a
+# `vX.Y.Z` tag by hand runs it directly. The workflow verifies the tag against
+# package.json and then reads the version out of package.json — the tag is a
+# trigger, not a second source of truth.
 #
 # Both editions come out of the same Dockerfile and the `ui` stage starts FROM
 # `light`, so one buildx invocation per target is enough; there is no
@@ -11,6 +12,12 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_call:
+    inputs:
+      tag:
+        description: The `vX.Y.Z` tag to release, already pushed
+        required: true
+        type: string
 
 permissions:
   contents: write # create the GitHub release
@@ -21,16 +28,30 @@ permissions:
 env:
   # GHCR rejects an uppercase reference, and the owner is spelled DevManfre.
   IMAGE: ghcr.io/devmanfre/isitdown
+  # Called, github.ref_name is the caller's branch (`main`); the tag comes in
+  # as an input. Pushed, there is no input and the ref is the tag.
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    # One release per tag at a time, whichever way it started; a second one
+    # queues behind the first rather than pushing the same images beside it.
+    concurrency:
+      group: release-${{ inputs.tag || github.ref_name }}
+      cancel-in-progress: false
     steps:
       # Full history: the release notes are generated from the commits since
-      # the previous tag.
+      # the previous tag. The tag, not the caller's `main`, is what is built.
       - uses: actions/checkout@v5
         with:
+          ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
+
+      # The commit the tag points at — for a pushed tag the same one as
+      # GITHUB_SHA, for a called run the `main` commit that was tagged.
+      - name: Resolve the tagged commit
+        run: echo "RELEASE_SHA=$(git rev-parse "refs/tags/$TAG^{commit}")" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v5
         with:
@@ -51,24 +72,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           for attempt in $(seq 1 120); do
-            state=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?check_name=verify" \
+            state=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/check-runs?check_name=verify" \
               -q '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.started_at) | last | "\(.status // "missing") \(.conclusion // "")"')
             case "$state" in
-              "completed success") echo "CI passed on $GITHUB_SHA"; exit 0 ;;
-              completed*) echo "CI did not pass on $GITHUB_SHA: $state" >&2; exit 1 ;;
+              "completed success") echo "CI passed on $RELEASE_SHA"; exit 0 ;;
+              completed*) echo "CI did not pass on $RELEASE_SHA: $state" >&2; exit 1 ;;
             esac
-            echo "CI on $GITHUB_SHA: $state — waiting"
+            echo "CI on $RELEASE_SHA: $state — waiting"
             sleep 15
           done
-          echo "no finished CI run on $GITHUB_SHA after 30 minutes" >&2
+          echo "no finished CI run on $RELEASE_SHA after 30 minutes" >&2
           exit 1
 
       - name: Read the version from package.json
         id: version
         run: |
           version=$(node -p "require('./package.json').version")
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "tag $GITHUB_REF_NAME does not match package.json version $version" >&2
+          if [ "v$version" != "$TAG" ]; then
+            echo "tag $TAG does not match package.json version $version" >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -129,7 +150,7 @@ jobs:
 
       # Grouped by commit TITLE — see tools/release-notes.mjs.
       - name: Generate the release notes
-        run: node tools/release-notes.mjs "$GITHUB_REF_NAME" > release-notes.md
+        run: node tools/release-notes.mjs "$TAG" > release-notes.md
 
       # The single-file Light edition (roadmap 6.7), for an operator who wants
       # neither Docker nor a Node install. Built on the runner whose Node is
@@ -141,15 +162,18 @@ jobs:
 
       - name: Name the binary after the release
         run: |
-          mv dist/sea/isitdown-light "isitdown-light-${GITHUB_REF_NAME}-linux-x64"
-          sha256sum "isitdown-light-${GITHUB_REF_NAME}-linux-x64" > "isitdown-light-${GITHUB_REF_NAME}-linux-x64.sha256"
+          mv dist/sea/isitdown-light "isitdown-light-${TAG}-linux-x64"
+          sha256sum "isitdown-light-${TAG}-linux-x64" > "isitdown-light-${TAG}-linux-x64.sha256"
 
+      # tag_name explicit: its default is github.ref, which a called run has
+      # pointing at `main`.
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
           body_path: release-notes.md
           make_latest: true
           # Attached rather than pushed anywhere: a 120MB binary is a download
           # an operator asks for once, not something a registry should carry.
           files: |
-            isitdown-light-${{ github.ref_name }}-linux-x64
-            isitdown-light-${{ github.ref_name }}-linux-x64.sha256
+            isitdown-light-${{ env.TAG }}-linux-x64
+            isitdown-light-${{ env.TAG }}-linux-x64.sha256
