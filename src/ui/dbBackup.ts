@@ -60,6 +60,16 @@ const TABLES = [
 const VAPID_KEYS = ["vapidPublicKey", "vapidPrivateKey"] as const;
 const VAPID_MARKS = VAPID_KEYS.map(() => "?").join(", ");
 
+/**
+ * Takes the VAPID pair out of a copy, then VACUUMs it so the deleted rows do
+ * not linger in free pages. Shared by the download and the scheduled backup
+ * (roadmap 10.1): both are files that get moved around.
+ */
+export function stripVapidKeys(copy: DatabaseSync): void {
+  copy.prepare(`DELETE FROM settings WHERE key IN (${VAPID_MARKS})`).run(...VAPID_KEYS);
+  copy.exec("VACUUM");
+}
+
 export interface BackupSnapshot {
   bytes: Buffer;
   /** What the download is called; the date is the operator's own filing system. */
@@ -103,8 +113,7 @@ export function createBackup(db: DatabaseSync, at: Date = new Date()): BackupSna
     // rows do not linger in free pages of the bytes handed out.
     const copy = new DatabaseSync(target);
     try {
-      copy.prepare(`DELETE FROM settings WHERE key IN (${VAPID_MARKS})`).run(...VAPID_KEYS);
-      copy.exec("VACUUM");
+      stripVapidKeys(copy);
     } finally {
       copy.close();
     }

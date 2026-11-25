@@ -18,6 +18,7 @@ export type FixtureKey =
   | "summary"
   | "providerPush"
   | "storage"
+  | "backupSchedule"
   | "installHealth"
   | "history"
   | "incidents"
@@ -77,6 +78,8 @@ export interface Fixtures {
   serviceImpact?: unknown;
   /** `/config/storage`, matched before `/config` — the retention cost report. */
   storage?: unknown;
+  /** `/config/backup/schedule` and `/config/backup/run`, matched before `/config` — roadmap 10.1. */
+  backupSchedule?: unknown;
   /** `/config/health`, matched before `/config` — roadmap 5.15 and 5.16. */
   installHealth?: unknown;
   /** `/debug/adapters` — the adapter diagnostics panel's recent reads. */
@@ -172,6 +175,8 @@ export function fixtureKeyFor(path: string): FixtureKey {
                         ? "serviceImpact"
                         : path.startsWith("/config/storage")
                           ? "storage"
+                          : path.startsWith("/config/backup/schedule") || path.startsWith("/config/backup/run")
+                            ? "backupSchedule"
                           : path.startsWith("/config/catalog")
                             ? "catalog"
                             : path.startsWith("/config/provider-push")
@@ -224,6 +229,18 @@ export async function fakeResponse(
   // `cells`, no `byWeekdayHour` or no `annotations` is a shape no server
   // ever produces — a crash there would be the harness's, not the view's.
   const EMPTY: Partial<Record<FixtureKey, unknown>> = {
+    backupSchedule: {
+      cron: "",
+      keep: 7,
+      dir: "/app/data/backups",
+      source: { cron: "default", keep: "default" },
+      uploads: [],
+      nextAt: null,
+      lastAttemptAt: null,
+      lastOkAt: null,
+      lastFile: null,
+      lastError: null,
+    },
     providerCalendar: {
       providerId: "",
       days: 365,

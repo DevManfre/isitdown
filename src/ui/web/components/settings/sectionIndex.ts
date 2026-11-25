@@ -78,6 +78,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       "settings.backup.label",
       "settings.backup.import",
       "settings.restore.label",
+      "settings.backup-schedule.label",
       "field.update-check",
       "field.catalog-feed",
       "series.settings.label",

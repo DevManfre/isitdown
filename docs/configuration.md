@@ -701,6 +701,11 @@ notification (roadmap 4.5).
 | `HEARTBEAT_URL` | both | — | Pinged after every poll cycle that completed — IsItDown's own dead-man's switch ([3.39](#339-pinging-out--isitdowns-own-dead-mans-switch)). A Healthchecks.io or Uptime Kuma push URL. In the Light edition, `heartbeat.url` in `config.yml` wins. |
 | `HEARTBEAT_FAIL_URL` | both | — | Pinged after a cycle that failed (unreadable config, locked database) — Healthchecks.io's `/fail` URL. |
 | `HEARTBEAT_METHOD` | both | `GET` | `GET` or `POST`. `POST` sends a one-line text body: the cycle's summary, or why it failed. |
+| `BACKUP_CRON` | UI | — (off) | Scheduled backups: a five-field cron expression, read in the instance's time zone ([4.11](docker.md#411-scheduled-backups)). Wins over Settings → Data and locks the field there. |
+| `BACKUP_KEEP` | UI | `7` | How many scheduled backups to keep, 1–365. Wins over the dashboard. |
+| `BACKUP_DIR` | UI | `<data>/backups` | Where scheduled backups go. Mount it from another disk. |
+| `BACKUP_WEBDAV_URL` | UI | — | Also upload each scheduled backup to this WebDAV folder; credentials in the URL. |
+| `BACKUP_S3_URL` | UI | — | Also upload each scheduled backup to S3 or an S3-compatible store: `https://KEY:SECRET@host/bucket/prefix?region=…`. |
 | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | both, outpost | — | Every HTTP request goes through this proxy; hosts in `NO_PROXY` do not. Upper or lower case. See [Proxies and networks with no Internet](docker.md#410-proxies-and-networks-with-no-internet). |
 | `BIND_HOST` | UI | `127.0.0.1` | The address the dashboard listens on. Loopback by default, which is what keeps an instance with no `API_TOKEN` reachable only from this machine; the container images set `0.0.0.0` (the compose `ports` mapping then decides who can reach it, and publishes on `127.0.0.1` only). To reach the dashboard from another machine, publish on `0.0.0.0` (or set `BIND_HOST` on bare metal) **and** set `API_TOKEN` — see [3.12](#312-reaching-the-api-from-another-host) for what a request off this machine may then do. |
 | `PORT` | UI, outpost | `3000` (`8080` for the outpost) | HTTP port. |
@@ -3397,7 +3402,7 @@ history and four components.
 | Polling | no cycle has started for more than twice the poll interval, or the last three cycles each took over half of it |
 | Adapters | another enabled provider has failed as many reads in a row as `failureThreshold` ([3.1](#31-light-edition--configyml)), the same count that marks its own view degraded |
 | Notifications | a notification failed for good, every retry spent, in the last 24 hours |
-| Database | less than 256 MiB is free on the filesystem holding the database |
+| Database | less than 256 MiB is free on the filesystem holding the database, or the latest scheduled backup failed ([4.11](docker.md#411-scheduled-backups)) |
 
 The provider is degraded while any component is, and never down: an instance
 that can answer is not down. A gap from before the current process started is

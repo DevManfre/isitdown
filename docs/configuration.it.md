@@ -723,6 +723,11 @@ prova reale (roadmap 4.5).
 | `HEARTBEAT_URL` | entrambe | — | Chiamato dopo ogni ciclo di polling completato: il dead-man's switch di IsItDown stesso ([3.39](#339-ping-in-uscita--il-dead-mans-switch-di-isitdown)). Un URL di Healthchecks.io o di un monitor push di Uptime Kuma. Nella Light vince `heartbeat.url` in `config.yml`. |
 | `HEARTBEAT_FAIL_URL` | entrambe | — | Chiamato dopo un ciclo fallito (config illeggibile, database bloccato): l'URL `/fail` di Healthchecks.io. |
 | `HEARTBEAT_METHOD` | entrambe | `GET` | `GET` o `POST`. `POST` invia una riga di testo: il riepilogo del ciclo, o il motivo del fallimento. |
+| `BACKUP_CRON` | UI | — (spento) | Backup programmati: un'espressione cron a cinque campi, letta nel fuso orario dell'istanza ([4.11](docker.it.md#411-backup-programmati)). Vince su Impostazioni → Dati e lì blocca il campo. |
+| `BACKUP_KEEP` | UI | `7` | Quanti backup programmati tenere, 1–365. Vince sulla dashboard. |
+| `BACKUP_DIR` | UI | `<data>/backups` | Dove vanno i backup programmati. Montala da un altro disco. |
+| `BACKUP_WEBDAV_URL` | UI | — | Carica anche ogni backup programmato in questa cartella WebDAV; credenziali nell'URL. |
+| `BACKUP_S3_URL` | UI | — | Carica anche ogni backup programmato su S3 o uno storage compatibile: `https://KEY:SECRET@host/bucket/prefix?region=…`. |
 | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | entrambe, outpost | — | Ogni richiesta HTTP passa da questo proxy; gli host in `NO_PROXY` no. Maiuscole o minuscole. Vedi [Proxy e reti senza Internet](docker.it.md#410-proxy-e-reti-senza-internet). |
 | `BIND_HOST` | UI | `127.0.0.1` | L'indirizzo su cui la dashboard è in ascolto. Per impostazione predefinita è il loopback, ciò che mantiene un'istanza senza `API_TOKEN` raggiungibile solo da questa macchina; le immagini container impostano `0.0.0.0` (la mappatura `ports` di compose decide poi chi può raggiungerla, e pubblica solo su `127.0.0.1`). Per raggiungere la dashboard da un'altra macchina, pubblica su `0.0.0.0` (o imposta `BIND_HOST` su bare metal) **e** imposta `API_TOKEN` — vedi [3.12](#312-raggiungere-lapi-da-un-altro-host) per ciò che una richiesta da fuori questa macchina può fare. |
 | `PORT` | UI, outpost | `3000` (`8080` per l'outpost) | Porta HTTP. |
@@ -3538,7 +3543,7 @@ uptime e quattro componenti.
 | Polling | nessun ciclo parte da più del doppio dell'intervallo di poll, oppure gli ultimi tre cicli hanno impiegato ciascuno più della sua metà |
 | Adapter | un altro provider attivo ha fallito tante letture di fila quante ne dice `failureThreshold` ([3.1](#31-edizione-light--configyml)), lo stesso conteggio che segna come degradata la sua vista |
 | Notifiche | una notifica è fallita del tutto, esauriti i tentativi, nelle ultime 24 ore |
-| Database | sul filesystem che ospita il database restano meno di 256 MiB liberi |
+| Database | sul filesystem che ospita il database restano meno di 256 MiB liberi, o l'ultimo backup programmato è fallito ([4.11](docker.it.md#411-backup-programmati)) |
 
 Il provider è degradato finché lo è un componente, e mai giù: un'istanza che
 risponde non è giù. Un vuoto precedente all'avvio del processo attuale è un

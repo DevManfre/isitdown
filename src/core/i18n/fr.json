@@ -181,6 +181,10 @@
   "cli.import.tool.statusgator": "StatusGator",
 
   "ui.startup.dbCorrupt": "IsItDown ne peut pas démarrer : la base de données {path} est endommagée.\nSQLite signale : {detail}\n\nRien n'y a été écrit. Pour repartir :\n  1. Arrêtez IsItDown et mettez le fichier endommagé de côté, avec les fichiers -wal et -shm à côté. Gardez-le : `sqlite3 <file> .recover > recovered.sql` peut récupérer des lignes que votre dernière sauvegarde n'a pas.\n  2. Copiez vers {path} votre sauvegarde la plus récente — le fichier enregistré par Réglages → Données → Sauvegarde de la base de données → Télécharger la base, nommé isitdown-<date>.db.\n  3. Redémarrez IsItDown. Une sauvegarde plus ancienne est mise au schéma actuel d'elle-même. Sans sauvegarde, démarrer avec le fichier mis de côté commence une base vide.\n\nPlus dans docs/docker.md, \"A database that will not open\".",
+  "ui.startup.dbNewer": "IsItDown ne peut pas démarrer : la base de données {path} est au schéma {found}, et cette version ne connaît que jusqu'au {known}. Un IsItDown plus récent ({version}) l'a mise à jour.\n\nRien n'y a été écrit. Au choix :\n  - relancer l'image plus récente ; ou\n  - pour rester sur cette version, redescendre d'abord le schéma avec la plus récente : `node dist/ui/server.js --migrate-down {known}`, puis démarrer celle-ci ; ou\n  - restaurer la copie prise avant cette mise à jour, {backup} — ce qui a été enregistré depuis n'y est pas.\n\nPlus dans docs/docker.md, « Upgrading and rolling back ».",
+  "ui.migrateDown.usage": "usage : node dist/ui/server.js --migrate-down <version du schéma>  (le plus bas que cette version atteint est {floor})",
+  "ui.migrateDown.done": "La base de données est passée du schéma {from} au {to}. La copie prise avant : {backup}\nDémarrez maintenant l'IsItDown plus ancien — pas celui-ci, qui la remettrait à jour.",
+  "ui.migrateDown.failed": "Rien n'a changé : {detail}",
 
   "self-monitor.component.polling": "Interrogation",
   "self-monitor.component.adapters": "Adaptateurs",

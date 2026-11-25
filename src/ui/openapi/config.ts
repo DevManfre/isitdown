@@ -288,6 +288,38 @@ export const configPaths: Json = {
       },
     },
   },
+  "/config/backup/schedule": {
+    get: {
+      tags: ["Configuration"],
+      summary: "Scheduled backups: the policy in force, where each half came from, and the last and next run.",
+      description:
+        "Roadmap 10.1. `cron` is empty while scheduled backups are off. `source.cron` and `source.keep` are `env` when `BACKUP_CRON` / `BACKUP_KEEP` set them — the dashboard cannot change those. `uploads` lists the WebDAV / S3 targets the environment names, by label only. `lastError` is set while the latest attempt failed.",
+      responses: { "200": ok(ref("BackupSchedule")) },
+    },
+    put: {
+      tags: ["Configuration"],
+      summary: "Change the schedule or how many copies are kept.",
+      requestBody: {
+        required: true,
+        ...json(obj({ cron: { type: "string", maxLength: 100 }, keep: { type: "integer", minimum: 1, maximum: 365 } }, [])),
+      },
+      responses: {
+        "200": ok(ref("BackupSchedule")),
+        "400": badRequest,
+        "409": { description: "That field is set by the environment.", ...json(ref("Error")) },
+      },
+    },
+  },
+  "/config/backup/run": {
+    post: {
+      tags: ["Configuration"],
+      summary: "Take a scheduled backup now: same folder, rotation and uploads.",
+      responses: {
+        "200": ok(ref("BackupSchedule")),
+        "500": { description: "The backup failed; `lastError` says why.", ...json(ref("BackupSchedule")) },
+      },
+    },
+  },
   "/config/restore": {
     post: {
       tags: ["Configuration"],
@@ -728,6 +760,18 @@ export const configSchemas: Json = {
     name: str,
     createdAt: str,
     services: { ...int, description: "Providers the snapshot holds." },
+  }),
+  BackupSchedule: obj({
+    cron: str,
+    keep: int,
+    dir: str,
+    source: obj({ cron: { type: "string", enum: ["env", "settings", "default"] }, keep: { type: "string", enum: ["env", "settings", "default"] } }),
+    uploads: { type: "array", items: obj({ kind: { type: "string", enum: ["webdav", "s3"] }, label: str }) },
+    nextAt: nullableStr,
+    lastAttemptAt: nullableStr,
+    lastOkAt: nullableStr,
+    lastFile: nullableStr,
+    lastError: nullableStr,
   }),
   ConfigHistoryEntry: obj({
     id: int,
