@@ -744,7 +744,7 @@ accanto a ciò che coprono.
 
 ### 9.6 Rilasci
 
-Due workflow, e la versione vive in un posto solo.
+Tre workflow, e la versione vive in un posto solo.
 
 `.github/workflows/ci.yml` gira su ogni pull request e su ogni push su `dev` o
 `main`, come job affiancati su runner propri — typecheck, lint e parità
@@ -767,10 +767,36 @@ git commit -am "🔖 RELEASE - bump the version to X.Y.Z"
 nuova versione, quindi un secondo tentativo fa un doppio bump. Si aggiornano
 `package.json` e `package-lock.json` (`version` e `packages[""].version`) a mano.
 La skill `release-flow` ha la sequenza completa, dal bump su `dev` alla pull
-request verso `main` fino al tag.
+request verso `main` fino alla release pubblicata.
 
-Il push del tag avvia `.github/workflows/release.yml`, che prima attende il check
-`verify` della CI sul commit taggato (un push di tag non fa scattare la CI da
+Il merge della pull request di rilascio (`release/vX.Y.Z`) su `main` è il
+rilascio: `.github/workflows/tag-release.yml` gira a ogni push su `main`, e
+quando la versione di `package.json` è diversa da quella che `main` aveva prima
+del push (o il push è il merge di `release/v<versione>`) e `v<versione>` non ha
+ancora un tag, crea il tag annotato su quel commit e richiama `release.yml` con
+quel tag. Ogni altro push su `main` finisce lì senza creare nulla. Il tag viene
+pubblicato con il `GITHUB_TOKEN` del workflow stesso — nessun token personale,
+nessun segreto in più — e, per una regola di GitHub, un tag pubblicato così non
+avvia alcun workflow: per questo `release.yml` è richiamato come workflow
+riutilizzabile invece di aspettare il push del tag, ed è per questo che lo
+stesso rilascio non parte mai due volte.
+
+Il push a mano di un tag `vX.Y.Z` funziona ancora ed è l'alternativa — per un
+commit che il percorso automatico ha saltato, o per ripetere un rilascio dopo
+averne cancellato il tag:
+
+```bash
+git tag -a vX.Y.Z origin/main -m "🔖 RELEASE - vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+Un tag pubblicato a mano prima che arrivi il merge fa uscire `tag-release.yml`,
+quindi quel rilascio parte una volta sola, dal push del tag; inoltre il job di
+rilascio è serializzato per tag, così due run della stessa versione non
+pubblicano mai in parallelo.
+
+In entrambi i casi `.github/workflows/release.yml` gira sul tag: prima attende
+il check `verify` della CI sul commit taggato (un tag non fa scattare la CI da
 solo, quindi legge il run avviato dal push di `main`) e si ferma se è fallito, si
 rifiuta di procedere se tag e
 `package.json` non concordano, costruisce entrambi i target per `linux/amd64` e

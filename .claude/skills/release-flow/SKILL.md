@@ -86,7 +86,15 @@ git switch main && git pull --ff-only origin main
 
 `SKIP_VISUAL=1` because the pre-push hook would rebuild and screenshot a tree whose baselines CI has just checked on `dev`. Run the `gh pr checks` watch in the background like the others; a failing check means stop, not `--admin`. The PR title and the merge subject follow `git-commit-style`; the body carries no Claude attribution. The merge itself pushes `main`, so there is no separate `git push origin main`; `--delete-branch` removes the release branch on both sides, and the `pull` brings the merge commit down for the tag. Don't wait for `main`'s CI here: step 3's workflow waits for it.
 
-## 3. Tag and gate on the Release workflow
+## 3. Gate on the Release workflow
+
+The merge tags the release: `tag-release.yml` runs on the `main` push, sees the new `package.json` version, creates `vX.Y.Z` on the merge commit and calls `release.yml` with it. Don't push the tag yourself — watch that run:
+
+```bash
+gh run watch "$(gh run list --workflow tag-release.yml --branch main --limit 1 --json databaseId -q '.[0].databaseId')" --exit-status --interval 30
+```
+
+If its `tag` job ended without creating the tag (the log says why: tag already there, version unchanged), tag by hand and watch the Release workflow instead:
 
 ```bash
 git tag -a vX.Y.Z origin/main -m "🔖 RELEASE - vX.Y.Z"
