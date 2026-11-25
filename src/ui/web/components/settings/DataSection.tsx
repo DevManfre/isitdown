@@ -10,6 +10,7 @@ import { SettingsSection } from "@/components/SettingsSection.tsx";
 import { ChangesDialog } from "@/components/settings/ChangesDialog.tsx";
 import { HistoryDialog } from "@/components/settings/HistoryDialog.tsx";
 import { SnapshotsDialog } from "@/components/settings/SnapshotsDialog.tsx";
+import { BackupScheduleRow } from "@/components/settings/BackupScheduleRow.tsx";
 import { CatalogUpdatesRow } from "@/components/settings/CatalogUpdatesRow.tsx";
 import { OperatorSeriesRows } from "@/components/settings/OperatorSeriesRows.tsx";
 import { UsageReportRow } from "@/components/settings/UsageReportRow.tsx";
@@ -417,6 +418,10 @@ export function DataSection({
           }}
         />
       </SettingRow>
+
+      {/* Roadmap 10.1. Beside the download because it is the same file, taken
+      on a schedule instead of by hand. */}
+      <BackupScheduleRow />
 
       {/* Roadmap 15.11a. Off by default: the switch is the whole form. The
       disclosure below is always visible, even with the switch off — what

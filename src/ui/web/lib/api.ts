@@ -21,6 +21,7 @@ import type {
   HistoryEntry,
   DbRestoreReport,
   IncidentNote,
+  BackupSchedule,
   DbMaintenanceReport,
   DeliveryLogResponse,
   DeliveryState,
@@ -493,6 +494,11 @@ export const getInstallHealth = () =>
 /** Integrity check then vacuum, on demand — roadmap 6.13. */
 export const runStorageMaintenance = () =>
   request<DbMaintenanceReport>("POST", "/config/storage/maintenance");
+/** Scheduled backups — roadmap 10.1. */
+export const getBackupSchedule = () => request<BackupSchedule>("GET", "/config/backup/schedule");
+export const putBackupSchedule = (patch: { cron?: string; keep?: number }) =>
+  request<BackupSchedule>("PUT", "/config/backup/schedule", patch);
+export const runBackupNow = () => request<BackupSchedule>("POST", "/config/backup/run");
 /** The adapter debug panel's two halves — roadmap 5.18. */
 export const getAdapterDebug = () =>
   request<AdapterDebugResponse>("GET", "/debug/adapters");

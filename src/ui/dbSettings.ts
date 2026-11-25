@@ -117,6 +117,13 @@ const settingsSchema = z.object({
    * anyone who wants year-on-year comparisons more than they want the disk.
    */
   retentionDays: z.coerce.number().int().min(7).max(3650).catch(120),
+  /**
+   * Scheduled backups (roadmap 10.1): a five-field cron expression, empty for
+   * off — the default, since where the files go is a mount the operator makes
+   * first. `BACKUP_CRON` / `BACKUP_KEEP` in the environment win over both.
+   */
+  backupCron: z.string().max(100).catch(""),
+  backupKeep: z.coerce.number().int().min(1).max(365).catch(7),
   theme: z.enum(THEME_MODES).catch("system"),
   /**
    * Instance identity (roadmap 4.19): the accent colour, the name and the logo

@@ -7,6 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "../../src/ui/db/open.ts";
 import { migrate, SCHEMA_VERSION } from "../../src/ui/db/migrate.ts";
 import { seedDefaults } from "../../src/ui/db/seed.ts";
+import pkg from "../../package.json" with { type: "json" };
 
 async function freshDb(): Promise<DatabaseSync> {
   const dir = await mkdtemp(join(tmpdir(), "isitdown-db-"));
@@ -265,6 +266,8 @@ test("seedDefaults writes the polling and preference defaults", async () => {
     timeZone: "auto",
     uiLocale: "en",
     notificationLocale: "en",
+    // Roadmap 10.2: which IsItDown moved the schema, for an older one to name.
+    schemaWrittenBy: pkg.version,
   });
   db.close();
 });

@@ -1,3 +1,4 @@
+import { dirname, join } from "node:path";
 import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { configureOutbound, parseAllowList, unusableAllowEntries } from "../core/outboundPolicy.ts";
@@ -7,6 +8,8 @@ import { buildUiRuntime } from "./runtime.ts";
 import { REVISION_CHECK_INTERVAL_MS } from "./incidentRevisions.ts";
 import { readBindHost } from "./bindHost.ts";
 import { DatabaseCorruptError } from "./db/open.ts";
+import { NewerDatabaseError, preUpgradeBackupName } from "./db/migrate.ts";
+import { runMigrateDown } from "./migrateDownCommand.ts";
 import { SOURCE_LOCALE, t } from "../core/i18n/index.ts";
 
 const DB_PATH = process.env["DB_PATH"] ?? "/app/data/isitdown.db";
@@ -28,6 +31,12 @@ for (const entry of unusableAllowEntries(parseAllowList(process.env["EGRESS_ALLO
   logger.warn("EGRESS_ALLOW entry ignored: neither an address, a CIDR range nor a host name", { entry });
 }
 
+// Roadmap 10.2: `--migrate-down <N>` takes the schema back for an image
+// rollback, then exits — the server never starts, so nothing writes the newer
+// schema back over it.
+const migrateDownAt = process.argv.indexOf("--migrate-down");
+if (migrateDownAt !== -1) process.exit(runMigrateDown(DB_PATH, process.argv[migrateDownAt + 1]));
+
 let runtime: Awaited<ReturnType<typeof buildUiRuntime>> | undefined;
 try {
   runtime = await buildUiRuntime({ dbPath: DB_PATH, env: process.env, logger, seedProviders: false, seedSelfMonitor: true });
@@ -38,6 +47,19 @@ try {
   if (error instanceof DatabaseCorruptError) {
     process.stderr.write(
       `${t(SOURCE_LOCALE, "ui.startup.dbCorrupt", { path: error.path, detail: error.detail })}\n`,
+    );
+  }
+  // Roadmap 10.2. An image rolled back over a database a newer one upgraded:
+  // which version it needs, and where the copy from before that upgrade is.
+  if (error instanceof NewerDatabaseError) {
+    process.stderr.write(
+      `${t(SOURCE_LOCALE, "ui.startup.dbNewer", {
+        path: DB_PATH,
+        found: error.found,
+        known: error.known,
+        version: error.writtenBy ?? "?",
+        backup: join(dirname(DB_PATH), "backups", preUpgradeBackupName(error.found)),
+      })}\n`,
     );
   }
   logger.error("isitdown ui failed to start", {

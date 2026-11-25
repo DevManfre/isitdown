@@ -9,6 +9,7 @@ import type { Logger } from "../core/logger.ts";
 import type { ComponentStatus, NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { rollback } from "./db/open.ts";
 import { readSettings } from "./dbSettings.ts";
+import { readBackupState } from "./backupSchedule.ts";
 import { SELF_MONITOR_ID } from "./selfMonitorId.ts";
 
 /**
@@ -55,6 +56,12 @@ export interface SelfSignals {
   failedDeliveries: number;
   /** Free bytes on the database's filesystem; null when there is no file to measure. */
   freeBytes: number | null;
+  /**
+   * Why the latest scheduled backup failed (roadmap 10.1); null or absent while
+   * it worked or none ran. A failed backup reaches the operator as this
+   * finding — through the diff engine, like every other alert.
+   */
+  backupError?: string | null;
 }
 
 export interface SelfFinding {
@@ -111,6 +118,10 @@ export function selfFindings(signals: SelfSignals): SelfFinding[] {
       component: "database",
       note: `${Math.round(signals.freeBytes / 1024 / 1024)} MiB free beside the database`,
     });
+  }
+
+  if (signals.backupError !== undefined && signals.backupError !== null) {
+    findings.push({ component: "database", note: `scheduled backup failed: ${signals.backupError}` });
   }
 
   return findings;
@@ -172,6 +183,7 @@ export function readSelfSignals(binding: Binding, now: number): SelfSignals {
         .get(new Date(now - FAILED_DELIVERY_WINDOW_MS).toISOString()),
     ).n,
     freeBytes: freeBytes(binding.dbPath),
+    backupError: readBackupState(db).lastError,
   };
 }
 

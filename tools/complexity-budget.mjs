@@ -31,7 +31,10 @@ export const BUDGET = {
   // +3 (HEARTBEAT_URL, _FAIL_URL, _METHOD), same issue: the UI edition has no
   // config.yml, so the environment is its only way in. The proxy variables of
   // ALE-141 (10.7) are read by Node itself and add nothing here.
-  envVars: 44,
+  // 44 -> 49 (+5: BACKUP_CRON, _KEEP, _DIR, _WEBDAV_URL, _S3_URL): scheduled
+  // backups, ALE-87 (roadmap 10.1). The folder is a mount, so environment
+  // only; the S3 keys ride in the URL rather than as four AWS_* variables.
+  envVars: 49,
   subsystems: 9,
   targets: 13,
   adapters: 30,
