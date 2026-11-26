@@ -112,7 +112,7 @@
   "public.empty": "Es wird noch kein Dienst veröffentlicht.",
   "public.generated": "Zuletzt geprüft {at}. Diese Seite erzeugt IsItDown aus der öffentlichen Statusseite jedes Anbieters.",
 
-  "cli.usage": "Verwendung: isitdown <befehl>\n\nBefehle:\n  watch    zeigt die Flotte einer laufenden UI-Edition-Instanz und aktualisiert sich bei Änderungen\n  discover liest die Dateien eines Projekts und schlägt die Anbieter vor, von denen es abhängt\n  import   liest den Export eines anderen Monitoring-Tools und schlägt die Anbieter vor, die daraus werden\n\nFühre 'isitdown <befehl> --help' für dessen Optionen aus.\n",
+  "cli.usage": "Verwendung: isitdown <befehl>\n\nBefehle:\n  watch    zeigt die Flotte einer laufenden UI-Edition-Instanz und aktualisiert sich bei Änderungen\n  mcp      stellt Status und Verlauf der Flotte einem KI-Assistenten über MCP (stdio) bereit\n  discover liest die Dateien eines Projekts und schlägt die Anbieter vor, von denen es abhängt\n  import   liest den Export eines anderen Monitoring-Tools und schlägt die Anbieter vor, die daraus werden\n\nFühre 'isitdown <befehl> --help' für dessen Optionen aus.\n",
   "cli.error.unknownCommand": "unbekannter Befehl: {command}",
   "cli.error.missingValue": "{option} benötigt einen Wert",
   "cli.error.unknownOption": "unbekannte Option: {option}",
@@ -139,6 +139,7 @@
   "cli.watch.changes.empty": "Noch keine Änderungen beobachtet.",
   "cli.watch.changes.line": "{at}  {provider} -> {status}",
   "cli.watch.footer": "Drücke Strg+C zum Beenden.",
+  "cli.mcp.usage": "Verwendung: isitdown mcp [--url <url>] [--token <token>]\n\nStellt Status, Verlauf, Vorfälle und Anmerkungen einer laufenden UI-Edition-Instanz\neinem KI-Assistenten als Model-Context-Protocol-Server über stdio bereit.\nNur lesend: dieser Befehl schreibt nie auf die gelesene Instanz.\n\n  --url    zu lesende Instanz (Standard: http://localhost:3000)\n  --token  schreibgeschützter API-Token (Standard: $API_TOKEN)\n",
   "cli.discover.usage": "Verwendung: isitdown discover [pfad...] [--yaml | --json]\n\nLiest die Dateien eines Projekts — package.json, Compose-Dateien, Dockerfiles, .env,\nTerraform, requirements.txt, pyproject.toml, go.mod, eine hosts-Datei — und\nschlägt die Katalog-Anbieter vor, von denen es abhängt, jeweils mit dem Fund.\nOffline: nichts wird abgerufen, nichts geschrieben.\n\n  pfad    Dateien oder Verzeichnisse (Standard: das aktuelle Verzeichnis)\n  --yaml  gibt einen services:-Block für die config.yml der Light-Edition aus\n  --json  gibt das vollständige Ergebnis als JSON aus\n",
   "cli.discover.read": "{files} Dateien gelesen.",
   "cli.discover.none": "Kein Katalog-Anbieter darin gefunden.",
