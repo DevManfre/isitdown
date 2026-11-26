@@ -112,7 +112,7 @@
   "public.empty": "Aucun service n'est encore publié.",
   "public.generated": "Dernière vérification {at}. Cette page est générée par IsItDown à partir de la page d'état publique de chaque fournisseur.",
 
-  "cli.usage": "usage : isitdown <commande>\n\nCommandes :\n  watch    affiche la flotte d'une instance de l'édition UI en cours d'exécution et se met à jour aux changements\n  discover lit les fichiers d'un projet et propose les fournisseurs dont il dépend\n  import   lit l'export d'un autre outil de supervision et propose les fournisseurs qui en découlent\n\nExécutez 'isitdown <commande> --help' pour ses options.\n",
+  "cli.usage": "usage : isitdown <commande>\n\nCommandes :\n  watch    affiche la flotte d'une instance de l'édition UI en cours d'exécution et se met à jour aux changements\n  mcp      expose l'état et l'historique de la flotte à un assistant IA via MCP (stdio)\n  discover lit les fichiers d'un projet et propose les fournisseurs dont il dépend\n  import   lit l'export d'un autre outil de supervision et propose les fournisseurs qui en découlent\n\nExécutez 'isitdown <commande> --help' pour ses options.\n",
   "cli.error.unknownCommand": "commande inconnue : {command}",
   "cli.error.missingValue": "{option} nécessite une valeur",
   "cli.error.unknownOption": "option inconnue : {option}",
@@ -139,6 +139,7 @@
   "cli.watch.changes.empty": "Aucun changement observé pour l'instant.",
   "cli.watch.changes.line": "{at}  {provider} -> {status}",
   "cli.watch.footer": "Appuyez sur Ctrl+C pour quitter.",
+  "cli.mcp.usage": "usage : isitdown mcp [--url <url>] [--token <token>]\n\nExpose l'état, l'historique, les incidents et les annotations d'une instance de\nl'édition UI en cours d'exécution à un assistant IA, comme serveur Model Context\nProtocol sur stdio.\nLecture seule : cette commande n'écrit jamais sur l'instance lue.\n\n  --url    instance à lire (par défaut : http://localhost:3000)\n  --token  jeton API en lecture seule (par défaut : $API_TOKEN)\n",
   "cli.discover.usage": "usage : isitdown discover [chemin...] [--yaml | --json]\n\nLit les fichiers d'un projet — package.json, fichiers compose, Dockerfiles, .env,\nTerraform, requirements.txt, pyproject.toml, go.mod, un fichier hosts — et\npropose les fournisseurs du catalogue dont il dépend, avec ce qui les a trahis.\nHors ligne : rien n'est téléchargé ni écrit.\n\n  chemin  fichiers ou dossiers à lire (par défaut : le dossier courant)\n  --yaml  affiche un bloc services: pour le config.yml de l'édition Light\n  --json  affiche le résultat complet en JSON\n",
   "cli.discover.read": "{files} fichiers lus.",
   "cli.discover.none": "Aucun fournisseur du catalogue trouvé.",
