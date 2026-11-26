@@ -1,0 +1,37 @@
+# Roadmap 9.6. CodeQL's security queries over the JavaScript and TypeScript
+# sources, on every pull request and every push to `dev` (and `main`, so the
+# default branch's code-scanning view stays current). Nothing is compiled for
+# it: `build-mode: none` reads the sources as they are. Findings land in the
+# repository's Security tab and as annotations on the pull request.
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+  schedule:
+    - cron: "41 5 * * 1"
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: CodeQL (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: github/codeql-action/init@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          languages: javascript-typescript
+          build-mode: none
+      - uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          category: /language:javascript-typescript

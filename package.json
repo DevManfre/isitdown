@@ -22,6 +22,7 @@
     "check:i18n": "node tools/i18n-orphans.mjs",
     "check:quarantine": "node tools/quarantine.mjs check",
     "check:complexity": "node tools/complexity-budget.mjs",
+    "check:cve-exceptions": "node tools/cve-exceptions.mjs check",
     "coverage": "npm run coverage:server && npm run coverage:web",
     "coverage:server": "node tools/quarantine.mjs run server -- node --import ./test/helpers/openapiContract.ts --test --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"tools/**\" --test-coverage-exclude=\"src/ui/web/**\" --test-coverage-exclude=\"**/isitdown-plugins-*/**\" --test-coverage-lines=95 --test-coverage-branches=88 --test-coverage-functions=93 \"test/**/*.test.ts\"",
     "coverage:web": "node tools/quarantine.mjs run dashboard -- vitest run --coverage",

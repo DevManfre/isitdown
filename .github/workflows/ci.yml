@@ -66,6 +66,11 @@ jobs:
       # fail. Raising a ceiling is a commit of its own in the budget file.
       - name: Complexity budget
         run: npm run check:complexity
+      # Roadmap 9.6. The accepted CVEs in .trivyignore.yaml: an entry without
+      # a reason or an expiry date, or one past its date, fails here. The scan
+      # itself is supply-chain.yml.
+      - name: CVE exceptions
+        run: npm run check:cve-exceptions
 
   # Roadmap 7.2. The same two suites `npm test` runs, each under a coverage
   # floor: a new subsystem that lands without tests of its own drags the total

@@ -360,6 +360,7 @@ npm run check:bundle     # la dashboard compilata contro il suo budget di dimens
 npm run check:readme     # questo file contro ogni README.<lang>.md
 npm run check:i18n       # chiavi di catalogo che nessun codice usa (avviso) e chiavi usate che mancano (errore)
 npm run check:quarantine # test/quarantine.json: fallisce su una voce scaduta o malformata (13.6)
+npm run check:cve-exceptions # .trivyignore.yaml: fallisce su una CVE accettata senza motivo, o scaduta (9.6)
 npm run typecheck        # tsconfig del server + tsconfig della dashboard (tsconfig.web.json)
 npm run lint             # Biome, solo controllo: regole correctness + suspicious, nessun formatter
 npm run build:light      # tsc + copia asset, escludendo src/ui
@@ -848,6 +849,7 @@ il calendario sia l'attesa.
 | lo stack della dashboard (React, Vite, Vitest, Tailwind, shadcn, Radix e i loro plugin) | un gruppo solo, perché una major in uno rompe gli altri; le sue major in una PR separata dalle minor |
 | ogni altra major | una PR per pacchetto |
 | patch e minor delle GitHub Actions | una PR settimanale; una major ha la sua |
+| l'immagine base Node del `Dockerfile` (digest, minor, patch) | una PR, quando il tag viene ripubblicato |
 | le dipendenze transitive del lockfile | un refresh settimanale del lockfile |
 | una major di Node | mai dal bot, vedi sotto |
 
@@ -869,6 +871,32 @@ Tailwind 4) con `EALLOWREMOTE`: è un bug di npm,
 vincolo si toglie quando quella issue è risolta, oppure quando la major di Node
 passa a una che porta npm 12.
 
+**La supply chain si controlla a ogni pull request** (roadmap 9.6), oltre alla
+firma cosign, all'SBOM e alla provenance che la release allega:
+
+- `.github/workflows/supply-chain.yml` esegue hadolint sul `Dockerfile`, e
+  Trivy su `package-lock.json` e su entrambe le immagini costruite (`light` e
+  `ui`). Fallisce su una vulnerabilità HIGH o CRITICAL che ha una versione
+  corretta; una senza correzione non è un fallimento, perché non c'è niente a
+  cui aggiornare. Gira anche ogni lunedì, così una CVE pubblicata contro una
+  dipendenza che nessuno ha toccato fa comunque diventare rosso il run.
+- Una CVE accettata è una voce in `.trivyignore.yaml`, il file di ignore di
+  Trivy stesso, con l'id dell'advisory, uno `statement` che dice perché e una
+  data `expired_at`; `paths` la restringe a dove è stata trovata.
+  `npm run check:cve-exceptions` (in `ci.yml`) rifiuta una voce senza motivo o
+  senza data, o con un pattern al posto dell'id, e fallisce il giorno dopo la
+  scadenza. Non esiste un interruttore che spegne la scansione.
+- `.github/workflows/codeql.yml` esegue le query JavaScript/TypeScript di CodeQL
+  a ogni pull request e a ogni push su `dev` e `main`; i risultati finiscono
+  nella scheda Security.
+- `.github/workflows/scorecard.yml` esegue OpenSSF Scorecard ogni lunedì e a
+  ogni push su `main` (legge solo il branch di default) e pubblica il punteggio
+  dietro il badge del README.
+- Entrambe le righe `FROM` del `Dockerfile` fissano `node:<major>-alpine` per
+  digest, e Renovate propone il nuovo digest quando il tag viene ripubblicato.
+  Le action di terze parti nei nuovi workflow sono fissate per commit con la
+  versione in un commento; Renovate le sposta con il gruppo delle GitHub Actions.
+
 **Node segue la linea LTS, di proposito con un po' di ritardo.** IsItDown gira
 su una sola major di Node alla volta, sempre una linea LTS pari. Il passaggio
 alla successiva (Node 28 dopo Node 26) è dovuto quando la nuova linea è
@@ -880,7 +908,8 @@ un solo commit su `dev` e cambia insieme tutto ciò che nomina la major:
 - `.nvmrc`, che CI e workflow di release leggono tramite `node-version-file`;
 - `engines.node` in `package.json`, che `engine-strict` trasforma nel rifiuto
   di installare su un Node più vecchio;
-- entrambe le righe `FROM node:<major>-alpine` del `Dockerfile`, e il `target`
+- entrambe le righe `FROM node:<major>-alpine@sha256:…` del `Dockerfile`, con
+  il digest del nuovo tag, e il `target`
   esbuild della build SEA in `tools/build-sea.mjs`;
 - la major di `@types/node`.
 
