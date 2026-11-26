@@ -5,10 +5,11 @@
       "url": "https://hooks.example/SECRET-PATH",
       "headers": {
         "content-type": "application/json",
-        "x-isitdown-signature": "sha256=eedf1e7fce0849e099be4e39f9e8b60f3bdca5e8b23845b9227ed6f317bcc380",
+        "x-isitdown-signature": "sha256=5f63742d86942ce78f8a2cfc375cd959d2d9b3b0c5ee4c3fb46566d2bf68c7d5",
         "x-isitdown-timestamp": "2026-10-20T08:00:00.000Z"
       },
       "body": {
+        "schemaVersion": 1,
         "change": {
           "kind": "incident_opened",
           "providerId": "github",
@@ -38,10 +39,11 @@
       "url": "https://hooks.example/SECRET-PATH",
       "headers": {
         "content-type": "application/json",
-        "x-isitdown-signature": "sha256=1771709406e34b11248a8cc61ba1702ac2fd874c193d527ab34a06e1cf56840c",
+        "x-isitdown-signature": "sha256=e371c6954a614047694a31a53f57120c2b18bb3f2474b0706d3323446ccf7d2d",
         "x-isitdown-timestamp": "2026-10-20T08:00:00.000Z"
       },
       "body": {
+        "schemaVersion": 1,
         "change": {
           "kind": "incident_resolved",
           "providerId": "github",
@@ -71,10 +73,11 @@
       "url": "https://hooks.example/SECRET-PATH",
       "headers": {
         "content-type": "application/json",
-        "x-isitdown-signature": "sha256=4478e82901e7ccbbbd32f23aae6915d4390e446e04a6c8dd0ee1be4389cbf4da",
+        "x-isitdown-signature": "sha256=b3f6648dd773b7208794a147cc43f5f6579223bd311f1347e35d72a26b904766",
         "x-isitdown-timestamp": "2026-10-20T08:00:00.000Z"
       },
       "body": {
+        "schemaVersion": 1,
         "change": {
           "kind": "status_change",
           "providerId": "github",
@@ -97,10 +100,11 @@
       "url": "https://hooks.example/SECRET-PATH",
       "headers": {
         "content-type": "application/json",
-        "x-isitdown-signature": "sha256=31f726fb6f1c842d2ba93304cf5326afd089827354b9697d7b08d2e22abc348d",
+        "x-isitdown-signature": "sha256=7ede11eec71f1dd59e465543ea89dd73d7dc62efd1a7ea08716964a1ccc88140",
         "x-isitdown-timestamp": "2026-10-20T08:00:00.000Z"
       },
       "body": {
+        "schemaVersion": 1,
         "change": {
           "kind": "maintenance_upcoming",
           "providerId": "github",

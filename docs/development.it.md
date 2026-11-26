@@ -138,8 +138,11 @@ isitdown/
 │   ├── visual-regression.mjs          ogni vista, entrambi i temi, ogni lingua contro test/visual/baseline (npm run test:visual); helper in tools/visual/
 │   ├── envelope.mjs                   memoria, CPU, avvio e crescita del database a 10 / 100 / 500 provider (npm run measure:envelope, docker.it.md 4.9)
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   la sonda canary, test di carico e di mutazione, registrazione dei fixture, note di rilascio, la build a file singolo, icone PWA
+│   ├── webhook-schema.mjs             schema/webhook-event.v1.json dalla definizione zod in src/notifiers/webhookEvent.ts (7.11)
 │   ├── build-catalog.mjs              rigenera il catalogo da tools/catalog/seed.json e dalle liste pubbliche (2.1)
 │   └── sign-catalog.mjs               firma catalog/catalog.json con $CATALOG_SIGNING_KEY (2.2)
+├── schema/webhook-event.v1.json       lo schema JSON pubblicato del webhook generico, confrontato con quello generato (7.11)
+├── examples/                          un workflow n8n e un flow Node-RED che ricevono l'evento del webhook
 ├── catalog/                           il catalogo pubblicato e firmato, e il report dell'ultima generazione
 ├── test/
 │   ├── core/                          diff engine, poller, scheduler, dispatcher, i18n, schemi
@@ -741,7 +744,7 @@ accanto a ciò che coprono.
 
 ### 9.6 Rilasci
 
-Due workflow, e la versione vive in un posto solo.
+Tre workflow, e la versione vive in un posto solo.
 
 `.github/workflows/ci.yml` gira su ogni pull request e su ogni push su `dev` o
 `main`, come job affiancati su runner propri — typecheck, lint e parità
@@ -764,10 +767,36 @@ git commit -am "🔖 RELEASE - bump the version to X.Y.Z"
 nuova versione, quindi un secondo tentativo fa un doppio bump. Si aggiornano
 `package.json` e `package-lock.json` (`version` e `packages[""].version`) a mano.
 La skill `release-flow` ha la sequenza completa, dal bump su `dev` alla pull
-request verso `main` fino al tag.
+request verso `main` fino alla release pubblicata.
 
-Il push del tag avvia `.github/workflows/release.yml`, che prima attende il check
-`verify` della CI sul commit taggato (un push di tag non fa scattare la CI da
+Il merge della pull request di rilascio (`release/vX.Y.Z`) su `main` è il
+rilascio: `.github/workflows/tag-release.yml` gira a ogni push su `main`, e
+quando la versione di `package.json` è diversa da quella che `main` aveva prima
+del push (o il push è il merge di `release/v<versione>`) e `v<versione>` non ha
+ancora un tag, crea il tag annotato su quel commit e richiama `release.yml` con
+quel tag. Ogni altro push su `main` finisce lì senza creare nulla. Il tag viene
+pubblicato con il `GITHUB_TOKEN` del workflow stesso — nessun token personale,
+nessun segreto in più — e, per una regola di GitHub, un tag pubblicato così non
+avvia alcun workflow: per questo `release.yml` è richiamato come workflow
+riutilizzabile invece di aspettare il push del tag, ed è per questo che lo
+stesso rilascio non parte mai due volte.
+
+Il push a mano di un tag `vX.Y.Z` funziona ancora ed è l'alternativa — per un
+commit che il percorso automatico ha saltato, o per ripetere un rilascio dopo
+averne cancellato il tag:
+
+```bash
+git tag -a vX.Y.Z origin/main -m "🔖 RELEASE - vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+Un tag pubblicato a mano prima che arrivi il merge fa uscire `tag-release.yml`,
+quindi quel rilascio parte una volta sola, dal push del tag; inoltre il job di
+rilascio è serializzato per tag, così due run della stessa versione non
+pubblicano mai in parallelo.
+
+In entrambi i casi `.github/workflows/release.yml` gira sul tag: prima attende
+il check `verify` della CI sul commit taggato (un tag non fa scattare la CI da
 solo, quindi legge il run avviato dal push di `main`) e si ferma se è fallito, si
 rifiuta di procedere se tag e
 `package.json` non concordano, costruisce entrambi i target per `linux/amd64` e

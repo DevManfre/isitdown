@@ -4,7 +4,30 @@ Every release of IsItDown, newest first, grouped by the surface each commit
 touched. Generated from the commit log by `tools/changelog.mjs` — don't edit
 it by hand; the release flow regenerates it.
 
+## v2.50.0 — 2026-11-26
+
+### CI
+
+- 👷 tag and release automatically when a release merges into main
+
+### SECURITY
+
+- 📝 write the threat model and link it from the README
+
+### WEBHOOK
+
+- ✨ version the event body and publish its JSON Schema
+
 ## v2.49.0 — 2026-11-25
+
+### DOCS
+
+- 📝 add a security policy for private vulnerability reports
+- 📝 add a security policy for private vulnerability reports
+
+### RELEASE
+
+- 🔖 bump the version to 2.49.0
 
 ### BACKUP
 

@@ -1,0 +1,100 @@
+# Merging a release into `main` releases it: when a push to `main` carries a
+# new `package.json` version that has no tag yet, this creates the annotated
+# `vX.Y.Z` tag on that commit and runs release.yml with it.
+#
+# release.yml is called here rather than left to its own `push: tags` trigger:
+# a tag pushed with the workflow's GITHUB_TOKEN never starts another workflow,
+# by GitHub's rule against recursive runs. The same rule is what keeps this
+# path from releasing twice — the tag created below does not fire release.yml
+# a second time — and a tag pushed by hand first makes this exit instead.
+name: Tag release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the tag
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      # A release is a push whose version differs from the one `main` had
+      # before it — against the push's `before`, not HEAD^, so a push of
+      # several commits is compared as a whole — or the merge of the
+      # `release/v<version>` branch. Anything else, and a version whose tag
+      # already exists, ends here with nothing created.
+      - name: Decide whether this push is a release
+        id: decide
+        env:
+          BEFORE: ${{ github.event.before }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          version=$(jq -r .version package.json)
+          tag="v$version"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "$tag already exists — nothing to release"
+            exit 0
+          fi
+
+          # `before` is all zeros on a branch's first push; HEAD^ (fetched by
+          # the checkout's depth of 2) stands in when it is unusable.
+          base=HEAD^
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+            && git fetch --quiet --depth=1 origin "$BEFORE"; then
+            base=$BEFORE
+          fi
+          previous=$(git show "$base:package.json" 2>/dev/null | jq -r .version) || previous=""
+
+          if [ "$previous" != "$version" ]; then
+            echo "version ${previous:-(none)} -> $version"
+          elif printf '%s' "$HEAD_MESSAGE" | grep -qF "release/$tag"; then
+            echo "merge of release/$tag"
+          else
+            echo "version $version unchanged and not a release/$tag merge — nothing to release"
+            exit 0
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # If somebody pushes the same tag by hand between the check above and
+      # this push, theirs wins: the push is rejected, their tag push runs
+      # release.yml on its own, and this run stops without calling it.
+      - name: Create and push the tag
+        id: tag
+        if: steps.decide.outputs.tag != ''
+        env:
+          TAG: ${{ steps.decide.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$GITHUB_SHA" -m "🔖 RELEASE - $TAG"
+          if git push origin "refs/tags/$TAG"; then
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          elif git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "$TAG was pushed by someone else meanwhile — its own run releases it"
+          else
+            exit 1
+          fi
+
+  release:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    # A called workflow gets at most what its caller grants: release.yml's own
+    # list, which it still narrows to.
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      checks: read
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}

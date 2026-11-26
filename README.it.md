@@ -42,6 +42,7 @@ Il manuale, un file per sezione:
 - [8. Tema e localizzazione](docs/theming.it.md) — temi, le sei lingue della dashboard, accessibilità
 - [9. Sviluppo](docs/development.it.md) — struttura, stack tecnico, sviluppo live, test, rilasci
 - [10. Client da terminale](docs/cli.it.md) — `isitdown watch`, una vista di sola lettura della flotta per il terminale, `isitdown discover`, una prima flotta letta dai file di un progetto, e `isitdown import`, una flotta portata da Uptime Kuma, Gatus, Statping o StatusGator
+- [11. Sicurezza](docs/security.it.md) — il threat model: di cosa ci si fida, cosa è salvato dove, cosa può fare ciascun attaccante, cosa è fuori scopo
 - [13. Deprecazioni](docs/deprecations.it.md) — cosa se ne sta andando e quando, e il report d'uso facoltativo che decide il resto
 
 Ogni pagina ha accanto la sua gemella inglese (`docs/<nome>.md`).
@@ -50,7 +51,7 @@ Contribuire: [CONTRIBUTING.md](CONTRIBUTING.md) (setup, controlli, le regole a c
 risponde una pull request) · [codice di condotta](CODE_OF_CONDUCT.md) · [changelog](CHANGELOG.md).
 
 Sicurezza: [SECURITY.md](SECURITY.md) (versioni supportate, come segnalare una
-vulnerabilità in privato — mai in una issue pubblica).
+vulnerabilità in privato — mai in una issue pubblica) · [threat model](docs/security.it.md).
 
 ## 1. Cosa fa
 

@@ -1465,11 +1465,12 @@ enabling the channel and pressing "enable on this browser" in Settings is the
 whole setup. Each browser that is enabled appears in the card's device list and
 can be removed from there.
 
-The webhook POSTs `{ change, service, message }`, so a consumer can either display
-the rendered text or route on the structured fields:
+The webhook POSTs `{ schemaVersion, change, service, message }`, so a consumer can
+either display the rendered text or route on the structured fields:
 
 ```json
 {
+  "schemaVersion": 1,
   "change": {
     "kind": "status_change",
     "providerId": "cloudflare",
@@ -1481,6 +1482,19 @@ the rendered text or route on the structured fields:
   "message": "🔴 Cloudflare — MAJOR OUTAGE\n\nStatus changed from Operational to Major outage.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.cloudflarestatus.com"
 }
 ```
+
+**A versioned event.** `change` is the diff engine's own event, field for field —
+provider, component, status before and after, incident, maintenance window, and
+whatever the kind carries — and `service` carries the status-page link and the
+operator's notes, so an automation (n8n, Node-RED, Zapier, Make) routes on fields
+and never parses `message`. Its JSON Schema is published at
+[`schema/webhook-event.v1.json`](../schema/webhook-event.v1.json), generated from
+the zod definition in `src/notifiers/webhookEvent.ts`. The rule: a field is
+*added* without changing `schemaVersion`, so ignore the ones you do not know;
+removing or renaming one is version 2, published beside it as a new file.
+Ready-made starting points are in [`examples/`](../examples/): an n8n workflow
+and a Node-RED flow that receive the event, check its version, and branch on
+`change.kind`.
 
 **Signing.** Set `WEBHOOK_SECRET` (or `webhook.secret` in `config.yml`) and each
 request carries two extra headers:
