@@ -1,0 +1,77 @@
+# Roadmap 9.6. What reaches the published images is checked on every pull
+# request and every push to a long-lived branch, and again every Monday — a CVE
+# published against a dependency nobody touched still has to turn something red.
+#
+# - hadolint on the Dockerfile;
+# - Trivy on the dependency tree (package-lock.json) and on both built images,
+#   failing on a HIGH or CRITICAL vulnerability that has a fix. Unfixable ones
+#   are reported by the scanner but do not fail: there is nothing to upgrade to.
+#   An accepted CVE is an entry in .trivyignore.yaml with a reason and an expiry
+#   date (tools/cve-exceptions.mjs), never a flag that turns the scan off.
+#
+# Third-party actions are pinned by commit, with the version beside it;
+# Renovate moves the commit with the tag (renovate.json, GitHub Actions group).
+name: Supply chain
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: supply-chain-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hadolint:
+    name: Dockerfile lint (hadolint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: info
+
+  dependencies:
+    name: CVE scan, dependencies (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: package-lock.json
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore.yaml
+
+  image:
+    name: CVE scan, ${{ matrix.target }} image (Trivy)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [light, ui]
+    steps:
+      - uses: actions/checkout@v5
+      # Single platform and not pushed: the layers and packages are the same
+      # ones release.yml publishes for amd64, which is what is being scanned.
+      - name: Build the ${{ matrix.target }} image
+        run: docker build --target "${{ matrix.target }}" -t "isitdown:${{ matrix.target }}-scan" .
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: isitdown:${{ matrix.target }}-scan
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore.yaml
