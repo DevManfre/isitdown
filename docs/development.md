@@ -360,6 +360,7 @@ npm run check:bundle     # the built dashboard against its gzipped size budget
 npm run check:readme     # this file against every README.<lang>.md
 npm run check:i18n       # catalog keys no code uses (warning) and used keys a catalog lacks (error)
 npm run check:quarantine # test/quarantine.json: fails on an expired or malformed entry (13.6)
+npm run check:cve-exceptions # .trivyignore.yaml: fails on an accepted CVE without a reason, or expired (9.6)
 npm run typecheck        # server tsconfig + dashboard tsconfig (tsconfig.web.json)
 npm run lint             # Biome, check only: correctness + suspicious rules, no formatter
 npm run build:light      # tsc + copy assets, excluding src/ui
@@ -811,6 +812,7 @@ first day out of the tree. A security fix skips both the schedule and the wait.
 | the dashboard stack (React, Vite, Vitest, Tailwind, shadcn, Radix and their plugins) | one group, because a major in one breaks the others; its majors in a separate PR from its minors |
 | any other major | one PR per package |
 | GitHub Actions patches and minors | one weekly PR; a major gets its own |
+| the `Dockerfile`'s Node base image (digest, minor, patch) | one PR, when the tag is republished |
 | the lockfile's transitive dependencies | a weekly lockfile refresh |
 | a Node major | never by the bot, see below |
 
@@ -830,6 +832,32 @@ The PR then changes `package.json` but not `package-lock.json`, and `npm ci`
 fails every job. Drop the constraint once that issue is fixed, or when the Node
 major moves to one that ships npm 12.
 
+**The supply chain is checked on every pull request** (roadmap 9.6), on top of
+the cosign signature, SBOM and provenance the release attaches:
+
+- `.github/workflows/supply-chain.yml` runs hadolint on the `Dockerfile`, and
+  Trivy on `package-lock.json` and on both built images (`light` and `ui`). It
+  fails on a HIGH or CRITICAL vulnerability that has a fixed version; one
+  without a fix is not a failure, since there is nothing to upgrade to. It also
+  runs every Monday, so a CVE published against an untouched dependency still
+  turns the run red.
+- An accepted CVE is an entry in `.trivyignore.yaml` — Trivy's own ignore
+  file — with the advisory's id, a `statement` saying why, and an `expired_at`
+  date; `paths` narrows it to where it was found. `npm run check:cve-exceptions`
+  (in `ci.yml`) refuses an entry without a reason or a date, or with a pattern
+  for an id, and fails the day after one expires. There is no switch that turns
+  the scan off.
+- `.github/workflows/codeql.yml` runs CodeQL's JavaScript/TypeScript queries on
+  every pull request and every push to `dev` and `main`; findings land in the
+  Security tab.
+- `.github/workflows/scorecard.yml` runs OpenSSF Scorecard every Monday and on
+  each push to `main` (it only reads the default branch) and publishes the
+  score behind the README badge.
+- Both `FROM` lines of the `Dockerfile` pin `node:<major>-alpine` by digest,
+  and Renovate proposes the new digest when the tag is republished. Third-party
+  actions in the new workflows are pinned by commit with the version in a
+  comment; Renovate moves them with the GitHub Actions group.
+
 **Node follows the LTS line, a little late on purpose.** IsItDown runs on one
 Node major at a time, always an even-numbered LTS line. The move to the next
 one (Node 28 after Node 26) is due once the new line has been **Active LTS for
@@ -841,7 +869,8 @@ to Node 26, landed in November 2026 (roadmap 13.13). The move is one commit on
 - `.nvmrc`, which CI and the release workflow read through `node-version-file`;
 - `engines.node` in `package.json`, which `engine-strict` turns into a refusal
   to install on an older Node;
-- both `FROM node:<major>-alpine` lines in the `Dockerfile`, and the SEA
+- both `FROM node:<major>-alpine@sha256:…` lines in the `Dockerfile`, with
+  the new tag's digest, and the SEA
   build's esbuild `target` in `tools/build-sea.mjs`;
 - the `@types/node` major.
 
