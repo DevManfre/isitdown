@@ -50,7 +50,9 @@ COPY --from=builder /app/dist/light ./dist/light
 # `outpost` profile in docker-compose.yml.
 COPY --from=builder /app/dist/outpost ./dist/outpost
 RUN mkdir -p /app/config /app/data && chown -R node:node /app
-USER node
+# Numeric ids (node = 1000 in the base image), so an orchestrator enforcing
+# runAsNonRoot can tell this is not root without reading /etc/passwd.
+USER 1000:1000
 VOLUME ["/app/config", "/app/data"]
 # No EXPOSE and no server: this edition only polls and notifies.
 # The state file is rewritten by every cycle, so its age is the liveness signal.
@@ -95,7 +97,7 @@ ENV PORT=3000
 # Inside a container the published port reaches the container's own interface, so
 # loopback there would be unreachable; exposure is decided by the compose `ports` mapping.
 ENV BIND_HOST=0.0.0.0
-USER root
+USER 0:0
 COPY --from=builder /app/dist/ui ./dist/ui
 RUN chown -R node:node /app/dist/ui
 # Roadmap 6.10: the incident summary's "Local CLI" provider runs `claude -p`.
@@ -107,7 +109,7 @@ ARG WITH_CLAUDE_CODE=false
 # part of the published image, so hadolint's version-pin rule does not apply.
 # hadolint ignore=DL3016
 RUN if [ "$WITH_CLAUDE_CODE" = "true" ]; then npm install -g @anthropic-ai/claude-code && npm cache clean --force; fi
-USER node
+USER 1000:1000
 EXPOSE 3000
 # The probe is readiness, not liveness (roadmap 6.9): it stays 503 until the
 # first cycle has actually read the fleet, so the start period covers the
