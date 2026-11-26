@@ -12,13 +12,18 @@
 # The `ui` stage starts FROM `light`, so the UI image is the Light image plus a
 # single thin layer: everything below it — base image, production dependencies,
 # core engine — is shared on disk and in a registry.
+#
+# Both FROM lines pin the base image by digest (roadmap 9.6): the tag says which
+# Node line, the digest says which build of it, so two builds of one commit get
+# the same base. Renovate moves the digest in a pull request of its own when the
+# tag is republished — see docs/development.md §9.7.
 
 # --- Build stage ---------------------------------------------------------------
 # Pinned to the machine running the build, not the image's target platform: the
 # output is plain JavaScript, identical on every architecture, so an arm64
 # release compiles natively and copies the result across instead of running
 # npm ci, tsc and Vite under QEMU — which was most of the release's wall clock.
-FROM --platform=$BUILDPLATFORM node:26-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -29,7 +34,7 @@ COPY src ./src
 RUN npm run build
 
 # --- Light edition -------------------------------------------------------------
-FROM node:26-alpine AS light
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS light
 WORKDIR /app
 ENV NODE_ENV=production
 ENV CONFIG_PATH=/app/config/config.yml
@@ -98,6 +103,9 @@ RUN chown -R node:node /app/dist/ui
 # so the published image stays without it. Sign-in is the operator's: a token
 # from `claude setup-token`, saved in Settings → AI implementation.
 ARG WITH_CLAUDE_CODE=false
+# Unpinned on purpose: an opt-in local build that follows the current CLI, never
+# part of the published image, so hadolint's version-pin rule does not apply.
+# hadolint ignore=DL3016
 RUN if [ "$WITH_CLAUDE_CODE" = "true" ]; then npm install -g @anthropic-ai/claude-code && npm cache clean --force; fi
 USER node
 EXPOSE 3000

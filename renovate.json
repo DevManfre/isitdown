@@ -61,6 +61,15 @@
       "groupSlug": "actions-non-major"
     },
     {
+      "description": "The Dockerfile's base image is pinned by digest (roadmap 9.6): a republished node:<major>-alpine arrives as a digest PR of its own, so the published images change base only through a reviewed, CVE-scanned pull request.",
+      "matchDatasources": ["docker"],
+      "matchDepNames": ["node"],
+      "matchUpdateTypes": ["digest", "minor", "patch"],
+      "pinDigests": true,
+      "groupName": "Node base image",
+      "groupSlug": "node-base-image"
+    },
+    {
       "description": "A Node major is a deliberate move with a checklist (docs/development.md §9.7), never a bot PR: .nvmrc, the Dockerfile's node:<major>-alpine, engines and @types/node change together, by hand.",
       "matchDepNames": ["node", "@types/node"],
       "matchUpdateTypes": ["major"],
