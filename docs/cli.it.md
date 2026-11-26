@@ -150,3 +150,78 @@ per amministrarla. Aggiungere accesso in scrittura o un'altra vista è fuori dal
 perimetro di questa pagina; ognuno sarebbe una riga di roadmap a sé.
 `discover` (10.2) e `import` (10.3) sono comandi separati che leggono file
 locali, non l'istanza.
+
+### 10.7 `isitdown mcp`
+
+```
+utilizzo: isitdown mcp [--url <url>] [--token <token>]
+```
+
+Il quarto comando (roadmap 7.1): la stessa istanza che legge `watch`, servita a
+un assistente AI come server [Model Context Protocol](https://modelcontextprotocol.io)
+su stdio — così può rispondere a "Cloudflare era degradato quando ieri alle 15
+è salito il nostro tasso di errore?" con i dati che la dashboard ha già.
+`--url` e `--token` significano ciò che significano per `watch` (10.1),
+`$API_TOKEN` compreso. Sul server non cambia niente: ogni tool è una `GET` su
+route che la dashboard usa ([6](api.it.md#6-api-http)), ogni risposta è validata
+con zod come quelle di `watch`, e nessuno di essi può scrivere.
+
+| Tool | Argomenti | Cosa risponde | Legge |
+|---|---|---|---|
+| `fleet_status` | `providers?` | Stato attuale, incidenti aperti, manutenzioni in corso, uptime a 90 giorni | `/status` |
+| `provider_history` | `provider`, `days?` oppure `from`+`to` | Per ogni giorno lo stato peggiore e l'uptime, gli incidenti e il downtime della finestra | `/history` |
+| `incidents_search` | `provider?`, `q?`, `state?`, `from?`, `to?`, `limit?` | Incidenti dal più recente, per provider, testo nel nome e giorni in cui sono iniziati | `/incidents` |
+| `status_at` | `at`, `providers?` | Gli incidenti aperti in un istante, lo stato che ne deriva, e stato peggiore e uptime di quel giorno | `/incidents/timeline`, `/history` |
+| `annotations_list` | `provider?`, `days?` oppure `from`+`to` | I marcatori dell'operatore — deploy e simili | `/annotations` |
+
+`days` è `7`, `30` o `90`, e `from`/`to` sono `YYYY-MM-DD`, come li prende l'API.
+`status_at` non ha un endpoint suo: l'impatto di un incidente aperto ne dà lo
+stato (`minor` degradato, `major` interruzione parziale, `critical`
+interruzione grave), e un giorno in cui non si è misurato niente è `unknown`, non
+operativo. Arriva fino a 90 giorni indietro, la finestra più ampia della
+timeline. Una chiamata fallita — argomenti sbagliati, istanza irraggiungibile,
+token rifiutato — torna come errore del tool stesso, con il motivo dato
+dall'API, così l'assistente può correggersi.
+
+Il protocollo è scritto a mano (`src/cli/mcp/server.ts`, quattro metodi su
+JSON-RPC delimitato da a capo) invece di usare l'SDK MCP: a un server di sola
+lettura con soli tool non serve altro, e la build della CLI non guadagna
+dipendenze.
+
+**Claude Code** — dalla cartella in cui IsItDown è compilato:
+
+```bash
+claude mcp add isitdown --env API_TOKEN=$API_TOKEN -- node "$PWD/dist/cli/index.js" mcp --url http://localhost:3000
+```
+
+oppure, condiviso con un progetto nel suo `.mcp.json`, con il token espanso
+dall'ambiente di ciascuno invece che scritto nel file:
+
+```json
+{
+  "mcpServers": {
+    "isitdown": {
+      "command": "node",
+      "args": ["/path/to/isitdown/dist/cli/index.js", "mcp", "--url", "http://localhost:3000"],
+      "env": { "API_TOKEN": "${API_TOKEN}" }
+    }
+  }
+}
+```
+
+**Claude Desktop** — lo stesso blocco in `claude_desktop_config.json`
+(Impostazioni → Sviluppatore → Modifica configurazione), con il token stesso in
+`env`, perché l'app desktop non espande le variabili: il file resta sulla tua
+macchina, e il token può solo leggere. Togli `env` se l'istanza non ha `API_TOKEN`.
+
+```json
+{
+  "mcpServers": {
+    "isitdown": {
+      "command": "node",
+      "args": ["/path/to/isitdown/dist/cli/index.js", "mcp", "--url", "http://localhost:3000"],
+      "env": { "API_TOKEN": "<token di sola lettura>" }
+    }
+  }
+}
+```
