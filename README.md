@@ -42,6 +42,7 @@ The manual, one file per section:
 - [8. Theming and localisation](docs/theming.md) — themes, the six dashboard languages, accessibility
 - [9. Development](docs/development.md) — layout, tech stack, live development, tests, releases
 - [10. Terminal client](docs/cli.md) — `isitdown watch`, a read-only fleet view for a terminal, `isitdown discover`, a first fleet read from a project's own files, and `isitdown import`, a fleet carried over from Uptime Kuma, Gatus, Statping or StatusGator
+- [11. Security](docs/security.md) — the threat model: what is trusted, what is stored where, what each attacker can do, what is out of scope
 - [13. Deprecations](docs/deprecations.md) — what is on its way out and when, and the opt-in usage report that decides what is next
 
 Each page has an Italian twin beside it (`docs/<name>.it.md`).
@@ -50,7 +51,7 @@ Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) (setup, checks, the rules a pul
 request is held to) · [code of conduct](CODE_OF_CONDUCT.md) · [changelog](CHANGELOG.md).
 
 Security: [SECURITY.md](SECURITY.md) (supported versions, how to report a
-vulnerability privately — never in a public issue).
+vulnerability privately — never in a public issue) · [threat model](docs/security.md).
 
 ## 1. What it does
 

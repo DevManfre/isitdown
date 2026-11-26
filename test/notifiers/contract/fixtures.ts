@@ -77,6 +77,9 @@ const BY_KIND: Record<StatusChangeKind, Omit<StatusChange, "kind" | "providerId"
       sla: [{ providerId: "github", target: 99.9, spentMinutes: 21.6, budgetMinutes: 43.2 }],
     },
   },
+  // What `runtime.ts` sends on a routine delivery test: no status of its own,
+  // and the channel under test.
+  delivery_test: { currentStatus: "unknown", channel: { id: "webhook", failures: 0, since: AT } },
   silent_outage: { currentStatus: "major_outage", crossCheck: { probeId: "github-api", note: "HTTP 503" } },
   sla_burn: {
     currentStatus: "degraded",

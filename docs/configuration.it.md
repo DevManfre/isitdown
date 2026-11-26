@@ -1512,11 +1512,13 @@ database, quindi abilitare il canale e premere "abilita su questo browser" nelle
 Impostazioni è tutta la procedura. Ogni browser abilitato compare nell'elenco
 dispositivi della card e può essere rimosso da lì.
 
-Il webhook fa POST di `{ change, service, message }`, così chi lo consuma può
-mostrare il testo già formattato oppure fare routing sui campi strutturati:
+Il webhook fa POST di `{ schemaVersion, change, service, message }`, così chi lo
+consuma può mostrare il testo già formattato oppure fare routing sui campi
+strutturati:
 
 ```json
 {
+  "schemaVersion": 1,
   "change": {
     "kind": "status_change",
     "providerId": "cloudflare",
@@ -1528,6 +1530,19 @@ mostrare il testo già formattato oppure fare routing sui campi strutturati:
   "message": "🔴 Cloudflare — MAJOR OUTAGE\n\nStatus changed from Operational to Major outage.\nUpdated: 2026-08-19 14:32 UTC\n\nhttps://www.cloudflarestatus.com"
 }
 ```
+
+**Un evento versionato.** `change` è l'evento del diff engine così com'è, campo
+per campo — provider, componente, stato prima e dopo, incidente, finestra di
+manutenzione e quel che il tipo porta con sé — e `service` porta il link alla
+status page e le note dell'operatore, così un'automazione (n8n, Node-RED, Zapier,
+Make) fa routing sui campi e non deve mai interpretare `message`. Lo schema JSON
+è pubblicato in [`schema/webhook-event.v1.json`](../schema/webhook-event.v1.json),
+generato dalla definizione zod in `src/notifiers/webhookEvent.ts`. La regola: un
+campo si *aggiunge* senza cambiare `schemaVersion`, quindi ignora quelli che non
+conosci; toglierne o rinominarne uno è la versione 2, pubblicata accanto come
+nuovo file. Punti di partenza pronti in [`examples/`](../examples/): un workflow
+n8n e un flow Node-RED che ricevono l'evento, ne controllano la versione e si
+diramano su `change.kind`.
 
 **Firma.** Impostando `WEBHOOK_SECRET` (o `webhook.secret` in `config.yml`) ogni
 richiesta porta due header in più:

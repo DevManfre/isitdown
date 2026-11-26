@@ -1,0 +1,111 @@
+{
+  "name": "IsItDown webhook event",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "isitdown",
+        "responseMode": "onReceived",
+        "responseCode": 204,
+        "options": {}
+      },
+      "id": "a1f0c2d4-0001-4000-8000-000000000001",
+      "name": "IsItDown event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "isitdown"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            { "value1": "={{ $json.body.schemaVersion }}", "operation": "equal", "value2": 1 }
+          ]
+        }
+      },
+      "id": "a1f0c2d4-0002-4000-8000-000000000002",
+      "name": "Schema v1?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.body.change.kind }}",
+        "rules": {
+          "rules": [
+            { "value2": "incident_opened", "output": 0 },
+            { "value2": "incident_resolved", "output": 1 },
+            { "value2": "status_change", "output": 2 }
+          ]
+        },
+        "fallbackOutput": 3
+      },
+      "id": "a1f0c2d4-0003-4000-8000-000000000003",
+      "name": "By kind",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [680, 280]
+    },
+    {
+      "parameters": {},
+      "id": "a1f0c2d4-0004-4000-8000-000000000004",
+      "name": "Incident opened",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [920, 140]
+    },
+    {
+      "parameters": {},
+      "id": "a1f0c2d4-0005-4000-8000-000000000005",
+      "name": "Incident resolved",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [920, 260]
+    },
+    {
+      "parameters": {},
+      "id": "a1f0c2d4-0006-4000-8000-000000000006",
+      "name": "Status changed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [920, 380]
+    },
+    {
+      "parameters": {},
+      "id": "a1f0c2d4-0007-4000-8000-000000000007",
+      "name": "Any other kind",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [920, 500]
+    },
+    {
+      "parameters": {},
+      "id": "a1f0c2d4-0008-4000-8000-000000000008",
+      "name": "Unknown schema version",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [680, 480]
+    }
+  ],
+  "connections": {
+    "IsItDown event": { "main": [[{ "node": "Schema v1?", "type": "main", "index": 0 }]] },
+    "Schema v1?": {
+      "main": [
+        [{ "node": "By kind", "type": "main", "index": 0 }],
+        [{ "node": "Unknown schema version", "type": "main", "index": 0 }]
+      ]
+    },
+    "By kind": {
+      "main": [
+        [{ "node": "Incident opened", "type": "main", "index": 0 }],
+        [{ "node": "Incident resolved", "type": "main", "index": 0 }],
+        [{ "node": "Status changed", "type": "main", "index": 0 }],
+        [{ "node": "Any other kind", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {}
+}

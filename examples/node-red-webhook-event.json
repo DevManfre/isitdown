@@ -1,0 +1,135 @@
+[
+  {
+    "id": "isitdown.tab",
+    "type": "tab",
+    "label": "IsItDown webhook event",
+    "info": "Receives the IsItDown generic webhook (schema/webhook-event.v1.json) and branches on change.kind."
+  },
+  {
+    "id": "isitdown.in",
+    "type": "http in",
+    "z": "isitdown.tab",
+    "name": "IsItDown event",
+    "url": "/isitdown",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 140,
+    "y": 120,
+    "wires": [["isitdown.ack", "isitdown.version"]]
+  },
+  {
+    "id": "isitdown.ack",
+    "type": "http response",
+    "z": "isitdown.tab",
+    "name": "204",
+    "statusCode": "204",
+    "headers": {},
+    "x": 340,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "isitdown.version",
+    "type": "switch",
+    "z": "isitdown.tab",
+    "name": "Schema v1?",
+    "property": "payload.schemaVersion",
+    "propertyType": "msg",
+    "rules": [
+      { "t": "eq", "v": "1", "vt": "num" },
+      { "t": "else" }
+    ],
+    "checkall": "false",
+    "repair": false,
+    "outputs": 2,
+    "x": 350,
+    "y": 140,
+    "wires": [["isitdown.kind"], ["isitdown.unknown"]]
+  },
+  {
+    "id": "isitdown.kind",
+    "type": "switch",
+    "z": "isitdown.tab",
+    "name": "By kind",
+    "property": "payload.change.kind",
+    "propertyType": "msg",
+    "rules": [
+      { "t": "eq", "v": "incident_opened", "vt": "str" },
+      { "t": "eq", "v": "incident_resolved", "vt": "str" },
+      { "t": "eq", "v": "status_change", "vt": "str" },
+      { "t": "else" }
+    ],
+    "checkall": "false",
+    "repair": false,
+    "outputs": 4,
+    "x": 550,
+    "y": 120,
+    "wires": [["isitdown.opened"], ["isitdown.resolved"], ["isitdown.status"], ["isitdown.other"]]
+  },
+  {
+    "id": "isitdown.opened",
+    "type": "debug",
+    "z": "isitdown.tab",
+    "name": "Incident opened",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload.change.incident",
+    "targetType": "msg",
+    "x": 780,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "isitdown.resolved",
+    "type": "debug",
+    "z": "isitdown.tab",
+    "name": "Incident resolved",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload.change.incident",
+    "targetType": "msg",
+    "x": 780,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "isitdown.status",
+    "type": "debug",
+    "z": "isitdown.tab",
+    "name": "Status changed",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload.change",
+    "targetType": "msg",
+    "x": 780,
+    "y": 140,
+    "wires": []
+  },
+  {
+    "id": "isitdown.other",
+    "type": "debug",
+    "z": "isitdown.tab",
+    "name": "Any other kind",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload.change.kind",
+    "targetType": "msg",
+    "x": 780,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "isitdown.unknown",
+    "type": "debug",
+    "z": "isitdown.tab",
+    "name": "Unknown schema version",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload.schemaVersion",
+    "targetType": "msg",
+    "x": 570,
+    "y": 200,
+    "wires": []
+  }
+]
