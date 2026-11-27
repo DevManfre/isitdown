@@ -1,0 +1,48 @@
+# Accepted CVEs — roadmap 9.6, see tools/cve-exceptions.mjs and
+# docs/development.md §9.7. The supply-chain workflow fails on a HIGH or
+# CRITICAL vulnerability with a fix available; an entry here accepts one CVE,
+# with the reason and the date it stops being accepted. `npm run
+# check:cve-exceptions` refuses an entry without either, and fails CI the day
+# after it expires.
+#
+#   - id: CVE-2026-12345
+#     statement: the vulnerable path is never reached — why, in one sentence
+#     expired_at: 2026-12-31
+#     paths: [package-lock.json]
+vulnerabilities:
+  - id: CVE-2026-111181
+    statement: body-parser 2.3.0, under express; the fix is a patch release inside express's own range, so it needs only a lockfile refresh — Renovate's weekly lockfile maintenance or its vulnerability-alert PR; remove the entry with that PR
+    expired_at: 2026-12-14
+  - id: CVE-2026-90711
+    statement: proxy-addr 2.0.7, under express; the fix is a patch release inside express's own range, so it needs only a lockfile refresh — Renovate's weekly lockfile maintenance or its vulnerability-alert PR; remove the entry with that PR
+    expired_at: 2026-12-14
+  - id: CVE-2026-102276
+    statement: brace-expansion inside the npm that node:26-alpine bundles; npm is not run by either image's entrypoint, so it waits for a base digest with a fixed npm, which Renovate proposes
+    expired_at: 2026-12-31
+    paths:
+      - usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json
+  - id: CVE-2026-102278
+    statement: brace-expansion inside the npm that node:26-alpine bundles; npm is not run by either image's entrypoint, so it waits for a base digest with a fixed npm, which Renovate proposes
+    expired_at: 2026-12-31
+    paths:
+      - usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json
+  - id: CVE-2026-109383
+    statement: undici inside the npm that node:26-alpine bundles; npm is not run by either image's entrypoint, so it waits for a base digest with a fixed npm, which Renovate proposes
+    expired_at: 2026-12-31
+    paths:
+      - usr/local/lib/node_modules/npm/node_modules/undici/package.json
+  - id: CVE-2026-109869
+    statement: undici inside the npm that node:26-alpine bundles; npm is not run by either image's entrypoint, so it waits for a base digest with a fixed npm, which Renovate proposes
+    expired_at: 2026-12-31
+    paths:
+      - usr/local/lib/node_modules/npm/node_modules/undici/package.json
+  - id: CVE-2026-19534
+    statement: undici inside the npm that node:26-alpine bundles; npm is not run by either image's entrypoint, so it waits for a base digest with a fixed npm, which Renovate proposes
+    expired_at: 2026-12-31
+    paths:
+      - usr/local/lib/node_modules/npm/node_modules/undici/package.json
+  - id: CVE-2026-87018
+    statement: undici inside the npm that node:26-alpine bundles; npm is not run by either image's entrypoint, so it waits for a base digest with a fixed npm, which Renovate proposes
+    expired_at: 2026-12-31
+    paths:
+      - usr/local/lib/node_modules/npm/node_modules/undici/package.json
