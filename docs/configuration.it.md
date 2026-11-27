@@ -707,6 +707,8 @@ prova reale (roadmap 4.5).
 | `DATA_PATH` | Light | | `/app/data/state.json` | Dove tenere il file di stato. |
 | `DB_PATH` | UI | | `/app/data/isitdown.db` | Database SQLite. |
 | `API_TOKEN` | UI | ✓ | — | Un token bearer di sola lettura ([3.12](#312-raggiungere-lapi-da-un-altro-host)). Non impostato — il valore predefinito — lascia ogni rotta aperta, che è giusto per un'istanza legata a `127.0.0.1`. Impostandolo, una richiesta che lo porta può fare `GET` da qualunque host; le scritture restano solo locali. |
+| `ISITDOWN_URL` | CLI | | `http://localhost:3000` | L'istanza che `isitdown status` interroga ([CLI §10.8](cli.it.md#108-isitdown-status)). `--url` ha la precedenza. |
+| `ISITDOWN_TOKEN` | CLI | ✓ | — | Il token che `isitdown status` manda; in mancanza usa `API_TOKEN`. `--token` ha la precedenza. |
 | `API_LOCAL_BYPASS` | UI | | `true` | Se una richiesta da questa macchina possa saltare `API_TOKEN`. Impostalo a `false` dietro un reverse proxy, dove ogni richiesta inoltrata sembra locale. |
 | `AUDIT_ACTOR_HEADER` | UI | | — | L'header di richiesta che indica chi ha fatto una scrittura di configurazione nella cronologia (`GET /config/history`, roadmap 5.7) — per esempio `X-Forwarded-User` dietro un reverse proxy che autentica. Non impostato, o con una richiesta che non lo porta, l'attore è registrato come `local`. Ci si fida del valore così com'è: impostalo solo dove un proxy possiede quell'header. |
 | `ALLOWED_HOSTS` | UI | | — | Hostname extra, separati da virgola, con cui la dashboard può essere servita (ad es. il nome di un reverse proxy). Una scrittura il cui `Origin` o `Host` non sia quello della dashboard, `localhost` o un indirizzo IP viene rifiutata con `403`. Nessun wildcard. |

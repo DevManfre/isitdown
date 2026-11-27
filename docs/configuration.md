@@ -685,6 +685,8 @@ notification (roadmap 4.5).
 | `DATA_PATH` | Light | | `/app/data/state.json` | Where to keep the state file. |
 | `DB_PATH` | UI | | `/app/data/isitdown.db` | SQLite database. |
 | `API_TOKEN` | UI | ✓ | — | A read-only bearer token ([3.12](#312-reaching-the-api-from-another-host)). Unset — the default — leaves every route open, which is right for an instance bound to `127.0.0.1`. Set it and a request carrying it may `GET` from any host; writes stay local-only. |
+| `ISITDOWN_URL` | CLI | | `http://localhost:3000` | The instance `isitdown status` asks ([CLI §10.8](cli.md#108-isitdown-status)). `--url` wins. |
+| `ISITDOWN_TOKEN` | CLI | ✓ | — | The token `isitdown status` sends; falls back to `API_TOKEN`. `--token` wins. |
 | `API_LOCAL_BYPASS` | UI | | `true` | Whether a request from this machine may skip `API_TOKEN`. Set it to `false` behind a reverse proxy, where every forwarded request looks local. |
 | `AUDIT_ACTOR_HEADER` | UI | | — | The request header that names who made a configuration write in the history (`GET /config/history`, roadmap 5.7) — say `X-Forwarded-User` behind a reverse proxy that authenticates. Unset, or a request without it, records the actor as `local`. Trusted as sent: set it only where a proxy owns that header. |
 | `ALLOWED_HOSTS` | UI | | — | Comma-separated extra hostnames the dashboard may be served under (for example a reverse proxy's name). A write whose `Origin` or `Host` is neither the dashboard's own, `localhost` nor an IP literal is refused with `403`. No wildcard. |

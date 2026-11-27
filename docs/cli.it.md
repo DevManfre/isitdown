@@ -225,3 +225,95 @@ macchina, e il token può solo leggere. Togli `env` se l'istanza non ha `API_TOK
   }
 }
 ```
+
+### 10.8 `isitdown status`
+
+```
+utilizzo: isitdown status [--url <url>] [--token <token>] [--provider <id,id>] [--json] [--exit-code]
+```
+
+Il quinto comando (roadmap 12.2): la flotta letta una volta, per uno script
+invece che per una persona — "non deployare finché GitHub è giù", un hook git,
+un job cron. Come `watch` e `mcp`, manda solo una `GET /status`.
+
+- **L'output predefinito** è una riga per ogni provider non operativo
+  (`GitHub (github): Major outage`), oppure un'unica riga
+  `all 12 providers operational` — in inglese, come il resto della CLI.
+- **`--provider github,cloudflare`** tiene solo quegli id — per l'output e per
+  l'exit code. Ripetibile. Un id che l'istanza non monitora (o ha disattivato)
+  è un errore, così un refuso non può passare per "tutto a posto".
+- **`--json`** stampa invece questa forma, e nient'altro su stdout:
+
+  ```json
+  {
+    "overall": "down",
+    "serverNow": "2026-11-27T10:00:05.000Z",
+    "providers": [
+      { "id": "github", "name": "GitHub", "status": "major_outage", "fetchedAt": "2026-11-27T10:00:00.000Z" }
+    ]
+  }
+  ```
+
+  `overall` vale `operational`, `degraded` o `down`; `status` è la lettura del
+  provider stesso, uno tra `operational`, `degraded`, `partial_outage`,
+  `major_outage`, `unknown`. I provider disattivati sono esclusi.
+- **`--exit-code`** fa dello stato della flotta l'exit code:
+
+  | Codice | Significa |
+  |---|---|
+  | `0` | Tutto ciò che è stato tenuto è operativo |
+  | `1` | Qualcosa è degradato, in interruzione parziale o `unknown` — niente è giù |
+  | `2` | Qualcosa è in interruzione grave |
+  | `3` | L'istanza non si è potuta leggere: irraggiungibile, token rifiutato, risposta inattesa |
+  | `64` | Uso sbagliato: un'opzione sconosciuta, un `--url` non valido, un `--provider` che l'istanza non monitora |
+
+  Senza `--exit-code` il comando esce con `0` qualunque sia lo stato della
+  flotta, e comunque con `3` o `64` quando non ha potuto rispondere. `64` sta
+  fuori da 0–3 di proposito: uno script rotto non deve sembrare "qualcosa è giù".
+
+`--url` ripiega su `$ISITDOWN_URL`, poi `http://localhost:3000`; `--token` su
+`$ISITDOWN_TOKEN`, poi `$API_TOKEN` — la variabile che leggono `watch` e `mcp`
+— così uno script resta di una riga.
+
+**GitHub Actions — saltare il deploy mentre una dipendenza è giù.** Il runner
+deve raggiungere l'istanza (un runner self-hosted sulla stessa rete, o
+un'istanza pubblicata dietro un reverse proxy). L'exit code `2` vuol dire giù;
+con `1`, degradato, il deploy parte comunque:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the IsItDown CLI
+        run: |
+          git clone --depth 1 https://github.com/DevManfre/isitdown /tmp/isitdown
+          cd /tmp/isitdown && npm ci && npm run build:cli
+      - name: Are our providers up?
+        id: providers
+        env:
+          ISITDOWN_URL: ${{ vars.ISITDOWN_URL }}
+          ISITDOWN_TOKEN: ${{ secrets.ISITDOWN_TOKEN }}
+        run: |
+          set +e
+          node /tmp/isitdown/dist/cli/index.js status --provider github,cloudflare --exit-code
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          [ "$code" -le 2 ]   # 3 o 64: è il controllo stesso a fallire, fallisce il job
+      - name: Deploy
+        if: steps.providers.outputs.code != '2'
+        run: ./deploy.sh
+```
+
+**Un hook pre-push** che rifiuta il push finché GitHub è giù, e dice perché —
+`.git/hooks/pre-push`, eseguibile:
+
+```bash
+#!/bin/sh
+node /path/to/isitdown/dist/cli/index.js status --provider github --exit-code
+case $? in
+  2) echo "GitHub è giù: riprova più tardi, o salta il controllo con --no-verify" >&2; exit 1 ;;
+  *) exit 0 ;;   # su, degradato, o istanza spenta: il push non si blocca
+esac
+```
