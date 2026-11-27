@@ -785,7 +785,7 @@ design, ma in un solo verso: dentro.
 Kubernetes consegnano un segreto come file montato, non come variabile. Ogni
 variabile segnata ✓ nella colonna `_FILE` della [3.3](#33-variabili-dambiente) —
 più `SMTP_PASSWORD`, `AI_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` e `PROMETHEUS_TOKEN`,
-documentate con le loro funzioni — accetta anche `NOME_FILE`: il percorso di un
+documentate con le loro funzioni — accetta anche `NAME_FILE`: il percorso di un
 file il cui contenuto è il valore, senza l'ultimo a capo. Vale anche per
 qualsiasi variabile che nomini tu, in un riferimento `${VAR}` del `config.yml`,
 nel nome di variabile di un canale nella dashboard o nelle credenziali di una
@@ -802,9 +802,9 @@ secrets:
     file: ./telegram_bot_token.txt
 ```
 
-Impostare sia `NOME` sia `NOME_FILE` è un errore all'avvio che le nomina
+Impostare sia `NAME` sia `NAME_FILE` è un errore all'avvio che le nomina
 entrambe: due fonti per un solo segreto vogliono dire che una delle due è
-vecchia. Lo stesso vale per un `NOME_FILE` che punta a un file che il processo
+vecchia. Lo stesso vale per un `NAME_FILE` che punta a un file che il processo
 non riesce a leggere. `LOG_FILE` non c'entra: è dove va il log.
 
 ### 3.5 Provider monitorati

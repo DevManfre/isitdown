@@ -167,7 +167,7 @@ perché una ConfigMap montata che cambia su disco non riavvia nulla da sola.
 
 Per tenere le credenziali del tutto fuori dall'ambiente del pod, `secretFiles:`
 monta un Secret esistente in sola lettura su `/run/secrets/isitdown` e consegna
-ogni chiave come `NOME_FILE` ([configurazione §3.4](configuration.it.md#34-come-vengono-gestiti-i-segreti),
+ogni chiave come `NAME_FILE` ([configurazione §3.4](configuration.it.md#34-come-vengono-gestiti-i-segreti),
 roadmap 9.4):
 
 ```yaml
