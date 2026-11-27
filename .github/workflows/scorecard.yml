@@ -1,0 +1,44 @@
+# Roadmap 9.6. OpenSSF Scorecard grades the repository's own practices —
+# branch protection, pinned dependencies, token permissions, signed releases —
+# every Monday and on each push to `main`. The result is published to
+# scorecard.dev, which serves the badge in the README, and uploaded to the
+# Security tab. Scorecard only analyses the default branch.
+#
+# Publishing restricts what this workflow may contain: no top-level write
+# permission, no `env` or `defaults`, and only allow-listed actions — keep it
+# that way, or the run is rejected.
+name: Scorecard
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "29 5 * * 1"
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write # upload the SARIF to code scanning
+      id-token: write # publish the result, and with it the badge
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@23f22cd43608bae7a1f1fa2603d7314dee9538a5 # v2.6.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scorecard
+          path: results.sarif
+          retention-days: 5
+      - uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          sarif_file: results.sarif

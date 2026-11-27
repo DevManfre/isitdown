@@ -4,7 +4,37 @@ Every release of IsItDown, newest first, grouped by the surface each commit
 touched. Generated from the commit log by `tools/changelog.mjs` — don't edit
 it by hand; the release flow regenerates it.
 
+## v2.51.0 — 2026-11-27
+
+### CLI
+
+- ✨ serve the fleet to an AI assistant with isitdown mcp (ALE-122)
+
+### FIX
+
+- 🐛 switch the Dockerfile USER lines to numeric ids for hadolint DL3066 (ALE-94)
+
+### DOCS
+
+- 📝 document the supply-chain checks in the Italian developer manual
+- 📝 document the supply-chain checks and the CVE exceptions file
+- 📝 add the OpenSSF Scorecard badge to the Italian README
+- 📝 add the OpenSSF Scorecard badge to the README
+
+### CI
+
+- 👷 refuse a CVE exception without a reason or past its expiry
+- 👷 scan for CVEs, lint the Dockerfile, run CodeQL and Scorecard
+
+### DOCKER
+
+- 📌 pin the node base image by digest and let Renovate move it
+
 ## v2.50.0 — 2026-11-26
+
+### RELEASE
+
+- 🔖 bump the version to 2.50.0
 
 ### CI
 
