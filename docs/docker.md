@@ -160,6 +160,18 @@ and mounted read-only; `${VAR}` references in it resolve against that same Secre
 An edit to it rolls the pod, because a mounted ConfigMap changing on disk
 restarts nothing on its own.
 
+To keep credentials out of the pod's environment altogether, `secretFiles:`
+mounts an existing Secret read-only at `/run/secrets/isitdown` and hands each key
+over as `NAME_FILE` ([configuration §3.4](configuration.md#34-how-secrets-are-handled),
+roadmap 9.4):
+
+```yaml
+secretFiles:
+  secretName: isitdown-credentials
+  keys:
+    TELEGRAM_BOT_TOKEN: telegram-bot-token   # → TELEGRAM_BOT_TOKEN_FILE
+```
+
 ### 4.5 Neither: the single-file Light edition
 
 > **Deprecated in 2.46, not published from 3.0** ([Deprecations](deprecations.md)):

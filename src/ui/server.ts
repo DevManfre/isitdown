@@ -3,6 +3,7 @@ import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { configureOutbound, parseAllowList, unusableAllowEntries } from "../core/outboundPolicy.ts";
 import { useEnvProxy } from "../core/proxy.ts";
+import { applySecretFiles } from "../core/secretEnv.ts";
 import { createChatops } from "./chatops.ts";
 import { buildUiRuntime } from "./runtime.ts";
 import { REVISION_CHECK_INTERVAL_MS } from "./incidentRevisions.ts";
@@ -20,6 +21,14 @@ const logger = createLogger(
   parseLogLevel(process.env["LOG_LEVEL"]),
   createLogWriter(readFileLogOptions(process.env)),
 );
+
+// Roadmap 9.4: every NAME_FILE becomes NAME before anything reads a secret.
+try {
+  applySecretFiles(process.env);
+} catch (error) {
+  logger.error("isitdown ui failed to start", { error: error instanceof Error ? error.message : String(error) });
+  process.exit(1);
+}
 
 // Roadmap 9.1: anyone who can add a provider here — through the dashboard or
 // an API token — could otherwise read the LAN, so loopback and private targets

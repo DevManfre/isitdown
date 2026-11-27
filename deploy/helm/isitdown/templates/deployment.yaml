@@ -48,11 +48,17 @@ spec:
               containerPort: 3000
               protocol: TCP
           {{- end }}
-          {{- if or .Values.env .Values.secrets .Values.existingSecret }}
+          {{- if or .Values.env .Values.secrets .Values.existingSecret .Values.secretFiles.secretName }}
           env:
             {{- range $name, $value := .Values.env }}
             - name: {{ $name }}
               value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.secretFiles.secretName }}
+            {{- range $name, $key := .Values.secretFiles.keys }}
+            - name: {{ printf "%s_FILE" $name }}
+              value: {{ printf "/run/secrets/isitdown/%s" $key | quote }}
+            {{- end }}
             {{- end }}
           {{- end }}
           {{- if or .Values.secrets .Values.existingSecret }}
@@ -97,6 +103,11 @@ spec:
               subPath: config.yml
               readOnly: true
             {{- end }}
+            {{- if .Values.secretFiles.secretName }}
+            - name: secret-files
+              mountPath: /run/secrets/isitdown
+              readOnly: true
+            {{- end }}
       volumes:
         - name: data
           {{- if .Values.persistence.enabled }}
@@ -111,6 +122,12 @@ spec:
         - name: config
           configMap:
             name: {{ include "isitdown.fullname" . }}-config
+        {{- end }}
+        {{- if .Values.secretFiles.secretName }}
+        - name: secret-files
+          secret:
+            secretName: {{ .Values.secretFiles.secretName }}
+            defaultMode: 0400
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

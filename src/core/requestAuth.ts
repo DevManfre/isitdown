@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { USER_AGENT } from "./http.ts";
 import { guardedFetch, readOutboundPolicy } from "./outboundPolicy.ts";
+import { readSecretEnv } from "./secretEnv.ts";
 
 /**
  * Credentials for a status source that answers only to somebody it knows —
@@ -101,7 +102,7 @@ export function authProblems(options: Record<string, string> | undefined): strin
  * because of our own missing secret is the wrong thing to wake up to.
  */
 function fromEnv(name: string, providerId: string, key: string): string {
-  const value = process.env[name];
+  const value = readSecretEnv(name, process.env);
   if (value === undefined || value === "") {
     throw new Error(`credentials for ${providerId}: ${key} names ${name}, which is not set`);
   }

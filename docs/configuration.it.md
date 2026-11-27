@@ -621,116 +621,116 @@ prova reale (roadmap 4.5).
 
 ### 3.3 Variabili d'ambiente
 
-| Variabile | Edizioni | Default | Scopo |
-|---|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | entrambe | — | Token del bot Telegram. Obbligatoria se il canale Telegram è attivo. |
-| `TELEGRAM_CHAT_ID` | entrambe | — | Chat di destinazione. Obbligatoria con la precedente. |
-| `WEBHOOK_URL` | entrambe | — | Dove il webhook generico fa POST. Obbligatoria se quel canale è attivo. |
-| `DISCORD_WEBHOOK_URL` | entrambe | — | Webhook in entrata di Discord. Obbligatoria se il canale Discord è attivo. |
-| `SLACK_WEBHOOK_URL` | entrambe | — | Webhook in entrata di Slack. Obbligatoria se il canale Slack è attivo. |
-| `NTFY_TOPIC_URL` | entrambe | — | URL del topic ntfy, server incluso (`https://ntfy.sh/mio-topic`). Obbligatoria se il canale ntfy è attivo. |
-| `NTFY_TOKEN` | entrambe | — | Token di accesso ntfy, opzionale. Serve solo su un server con controllo degli accessi. |
-| `GOTIFY_URL` | entrambe | — | Server Gotify (`https://gotify.example.com`). Obbligatoria se il canale Gotify è attivo. |
-| `GOTIFY_TOKEN` | entrambe | — | Token applicativo di Gotify. Obbligatoria insieme alla precedente. |
-| `PUSHOVER_TOKEN` | entrambe | — | Token API dell'applicazione Pushover. Obbligatoria se il canale Pushover è attivo. |
-| `PUSHOVER_USER_KEY` | entrambe | — | User key (o group key) di Pushover. Obbligatoria insieme alla precedente. |
-| `PUSHOVER_DEVICE` | entrambe | — | Opzionale. Un singolo dispositivo registrato; se vuota la notifica arriva su tutti. |
-| `TEAMS_WEBHOOK_URL` | entrambe | — | Webhook del canale Microsoft Teams. Obbligatoria se il canale Teams è attivo. |
-| `MATRIX_HOMESERVER_URL` | entrambe | — | Radice dell'homeserver Matrix (`https://matrix.example.org`). Obbligatoria se il canale Matrix è attivo. |
-| `MATRIX_ROOM_ID` | entrambe | — | Id interno della stanza (`!ops:example.org`), non un alias. Obbligatoria con la precedente. |
-| `MATRIX_ACCESS_TOKEN` | entrambe | — | Access token dell'utente che pubblica. Obbligatoria con le precedenti. |
-| `PAGERDUTY_ROUTING_KEY` | entrambe | — | Integration key di un'integrazione Events API v2. Obbligatoria se il canale PagerDuty è attivo. |
-| `PAGERDUTY_REGION` | entrambe | — | Opzionale. `eu` per un account nella service region europea di PagerDuty. |
-| `OPSGENIE_API_KEY` | entrambe | — | Chiave API di un'integrazione Opsgenie. Obbligatoria se il canale Opsgenie è attivo. |
-| `OPSGENIE_REGION` | entrambe | — | Opzionale. `eu` per un account sull'istanza europea di Opsgenie. |
-| `APPRISE_SERVER_URL` | entrambe | — | Server API Apprise (`http://apprise:8000`). Obbligatoria se il canale Apprise è attivo. |
-| `APPRISE_CONFIG_KEY` | entrambe | — | Chiave di una configurazione salvata sul server Apprise. Serve questa oppure `APPRISE_URLS`. |
-| `APPRISE_URLS` | entrambe | — | URL dei servizi Apprise, separati da virgola, per un server stateless. Serve questa oppure `APPRISE_CONFIG_KEY`. |
-| `SPLUNK_ONCALL_API_KEY` | entrambe | — | Chiave API dell'endpoint REST di Splunk On-Call. Obbligatoria se quel canale è attivo. |
-| `SPLUNK_ONCALL_ROUTING_KEY` | entrambe | — | La routing key che sceglie la policy di escalation. Obbligatoria con la precedente. |
-| `SQUADCAST_WEBHOOK_URL` | entrambe | — | URL dell'Incident Webhook di Squadcast. Obbligatorio se quel canale è attivo. |
-| `ZENDUTY_INTEGRATION_KEY` | entrambe | — | Chiave di un'integrazione API di Zenduty. Obbligatoria se quel canale è attivo. |
-| `INCIDENT_IO_ALERT_SOURCE_ID` | entrambe | — | Config id della alert source HTTP di incident.io. Obbligatorio se quel canale è attivo. |
-| `INCIDENT_IO_TOKEN` | entrambe | — | Il bearer token di quella alert source. Obbligatorio con il precedente. |
-| `GRAFANA_ONCALL_WEBHOOK_URL` | entrambe | — | URL del Formatted Webhook di Grafana OnCall. Obbligatorio se quel canale è attivo. |
-| `MATTERMOST_URL` | entrambe | — | Server Mattermost (`https://chat.example.com`). Obbligatorio se quel canale è attivo. |
-| `MATTERMOST_TOKEN` | entrambe | — | Il token di un account bot. Obbligatorio con il precedente. |
-| `MATTERMOST_CHANNEL_ID` | entrambe | — | L'id del canale, non il nome. Obbligatorio con il precedente. |
-| `ROCKETCHAT_URL` | entrambe | — | Server Rocket.Chat. Obbligatorio se quel canale è attivo. |
-| `ROCKETCHAT_USER_ID` | entrambe | — | L'id dell'utente bot. Obbligatorio con il precedente. |
-| `ROCKETCHAT_TOKEN` | entrambe | — | Un personal access token di quell'utente. Obbligatorio con il precedente. |
-| `ROCKETCHAT_ROOM_ID` | entrambe | — | L'id della stanza, non il suo `#nome`. Obbligatorio con il precedente. |
-| `ZULIP_SITE_URL` | entrambe | — | Organizzazione Zulip (`https://example.zulipchat.com`). Obbligatoria se quel canale è attivo. |
-| `ZULIP_BOT_EMAIL` | entrambe | — | L'indirizzo email del bot. Obbligatorio con il precedente. |
-| `ZULIP_API_KEY` | entrambe | — | La chiave API del bot. Obbligatoria con il precedente. |
-| `ZULIP_STREAM` | entrambe | — | Il canale (stream) in cui scrivere. Obbligatorio con il precedente. |
-| `ZULIP_TOPIC` | entrambe | — | Opzionale. Un topic fisso; se non impostato ogni provider ha il suo. |
-| `GOOGLE_CHAT_WEBHOOK_URL` | entrambe | — | Il webhook in entrata di uno spazio Google Chat. Obbligatorio se quel canale è attivo. |
-| `TWILIO_SMS_ACCOUNT_SID` | entrambe | — | Account SID Twilio (`AC…`) per gli SMS. Obbligatorio se il canale SMS è attivo. |
-| `TWILIO_SMS_AUTH_TOKEN` | entrambe | — | L'auth token di quell'account. Obbligatorio con il precedente. |
-| `TWILIO_SMS_FROM` | entrambe | — | Il numero Twilio da cui scrivere, E.164. Obbligatorio con il precedente. |
-| `TWILIO_SMS_TO` | entrambe | — | Il numero a cui scrivere, E.164. Obbligatorio con il precedente. |
-| `TWILIO_CALL_ACCOUNT_SID` | entrambe | — | Account SID Twilio per le chiamate. Obbligatorio se il canale chiamata è attivo. Variabile propria anche per lo stesso account: due canali non ne condividono mai una. |
-| `TWILIO_CALL_AUTH_TOKEN` | entrambe | — | L'auth token di quell'account. Obbligatorio con il precedente. |
-| `TWILIO_CALL_FROM` | entrambe | — | Il numero Twilio da cui chiamare, E.164. Obbligatorio con il precedente. |
-| `TWILIO_CALL_TO` | entrambe | — | Il numero da chiamare, E.164. Obbligatorio con il precedente. |
-| `BARK_DEVICE_KEY` | entrambe | — | La device key mostrata dall'app Bark per iOS. Obbligatoria se quel canale è attivo. |
-| `BARK_SERVER_URL` | entrambe | — | Opzionale. Un bark-server self-hosted; se non impostato si usa `https://api.day.app`. |
-| `SIGNAL_API_URL` | entrambe | — | Un server signal-cli-rest-api (`http://signal-api:8080`). Obbligatorio se quel canale è attivo. |
-| `SIGNAL_NUMBER` | entrambe | — | Il numero registrato da cui partono i messaggi, E.164. Obbligatorio con il precedente. |
-| `SIGNAL_RECIPIENTS` | entrambe | — | Numeri o id `group.…`, separati da virgola. Obbligatorio con il precedente. |
-| `SYSLOG_URL` | entrambe | — | `udp://host:514`, `tcp://host:601` o `tls://host:6514`. Obbligatorio se quel canale è attivo. |
-| `SYSLOG_FACILITY` | entrambe | `local0` | Opzionale. Da `local0` a `local7`. |
-| `MQTT_BROKER_URL` | entrambe | — | `mqtt://broker:1883`, o `mqtts://` per TLS. Obbligatorio se quel canale è attivo. |
-| `MQTT_TOPIC` | entrambe | `isitdown` | Opzionale. Prefisso dei topic; i messaggi vanno su `<prefisso>/<provider>`. |
-| `MQTT_USERNAME` | entrambe | — | Opzionale. Solo per un broker che chiede credenziali. |
-| `MQTT_PASSWORD` | entrambe | — | Opzionale. Inviata solo insieme a un nome utente. |
-| `MASTODON_INSTANCE_URL` | entrambe | — | Istanza Mastodon (`https://mastodon.social`). Obbligatoria se quel canale è attivo. |
-| `MASTODON_ACCESS_TOKEN` | entrambe | — | Il token di un'applicazione con `write:statuses`. Obbligatorio con il precedente. |
-| `MASTODON_VISIBILITY` | entrambe | `public` | Opzionale. `public`, `unlisted` o `private`. |
-| `BLUESKY_HANDLE` | entrambe | — | L'handle dell'account. Obbligatorio se quel canale è attivo. |
-| `BLUESKY_APP_PASSWORD` | entrambe | — | Una app password, mai la password dell'account. Obbligatoria con il precedente. |
-| `BLUESKY_SERVICE_URL` | entrambe | `https://bsky.social` | Opzionale. Il PDS dell'account. |
-| `WEBHOOK_SECRET` | entrambe | — | Segreto condiviso opzionale per il webhook generico. Impostandolo ogni richiesta viene firmata (vedi [3.6](#36-canali-di-notifica)); lasciandolo vuoto le richieste partono non firmate, esattamente come prima. |
-| `LOG_LEVEL` | entrambe | `info` | `debug` · `info` · `warn` · `error`. |
-| `PLUGINS_DIR` | entrambe | — | Una cartella di plugin adapter da caricare all'avvio ([3.14](#314-plugin-adapter)). Non impostata — il valore predefinito, anche nelle immagini — non carica nulla. **Un plugin gira con i privilegi di questo processo.** |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | entrambe | — | L'URL base di un collector OTLP/HTTP; `/v1/traces` viene aggiunto. Impostarla attiva il tracing ([3.16](#316-tracce)). Se non è impostata non viene tracciato nulla e non viene allocato nulla. |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | entrambe | — | L'endpoint delle tracce esatto, quando non è `<base>/v1/traces`. Ha la precedenza sulla variabile qui sopra. |
-| `OTEL_EXPORTER_OTLP_HEADERS` | entrambe | — | `chiave=valore,altra=valore` — una API key che un collector gestito richiede. |
-| `OTEL_SERVICE_NAME` | entrambe | `isitdown` | Come il collector etichetta questo processo. |
-| `OUTPOSTS` | entrambe | — | Gli outpost a cui chiedere una seconda lettura di ogni sonda, URL base separati da virgola (`https://vps-1.example.com:8080`) — roadmap 1.7, vedi [Docker §4.7](docker.it.md#47-outpost--un-secondo-punto-di-vista-per-le-sonde). Non impostata — il default — ogni sonda resta la sola lettura di questo container. |
-| `OUTPOST_TOKEN` | entrambe, outpost | — | Il bearer token con cui è stato avviato ogni outpost. Obbligatoria insieme a `OUTPOSTS`; un outpost senza non parte. |
-| `LOG_FILE` | entrambe | — | Accoda ogni riga di log anche a questo file, ruotato per dimensione. Se non è impostata, i log vanno solo su stdout. |
-| `LOG_MAX_BYTES` | entrambe | `5242880` | Dimensione alla quale `LOG_FILE` ruota. |
-| `LOG_MAX_FILES` | entrambe | `5` | Quante generazioni ruotate (`.1` … `.5`) sopravvivono accanto al file vivo. |
-| `CONFIG_PATH` | Light | `/app/config/config.yml` | Dove leggere `config.yml`. |
-| `DATA_PATH` | Light | `/app/data/state.json` | Dove tenere il file di stato. |
-| `DB_PATH` | UI | `/app/data/isitdown.db` | Database SQLite. |
-| `API_TOKEN` | UI | — | Un token bearer di sola lettura ([3.12](#312-raggiungere-lapi-da-un-altro-host)). Non impostato — il valore predefinito — lascia ogni rotta aperta, che è giusto per un'istanza legata a `127.0.0.1`. Impostandolo, una richiesta che lo porta può fare `GET` da qualunque host; le scritture restano solo locali. |
-| `API_LOCAL_BYPASS` | UI | `true` | Se una richiesta da questa macchina possa saltare `API_TOKEN`. Impostalo a `false` dietro un reverse proxy, dove ogni richiesta inoltrata sembra locale. |
-| `AUDIT_ACTOR_HEADER` | UI | — | L'header di richiesta che indica chi ha fatto una scrittura di configurazione nella cronologia (`GET /config/history`, roadmap 5.7) — per esempio `X-Forwarded-User` dietro un reverse proxy che autentica. Non impostato, o con una richiesta che non lo porta, l'attore è registrato come `local`. Ci si fida del valore così com'è: impostalo solo dove un proxy possiede quell'header. |
-| `ALLOWED_HOSTS` | UI | — | Hostname extra, separati da virgola, con cui la dashboard può essere servita (ad es. il nome di un reverse proxy). Una scrittura il cui `Origin` o `Host` non sia quello della dashboard, `localhost` o un indirizzo IP viene rifiutata con `403`. Nessun wildcard. |
-| `TELEGRAM_CHATOPS` | UI | `false` | Impostala a `true` perché il bot Telegram accetti comandi oltre a inviare avvisi ([3.17](#317-chatops--comandare-il-bot-da-telegram)). Spento per default: un canale di comando in entrata è una cosa che si sceglie. |
-| `TELEGRAM_COMMAND_CHAT_IDS` | UI | — | Altre chat autorizzate a comandare il bot, separate da virgola. La chat a cui il canale Telegram già invia è sempre autorizzata; questa serve a un'installazione avvisata in una chat e comandata da un'altra. |
-| `PUBLIC_PAGE` | UI | `false` | Impostala a `true` per pubblicare una pagina di stato in sola lettura su `/public` ([3.18](#318-la-pagina-di-stato-pubblica)). Spenta per default: è l'unica superficie che possono leggere degli estranei. |
-| `PUBLIC_PAGE_TITLE` | UI | `Service status` | Il titolo della pagina e quello del browser. |
-| `PUBLIC_PAGE_PROVIDERS` | UI | — | Quali provider pubblicare, per id e separati da virgola. Se non è impostata pubblica tutti i provider attivi. Un visitatore non può allargare l'elenco: la pagina non legge nulla dalla richiesta. |
-| `PUBLIC_PAGE_LOCALE` | UI | — | La lingua in cui è scritta quella pagina. Se non è impostata segue il locale delle notifiche dell'installazione. |
-| `PUSH_TOKEN` | UI | — | Attiva l'endpoint per i webhook dei provider ([3.15](#315-push-del-provider-invece-del-polling)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
-| `HEARTBEAT_TOKEN` | UI | — | Attiva l'endpoint dei ping heartbeat ([3.19](#319-heartbeat--il-dead-mans-switch)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
-| `EGRESS_ALLOW` | entrambe | — | Indirizzi, range CIDR e nomi host che la policy di uscita lascia passare ([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)), separati da virgole o spazi: `10.0.0.0/8,nas.lan`. Alla UI serve per osservare qualunque cosa sulla LAN o su questo host. |
-| `OUTBOUND_BLOCK_PRIVATE` | entrambe | non impostata | `true` fa rifiutare alla Light e all'outpost i target loopback e privati, come già fa la UI ([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)). Qualsiasi altro valore lascia il default dell'edizione. |
-| `HEARTBEAT_URL` | entrambe | — | Chiamato dopo ogni ciclo di polling completato: il dead-man's switch di IsItDown stesso ([3.39](#339-ping-in-uscita--il-dead-mans-switch-di-isitdown)). Un URL di Healthchecks.io o di un monitor push di Uptime Kuma. Nella Light vince `heartbeat.url` in `config.yml`. |
-| `HEARTBEAT_FAIL_URL` | entrambe | — | Chiamato dopo un ciclo fallito (config illeggibile, database bloccato): l'URL `/fail` di Healthchecks.io. |
-| `HEARTBEAT_METHOD` | entrambe | `GET` | `GET` o `POST`. `POST` invia una riga di testo: il riepilogo del ciclo, o il motivo del fallimento. |
-| `BACKUP_CRON` | UI | — (spento) | Backup programmati: un'espressione cron a cinque campi, letta nel fuso orario dell'istanza ([4.11](docker.it.md#411-backup-programmati)). Vince su Impostazioni → Dati e lì blocca il campo. |
-| `BACKUP_KEEP` | UI | `7` | Quanti backup programmati tenere, 1–365. Vince sulla dashboard. |
-| `BACKUP_DIR` | UI | `<data>/backups` | Dove vanno i backup programmati. Montala da un altro disco. |
-| `BACKUP_WEBDAV_URL` | UI | — | Carica anche ogni backup programmato in questa cartella WebDAV; credenziali nell'URL. |
-| `BACKUP_S3_URL` | UI | — | Carica anche ogni backup programmato su S3 o uno storage compatibile: `https://KEY:SECRET@host/bucket/prefix?region=…`. |
-| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | entrambe, outpost | — | Ogni richiesta HTTP passa da questo proxy; gli host in `NO_PROXY` no. Maiuscole o minuscole. Vedi [Proxy e reti senza Internet](docker.it.md#410-proxy-e-reti-senza-internet). |
-| `BIND_HOST` | UI | `127.0.0.1` | L'indirizzo su cui la dashboard è in ascolto. Per impostazione predefinita è il loopback, ciò che mantiene un'istanza senza `API_TOKEN` raggiungibile solo da questa macchina; le immagini container impostano `0.0.0.0` (la mappatura `ports` di compose decide poi chi può raggiungerla, e pubblica solo su `127.0.0.1`). Per raggiungere la dashboard da un'altra macchina, pubblica su `0.0.0.0` (o imposta `BIND_HOST` su bare metal) **e** imposta `API_TOKEN` — vedi [3.12](#312-raggiungere-lapi-da-un-altro-host) per ciò che una richiesta da fuori questa macchina può fare. |
-| `PORT` | UI, outpost | `3000` (`8080` per l'outpost) | Porta HTTP. |
+| Variabile | Edizioni | `_FILE` | Default | Scopo |
+|---|---|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | entrambe | ✓ | — | Token del bot Telegram. Obbligatoria se il canale Telegram è attivo. |
+| `TELEGRAM_CHAT_ID` | entrambe | | — | Chat di destinazione. Obbligatoria con la precedente. |
+| `WEBHOOK_URL` | entrambe | ✓ | — | Dove il webhook generico fa POST. Obbligatoria se quel canale è attivo. |
+| `DISCORD_WEBHOOK_URL` | entrambe | ✓ | — | Webhook in entrata di Discord. Obbligatoria se il canale Discord è attivo. |
+| `SLACK_WEBHOOK_URL` | entrambe | ✓ | — | Webhook in entrata di Slack. Obbligatoria se il canale Slack è attivo. |
+| `NTFY_TOPIC_URL` | entrambe | ✓ | — | URL del topic ntfy, server incluso (`https://ntfy.sh/mio-topic`). Obbligatoria se il canale ntfy è attivo. |
+| `NTFY_TOKEN` | entrambe | ✓ | — | Token di accesso ntfy, opzionale. Serve solo su un server con controllo degli accessi. |
+| `GOTIFY_URL` | entrambe | | — | Server Gotify (`https://gotify.example.com`). Obbligatoria se il canale Gotify è attivo. |
+| `GOTIFY_TOKEN` | entrambe | ✓ | — | Token applicativo di Gotify. Obbligatoria insieme alla precedente. |
+| `PUSHOVER_TOKEN` | entrambe | ✓ | — | Token API dell'applicazione Pushover. Obbligatoria se il canale Pushover è attivo. |
+| `PUSHOVER_USER_KEY` | entrambe | ✓ | — | User key (o group key) di Pushover. Obbligatoria insieme alla precedente. |
+| `PUSHOVER_DEVICE` | entrambe | | — | Opzionale. Un singolo dispositivo registrato; se vuota la notifica arriva su tutti. |
+| `TEAMS_WEBHOOK_URL` | entrambe | ✓ | — | Webhook del canale Microsoft Teams. Obbligatoria se il canale Teams è attivo. |
+| `MATRIX_HOMESERVER_URL` | entrambe | | — | Radice dell'homeserver Matrix (`https://matrix.example.org`). Obbligatoria se il canale Matrix è attivo. |
+| `MATRIX_ROOM_ID` | entrambe | | — | Id interno della stanza (`!ops:example.org`), non un alias. Obbligatoria con la precedente. |
+| `MATRIX_ACCESS_TOKEN` | entrambe | ✓ | — | Access token dell'utente che pubblica. Obbligatoria con le precedenti. |
+| `PAGERDUTY_ROUTING_KEY` | entrambe | ✓ | — | Integration key di un'integrazione Events API v2. Obbligatoria se il canale PagerDuty è attivo. |
+| `PAGERDUTY_REGION` | entrambe | | — | Opzionale. `eu` per un account nella service region europea di PagerDuty. |
+| `OPSGENIE_API_KEY` | entrambe | ✓ | — | Chiave API di un'integrazione Opsgenie. Obbligatoria se il canale Opsgenie è attivo. |
+| `OPSGENIE_REGION` | entrambe | | — | Opzionale. `eu` per un account sull'istanza europea di Opsgenie. |
+| `APPRISE_SERVER_URL` | entrambe | | — | Server API Apprise (`http://apprise:8000`). Obbligatoria se il canale Apprise è attivo. |
+| `APPRISE_CONFIG_KEY` | entrambe | ✓ | — | Chiave di una configurazione salvata sul server Apprise. Serve questa oppure `APPRISE_URLS`. |
+| `APPRISE_URLS` | entrambe | ✓ | — | URL dei servizi Apprise, separati da virgola, per un server stateless. Serve questa oppure `APPRISE_CONFIG_KEY`. |
+| `SPLUNK_ONCALL_API_KEY` | entrambe | ✓ | — | Chiave API dell'endpoint REST di Splunk On-Call. Obbligatoria se quel canale è attivo. |
+| `SPLUNK_ONCALL_ROUTING_KEY` | entrambe | ✓ | — | La routing key che sceglie la policy di escalation. Obbligatoria con la precedente. |
+| `SQUADCAST_WEBHOOK_URL` | entrambe | ✓ | — | URL dell'Incident Webhook di Squadcast. Obbligatorio se quel canale è attivo. |
+| `ZENDUTY_INTEGRATION_KEY` | entrambe | ✓ | — | Chiave di un'integrazione API di Zenduty. Obbligatoria se quel canale è attivo. |
+| `INCIDENT_IO_ALERT_SOURCE_ID` | entrambe | | — | Config id della alert source HTTP di incident.io. Obbligatorio se quel canale è attivo. |
+| `INCIDENT_IO_TOKEN` | entrambe | ✓ | — | Il bearer token di quella alert source. Obbligatorio con il precedente. |
+| `GRAFANA_ONCALL_WEBHOOK_URL` | entrambe | ✓ | — | URL del Formatted Webhook di Grafana OnCall. Obbligatorio se quel canale è attivo. |
+| `MATTERMOST_URL` | entrambe | | — | Server Mattermost (`https://chat.example.com`). Obbligatorio se quel canale è attivo. |
+| `MATTERMOST_TOKEN` | entrambe | ✓ | — | Il token di un account bot. Obbligatorio con il precedente. |
+| `MATTERMOST_CHANNEL_ID` | entrambe | | — | L'id del canale, non il nome. Obbligatorio con il precedente. |
+| `ROCKETCHAT_URL` | entrambe | | — | Server Rocket.Chat. Obbligatorio se quel canale è attivo. |
+| `ROCKETCHAT_USER_ID` | entrambe | | — | L'id dell'utente bot. Obbligatorio con il precedente. |
+| `ROCKETCHAT_TOKEN` | entrambe | ✓ | — | Un personal access token di quell'utente. Obbligatorio con il precedente. |
+| `ROCKETCHAT_ROOM_ID` | entrambe | | — | L'id della stanza, non il suo `#nome`. Obbligatorio con il precedente. |
+| `ZULIP_SITE_URL` | entrambe | | — | Organizzazione Zulip (`https://example.zulipchat.com`). Obbligatoria se quel canale è attivo. |
+| `ZULIP_BOT_EMAIL` | entrambe | | — | L'indirizzo email del bot. Obbligatorio con il precedente. |
+| `ZULIP_API_KEY` | entrambe | ✓ | — | La chiave API del bot. Obbligatoria con il precedente. |
+| `ZULIP_STREAM` | entrambe | | — | Il canale (stream) in cui scrivere. Obbligatorio con il precedente. |
+| `ZULIP_TOPIC` | entrambe | | — | Opzionale. Un topic fisso; se non impostato ogni provider ha il suo. |
+| `GOOGLE_CHAT_WEBHOOK_URL` | entrambe | ✓ | — | Il webhook in entrata di uno spazio Google Chat. Obbligatorio se quel canale è attivo. |
+| `TWILIO_SMS_ACCOUNT_SID` | entrambe | | — | Account SID Twilio (`AC…`) per gli SMS. Obbligatorio se il canale SMS è attivo. |
+| `TWILIO_SMS_AUTH_TOKEN` | entrambe | ✓ | — | L'auth token di quell'account. Obbligatorio con il precedente. |
+| `TWILIO_SMS_FROM` | entrambe | | — | Il numero Twilio da cui scrivere, E.164. Obbligatorio con il precedente. |
+| `TWILIO_SMS_TO` | entrambe | | — | Il numero a cui scrivere, E.164. Obbligatorio con il precedente. |
+| `TWILIO_CALL_ACCOUNT_SID` | entrambe | | — | Account SID Twilio per le chiamate. Obbligatorio se il canale chiamata è attivo. Variabile propria anche per lo stesso account: due canali non ne condividono mai una. |
+| `TWILIO_CALL_AUTH_TOKEN` | entrambe | ✓ | — | L'auth token di quell'account. Obbligatorio con il precedente. |
+| `TWILIO_CALL_FROM` | entrambe | | — | Il numero Twilio da cui chiamare, E.164. Obbligatorio con il precedente. |
+| `TWILIO_CALL_TO` | entrambe | | — | Il numero da chiamare, E.164. Obbligatorio con il precedente. |
+| `BARK_DEVICE_KEY` | entrambe | ✓ | — | La device key mostrata dall'app Bark per iOS. Obbligatoria se quel canale è attivo. |
+| `BARK_SERVER_URL` | entrambe | | — | Opzionale. Un bark-server self-hosted; se non impostato si usa `https://api.day.app`. |
+| `SIGNAL_API_URL` | entrambe | | — | Un server signal-cli-rest-api (`http://signal-api:8080`). Obbligatorio se quel canale è attivo. |
+| `SIGNAL_NUMBER` | entrambe | | — | Il numero registrato da cui partono i messaggi, E.164. Obbligatorio con il precedente. |
+| `SIGNAL_RECIPIENTS` | entrambe | | — | Numeri o id `group.…`, separati da virgola. Obbligatorio con il precedente. |
+| `SYSLOG_URL` | entrambe | | — | `udp://host:514`, `tcp://host:601` o `tls://host:6514`. Obbligatorio se quel canale è attivo. |
+| `SYSLOG_FACILITY` | entrambe | | `local0` | Opzionale. Da `local0` a `local7`. |
+| `MQTT_BROKER_URL` | entrambe | | — | `mqtt://broker:1883`, o `mqtts://` per TLS. Obbligatorio se quel canale è attivo. |
+| `MQTT_TOPIC` | entrambe | | `isitdown` | Opzionale. Prefisso dei topic; i messaggi vanno su `<prefisso>/<provider>`. |
+| `MQTT_USERNAME` | entrambe | | — | Opzionale. Solo per un broker che chiede credenziali. |
+| `MQTT_PASSWORD` | entrambe | ✓ | — | Opzionale. Inviata solo insieme a un nome utente. |
+| `MASTODON_INSTANCE_URL` | entrambe | | — | Istanza Mastodon (`https://mastodon.social`). Obbligatoria se quel canale è attivo. |
+| `MASTODON_ACCESS_TOKEN` | entrambe | ✓ | — | Il token di un'applicazione con `write:statuses`. Obbligatorio con il precedente. |
+| `MASTODON_VISIBILITY` | entrambe | | `public` | Opzionale. `public`, `unlisted` o `private`. |
+| `BLUESKY_HANDLE` | entrambe | | — | L'handle dell'account. Obbligatorio se quel canale è attivo. |
+| `BLUESKY_APP_PASSWORD` | entrambe | ✓ | — | Una app password, mai la password dell'account. Obbligatoria con il precedente. |
+| `BLUESKY_SERVICE_URL` | entrambe | | `https://bsky.social` | Opzionale. Il PDS dell'account. |
+| `WEBHOOK_SECRET` | entrambe | ✓ | — | Segreto condiviso opzionale per il webhook generico. Impostandolo ogni richiesta viene firmata (vedi [3.6](#36-canali-di-notifica)); lasciandolo vuoto le richieste partono non firmate, esattamente come prima. |
+| `LOG_LEVEL` | entrambe | | `info` | `debug` · `info` · `warn` · `error`. |
+| `PLUGINS_DIR` | entrambe | | — | Una cartella di plugin adapter da caricare all'avvio ([3.14](#314-plugin-adapter)). Non impostata — il valore predefinito, anche nelle immagini — non carica nulla. **Un plugin gira con i privilegi di questo processo.** |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | entrambe | | — | L'URL base di un collector OTLP/HTTP; `/v1/traces` viene aggiunto. Impostarla attiva il tracing ([3.16](#316-tracce)). Se non è impostata non viene tracciato nulla e non viene allocato nulla. |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | entrambe | | — | L'endpoint delle tracce esatto, quando non è `<base>/v1/traces`. Ha la precedenza sulla variabile qui sopra. |
+| `OTEL_EXPORTER_OTLP_HEADERS` | entrambe | ✓ | — | `chiave=valore,altra=valore` — una API key che un collector gestito richiede. |
+| `OTEL_SERVICE_NAME` | entrambe | | `isitdown` | Come il collector etichetta questo processo. |
+| `OUTPOSTS` | entrambe | | — | Gli outpost a cui chiedere una seconda lettura di ogni sonda, URL base separati da virgola (`https://vps-1.example.com:8080`) — roadmap 1.7, vedi [Docker §4.7](docker.it.md#47-outpost--un-secondo-punto-di-vista-per-le-sonde). Non impostata — il default — ogni sonda resta la sola lettura di questo container. |
+| `OUTPOST_TOKEN` | entrambe, outpost | ✓ | — | Il bearer token con cui è stato avviato ogni outpost. Obbligatoria insieme a `OUTPOSTS`; un outpost senza non parte. |
+| `LOG_FILE` | entrambe | | — | Accoda ogni riga di log anche a questo file, ruotato per dimensione. Se non è impostata, i log vanno solo su stdout. |
+| `LOG_MAX_BYTES` | entrambe | | `5242880` | Dimensione alla quale `LOG_FILE` ruota. |
+| `LOG_MAX_FILES` | entrambe | | `5` | Quante generazioni ruotate (`.1` … `.5`) sopravvivono accanto al file vivo. |
+| `CONFIG_PATH` | Light | | `/app/config/config.yml` | Dove leggere `config.yml`. |
+| `DATA_PATH` | Light | | `/app/data/state.json` | Dove tenere il file di stato. |
+| `DB_PATH` | UI | | `/app/data/isitdown.db` | Database SQLite. |
+| `API_TOKEN` | UI | ✓ | — | Un token bearer di sola lettura ([3.12](#312-raggiungere-lapi-da-un-altro-host)). Non impostato — il valore predefinito — lascia ogni rotta aperta, che è giusto per un'istanza legata a `127.0.0.1`. Impostandolo, una richiesta che lo porta può fare `GET` da qualunque host; le scritture restano solo locali. |
+| `API_LOCAL_BYPASS` | UI | | `true` | Se una richiesta da questa macchina possa saltare `API_TOKEN`. Impostalo a `false` dietro un reverse proxy, dove ogni richiesta inoltrata sembra locale. |
+| `AUDIT_ACTOR_HEADER` | UI | | — | L'header di richiesta che indica chi ha fatto una scrittura di configurazione nella cronologia (`GET /config/history`, roadmap 5.7) — per esempio `X-Forwarded-User` dietro un reverse proxy che autentica. Non impostato, o con una richiesta che non lo porta, l'attore è registrato come `local`. Ci si fida del valore così com'è: impostalo solo dove un proxy possiede quell'header. |
+| `ALLOWED_HOSTS` | UI | | — | Hostname extra, separati da virgola, con cui la dashboard può essere servita (ad es. il nome di un reverse proxy). Una scrittura il cui `Origin` o `Host` non sia quello della dashboard, `localhost` o un indirizzo IP viene rifiutata con `403`. Nessun wildcard. |
+| `TELEGRAM_CHATOPS` | UI | | `false` | Impostala a `true` perché il bot Telegram accetti comandi oltre a inviare avvisi ([3.17](#317-chatops--comandare-il-bot-da-telegram)). Spento per default: un canale di comando in entrata è una cosa che si sceglie. |
+| `TELEGRAM_COMMAND_CHAT_IDS` | UI | | — | Altre chat autorizzate a comandare il bot, separate da virgola. La chat a cui il canale Telegram già invia è sempre autorizzata; questa serve a un'installazione avvisata in una chat e comandata da un'altra. |
+| `PUBLIC_PAGE` | UI | | `false` | Impostala a `true` per pubblicare una pagina di stato in sola lettura su `/public` ([3.18](#318-la-pagina-di-stato-pubblica)). Spenta per default: è l'unica superficie che possono leggere degli estranei. |
+| `PUBLIC_PAGE_TITLE` | UI | | `Service status` | Il titolo della pagina e quello del browser. |
+| `PUBLIC_PAGE_PROVIDERS` | UI | | — | Quali provider pubblicare, per id e separati da virgola. Se non è impostata pubblica tutti i provider attivi. Un visitatore non può allargare l'elenco: la pagina non legge nulla dalla richiesta. |
+| `PUBLIC_PAGE_LOCALE` | UI | | — | La lingua in cui è scritta quella pagina. Se non è impostata segue il locale delle notifiche dell'installazione. |
+| `PUSH_TOKEN` | UI | ✓ | — | Attiva l'endpoint per i webhook dei provider ([3.15](#315-push-del-provider-invece-del-polling)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
+| `HEARTBEAT_TOKEN` | UI | ✓ | — | Attiva l'endpoint dei ping heartbeat ([3.19](#319-heartbeat--il-dead-mans-switch)) ed è la credenziale nel suo URL. Se non è impostata, quella rotta risponde `404`. |
+| `EGRESS_ALLOW` | entrambe | | — | Indirizzi, range CIDR e nomi host che la policy di uscita lascia passare ([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)), separati da virgole o spazi: `10.0.0.0/8,nas.lan`. Alla UI serve per osservare qualunque cosa sulla LAN o su questo host. |
+| `OUTBOUND_BLOCK_PRIVATE` | entrambe | | non impostata | `true` fa rifiutare alla Light e all'outpost i target loopback e privati, come già fa la UI ([3.38](#338-la-policy-di-uscita--cosa-può-raggiungere-una-sonda)). Qualsiasi altro valore lascia il default dell'edizione. |
+| `HEARTBEAT_URL` | entrambe | ✓ | — | Chiamato dopo ogni ciclo di polling completato: il dead-man's switch di IsItDown stesso ([3.39](#339-ping-in-uscita--il-dead-mans-switch-di-isitdown)). Un URL di Healthchecks.io o di un monitor push di Uptime Kuma. Nella Light vince `heartbeat.url` in `config.yml`. |
+| `HEARTBEAT_FAIL_URL` | entrambe | ✓ | — | Chiamato dopo un ciclo fallito (config illeggibile, database bloccato): l'URL `/fail` di Healthchecks.io. |
+| `HEARTBEAT_METHOD` | entrambe | | `GET` | `GET` o `POST`. `POST` invia una riga di testo: il riepilogo del ciclo, o il motivo del fallimento. |
+| `BACKUP_CRON` | UI | | — (spento) | Backup programmati: un'espressione cron a cinque campi, letta nel fuso orario dell'istanza ([4.11](docker.it.md#411-backup-programmati)). Vince su Impostazioni → Dati e lì blocca il campo. |
+| `BACKUP_KEEP` | UI | | `7` | Quanti backup programmati tenere, 1–365. Vince sulla dashboard. |
+| `BACKUP_DIR` | UI | | `<data>/backups` | Dove vanno i backup programmati. Montala da un altro disco. |
+| `BACKUP_WEBDAV_URL` | UI | ✓ | — | Carica anche ogni backup programmato in questa cartella WebDAV; credenziali nell'URL. |
+| `BACKUP_S3_URL` | UI | ✓ | — | Carica anche ogni backup programmato su S3 o uno storage compatibile: `https://KEY:SECRET@host/bucket/prefix?region=…`. |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | entrambe, outpost | | — | Ogni richiesta HTTP passa da questo proxy; gli host in `NO_PROXY` no. Maiuscole o minuscole. Vedi [Proxy e reti senza Internet](docker.it.md#410-proxy-e-reti-senza-internet). |
+| `BIND_HOST` | UI | | `127.0.0.1` | L'indirizzo su cui la dashboard è in ascolto. Per impostazione predefinita è il loopback, ciò che mantiene un'istanza senza `API_TOKEN` raggiungibile solo da questa macchina; le immagini container impostano `0.0.0.0` (la mappatura `ports` di compose decide poi chi può raggiungerla, e pubblica solo su `127.0.0.1`). Per raggiungere la dashboard da un'altra macchina, pubblica su `0.0.0.0` (o imposta `BIND_HOST` su bare metal) **e** imposta `API_TOKEN` — vedi [3.12](#312-raggiungere-lapi-da-un-altro-host) per ciò che una richiesta da fuori questa macchina può fare. |
+| `PORT` | UI, outpost | | `3000` (`8080` per l'outpost) | Porta HTTP. |
 
 I segreti arrivano tramite `env_file` a runtime; nulla viene incorporato in
 un'immagine. `docker history` su entrambe le immagini non mostra alcun layer `ENV`
@@ -778,6 +778,32 @@ dalla richiesta successiva senza riavviare nulla. Conseguenze da conoscere:
 
 La dashboard accetta quindi una credenziale, come disegnava il prototipo di
 design, ma in un solo verso: dentro.
+
+**Segreti da file** (roadmap 9.4). Docker Swarm, i `secrets:` di Compose e
+Kubernetes consegnano un segreto come file montato, non come variabile. Ogni
+variabile segnata ✓ nella colonna `_FILE` della [3.3](#33-variabili-dambiente) —
+più `SMTP_PASSWORD`, `AI_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` e `PROMETHEUS_TOKEN`,
+documentate con le loro funzioni — accetta anche `NOME_FILE`: il percorso di un
+file il cui contenuto è il valore, senza l'ultimo a capo. Vale anche per
+qualsiasi variabile che nomini tu, in un riferimento `${VAR}` del `config.yml`,
+nel nome di variabile di un canale nella dashboard o nelle credenziali di una
+sonda.
+
+```yaml
+services:
+  isitdown:
+    environment:
+      TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
+    secrets: [telegram_bot_token]
+secrets:
+  telegram_bot_token:
+    file: ./telegram_bot_token.txt
+```
+
+Impostare sia `NOME` sia `NOME_FILE` è un errore all'avvio che le nomina
+entrambe: due fonti per un solo segreto vogliono dire che una delle due è
+vecchia. Lo stesso vale per un `NOME_FILE` che punta a un file che il processo
+non riesce a leggere. `LOG_FILE` non c'entra: è dove va il log.
 
 ### 3.5 Provider monitorati
 

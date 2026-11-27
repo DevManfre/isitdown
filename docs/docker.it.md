@@ -165,6 +165,18 @@ reso in una ConfigMap e montato in sola lettura; i riferimenti `${VAR}` al suo
 interno si risolvono contro quello stesso Secret. Una modifica fa ruotare il pod,
 perché una ConfigMap montata che cambia su disco non riavvia nulla da sola.
 
+Per tenere le credenziali del tutto fuori dall'ambiente del pod, `secretFiles:`
+monta un Secret esistente in sola lettura su `/run/secrets/isitdown` e consegna
+ogni chiave come `NOME_FILE` ([configurazione §3.4](configuration.it.md#34-come-vengono-gestiti-i-segreti),
+roadmap 9.4):
+
+```yaml
+secretFiles:
+  secretName: isitdown-credentials
+  keys:
+    TELEGRAM_BOT_TOKEN: telegram-bot-token   # → TELEGRAM_BOT_TOKEN_FILE
+```
+
 ### 4.5 Nessuno dei due: l'edizione Light in un solo file
 
 > **Deprecata dalla 2.46, non più pubblicata dalla 3.0** ([Deprecazioni](deprecations.it.md)):

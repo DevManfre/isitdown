@@ -11,6 +11,7 @@ import {
 } from "../../core/configSource.interface.ts";
 import { configureOutbound, parseAllowList, unusableAllowEntries } from "../../core/outboundPolicy.ts";
 import { CATCH_ALL_RULE, type RoutingRule } from "../../core/routing.ts";
+import { readSecretEnv } from "../../core/secretEnv.ts";
 import { templateProblems } from "../../notifiers/template.ts";
 import { fileConfigSchema, REQUIRED_CHANNEL_SETTINGS, type FileConfig } from "./schema.ts";
 
@@ -299,7 +300,8 @@ function substitute(
   if (typeof value === "string") {
     const missing: string[] = [];
     const replaced = value.replace(ENV_REFERENCE, (_match, name: string) => {
-      const resolved = env[name];
+      // Roadmap 9.4: `${NAME}` also reads NAME_FILE; both set throws, readably.
+      const resolved = readSecretEnv(name, env);
       if (resolved === undefined || resolved === "") {
         missing.push(name);
         return "";

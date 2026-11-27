@@ -83,6 +83,30 @@ test("environment references are substituted from the passed environment", async
   assert.equal(telegram?.settings["chatId"], "-100");
 });
 
+test("an environment reference also reads NAME_FILE, without the trailing newline (roadmap 9.4)", async () => {
+  const secret = join(await mkdtemp(join(tmpdir(), "isitdown-secret-")), "token");
+  await writeFile(secret, "123:ABC\n", "utf8");
+  const config = await loadConfig(await configFile(FULL), {
+    TELEGRAM_BOT_TOKEN_FILE: secret,
+    TELEGRAM_CHAT_ID: "-100",
+  });
+  const telegram = config.channels.find((channel) => channel.id === "telegram");
+  assert.equal(telegram?.settings["botToken"], "123:ABC");
+});
+
+test("a reference set both directly and as NAME_FILE is refused, naming both", async () => {
+  const secret = join(await mkdtemp(join(tmpdir(), "isitdown-secret-")), "token");
+  await writeFile(secret, "123:ABC", "utf8");
+  await assert.rejects(
+    loadConfig(await configFile(FULL), {
+      TELEGRAM_BOT_TOKEN: "123:ABC",
+      TELEGRAM_BOT_TOKEN_FILE: secret,
+      TELEGRAM_CHAT_ID: "-100",
+    }),
+    /TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_TOKEN_FILE/,
+  );
+});
+
 test("an enabled channel whose secret is unset is fatal and names the variable", async () => {
   await assert.rejects(
     loadConfig(await configFile(FULL), { TELEGRAM_CHAT_ID: "-100" }),

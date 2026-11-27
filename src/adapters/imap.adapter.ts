@@ -1,6 +1,7 @@
 import type { Adapter, FetchContext, ReadingNote, ServiceRef } from "../core/adapter.interface.ts";
 import { assertProbeHost } from "../core/outboundPolicy.ts";
 import type { Incident, NormalizedStatus, OverallStatus } from "../core/types.ts";
+import { readSecretEnv } from "../core/secretEnv.ts";
 import { readRecentHeaders, type ImapEndpoint, type MailHeaders } from "./imapSession.ts";
 import { severityFromWords, worstStatus } from "./severity.ts";
 
@@ -179,7 +180,7 @@ export function imapConfig(service: ServiceRef): ImapConfig {
  */
 function resolveEnv(value: string, service: ServiceRef, key: string, env: NodeJS.ProcessEnv): string {
   return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name: string) => {
-    const found = env[name];
+    const found = readSecretEnv(name, env);
     if (found === undefined || found === "") {
       throw new Error(`imap for ${service.id}: ${key} references ${name}, which is not set`);
     }
@@ -188,7 +189,7 @@ function resolveEnv(value: string, service: ServiceRef, key: string, env: NodeJS
 }
 
 function secretOf(name: string, service: ServiceRef, env: NodeJS.ProcessEnv): string {
-  const found = env[name];
+  const found = readSecretEnv(name, env);
   if (found === undefined || found === "") {
     throw new Error(`imap for ${service.id}: passwordEnv names ${name}, which is not set`);
   }

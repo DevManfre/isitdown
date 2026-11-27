@@ -4,6 +4,7 @@ import { USER_AGENT } from "../core/http.ts";
 import { BodyTooLargeError, MAX_BODY_BYTES, guardedFetch, readCapped, readOutboundPolicy } from "../core/outboundPolicy.ts";
 import type { NormalizedStatus, OverallStatus } from "../core/types.ts";
 import { tlsServerName } from "../core/tlsServerName.ts";
+import { readSecretEnv } from "../core/secretEnv.ts";
 
 /**
  * The probe: the one adapter whose subject is a service itself rather than a
@@ -104,7 +105,7 @@ const trimmed = (value: string | undefined): string | undefined => {
  */
 export function resolveEnv(value: string, service: ServiceRef, key: string): string {
   return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name: string) => {
-    const found = process.env[name];
+    const found = readSecretEnv(name, process.env);
     if (found === undefined || found === "") {
       throw new Error(`http probe for ${service.id}: ${key} references ${name}, which is not set`);
     }
