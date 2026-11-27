@@ -22,6 +22,7 @@ import { describeChannels } from "../dbChannels.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
 import { auditWrites } from "../configAudit.ts";
 import { configHistoryRoutes } from "./config.history.routes.ts";
+import { configTokenRoutes } from "./config.tokens.routes.ts";
 import { configImportExportRoutes } from "./config.importexport.routes.ts";
 import { configPushRoutes } from "./config.push.routes.ts";
 import { configHealthRoutes } from "./config.health.routes.ts";
@@ -157,6 +158,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
     auditWrites({ db, logger: runtime.logger, actorHeader: runtime.env["AUDIT_ACTOR_HEADER"] }),
   );
   configHistoryRoutes(runtime, router);
+  configTokenRoutes(runtime, router);
 
   router.get("/config", (_req, res) => {
     const settings = readSettings(db, runtime.logger);

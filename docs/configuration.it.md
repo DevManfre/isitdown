@@ -2341,6 +2341,36 @@ Quando è impostato:
   dall'indirizzo del nodo, non da loopback, e un controllo di liveness che
   comincia a fallire perché è stato impostato un token è un ciclo di riavvii.
 
+**Token nominati con scope** (roadmap 9.11). Una sola chiave condivisa è troppo
+per un job di CI che scrive solo marcatori di deploy, e troppo poco per
+toglierla a lui solo. **Impostazioni → Token** — oppure `POST /config/tokens`
+([API](api.it.md)) — crea un token nominato con gli scope che gli
+servono, lo mostra **una volta sola** e ne tiene solo lo SHA-256: niente, nemmeno
+la dashboard, può rileggerlo.
+
+| Scope | Cosa apre |
+|---|---|
+| `read` | Ogni `GET` e `HEAD` — ciò che concede `API_TOKEN`. |
+| `annotations:write` | `POST /annotations`, `DELETE /annotations/:id` — i marcatori di deploy dalla CI. |
+| `mute` | `POST /providers/:id/mute` e `/ack` — uno script di manutenzione. |
+| `push` | `POST /poll` — "leggi tutto adesso" da una pipeline. |
+| `admin` | Tutto, e implica ogni scope qui sopra. |
+
+Per il resto gli scope sono indipendenti: un token `annotations:write` non può
+leggere `/status`. Una richiesta fuori dagli scope di un token risponde `403`
+nominando lo scope che serviva; un token sconosciuto o **revocato** risponde
+`401`, dalla richiesta successiva. L'elenco mostra di ogni token nome, scope,
+creazione e ultimo uso (scritto al massimo una volta al minuto); revocare tiene
+la riga, così l'elenco dice ancora cos'era. Creazioni e revoche finiscono nella
+cronologia della configurazione, senza il valore. Quale scope serve a ogni rotta
+è una tabella sola in `src/ui/apiToken.ts`, il documento OpenAPI la ripete come
+`x-required-scope`, e un test fallisce su una rotta di scrittura che la tabella
+non nomina.
+
+Creare il primo token accende il controllo anche senza `API_TOKEN` impostato — da
+lì valgono le regole qui sopra. `API_TOKEN` continua a funzionare esattamente come
+prima, come un token con il solo `read`, accanto a quanti token nominati si vuole.
+
 Due cose da mettere in chiaro:
 
 - **`X-Forwarded-For` viene ignorato.** Un header scritto dal client non può
@@ -2348,9 +2378,9 @@ Due cose da mettere in chiaro:
   su questa stessa macchina fa sembrare locale ogni richiesta che inoltra —
   quindi dietro a uno imposta `API_LOCAL_BYPASS=false` e richiedi il token a
   tutti, questa macchina compresa.
-- **Questa non è autenticazione.** Un token, nessuna identità, nessuna scadenza,
-  e niente da revocare se non la variabile. È una porta con una chiave. L'auth
-  multi-utente resta un non-obiettivo dichiarato.
+- **Questa non è autenticazione.** I token dicono cosa può fare chi chiama, mai
+  chi è: nessuna identità, nessuna scadenza, nessun utente. L'auth multi-utente
+  resta un non-obiettivo dichiarato.
 
 ```bash
 curl -H "Authorization: Bearer $API_TOKEN" http://isitdown.lan:3000/widget

@@ -9,7 +9,11 @@ back reports a parse failure instead of the real problem.
 Unauthenticated by default: this is a single-operator dashboard bound to the
 machine it runs on. Setting `API_TOKEN` turns on one read-only bearer token —
 `GET` and `HEAD` from any host, everything else refused, `/health` and `/ready`
-never gated. See [3.12](configuration.md#312-reaching-the-api-from-another-host).
+never gated. Named tokens with scopes (`read`, `annotations:write`, `mute`,
+`push`, `admin`) are created at `/config/tokens` below, and creating the first
+one turns the same gate on (roadmap 9.11); each operation in the
+[OpenAPI document](#61-the-openapi-document) names its scope as
+`x-required-scope`. See [3.12](configuration.md#312-reaching-the-api-from-another-host).
 
 A write whose browser `Origin` is not the dashboard's own host is refused with
 `403`, as is one whose `Host` is not `localhost`, an IP address or a name listed in
@@ -75,6 +79,9 @@ The outpost (shipped in the Light image) is a separate, much smaller server: `PO
 | `POST` | `/config/import/preview` | What `POST /config/import` would do with the same body, without doing it (roadmap 5.9). Refuses exactly what the import refuses. `{ services: { added, removed, changed: [{ id, changes: [{ path, from, to }] }] }, settings: [{ path, from, to }], channels: [{ id, changes }], routing, recipients, empty }` — `routing` and `recipients` are `{ from, to }` counts when the file would replace them and `null` when it leaves them alone; `empty` is true when the import would change nothing. |
 | `GET` | `/config/history` | The configuration history (roadmap 5.7): every value a write moved, newest first, as `{ entries: [{ id, at, actor, method, route, kind, target, field, before, after, revertible }] }`. `kind` is `service`, `setting`, `channel`, `routing`, `recipients` or `credential`; a provider added or removed as a whole has `field: "*"`. Filter with `?kind=`, `?target=` and `?limit=` (1–500, default 100). The trail is derived by reading the configuration before and after each write, so every route is covered; the last 5000 entries are kept. `actor` is the value of the request header named by `AUDIT_ACTOR_HEADER` (set by a reverse proxy that authenticates), `local` otherwise. Credentials appear only as events — `set` or `cleared` — never as values. |
 | `POST` | `/config/history/:id/revert` | Writes an entry's old value back. An ordinary write, so the revert is recorded too. `409` when the old value can no longer be written (a credential, a provider removed for good, a value the schema now refuses); `404` on an unknown id. |
+| `GET` | `/config/tokens` | API tokens — roadmap 9.11: `{ tokens: [{ id, name, scopes, createdAt, lastUsedAt, revokedAt }] }`, oldest first, revoked ones included. Never the token, never its hash. `admin` scope. |
+| `POST` | `/config/tokens` | `{ name, scopes }` → `201` with the same fields plus `token` (`iid_…`) — the only time it is shown. `name` 1 to 80 characters, `scopes` at least one of `read`, `annotations:write`, `mute`, `push`, `admin`. Audited as a credential, without its value. `admin` scope. |
+| `DELETE` | `/config/tokens/:id` | Revokes a token: `204`, and it answers `401` from the next request on. Unknown or already revoked `404`. `admin` scope. |
 | `GET` | `/config/snapshots` | Named configuration snapshots (roadmap 5.8), newest first: `{ snapshots: [{ id, name, createdAt, services }] }`. |
 | `POST` | `/config/snapshots` | Saves the configuration as it stands, as the `config.yml` export kept under `{ name }` (1–80 characters, unique). `201` with the new entry, `409` when the name is taken. Credentials are `${VAR}` references in it, so nothing secret is stored; history is never part of a snapshot. |
 | `GET` | `/config/snapshots/:id/preview` | What restoring the snapshot would change — the same diff as `/config/import/preview`. |

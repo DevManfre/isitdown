@@ -111,6 +111,7 @@ export const DOWN: Readonly<Record<number, Down>> = {
   40: dropTables("status_readings"),
   41: both(dropTables("daily_rollups"), dropColumns("services", "outage_cost_per_hour")),
   42: dropTables("operator_points", "operator_series"),
+  43: dropTables("api_tokens"),
 };
 
 /** The file holding the database as it was before going down to `version`. */

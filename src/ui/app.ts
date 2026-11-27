@@ -45,7 +45,7 @@ export function createApp(runtime: UiRuntimeCore): Express {
   // First, before the body parsers: a request this instance will not answer
   // should be refused before 512 MB of it has been read (roadmap 4.15). Does
   // nothing at all unless `API_TOKEN` is set.
-  app.use(apiToken(runtime.env));
+  app.use(apiToken(runtime.env, runtime.apiTokens));
   // Refuse a foreign-origin or rebound-host write before any body is parsed.
   app.use(originGuard(runtime.env));
   app.use(express.json({ limit: "64kb" }));

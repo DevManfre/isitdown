@@ -2250,6 +2250,34 @@ With it set:
   the node's address, not from loopback, and a liveness check that starts
   failing because a token was set is a restart loop.
 
+**Named tokens with scopes** (roadmap 9.11). One shared key is too much for a CI
+job that only writes deploy markers and too little to take back from it alone.
+**Settings → Tokens** — or `POST /config/tokens` ([API](api.md)) —
+creates a named token with the scopes it needs, shows it **once**, and keeps only
+its SHA-256: nothing, the dashboard included, can read it back.
+
+| Scope | What it opens |
+|---|---|
+| `read` | Every `GET` and `HEAD` — what `API_TOKEN` grants. |
+| `annotations:write` | `POST /annotations`, `DELETE /annotations/:id` — deploy markers from CI. |
+| `mute` | `POST /providers/:id/mute` and `/ack` — a maintenance script. |
+| `push` | `POST /poll` — "read everything now" from a pipeline. |
+| `admin` | Everything, and implies every scope above. |
+
+Scopes are otherwise independent: an `annotations:write` token cannot read
+`/status`. A request outside a token's scopes answers `403` naming the scope it
+needed; an unknown or **revoked** token answers `401`, from the next request on.
+The list shows each token's name, scopes, creation and last use (written at most
+once a minute); revoking keeps the row, so the list still says what it was.
+Creating and revoking are recorded in the configuration history, without the
+value. Which scope each route needs is one table in `src/ui/apiToken.ts`, the
+OpenAPI document repeats it as `x-required-scope`, and a test fails on a write
+route that table does not name.
+
+Creating the first token turns the gate on even with no `API_TOKEN` set — from
+then on the rules above apply. `API_TOKEN` keeps working exactly as before, as a
+token with `read` alone, beside any number of named ones.
+
 Two things to be clear about:
 
 - **`X-Forwarded-For` is ignored.** A header the client writes cannot decide
@@ -2257,9 +2285,9 @@ Two things to be clear about:
   on this same host makes every request it forwards look local — so behind one,
   set `API_LOCAL_BYPASS=false` and require the token from everybody, this
   machine included.
-- **This is not authentication.** One token, no identities, no expiry, and
-  nothing to revoke but the variable. It is a door with one key. Multi-user auth
-  remains a declared non-goal.
+- **This is not authentication.** Tokens say what a caller may do, never who it
+  is: no identities, no expiry, no users. Multi-user auth remains a declared
+  non-goal.
 
 ```bash
 curl -H "Authorization: Bearer $API_TOKEN" http://isitdown.lan:3000/widget
