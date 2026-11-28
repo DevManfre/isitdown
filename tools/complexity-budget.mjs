@@ -34,7 +34,9 @@ export const BUDGET = {
   // 44 -> 49 (+5: BACKUP_CRON, _KEEP, _DIR, _WEBDAV_URL, _S3_URL): scheduled
   // backups, ALE-87 (roadmap 10.1). The folder is a mount, so environment
   // only; the S3 keys ride in the URL rather than as four AWS_* variables.
-  envVars: 49,
+  // 49 -> 51 (+2: ISITDOWN_URL, ISITDOWN_TOKEN): `isitdown status`, ALE-116
+  // (roadmap 12.2) — a script names its instance once, not on every call.
+  envVars: 51,
   subsystems: 9,
   targets: 13,
   adapters: 30,

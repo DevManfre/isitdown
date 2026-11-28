@@ -92,6 +92,12 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     rowKeys: ["ai.provider.label", "ai.model.label", "ai.base-url.label", "ai.key.label"],
   },
   {
+    id: "tokens",
+    labelKey: "settings.section.tokens",
+    blurbKey: "settings.section.tokens.blurb",
+    rowKeys: ["tokens.create", "tokens.revoke"],
+  },
+  {
     id: "appearance",
     labelKey: "settings.section.appearance",
     blurbKey: "settings.section.appearance.blurb",

@@ -42,7 +42,7 @@ Il manuale, un file per sezione:
 - [7. Come funziona](docs/how-it-works.it.md) — flusso dei dati, componenti, quando scatta una notifica, resilienza, consenso degli outpost
 - [8. Tema e localizzazione](docs/theming.it.md) — temi, le sei lingue della dashboard, accessibilità
 - [9. Sviluppo](docs/development.it.md) — struttura, stack tecnico, sviluppo live, test, rilasci
-- [10. Client da terminale](docs/cli.it.md) — `isitdown watch`, una vista di sola lettura della flotta per il terminale, `isitdown discover`, una prima flotta letta dai file di un progetto, e `isitdown import`, una flotta portata da Uptime Kuma, Gatus, Statping o StatusGator
+- [10. Client da terminale](docs/cli.it.md) — `isitdown watch`, una vista di sola lettura della flotta per il terminale, `isitdown status`, la flotta letta una volta con un exit code per gli script, `isitdown discover`, una prima flotta letta dai file di un progetto, e `isitdown import`, una flotta portata da Uptime Kuma, Gatus, Statping o StatusGator
 - [11. Sicurezza](docs/security.it.md) — il threat model: di cosa ci si fida, cosa è salvato dove, cosa può fare ciascun attaccante, cosa è fuori scopo
 - [13. Deprecazioni](docs/deprecations.it.md) — cosa se ne sta andando e quando, e il report d'uso facoltativo che decide il resto
 

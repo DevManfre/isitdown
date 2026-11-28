@@ -12,6 +12,7 @@ import {
   type ServiceDefinition,
 } from "../core/configSource.interface.ts";
 import type { Logger } from "../core/logger.ts";
+import { readSecretEnv } from "../core/secretEnv.ts";
 import { CATCH_ALL_RULE } from "../core/routing.ts";
 import { isOptionalSetting } from "../notifiers/settings.ts";
 import { ENV_SUFFIX, readSettings, deliveryOf } from "./dbSettings.ts";
@@ -72,7 +73,17 @@ export function createDbConfigSource(
             continue;
           }
           const name = key.slice(0, -ENV_SUFFIX.length);
-          const fromEnv = env[value] ?? "";
+          // Roadmap 9.4: the name the operator chose accepts NAME_FILE too.
+          // A broken file is logged, then treated like an unset variable.
+          let fromEnv = "";
+          try {
+            fromEnv = readSecretEnv(value, env) ?? "";
+          } catch (error) {
+            logger.warn("channel variable cannot be read", {
+              channel: channel.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
           // An unset optional credential is not a broken channel: the webhook's
           // signing secret is offered as a field to every installation, and
           // most of them will never set it.

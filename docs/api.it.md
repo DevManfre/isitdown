@@ -9,7 +9,11 @@ HTML di errore segnala un errore di parsing invece del problema vero.
 Senza autenticazione per impostazione predefinita: questa è una dashboard per un
 solo operatore, legata alla macchina su cui gira. Impostare `API_TOKEN` attiva un
 unico token bearer di sola lettura — `GET` e `HEAD` da qualunque host, tutto il
-resto rifiutato, `/health` e `/ready` mai protette. Vedi
+resto rifiutato, `/health` e `/ready` mai protette. I token nominati con scope
+(`read`, `annotations:write`, `mute`, `push`, `admin`) si creano su
+`/config/tokens` qui sotto, e creare il primo accende lo stesso controllo
+(roadmap 9.11); ogni operazione del [documento OpenAPI](#61-il-documento-openapi)
+nomina il suo scope come `x-required-scope`. Vedi
 [3.12](configuration.it.md#312-raggiungere-lapi-da-un-altro-host).
 
 Una scrittura il cui `Origin` del browser non è l'host della dashboard viene
@@ -77,6 +81,9 @@ L'outpost (nell'immagine Light) è un server a parte, molto più piccolo: `POST 
 | `POST` | `/config/import/preview` | Cosa farebbe `POST /config/import` con lo stesso corpo, senza farlo (roadmap 5.9). Rifiuta esattamente ciò che rifiuta l'import. `{ services: { added, removed, changed: [{ id, changes: [{ path, from, to }] }] }, settings: [{ path, from, to }], channels: [{ id, changes }], routing, recipients, empty }` — `routing` e `recipients` sono conteggi `{ from, to }` quando il file li sostituirebbe e `null` quando li lascia stare; `empty` è vero quando l'import non cambierebbe nulla. |
 | `GET` | `/config/history` | La cronologia della configurazione (roadmap 5.7): ogni valore che una scrittura ha mosso, dal più recente, come `{ entries: [{ id, at, actor, method, route, kind, target, field, before, after, revertible }] }`. `kind` è `service`, `setting`, `channel`, `routing`, `recipients` o `credential`; un provider aggiunto o rimosso per intero ha `field: "*"`. Si filtra con `?kind=`, `?target=` e `?limit=` (1–500, predefinito 100). La traccia è derivata leggendo la configurazione prima e dopo ogni scrittura, quindi copre ogni route; si conservano le ultime 5000 voci. `actor` è il valore dell'header di richiesta indicato da `AUDIT_ACTOR_HEADER` (impostato da un reverse proxy che autentica), altrimenti `local`. Le credenziali compaiono solo come eventi — `set` o `cleared` — mai come valori. |
 | `POST` | `/config/history/:id/revert` | Riscrive il vecchio valore di una voce. Una scrittura come le altre, quindi anche il ripristino viene registrato. `409` quando il vecchio valore non si può più scrivere (una credenziale, un provider rimosso definitivamente, un valore che lo schema ora rifiuta); `404` su un id sconosciuto. |
+| `GET` | `/config/tokens` | Token API — roadmap 9.11: `{ tokens: [{ id, name, scopes, createdAt, lastUsedAt, revokedAt }] }`, dal più vecchio, revocati compresi. Mai il token, mai il suo hash. Scope `admin`. |
+| `POST` | `/config/tokens` | `{ name, scopes }` → `201` con gli stessi campi più `token` (`iid_…`) — l'unica volta che viene mostrato. `name` da 1 a 80 caratteri, `scopes` almeno uno tra `read`, `annotations:write`, `mute`, `push`, `admin`. Registrato nell'audit come credenziale, senza il valore. Scope `admin`. |
+| `DELETE` | `/config/tokens/:id` | Revoca un token: `204`, e dalla richiesta successiva risponde `401`. Sconosciuto o già revocato `404`. Scope `admin`. |
 | `GET` | `/config/snapshots` | Gli snapshot di configurazione nominati (roadmap 5.8), dal più recente: `{ snapshots: [{ id, name, createdAt, services }] }`. |
 | `POST` | `/config/snapshots` | Salva la configurazione com'è, come l'export `config.yml` conservato sotto `{ name }` (1–80 caratteri, univoco). `201` con la nuova voce, `409` se il nome è già preso. Le credenziali sono riferimenti `${VAR}`, quindi non si salva nulla di segreto; lo storico non fa mai parte di uno snapshot. |
 | `GET` | `/config/snapshots/:id/preview` | Cosa cambierebbe ripristinando lo snapshot — lo stesso diff di `/config/import/preview`. |

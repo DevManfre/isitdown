@@ -47,6 +47,7 @@ export type FixtureKey =
   | "latency"
   | "timeline"
   | "heartbeats"
+  | "apiTokens"
   | "trust";
 
 export interface Fixtures {
@@ -106,6 +107,8 @@ export interface Fixtures {
   timeline?: unknown;
   /** `/config/heartbeats`, matched before `/config` — when each job last pinged. */
   heartbeats?: unknown;
+  /** `/config/tokens`, matched before `/config` — the API tokens list (roadmap 9.11). */
+  apiTokens?: unknown;
   /** `/trust` — how each status page tracked its probe (roadmap 8.1). */
   trust?: unknown;
   /** `/config/ai`, matched before `/config` — Settings → AI implementation (roadmap 6.10). */
@@ -183,6 +186,8 @@ export function fixtureKeyFor(path: string): FixtureKey {
                               ? "providerPush"
                             : path.startsWith("/config/heartbeats")
                               ? "heartbeats"
+                            : path.startsWith("/config/tokens")
+                              ? "apiTokens"
                             : path.startsWith("/search")
                               ? "search"
                             : path.startsWith("/sla")
@@ -295,6 +300,7 @@ export async function fakeResponse(
     latency: { provider: "", range: "7d", slowMs: null, summary: null, points: [] },
     timeline: { days: 30, incidents: [] },
     heartbeats: { enabled: false, tokenRevealed: false, heartbeats: [] },
+    apiTokens: { tokens: [], envToken: false },
     dashboards: [
       { id: "default", name: "Overview", home: true, isDefault: true, updatedAt: "2026-08-21T10:00:00.000Z" },
     ],

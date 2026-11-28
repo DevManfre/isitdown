@@ -276,6 +276,43 @@ export const configPaths: Json = {
       },
     },
   },
+  "/config/tokens": {
+    get: {
+      tags: ["Configuration"],
+      summary: "API tokens: name, scopes, when created, last used and revoked. Never the token or its hash.",
+      description: "Roadmap 9.11. Oldest first; revoked tokens stay listed with `revokedAt` set.",
+      responses: {
+        "200": ok(
+          obj({
+            tokens: { type: "array", items: ref("ApiToken") },
+            envToken: { type: "boolean", description: "Whether API_TOKEN is set in the environment — a read token Settings cannot revoke." },
+          }),
+        ),
+      },
+    },
+    post: {
+      tags: ["Configuration"],
+      summary: "Create a named token with the given scopes. The response is the only time the token is shown.",
+      description:
+        "Scopes: `read` (every GET), `annotations:write` (POST/DELETE /annotations), `mute` (mute and acknowledge a provider), `push` (POST /poll), `admin` (everything, implies the rest). Creating the first token turns the gate on even with no API_TOKEN set.",
+      requestBody: {
+        required: true,
+        ...json(obj({ name: { type: "string", minLength: 1, maxLength: 80 }, scopes: { type: "array", minItems: 1, items: ref("ApiScope") } })),
+      },
+      responses: {
+        "201": ok(ref("CreatedApiToken"), "Created."),
+        "400": badRequest,
+      },
+    },
+  },
+  "/config/tokens/{id}": {
+    delete: {
+      tags: ["Configuration"],
+      summary: "Revoke a token. It answers 401 from the next request on.",
+      parameters: [path("id", "The token's id, from the list.")],
+      responses: { "204": { description: "Revoked." }, "404": notFound },
+    },
+  },
   "/config/backup": {
     get: {
       tags: ["Configuration"],
@@ -725,6 +762,24 @@ export const configPaths: Json = {
 
 /** Shapes this module's operations answer with, referenced as `#/components/schemas/<name>`. */
 export const configSchemas: Json = {
+  ApiScope: { type: "string", enum: ["read", "annotations:write", "push", "mute", "admin"] },
+  ApiToken: obj({
+    id: int,
+    name: str,
+    scopes: { type: "array", items: ref("ApiScope") },
+    createdAt: str,
+    lastUsedAt: nullableStr,
+    revokedAt: nullableStr,
+  }),
+  CreatedApiToken: obj({
+    id: int,
+    name: str,
+    scopes: { type: "array", items: ref("ApiScope") },
+    createdAt: str,
+    lastUsedAt: nullableStr,
+    revokedAt: nullableStr,
+    token: { type: "string", description: "`iid_` and 43 characters. Store it now: it cannot be read back." },
+  }),
   ConfigChange: obj({ path: str, from: anyValue, to: anyValue }, ["path"]),
   ConfigDiff: obj({
     services: obj({

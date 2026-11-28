@@ -599,116 +599,118 @@ notification (roadmap 4.5).
 
 ### 3.3 Environment variables
 
-| Variable | Editions | Default | Purpose |
-|---|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | both | — | Telegram bot token. Required if the Telegram channel is enabled. |
-| `TELEGRAM_CHAT_ID` | both | — | Target chat. Required with the above. |
-| `WEBHOOK_URL` | both | — | Where the generic webhook POSTs. Required if that channel is enabled. |
-| `DISCORD_WEBHOOK_URL` | both | — | Discord incoming webhook. Required if the Discord channel is enabled. |
-| `SLACK_WEBHOOK_URL` | both | — | Slack incoming webhook. Required if the Slack channel is enabled. |
-| `NTFY_TOPIC_URL` | both | — | ntfy topic URL, server included (`https://ntfy.sh/my-topic`). Required if the ntfy channel is enabled. |
-| `NTFY_TOKEN` | both | — | Optional ntfy access token. Only a server with access control needs one. |
-| `GOTIFY_URL` | both | — | Gotify server (`https://gotify.example.com`). Required if the Gotify channel is enabled. |
-| `GOTIFY_TOKEN` | both | — | Gotify application token. Required with the above. |
-| `PUSHOVER_TOKEN` | both | — | Pushover application API token. Required if the Pushover channel is enabled. |
-| `PUSHOVER_USER_KEY` | both | — | Pushover user or group key. Required with the above. |
-| `PUSHOVER_DEVICE` | both | — | Optional. One registered device; unset delivers to every device on the account. |
-| `TEAMS_WEBHOOK_URL` | both | — | Microsoft Teams channel webhook. Required if the Teams channel is enabled. |
-| `MATRIX_HOMESERVER_URL` | both | — | Matrix homeserver root (`https://matrix.example.org`). Required if the Matrix channel is enabled. |
-| `MATRIX_ROOM_ID` | both | — | Internal room id (`!ops:example.org`), not an alias. Required with the above. |
-| `MATRIX_ACCESS_TOKEN` | both | — | Access token for the user that posts. Required with the above. |
-| `PAGERDUTY_ROUTING_KEY` | both | — | Integration key of an Events API v2 integration. Required if the PagerDuty channel is enabled. |
-| `PAGERDUTY_REGION` | both | — | Optional. `eu` for an account in PagerDuty's EU service region. |
-| `OPSGENIE_API_KEY` | both | — | Opsgenie API integration key. Required if the Opsgenie channel is enabled. |
-| `OPSGENIE_REGION` | both | — | Optional. `eu` for an account on Opsgenie's EU instance. |
-| `APPRISE_SERVER_URL` | both | — | Apprise API server (`http://apprise:8000`). Required if the Apprise channel is enabled. |
-| `APPRISE_CONFIG_KEY` | both | — | Key of a configuration the Apprise server stores. Either this or `APPRISE_URLS` is required. |
-| `APPRISE_URLS` | both | — | Apprise service URLs, comma-separated, for a stateless server. Either this or `APPRISE_CONFIG_KEY` is required. |
-| `SPLUNK_ONCALL_API_KEY` | both | — | Splunk On-Call REST endpoint API key. Required if that channel is enabled. |
-| `SPLUNK_ONCALL_ROUTING_KEY` | both | — | The routing key that picks the escalation policy. Required with the above. |
-| `SQUADCAST_WEBHOOK_URL` | both | — | Squadcast Incident Webhook URL. Required if that channel is enabled. |
-| `ZENDUTY_INTEGRATION_KEY` | both | — | Zenduty API integration key. Required if that channel is enabled. |
-| `INCIDENT_IO_ALERT_SOURCE_ID` | both | — | incident.io HTTP alert source config id. Required if that channel is enabled. |
-| `INCIDENT_IO_TOKEN` | both | — | That alert source's bearer token. Required with the above. |
-| `GRAFANA_ONCALL_WEBHOOK_URL` | both | — | Grafana OnCall Formatted Webhook URL. Required if that channel is enabled. |
-| `MATTERMOST_URL` | both | — | Mattermost server (`https://chat.example.com`). Required if that channel is enabled. |
-| `MATTERMOST_TOKEN` | both | — | A bot account's access token. Required with the above. |
-| `MATTERMOST_CHANNEL_ID` | both | — | The channel's id, not its name. Required with the above. |
-| `ROCKETCHAT_URL` | both | — | Rocket.Chat server. Required if that channel is enabled. |
-| `ROCKETCHAT_USER_ID` | both | — | The bot user's id. Required with the above. |
-| `ROCKETCHAT_TOKEN` | both | — | A personal access token of that user. Required with the above. |
-| `ROCKETCHAT_ROOM_ID` | both | — | The room's id, not its `#name`. Required with the above. |
-| `ZULIP_SITE_URL` | both | — | Zulip organisation (`https://example.zulipchat.com`). Required if that channel is enabled. |
-| `ZULIP_BOT_EMAIL` | both | — | The bot's email address. Required with the above. |
-| `ZULIP_API_KEY` | both | — | The bot's API key. Required with the above. |
-| `ZULIP_STREAM` | both | — | The channel (stream) to post in. Required with the above. |
-| `ZULIP_TOPIC` | both | — | Optional. One fixed topic; unset gives each provider a topic of its own. |
-| `GOOGLE_CHAT_WEBHOOK_URL` | both | — | A Google Chat space's incoming webhook. Required if that channel is enabled. |
-| `TWILIO_SMS_ACCOUNT_SID` | both | — | Twilio account SID (`AC…`) for SMS. Required if the SMS channel is enabled. |
-| `TWILIO_SMS_AUTH_TOKEN` | both | — | That account's auth token. Required with the above. |
-| `TWILIO_SMS_FROM` | both | — | The Twilio number to text from, E.164. Required with the above. |
-| `TWILIO_SMS_TO` | both | — | The number to text, E.164. Required with the above. |
-| `TWILIO_CALL_ACCOUNT_SID` | both | — | Twilio account SID for voice calls. Required if the call channel is enabled. Its own variable, even for the same account: two channels never share one. |
-| `TWILIO_CALL_AUTH_TOKEN` | both | — | That account's auth token. Required with the above. |
-| `TWILIO_CALL_FROM` | both | — | The Twilio number to call from, E.164. Required with the above. |
-| `TWILIO_CALL_TO` | both | — | The number to call, E.164. Required with the above. |
-| `BARK_DEVICE_KEY` | both | — | The device key the Bark iOS app shows. Required if that channel is enabled. |
-| `BARK_SERVER_URL` | both | — | Optional. A self-hosted bark-server; unset uses `https://api.day.app`. |
-| `SIGNAL_API_URL` | both | — | A signal-cli-rest-api server (`http://signal-api:8080`). Required if that channel is enabled. |
-| `SIGNAL_NUMBER` | both | — | The registered number messages are sent from, E.164. Required with the above. |
-| `SIGNAL_RECIPIENTS` | both | — | Numbers or `group.…` ids, comma-separated. Required with the above. |
-| `SYSLOG_URL` | both | — | `udp://host:514`, `tcp://host:601` or `tls://host:6514`. Required if that channel is enabled. |
-| `SYSLOG_FACILITY` | both | `local0` | Optional. `local0` to `local7`. |
-| `MQTT_BROKER_URL` | both | — | `mqtt://broker:1883`, or `mqtts://` for TLS. Required if that channel is enabled. |
-| `MQTT_TOPIC` | both | `isitdown` | Optional. Topic prefix; messages go to `<prefix>/<provider>`. |
-| `MQTT_USERNAME` | both | — | Optional. Only for a broker that wants credentials. |
-| `MQTT_PASSWORD` | both | — | Optional. Sent only with a user name. |
-| `MASTODON_INSTANCE_URL` | both | — | Mastodon instance (`https://mastodon.social`). Required if that channel is enabled. |
-| `MASTODON_ACCESS_TOKEN` | both | — | An application token with `write:statuses`. Required with the above. |
-| `MASTODON_VISIBILITY` | both | `public` | Optional. `public`, `unlisted` or `private`. |
-| `BLUESKY_HANDLE` | both | — | The account's handle. Required if that channel is enabled. |
-| `BLUESKY_APP_PASSWORD` | both | — | An app password, never the account's own. Required with the above. |
-| `BLUESKY_SERVICE_URL` | both | `https://bsky.social` | Optional. The account's PDS. |
-| `WEBHOOK_SECRET` | both | — | Optional shared secret for the generic webhook. Set it and every request is signed (see [3.6](#36-notification-channels)); leave it unset and requests go out unsigned, exactly as before. |
-| `LOG_LEVEL` | both | `info` | `debug` · `info` · `warn` · `error`. |
-| `PLUGINS_DIR` | both | — | A directory of adapter plugins to load at boot ([3.14](#314-adapter-plugins)). Unset — the default, in the images too — loads nothing. **A plugin runs with this process's own privileges.** |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | both | — | An OTLP/HTTP collector base URL; `/v1/traces` is appended. Setting it turns tracing on ([3.16](#316-traces)). Unset, nothing is traced and nothing is allocated. |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | both | — | The traces endpoint exactly, when it is not `<base>/v1/traces`. Wins over the variable above. |
-| `OTEL_EXPORTER_OTLP_HEADERS` | both | — | `key=value,other=value` — an API key a hosted collector wants. |
-| `OTEL_SERVICE_NAME` | both | `isitdown` | What the collector labels this process. |
-| `OUTPOSTS` | both | — | Outposts to ask for a second reading of every probe, comma-separated base URLs (`https://vps-1.example.com:8080`) — roadmap 1.7, see [Docker §4.7](docker.md#47-outposts--a-second-point-of-view-for-probes). Unset — the default — leaves every probe this container's reading alone. |
-| `OUTPOST_TOKEN` | both, outpost | — | The bearer token every outpost was started with. Required beside `OUTPOSTS`; an outpost refuses to start without one. |
-| `LOG_FILE` | both | — | Also append every log line to this file, rotated by size. Unset, logs go to stdout only. |
-| `LOG_MAX_BYTES` | both | `5242880` | Size at which `LOG_FILE` rotates. |
-| `LOG_MAX_FILES` | both | `5` | How many rotated generations (`.1` … `.5`) survive beside the live file. |
-| `CONFIG_PATH` | Light | `/app/config/config.yml` | Where to read `config.yml`. |
-| `DATA_PATH` | Light | `/app/data/state.json` | Where to keep the state file. |
-| `DB_PATH` | UI | `/app/data/isitdown.db` | SQLite database. |
-| `API_TOKEN` | UI | — | A read-only bearer token ([3.12](#312-reaching-the-api-from-another-host)). Unset — the default — leaves every route open, which is right for an instance bound to `127.0.0.1`. Set it and a request carrying it may `GET` from any host; writes stay local-only. |
-| `API_LOCAL_BYPASS` | UI | `true` | Whether a request from this machine may skip `API_TOKEN`. Set it to `false` behind a reverse proxy, where every forwarded request looks local. |
-| `AUDIT_ACTOR_HEADER` | UI | — | The request header that names who made a configuration write in the history (`GET /config/history`, roadmap 5.7) — say `X-Forwarded-User` behind a reverse proxy that authenticates. Unset, or a request without it, records the actor as `local`. Trusted as sent: set it only where a proxy owns that header. |
-| `ALLOWED_HOSTS` | UI | — | Comma-separated extra hostnames the dashboard may be served under (for example a reverse proxy's name). A write whose `Origin` or `Host` is neither the dashboard's own, `localhost` nor an IP literal is refused with `403`. No wildcard. |
-| `TELEGRAM_CHATOPS` | UI | `false` | Set it to `true` to let the Telegram bot take commands as well as send alerts ([3.17](#317-chatops--commanding-the-bot-from-telegram)). Off by default: an inbound command channel is something you opt into. |
-| `TELEGRAM_COMMAND_CHAT_IDS` | UI | — | Extra chat ids allowed to command the bot, comma-separated. The chat the Telegram channel already sends to is always allowed; this is for an installation alerted in one chat and commanded from another. |
-| `PUBLIC_PAGE` | UI | `false` | Set it to `true` to publish a read-only status page at `/public` ([3.18](#318-the-public-status-page)). Off by default — it is the one surface strangers can read. |
-| `PUBLIC_PAGE_TITLE` | UI | `Service status` | The heading and the browser title of that page. |
-| `PUBLIC_PAGE_PROVIDERS` | UI | — | Which providers to publish, comma-separated by id. Unset publishes every enabled provider. A visitor cannot widen this: the page takes no request input at all. |
-| `PUBLIC_PAGE_LOCALE` | UI | — | The language that page is written in. Unset follows the installation's own notification locale. |
-| `PUSH_TOKEN` | UI | — | Turns on the provider-webhook endpoint ([3.15](#315-provider-push-instead-of-poll)) and is the credential in its URL. Unset, that route answers `404`. |
-| `HEARTBEAT_TOKEN` | UI | — | Turns on the heartbeat ping endpoint ([3.19](#319-heartbeats--the-dead-mans-switch)) and is the credential in its URL. Unset, that route answers `404`. |
-| `EGRESS_ALLOW` | both | — | Addresses, CIDR ranges and host names the egress policy lets through ([3.38](#338-the-egress-policy--what-a-probe-may-reach)), comma- or space-separated: `10.0.0.0/8,nas.lan`. The UI edition needs it to watch anything on the LAN or on this host. |
-| `OUTBOUND_BLOCK_PRIVATE` | both | unset | `true` makes the Light edition and the outpost refuse loopback and private targets the way the UI edition already does ([3.38](#338-the-egress-policy--what-a-probe-may-reach)). Anything else keeps the edition's default. |
-| `HEARTBEAT_URL` | both | — | Pinged after every poll cycle that completed — IsItDown's own dead-man's switch ([3.39](#339-pinging-out--isitdowns-own-dead-mans-switch)). A Healthchecks.io or Uptime Kuma push URL. In the Light edition, `heartbeat.url` in `config.yml` wins. |
-| `HEARTBEAT_FAIL_URL` | both | — | Pinged after a cycle that failed (unreadable config, locked database) — Healthchecks.io's `/fail` URL. |
-| `HEARTBEAT_METHOD` | both | `GET` | `GET` or `POST`. `POST` sends a one-line text body: the cycle's summary, or why it failed. |
-| `BACKUP_CRON` | UI | — (off) | Scheduled backups: a five-field cron expression, read in the instance's time zone ([4.11](docker.md#411-scheduled-backups)). Wins over Settings → Data and locks the field there. |
-| `BACKUP_KEEP` | UI | `7` | How many scheduled backups to keep, 1–365. Wins over the dashboard. |
-| `BACKUP_DIR` | UI | `<data>/backups` | Where scheduled backups go. Mount it from another disk. |
-| `BACKUP_WEBDAV_URL` | UI | — | Also upload each scheduled backup to this WebDAV folder; credentials in the URL. |
-| `BACKUP_S3_URL` | UI | — | Also upload each scheduled backup to S3 or an S3-compatible store: `https://KEY:SECRET@host/bucket/prefix?region=…`. |
-| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | both, outpost | — | Every HTTP request goes through this proxy; hosts in `NO_PROXY` do not. Upper or lower case. See [Proxies and networks with no Internet](docker.md#410-proxies-and-networks-with-no-internet). |
-| `BIND_HOST` | UI | `127.0.0.1` | The address the dashboard listens on. Loopback by default, which is what keeps an instance with no `API_TOKEN` reachable only from this machine; the container images set `0.0.0.0` (the compose `ports` mapping then decides who can reach it, and publishes on `127.0.0.1` only). To reach the dashboard from another machine, publish on `0.0.0.0` (or set `BIND_HOST` on bare metal) **and** set `API_TOKEN` — see [3.12](#312-reaching-the-api-from-another-host) for what a request off this machine may then do. |
-| `PORT` | UI, outpost | `3000` (`8080` for the outpost) | HTTP port. |
+| Variable | Editions | `_FILE` | Default | Purpose |
+|---|---|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | both | ✓ | — | Telegram bot token. Required if the Telegram channel is enabled. |
+| `TELEGRAM_CHAT_ID` | both | | — | Target chat. Required with the above. |
+| `WEBHOOK_URL` | both | ✓ | — | Where the generic webhook POSTs. Required if that channel is enabled. |
+| `DISCORD_WEBHOOK_URL` | both | ✓ | — | Discord incoming webhook. Required if the Discord channel is enabled. |
+| `SLACK_WEBHOOK_URL` | both | ✓ | — | Slack incoming webhook. Required if the Slack channel is enabled. |
+| `NTFY_TOPIC_URL` | both | ✓ | — | ntfy topic URL, server included (`https://ntfy.sh/my-topic`). Required if the ntfy channel is enabled. |
+| `NTFY_TOKEN` | both | ✓ | — | Optional ntfy access token. Only a server with access control needs one. |
+| `GOTIFY_URL` | both | | — | Gotify server (`https://gotify.example.com`). Required if the Gotify channel is enabled. |
+| `GOTIFY_TOKEN` | both | ✓ | — | Gotify application token. Required with the above. |
+| `PUSHOVER_TOKEN` | both | ✓ | — | Pushover application API token. Required if the Pushover channel is enabled. |
+| `PUSHOVER_USER_KEY` | both | ✓ | — | Pushover user or group key. Required with the above. |
+| `PUSHOVER_DEVICE` | both | | — | Optional. One registered device; unset delivers to every device on the account. |
+| `TEAMS_WEBHOOK_URL` | both | ✓ | — | Microsoft Teams channel webhook. Required if the Teams channel is enabled. |
+| `MATRIX_HOMESERVER_URL` | both | | — | Matrix homeserver root (`https://matrix.example.org`). Required if the Matrix channel is enabled. |
+| `MATRIX_ROOM_ID` | both | | — | Internal room id (`!ops:example.org`), not an alias. Required with the above. |
+| `MATRIX_ACCESS_TOKEN` | both | ✓ | — | Access token for the user that posts. Required with the above. |
+| `PAGERDUTY_ROUTING_KEY` | both | ✓ | — | Integration key of an Events API v2 integration. Required if the PagerDuty channel is enabled. |
+| `PAGERDUTY_REGION` | both | | — | Optional. `eu` for an account in PagerDuty's EU service region. |
+| `OPSGENIE_API_KEY` | both | ✓ | — | Opsgenie API integration key. Required if the Opsgenie channel is enabled. |
+| `OPSGENIE_REGION` | both | | — | Optional. `eu` for an account on Opsgenie's EU instance. |
+| `APPRISE_SERVER_URL` | both | | — | Apprise API server (`http://apprise:8000`). Required if the Apprise channel is enabled. |
+| `APPRISE_CONFIG_KEY` | both | ✓ | — | Key of a configuration the Apprise server stores. Either this or `APPRISE_URLS` is required. |
+| `APPRISE_URLS` | both | ✓ | — | Apprise service URLs, comma-separated, for a stateless server. Either this or `APPRISE_CONFIG_KEY` is required. |
+| `SPLUNK_ONCALL_API_KEY` | both | ✓ | — | Splunk On-Call REST endpoint API key. Required if that channel is enabled. |
+| `SPLUNK_ONCALL_ROUTING_KEY` | both | ✓ | — | The routing key that picks the escalation policy. Required with the above. |
+| `SQUADCAST_WEBHOOK_URL` | both | ✓ | — | Squadcast Incident Webhook URL. Required if that channel is enabled. |
+| `ZENDUTY_INTEGRATION_KEY` | both | ✓ | — | Zenduty API integration key. Required if that channel is enabled. |
+| `INCIDENT_IO_ALERT_SOURCE_ID` | both | | — | incident.io HTTP alert source config id. Required if that channel is enabled. |
+| `INCIDENT_IO_TOKEN` | both | ✓ | — | That alert source's bearer token. Required with the above. |
+| `GRAFANA_ONCALL_WEBHOOK_URL` | both | ✓ | — | Grafana OnCall Formatted Webhook URL. Required if that channel is enabled. |
+| `MATTERMOST_URL` | both | | — | Mattermost server (`https://chat.example.com`). Required if that channel is enabled. |
+| `MATTERMOST_TOKEN` | both | ✓ | — | A bot account's access token. Required with the above. |
+| `MATTERMOST_CHANNEL_ID` | both | | — | The channel's id, not its name. Required with the above. |
+| `ROCKETCHAT_URL` | both | | — | Rocket.Chat server. Required if that channel is enabled. |
+| `ROCKETCHAT_USER_ID` | both | | — | The bot user's id. Required with the above. |
+| `ROCKETCHAT_TOKEN` | both | ✓ | — | A personal access token of that user. Required with the above. |
+| `ROCKETCHAT_ROOM_ID` | both | | — | The room's id, not its `#name`. Required with the above. |
+| `ZULIP_SITE_URL` | both | | — | Zulip organisation (`https://example.zulipchat.com`). Required if that channel is enabled. |
+| `ZULIP_BOT_EMAIL` | both | | — | The bot's email address. Required with the above. |
+| `ZULIP_API_KEY` | both | ✓ | — | The bot's API key. Required with the above. |
+| `ZULIP_STREAM` | both | | — | The channel (stream) to post in. Required with the above. |
+| `ZULIP_TOPIC` | both | | — | Optional. One fixed topic; unset gives each provider a topic of its own. |
+| `GOOGLE_CHAT_WEBHOOK_URL` | both | ✓ | — | A Google Chat space's incoming webhook. Required if that channel is enabled. |
+| `TWILIO_SMS_ACCOUNT_SID` | both | | — | Twilio account SID (`AC…`) for SMS. Required if the SMS channel is enabled. |
+| `TWILIO_SMS_AUTH_TOKEN` | both | ✓ | — | That account's auth token. Required with the above. |
+| `TWILIO_SMS_FROM` | both | | — | The Twilio number to text from, E.164. Required with the above. |
+| `TWILIO_SMS_TO` | both | | — | The number to text, E.164. Required with the above. |
+| `TWILIO_CALL_ACCOUNT_SID` | both | | — | Twilio account SID for voice calls. Required if the call channel is enabled. Its own variable, even for the same account: two channels never share one. |
+| `TWILIO_CALL_AUTH_TOKEN` | both | ✓ | — | That account's auth token. Required with the above. |
+| `TWILIO_CALL_FROM` | both | | — | The Twilio number to call from, E.164. Required with the above. |
+| `TWILIO_CALL_TO` | both | | — | The number to call, E.164. Required with the above. |
+| `BARK_DEVICE_KEY` | both | ✓ | — | The device key the Bark iOS app shows. Required if that channel is enabled. |
+| `BARK_SERVER_URL` | both | | — | Optional. A self-hosted bark-server; unset uses `https://api.day.app`. |
+| `SIGNAL_API_URL` | both | | — | A signal-cli-rest-api server (`http://signal-api:8080`). Required if that channel is enabled. |
+| `SIGNAL_NUMBER` | both | | — | The registered number messages are sent from, E.164. Required with the above. |
+| `SIGNAL_RECIPIENTS` | both | | — | Numbers or `group.…` ids, comma-separated. Required with the above. |
+| `SYSLOG_URL` | both | | — | `udp://host:514`, `tcp://host:601` or `tls://host:6514`. Required if that channel is enabled. |
+| `SYSLOG_FACILITY` | both | | `local0` | Optional. `local0` to `local7`. |
+| `MQTT_BROKER_URL` | both | | — | `mqtt://broker:1883`, or `mqtts://` for TLS. Required if that channel is enabled. |
+| `MQTT_TOPIC` | both | | `isitdown` | Optional. Topic prefix; messages go to `<prefix>/<provider>`. |
+| `MQTT_USERNAME` | both | | — | Optional. Only for a broker that wants credentials. |
+| `MQTT_PASSWORD` | both | ✓ | — | Optional. Sent only with a user name. |
+| `MASTODON_INSTANCE_URL` | both | | — | Mastodon instance (`https://mastodon.social`). Required if that channel is enabled. |
+| `MASTODON_ACCESS_TOKEN` | both | ✓ | — | An application token with `write:statuses`. Required with the above. |
+| `MASTODON_VISIBILITY` | both | | `public` | Optional. `public`, `unlisted` or `private`. |
+| `BLUESKY_HANDLE` | both | | — | The account's handle. Required if that channel is enabled. |
+| `BLUESKY_APP_PASSWORD` | both | ✓ | — | An app password, never the account's own. Required with the above. |
+| `BLUESKY_SERVICE_URL` | both | | `https://bsky.social` | Optional. The account's PDS. |
+| `WEBHOOK_SECRET` | both | ✓ | — | Optional shared secret for the generic webhook. Set it and every request is signed (see [3.6](#36-notification-channels)); leave it unset and requests go out unsigned, exactly as before. |
+| `LOG_LEVEL` | both | | `info` | `debug` · `info` · `warn` · `error`. |
+| `PLUGINS_DIR` | both | | — | A directory of adapter plugins to load at boot ([3.14](#314-adapter-plugins)). Unset — the default, in the images too — loads nothing. **A plugin runs with this process's own privileges.** |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | both | | — | An OTLP/HTTP collector base URL; `/v1/traces` is appended. Setting it turns tracing on ([3.16](#316-traces)). Unset, nothing is traced and nothing is allocated. |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | both | | — | The traces endpoint exactly, when it is not `<base>/v1/traces`. Wins over the variable above. |
+| `OTEL_EXPORTER_OTLP_HEADERS` | both | ✓ | — | `key=value,other=value` — an API key a hosted collector wants. |
+| `OTEL_SERVICE_NAME` | both | | `isitdown` | What the collector labels this process. |
+| `OUTPOSTS` | both | | — | Outposts to ask for a second reading of every probe, comma-separated base URLs (`https://vps-1.example.com:8080`) — roadmap 1.7, see [Docker §4.7](docker.md#47-outposts--a-second-point-of-view-for-probes). Unset — the default — leaves every probe this container's reading alone. |
+| `OUTPOST_TOKEN` | both, outpost | ✓ | — | The bearer token every outpost was started with. Required beside `OUTPOSTS`; an outpost refuses to start without one. |
+| `LOG_FILE` | both | | — | Also append every log line to this file, rotated by size. Unset, logs go to stdout only. |
+| `LOG_MAX_BYTES` | both | | `5242880` | Size at which `LOG_FILE` rotates. |
+| `LOG_MAX_FILES` | both | | `5` | How many rotated generations (`.1` … `.5`) survive beside the live file. |
+| `CONFIG_PATH` | Light | | `/app/config/config.yml` | Where to read `config.yml`. |
+| `DATA_PATH` | Light | | `/app/data/state.json` | Where to keep the state file. |
+| `DB_PATH` | UI | | `/app/data/isitdown.db` | SQLite database. |
+| `API_TOKEN` | UI | ✓ | — | A read-only bearer token ([3.12](#312-reaching-the-api-from-another-host)). Unset — the default — leaves every route open, which is right for an instance bound to `127.0.0.1`. Set it and a request carrying it may `GET` from any host; writes stay local-only. |
+| `ISITDOWN_URL` | CLI | | `http://localhost:3000` | The instance `isitdown status` asks ([CLI §10.8](cli.md#108-isitdown-status)). `--url` wins. |
+| `ISITDOWN_TOKEN` | CLI | ✓ | — | The token `isitdown status` sends; falls back to `API_TOKEN`. `--token` wins. |
+| `API_LOCAL_BYPASS` | UI | | `true` | Whether a request from this machine may skip `API_TOKEN`. Set it to `false` behind a reverse proxy, where every forwarded request looks local. |
+| `AUDIT_ACTOR_HEADER` | UI | | — | The request header that names who made a configuration write in the history (`GET /config/history`, roadmap 5.7) — say `X-Forwarded-User` behind a reverse proxy that authenticates. Unset, or a request without it, records the actor as `local`. Trusted as sent: set it only where a proxy owns that header. |
+| `ALLOWED_HOSTS` | UI | | — | Comma-separated extra hostnames the dashboard may be served under (for example a reverse proxy's name). A write whose `Origin` or `Host` is neither the dashboard's own, `localhost` nor an IP literal is refused with `403`. No wildcard. |
+| `TELEGRAM_CHATOPS` | UI | | `false` | Set it to `true` to let the Telegram bot take commands as well as send alerts ([3.17](#317-chatops--commanding-the-bot-from-telegram)). Off by default: an inbound command channel is something you opt into. |
+| `TELEGRAM_COMMAND_CHAT_IDS` | UI | | — | Extra chat ids allowed to command the bot, comma-separated. The chat the Telegram channel already sends to is always allowed; this is for an installation alerted in one chat and commanded from another. |
+| `PUBLIC_PAGE` | UI | | `false` | Set it to `true` to publish a read-only status page at `/public` ([3.18](#318-the-public-status-page)). Off by default — it is the one surface strangers can read. |
+| `PUBLIC_PAGE_TITLE` | UI | | `Service status` | The heading and the browser title of that page. |
+| `PUBLIC_PAGE_PROVIDERS` | UI | | — | Which providers to publish, comma-separated by id. Unset publishes every enabled provider. A visitor cannot widen this: the page takes no request input at all. |
+| `PUBLIC_PAGE_LOCALE` | UI | | — | The language that page is written in. Unset follows the installation's own notification locale. |
+| `PUSH_TOKEN` | UI | ✓ | — | Turns on the provider-webhook endpoint ([3.15](#315-provider-push-instead-of-poll)) and is the credential in its URL. Unset, that route answers `404`. |
+| `HEARTBEAT_TOKEN` | UI | ✓ | — | Turns on the heartbeat ping endpoint ([3.19](#319-heartbeats--the-dead-mans-switch)) and is the credential in its URL. Unset, that route answers `404`. |
+| `EGRESS_ALLOW` | both | | — | Addresses, CIDR ranges and host names the egress policy lets through ([3.38](#338-the-egress-policy--what-a-probe-may-reach)), comma- or space-separated: `10.0.0.0/8,nas.lan`. The UI edition needs it to watch anything on the LAN or on this host. |
+| `OUTBOUND_BLOCK_PRIVATE` | both | | unset | `true` makes the Light edition and the outpost refuse loopback and private targets the way the UI edition already does ([3.38](#338-the-egress-policy--what-a-probe-may-reach)). Anything else keeps the edition's default. |
+| `HEARTBEAT_URL` | both | ✓ | — | Pinged after every poll cycle that completed — IsItDown's own dead-man's switch ([3.39](#339-pinging-out--isitdowns-own-dead-mans-switch)). A Healthchecks.io or Uptime Kuma push URL. In the Light edition, `heartbeat.url` in `config.yml` wins. |
+| `HEARTBEAT_FAIL_URL` | both | ✓ | — | Pinged after a cycle that failed (unreadable config, locked database) — Healthchecks.io's `/fail` URL. |
+| `HEARTBEAT_METHOD` | both | | `GET` | `GET` or `POST`. `POST` sends a one-line text body: the cycle's summary, or why it failed. |
+| `BACKUP_CRON` | UI | | — (off) | Scheduled backups: a five-field cron expression, read in the instance's time zone ([4.11](docker.md#411-scheduled-backups)). Wins over Settings → Data and locks the field there. |
+| `BACKUP_KEEP` | UI | | `7` | How many scheduled backups to keep, 1–365. Wins over the dashboard. |
+| `BACKUP_DIR` | UI | | `<data>/backups` | Where scheduled backups go. Mount it from another disk. |
+| `BACKUP_WEBDAV_URL` | UI | ✓ | — | Also upload each scheduled backup to this WebDAV folder; credentials in the URL. |
+| `BACKUP_S3_URL` | UI | ✓ | — | Also upload each scheduled backup to S3 or an S3-compatible store: `https://KEY:SECRET@host/bucket/prefix?region=…`. |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | both, outpost | | — | Every HTTP request goes through this proxy; hosts in `NO_PROXY` do not. Upper or lower case. See [Proxies and networks with no Internet](docker.md#410-proxies-and-networks-with-no-internet). |
+| `BIND_HOST` | UI | | `127.0.0.1` | The address the dashboard listens on. Loopback by default, which is what keeps an instance with no `API_TOKEN` reachable only from this machine; the container images set `0.0.0.0` (the compose `ports` mapping then decides who can reach it, and publishes on `127.0.0.1` only). To reach the dashboard from another machine, publish on `0.0.0.0` (or set `BIND_HOST` on bare metal) **and** set `API_TOKEN` — see [3.12](#312-reaching-the-api-from-another-host) for what a request off this machine may then do. |
+| `PORT` | UI, outpost | | `3000` (`8080` for the outpost) | HTTP port. |
 
 Secrets arrive through `env_file` at runtime; nothing is baked into an image.
 `docker history` on either image shows no `ENV` layer carrying a value.
@@ -754,6 +756,31 @@ knowing:
 
 The dashboard therefore accepts a credential, as the design prototype drew, but
 only one way: in.
+
+**Secrets from files** (roadmap 9.4). Docker Swarm, Compose `secrets:` and
+Kubernetes hand a secret over as a mounted file, not a variable. Every variable
+marked ✓ in the `_FILE` column of [3.3](#33-environment-variables) — plus
+`SMTP_PASSWORD`, `AI_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` and `PROMETHEUS_TOKEN`,
+documented with their features — also accepts `NAME_FILE`: the path of a file
+whose content is the value, one trailing newline removed. So does any variable
+you name yourself, in a `${VAR}` reference in `config.yml`, a channel's
+variable name in the dashboard, or a probe's credentials.
+
+```yaml
+services:
+  isitdown:
+    environment:
+      TELEGRAM_BOT_TOKEN_FILE: /run/secrets/telegram_bot_token
+    secrets: [telegram_bot_token]
+secrets:
+  telegram_bot_token:
+    file: ./telegram_bot_token.txt
+```
+
+Setting both `NAME` and `NAME_FILE` is a startup error that names both — two
+sources for one secret means one of them is stale. So is a `NAME_FILE` that
+points at a file the process cannot read. `LOG_FILE` is unrelated: it is where
+the log goes.
 
 ### 3.5 Monitored providers
 
@@ -2223,6 +2250,34 @@ With it set:
   the node's address, not from loopback, and a liveness check that starts
   failing because a token was set is a restart loop.
 
+**Named tokens with scopes** (roadmap 9.11). One shared key is too much for a CI
+job that only writes deploy markers and too little to take back from it alone.
+**Settings → Tokens** — or `POST /config/tokens` ([API](api.md)) —
+creates a named token with the scopes it needs, shows it **once**, and keeps only
+its SHA-256: nothing, the dashboard included, can read it back.
+
+| Scope | What it opens |
+|---|---|
+| `read` | Every `GET` and `HEAD` — what `API_TOKEN` grants. |
+| `annotations:write` | `POST /annotations`, `DELETE /annotations/:id` — deploy markers from CI. |
+| `mute` | `POST /providers/:id/mute` and `/ack` — a maintenance script. |
+| `push` | `POST /poll` — "read everything now" from a pipeline. |
+| `admin` | Everything, and implies every scope above. |
+
+Scopes are otherwise independent: an `annotations:write` token cannot read
+`/status`. A request outside a token's scopes answers `403` naming the scope it
+needed; an unknown or **revoked** token answers `401`, from the next request on.
+The list shows each token's name, scopes, creation and last use (written at most
+once a minute); revoking keeps the row, so the list still says what it was.
+Creating and revoking are recorded in the configuration history, without the
+value. Which scope each route needs is one table in `src/ui/apiToken.ts`, the
+OpenAPI document repeats it as `x-required-scope`, and a test fails on a write
+route that table does not name.
+
+Creating the first token turns the gate on even with no `API_TOKEN` set — from
+then on the rules above apply. `API_TOKEN` keeps working exactly as before, as a
+token with `read` alone, beside any number of named ones.
+
 Two things to be clear about:
 
 - **`X-Forwarded-For` is ignored.** A header the client writes cannot decide
@@ -2230,9 +2285,9 @@ Two things to be clear about:
   on this same host makes every request it forwards look local — so behind one,
   set `API_LOCAL_BYPASS=false` and require the token from everybody, this
   machine included.
-- **This is not authentication.** One token, no identities, no expiry, and
-  nothing to revoke but the variable. It is a door with one key. Multi-user auth
-  remains a declared non-goal.
+- **This is not authentication.** Tokens say what a caller may do, never who it
+  is: no identities, no expiry, no users. Multi-user auth remains a declared
+  non-goal.
 
 ```bash
 curl -H "Authorization: Bearer $API_TOKEN" http://isitdown.lan:3000/widget

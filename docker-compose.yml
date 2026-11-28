@@ -55,6 +55,12 @@ services:
     # No config.yml: the UI edition keeps its configuration in SQLite.
     volumes:
       - isitdown-ui-data:/app/data
+    # Roadmap 9.4: any secret can come from a file instead — NAME_FILE beside
+    # NAME (docs/configuration.md §3.4). With Compose secrets:
+    # environment:
+    #   API_TOKEN_FILE: /run/secrets/api_token
+    # secrets: [api_token]
+    # and, at the top level: secrets: { api_token: { file: ./api_token.txt } }
     profiles: ["ui"]
 
   # A second point of view for probes (roadmap 1.7), meant for another

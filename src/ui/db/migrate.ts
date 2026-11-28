@@ -4,7 +4,7 @@ import pkg from "../../../package.json" with { type: "json" };
 import { rollback } from "./open.ts";
 import { snapshotInto } from "./snapshot.ts";
 
-export const SCHEMA_VERSION = 42;
+export const SCHEMA_VERSION = 43;
 
 /**
  * The `settings` row naming the IsItDown version that last moved the schema —
@@ -1023,6 +1023,24 @@ function upgrade(db: DatabaseSync, from: number): void {
         at        TEXT NOT NULL,
         value     REAL NOT NULL,
         PRIMARY KEY (series_id, at)
+      );
+    `);
+  }
+
+  if (from < 43) {
+    // Named, scoped, revocable API tokens — roadmap 9.11. Only a hash is kept:
+    // the token is shown once, at creation, and nothing can read it back.
+    // Revoking stamps `revoked_at` rather than deleting, so the list can still
+    // say what a token was called and when it was last used.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS api_tokens (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        name         TEXT NOT NULL,
+        token_hash   TEXT NOT NULL UNIQUE,
+        scopes       TEXT NOT NULL,
+        created_at   TEXT NOT NULL,
+        last_used_at TEXT,
+        revoked_at   TEXT
       );
     `);
   }

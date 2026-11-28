@@ -228,8 +228,15 @@ const ASSETS = "dist/ui/public/assets";
  * — it simply ships more code); the other ~10 kB is the dashboard stack:
  * react/react-dom 19.2 -> 19.3, radix-ui 1.6 -> 1.8, vite 8.2 -> 8.3.
  * No direct dependency was added.
+ *
+ * It moved 812,000 -> 820,000 (793.0 -> 800.8 kB) for roadmap 9.11's
+ * Settings → API tokens section (ALE-101). Measured: 791.7 kB gzipped
+ * before, 799.0 kB after — 7.3 kB. Most of it is fifty strings in six
+ * catalogs (each scope's label, help line and "can no longer…" phrase, the
+ * create, shown-once and revoke dialogs); the rest is the section itself.
+ * No dependency was added.
  */
-export const BUDGET = { js: 812_000, css: 23_500 };
+export const BUDGET = { js: 820_000, css: 23_500 };
 
 /** Everything else in `assets/` — fonts, images, the map grid — is not code and not budgeted here. */
 const KINDS = ["js", "css"];

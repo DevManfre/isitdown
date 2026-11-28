@@ -41,7 +41,7 @@ export function heartbeatRoutes(runtime: UiRuntimeCore): Router {
   router.get("/config/heartbeats", (req, res) => {
     const token = (runtime.env["HEARTBEAT_TOKEN"] ?? "").trim();
     const enabled = token !== "";
-    const revealed = enabled && mayWrite(runtime.env, req);
+    const revealed = enabled && mayWrite(runtime.env, req, runtime.apiTokens);
     const origin = `${req.protocol}://${req.host}`;
     const records = new Map(ledger.list().map((record) => [record.providerId, record]));
     res.json({

@@ -2,6 +2,7 @@ import { isSea } from "node:sea";
 import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { useEnvProxy } from "../core/proxy.ts";
+import { applySecretFiles } from "../core/secretEnv.ts";
 import { buildLightRuntime } from "./runtime.ts";
 
 const CONFIG_PATH = process.env["CONFIG_PATH"] ?? "/app/config/config.yml";
@@ -21,6 +22,14 @@ async function main(): Promise<void> {
     parseLogLevel(process.env["LOG_LEVEL"]),
     createLogWriter(readFileLogOptions(process.env)),
   );
+
+  // Roadmap 9.4: every NAME_FILE becomes NAME before anything reads a secret.
+  try {
+    applySecretFiles(process.env);
+  } catch (error) {
+    logger.error("isitdown light failed to start", { error: error instanceof Error ? error.message : String(error) });
+    process.exit(1);
+  }
 
   // Roadmap 10.7: before the runtime is built, so the first cycle reads through
   // the proxy too. Process-wide, so it lives here rather than in the runtime
