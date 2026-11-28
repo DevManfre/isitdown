@@ -108,6 +108,17 @@ env: {}
 secrets: {}
 existingSecret: ""
 
+# Roadmap 9.4: the same credentials as files rather than variables — a Secret
+# mounted read-only, each key handed over as NAME_FILE. Nothing lands in the
+# pod's environment, so `kubectl describe pod` and a process dump show a path.
+#   secretFiles:
+#     secretName: isitdown-credentials
+#     keys:
+#       TELEGRAM_BOT_TOKEN: telegram-bot-token   # → TELEGRAM_BOT_TOKEN_FILE
+secretFiles:
+  secretName: ""
+  keys: {}
+
 # Light edition only: the contents of `config.yml`, rendered into a ConfigMap
 # and mounted read-only at /app/config/config.yml. `${VAR}` references resolve
 # against the environment above, exactly as they do in Docker.

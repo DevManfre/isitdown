@@ -1,4 +1,7 @@
 import type {
+  ApiScope,
+  ApiTokenList,
+  CreatedApiToken,
   OperatorSeries,
   NewOperatorSeries,
   SeriesReading,
@@ -639,5 +642,11 @@ export const summarizeIncident = (providerId: string, incidentId: string, locale
 export const getOperatorSeries = () => request<{ series: OperatorSeries[] }>("GET", "/config/series");
 export const addOperatorSeries = (series: NewOperatorSeries) => request<OperatorSeries>("POST", "/config/series", series);
 export const deleteOperatorSeries = (id: number) => request<undefined>("DELETE", `/config/series/${id}`);
+
+/** API tokens — roadmap 9.11. The created token comes back once, in the create response. */
+export const getApiTokens = () => request<ApiTokenList>("GET", "/config/tokens");
+export const createApiToken = (body: { name: string; scopes: ApiScope[] }) =>
+  request<CreatedApiToken>("POST", "/config/tokens", body);
+export const revokeApiToken = (id: number) => request<undefined>("DELETE", `/config/tokens/${id}`);
 export const getSeriesReading = (id: number, from: string, to: string) =>
   request<SeriesReading>("GET", `/series/${id}?${new URLSearchParams({ from, to }).toString()}`);

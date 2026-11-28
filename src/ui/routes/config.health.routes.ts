@@ -30,7 +30,7 @@ export function configHealthRoutes(runtime: UiRuntimeCore, router: Router): void
           retentionDays: readSettings(db, runtime.logger).retentionDays,
           update: runtime.updateCheck.state().status,
           publicPageEnabled: readPublicPageSettings(runtime.env).enabled,
-          apiTokenSet: (runtime.env["API_TOKEN"] ?? "").trim() !== "",
+          apiTokenSet: (runtime.env["API_TOKEN"] ?? "").trim() !== "" || runtime.apiTokens.anyActive(),
         },
         now,
       ),

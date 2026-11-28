@@ -217,3 +217,94 @@ token only ever reads. Leave `env` out when the instance has no `API_TOKEN`.
   }
 }
 ```
+
+### 10.8 `isitdown status`
+
+```
+usage: isitdown status [--url <url>] [--token <token>] [--provider <id,id>] [--json] [--exit-code]
+```
+
+The fifth command (roadmap 12.2): the fleet read once, for a script rather than
+a person — "don't deploy while GitHub is down", a git hook, a cron job. Like
+`watch` and `mcp` it only ever sends a `GET /status`.
+
+- **Default output** is one line per provider that is not operational
+  (`GitHub (github): Major outage`), or a single `all 12 providers operational`.
+- **`--provider github,cloudflare`** keeps only those ids — for the output and
+  for the exit code. Repeatable. An id the instance does not monitor (or has
+  disabled) is an error, so a typo cannot pass as "all clear".
+- **`--json`** prints this shape instead, and nothing else on stdout:
+
+  ```json
+  {
+    "overall": "down",
+    "serverNow": "2026-11-27T10:00:05.000Z",
+    "providers": [
+      { "id": "github", "name": "GitHub", "status": "major_outage", "fetchedAt": "2026-11-27T10:00:00.000Z" }
+    ]
+  }
+  ```
+
+  `overall` is `operational`, `degraded` or `down`; `status` is the provider's
+  own reading, one of `operational`, `degraded`, `partial_outage`,
+  `major_outage`, `unknown`. Disabled providers are left out.
+- **`--exit-code`** makes the fleet's state the exit code:
+
+  | Code | Means |
+  |---|---|
+  | `0` | Everything kept is operational |
+  | `1` | Something is degraded, in partial outage, or `unknown` — nothing is down |
+  | `2` | Something is in major outage |
+  | `3` | The instance could not be read: unreachable, token rejected, unexpected answer |
+  | `64` | Wrong usage: an unknown option, a bad `--url`, a `--provider` the instance does not monitor |
+
+  Without `--exit-code` the command exits `0` whatever the fleet's state, and
+  still `3` or `64` when it could not answer. `64` sits outside 0–3 on purpose:
+  a broken script must not read as "something is down".
+
+`--url` falls back to `$ISITDOWN_URL`, then `http://localhost:3000`; `--token`
+to `$ISITDOWN_TOKEN`, then `$API_TOKEN` — the variable `watch` and `mcp` read —
+so a script stays one line.
+
+**GitHub Actions — skip the deploy while a dependency is down.** The runner has
+to reach the instance (a self-hosted runner on the same network, or an instance
+published behind a reverse proxy). Exit code `2` means down; `1`, degraded,
+still deploys:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the IsItDown CLI
+        run: |
+          git clone --depth 1 https://github.com/DevManfre/isitdown /tmp/isitdown
+          cd /tmp/isitdown && npm ci && npm run build:cli
+      - name: Are our providers up?
+        id: providers
+        env:
+          ISITDOWN_URL: ${{ vars.ISITDOWN_URL }}
+          ISITDOWN_TOKEN: ${{ secrets.ISITDOWN_TOKEN }}
+        run: |
+          set +e
+          node /tmp/isitdown/dist/cli/index.js status --provider github,cloudflare --exit-code
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          [ "$code" -le 2 ]   # 3 or 64: the check itself failed, fail the job
+      - name: Deploy
+        if: steps.providers.outputs.code != '2'
+        run: ./deploy.sh
+```
+
+**A pre-push hook** that refuses to push while GitHub is down, and says why —
+`.git/hooks/pre-push`, executable:
+
+```bash
+#!/bin/sh
+node /path/to/isitdown/dist/cli/index.js status --provider github --exit-code
+case $? in
+  2) echo "GitHub is down: push again later, or skip this check with --no-verify" >&2; exit 1 ;;
+  *) exit 0 ;;   # up, degraded, or the instance is off: don't block the push
+esac
+```

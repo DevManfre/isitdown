@@ -1345,3 +1345,27 @@ export interface SeriesReading {
 export type NewOperatorSeries =
   | { source: "prometheus"; name: string; unit: string; url: string; query: string }
   | { source: "csv"; name: string; unit: string; csv: string };
+
+/** What an API token may do — roadmap 9.11. `admin` implies every other. */
+export type ApiScope = "read" | "annotations:write" | "push" | "mute" | "admin";
+
+/** One API token as the list shows it: never the token, never its hash. */
+export interface ApiToken {
+  id: number;
+  name: string;
+  scopes: ApiScope[];
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+/** `GET /config/tokens`. `envToken`: whether `API_TOKEN` is set — a read token Settings cannot revoke. */
+export interface ApiTokenList {
+  tokens: ApiToken[];
+  envToken: boolean;
+}
+
+/** `POST /config/tokens` — the only response that ever carries the token. */
+export interface CreatedApiToken extends ApiToken {
+  token: string;
+}

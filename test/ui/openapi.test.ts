@@ -147,3 +147,20 @@ test("the token scheme is declared but nothing requires it — most installation
     }
   }
 });
+
+test("every operation names the token scope the gate enforces for it (roadmap 9.11)", () => {
+  const document = openapiDocument() as { paths: Record<string, Record<string, { "x-required-scope"?: string }>> };
+  const scope = (path: string, method: string) => document.paths[path]?.[method]?.["x-required-scope"];
+  assert.equal(scope("/status", "get"), "read");
+  assert.equal(scope("/annotations", "post"), "annotations:write");
+  assert.equal(scope("/annotations/{id}", "delete"), "annotations:write");
+  assert.equal(scope("/providers/{id}/mute", "post"), "mute");
+  assert.equal(scope("/poll", "post"), "push");
+  assert.equal(scope("/config/tokens", "get"), "admin");
+  assert.equal(scope("/config/services/{id}", "delete"), "admin");
+  for (const [path, operations] of Object.entries(document.paths)) {
+    for (const [method, operation] of Object.entries(operations)) {
+      assert.ok(operation["x-required-scope"] !== undefined, `${method.toUpperCase()} ${path}`);
+    }
+  }
+});

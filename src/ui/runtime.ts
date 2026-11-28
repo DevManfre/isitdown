@@ -39,6 +39,7 @@ import { createLiveEvents, type LiveEvents } from "./liveEvents.ts";
 import type { HistoryStore } from "./historyStore.interface.ts";
 import { createMapLane, type MapLane } from "./mapLane.ts";
 import { createMapStore, type MapStore } from "./mapStore.ts";
+import { createApiTokenStore, type ApiTokenStore } from "./dbApiTokens.ts";
 import { createMetricsRegistry, type MetricsRegistry } from "./metrics.ts";
 import { componentTargetOf, inQuietHours } from "../core/routing.ts";
 import { createReportService, reportPeriod } from "./periodicReport.ts";
@@ -139,6 +140,8 @@ export interface UiRuntimeCore {
   /** Built here, run by the server at boot — never by the runtime builder, so tests stay offline. */
   backfill: BackfillService;
   mapStore: MapStore;
+  /** Named, scoped, revocable API tokens — roadmap 9.11. */
+  apiTokens: ApiTokenStore;
   /** The Prometheus scrape surface, fed by the dispatcher and the scheduler. */
   metrics: MetricsRegistry;
   /** The push channel behind `GET /events`; published to as each cycle finishes. */
@@ -658,6 +661,7 @@ export async function buildUiRuntime(options: UiRuntimeOptions): Promise<UiRunti
     scheduler,
     backfill,
     mapStore,
+    apiTokens: createApiTokenStore(db),
     metrics,
     live,
     pushSubscriptions,

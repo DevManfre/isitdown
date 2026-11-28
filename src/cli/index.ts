@@ -1,8 +1,10 @@
 import { SOURCE_LOCALE, t } from "../core/i18n/index.ts";
+import { applySecretFiles } from "../core/secretEnv.ts";
 import { main as runWatchCommand, WATCH_USAGE } from "./watch/run.ts";
 import { DISCOVER_USAGE, main as runDiscoverCommand } from "./discover/run.ts";
 import { IMPORT_USAGE, main as runImportCommand } from "./import/run.ts";
 import { MCP_USAGE, main as runMcpCommand } from "./mcp/run.ts";
+import { STATUS_USAGE, main as runStatusCommand } from "./status/run.ts";
 
 /**
  * `isitdown` — the terminal client (roadmap 17.7), a third entrypoint beside
@@ -10,14 +12,25 @@ import { MCP_USAGE, main as runMcpCommand } from "./mcp/run.ts";
  * `src/ui` itself (golden rule, `CLAUDE.md`) and carries no adapter, no
  * notifier, no state store of its own.
  *
- * Four subcommands: `watch` reads an instance, and so does `mcp` (roadmap
- * 7.1), for an assistant rather than a person; `discover` (roadmap 2.3)
+ * Five subcommands: `watch` reads an instance, and so does `mcp` (roadmap
+ * 7.1), for an assistant rather than a person, and `status` (roadmap 12.2),
+ * once, for a script; `discover` (roadmap 2.3)
  * reads a project's files and `import` (roadmap 2.4) another monitoring tool's
  * export, and neither needs an instance at all.
  */
 const USAGE = t(SOURCE_LOCALE, "cli.usage");
 
 const [command, ...rest] = process.argv.slice(2);
+
+// Roadmap 9.4: API_TOKEN_FILE / ISITDOWN_TOKEN_FILE, as on the server. A broken
+// one exits 64 — a usage problem, never a code `status --exit-code` gives a
+// meaning to.
+try {
+  applySecretFiles(process.env);
+} catch (error) {
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.exit(64);
+}
 
 if (command === "watch") {
   if (rest.includes("--help") || rest.includes("-h")) {
@@ -50,6 +63,14 @@ if (command === "mcp") {
     process.exit(0);
   }
   process.exit(await runMcpCommand(rest, process.env));
+}
+
+if (command === "status") {
+  if (rest.includes("--help") || rest.includes("-h")) {
+    process.stdout.write(STATUS_USAGE);
+    process.exit(0);
+  }
+  process.exit(await runStatusCommand(rest, process.env));
 }
 
 if (command === "--help" || command === "-h" || command === undefined) {

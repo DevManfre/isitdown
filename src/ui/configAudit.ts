@@ -277,6 +277,8 @@ export function actorOf(req: Request, headerName: string | undefined): string {
 }
 
 const SECRETS_ROUTE = /^\/config\/channels\/([^/]+)\/secrets(?:\/([^/]+))?$/;
+/** API tokens — roadmap 9.11: a credential, recorded as created or revoked, never with its value. */
+const TOKENS_ROUTE = /^\/config\/tokens(?:\/(\d+))?$/;
 /** Writes that replace the whole database or only read: the diff would be noise. */
 const UNAUDITED = /^\/config\/(restore|backup|storage|push|snapshots(?:\/\d+)?$|catalog)/;
 
@@ -315,6 +317,12 @@ export function auditWrites(options: AuditOptions) {
         // as set or cleared, never with a value.
         if (route === "/config/ai/key" || route === "/config/ai/cli-token") {
           recordChanges(db, [{ kind: "credential", target: "ai", field: route.slice("/config/ai/".length), before: null, after: req.method === "DELETE" ? "cleared" : "set" }], context);
+          return;
+        }
+        const token = TOKENS_ROUTE.exec(route);
+        if (token !== null) {
+          const name = typeof (req.body as { name?: unknown } | undefined)?.name === "string" ? (req.body as { name: string }).name : "";
+          recordChanges(db, [{ kind: "credential", target: "api-token", field: token[1] ?? name, before: null, after: req.method === "DELETE" ? "cleared" : "set" }], context);
           return;
         }
         const secrets = SECRETS_ROUTE.exec(route);

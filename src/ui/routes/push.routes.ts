@@ -103,7 +103,7 @@ export function pushRoutes(runtime: UiRuntimeCore): Router {
   router.get("/config/provider-push", (req, res) => {
     const token = (runtime.env["PUSH_TOKEN"] ?? "").trim();
     const enabled = token !== "";
-    const revealed = enabled && mayWrite(runtime.env, req);
+    const revealed = enabled && mayWrite(runtime.env, req, runtime.apiTokens);
     const origin = `${req.protocol}://${req.host}`;
     const lastReceived = new Map(receipts.list().map((receipt) => [receipt.providerId, receipt]));
     res.json({

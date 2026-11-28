@@ -1045,6 +1045,19 @@ export const useSeriesReading = (id: number | undefined, from: string, to: strin
     staleTime: 60_000,
   });
 
+/** Settings → API tokens (roadmap 9.11). */
+export const useApiTokens = () =>
+  useQuery({ queryKey: ["api-tokens"], queryFn: api.getApiTokens, throwOnError: false, retry: false });
+
+export function useApiTokenMutations() {
+  const client = useQueryClient();
+  const refresh = () => client.invalidateQueries({ queryKey: ["api-tokens"] });
+  return {
+    create: useMutation({ mutationFn: api.createApiToken, onSuccess: refresh }),
+    revoke: useMutation({ mutationFn: api.revokeApiToken, onSuccess: refresh }),
+  };
+}
+
 export function useOperatorSeriesMutations() {
   const client = useQueryClient();
   const refresh = () => client.invalidateQueries({ queryKey: ["operator-series"] });

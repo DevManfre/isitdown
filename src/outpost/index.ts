@@ -3,6 +3,7 @@ import { createLogWriter, readFileLogOptions } from "../core/logFile.ts";
 import { createLogger, parseLogLevel } from "../core/logger.ts";
 import { configureOutbound } from "../core/outboundPolicy.ts";
 import { useEnvProxy } from "../core/proxy.ts";
+import { applySecretFiles } from "../core/secretEnv.ts";
 import { createOutpostServer } from "./server.ts";
 
 /**
@@ -17,6 +18,13 @@ function main(): void {
     parseLogLevel(process.env["LOG_LEVEL"]),
     createLogWriter(readFileLogOptions(process.env)),
   );
+  // Roadmap 9.4: OUTPOST_TOKEN_FILE, like every other secret.
+  try {
+    applySecretFiles(process.env);
+  } catch (error) {
+    logger.error("isitdown outpost failed to start", { error: error instanceof Error ? error.message : String(error) });
+    process.exit(1);
+  }
   const token = process.env["OUTPOST_TOKEN"]?.trim() ?? "";
   if (token === "") {
     logger.error("isitdown outpost failed to start", { error: "OUTPOST_TOKEN is not set" });

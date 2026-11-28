@@ -27,6 +27,7 @@ test("migrate creates every table the dashboard reads", async () => {
   assert.deepEqual(names(db, "table"), [
     "acks",
     "annotations",
+    "api_tokens",
     "channels",
     "component_samples",
     "config_audit",

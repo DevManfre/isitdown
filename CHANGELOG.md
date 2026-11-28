@@ -4,7 +4,45 @@ Every release of IsItDown, newest first, grouped by the surface each commit
 touched. Generated from the commit log by `tools/changelog.mjs` — don't edit
 it by hand; the release flow regenerates it.
 
+## v2.52.0 — 2026-11-28
+
+### DOCS
+
+- 📝 keep NAME_FILE as written in the Italian secrets section (ALE-92)
+
+### VISUAL
+
+- ✅ agree the API tokens section stories
+
+### UI
+
+- ✨ add the API tokens section to Settings (ALE-101)
+
+### BUNDLE
+
+- 🔧 raise the dashboard budget to 820 kB for the tokens section (ALE-101)
+
+### API
+
+- ✨ add named, revocable, scoped API tokens (ALE-101)
+
+### CLI
+
+- ✨ add isitdown status with --json and --exit-code (ALE-116)
+
+### SECRETS
+
+- ✨ accept NAME_FILE beside every secret variable (ALE-92)
+
+### COMPLEXITY
+
+- 🔧 raise the env var ceiling to 51 for isitdown status
+
 ## v2.51.0 — 2026-11-27
+
+### RELEASE
+
+- 🔖 bump the version to 2.51.0
 
 ### CLI
 

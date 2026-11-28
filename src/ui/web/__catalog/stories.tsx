@@ -4,6 +4,7 @@ import { UptimeStrip } from "@/components/charts/UptimeStrip.tsx";
 import { IncidentBand } from "@/components/IncidentBand.tsx";
 import { IncidentTimelineCard } from "@/components/IncidentTimelineCard.tsx";
 import { EngineSection } from "@/components/settings/EngineSection.tsx";
+import { TokensSection } from "@/components/settings/TokensSection.tsx";
 import type { HistoryBucket, OverallStatus, ProviderStatus, RuntimeConfigResponse } from "@/lib/types.ts";
 import type { Fixtures } from "@/test/fakeApi.ts";
 import { ProviderTile } from "@/widgets/catalog/ProviderTile.tsx";
@@ -307,5 +308,27 @@ export function stories(): Story[] {
 
     // Settings form: the engine section, the densest form on the page.
     story({ id: "settings-engine--populated", component: EngineSection, props: { config }, state: "populated", width: 800 }),
+
+    // Settings → API tokens (roadmap 9.11): every state the section has.
+    story({
+      id: "settings-tokens--populated",
+      component: TokensSection,
+      props: {},
+      state: "populated",
+      width: 880,
+      fixtures: {
+        apiTokens: {
+          envToken: true,
+          tokens: [
+            { id: 1, name: "GitHub Actions — deploys", scopes: ["read", "annotations:write"], createdAt: iso(15 * DAY), lastUsedAt: iso(180 * MINUTE), revokedAt: null },
+            { id: 2, name: "Mute script", scopes: ["mute"], createdAt: iso(7 * DAY), lastUsedAt: iso(DAY), revokedAt: null },
+            { id: 3, name: "Homepage widget", scopes: ["read"], createdAt: iso(56 * DAY), lastUsedAt: null, revokedAt: iso(2 * DAY) },
+          ],
+        },
+      },
+    }),
+    story({ id: "settings-tokens--empty", component: TokensSection, props: {}, state: "empty", width: 880, fixtures: { apiTokens: { tokens: [], envToken: false } } }),
+    story({ id: "settings-tokens--loading", component: TokensSection, props: {}, state: "loading", width: 880, fixtures: { apiTokens: pending } }),
+    story({ id: "settings-tokens--error", component: TokensSection, props: {}, state: "error", width: 880, fixtures: { errors: { apiTokens: 503 } } }),
   ];
 }
