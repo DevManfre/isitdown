@@ -36,7 +36,8 @@ export const BUDGET = {
   // only; the S3 keys ride in the URL rather than as four AWS_* variables.
   // 49 -> 51 (+2: ISITDOWN_URL, ISITDOWN_TOKEN): `isitdown status`, ALE-116
   // (roadmap 12.2) — a script names its instance once, not on every call.
-  envVars: 51,
+  // 51 -> 53 (+2: TRUSTED_PROXY, IDENTITY_HEADER): identity from a trusted reverse proxy, ALE-99
+  envVars: 53,
   subsystems: 9,
   targets: 13,
   adapters: 30,
