@@ -4,7 +4,7 @@ import pkg from "../../../package.json" with { type: "json" };
 import { rollback } from "./open.ts";
 import { snapshotInto } from "./snapshot.ts";
 
-export const SCHEMA_VERSION = 43;
+export const SCHEMA_VERSION = 44;
 
 /**
  * The `settings` row naming the IsItDown version that last moved the schema —
@@ -1043,6 +1043,18 @@ function upgrade(db: DatabaseSync, from: number): void {
         revoked_at   TEXT
       );
     `);
+  }
+
+  if (from < 44) {
+    // Who put a marker on the timeline — roadmap 9.3: the name the trusted
+    // reverse proxy asserted, null without one. Nullable rather than defaulted
+    // to "local": every marker before this column had nobody to name.
+    const annotationColumns = (db.prepare("PRAGMA table_info(annotations)").all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    if (!annotationColumns.includes("created_by")) {
+      db.exec("ALTER TABLE annotations ADD COLUMN created_by TEXT");
+    }
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

@@ -28,9 +28,11 @@ default, and named in [11.4](#114-surfaces-reachable-from-off-the-machine).
 | A plugin in `PLUGINS_DIR` | Everything the poller can do, every resolved credential | It is code, loaded into the process ([configuration §3.14](configuration.md#314-adapter-plugins)). |
 | A provider's status page | Nothing | Every response is validated with zod before use; a malformed one is an error on that provider. |
 | The host and the container runtime | Everything | Whoever controls the host reads the data volume. |
+| A reverse proxy listed in `TRUSTED_PROXY` | Naming the user (`IDENTITY_HEADER`) and the real client (`X-Forwarded-For`) | Roadmap 9.3: the name only labels the history and markers, it grants nothing; the client address decides the local bypass. Unset, no proxy is trusted ([Docker §4.13](docker.md#413-behind-an-authenticating-reverse-proxy)). |
 
-Not trusted: `X-Forwarded-For` (a client writes it, so it never decides whether a
-request is local), a browser `Origin` that is not the dashboard's own (writes are
+Not trusted: `X-Forwarded-For` and the identity header from any address outside
+`TRUSTED_PROXY` (a client writes them, so they never decide whether a request is
+local or who made it — the identity header is removed before any route sees it), a browser `Origin` that is not the dashboard's own (writes are
 refused with `403`), a `Host` that is not `localhost`, an IP address or a name in
 `ALLOWED_HOSTS`.
 

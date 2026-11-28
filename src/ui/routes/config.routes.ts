@@ -155,7 +155,7 @@ export function configRoutes(runtime: UiRuntimeCore): Router {
   // after and what it moved is recorded.
   router.use(
     "/config",
-    auditWrites({ db, logger: runtime.logger, actorHeader: runtime.env["AUDIT_ACTOR_HEADER"] }),
+    auditWrites({ db, logger: runtime.logger }),
   );
   configHistoryRoutes(runtime, router);
   configTokenRoutes(runtime, router);

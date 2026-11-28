@@ -570,7 +570,8 @@ you confirm. **Snapshots** keeps the configuration under a name you choose
 configuration it replaces as a snapshot of its own, so it can be undone too.
 Snapshots are the `config.yml` export, so they hold `${VAR}` references and never
 a credential, and they never include history. **Change history** lists every
-configuration write — who made it (the header named by `AUDIT_ACTOR_HEADER`,
+configuration write — who made it (the name a trusted reverse proxy sends in
+`IDENTITY_HEADER`, roadmap 9.3 — see [Docker §4.13](docker.md#413-behind-an-authenticating-reverse-proxy);
 otherwise `local`), what the value was before, and a button that writes it back.
 Credentials appear there only as "set" or "cleared", never as values.
 
@@ -687,8 +688,10 @@ notification (roadmap 4.5).
 | `API_TOKEN` | UI | ✓ | — | A read-only bearer token ([3.12](#312-reaching-the-api-from-another-host)). Unset — the default — leaves every route open, which is right for an instance bound to `127.0.0.1`. Set it and a request carrying it may `GET` from any host; writes stay local-only. |
 | `ISITDOWN_URL` | CLI | | `http://localhost:3000` | The instance `isitdown status` asks ([CLI §10.8](cli.md#108-isitdown-status)). `--url` wins. |
 | `ISITDOWN_TOKEN` | CLI | ✓ | — | The token `isitdown status` sends; falls back to `API_TOKEN`. `--token` wins. |
-| `API_LOCAL_BYPASS` | UI | | `true` | Whether a request from this machine may skip `API_TOKEN`. Set it to `false` behind a reverse proxy, where every forwarded request looks local. |
-| `AUDIT_ACTOR_HEADER` | UI | | — | The request header that names who made a configuration write in the history (`GET /config/history`, roadmap 5.7) — say `X-Forwarded-User` behind a reverse proxy that authenticates. Unset, or a request without it, records the actor as `local`. Trusted as sent: set it only where a proxy owns that header. |
+| `API_LOCAL_BYPASS` | UI | | `true` | Whether a request from this machine may skip `API_TOKEN`. Behind a reverse proxy on this host, either list the proxy in `TRUSTED_PROXY` (the real client then decides) or set this to `false`, since otherwise every forwarded request looks local. |
+| `TRUSTED_PROXY` | UI | | — | Addresses and CIDR ranges (IPv4 or IPv6, commas or spaces) of the reverse proxy this instance trusts (roadmap 9.3). Only a request whose connection comes from one of them may carry an identity (`IDENTITY_HEADER`) or an `X-Forwarded-For` that is read. Unset means no proxy is trusted. An entry that is neither an address nor a range is logged and ignored. See [Docker §4.13](docker.md#413-behind-an-authenticating-reverse-proxy). |
+| `IDENTITY_HEADER` | UI | | `Remote-User` | The request header in which the trusted proxy names the user: the actor in the configuration history and the author of a marker made from the dashboard. Authelia and Authentik send `Remote-User`; Tailscale Serve sends `Tailscale-User-Login`. From an address outside `TRUSTED_PROXY` the header is ignored and removed from the request. |
+| `AUDIT_ACTOR_HEADER` | UI | | — | Deprecated: use `IDENTITY_HEADER`. Still names the header when `IDENTITY_HEADER` is unset, but since roadmap 9.3 it is believed only from `TRUSTED_PROXY` — without it the actor is always `local`. A warning is logged at startup. |
 | `ALLOWED_HOSTS` | UI | | — | Comma-separated extra hostnames the dashboard may be served under (for example a reverse proxy's name). A write whose `Origin` or `Host` is neither the dashboard's own, `localhost` nor an IP literal is refused with `403`. No wildcard. |
 | `TELEGRAM_CHATOPS` | UI | | `false` | Set it to `true` to let the Telegram bot take commands as well as send alerts ([3.17](#317-chatops--commanding-the-bot-from-telegram)). Off by default: an inbound command channel is something you opt into. |
 | `TELEGRAM_COMMAND_CHAT_IDS` | UI | | — | Extra chat ids allowed to command the bot, comma-separated. The chat the Telegram channel already sends to is always allowed; this is for an installation alerted in one chat and commanded from another. |
@@ -2305,11 +2308,14 @@ token with `read` alone, beside any number of named ones.
 
 Two things to be clear about:
 
-- **`X-Forwarded-For` is ignored.** A header the client writes cannot decide
-  whether the client is local. The consequence is that a reverse proxy running
-  on this same host makes every request it forwards look local — so behind one,
-  set `API_LOCAL_BYPASS=false` and require the token from everybody, this
-  machine included.
+- **`X-Forwarded-For` is read only from a trusted proxy.** A header the client
+  writes cannot decide whether the client is local. Without `TRUSTED_PROXY`
+  (roadmap 9.3) the connection's own address decides, so a reverse proxy on this
+  same host makes every request it forwards look local. Behind one, either list
+  it in `TRUSTED_PROXY` — `X-Forwarded-For` is then read from the right,
+  skipping the trusted hops, and the first address none of them vouches for is
+  the client — or set `API_LOCAL_BYPASS=false` and require the token from
+  everybody, this machine included.
 - **This is not authentication.** Tokens say what a caller may do, never who it
   is: no identities, no expiry, no users. Multi-user auth remains a declared
   non-goal.

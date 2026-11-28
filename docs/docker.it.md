@@ -507,3 +507,91 @@ fin dove può arrivare.
 il database esattamente come l'ha lasciato la versione più vecchia.
 Ripristinalo come [4.8](#48-un-database-che-non-si-apre) ripristina un backup;
 quello che è stato registrato dopo l'aggiornamento non c'è.
+
+### 4.13 Dietro un reverse proxy che autentica
+
+Roadmap 9.3. Molti homelab mettono già davanti ai propri servizi un proxy che fa
+il login (Authelia, Authentik, Tailscale Serve). IsItDown può prendere il nome che
+quel proxy manda: diventa l'attore nella cronologia della configurazione e
+l'autore di un marcatore creato dalla dashboard. Non gestisce nessuna identità
+sua — niente utenti, niente ruoli, sempre un solo operatore.
+
+Due impostazioni: `TRUSTED_PROXY`, l'indirizzo (o il range) da cui si connette il
+proxy, e `IDENTITY_HEADER`, l'header che porta il nome (`Remote-User` di
+predefinito). All'header si crede solo quando la connessione arriva da
+`TRUSTED_PROXY`; da qualunque altro indirizzo viene ignorato e tolto dalla
+richiesta. La stessa lista permette a IsItDown di leggere `X-Forwarded-For`, così
+un client remoto inoltrato da un proxy su questa macchina non viene più scambiato
+per uno locale dal bypass di `API_TOKEN`
+([configurazione §3.12](configuration.it.md#312-raggiungere-lapi-da-un-altro-host)).
+
+`TRUSTED_PROXY` è l'indirizzo che vede *IsItDown*, non quello pubblico del proxy.
+In Compose, dai alla rete condivisa una subnet fissa e fidati solo dell'indirizzo
+del proxy al suo interno, così nessun altro container su quella rete può
+dichiarare un nome. Aggiungi il nome con cui apri la dashboard in
+`ALLOWED_HOSTS`, altrimenti le scritture dalla dashboard vengono rifiutate.
+
+**Authelia con Traefik.** Il forward-auth di Authelia risponde con `Remote-User`,
+l'header predefinito:
+
+```yaml
+services:
+  isitdown:
+    environment:
+      TRUSTED_PROXY: 172.30.0.10        # l'indirizzo fisso di Traefik sulla rete condivisa
+      ALLOWED_HOSTS: isitdown.example.com
+    labels:
+      traefik.http.routers.isitdown.rule: Host(`isitdown.example.com`)
+      traefik.http.routers.isitdown.middlewares: authelia@docker
+      traefik.http.services.isitdown.loadbalancer.server.port: "3000"
+  authelia:
+    labels:
+      traefik.http.middlewares.authelia.forwardauth.address: http://authelia:9091/api/authz/forward-auth
+      traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: "true"
+      traefik.http.middlewares.authelia.forwardauth.authResponseHeaders: Remote-User,Remote-Groups,Remote-Email,Remote-Name
+```
+
+**Authentik con Traefik.** Un proxy provider in modalità forward-auth, servito
+dall'outpost integrato; Authentik indica l'utente in `X-authentik-username`:
+
+```yaml
+services:
+  isitdown:
+    environment:
+      TRUSTED_PROXY: 172.30.0.10
+      IDENTITY_HEADER: X-authentik-username
+      ALLOWED_HOSTS: isitdown.example.com
+    labels:
+      traefik.http.routers.isitdown.middlewares: authentik@docker
+  authentik-server:
+    labels:
+      traefik.http.middlewares.authentik.forwardauth.address: http://authentik-server:9000/outpost.goauthentik.io/auth/traefik
+      traefik.http.middlewares.authentik.forwardauth.trustForwardHeader: "true"
+      traefik.http.middlewares.authentik.forwardauth.authResponseHeaders: X-authentik-username,X-authentik-email
+```
+
+**Tailscale Serve.** `tailscale serve` sulla stessa macchina inoltra la tailnet
+alla dashboard e aggiunge `Tailscale-User-Login` per un utente della tailnet che
+ha fatto l'accesso (mai per il traffico di Funnel, che non ha un utente):
+
+```bash
+tailscale serve --bg 3000
+```
+
+```yaml
+environment:
+  TRUSTED_PROXY: 127.0.0.1             # node avviato direttamente, o network_mode: host
+  IDENTITY_HEADER: Tailscale-User-Login
+  ALLOWED_HOSTS: myhost.tailnet-name.ts.net
+```
+
+Con una porta del container pubblicata la connessione arriva a IsItDown dal
+gateway della rete Docker invece che da `127.0.0.1` (lo mostra
+`docker network inspect`); fidati di quell'indirizzo.
+
+Per verificarlo, fai una modifica alle impostazioni passando dal proxy:
+**Impostazioni → Dati → Cronologia delle modifiche** mostra il tuo nome invece di
+`local`. Una voce di `TRUSTED_PROXY` che non è né un indirizzo né un range viene
+segnalata nel log all'avvio e ignorata. Anche il deprecato `AUDIT_ACTOR_HEADER`
+scrive un avviso nel log: indica ancora l'header, ma si crede solo a una
+richiesta da `TRUSTED_PROXY`.

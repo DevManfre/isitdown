@@ -489,3 +489,88 @@ at the newest of those and says how far it can go.
 database exactly as the older version left it. Restore it the way
 [4.8](#48-a-database-that-will-not-open) restores a backup; anything recorded
 since the upgrade is not in it.
+
+### 4.13 Behind an authenticating reverse proxy
+
+Roadmap 9.3. Many homelabs already put a proxy that logs people in (Authelia,
+Authentik, Tailscale Serve) in front of their services. IsItDown can take the
+name that proxy sends: it becomes the actor in the configuration history and the
+author of a marker made from the dashboard. It manages no identity itself — no
+users, no roles, still one operator.
+
+Two settings: `TRUSTED_PROXY`, the address (or range) the proxy connects from,
+and `IDENTITY_HEADER`, the header carrying the name (`Remote-User` by default).
+The header is believed only when the connection comes from `TRUSTED_PROXY`; from
+anywhere else it is ignored and removed from the request. The same list lets
+IsItDown read `X-Forwarded-For`, so a remote client forwarded by a proxy on this
+host is no longer taken for a local one by the `API_TOKEN` bypass
+([configuration §3.12](configuration.md#312-reaching-the-api-from-another-host)).
+
+`TRUSTED_PROXY` is the address *IsItDown* sees, not the proxy's public one. In
+Compose, give the shared network a fixed subnet and trust only the proxy's
+address in it, so no other container on that network can claim a name. Add the
+name you browse to in `ALLOWED_HOSTS`, or dashboard writes are refused.
+
+**Authelia with Traefik.** Authelia's forward-auth answers with `Remote-User`,
+the default header:
+
+```yaml
+services:
+  isitdown:
+    environment:
+      TRUSTED_PROXY: 172.30.0.10        # Traefik's fixed address on the shared network
+      ALLOWED_HOSTS: isitdown.example.com
+    labels:
+      traefik.http.routers.isitdown.rule: Host(`isitdown.example.com`)
+      traefik.http.routers.isitdown.middlewares: authelia@docker
+      traefik.http.services.isitdown.loadbalancer.server.port: "3000"
+  authelia:
+    labels:
+      traefik.http.middlewares.authelia.forwardauth.address: http://authelia:9091/api/authz/forward-auth
+      traefik.http.middlewares.authelia.forwardauth.trustForwardHeader: "true"
+      traefik.http.middlewares.authelia.forwardauth.authResponseHeaders: Remote-User,Remote-Groups,Remote-Email,Remote-Name
+```
+
+**Authentik with Traefik.** A proxy provider in forward-auth mode, served by the
+embedded outpost; Authentik names the user in `X-authentik-username`:
+
+```yaml
+services:
+  isitdown:
+    environment:
+      TRUSTED_PROXY: 172.30.0.10
+      IDENTITY_HEADER: X-authentik-username
+      ALLOWED_HOSTS: isitdown.example.com
+    labels:
+      traefik.http.routers.isitdown.middlewares: authentik@docker
+  authentik-server:
+    labels:
+      traefik.http.middlewares.authentik.forwardauth.address: http://authentik-server:9000/outpost.goauthentik.io/auth/traefik
+      traefik.http.middlewares.authentik.forwardauth.trustForwardHeader: "true"
+      traefik.http.middlewares.authentik.forwardauth.authResponseHeaders: X-authentik-username,X-authentik-email
+```
+
+**Tailscale Serve.** `tailscale serve` on the same machine proxies the tailnet
+to the dashboard and adds `Tailscale-User-Login` for a signed-in tailnet user
+(never for Funnel traffic, which has no user):
+
+```bash
+tailscale serve --bg 3000
+```
+
+```yaml
+environment:
+  TRUSTED_PROXY: 127.0.0.1             # node run directly, or network_mode: host
+  IDENTITY_HEADER: Tailscale-User-Login
+  ALLOWED_HOSTS: myhost.tailnet-name.ts.net
+```
+
+With a published container port the connection reaches IsItDown from the Docker
+network's gateway rather than from `127.0.0.1` (`docker network inspect` shows
+it); trust that address instead.
+
+To check it, make one settings change through the proxy: **Settings → Data →
+Change history** shows your name instead of `local`. A `TRUSTED_PROXY` entry
+that is neither an address nor a range is logged at startup and ignored. The
+deprecated `AUDIT_ACTOR_HEADER` logs a warning too: it still names the header,
+but only a request from `TRUSTED_PROXY` is believed.

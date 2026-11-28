@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { hashToken, type ApiScope, type ApiTokenStore } from "./dbApiTokens.ts";
+import { clientAddress, readProxyTrust, type ProxyTrust } from "./trustedProxy.ts";
 
 /**
  * A read-only API token — roadmap 4.15.
@@ -28,12 +29,13 @@ import { hashToken, type ApiScope, type ApiTokenStore } from "./dbApiTokens.ts";
  *
  * Two things this deliberately does *not* do:
  *
- * - **It never reads `X-Forwarded-For`.** A header the client writes cannot
- *   decide whether the client is local. The consequence is real and is
- *   documented: a reverse proxy on this same host makes every request it
- *   forwards look local, so an installation behind one sets
- *   `API_LOCAL_BYPASS=false` and requires the token from everybody, loopback
- *   included.
+ * - **It reads `X-Forwarded-For` only from a trusted proxy.** A header the
+ *   client writes cannot decide whether the client is local. Without
+ *   `TRUSTED_PROXY` (roadmap 9.3) the socket's peer decides, so a reverse
+ *   proxy on this same host makes every request it forwards look local — an
+ *   installation behind one either names it in `TRUSTED_PROXY`, which makes
+ *   the real client decide (`clientAddress`), or sets
+ *   `API_LOCAL_BYPASS=false` and requires the token from everybody.
  * - **It is not authentication.** No identities, no expiry, no users. Since
  *   roadmap 9.11 there can be more than one key — named tokens kept (as hashes)
  *   in the database, each with scopes and each revocable on its own — but a key
@@ -310,7 +312,7 @@ export function mayWrite(env: NodeJS.ProcessEnv, req: Request, stored?: ApiToken
       authorization: req.get("authorization"),
       apiToken: req.get("x-api-token"),
     }),
-    local: isLocalAddress(req.socket.remoteAddress),
+    local: isLocalAddress(clientAddress(req, readProxyTrust(env).trust)),
     stored,
   }).allow;
 }
@@ -319,7 +321,7 @@ export function mayWrite(env: NodeJS.ProcessEnv, req: Request, stored?: ApiToken
  * The middleware. Mounted first, so nothing downstream — not a route, not the
  * static dashboard — can be reached around it.
  */
-export function apiToken(env: NodeJS.ProcessEnv, stored?: ApiTokenStore) {
+export function apiToken(env: NodeJS.ProcessEnv, stored?: ApiTokenStore, trust: ProxyTrust = readProxyTrust(env).trust) {
   const policy = readTokenPolicy(env);
   return (req: Request, res: Response, next: NextFunction): void => {
     const verdict = decide({
@@ -332,7 +334,7 @@ export function apiToken(env: NodeJS.ProcessEnv, stored?: ApiTokenStore) {
         authorization: req.get("authorization"),
         apiToken: req.get("x-api-token"),
       }),
-      local: isLocalAddress(req.socket.remoteAddress),
+      local: isLocalAddress(clientAddress(req, trust)),
       stored,
     });
     if (verdict.allow) {

@@ -13,6 +13,7 @@ import {
 import { replaceRecipients, replaceRoutingRules } from "./dbRouting.ts";
 import { updateChannel } from "./dbChannels.ts";
 import { rollback } from "./db/open.ts";
+import { identityOf } from "./trustedProxy.ts";
 
 /**
  * Configuration history (roadmap 5.7): every write that moved a value, with
@@ -263,17 +264,9 @@ export function revertEntry(db: DatabaseSync, entry: AuditEntry): void {
   }
 }
 
-/** Where the actor comes from: the named request header, else `local`. */
-export function actorOf(req: Request, headerName: string | undefined): string {
-  if (headerName === undefined || headerName === "") return "local";
-  const raw = req.header(headerName);
-  // Control characters dropped by code point: a header value can carry any byte
-  // the proxy let through, and none of them belongs in a log line or a list.
-  const clean =
-    typeof raw === "string"
-      ? [...raw].filter((char) => (char.codePointAt(0) ?? 0) > 0x1f).join("").trim().slice(0, 120)
-      : "";
-  return clean === "" ? "local" : clean;
+/** Who made the write: the trusted proxy's identity (roadmap 9.3), else `local`. */
+export function actorOf(res: Response): string {
+  return identityOf(res) ?? "local";
 }
 
 const SECRETS_ROUTE = /^\/config\/channels\/([^/]+)\/secrets(?:\/([^/]+))?$/;
@@ -285,8 +278,6 @@ const UNAUDITED = /^\/config\/(restore|backup|storage|push|snapshots(?:\/\d+)?$|
 export interface AuditOptions {
   db: DatabaseSync;
   logger: Logger;
-  /** `AUDIT_ACTOR_HEADER`: which request header names the actor. */
-  actorHeader: string | undefined;
 }
 
 /**
@@ -312,7 +303,7 @@ export function auditWrites(options: AuditOptions) {
     res.on("finish", () => {
       if (res.statusCode >= 400) return;
       try {
-        const context: AuditContext = { at: new Date(), actor: actorOf(req, options.actorHeader), method: req.method, route };
+        const context: AuditContext = { at: new Date(), actor: actorOf(res), method: req.method, route };
         // Roadmap 6.10: the AI key is a credential like a channel's — recorded
         // as set or cleared, never with a value.
         if (route === "/config/ai/key" || route === "/config/ai/cli-token") {

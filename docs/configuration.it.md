@@ -589,7 +589,8 @@ rimette più tardi; un ripristino salva la configurazione che sostituisce come
 snapshot a sé, quindi anche lui si può annullare. Gli snapshot sono l'export
 `config.yml`, quindi contengono riferimenti `${VAR}` e mai una credenziale, e non
 includono mai lo storico. **Cronologia modifiche** elenca ogni scrittura di
-configurazione — chi l'ha fatta (l'header indicato da `AUDIT_ACTOR_HEADER`,
+configurazione — chi l'ha fatta (il nome che un reverse proxy fidato manda in
+`IDENTITY_HEADER`, roadmap 9.3 — vedi [Docker §4.13](docker.it.md#413-dietro-un-reverse-proxy-che-autentica);
 altrimenti `local`), quale era il valore prima, e un pulsante che lo riscrive. Le
 credenziali compaiono lì solo come «impostata» o «rimossa», mai come valori.
 
@@ -709,8 +710,10 @@ prova reale (roadmap 4.5).
 | `API_TOKEN` | UI | ✓ | — | Un token bearer di sola lettura ([3.12](#312-raggiungere-lapi-da-un-altro-host)). Non impostato — il valore predefinito — lascia ogni rotta aperta, che è giusto per un'istanza legata a `127.0.0.1`. Impostandolo, una richiesta che lo porta può fare `GET` da qualunque host; le scritture restano solo locali. |
 | `ISITDOWN_URL` | CLI | | `http://localhost:3000` | L'istanza che `isitdown status` interroga ([CLI §10.8](cli.it.md#108-isitdown-status)). `--url` ha la precedenza. |
 | `ISITDOWN_TOKEN` | CLI | ✓ | — | Il token che `isitdown status` manda; in mancanza usa `API_TOKEN`. `--token` ha la precedenza. |
-| `API_LOCAL_BYPASS` | UI | | `true` | Se una richiesta da questa macchina possa saltare `API_TOKEN`. Impostalo a `false` dietro un reverse proxy, dove ogni richiesta inoltrata sembra locale. |
-| `AUDIT_ACTOR_HEADER` | UI | | — | L'header di richiesta che indica chi ha fatto una scrittura di configurazione nella cronologia (`GET /config/history`, roadmap 5.7) — per esempio `X-Forwarded-User` dietro un reverse proxy che autentica. Non impostato, o con una richiesta che non lo porta, l'attore è registrato come `local`. Ci si fida del valore così com'è: impostalo solo dove un proxy possiede quell'header. |
+| `API_LOCAL_BYPASS` | UI | | `true` | Se una richiesta da questa macchina possa saltare `API_TOKEN`. Dietro un reverse proxy su questa macchina, o elenchi il proxy in `TRUSTED_PROXY` (allora decide il client vero) o lo imposti a `false`, perché altrimenti ogni richiesta inoltrata sembra locale. |
+| `TRUSTED_PROXY` | UI | | — | Indirizzi e range CIDR (IPv4 o IPv6, separati da virgole o spazi) del reverse proxy di cui questa istanza si fida (roadmap 9.3). Solo una richiesta la cui connessione arriva da uno di questi può portare un'identità (`IDENTITY_HEADER`) o un `X-Forwarded-For` che viene letto. Non impostato, nessun proxy è fidato. Una voce che non è né un indirizzo né un range viene segnalata nel log e ignorata. Vedi [Docker §4.13](docker.it.md#413-dietro-un-reverse-proxy-che-autentica). |
+| `IDENTITY_HEADER` | UI | | `Remote-User` | L'header di richiesta in cui il proxy fidato indica l'utente: l'attore nella cronologia della configurazione e l'autore di un marcatore creato dalla dashboard. Authelia e Authentik mandano `Remote-User`; Tailscale Serve manda `Tailscale-User-Login`. Da un indirizzo fuori da `TRUSTED_PROXY` l'header viene ignorato e tolto dalla richiesta. |
+| `AUDIT_ACTOR_HEADER` | UI | | — | Deprecato: usa `IDENTITY_HEADER`. Indica ancora l'header quando `IDENTITY_HEADER` non è impostato, ma dalla roadmap 9.3 gli si crede solo da `TRUSTED_PROXY` — senza, l'attore è sempre `local`. All'avvio viene scritto un avviso nel log. |
 | `ALLOWED_HOSTS` | UI | | — | Hostname extra, separati da virgola, con cui la dashboard può essere servita (ad es. il nome di un reverse proxy). Una scrittura il cui `Origin` o `Host` non sia quello della dashboard, `localhost` o un indirizzo IP viene rifiutata con `403`. Nessun wildcard. |
 | `TELEGRAM_CHATOPS` | UI | | `false` | Impostala a `true` perché il bot Telegram accetti comandi oltre a inviare avvisi ([3.17](#317-chatops--comandare-il-bot-da-telegram)). Spento per default: un canale di comando in entrata è una cosa che si sceglie. |
 | `TELEGRAM_COMMAND_CHAT_IDS` | UI | | — | Altre chat autorizzate a comandare il bot, separate da virgola. La chat a cui il canale Telegram già invia è sempre autorizzata; questa serve a un'installazione avvisata in una chat e comandata da un'altra. |
@@ -2399,11 +2402,14 @@ prima, come un token con il solo `read`, accanto a quanti token nominati si vuol
 
 Due cose da mettere in chiaro:
 
-- **`X-Forwarded-For` viene ignorato.** Un header scritto dal client non può
-  decidere se il client è locale. La conseguenza è che un reverse proxy che gira
-  su questa stessa macchina fa sembrare locale ogni richiesta che inoltra —
-  quindi dietro a uno imposta `API_LOCAL_BYPASS=false` e richiedi il token a
-  tutti, questa macchina compresa.
+- **`X-Forwarded-For` viene letto solo da un proxy fidato.** Un header scritto
+  dal client non può decidere se il client è locale. Senza `TRUSTED_PROXY`
+  (roadmap 9.3) decide l'indirizzo della connessione stessa, quindi un reverse
+  proxy su questa stessa macchina fa sembrare locale ogni richiesta che inoltra.
+  Dietro a uno, o lo elenchi in `TRUSTED_PROXY` — `X-Forwarded-For` viene allora
+  letto da destra, saltando gli hop fidati, e il primo indirizzo di cui nessuno
+  di loro risponde è il client — o imposti `API_LOCAL_BYPASS=false` e richiedi il
+  token a tutti, questa macchina compresa.
 - **Questa non è autenticazione.** I token dicono cosa può fare chi chiama, mai
   chi è: nessuna identità, nessuna scadenza, nessun utente. L'auth multi-utente
   resta un non-obiettivo dichiarato.

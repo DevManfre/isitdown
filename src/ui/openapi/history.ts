@@ -261,6 +261,10 @@ export const historySchemas: Json = {
     colour: { type: "string", enum: [...ANNOTATION_COLOURS] },
     providerId: { ...nullable("string"), description: "Null for a marker about the whole fleet." },
     createdAt: { type: "string", format: "date-time" },
+    createdBy: {
+      ...nullable("string"),
+      description: "Who added it, as the trusted reverse proxy named them (TRUSTED_PROXY); null without one.",
+    },
   }),
   HistoryIncidentRow: object(
     {

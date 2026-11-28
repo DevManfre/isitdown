@@ -150,6 +150,11 @@ export interface Annotation {
    */
   providerId: string | null;
   createdAt: string;
+  /**
+   * Who put it there, as the trusted reverse proxy named them (roadmap 9.3);
+   * null without one, or for a marker an API token or the CLI wrote.
+   */
+  createdBy: string | null;
 }
 
 /** One operator note on one incident (roadmap 5.3). */
@@ -206,7 +211,7 @@ export interface HistoryStore extends StateStore, MessageRefStore, AckStore {
     toIso: string,
     providerId?: string | undefined,
   ): Promise<Annotation[]>;
-  addAnnotation(input: Omit<Annotation, "id" | "createdAt">): Promise<Annotation>;
+  addAnnotation(input: Omit<Annotation, "id" | "createdAt" | "createdBy"> & { createdBy?: string | null }): Promise<Annotation>;
   /** Returns whether a row was removed, so a stale id reads 404 rather than 204. */
   deleteAnnotation(id: number): Promise<boolean>;
   /** Every configured provider, enabled or not: its history is real either way. */

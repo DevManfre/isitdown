@@ -4,6 +4,7 @@ import { dayStart, resolveZone, shiftDay, zonedDayKey } from "../calendarDays.ts
 import { ANNOTATION_COLOURS } from "../historyStore.interface.ts";
 import { latencySeries, latencySummary } from "../latencySeries.ts";
 import type { UiRuntimeCore } from "../runtime.ts";
+import { identityOf } from "../trustedProxy.ts";
 import { ALLOWED_DAYS, CALENDAR_DAYS, parseDays, parseWindow } from "./historyWindow.ts";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -245,6 +246,7 @@ export function historyRoutes(runtime: UiRuntimeCore): Router {
         label,
         colour,
         providerId: providerId ?? null,
+        createdBy: identityOf(res) ?? null,
       }),
     );
   });

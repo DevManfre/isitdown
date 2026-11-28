@@ -70,6 +70,7 @@ export const annotationRowSchema = z.object({
   colour: z.enum(ANNOTATION_COLOURS),
   provider_id: z.string().nullable(),
   created_at: z.string(),
+  created_by: z.string().nullable(),
 });
 
 export const incidentNoteRowSchema = z.object({

@@ -620,7 +620,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
       if (term === undefined) return [];
       return db
         .prepare(
-          `SELECT id, at, label, colour, provider_id, created_at FROM annotations
+          `SELECT id, at, label, colour, provider_id, created_at, created_by FROM annotations
            WHERE label LIKE ? ESCAPE '\\'
              AND (provider_id IS NULL OR provider_id IN (${providerIds.map(() => "?").join(", ")}))
            ORDER BY at DESC, id DESC
@@ -635,6 +635,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
           colour: row.colour,
           providerId: row.provider_id,
           createdAt: row.created_at,
+          createdBy: row.created_by,
         }));
     },
 
@@ -800,7 +801,7 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
           : "at >= ? AND at < ? AND (provider_id IS NULL OR provider_id = ?)";
       const params = providerId === undefined ? [fromIso, toIso] : [fromIso, toIso, providerId];
       return db
-        .prepare(`SELECT id, at, label, colour, provider_id, created_at FROM annotations WHERE ${where} ORDER BY at ASC, id ASC`)
+        .prepare(`SELECT id, at, label, colour, provider_id, created_at, created_by FROM annotations WHERE ${where} ORDER BY at ASC, id ASC`)
         .all(...params)
         .map((raw) => annotationRowSchema.parse(raw))
         .map((row) => ({
@@ -810,15 +811,17 @@ export function createSqliteStateStore(db: DatabaseSync, deps: SqliteStateStoreD
           colour: row.colour,
           providerId: row.provider_id,
           createdAt: row.created_at,
+          createdBy: row.created_by,
         }));
     },
 
-    async addAnnotation(input: Omit<Annotation, "id" | "createdAt">): Promise<Annotation> {
+    async addAnnotation(input: Omit<Annotation, "id" | "createdAt" | "createdBy"> & { createdBy?: string | null }): Promise<Annotation> {
       const createdAt = now().toISOString();
+      const createdBy = input.createdBy ?? null;
       const { lastInsertRowid } = db
-        .prepare("INSERT INTO annotations (at, label, colour, provider_id, created_at) VALUES (?, ?, ?, ?, ?)")
-        .run(input.at, input.label, input.colour, input.providerId, createdAt);
-      return { ...input, id: Number(lastInsertRowid), createdAt };
+        .prepare("INSERT INTO annotations (at, label, colour, provider_id, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(input.at, input.label, input.colour, input.providerId, createdAt, createdBy);
+      return { ...input, id: Number(lastInsertRowid), createdAt, createdBy };
     },
 
     async deleteAnnotation(id: number): Promise<boolean> {

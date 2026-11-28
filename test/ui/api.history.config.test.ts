@@ -52,7 +52,7 @@ test("a fresh install has an empty trail", async () => {
 });
 
 test("a setting change records the old and the new value, with the actor", async () => {
-  const app = await api({ AUDIT_ACTOR_HEADER: "x-forwarded-user" });
+  const app = await api({ TRUSTED_PROXY: "127.0.0.1", IDENTITY_HEADER: "x-forwarded-user" });
   try {
     const old = ((await app.call("GET", "/config")).body as { polling: { intervalMinutes: number } }).polling.intervalMinutes;
     const patched = await app.call("PATCH", "/config/settings", { intervalMinutes: old + 4 }, { "x-forwarded-user": "alice" });
@@ -68,6 +68,33 @@ test("a setting change records the old and the new value, with the actor", async
     assert.equal(entry?.revertible, true);
   } finally {
     await app.close();
+  }
+});
+
+test("roadmap 9.3: the identity header from an address outside TRUSTED_PROXY is ignored", async () => {
+  const app = await api({ TRUSTED_PROXY: "10.0.0.5,172.18.0.0/16", IDENTITY_HEADER: "x-forwarded-user" });
+  try {
+    await app.call("PATCH", "/config/settings", { maxRetries: 4 }, { "x-forwarded-user": "mallory" });
+    assert.equal((await app.history())[0]?.actor, "local");
+  } finally {
+    await app.close();
+  }
+});
+
+test("roadmap 9.3: Remote-User from the trusted proxy is the default header, and AUDIT_ACTOR_HEADER no longer trusts any sender", async () => {
+  const proxied = await api({ TRUSTED_PROXY: "127.0.0.1/32" });
+  try {
+    await proxied.call("PATCH", "/config/settings", { maxRetries: 4 }, { "remote-user": "alice@example.com" });
+    assert.equal((await proxied.history())[0]?.actor, "alice@example.com");
+  } finally {
+    await proxied.close();
+  }
+  const legacy = await api({ AUDIT_ACTOR_HEADER: "x-forwarded-user" });
+  try {
+    await legacy.call("PATCH", "/config/settings", { maxRetries: 4 }, { "x-forwarded-user": "mallory" });
+    assert.equal((await legacy.history())[0]?.actor, "local");
+  } finally {
+    await legacy.close();
   }
 });
 

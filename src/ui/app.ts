@@ -1,6 +1,7 @@
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { apiToken } from "./apiToken.ts";
 import { originGuard } from "./originGuard.ts";
+import { proxyIdentity, readProxyTrust } from "./trustedProxy.ts";
 import { badgeRoutes } from "./routes/badge.routes.ts";
 import { configRoutes } from "./routes/config.routes.ts";
 import { debugRoutes } from "./routes/debug.routes.ts";
@@ -42,10 +43,20 @@ const PUBLIC_DIR = process.env["WEB_DIR"] ?? new URL("./public/", import.meta.ur
 export function createApp(runtime: UiRuntimeCore): Express {
   const app = express();
   app.disable("x-powered-by");
-  // First, before the body parsers: a request this instance will not answer
+  // Roadmap 9.3: who the trusted proxy says the user is — and, from anywhere
+  // else, the identity header removed before any route can read it.
+  const proxy = readProxyTrust(runtime.env);
+  for (const entry of proxy.unusable) {
+    runtime.logger.warn(`TRUSTED_PROXY entry "${entry}" is neither an address nor a CIDR range; it is ignored`);
+  }
+  if (proxy.deprecatedHeader) {
+    runtime.logger.warn("AUDIT_ACTOR_HEADER is deprecated: use IDENTITY_HEADER, read only from TRUSTED_PROXY");
+  }
+  app.use(proxyIdentity(proxy.trust));
+  // Then, before the body parsers: a request this instance will not answer
   // should be refused before 512 MB of it has been read (roadmap 4.15). Does
   // nothing at all unless `API_TOKEN` is set.
-  app.use(apiToken(runtime.env, runtime.apiTokens));
+  app.use(apiToken(runtime.env, runtime.apiTokens, proxy.trust));
   // Refuse a foreign-origin or rebound-host write before any body is parsed.
   app.use(originGuard(runtime.env));
   app.use(express.json({ limit: "64kb" }));

@@ -28,9 +28,12 @@ default, ed è elencata in [11.4](#114-superfici-raggiungibili-da-fuori-della-ma
 | Un plugin in `PLUGINS_DIR` | Tutto ciò che può fare il poller, ogni credenziale risolta | È codice, caricato nel processo ([configurazione §3.14](configuration.it.md#314-plugin-adapter)). |
 | La status page di un provider | Niente | Ogni risposta è validata con zod prima dell'uso; una malformata è un errore su quel provider. |
 | L'host e il runtime dei container | Tutto | Chi controlla l'host legge il volume dei dati. |
+| Un reverse proxy elencato in `TRUSTED_PROXY` | Indicare l'utente (`IDENTITY_HEADER`) e il client vero (`X-Forwarded-For`) | Roadmap 9.3: il nome etichetta solo la cronologia e i marcatori, non concede niente; l'indirizzo del client decide il bypass locale. Non impostato, nessun proxy è fidato ([Docker §4.13](docker.it.md#413-dietro-un-reverse-proxy-che-autentica)). |
 
-Non fidati: `X-Forwarded-For` (lo scrive il client, quindi non decide mai se una
-richiesta è locale), un `Origin` del browser che non sia quello della dashboard
+Non fidati: `X-Forwarded-For` e l'header d'identità da qualunque indirizzo fuori da
+`TRUSTED_PROXY` (li scrive il client, quindi non decidono mai se una richiesta è
+locale né chi l'ha fatta — l'header d'identità viene tolto prima che una route lo
+veda), un `Origin` del browser che non sia quello della dashboard
 (le scritture vengono rifiutate con `403`), un `Host` che non sia `localhost`, un
 indirizzo IP o un nome in `ALLOWED_HOSTS`.
 
