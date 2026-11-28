@@ -41,12 +41,12 @@ const httpUrl = z
 /** The shape both editions accept — `config.yml`'s `heartbeat:` and the env variables. */
 export const heartbeatTargetSchema = z
   .object({
-    url: httpUrl.optional(),
-    failUrl: httpUrl.optional(),
+    url: httpUrl.optional().describe("Pinged after every poll cycle that completed."),
+    failUrl: httpUrl.optional().describe("Pinged instead after a cycle that failed."),
     method: z.preprocess(
       (value) => (typeof value === "string" ? value.trim().toUpperCase() : value),
       z.enum(["GET", "POST"]).default("GET"),
-    ),
+    ).describe("HTTP method of the ping: GET or POST. Default GET."),
   })
   .strict()
   .refine((target) => target.url !== undefined || target.failUrl !== undefined, {

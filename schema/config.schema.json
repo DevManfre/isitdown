@@ -1,0 +1,1919 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/DevManfre/isitdown/main/schema/config.schema.json",
+  "title": "IsItDown config.yml",
+  "description": "The Light edition's configuration file. Secrets go in the environment and are referenced as ${VAR}.",
+  "type": "object",
+  "properties": {
+    "pollIntervalMinutes": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 1440,
+      "description": "Minutes between polls of every provider, 1–1440. Default 3."
+    },
+    "requestTimeoutSeconds": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 120,
+      "description": "Timeout of each HTTP request in seconds, 1–120. Default 8."
+    },
+    "maxRetries": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 10,
+      "description": "Attempts per provider per cycle, with backoff, 1–10. Default 3."
+    },
+    "failureThreshold": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 100,
+      "description": "Consecutive failed cycles before one \"monitoring degraded\" warning, 1–100. Default 5."
+    },
+    "adaptivePolling": {
+      "type": "boolean",
+      "description": "Poll a provider with an open incident on adaptiveIntervalMinutes instead of its own cadence. Default true."
+    },
+    "adaptiveIntervalMinutes": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 1440,
+      "description": "Cadence for a provider in trouble, 1–1440; never slower than its own. Default 1."
+    },
+    "confirmSamples": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 10,
+      "description": "Consecutive polls that must agree before a change notifies, 1–10. Default 1 (off)."
+    },
+    "correlationThreshold": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Providers going bad inside correlationWindowMinutes before one shared-failure alert replaces their own. 0 or 1 is off (default)."
+    },
+    "correlationWindowMinutes": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 1440,
+      "description": "How wide the shared-failure window is, in minutes, 1–1440. Default 10."
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+      "default": "en",
+      "description": "Language of notification messages: en, it, de, es, fr or pt. Default en."
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "description": "Unique lowercase slug for this provider (letters, digits, dashes)."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name."
+          },
+          "adapter": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "description": "How the page is read: statuspage, rss, html, http, tcp, dns and others (see docs/configuration.md)."
+          },
+          "baseUrl": {
+            "type": "string",
+            "description": "The status page or endpoint URL, http or https."
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "false keeps the entry but stops polling it. Default true."
+          },
+          "group": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "description": "Slug of the group this provider belongs to; routing can target group:<slug>."
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "Ids of providers this one runs on, named as the probable cause of a shared failure."
+          },
+          "crossChecks": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*(#[A-Za-z0-9][A-Za-z0-9 ._-]*)?$",
+            "description": "Probes and imap only: the provider (optionally provider#component) whose page this is a second opinion on."
+          },
+          "intervalMinutes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1440,
+            "description": "This provider's own cadence, 1–1440; omit to follow pollIntervalMinutes."
+          },
+          "intervalSeconds": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 3600,
+            "description": "Probes only: cadence in seconds, 10–3600. Never together with intervalMinutes."
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Adapter-specific settings, as strings (see the adapter's section in docs/configuration.md)."
+          },
+          "mutedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC time until which this provider notifies nothing."
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The component's id as the provider publishes it."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The component's name, shown where the provider's own is unavailable."
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": false
+            },
+            "default": [],
+            "description": "Components to watch, each with its id and name; empty watches the whole page."
+          },
+          "scopeToComponents": {
+            "type": "boolean",
+            "default": false,
+            "description": "true derives the provider's status from the selected components only. Default false."
+          },
+          "favorite": {
+            "type": "boolean",
+            "description": "Star the provider: listed first and always in the weekly summary."
+          },
+          "slaTarget": {
+            "type": "number",
+            "minimum": 50,
+            "maximum": 100,
+            "description": "Promised monthly uptime in percent, 50–100 (e.g. 99.9)."
+          },
+          "outageCostPerHour": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1000000000,
+            "description": "What an hour of outage costs you, as a bare number in your own currency."
+          },
+          "authority": {
+            "type": "string",
+            "enum": [
+              "declared",
+              "observed"
+            ],
+            "description": "Override whether this source is declared (the provider's word) or observed (our own reading)."
+          },
+          "impact": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "What breaks when this provider does, one sentence carried into every message."
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "Who answers for this provider, carried into every message."
+          },
+          "runbook": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "What to do when it is down, in Markdown; linked from every message."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "maxItems": 20,
+            "description": "Free lowercase labels; routing can target tag:<slug>."
+          },
+          "muteSchedules": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Start of a one-off mute, ISO 8601 with offset."
+                    },
+                    "until": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "End of a one-off mute, ISO 8601 with offset; after from."
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "until"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "days": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "mon",
+                          "tue",
+                          "wed",
+                          "thu",
+                          "fri",
+                          "sat",
+                          "sun"
+                        ]
+                      },
+                      "minItems": 1,
+                      "description": "Weekdays a weekly mute runs on: mon, tue, wed, thu, fri, sat, sun."
+                    },
+                    "start": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                      "description": "Start of a weekly mute, 24-hour HH:MM."
+                    },
+                    "end": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                      "description": "End of a weekly mute, 24-hour HH:MM; may wrap past midnight."
+                    },
+                    "timeZone": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "default": "auto",
+                      "description": "IANA time zone the weekly window is read in, or \"auto\" for the process's own. Default auto."
+                    }
+                  },
+                  "required": [
+                    "days",
+                    "start",
+                    "end"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "maxItems": 20,
+            "description": "Planned mutes: one-off spans or weekly windows."
+          },
+          "maintenanceWindows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "maxLength": 120,
+                  "default": "",
+                  "description": "What the maintenance is, shown on the timeline."
+                },
+                "startsAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the window opens, ISO 8601 with offset."
+                },
+                "endsAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the window closes, ISO 8601 with offset; after startsAt."
+                }
+              },
+              "required": [
+                "startsAt",
+                "endsAt"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 50,
+            "description": "Maintenance you declare for this provider, treated as if its page had published it."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "adapter",
+          "baseUrl"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "description": "The providers to watch: at least one."
+    },
+    "notifications": {
+      "type": "object",
+      "properties": {
+        "telegram": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "botToken": {
+              "type": "string",
+              "default": "",
+              "description": "The bot's token from @BotFather. Reference a secret as ${VAR}."
+            },
+            "chatId": {
+              "type": "string",
+              "default": "",
+              "description": "The chat, group or channel id the bot posts to."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Telegram, through a bot."
+        },
+        "webhook": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "url": {
+              "type": "string",
+              "default": "",
+              "description": "The URL each change is POSTed to as JSON. Reference a secret as ${VAR}."
+            },
+            "secret": {
+              "type": "string",
+              "default": "",
+              "description": "Optional shared secret that signs each request in the X-IsItDown-Signature header. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "A generic JSON webhook, optionally HMAC-signed."
+        },
+        "discord": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "webhookUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The channel's incoming webhook URL. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Discord, through a channel webhook."
+        },
+        "slack": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "webhookUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The channel's incoming webhook URL. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Slack, through an incoming webhook."
+        },
+        "ntfy": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "topicUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The topic's full URL, on ntfy.sh or a self-hosted server."
+            },
+            "token": {
+              "type": "string",
+              "default": "",
+              "description": "Access token, only for a server with access control. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "ntfy push notifications."
+        },
+        "gotify": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "serverUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The Gotify server's URL."
+            },
+            "token": {
+              "type": "string",
+              "default": "",
+              "description": "The application token. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Gotify push notifications."
+        },
+        "matrix": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "homeserverUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The homeserver's URL."
+            },
+            "roomId": {
+              "type": "string",
+              "default": "",
+              "description": "The room's internal id (!…:server)."
+            },
+            "accessToken": {
+              "type": "string",
+              "default": "",
+              "description": "The sending user's access token. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "A Matrix room."
+        },
+        "pagerduty": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "routingKey": {
+              "type": "string",
+              "default": "",
+              "description": "The Events API v2 integration key. Reference a secret as ${VAR}."
+            },
+            "region": {
+              "type": "string",
+              "default": "",
+              "description": "\"eu\" for an account in PagerDuty's EU service region; empty otherwise."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "PagerDuty Events API v2."
+        },
+        "opsgenie": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "apiKey": {
+              "type": "string",
+              "default": "",
+              "description": "The Alerts API key. Reference a secret as ${VAR}."
+            },
+            "region": {
+              "type": "string",
+              "default": "",
+              "description": "\"eu\" for an account in Opsgenie's EU region; empty otherwise."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Opsgenie Alerts API."
+        },
+        "apprise": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "serverUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The Apprise API server's URL."
+            },
+            "configKey": {
+              "type": "string",
+              "default": "",
+              "description": "Key of a configuration the server stores. Set this or urls. Reference a secret as ${VAR}."
+            },
+            "urls": {
+              "type": "string",
+              "default": "",
+              "description": "Apprise service URLs, comma-separated, for a stateless server. Set this or configKey. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "An Apprise API server, fanning out to its services."
+        },
+        "splunk-oncall": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "apiKey": {
+              "type": "string",
+              "default": "",
+              "description": "The REST integration's API key. Reference a secret as ${VAR}."
+            },
+            "routingKey": {
+              "type": "string",
+              "default": "",
+              "description": "The routing key that picks the escalation policy."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Splunk On-Call (VictorOps)."
+        },
+        "squadcast": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "webhookUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The Incident Webhook URL, which carries the integration key. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Squadcast Incident Webhook."
+        },
+        "zenduty": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "integrationKey": {
+              "type": "string",
+              "default": "",
+              "description": "The Events API integration key. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Zenduty Events API."
+        },
+        "incident-io": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "alertSourceId": {
+              "type": "string",
+              "default": "",
+              "description": "The HTTP alert source's config id."
+            },
+            "token": {
+              "type": "string",
+              "default": "",
+              "description": "The alert source's bearer token. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "An incident.io HTTP alert source."
+        },
+        "grafana-oncall": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "webhookUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The formatted webhook integration URL. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Grafana OnCall formatted webhook."
+        },
+        "mattermost": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "serverUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The Mattermost server's URL."
+            },
+            "token": {
+              "type": "string",
+              "default": "",
+              "description": "The bot's access token. Reference a secret as ${VAR}."
+            },
+            "channelId": {
+              "type": "string",
+              "default": "",
+              "description": "The id of the channel to post in."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Mattermost, through a bot."
+        },
+        "rocketchat": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "serverUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The Rocket.Chat server's URL."
+            },
+            "userId": {
+              "type": "string",
+              "default": "",
+              "description": "The bot user's id."
+            },
+            "token": {
+              "type": "string",
+              "default": "",
+              "description": "The bot user's auth token. Reference a secret as ${VAR}."
+            },
+            "roomId": {
+              "type": "string",
+              "default": "",
+              "description": "The id of the room to post in."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Rocket.Chat, through its REST API."
+        },
+        "zulip": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "siteUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The Zulip organization's URL."
+            },
+            "botEmail": {
+              "type": "string",
+              "default": "",
+              "description": "The bot's email address."
+            },
+            "apiKey": {
+              "type": "string",
+              "default": "",
+              "description": "The bot's API key. Reference a secret as ${VAR}."
+            },
+            "stream": {
+              "type": "string",
+              "default": "",
+              "description": "The channel (stream) to post in."
+            },
+            "topic": {
+              "type": "string",
+              "default": "",
+              "description": "A fixed topic; empty uses one topic per provider."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Zulip, through a bot."
+        },
+        "google-chat": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "webhookUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The space's incoming webhook URL, which carries the key and token. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "A Google Chat space webhook."
+        },
+        "twilio-sms": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "accountSid": {
+              "type": "string",
+              "default": "",
+              "description": "The Twilio account SID."
+            },
+            "authToken": {
+              "type": "string",
+              "default": "",
+              "description": "The Twilio auth token. Reference a secret as ${VAR}."
+            },
+            "from": {
+              "type": "string",
+              "default": "",
+              "description": "The Twilio number to send from, E.164 (+39…)."
+            },
+            "to": {
+              "type": "string",
+              "default": "",
+              "description": "The number to text, E.164 (+39…)."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "SMS through Twilio."
+        },
+        "twilio-call": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "accountSid": {
+              "type": "string",
+              "default": "",
+              "description": "The Twilio account SID."
+            },
+            "authToken": {
+              "type": "string",
+              "default": "",
+              "description": "The Twilio auth token. Reference a secret as ${VAR}."
+            },
+            "from": {
+              "type": "string",
+              "default": "",
+              "description": "The Twilio number to call from, E.164 (+39…)."
+            },
+            "to": {
+              "type": "string",
+              "default": "",
+              "description": "The number to call, E.164 (+39…)."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "A phone call through Twilio."
+        },
+        "bark": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "deviceKey": {
+              "type": "string",
+              "default": "",
+              "description": "The Bark app's device key. Reference a secret as ${VAR}."
+            },
+            "serverUrl": {
+              "type": "string",
+              "default": "",
+              "description": "A self-hosted Bark server's URL; empty uses the public one."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Bark push notifications on iOS."
+        },
+        "signal": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "serverUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The signal-cli-rest-api server's URL."
+            },
+            "number": {
+              "type": "string",
+              "default": "",
+              "description": "The registered number that sends."
+            },
+            "recipients": {
+              "type": "string",
+              "default": "",
+              "description": "Numbers or group ids to send to, comma-separated."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Signal, through a signal-cli-rest-api server."
+        },
+        "syslog": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "url": {
+              "type": "string",
+              "default": "",
+              "description": "udp://, tcp:// or tls://host:port of the syslog receiver."
+            },
+            "facility": {
+              "type": "string",
+              "default": "",
+              "description": "local0 to local7; empty means local0."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Syslog (RFC 5424)."
+        },
+        "mqtt": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "brokerUrl": {
+              "type": "string",
+              "default": "",
+              "description": "mqtt:// or mqtts:// broker URL."
+            },
+            "topic": {
+              "type": "string",
+              "default": "",
+              "description": "Topic prefix; empty means isitdown."
+            },
+            "username": {
+              "type": "string",
+              "default": "",
+              "description": "Broker user name, if the broker wants one. Reference a secret as ${VAR}."
+            },
+            "password": {
+              "type": "string",
+              "default": "",
+              "description": "Broker password. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "An MQTT broker."
+        },
+        "mastodon": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "instanceUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The Mastodon instance's URL."
+            },
+            "accessToken": {
+              "type": "string",
+              "default": "",
+              "description": "An access token with the write:statuses scope. Reference a secret as ${VAR}."
+            },
+            "visibility": {
+              "type": "string",
+              "default": "",
+              "description": "Post visibility; empty means public."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "A public Mastodon post."
+        },
+        "bluesky": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "handle": {
+              "type": "string",
+              "default": "",
+              "description": "The account's handle."
+            },
+            "appPassword": {
+              "type": "string",
+              "default": "",
+              "description": "An app password for the account. Reference a secret as ${VAR}."
+            },
+            "serviceUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The PDS URL, when it is not bsky.social."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "A public Bluesky post."
+        },
+        "pushover": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "token": {
+              "type": "string",
+              "default": "",
+              "description": "The application's API token. Reference a secret as ${VAR}."
+            },
+            "userKey": {
+              "type": "string",
+              "default": "",
+              "description": "The user or group key. Reference a secret as ${VAR}."
+            },
+            "device": {
+              "type": "string",
+              "default": "",
+              "description": "One registered device; empty sends to every device on the account."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Pushover push notifications."
+        },
+        "teams": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "webhookUrl": {
+              "type": "string",
+              "default": "",
+              "description": "The Power Automate workflow trigger URL, or an old connector's webhook URL. Reference a secret as ${VAR}."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Microsoft Teams, through a workflow or connector webhook."
+        },
+        "email": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Turn this channel on. Default false."
+            },
+            "host": {
+              "type": "string",
+              "default": "",
+              "description": "SMTP server host name."
+            },
+            "port": {
+              "type": "string",
+              "default": "",
+              "description": "SMTP port, as a string. Empty uses the default for the TLS mode."
+            },
+            "secure": {
+              "type": "string",
+              "default": "",
+              "description": "\"true\" for implicit TLS (port 465); otherwise STARTTLS is used when the server offers it."
+            },
+            "allowInsecureAuth": {
+              "type": "string",
+              "default": "",
+              "description": "\"true\" sends credentials over an unencrypted connection, for an MTA on the same machine."
+            },
+            "allowSelfSigned": {
+              "type": "string",
+              "default": "",
+              "description": "\"true\" accepts a certificate no public CA signed, such as a self-hosted server's own."
+            },
+            "username": {
+              "type": "string",
+              "default": "",
+              "description": "SMTP user name, when the server wants credentials. Reference a secret as ${VAR}."
+            },
+            "password": {
+              "type": "string",
+              "default": "",
+              "description": "SMTP password. Reference a secret as ${VAR}."
+            },
+            "from": {
+              "type": "string",
+              "default": "",
+              "description": "Sender address."
+            },
+            "to": {
+              "type": "string",
+              "default": "",
+              "description": "Recipient addresses, comma-separated."
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[a-z0-9]+)*$",
+              "default": "en",
+              "description": "Language of this channel's messages, overriding the top-level locale (en, it, de, es, fr, pt)."
+            },
+            "template": {
+              "type": "string",
+              "maxLength": 2000,
+              "description": "Custom message text with {{tokens}}, replacing the built-in wording on this channel."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Email over SMTP."
+        }
+      },
+      "additionalProperties": false,
+      "default": {},
+      "description": "The channels changes are sent to, keyed by channel id."
+    },
+    "routing": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "*"
+              },
+              {
+                "type": "string",
+                "pattern": "^group:[a-z0-9][a-z0-9-]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^tag:[a-z0-9][a-z0-9-]*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*#[A-Za-z0-9._:-]{1,128}$"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              }
+            ],
+            "description": "Which changes the rule matches: a service id, group:<slug>, tag:<slug>, <id>#<component>, or \"*\"."
+          },
+          "classes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "status",
+                "incident",
+                "maintenance",
+                "monitoring"
+              ]
+            },
+            "default": [
+              "status",
+              "incident",
+              "maintenance",
+              "monitoring"
+            ],
+            "description": "Event classes matched: status, incident, maintenance, monitoring. Default all."
+          },
+          "minSeverity": {
+            "type": "string",
+            "enum": [
+              "any",
+              "degraded",
+              "partial_outage",
+              "major_outage"
+            ],
+            "default": "any",
+            "description": "Lowest severity matched: any, degraded, partial_outage, major_outage. Default any."
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "*"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9-]*$"
+                }
+              ]
+            },
+            "default": [
+              "*"
+            ],
+            "description": "Channel ids to send to, \"*\" for every enabled channel, or [] to mute. Default [\"*\"]."
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Ordered rules choosing which channels hear about a change; the first match wins. Absent sends everything everywhere."
+    },
+    "delivery": {
+      "type": "object",
+      "properties": {
+        "quietHours": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Hold back changes below minSeverity during the window. Default false."
+            },
+            "start": {
+              "type": "string",
+              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+              "default": "23:00",
+              "description": "Window start, 24-hour HH:MM (inclusive). Default 23:00."
+            },
+            "end": {
+              "type": "string",
+              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+              "default": "07:00",
+              "description": "Window end, 24-hour HH:MM (exclusive); may wrap midnight. Default 07:00."
+            },
+            "timeZone": {
+              "type": "string",
+              "maxLength": 64,
+              "default": "auto",
+              "description": "IANA time zone the window is read in, or \"auto\" for the process's own. Default auto."
+            },
+            "minSeverity": {
+              "type": "string",
+              "enum": [
+                "any",
+                "degraded",
+                "partial_outage",
+                "major_outage"
+              ],
+              "default": "major_outage",
+              "description": "Severity that still gets through inside the window. Default major_outage."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "Hours when only serious changes get through."
+        },
+        "digest": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Batch changes below immediateFloor into one message per window. Default false."
+            },
+            "windowMinutes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1440,
+              "default": 15,
+              "description": "Length of the digest window in minutes, 1–1440. Default 15."
+            },
+            "immediateFloor": {
+              "type": "string",
+              "enum": [
+                "any",
+                "degraded",
+                "partial_outage",
+                "major_outage"
+              ],
+              "default": "major_outage",
+              "description": "Severity sent at once instead of batched. Default major_outage."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "Batch non-urgent changes into one message per window."
+        },
+        "cap": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Cap the messages per provider per rolling hour. Default false."
+            },
+            "maxPerHour": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 10,
+              "description": "Most changes per provider per hour, 1–1000. Default 10."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "A ceiling on messages per provider per hour."
+        },
+        "updateInPlace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Edit one message per incident instead of sending one per update, where the channel can. Default false."
+        },
+        "maintenanceNotice": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Announce a declared maintenance window before it opens. Default false."
+            },
+            "leadMinutes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 10080,
+              "default": 120,
+              "description": "How long before the window to announce it, in minutes, 1–10080. Default 120."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "A heads-up before a declared maintenance window opens."
+        },
+        "escalation": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Resend an unacknowledged change on another channel. UI edition only. Default false."
+            },
+            "afterMinutes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1440,
+              "default": 15,
+              "description": "Minutes without acknowledgement before escalating, 1–1440. Default 15."
+            },
+            "channel": {
+              "type": "string",
+              "maxLength": 64,
+              "default": "",
+              "description": "The channel id the escalation goes to."
+            },
+            "minSeverity": {
+              "type": "string",
+              "enum": [
+                "any",
+                "degraded",
+                "partial_outage",
+                "major_outage"
+              ],
+              "default": "major_outage",
+              "description": "Lowest severity that escalates. Default major_outage."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "Resend an unacknowledged change on another channel."
+        },
+        "channelHealth": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Tell the other channels when one keeps failing. Default false."
+            },
+            "afterFailures": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 100,
+              "default": 3,
+              "description": "Failed messages in a row before saying so, 2–100. Default 3."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "An alert when a channel keeps failing."
+        },
+        "incidentSummary": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Replace the resolved messages of a shared failure with one summary. Default false."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "One summary when a shared failure ends."
+        },
+        "coalesce": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Send only the latest of a run of updates to the same incident. Default false."
+            },
+            "windowMinutes": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 60,
+              "default": 2,
+              "description": "How long an update waits for a newer one, in minutes, 1–60. Default 2."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "Collapse a run of updates to the same incident."
+        },
+        "knownOutage": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Batch further updates of an incident already in major outage into the digest. Default false."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "Quiet updates during an outage already announced."
+        },
+        "report": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Send the fleet's weekly or monthly report. UI edition only. Default false."
+            },
+            "frequency": {
+              "type": "string",
+              "enum": [
+                "weekly",
+                "monthly"
+              ],
+              "default": "weekly",
+              "description": "weekly or monthly. Default weekly."
+            },
+            "channel": {
+              "type": "string",
+              "maxLength": 64,
+              "default": "",
+              "description": "The channel id the report goes to."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "A weekly or monthly fleet report on one channel."
+        },
+        "onCall": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Also notify whoever is on call this week. Default false."
+            },
+            "minSeverity": {
+              "type": "string",
+              "enum": [
+                "any",
+                "degraded",
+                "partial_outage",
+                "major_outage"
+              ],
+              "default": "major_outage",
+              "description": "Lowest severity the on-call person hears. Default major_outage."
+            },
+            "rotation": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "maxItems": 32,
+              "default": [],
+              "description": "Recipient ids taking turns, one per week (Monday to Sunday, UTC)."
+            },
+            "startsOn": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "string",
+                  "const": ""
+                }
+              ],
+              "default": "",
+              "description": "Any day of the rotation's first week, YYYY-MM-DD."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "A weekly on-call rotation of recipients."
+        },
+        "deliveryTest": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Send every enabled channel a routine test message once a week. Default false."
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "A weekly routine test message on every channel."
+        },
+        "attachChart": {
+          "type": "boolean",
+          "default": false,
+          "description": "Attach the provider's last 24 hours as an SVG chart, on email and webhook. UI edition only. Default false."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Quiet hours, digests, caps and the other delivery controls. All off by default."
+    },
+    "recipients": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "description": "Unique lowercase slug for this person, used in routing and on-call rotations."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "The person's name."
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "minItems": 2,
+            "maxItems": 10,
+            "description": "Channel ids in order of preference, at least two, each once."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "channels"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 50,
+      "description": "People reached through several channels, preferred channel first."
+    },
+    "egress": {
+      "type": "object",
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 200,
+          "default": [],
+          "description": "Private addresses, CIDR ranges or host names a probe may reach, on top of EGRESS_ALLOW."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Egress policy: which private or loopback targets a probe may reach."
+    },
+    "heartbeat": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Pinged after every poll cycle that completed."
+        },
+        "failUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Pinged instead after a cycle that failed."
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "POST"
+          ],
+          "default": "GET",
+          "description": "HTTP method of the ping: GET or POST. Default GET."
+        }
+      },
+      "additionalProperties": false,
+      "description": "IsItDown's own dead-man's switch: a URL pinged after every cycle."
+    }
+  },
+  "required": [
+    "services"
+  ],
+  "additionalProperties": false
+}

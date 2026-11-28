@@ -139,9 +139,11 @@ isitdown/
 │   ├── envelope.mjs                   memoria, CPU, avvio e crescita del database a 10 / 100 / 500 provider (npm run measure:envelope, docker.it.md 4.9)
 │   ├── canary.mjs · loadtest.mjs · mutation.mjs · record-fixture.mjs · release-notes.mjs · build-sea.mjs · pwa-icons.mjs   la sonda canary, test di carico e di mutazione, registrazione dei fixture, note di rilascio, la build a file singolo, icone PWA
 │   ├── webhook-schema.mjs             schema/webhook-event.v1.json dalla definizione zod in src/notifiers/webhookEvent.ts (7.11)
+│   ├── config-schema.mjs              schema/config.schema.json dallo schema zod del config in src/light/config/schema.ts — da rilanciare dopo averlo cambiato (11.5)
 │   ├── build-catalog.mjs              rigenera il catalogo da tools/catalog/seed.json e dalle liste pubbliche (2.1)
 │   └── sign-catalog.mjs               firma catalog/catalog.json con $CATALOG_SIGNING_KEY (2.2)
 ├── schema/webhook-event.v1.json       lo schema JSON pubblicato del webhook generico, confrontato con quello generato (7.11)
+├── schema/config.schema.json          lo schema JSON pubblicato del config.yml della Light, confrontato con quello generato (11.5)
 ├── examples/                          un workflow n8n e un flow Node-RED che ricevono l'evento del webhook
 ├── catalog/                           il catalogo pubblicato e firmato, e il report dell'ultima generazione
 ├── test/

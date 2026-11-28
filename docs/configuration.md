@@ -2102,6 +2102,31 @@ than only for us:
     ghcr.io/devmanfre/isitdown:light-latest node dist/light/check.js
 ```
 
+**While you type** (roadmap 11.5). The file's shape is published as a JSON
+Schema, [`schema/config.schema.json`](../schema/config.schema.json), generated
+from the same zod schema the loader uses. Put this line at the top of your
+`config.yml` — `config.example.yml` already starts with it — and an editor with
+YAML language support (in VS Code, the `redhat.vscode-yaml` extension) completes
+keys, shows each key's description on hover and underlines mistakes as you type:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/DevManfre/isitdown/main/schema/config.schema.json
+```
+
+That URL follows `main`. To pin the schema of the version you run, point at the
+copy attached to each release,
+`https://github.com/DevManfre/isitdown/releases/download/vX.Y.Z/config.schema.json`,
+or at the file on the tag,
+`https://raw.githubusercontent.com/DevManfre/isitdown/vX.Y.Z/schema/config.schema.json`.
+
+The editor checks shape, types, allowed values, patterns and misspelt keys. It
+does not replace `check`: rules that span several fields (unique ids, `until`
+after `from`, recipients sharing a channel) and the http/https test on a URL are
+only in the loader. A `${VAR}` written into a numeric or pattern-checked field is
+underlined even when it resolves to a valid value at runtime, and
+`heartbeat.method` must be written in capitals for the editor (`GET`, `POST`)
+although the loader accepts either case.
+
 ### 3.10 Provider groups — "my stack"
 
 A flat fleet answers "is GitHub healthy" and never "is my deploy path healthy",

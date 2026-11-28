@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/DevManfre/isitdown/main/schema/config.schema.json
 # IsItDown — Light edition configuration.
 #
 # Copy this file to config.yml and edit it. In the container it is mounted at

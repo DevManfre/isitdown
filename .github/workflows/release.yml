@@ -174,6 +174,9 @@ jobs:
           make_latest: true
           # Attached rather than pushed anywhere: a 120MB binary is a download
           # an operator asks for once, not something a registry should carry.
+          # config.schema.json (roadmap 11.5): the schema of this version's
+          # config.yml, at a URL that never moves once the release exists.
           files: |
             isitdown-light-${{ env.TAG }}-linux-x64
             isitdown-light-${{ env.TAG }}-linux-x64.sha256
+            schema/config.schema.json

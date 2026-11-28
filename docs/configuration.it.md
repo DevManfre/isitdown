@@ -2187,6 +2187,32 @@ non solo per noi:
     ghcr.io/devmanfre/isitdown:light-latest node dist/light/check.js
 ```
 
+**Mentre scrivi** (roadmap 11.5). La forma del file è pubblicata come JSON
+Schema, [`schema/config.schema.json`](../schema/config.schema.json), generato
+dallo stesso schema zod che usa il loader. Metti questa riga in cima al tuo
+`config.yml` — `config.example.yml` comincia già così — e un editor con il
+supporto al linguaggio YAML (in VS Code, l'estensione `redhat.vscode-yaml`)
+completa le chiavi, mostra la descrizione di ogni chiave al passaggio del mouse e
+sottolinea gli errori mentre scrivi:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/DevManfre/isitdown/main/schema/config.schema.json
+```
+
+Quell'URL segue `main`. Per fissare lo schema della versione che usi, punta alla
+copia allegata a ogni rilascio,
+`https://github.com/DevManfre/isitdown/releases/download/vX.Y.Z/config.schema.json`,
+o al file sul tag,
+`https://raw.githubusercontent.com/DevManfre/isitdown/vX.Y.Z/schema/config.schema.json`.
+
+L'editor controlla forma, tipi, valori ammessi, pattern e chiavi scritte male. Non
+sostituisce `check`: le regole che coinvolgono più campi (id unici, `until` dopo
+`from`, recipient che condividono un canale) e il controllo http/https su un URL
+stanno solo nel loader. Un `${VAR}` scritto in un campo numerico o con un pattern
+viene sottolineato anche quando a runtime si risolve in un valore valido, e
+`heartbeat.method` va scritto in maiuscolo per l'editor (`GET`, `POST`) anche se il
+loader accetta entrambe le forme.
+
 ### 3.10 Gruppi di provider — "il mio stack"
 
 Un parco provider piatto risponde a "GitHub sta bene" e mai a "il mio percorso di deploy
