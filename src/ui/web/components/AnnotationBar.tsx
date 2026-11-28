@@ -138,6 +138,9 @@ export function AnnotationBar({
               <span className="font-mono text-muted-foreground">
                 {formatDateTime(i18n.language, annotation.at)}
               </span>
+              {annotation.createdBy !== null && (
+                <span className="text-muted-foreground">{t("annotation.by", { name: annotation.createdBy })}</span>
+              )}
               <button
                 type="button"
                 aria-label={t("annotation.remove")}

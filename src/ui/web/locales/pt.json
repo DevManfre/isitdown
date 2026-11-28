@@ -582,6 +582,7 @@
   "annotation.colour.neutral": "Neutro",
   "annotation.add": "Adicionar marcador",
   "annotation.remove": "Remover marcador",
+  "annotation.by": "por {{name}}",
   "annotation.none": "Sem marcadores nesta janela.",
   "reliability.title": "Fiabilidade dos fornecedores",
   "reliability.hint": "Qual deles \u00e9 o problema, com os registos como prova em vez da mem\u00f3ria.",

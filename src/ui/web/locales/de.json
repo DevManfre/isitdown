@@ -582,6 +582,7 @@
   "annotation.colour.neutral": "Neutral",
   "annotation.add": "Markierung hinzuf\u00fcgen",
   "annotation.remove": "Markierung entfernen",
+  "annotation.by": "von {{name}}",
   "annotation.none": "Keine Markierungen in diesem Zeitraum.",
   "reliability.title": "Zuverl\u00e4ssigkeit der Anbieter",
   "reliability.hint": "Welcher von ihnen das Problem ist \u2014 mit den Daten als Beleg statt aus dem Ged\u00e4chtnis.",

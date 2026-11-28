@@ -582,6 +582,7 @@
   "annotation.colour.neutral": "Neutro",
   "annotation.add": "Aggiungi marcatore",
   "annotation.remove": "Rimuovi marcatore",
+  "annotation.by": "di {{name}}",
   "annotation.none": "Nessun marcatore in questa finestra.",
   "reliability.title": "Affidabilit\u00e0 dei fornitori",
   "reliability.hint": "Quale di loro \u00e8 il problema, con le righe come prova invece della memoria.",

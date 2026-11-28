@@ -582,6 +582,7 @@
   "annotation.colour.neutral": "Neutral",
   "annotation.add": "Add marker",
   "annotation.remove": "Remove marker",
+  "annotation.by": "by {{name}}",
   "annotation.none": "No markers in this window.",
   "reliability.title": "Supplier reliability",
   "reliability.hint": "Which of them is the problem, with the rows as evidence rather than memory.",

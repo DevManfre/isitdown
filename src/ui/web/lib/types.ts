@@ -261,6 +261,8 @@ export interface Annotation {
   /** null means the whole fleet, which a deploy usually is. */
   providerId: string | null;
   createdAt: string;
+  /** Who added it, as the trusted reverse proxy named them (roadmap 9.3); null without one. */
+  createdBy: string | null;
 }
 
 export interface DayCoverage {

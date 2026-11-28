@@ -582,6 +582,7 @@
   "annotation.colour.neutral": "Neutre",
   "annotation.add": "Ajouter un rep\u00e8re",
   "annotation.remove": "Supprimer le rep\u00e8re",
+  "annotation.by": "par {{name}}",
   "annotation.none": "Aucun rep\u00e8re dans cette fen\u00eatre.",
   "reliability.title": "Fiabilit\u00e9 des fournisseurs",
   "reliability.hint": "Lequel pose probl\u00e8me, avec les enregistrements pour preuve plut\u00f4t que la m\u00e9moire.",
